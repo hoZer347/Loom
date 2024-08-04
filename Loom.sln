@@ -5,11 +5,9 @@ VisualStudioVersion = 17.10.35122.118
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom", "Loom\Loom.vcxproj", "{3813DE5F-D426-4B1E-9638-7CE2259E5C3F}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Networking", "Networking\Networking.vcxproj", "{C720A3C1-4072-4B95-BAE9-684A0E576986}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Pong", "Pong\Pong.vcxproj", "{2241C302-BA1A-4503-B195-5A85D56701F0}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Server", "Server\Server.vcxproj", "{7504A440-2705-4451-9502-8573813461F4}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Client", "Client\Client.vcxproj", "{D1FB45DE-D611-424A-A853-60C2743A0959}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Pong Server", "Pong Server\Pong Server.vcxproj", "{0DC9847A-0F9E-4C34-BC89-3D99E536B76C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,18 +19,14 @@ Global
 		{3813DE5F-D426-4B1E-9638-7CE2259E5C3F}.Debug|x64.Build.0 = Debug|x64
 		{3813DE5F-D426-4B1E-9638-7CE2259E5C3F}.Release|x64.ActiveCfg = Release|x64
 		{3813DE5F-D426-4B1E-9638-7CE2259E5C3F}.Release|x64.Build.0 = Release|x64
-		{C720A3C1-4072-4B95-BAE9-684A0E576986}.Debug|x64.ActiveCfg = Debug|x64
-		{C720A3C1-4072-4B95-BAE9-684A0E576986}.Debug|x64.Build.0 = Debug|x64
-		{C720A3C1-4072-4B95-BAE9-684A0E576986}.Release|x64.ActiveCfg = Release|x64
-		{C720A3C1-4072-4B95-BAE9-684A0E576986}.Release|x64.Build.0 = Release|x64
-		{7504A440-2705-4451-9502-8573813461F4}.Debug|x64.ActiveCfg = Debug|x64
-		{7504A440-2705-4451-9502-8573813461F4}.Debug|x64.Build.0 = Debug|x64
-		{7504A440-2705-4451-9502-8573813461F4}.Release|x64.ActiveCfg = Release|x64
-		{7504A440-2705-4451-9502-8573813461F4}.Release|x64.Build.0 = Release|x64
-		{D1FB45DE-D611-424A-A853-60C2743A0959}.Debug|x64.ActiveCfg = Debug|x64
-		{D1FB45DE-D611-424A-A853-60C2743A0959}.Debug|x64.Build.0 = Debug|x64
-		{D1FB45DE-D611-424A-A853-60C2743A0959}.Release|x64.ActiveCfg = Release|x64
-		{D1FB45DE-D611-424A-A853-60C2743A0959}.Release|x64.Build.0 = Release|x64
+		{2241C302-BA1A-4503-B195-5A85D56701F0}.Debug|x64.ActiveCfg = Debug|x64
+		{2241C302-BA1A-4503-B195-5A85D56701F0}.Debug|x64.Build.0 = Debug|x64
+		{2241C302-BA1A-4503-B195-5A85D56701F0}.Release|x64.ActiveCfg = Release|x64
+		{2241C302-BA1A-4503-B195-5A85D56701F0}.Release|x64.Build.0 = Release|x64
+		{0DC9847A-0F9E-4C34-BC89-3D99E536B76C}.Debug|x64.ActiveCfg = Debug|x64
+		{0DC9847A-0F9E-4C34-BC89-3D99E536B76C}.Debug|x64.Build.0 = Debug|x64
+		{0DC9847A-0F9E-4C34-BC89-3D99E536B76C}.Release|x64.ActiveCfg = Release|x64
+		{0DC9847A-0F9E-4C34-BC89-3D99E536B76C}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

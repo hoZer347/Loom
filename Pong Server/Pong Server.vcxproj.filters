@@ -1,0 +1,90 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Loom">
+      <UniqueIdentifier>{6c8dc074-b052-4064-9f2a-deb71fe90c74}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Loom\Networking">
+      <UniqueIdentifier>{ad090401-f785-440e-9907-488370449233}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Loom\UI">
+      <UniqueIdentifier>{9c3ea96e-4ea5-4acf-8a65-2e18c129e70c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Loom\UI\imgui">
+      <UniqueIdentifier>{6d9b7bcc-69ee-474d-8f2b-4cb50b823f8b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Networking">
+      <UniqueIdentifier>{ef7d687c-d2fb-4c65-b365-7f978bcd2dd4}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\Loom\Networking.cpp">
+      <Filter>Loom\Networking</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Loom\UI.cpp">
+      <Filter>Loom\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Loom\UI_demos.cpp">
+      <Filter>Loom\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Loom\imgui.cpp">
+      <Filter>Loom\UI\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Loom\imgui_demo.cpp">
+      <Filter>Loom\UI\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Loom\imgui_draw.cpp">
+      <Filter>Loom\UI\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Loom\imgui_impl_glfw.cpp">
+      <Filter>Loom\UI\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Loom\imgui_impl_opengl3.cpp">
+      <Filter>Loom\UI\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Loom\imgui_tables.cpp">
+      <Filter>Loom\UI\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Loom\imgui_widgets.cpp">
+      <Filter>Loom\UI\imgui</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\Loom\Networking.h">
+      <Filter>Loom\Networking</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Loom\UI.h">
+      <Filter>Loom\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Loom\imconfig.h">
+      <Filter>Loom\UI\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Loom\imgui.h">
+      <Filter>Loom\UI\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Loom\imgui_impl_glfw.h">
+      <Filter>Loom\UI\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Loom\imgui_impl_opengl3.h">
+      <Filter>Loom\UI\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Loom\imgui_impl_opengl3_loader.h">
+      <Filter>Loom\UI\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Loom\imgui_internal.h">
+      <Filter>Loom\UI\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Loom\imstb_rectpack.h">
+      <Filter>Loom\UI\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Loom\imstb_textedit.h">
+      <Filter>Loom\UI\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Loom\imstb_truetype.h">
+      <Filter>Loom\UI\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="State.h">
+      <Filter>Networking</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

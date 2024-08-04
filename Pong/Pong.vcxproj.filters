@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Loom">
+      <UniqueIdentifier>{e07a5f10-851b-4ac4-8c1a-5b8c99ece081}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Loom\Networking">
+      <UniqueIdentifier>{a2207091-202a-4aab-b021-926a32d4c85c}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\Loom\Networking.cpp">
+      <Filter>Loom\Networking</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\Loom\Networking.h">
+      <Filter>Loom\Networking</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
