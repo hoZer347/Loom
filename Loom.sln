@@ -9,6 +9,13 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Pong", "Pong\Pong.vcxproj",
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Pong Server", "Pong Server\Pong Server.vcxproj", "{0DC9847A-0F9E-4C34-BC89-3D99E536B76C}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Pong Client", "Pong Client\Pong Client.vcxproj", "{7A669D68-3625-4062-8A42-58B3FDB4869A}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "iGDS", "iGDS\iGDS.vcxproj", "{5412970C-B5B1-4C4E-892B-F56370D61630}"
+	ProjectSection(ProjectDependencies) = postProject
+		{3813DE5F-D426-4B1E-9638-7CE2259E5C3F} = {3813DE5F-D426-4B1E-9638-7CE2259E5C3F}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -27,6 +34,14 @@ Global
 		{0DC9847A-0F9E-4C34-BC89-3D99E536B76C}.Debug|x64.Build.0 = Debug|x64
 		{0DC9847A-0F9E-4C34-BC89-3D99E536B76C}.Release|x64.ActiveCfg = Release|x64
 		{0DC9847A-0F9E-4C34-BC89-3D99E536B76C}.Release|x64.Build.0 = Release|x64
+		{7A669D68-3625-4062-8A42-58B3FDB4869A}.Debug|x64.ActiveCfg = Debug|x64
+		{7A669D68-3625-4062-8A42-58B3FDB4869A}.Debug|x64.Build.0 = Debug|x64
+		{7A669D68-3625-4062-8A42-58B3FDB4869A}.Release|x64.ActiveCfg = Release|x64
+		{7A669D68-3625-4062-8A42-58B3FDB4869A}.Release|x64.Build.0 = Release|x64
+		{5412970C-B5B1-4C4E-892B-F56370D61630}.Debug|x64.ActiveCfg = Debug|x64
+		{5412970C-B5B1-4C4E-892B-F56370D61630}.Debug|x64.Build.0 = Debug|x64
+		{5412970C-B5B1-4C4E-892B-F56370D61630}.Release|x64.ActiveCfg = Release|x64
+		{5412970C-B5B1-4C4E-892B-F56370D61630}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -11,6 +11,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Engine.cpp" />
+    <ClCompile Include="Error.cpp" />
+    <ClCompile Include="GameObject.cpp" />
+    <ClCompile Include="Geometry.cpp" />
     <ClCompile Include="imgui.cpp" />
     <ClCompile Include="imgui_demo.cpp" />
     <ClCompile Include="imgui_draw.cpp" />
@@ -18,7 +22,7 @@
     <ClCompile Include="imgui_impl_opengl3.cpp" />
     <ClCompile Include="imgui_tables.cpp" />
     <ClCompile Include="imgui_widgets.cpp" />
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="loom_main.cpp" />
     <ClCompile Include="Networking.cpp" />
     <ClCompile Include="UI.cpp" />
     <ClCompile Include="UI_demos.cpp" />
@@ -28,6 +32,10 @@
     <None Include="opengl32.dll" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Engine.h" />
+    <ClInclude Include="Error.h" />
+    <ClInclude Include="GameObject.h" />
+    <ClInclude Include="Geometry.h" />
     <ClInclude Include="imconfig.h" />
     <ClInclude Include="imgui.h" />
     <ClInclude Include="imgui_impl_glfw.h" />
@@ -66,10 +74,12 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\..\..\Dev\property files\OpenGL.props" />
+    <Import Project="..\..\..\Dev\property files\Open3D.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\..\..\Dev\property files\OpenGL.props" />
+    <Import Project="..\..\..\Dev\property files\Open3D.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -79,7 +89,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_WIN32_WINNT=0x0601;WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalIncludeDirectories>C:\Dev\boost;C:\Dev\glm;C:\Dev\glew\include;C:\Dev\glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -100,7 +110,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_WIN32_WINNT=0x0601;WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalIncludeDirectories>C:\Dev\boost;C:\Dev\glm;C:\Dev\glew\include;C:\Dev\glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>

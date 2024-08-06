@@ -1,65 +1,56 @@
 #include "Networking.h"
 
-#include <unordered_set>
+#include <string>
+#include <queue>
+#include <vector>
 #include <iostream>
+#include <unordered_set>
+#include <unordered_map>
+
+#include <boost/asio.hpp>
+
+using boost::asio::ip::udp;
+
+#define MIN_BUFFER_SIZE 4
 
 
 namespace Loom
 {
-	static inline bool shouldStop;
-	static inline thread_local bool is_thread_occupied = false;
+	static bool shouldStop;
 
-	std::unordered_set<udp::endpoint> endpoints{ };
+	static inline std::queue<Message*> outgoing{ };
+	static inline std::mutex outgoing_mut{ };
+	static inline std::unordered_set<udp::endpoint> endpoints{ };
+
+	static inline std::unordered_map<MessageType, void(*)(Message*)> handles{ };
 
 	void StartServer()
 	{
-		if (is_thread_occupied)
-		{
-			std::cerr << "Thread is already occupied" << std::endl;
-			return;
-		};
-
-		is_thread_occupied = true;
-
 		try
 		{
 			boost::asio::io_service io_service{ };
 			udp::endpoint endpoint{ udp::v4(), 1111 };
 			udp::socket socket{ io_service, endpoint };
 
-			shouldStop = false;
-
-			std::vector<char> recvBuffer;
-			std::vector<char> sendBuffer;
-
-			sendBuffer.resize(1024);
-			recvBuffer.resize(1024);
+			BYTE recvBuffer[1024]{ };
+			BYTE sendBuffer[1024]{ };
 
 			std::cout << "----- Server Started -----" << std::endl;
 
 			while (!shouldStop)
 			{
-				size_t size = socket.receive_from(
+
+				if (size_t size = socket.receive_from(
 					boost::asio::buffer(recvBuffer),
-					endpoint);
-
-				if (size > 0)
+					endpoint))
 				{
-					size = socket.send_to(
-						boost::asio::buffer(recvBuffer),
-						endpoint);
+					MessageType message_type = ((Message*)recvBuffer)->message_type;
+
+					if (message_type == LOOM_NULL_REQUEST) std::cout << "NULL-Type message was sent" << std::endl;
+					else if (message_type == LOOM_TEXT_MESSAGE) std::cout << "Received Message: " << ((TextMessage*)recvBuffer)->text << std::endl;
+					else if (handles.contains(message_type)) handles[message_type]((Message*)&recvBuffer);
+					else std::cerr << "No handle for message type: " << message_type << std::endl;
 				};
-
-				std::cout << "Message Type: " << *((long long*)recvBuffer.data()) << std::endl;
-
-				if (*((long long*)recvBuffer.data()) == 1u)
-				{
-					std::cout << "Test" << std::endl;
-				}
-				else std::cout << "Message Received on Server: " << recvBuffer.data() << std::endl;
-
-				for (auto& i : recvBuffer)
-					i = 0;
 			};
 		}
 		catch (const std::exception& ex)
@@ -67,20 +58,10 @@ namespace Loom
 			std::cerr << ex.what() << std::endl;
 			shouldStop = true;
 		};
-
-		is_thread_occupied = false;
 	};
 
 	void StartClient()
 	{
-		if (is_thread_occupied)
-		{
-			std::cerr << "Thread is already occupied" << std::endl;
-			return;
-		};
-
-		is_thread_occupied = true;
-
 		try
 		{
 			boost::asio::io_service io_service{ };
@@ -92,32 +73,52 @@ namespace Loom
 			udp::socket socket{ io_service };
 			socket.open(udp::v4());
 
-			udp::endpoint receiver_endpoint = *iterator;
+			udp::endpoint endpoint = *iterator;
 
 			shouldStop = false;
 
-			std::vector<char> recvBuffer;
-			std::vector<char> sendBuffer;
-
-			sendBuffer.resize(1024);
-			recvBuffer.resize(1024);
+			BYTE recvBuffer[1024]{ };
+			BYTE sendBuffer[1024]{ };
 
 			std::cout << "----- Client Started -----" << std::endl;
 
+			std::thread t([]()
+			{
+				while (true)
+				{
+					std::string s;
+					std::getline(std::cin, s);
+					auto text = new TextMessage();
+					text->message_type = LOOM_TEXT_MESSAGE;
+					int i = 0;
+					for (; i < s.size(); i++)
+						text->text[i] = s[i];
+					text->text[i] = '\0';
+					Send<LOOM_TEXT_MESSAGE>(text);
+				};
+			});
+			t.detach();
+
 			while (!shouldStop)
 			{
-				std::string s;
-				std::cin >> s;
-				socket.send_to(
-					boost::asio::buffer("\0\0\0\0"),
-					receiver_endpoint);
+				{
+					std::lock_guard<std::mutex> lock{ outgoing_mut };
 
-				size_t size = socket.receive_from(
-					boost::asio::buffer(recvBuffer),
-					receiver_endpoint);
+					while (!outgoing.empty())
+					{
+						memcpy(
+							recvBuffer,
+							outgoing.front(),
+							outgoing.front()->size);
 
-				if (size > 0)
-					std::cout << "Received Message: " << recvBuffer.data() << std::endl;
+						if (size_t size = socket.send_to(
+							boost::asio::buffer(recvBuffer),
+							endpoint))
+						{ };
+
+						outgoing.pop();
+					};
+				};
 			};
 		}
 		catch (const std::exception& ex)
@@ -125,7 +126,25 @@ namespace Loom
 			std::cerr << ex.what() << std::endl;
 			shouldStop = true;
 		};
+	};
 
-		is_thread_occupied = false;
+	void Send(MessageType message_type, Message* message, size_t size)
+	{
+		message->message_type = message_type;
+		message->size = size;
+
+		std::lock_guard<std::mutex> lock{ outgoing_mut };
+
+		outgoing.emplace(message);
+	};
+
+	void Request(RequestType request_type, Message* sent, size_t sent_size, Message* receive, size_t receive_size)
+	{
+		
+	};
+
+	void SetHandle(MessageType message_type, void(*message_interpretter)(Message*))
+	{
+		handles[message_type] = message_interpretter;
 	};
 };

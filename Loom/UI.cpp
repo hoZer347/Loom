@@ -6,14 +6,14 @@
 
 namespace Loom
 {
-	static inline std::mutex mut;
+	static inline std::mutex outgoing_mut;
 	static inline std::vector<void(*)()> ui_elements;
 
 	void AddUI(void(*ui_element)())
 	{
 		std::thread([ui_element]()
 		{
-			std::lock_guard<std::mutex> lock(mut);
+			std::lock_guard<std::mutex> lock(outgoing_mut);
 
 			ui_elements.push_back(ui_element);
 		}).detach();
@@ -23,7 +23,7 @@ namespace Loom
 	{
 		std::thread([ui_element]()
 		{
-			std::lock_guard<std::mutex> lock(mut);
+			std::lock_guard<std::mutex> lock(outgoing_mut);
 
 			ui_elements.push_back(ui_element);
 		}).detach();
@@ -31,11 +31,11 @@ namespace Loom
 
 	void UpdateUI()
 	{
-		mut.lock();
+		outgoing_mut.lock();
 
 		for (auto& ui : ui_elements)
 			ui();
 
-		mut.unlock();
+		outgoing_mut.unlock();
 	};
 };

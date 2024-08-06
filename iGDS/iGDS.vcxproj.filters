@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="iGDS">
+      <UniqueIdentifier>{6e07c553-b557-4af9-be3c-aeb9a79349eb}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="iGDS.cpp">
+      <Filter>iGDS</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="iGDS.h">
+      <Filter>iGDS</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

@@ -1,24 +1,24 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Loom">
-      <UniqueIdentifier>{6c8dc074-b052-4064-9f2a-deb71fe90c74}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Loom\Networking">
-      <UniqueIdentifier>{ad090401-f785-440e-9907-488370449233}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Networking">
-      <UniqueIdentifier>{2a9820b4-0bce-4e59-8a90-ee115e373ce7}</UniqueIdentifier>
-    </Filter>
-  </ItemGroup>
-  <ItemGroup>
+    <ClCompile Include="pong_client_main.cpp" />
     <ClCompile Include="..\Loom\Networking.cpp">
       <Filter>Loom\Networking</Filter>
     </ClCompile>
     <ClCompile Include="..\Pong\State.cpp">
       <Filter>Networking</Filter>
     </ClCompile>
-    <ClCompile Include="pong_server_main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Loom">
+      <UniqueIdentifier>{5bb85466-f182-45bf-96f6-1e12fecad93e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Loom\Networking">
+      <UniqueIdentifier>{1a3975d5-0b9a-4771-8b57-b2c0f7fafa36}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Networking">
+      <UniqueIdentifier>{5a1be0c1-3cf2-4a78-a08b-7b1af1411eca}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Loom\Networking.h">

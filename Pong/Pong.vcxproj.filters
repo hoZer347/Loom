@@ -2,18 +2,28 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Loom">
-      <UniqueIdentifier>{e07a5f10-851b-4ac4-8c1a-5b8c99ece081}</UniqueIdentifier>
+      <UniqueIdentifier>{90d6fc41-8de5-46be-93cf-39d14098f993}</UniqueIdentifier>
     </Filter>
     <Filter Include="Loom\Networking">
-      <UniqueIdentifier>{a2207091-202a-4aab-b021-926a32d4c85c}</UniqueIdentifier>
+      <UniqueIdentifier>{0cc354a5-4682-4c95-a222-95fba7043dcc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Loom\Networking\Networking">
+      <UniqueIdentifier>{fd9e69e8-7af6-4121-8348-de8709756dec}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="State.cpp">
+      <Filter>Loom\Networking\Networking</Filter>
+    </ClCompile>
     <ClCompile Include="..\Loom\Networking.cpp">
       <Filter>Loom\Networking</Filter>
     </ClCompile>
+    <ClCompile Include="pong_main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="State.h">
+      <Filter>Loom\Networking\Networking</Filter>
+    </ClInclude>
     <ClInclude Include="..\Loom\Networking.h">
       <Filter>Loom\Networking</Filter>
     </ClInclude>

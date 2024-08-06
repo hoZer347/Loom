@@ -11,36 +11,21 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\Loom\imgui.cpp" />
-    <ClCompile Include="..\Loom\imgui_demo.cpp" />
-    <ClCompile Include="..\Loom\imgui_draw.cpp" />
-    <ClCompile Include="..\Loom\imgui_impl_glfw.cpp" />
-    <ClCompile Include="..\Loom\imgui_impl_opengl3.cpp" />
-    <ClCompile Include="..\Loom\imgui_tables.cpp" />
-    <ClCompile Include="..\Loom\imgui_widgets.cpp" />
     <ClCompile Include="..\Loom\Networking.cpp" />
-    <ClCompile Include="..\Loom\UI.cpp" />
-    <ClCompile Include="..\Loom\UI_demos.cpp" />
+    <ClCompile Include="..\Pong\State.cpp" />
     <ClCompile Include="pong_server_main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Loom\Loom.vcxproj">
       <Project>{3813de5f-d426-4b1e-9638-7ce2259e5c3f}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\Pong\Pong.vcxproj">
+      <Project>{2241c302-ba1a-4503-b195-5a85d56701f0}</Project>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\Loom\imconfig.h" />
-    <ClInclude Include="..\Loom\imgui.h" />
-    <ClInclude Include="..\Loom\imgui_impl_glfw.h" />
-    <ClInclude Include="..\Loom\imgui_impl_opengl3.h" />
-    <ClInclude Include="..\Loom\imgui_impl_opengl3_loader.h" />
-    <ClInclude Include="..\Loom\imgui_internal.h" />
-    <ClInclude Include="..\Loom\imstb_rectpack.h" />
-    <ClInclude Include="..\Loom\imstb_textedit.h" />
-    <ClInclude Include="..\Loom\imstb_truetype.h" />
     <ClInclude Include="..\Loom\Networking.h" />
-    <ClInclude Include="..\Loom\UI.h" />
-    <ClInclude Include="State.h" />
+    <ClInclude Include="..\Pong\State.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{0DC9847A-0F9E-4C34-BC89-3D99E536B76C}</ProjectGuid>
@@ -67,13 +52,15 @@
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="..\..\..\Dev\property files\Loom.props" />
     <Import Project="..\..\..\Dev\property files\OpenGL.props" />
+    <Import Project="..\..\..\Dev\property files\Loom.props" />
+    <Import Project="..\..\..\Dev\property files\Pong.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="..\..\..\Dev\property files\Loom.props" />
     <Import Project="..\..\..\Dev\property files\OpenGL.props" />
+    <Import Project="..\..\..\Dev\property files\Loom.props" />
+    <Import Project="..\..\..\Dev\property files\Pong.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
