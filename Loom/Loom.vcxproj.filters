@@ -1,16 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="loom_main.cpp" />
-    <ClCompile Include="Networking.cpp">
-      <Filter>Networking</Filter>
-    </ClCompile>
-    <ClCompile Include="UI.cpp">
-      <Filter>UI</Filter>
-    </ClCompile>
-    <ClCompile Include="UI_demos.cpp">
-      <Filter>UI</Filter>
-    </ClCompile>
+    <ClCompile Include="main_loom.cpp" />
     <ClCompile Include="imgui.cpp">
       <Filter>UI\imgui</Filter>
     </ClCompile>
@@ -23,34 +14,46 @@
     <ClCompile Include="imgui_impl_glfw.cpp">
       <Filter>UI\imgui</Filter>
     </ClCompile>
-    <ClCompile Include="imgui_impl_opengl3.cpp">
-      <Filter>UI\imgui</Filter>
-    </ClCompile>
     <ClCompile Include="imgui_tables.cpp">
       <Filter>UI\imgui</Filter>
     </ClCompile>
     <ClCompile Include="imgui_widgets.cpp">
       <Filter>UI\imgui</Filter>
     </ClCompile>
-    <ClCompile Include="GameObject.cpp">
-      <Filter>Rendering</Filter>
-    </ClCompile>
-    <ClCompile Include="Geometry.cpp">
-      <Filter>Geometry</Filter>
-    </ClCompile>
     <ClCompile Include="Engine.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
-    <ClCompile Include="Error.cpp">
-      <Filter>Error</Filter>
+    <ClCompile Include="Application.cpp">
+      <Filter>Application</Filter>
+    </ClCompile>
+    <ClCompile Include="Transform.cpp">
+      <Filter>Transform</Filter>
+    </ClCompile>
+    <ClCompile Include="Transform.ixx">
+      <Filter>Transform</Filter>
+    </ClCompile>
+    <ClCompile Include="GameObject.ixx">
+      <Filter>Rendering\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine.ixx">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="Timer.ixx">
+      <Filter>Timer</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui_impl_vulkan.cpp">
+      <Filter>UI\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="Demos.ixx">
+      <Filter>Demos</Filter>
+    </ClCompile>
+    <ClCompile Include="Demos.cpp">
+      <Filter>Demos</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DLLs">
       <UniqueIdentifier>{795273c3-d61c-47aa-b46a-2b662059117d}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Networking">
-      <UniqueIdentifier>{52f0c5a1-c856-4bfb-a803-368a66d59fb1}</UniqueIdentifier>
     </Filter>
     <Filter Include="UI">
       <UniqueIdentifier>{cc1664b0-2fd1-4ec5-81fd-9ea863db1595}</UniqueIdentifier>
@@ -61,14 +64,23 @@
     <Filter Include="Rendering">
       <UniqueIdentifier>{478390f7-e44f-45be-9533-4cc817da8a7b}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Geometry">
-      <UniqueIdentifier>{80a6c583-7625-4fc7-93ed-7d3e141f540b}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Engine">
       <UniqueIdentifier>{4f94141a-f048-4d6b-aae1-53776a304f44}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Error">
-      <UniqueIdentifier>{2ce9839c-a304-453c-b948-91b90579cb63}</UniqueIdentifier>
+    <Filter Include="Rendering\Geometry">
+      <UniqueIdentifier>{80a6c583-7625-4fc7-93ed-7d3e141f540b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Application">
+      <UniqueIdentifier>{8dfd012e-566e-4ebc-87a1-0a7b55b7b079}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Timer">
+      <UniqueIdentifier>{e0e155f3-797f-43db-a42a-300a9fa355b4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Transform">
+      <UniqueIdentifier>{1d594ffd-ce6a-4c1e-974d-67fb0b57ed52}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Demos">
+      <UniqueIdentifier>{5755ff19-c34d-4cfc-9ba8-48ac64fd2b62}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -80,12 +92,6 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Networking.h">
-      <Filter>Networking</Filter>
-    </ClInclude>
-    <ClInclude Include="UI.h">
-      <Filter>UI</Filter>
-    </ClInclude>
     <ClInclude Include="imconfig.h">
       <Filter>UI\imgui</Filter>
     </ClInclude>
@@ -93,12 +99,6 @@
       <Filter>UI\imgui</Filter>
     </ClInclude>
     <ClInclude Include="imgui_impl_glfw.h">
-      <Filter>UI\imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="imgui_impl_opengl3.h">
-      <Filter>UI\imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="imgui_impl_opengl3_loader.h">
       <Filter>UI\imgui</Filter>
     </ClInclude>
     <ClInclude Include="imgui_internal.h">
@@ -113,17 +113,12 @@
     <ClInclude Include="imstb_truetype.h">
       <Filter>UI\imgui</Filter>
     </ClInclude>
-    <ClInclude Include="GameObject.h">
-      <Filter>Rendering</Filter>
+    <ClInclude Include="Application.h">
+      <Filter>Application</Filter>
     </ClInclude>
-    <ClInclude Include="Geometry.h">
-      <Filter>Geometry</Filter>
-    </ClInclude>
-    <ClInclude Include="Engine.h">
-      <Filter>Engine</Filter>
-    </ClInclude>
-    <ClInclude Include="Error.h">
-      <Filter>Error</Filter>
+    <ClInclude Include="Definitions.hpp" />
+    <ClInclude Include="imgui_impl_vulkan.h">
+      <Filter>UI\imgui</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
