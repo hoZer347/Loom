@@ -9,6 +9,7 @@
     <ClCompile Include="iGDS.cpp">
       <Filter>iGDS</Filter>
     </ClCompile>
+    <ClCompile Include="igds_main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="iGDS.h">
