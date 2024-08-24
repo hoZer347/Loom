@@ -13,6 +13,9 @@
     <ClCompile Include="Log.ixx">
       <Filter>Utility</Filter>
     </ClCompile>
+    <ClCompile Include="Type Utility.ixx">
+      <Filter>Utility</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Definitions.hpp">

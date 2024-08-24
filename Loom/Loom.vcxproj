@@ -12,22 +12,30 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Application.cpp" />
+    <ClCompile Include="Component Menu.ixx" />
+    <ClCompile Include="Component.ixx" />
+    <ClCompile Include="ComponentBase.ixx" />
+    <ClCompile Include="ComponentMenu.cpp" />
     <ClCompile Include="Demos.cpp" />
     <ClCompile Include="Demos.ixx" />
     <ClCompile Include="Engine.cpp" />
     <ClCompile Include="Engine.ixx" />
+    <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="GameObject.ixx" />
     <ClCompile Include="imgui.cpp" />
     <ClCompile Include="imgui_demo.cpp" />
     <ClCompile Include="imgui_draw.cpp" />
     <ClCompile Include="imgui_impl_glfw.cpp" />
-    <ClCompile Include="imgui_impl_vulkan.cpp" />
+    <ClCompile Include="imgui_impl_opengl3.cpp" />
     <ClCompile Include="imgui_tables.cpp" />
     <ClCompile Include="imgui_widgets.cpp" />
     <ClCompile Include="main_loom.cpp" />
+    <ClCompile Include="Scene.cpp" />
+    <ClCompile Include="Scene.ixx" />
     <ClCompile Include="Timer.ixx" />
     <ClCompile Include="Transform.cpp" />
     <ClCompile Include="Transform.ixx" />
+    <ClCompile Include="UI_Able.ixx" />
   </ItemGroup>
   <ItemGroup>
     <None Include="glfw3.dll" />
@@ -39,7 +47,8 @@
     <ClInclude Include="imconfig.h" />
     <ClInclude Include="imgui.h" />
     <ClInclude Include="imgui_impl_glfw.h" />
-    <ClInclude Include="imgui_impl_vulkan.h" />
+    <ClInclude Include="imgui_impl_opengl3.h" />
+    <ClInclude Include="imgui_impl_opengl3_loader.h" />
     <ClInclude Include="imgui_internal.h" />
     <ClInclude Include="imstb_rectpack.h" />
     <ClInclude Include="imstb_textedit.h" />
@@ -78,13 +87,13 @@
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="GLFW.props" />
-    <Import Project="..\..\..\Dev\property files\Vulkan.props" />
+    <Import Project="..\property files\GLFW.props" />
+    <Import Project="..\property files\OpenGL.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="GLFW.props" />
-    <Import Project="..\..\..\Dev\property files\Vulkan.props" />
+    <Import Project="..\property files\GLFW.props" />
+    <Import Project="..\property files\OpenGL.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">

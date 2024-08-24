@@ -14,6 +14,7 @@
     <ClCompile Include="Data Types.ixx" />
     <ClCompile Include="Log.ixx" />
     <ClCompile Include="main_utility.cpp" />
+    <ClCompile Include="Type Utility.ixx" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Definitions.hpp" />

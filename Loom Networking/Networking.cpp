@@ -1,5 +1,6 @@
 import Networking;
-#include "Definitions.hpp";
+
+#include "Definitions.hpp"
 
 #include <thread>
 #include <mutex>

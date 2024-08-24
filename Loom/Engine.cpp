@@ -1,163 +1,221 @@
 import Engine;
 import DataTypes;
 
-#define VK_USE_PLATFORM_WIN32_KHR
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-#define GLFW_EXPOSE_NATIVE_WIN32
-#include <GLFW/glfw3native.h>
-
-#include <vulkan/vulkan.hpp>
+import ComponentMenu;
+import GameObject;
+import <memory>;
 
 import <iostream>;
 
+// Borrowed + modified from imgui examples
+
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
+#include <stdio.h>
+#define GL_SILENCE_DEPRECATION
+#if defined(IMGUI_IMPL_OPENGL_ES2)
+#include <GLES2/gl2.h>
+#endif
+#include <GLFW/glfw3.h> // Will drag system OpenGL headers
+
+#include <queue>
+#include <list>
+#include <thread>
+#include <glm/glm.hpp>
+using namespace glm;
+
+import Timer;
+
+
+// [Win32] Our example includes a copy of glfw3.lib pre-compiled with VS2010 to maximize ease of testing and compatibility with old VS compilers.
+// To link with VS2010-era libraries, VS2015+ requires linking with legacy_stdio_definitions.lib, which we do using this pragma.
+// Your own project should not be affected, as you are likely to link with a newer binary of GLFW that is adequate for your version of Visual Studio.
+#if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
+#pragma comment(lib, "legacy_stdio_definitions")
+#endif
+
+// This example can also compile and run with Emscripten! See 'Makefile.emscripten' for details.
+#ifdef __EMSCRIPTEN__
+#include "../libs/emscripten/emscripten_mainloop_stub.h"
+#endif
+
+static void glfw_error_callback(int error, const char* description)
+{
+	fprintf(stderr, "GLFW Error %d: %s\n", error, description);
+}
 
 namespace Loom
 {
-	static inline VkInstance vk_instance{ };
-
-	struct Application
+	void Engine::Start()
 	{
-		VkInstance vk_instance;
-		std::vector<VkPhysicalDevice> physicalDevices;
-	};
+		std::queue<void*> queue{ };
 
-	void Engine::Init()
-	{
-		////////////////////////////////////////////////////////////////////////////////////////////////////
-	   ///
-	  /// Vulkan Initialization
-	 ///
-	////////////////////////////////////////////////////////////////////////////////////////////////////
+		glfwSetErrorCallback(glfw_error_callback);
+		if (!glfwInit())
+			return;
 
-		////////////////////////////////////////////////////////////////////////////////////////////////////
-	   ///
-	  /// Vulkan: Getting Extensions
-	 ///
-	////////////////////////////////////////////////////////////////////////////////////////////////////
+		// Decide GL+GLSL versions
+#if defined(IMGUI_IMPL_OPENGL_ES2)
+	// GL ES 2.0 + GLSL 100
+		const char* glsl_version = "#version 100";
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+		glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
+#elif defined(__APPLE__)
+	// GL 3.2 + GLSL 150
+		const char* glsl_version = "#version 150";
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
+		glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // Required on Mac
+#else
+	// GL 3.0 + GLSL 130
+		const char* glsl_version = "#version 130";
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+		//glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
+		//glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
+#endif
 
-		uint32_t glfwExtensionCount = 0;
-		const char** glfwExtensions;
+		// Create window with graphics context
+		window = glfwCreateWindow(1280, 720, "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
+		glfwMakeContextCurrent(window);
+		glfwSwapInterval(0); // Enable vsync
 
-		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-		std::vector<const char*> requiredExtensions;
-
-		for (uint32_t i = 0; i < glfwExtensionCount; i++)
-			requiredExtensions.emplace_back(glfwExtensions[i]);
-
-		requiredExtensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-
-		uint32_t extensionCount = 0;
-		vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-
-		std::vector<VkExtensionProperties> extensions(extensionCount);
-
-		vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
-
-		std::cout << "available extensions:\n";
-
-		for (const auto& extension : extensions)
-			std::cout << '\t' << extension.extensionName << '\n';
-
+		glfwSetKeyCallback(window, [](GLFWwindow*, int, int, int, int)
 		{
-			VkApplicationInfo vk_appInfo{ };
-			{
-				vk_appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-				vk_appInfo.pApplicationName = "Test Vulkan Instance";
-				vk_appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-				vk_appInfo.pEngineName = "No Engine";
-				vk_appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-				vk_appInfo.apiVersion = VK_API_VERSION_1_0;
-			};
+			glfwSetWindowShouldClose(glfwGetCurrentContext(), true);
+		});
 
-			VkInstanceCreateInfo vk_createInfo{};
-			{
-				vk_createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-				vk_createInfo.pApplicationInfo = &vk_appInfo;
-				vk_createInfo.enabledExtensionCount = glfwExtensionCount;
-				vk_createInfo.ppEnabledExtensionNames = glfwExtensions;
-				vk_createInfo.enabledLayerCount = 0;
-				vk_createInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-				vk_createInfo.enabledExtensionCount = (uint32_t)requiredExtensions.size();
-				vk_createInfo.ppEnabledExtensionNames = requiredExtensions.data();
-			};
+		// Setup Dear ImGui context
+		IMGUI_CHECKVERSION();
+		ImGui::CreateContext();
+		ImGuiIO& io = ImGui::GetIO(); (void)io;
+		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+		io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
+		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable Multi-Viewport / Platform Windows
+		io.ConfigViewportsNoAutoMerge = true;
+		io.ConfigViewportsNoTaskBarIcon = true;
 
-			if (vkCreateInstance(&vk_createInfo, nullptr, &vk_instance) != VK_SUCCESS)
-				throw std::runtime_error("failed to create instance!");
+		// Setup Dear ImGui style
+		ImGui::StyleColorsDark();
+		//ImGui::StyleColorsLight();
+
+		// When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
+		ImGuiStyle& style = ImGui::GetStyle();
+		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+		{
+			style.WindowRounding = 0.0f;
+			style.Colors[ImGuiCol_WindowBg].w = 1.0f;
 		};
 
-		////////////////////////////////////////////////////////////////////////////////////////////////////
-	   ///
-	  /// Vulkan: Getting Physical Devices
-	 ///
-	////////////////////////////////////////////////////////////////////////////////////////////////////
+		// Setup Platform/Renderer backends
+		ImGui_ImplGlfw_InitForOpenGL(window, true);
+#ifdef __EMSCRIPTEN__
+		ImGui_ImplGlfw_InstallEmscriptenCallbacks(window, "#canvas");
+#endif
+		ImGui_ImplOpenGL3_Init(glsl_version);
 
-		VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+		// Our state
+		ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-		uint32_t deviceCount = 0;
-		vkEnumeratePhysicalDevices(vk_instance, &deviceCount, nullptr);
+		std::list<float> deltaTimes{ };
 
-		if (deviceCount == 0) throw std::runtime_error("failed to find GPUs with Vulkan support!");
+		std::shared_ptr<GameObject> head = std::make_shared<GameObject>();
 
-		std::vector<VkPhysicalDevice> devices(deviceCount);
-		vkEnumeratePhysicalDevices(vk_instance, &deviceCount, devices.data());
-
-		for (auto& device : devices)
+		// Main loop
+#ifdef __EMSCRIPTEN__
+	// For an Emscripten build we are disabling file-system access, so let's not attempt to do a fopen() of the imgui.ini file.
+	// You may manually call LoadIniSettingsFromMemory() to load settings from your own storage.
+		io.IniFilename = nullptr;
+		EMSCRIPTEN_MAINLOOP_BEGIN
+#else
+		while (!glfwWindowShouldClose(window))
+#endif
 		{
-			VkPhysicalDeviceProperties properties;
-			vkGetPhysicalDeviceProperties(device, &properties);
-			std::cout << properties.deviceName << std::endl;
+			glfwPollEvents();
 
-			switch (properties.deviceType)
+			// Start the Dear ImGui frame
+			ImGui_ImplOpenGL3_NewFrame();
+			ImGui_ImplGlfw_NewFrame();
+			ImGui::NewFrame();
+
+
+			// Showing FPS
+			float total = 0;
+			deltaTimes.emplace_back(ImGui::GetIO().DeltaTime);
+			if (deltaTimes.size() > 100)
+				deltaTimes.pop_front();
+			for (auto& i : deltaTimes)
+				total += i;
+			//
+
+			
+			// GUI
+			ImGui::Begin("GameObjects");
+			head->Gui();
+			ImGui::End();
+			ComponentMenu::Gui();
+			//
+
+
+			// Rendering
+			ImGui::Render();
+			int display_w, display_h;
+			glfwGetFramebufferSize(window, &display_w, &display_h);
+			glViewport(0, 0, display_w, display_h);
+			glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+			//
+
+
+			// Update and Render additional Platform Windows
+			// (Platform functions may change the current OpenGL context, so we save/restore it to make it easier to paste this code elsewhere.
+			//  For this specific demo app we could also call glfwMakeContextCurrent(window) directly)
+			if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 			{
-			case 1:
-			case 2:
-			case 3:
-				goto found_gpu;
-				break;
+				GLFWwindow* backup_current_context = glfwGetCurrentContext();
+				ImGui::UpdatePlatformWindows();
+				ImGui::RenderPlatformWindowsDefault();
+				glfwMakeContextCurrent(backup_current_context);
 			};
 
-			continue;
+			int f_w, f_h;
+			glfwGetFramebufferSize(window, &f_w, &f_h);
 
-		found_gpu:
-			physicalDevice = device;
-			break;
-		};
+			size_t buffer_size = f_w * f_h * 4;  // 4 bytes per pixel (RGBA)
+			unsigned char* buffer = (unsigned char*)malloc(buffer_size);
+			queue.push(buffer);
 
-		if (physicalDevice == VK_NULL_HANDLE)
-			throw std::runtime_error("failed to find a suitable GPU!");
+			glDrawPixels(f_w, f_h, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
 
-		////////////////////////////////////////////////////////////////////////////////////////////////////
-	   ///
-	  /// Vulkan: Generating Surface
-	 ///
-	////////////////////////////////////////////////////////////////////////////////////////////////////
+			glfwSwapBuffers(window);
 
-		VkSurfaceKHR surface;
-		{
-			VkWin32SurfaceCreateInfoKHR vk_createInfo{ };
+			if (queue.size() > 2)
 			{
-				vk_createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-				//vk_createInfo.hwnd = glfwGetWin32Window(window);
-				vk_createInfo.hinstance = GetModuleHandle(nullptr);
+				free(queue.front());  // Correct memory deallocation
+				queue.pop();
 			};
 		};
+#ifdef __EMSCRIPTEN__
+		EMSCRIPTEN_MAINLOOP_END;
+#endif
+
+		// Cleanup
+		ImGui_ImplOpenGL3_Shutdown();
+		ImGui_ImplGlfw_Shutdown();
+		ImGui::DestroyContext();
+
+		glfwDestroyWindow(window);
+		glfwTerminate();
+		//
 	};
 
-	void Engine::Clean()
+	void Engine::Stop()
 	{
-		vkDestroyInstance(vk_instance, nullptr);
+		glfwSetWindowShouldClose(window, true);
 	};
-
-
-	//void Engine::UpdateAll()
-	//{
-	//	
-	//};
-
-	//void Engine::RenderAll()
-	//{
-	//	
-	//};
 };

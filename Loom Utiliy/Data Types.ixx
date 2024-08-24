@@ -40,18 +40,18 @@ namespace Loom
 		
 		constexpr ~ptr() noexcept
 		{
-			std::lock_guard lock{ s_mutex };
+			//std::lock_guard lock{ s_mutex };
 
-			// TODO: implement logging
-			std::cout << "Deleting " << typeid(T).name() << std::endl;
+			//// TODO: implement logging
+			//std::cout << "Deleting " << typeid(T).name() << std::endl;
 
-			std::swap(s_data[m_data_index], s_data.back());
-			std::swap(s_ptrs[m_data_index], s_ptrs.back());
-			
-			s_ptrs[m_data_index]->m_data_index = m_data_index;
+			//std::swap(s_data[m_data_index], s_data.back());
+			//std::swap(s_ptrs[m_data_index], s_ptrs.back());
+			//
+			//s_ptrs[m_data_index]->m_data_index = m_data_index;
 
-			s_data.pop_back();
-			s_ptrs.pop_back();
+			//s_data.pop_back();
+			//s_ptrs.pop_back();
 		};
 
 		static constexpr void lock() noexcept
@@ -82,7 +82,7 @@ namespace Loom
 			return s_data[m_data_index];
 		};
 
-	protected:
+	//protected:
 		uint64_t m_data_index;
 
 		static inline std::vector<T> s_data{ };

@@ -11,9 +11,6 @@
     <ClCompile Include="imgui_draw.cpp">
       <Filter>UI\imgui</Filter>
     </ClCompile>
-    <ClCompile Include="imgui_impl_glfw.cpp">
-      <Filter>UI\imgui</Filter>
-    </ClCompile>
     <ClCompile Include="imgui_tables.cpp">
       <Filter>UI\imgui</Filter>
     </ClCompile>
@@ -32,23 +29,50 @@
     <ClCompile Include="Transform.ixx">
       <Filter>Transform</Filter>
     </ClCompile>
-    <ClCompile Include="GameObject.ixx">
-      <Filter>Rendering\Geometry</Filter>
-    </ClCompile>
     <ClCompile Include="Engine.ixx">
       <Filter>Engine</Filter>
     </ClCompile>
     <ClCompile Include="Timer.ixx">
       <Filter>Timer</Filter>
     </ClCompile>
-    <ClCompile Include="imgui_impl_vulkan.cpp">
-      <Filter>UI\imgui</Filter>
-    </ClCompile>
     <ClCompile Include="Demos.ixx">
       <Filter>Demos</Filter>
     </ClCompile>
     <ClCompile Include="Demos.cpp">
       <Filter>Demos</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui_impl_glfw.cpp">
+      <Filter>UI\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui_impl_opengl3.cpp">
+      <Filter>UI\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="Component.ixx">
+      <Filter>Engine\Component</Filter>
+    </ClCompile>
+    <ClCompile Include="ComponentBase.ixx">
+      <Filter>Engine\Component</Filter>
+    </ClCompile>
+    <ClCompile Include="GameObject.cpp">
+      <Filter>Engine\GameObject</Filter>
+    </ClCompile>
+    <ClCompile Include="GameObject.ixx">
+      <Filter>Engine\GameObject</Filter>
+    </ClCompile>
+    <ClCompile Include="UI_Able.ixx">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene.cpp">
+      <Filter>Engine\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene.ixx">
+      <Filter>Engine\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Component Menu.ixx">
+      <Filter>Engine\Component Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="ComponentMenu.cpp">
+      <Filter>Engine\Component Menu</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -61,14 +85,8 @@
     <Filter Include="UI\imgui">
       <UniqueIdentifier>{df5642c3-c1d9-4139-b46d-0cba51ce63b2}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Rendering">
-      <UniqueIdentifier>{478390f7-e44f-45be-9533-4cc817da8a7b}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Engine">
       <UniqueIdentifier>{4f94141a-f048-4d6b-aae1-53776a304f44}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Rendering\Geometry">
-      <UniqueIdentifier>{80a6c583-7625-4fc7-93ed-7d3e141f540b}</UniqueIdentifier>
     </Filter>
     <Filter Include="Application">
       <UniqueIdentifier>{8dfd012e-566e-4ebc-87a1-0a7b55b7b079}</UniqueIdentifier>
@@ -81,6 +99,18 @@
     </Filter>
     <Filter Include="Demos">
       <UniqueIdentifier>{5755ff19-c34d-4cfc-9ba8-48ac64fd2b62}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Component">
+      <UniqueIdentifier>{8753db0b-5ca2-4cc7-9612-356292b78572}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\GameObject">
+      <UniqueIdentifier>{7fcc9bc6-06ea-4e15-8348-2d9e927ddc3f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Scene">
+      <UniqueIdentifier>{80418e62-2da1-4fb2-93f8-2ae4fb58d99f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine\Component Menu">
+      <UniqueIdentifier>{2631e5ef-695c-4854-99dd-d77aebf9bffc}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -96,9 +126,6 @@
       <Filter>UI\imgui</Filter>
     </ClInclude>
     <ClInclude Include="imgui.h">
-      <Filter>UI\imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="imgui_impl_glfw.h">
       <Filter>UI\imgui</Filter>
     </ClInclude>
     <ClInclude Include="imgui_internal.h">
@@ -117,7 +144,13 @@
       <Filter>Application</Filter>
     </ClInclude>
     <ClInclude Include="Definitions.hpp" />
-    <ClInclude Include="imgui_impl_vulkan.h">
+    <ClInclude Include="imgui_impl_glfw.h">
+      <Filter>UI\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="imgui_impl_opengl3.h">
+      <Filter>UI\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="imgui_impl_opengl3_loader.h">
       <Filter>UI\imgui</Filter>
     </ClInclude>
   </ItemGroup>

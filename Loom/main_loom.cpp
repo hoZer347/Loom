@@ -1,4 +1,4 @@
-#define GLFW_INCLUDE_VULKAN
+//#include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
 #define GLM_FORCE_RADIANS
@@ -10,39 +10,28 @@
 #include <thread>
 
 #include "imgui.h"
+#include "imgui_impl_glfw.h"
 
 import std;
 import Engine;
 import DataTypes;
 import Log;
 import Demos;
+import Component;
 
 using namespace Loom;
 
 
+struct Test0 : Component<Test0> { };
+struct Test1 : Component<Test1> { };
+
+
 int main()
 {
-	VulkanTriangle_0();
+	Engine engine{ };
+	std::thread t([&]() { engine.Start(); });
 
-	glfwInit();
-
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	GLFWwindow* window = glfwCreateWindow(800, 600, "Window", nullptr, nullptr);
-
-	Engine::Init();
-
-	while (!glfwWindowShouldClose(window))
-	{
-		glfwPollEvents();
-
-		glfwSwapBuffers(window);
-	};
-
-	Engine::Clean();
-
-	glfwDestroyWindow(window);
-
-	glfwTerminate();
+	t.join();
 
 	return 0;
 };
