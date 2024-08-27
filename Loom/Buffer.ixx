@@ -1,4 +1,4 @@
-export module Demos;
+export module Buffer;
 
 
 namespace Loom

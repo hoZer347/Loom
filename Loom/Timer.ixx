@@ -1,19 +1,27 @@
 export module Timer;
 
-import DataTypes;
 import <chrono>;
 import <iostream>;
 
 
 namespace Loom
 {
+	export template<size_t N>
+		struct Str final
+	{
+		constexpr Str(const char(&str)[N])
+		{
+			std::copy_n(str, N, value);
+		};
+		char value[N];
+	};
+
 	template <Str name = "Default">
 	struct Timer
 	{
 	protected:
 		template <Str> friend inline void StartTimer();
 		template <Str> friend inline int64_t GetTimeSince();
-
 		static inline int64_t start_time{ };
 	};
 
@@ -33,7 +41,6 @@ namespace Loom
 		inline void PrintTimeElapsed()
 	{
 		auto timeElapsed = GetTimeSince<name>();
-
 		//TODO: implement logging
 		std::cout << "Time Elapsed: " << timeElapsed << std::endl;
 	};

@@ -1,10 +1,10 @@
 import Engine;
-import DataTypes;
 
-import ComponentMenu;
+import Timer;
+import Scene;
 import GameObject;
-import <memory>;
 
+import <mutex>;
 import <iostream>;
 
 // Borrowed + modified from imgui examples
@@ -12,6 +12,7 @@ import <iostream>;
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "Buffer.cuh"
 #include <stdio.h>
 #define GL_SILENCE_DEPRECATION
 #if defined(IMGUI_IMPL_OPENGL_ES2)
@@ -19,14 +20,13 @@ import <iostream>;
 #endif
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
 
-#include <queue>
+#include <string>
 #include <list>
 #include <thread>
 #include <glm/glm.hpp>
 using namespace glm;
 
-import Timer;
-
+using namespace Loom;
 
 // [Win32] Our example includes a copy of glfw3.lib pre-compiled with VS2010 to maximize ease of testing and compatibility with old VS compilers.
 // To link with VS2010-era libraries, VS2015+ requires linking with legacy_stdio_definitions.lib, which we do using this pragma.
@@ -39,18 +39,41 @@ import Timer;
 #ifdef __EMSCRIPTEN__
 #include "../libs/emscripten/emscripten_mainloop_stub.h"
 #endif
+#include <queue>
 
 static void glfw_error_callback(int error, const char* description)
 {
 	fprintf(stderr, "GLFW Error %d: %s\n", error, description);
-}
+};
 
 namespace Loom
 {
+	void DoImGui_MainMenu()
+	{
+		static std::list<float> deltaTimes{ };
+
+		if (ImGui::Begin("Menu"))
+		{
+			ImGui::Text("FPS: ");
+			ImGui::SameLine();
+
+			// Showing FPS
+			float total = 0;
+			deltaTimes.emplace_back(ImGui::GetIO().DeltaTime);
+			if (deltaTimes.size() > 100)
+				deltaTimes.pop_front();
+			for (auto& i : deltaTimes)
+				total += i;
+			//
+
+			ImGui::Text(std::to_string(1/(total / deltaTimes.size())).c_str());
+		};
+
+		ImGui::End();
+	};
+
 	void Engine::Start()
 	{
-		std::queue<void*> queue{ };
-
 		glfwSetErrorCallback(glfw_error_callback);
 		if (!glfwInit())
 			return;
@@ -79,7 +102,7 @@ namespace Loom
 #endif
 
 		// Create window with graphics context
-		window = glfwCreateWindow(1280, 720, "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
+		window = glfwCreateWindow(1280, 720, "Loom", nullptr, nullptr);
 		glfwMakeContextCurrent(window);
 		glfwSwapInterval(0); // Enable vsync
 
@@ -121,9 +144,21 @@ namespace Loom
 		// Our state
 		ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-		std::list<float> deltaTimes{ };
+		int f_w, f_h;
+		glfwGetFramebufferSize(window, &f_w, &f_h);
 
-		std::shared_ptr<GameObject> head = std::make_shared<GameObject>();
+		size_t buffer_size = f_w * f_h * 4;  // 4 bytes per pixel (RGBA)
+		
+
+		BufferMalloc(GPU_buffer, buffer_size * sizeof(unsigned char) * 2);
+		BufferSet(GPU_buffer);
+		CPU_buffer = (unsigned char*)malloc(buffer_size * sizeof(unsigned char) * 2);
+
+		{
+			unsigned int dims[2] = { (unsigned int)f_w, (unsigned int)f_h };
+			BufferMalloc(GPU_dims, sizeof(unsigned int) * 4);
+			BufferSend(GPU_dims, dims, sizeof(unsigned int) * 4);
+		};
 
 		// Main loop
 #ifdef __EMSCRIPTEN__
@@ -142,22 +177,20 @@ namespace Loom
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
 
-
-			// Showing FPS
-			float total = 0;
-			deltaTimes.emplace_back(ImGui::GetIO().DeltaTime);
-			if (deltaTimes.size() > 100)
-				deltaTimes.pop_front();
-			for (auto& i : deltaTimes)
-				total += i;
-			//
-
 			
 			// GUI
-			ImGui::Begin("GameObjects");
-			head->Gui();
-			ImGui::End();
-			ComponentMenu::Gui();
+			DoImGui_MainMenu();
+
+			if (doGUI)
+			{
+				//std::lock_guard lock{ Scene::mutex };
+				for (auto& scene : Scene::allScenes)
+				{
+					if (ImGui::Begin(scene->name))
+						scene->root->_Gui();
+					ImGui::End();
+				};
+			};
 			//
 
 
@@ -183,26 +216,23 @@ namespace Loom
 				glfwMakeContextCurrent(backup_current_context);
 			};
 
-			int f_w, f_h;
-			glfwGetFramebufferSize(window, &f_w, &f_h);
-
-			size_t buffer_size = f_w * f_h * 4;  // 4 bytes per pixel (RGBA)
-			unsigned char* buffer = (unsigned char*)malloc(buffer_size);
-			queue.push(buffer);
-
-			glDrawPixels(f_w, f_h, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+			BufferCopy(CPU_buffer, GPU_buffer, buffer_size);
+			glDrawPixels(f_w, f_h, GL_RGBA, GL_UNSIGNED_BYTE, CPU_buffer);
 
 			glfwSwapBuffers(window);
-
-			if (queue.size() > 2)
-			{
-				free(queue.front());  // Correct memory deallocation
-				queue.pop();
-			};
 		};
 #ifdef __EMSCRIPTEN__
 		EMSCRIPTEN_MAINLOOP_END;
 #endif
+		for (auto& scene : Scene::allScenes)
+		{
+			scene->running = false;
+			if (scene->thread.joinable())
+				scene->thread.join();
+		};
+
+		BufferFree(GPU_buffer);
+		free(CPU_buffer);
 
 		// Cleanup
 		ImGui_ImplOpenGL3_Shutdown();

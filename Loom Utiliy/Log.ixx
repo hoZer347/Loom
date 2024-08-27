@@ -1,7 +1,5 @@
 export module Log;
 
-import DataTypes;
-
 import <chrono>;
 import <iostream>;
 

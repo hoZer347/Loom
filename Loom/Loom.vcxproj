@@ -11,17 +11,17 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Application.cpp" />
-    <ClCompile Include="Component Menu.ixx" />
+    <ClCompile Include="Buffer.cpp" />
+    <ClCompile Include="Buffer.ixx" />
     <ClCompile Include="Component.ixx" />
-    <ClCompile Include="ComponentBase.ixx" />
-    <ClCompile Include="ComponentMenu.cpp" />
     <ClCompile Include="Demos.cpp" />
     <ClCompile Include="Demos.ixx" />
     <ClCompile Include="Engine.cpp" />
     <ClCompile Include="Engine.ixx" />
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="GameObject.ixx" />
+    <ClCompile Include="Geometry.cpp" />
+    <ClCompile Include="Geometry.ixx" />
     <ClCompile Include="imgui.cpp" />
     <ClCompile Include="imgui_demo.cpp" />
     <ClCompile Include="imgui_draw.cpp" />
@@ -29,12 +29,11 @@
     <ClCompile Include="imgui_impl_opengl3.cpp" />
     <ClCompile Include="imgui_tables.cpp" />
     <ClCompile Include="imgui_widgets.cpp" />
+    <ClCompile Include="Loom.ixx" />
     <ClCompile Include="main_loom.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="Scene.ixx" />
     <ClCompile Include="Timer.ixx" />
-    <ClCompile Include="Transform.cpp" />
-    <ClCompile Include="Transform.ixx" />
     <ClCompile Include="UI_Able.ixx" />
   </ItemGroup>
   <ItemGroup>
@@ -42,8 +41,9 @@
     <None Include="opengl32.dll" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Application.h" />
+    <ClInclude Include="Buffer.cuh" />
     <ClInclude Include="Definitions.hpp" />
+    <ClInclude Include="Geometry.cuh" />
     <ClInclude Include="imconfig.h" />
     <ClInclude Include="imgui.h" />
     <ClInclude Include="imgui_impl_glfw.h" />
@@ -61,6 +61,10 @@
     <ProjectReference Include="..\Loom Utiliy\Loom Utiliy.vcxproj">
       <Project>{a5b5d9ee-0327-459c-9d9d-d7fa1b4e35e1}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="Buffer.cu" />
+    <CudaCompile Include="Geometry.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{3813DE5F-D426-4B1E-9638-7CE2259E5C3F}</ProjectGuid>
@@ -83,7 +87,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.6.props" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.5.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -143,6 +147,6 @@
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.6.targets" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.5.targets" />
   </ImportGroup>
 </Project>

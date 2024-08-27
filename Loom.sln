@@ -7,7 +7,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom", "Loom\Loom.vcxproj",
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Networking", "Loom Networking\Loom Networking.vcxproj", "{D4DB8697-7347-441E-B0F5-EC0886CD8B7A}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Utiliy", "Loom Utiliy\Loom Utiliy.vcxproj", "{A5B5D9EE-0327-459C-9D9D-D7FA1B4E35E1}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Utility", "Loom Utiliy\Loom Utiliy.vcxproj", "{A5B5D9EE-0327-459C-9D9D-D7FA1B4E35E1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

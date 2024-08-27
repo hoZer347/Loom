@@ -1,33 +1,50 @@
 import GameObject;
-import ComponentBase;
-import ComponentMenu;
 
 #include "imgui.h"
-import <string>;
 
 
 namespace Loom
 {
-	void GameObject::Gui()
+	GameObject* GameObject::AddChild(const char* name)
 	{
-		std::string title = typeid(*this).name();
-		title += ", GUID: ";
-		title += std::to_string(id);
+		std::lock_guard lock{ mutex };
 
-		if (ImGui::TreeNode(title.c_str()))
+		return children.emplace_back(new GameObject(name));
+	};
+
+	void GameObject::_Update()
+	{
+		std::lock_guard lock{ mutex };
+
+		Update();
+		for (Component* component : components)
+			component->Update();
+		for (GameObject* child : children)
+			child->_Update();
+	};
+
+	void GameObject::_Gui()
+	{
+		if (ImGui::TreeNode((void*)this, (std::string(name) + " (" + std::to_string(id) + ")").c_str()))
 		{
-			if (ImGui::Button("New"))
-				children.emplace_back(std::make_shared<GameObject>());
+			ImGui::SameLine();
+			if (ImGui::Button("Add"))
+			{
+				std::lock_guard lock{ mutex };
 
-			if (ImGui::Button("Open"))
-				ComponentMenu::subject = this;
+				children.push_back(new GameObject((char*)"New GameObject"));
+			};
 
-			ImGui::Indent();
-			for (auto& component : components)
-				component->Gui();
-			for (auto& child : children)
-				child->Gui();
-			ImGui::Unindent();
+			ImGui::Text("Name: ");
+			ImGui::SameLine();
+
+			if (ImGui::InputText(std::to_string(id).c_str(), newName, 128))
+				name = newName;
+
+			for (Component* component : components)
+				component->OnGui();
+			for (GameObject* child : children)
+				child->_Gui();
 
 			ImGui::TreePop();
 		};

@@ -1,25 +1,31 @@
 export module Scene;
 
-import Engine;
 import GameObject;
 
 import <thread>;
+import <mutex>;
+import <functional>;
 
 
 namespace Loom
 {
-	export struct Scene :
-		public GameObject
+	export struct Scene final
 	{
-		Scene()
-		{ };
+		Scene(const char* name);
+		virtual ~Scene();
 
-		virtual ~Scene()
-		{ };
+		const char* name;
 
-		void Gui() override;
+		GameObject* root = new GameObject("Root");
 
+	protected:
+		friend struct Engine;
+
+		static inline std::recursive_mutex mutex{ };
+		static inline std::vector<Scene*> allScenes{ };
+
+	private:
+		bool running = false;
 		std::thread thread;
-		std::shared_ptr<GameObject> head;
 	};
 };

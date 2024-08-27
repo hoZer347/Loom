@@ -1,11 +1,8 @@
 export module Engine;
 
-import DataTypes;
+import Buffer;
 
 import <GLFW/glfw3.h>;
-import <functional>;
-import <barrier>;
-import <memory>;
 import <atomic>;
 
 
@@ -16,14 +13,13 @@ namespace Loom
 		void Start();
 		void Stop();
 
-		constexpr inline void Add(std::function<void()>& func) noexcept { funcs.push_back(func); };
-		
-		void* buffer = nullptr;
+		static inline unsigned char* CPU_buffer = nullptr;
+		static inline unsigned char* GPU_buffer = nullptr;
+		static inline unsigned int* GPU_dims = nullptr;
 
-		static inline std::atomic<size_t> id_counter = 0;
+		bool doGUI = true;
 
 	private:
 		GLFWwindow* window = nullptr;
-		std::vector<std::function<void()>> funcs{ };
 	};
 };

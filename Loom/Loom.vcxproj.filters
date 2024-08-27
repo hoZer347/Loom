@@ -20,15 +20,6 @@
     <ClCompile Include="Engine.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
-    <ClCompile Include="Application.cpp">
-      <Filter>Application</Filter>
-    </ClCompile>
-    <ClCompile Include="Transform.cpp">
-      <Filter>Transform</Filter>
-    </ClCompile>
-    <ClCompile Include="Transform.ixx">
-      <Filter>Transform</Filter>
-    </ClCompile>
     <ClCompile Include="Engine.ixx">
       <Filter>Engine</Filter>
     </ClCompile>
@@ -47,15 +38,6 @@
     <ClCompile Include="imgui_impl_opengl3.cpp">
       <Filter>UI\imgui</Filter>
     </ClCompile>
-    <ClCompile Include="Component.ixx">
-      <Filter>Engine\Component</Filter>
-    </ClCompile>
-    <ClCompile Include="ComponentBase.ixx">
-      <Filter>Engine\Component</Filter>
-    </ClCompile>
-    <ClCompile Include="GameObject.cpp">
-      <Filter>Engine\GameObject</Filter>
-    </ClCompile>
     <ClCompile Include="GameObject.ixx">
       <Filter>Engine\GameObject</Filter>
     </ClCompile>
@@ -68,11 +50,24 @@
     <ClCompile Include="Scene.ixx">
       <Filter>Engine\Scene</Filter>
     </ClCompile>
-    <ClCompile Include="Component Menu.ixx">
-      <Filter>Engine\Component Menu</Filter>
+    <ClCompile Include="GameObject.cpp">
+      <Filter>Engine\GameObject</Filter>
     </ClCompile>
-    <ClCompile Include="ComponentMenu.cpp">
-      <Filter>Engine\Component Menu</Filter>
+    <ClCompile Include="Component.ixx">
+      <Filter>Engine\Component</Filter>
+    </ClCompile>
+    <ClCompile Include="Loom.ixx" />
+    <ClCompile Include="Buffer.ixx">
+      <Filter>Buffer</Filter>
+    </ClCompile>
+    <ClCompile Include="Buffer.cpp">
+      <Filter>Buffer</Filter>
+    </ClCompile>
+    <ClCompile Include="Geometry.cpp">
+      <Filter>Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="Geometry.ixx">
+      <Filter>Geometry</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -88,20 +83,11 @@
     <Filter Include="Engine">
       <UniqueIdentifier>{4f94141a-f048-4d6b-aae1-53776a304f44}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Application">
-      <UniqueIdentifier>{8dfd012e-566e-4ebc-87a1-0a7b55b7b079}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Timer">
       <UniqueIdentifier>{e0e155f3-797f-43db-a42a-300a9fa355b4}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Transform">
-      <UniqueIdentifier>{1d594ffd-ce6a-4c1e-974d-67fb0b57ed52}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Demos">
       <UniqueIdentifier>{5755ff19-c34d-4cfc-9ba8-48ac64fd2b62}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Engine\Component">
-      <UniqueIdentifier>{8753db0b-5ca2-4cc7-9612-356292b78572}</UniqueIdentifier>
     </Filter>
     <Filter Include="Engine\GameObject">
       <UniqueIdentifier>{7fcc9bc6-06ea-4e15-8348-2d9e927ddc3f}</UniqueIdentifier>
@@ -109,8 +95,14 @@
     <Filter Include="Engine\Scene">
       <UniqueIdentifier>{80418e62-2da1-4fb2-93f8-2ae4fb58d99f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Engine\Component Menu">
-      <UniqueIdentifier>{2631e5ef-695c-4854-99dd-d77aebf9bffc}</UniqueIdentifier>
+    <Filter Include="Engine\Component">
+      <UniqueIdentifier>{d94a1dea-6721-415a-ba5f-6716f9e06bbb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Buffer">
+      <UniqueIdentifier>{e98a62ce-c484-452c-8233-830dbecf5565}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Geometry">
+      <UniqueIdentifier>{ffad4dc7-a36f-407e-9a94-03f7dc6d0136}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -140,9 +132,6 @@
     <ClInclude Include="imstb_truetype.h">
       <Filter>UI\imgui</Filter>
     </ClInclude>
-    <ClInclude Include="Application.h">
-      <Filter>Application</Filter>
-    </ClInclude>
     <ClInclude Include="Definitions.hpp" />
     <ClInclude Include="imgui_impl_glfw.h">
       <Filter>UI\imgui</Filter>
@@ -153,5 +142,19 @@
     <ClInclude Include="imgui_impl_opengl3_loader.h">
       <Filter>UI\imgui</Filter>
     </ClInclude>
+    <ClInclude Include="Buffer.cuh">
+      <Filter>Buffer</Filter>
+    </ClInclude>
+    <ClInclude Include="Geometry.cuh">
+      <Filter>Geometry</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="Buffer.cu">
+      <Filter>Buffer</Filter>
+    </CudaCompile>
+    <CudaCompile Include="Geometry.cu">
+      <Filter>Geometry</Filter>
+    </CudaCompile>
   </ItemGroup>
 </Project>

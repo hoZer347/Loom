@@ -1,4 +1,3 @@
-import Transform;
 
 namespace Loom
 {

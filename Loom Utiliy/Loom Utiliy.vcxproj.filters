@@ -6,9 +6,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Data Types.ixx">
-      <Filter>Utility</Filter>
-    </ClCompile>
     <ClCompile Include="main_utility.cpp" />
     <ClCompile Include="Log.ixx">
       <Filter>Utility</Filter>
