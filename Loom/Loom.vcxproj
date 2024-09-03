@@ -29,14 +29,13 @@
     <ClCompile Include="imgui_impl_opengl3.cpp" />
     <ClCompile Include="imgui_tables.cpp" />
     <ClCompile Include="imgui_widgets.cpp" />
-    <ClCompile Include="Loom.ixx" />
     <ClCompile Include="main_loom.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="Scene.ixx" />
     <ClCompile Include="Timer.ixx" />
-    <ClCompile Include="UI_Able.ixx" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="glew32.dll" />
     <None Include="glfw3.dll" />
     <None Include="opengl32.dll" />
   </ItemGroup>
@@ -57,9 +56,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Loom Networking\Loom Networking.vcxproj">
       <Project>{d4db8697-7347-441e-b0f5-ec0886cd8b7a}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\Loom Utiliy\Loom Utiliy.vcxproj">
-      <Project>{a5b5d9ee-0327-459c-9d9d-d7fa1b4e35e1}</Project>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
@@ -117,6 +113,8 @@
       <SubSystem>Console</SubSystem>
       <AdditionalDependencies>OpenGL32.Lib;glfw3.lib;cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>C:\Dev\imgui;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.22621.0\um\x64;C:\Dev\glew\lib;C:\Dev\glfw\lib-vc2022;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <IgnoreSpecificDefaultLibraries>
+      </IgnoreSpecificDefaultLibraries>
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
@@ -140,6 +138,8 @@
       <SubSystem>Console</SubSystem>
       <AdditionalDependencies>OpenGL32.Lib;glfw3.lib;cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>C:\Dev\imgui;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.22621.0\um\x64;C:\Dev\glew\lib;C:\Dev\glfw\lib-vc2022;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <IgnoreSpecificDefaultLibraries>
+      </IgnoreSpecificDefaultLibraries>
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>

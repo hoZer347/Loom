@@ -2,24 +2,28 @@ export module Geometry;
 
 import Component;
 
+import <glm/glm.hpp>;
+using namespace glm;
+
 
 namespace Loom
 {
 	export struct Rect final :
-		public Component
+		public Component<Rect>
 	{
 		Rect(
-			const unsigned int& x,
-			const unsigned int& y,
-			const unsigned int& w,
-			const unsigned int& h);
+			const float& x,
+			const float& y,
+			const float& w,
+			const float& h,
+			const vec4& color);
+		
+		~Rect();
 
-		virtual ~Rect();
+		void OnGui() override;
+		void OnRender() override;
 
-		void Update() override;
-
-	private:
-		unsigned int* position;
-		unsigned int* dimensions;
+		vec4 color;
+		float x, y, w, h;
 	};
 };

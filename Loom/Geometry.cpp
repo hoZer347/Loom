@@ -1,38 +1,71 @@
 import Geometry;
 
-import Engine;
-
-#include "Geometry.cuh"
-#include "Buffer.cuh"
+#include "imgui.h"
 
 #include <iostream>
+
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+
+#include "stb_image.h"
+
+import <glm/glm.hpp>;
+using namespace glm;
 
 
 namespace Loom
 {
 	Rect::Rect(
-		const unsigned int& x,
-		const unsigned int& y,
-		const unsigned int& w,
-		const unsigned int& h)
-	{
-		dimensions = (unsigned int*)malloc(sizeof(unsigned int) * 2);
-		dimensions[0] = w;
-		dimensions[1] = h;
-
-		const unsigned int position[2]{ x, y };
-		BufferMalloc(this->position, sizeof(unsigned int) * 2);
-		BufferSend(this->position, position, sizeof(unsigned int) * 2);
-	};
+		const float& x,
+		const float& y,
+		const float& w,
+		const float& h,
+		const vec4& color) :
+		x(x),
+		y(y),
+		w(w),
+		h(h),
+		color(color)
+	{ };
 
 	Rect::~Rect()
+	{ };
+
+	void Rect::OnRender()
 	{
-		BufferFree((void*&)position);
-		BufferFree((void*&)dimensions);
+		if (GLFWwindow* window = glfwGetCurrentContext())
+		{
+			int w_w, w_h;
+			glfwGetWindowSize(window, &w_w, &w_h);
+
+			glBegin(GL_POLYGON);
+			glColor4f(color.r, color.g, color.b, color.a);
+			glVertex2f(x / w_w, y / w_h);
+			glVertex2f(x / w_w, (y + h) / w_h);
+			glVertex2f((x + w) / w_w, (y + h) / w_h);
+			glVertex2f((x + w) / w_w, y / w_h);
+			glEnd();
+		};
 	};
 
-	void Rect::Update()
+	void Rect::OnGui()
 	{
-		DrawRect(Engine::GPU_buffer, position, dimensions, Engine::GPU_dims);
+		if (GLFWwindow* window = glfwGetCurrentContext())
+		{
+			int w_w, w_h;
+			glfwGetWindowSize(window, &w_w, &w_h);
+
+			ImGui::Text("Rect: ");
+			ImGui::PushItemWidth(100);
+			ImGui::PushID(this);
+			ImGui::DragFloat("X: ", &x, 1);
+			ImGui::SameLine();
+			ImGui::DragFloat("Y: ", &y, 1);
+			ImGui::DragFloat("W: ", &w, 1);
+			ImGui::SameLine();
+			ImGui::DragFloat("H: ", &h, 1);
+			ImGui::PopItemWidth();
+			ImGui::PopID();
+		};
 	};
 };

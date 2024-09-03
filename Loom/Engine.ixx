@@ -1,25 +1,33 @@
 export module Engine;
 
-import Buffer;
-
 import <GLFW/glfw3.h>;
-import <atomic>;
+import <functional>;
+import <mutex>;
+import <queue>;
 
 
 namespace Loom
 {
+	export typedef std::function<void()> Task;
+	export struct Buffer;
+	export struct Scene;
+
 	export struct Engine final
 	{
 		void Start();
 		void Stop();
 
-		static inline unsigned char* CPU_buffer = nullptr;
-		static inline unsigned char* GPU_buffer = nullptr;
-		static inline unsigned int* GPU_dims = nullptr;
+		void QueueTask(const Task& task);
 
 		bool doGUI = true;
+		bool isRunning;
 
 	private:
+		void DoTasks() noexcept;
+
+		
+		std::recursive_mutex mutex;
+		std::queue<Task> taskQueue;
 		GLFWwindow* window = nullptr;
 	};
 };

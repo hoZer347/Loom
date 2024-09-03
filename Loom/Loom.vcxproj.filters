@@ -41,9 +41,6 @@
     <ClCompile Include="GameObject.ixx">
       <Filter>Engine\GameObject</Filter>
     </ClCompile>
-    <ClCompile Include="UI_Able.ixx">
-      <Filter>UI</Filter>
-    </ClCompile>
     <ClCompile Include="Scene.cpp">
       <Filter>Engine\Scene</Filter>
     </ClCompile>
@@ -56,7 +53,6 @@
     <ClCompile Include="Component.ixx">
       <Filter>Engine\Component</Filter>
     </ClCompile>
-    <ClCompile Include="Loom.ixx" />
     <ClCompile Include="Buffer.ixx">
       <Filter>Buffer</Filter>
     </ClCompile>
@@ -110,6 +106,9 @@
       <Filter>DLLs</Filter>
     </None>
     <None Include="opengl32.dll">
+      <Filter>DLLs</Filter>
+    </None>
+    <None Include="glew32.dll">
       <Filter>DLLs</Filter>
     </None>
   </ItemGroup>

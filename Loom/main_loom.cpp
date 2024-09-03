@@ -1,30 +1,40 @@
-import Component;
-import Engine;
 import Scene;
+import Engine;
+import Buffer;
 import Geometry;
-
-#include <thread>
+import Component;
+import GameObject;
 
 using namespace Loom;
 
+#define _CRTDBG_MAP_ALLOC
+#include <iostream>
+#include <stdlib.h>
+#include <crtdbg.h>
 
-struct Buh : public Component
-{ };
+#include <glm/glm.hpp>
+using namespace glm;
+
 
 int main()
 {
-	Engine engine	{ };
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
-	std::thread t([&]() { engine.Start(); });
+	Engine engine{ };
 
-	Scene scene0	{ "Scene 0" };
-	Scene scene1	{ "Scene 1" };
-	Scene scene2	{ "Scene 2" };
-	Scene scene3	{ "Scene 3" };
+	Scene scene0 { &engine, "Scene 1" };
+	Scene scene1 { &engine, "Scene 2" };
+	Scene scene2 { &engine, "Scene 3" };
+	Scene scene3 { &engine, "Scene 4" };
 
-	//scene0.root->Attach<Rect>(100, 100, 100, 100);
+	{
+		GameObject* gameObject = scene0.AddChild("Rectangle");
 
-	t.join();
+		gameObject->Attach<Rect>(100.0f, 100.0f, 100.0f, 100.0f, vec4(0.5, 0, 0, 0.5));
+		gameObject->Attach<Rect>(100.0f, 100.0f, 100.0f, 100.0f, vec4(0, 0.5, 0, 0.5));
+	};
+
+	engine.Start();
 
 	return 0;
 };

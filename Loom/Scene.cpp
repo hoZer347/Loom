@@ -1,33 +1,40 @@
 import Scene;
 
-import <mutex>;
+import Engine;
+
+import <vector>;
 
 #include "imgui.h"
 
 
 namespace Loom
 {
-	Scene::Scene(const char* name) :
-		name(name)
+	Scene::Scene(
+		Engine* engine,
+		const char* name,
+		int thread_id) :
+		engine(engine),
+		name(name),
+		thread_id(thread_id),
+		root(engine, nullptr, "Root", thread_id)
 	{
-		std::lock_guard lock{ mutex };
-		running = true;
-		allScenes.push_back(this);
-	
-		thread = std::thread([this]()
-		{
-			while (root && running)
+		engine->QueueTask(
+			[this]()
 			{
-				std::lock_guard lock{ mutex };
-				root->_Update();
-			};
-		});
+				allScenes.push_back(this);
+			});
 	};
 
 	Scene::~Scene()
 	{
-		running = false;
-		if (thread.joinable())
-			thread.join();
+		engine->QueueTask(
+			[this]()
+			{
+				allScenes.erase(
+					std::remove(
+						allScenes.begin(), 
+						allScenes.end(), this),
+					allScenes.end());
+			});
 	};
 };

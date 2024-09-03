@@ -2,10 +2,11 @@ import Engine;
 
 import Timer;
 import Scene;
+import Buffer;
 import GameObject;
 
-import <mutex>;
 import <iostream>;
+#include <barrier>
 
 // Borrowed + modified from imgui examples
 
@@ -18,7 +19,8 @@ import <iostream>;
 #if defined(IMGUI_IMPL_OPENGL_ES2)
 #include <GLES2/gl2.h>
 #endif
-#include <GLFW/glfw3.h> // Will drag system OpenGL headers
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 
 #include <string>
 #include <list>
@@ -48,6 +50,20 @@ static void glfw_error_callback(int error, const char* description)
 
 namespace Loom
 {
+	void Engine::DoTasks() noexcept
+	{
+		std::lock_guard lock{ mutex };
+
+		if (!taskQueue.empty())
+		{
+			while (!taskQueue.empty())
+			{
+				taskQueue.front()();
+				taskQueue.pop();
+			};
+		};
+	};
+
 	void DoImGui_MainMenu()
 	{
 		static std::list<float> deltaTimes{ };
@@ -72,11 +88,22 @@ namespace Loom
 		ImGui::End();
 	};
 
+	void Engine::QueueTask(const Task& task)
+	{
+		std::lock_guard lock{ mutex };
+		taskQueue.push(task);
+	};
+
 	void Engine::Start()
 	{
 		glfwSetErrorCallback(glfw_error_callback);
-		if (!glfwInit())
-			return;
+		
+		glfwInit();
+
+		glClearColor(0.5f, 0.5f, 0.5f, 0.0f);
+
+		glEnable(GL_TEXTURE_2D);
+		glEnable(GL_BLEND);
 
 		// Decide GL+GLSL versions
 #if defined(IMGUI_IMPL_OPENGL_ES2)
@@ -104,12 +131,14 @@ namespace Loom
 		// Create window with graphics context
 		window = glfwCreateWindow(1280, 720, "Loom", nullptr, nullptr);
 		glfwMakeContextCurrent(window);
-		glfwSwapInterval(0); // Enable vsync
+		glfwSwapInterval(0);
+		glewInit();
 
-		glfwSetKeyCallback(window, [](GLFWwindow*, int, int, int, int)
-		{
-			glfwSetWindowShouldClose(glfwGetCurrentContext(), true);
-		});
+		glfwSetWindowSizeCallback(window,
+			[](GLFWwindow* window, int w, int h)
+			{
+				glViewport(0, 0, w, h);
+			});
 
 		// Setup Dear ImGui context
 		IMGUI_CHECKVERSION();
@@ -123,8 +152,8 @@ namespace Loom
 		io.ConfigViewportsNoTaskBarIcon = true;
 
 		// Setup Dear ImGui style
-		ImGui::StyleColorsDark();
-		//ImGui::StyleColorsLight();
+		//ImGui::StyleColorsDark();
+		ImGui::StyleColorsLight();
 
 		// When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
 		ImGuiStyle& style = ImGui::GetStyle();
@@ -144,21 +173,40 @@ namespace Loom
 		// Our state
 		ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-		int f_w, f_h;
-		glfwGetFramebufferSize(window, &f_w, &f_h);
+		DoTasks();
 
-		size_t buffer_size = f_w * f_h * 4;  // 4 bytes per pixel (RGBA)
-		
+		Scene::is_engine_running = true;
 
-		BufferMalloc(GPU_buffer, buffer_size * sizeof(unsigned char) * 2);
-		BufferSet(GPU_buffer);
-		CPU_buffer = (unsigned char*)malloc(buffer_size * sizeof(unsigned char) * 2);
-
+		std::barrier barrier
 		{
-			unsigned int dims[2] = { (unsigned int)f_w, (unsigned int)f_h };
-			BufferMalloc(GPU_dims, sizeof(unsigned int) * 4);
-			BufferSend(GPU_dims, dims, sizeof(unsigned int) * 4);
+			std::thread::hardware_concurrency(),
+			[&]() noexcept
+			{
+				{
+					DoTasks();
+				};
+
+				glfwSwapBuffers(window);
+			}
 		};
+
+		isRunning = true;
+
+		std::vector<std::thread> threads;
+		for (unsigned int i = 0; i < std::thread::hardware_concurrency() - 1; i++)
+			threads.emplace_back(
+				[&, i]()
+				{
+					while (isRunning)
+					{
+						barrier.arrive_and_wait();
+						for (auto& scene : Scene::allScenes)
+							if (scene->thread_id == i)
+								scene->root.Update(i);
+					};
+
+					barrier.arrive_and_drop();
+				});
 
 		// Main loop
 #ifdef __EMSCRIPTEN__
@@ -176,30 +224,25 @@ namespace Loom
 			ImGui_ImplOpenGL3_NewFrame();
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
+			//
 
-			
+
 			// GUI
 			DoImGui_MainMenu();
 
 			if (doGUI)
-			{
-				//std::lock_guard lock{ Scene::mutex };
 				for (auto& scene : Scene::allScenes)
 				{
 					if (ImGui::Begin(scene->name))
-						scene->root->_Gui();
+						scene->root.Gui();
+					
 					ImGui::End();
 				};
-			};
 			//
 
 
 			// Rendering
 			ImGui::Render();
-			int display_w, display_h;
-			glfwGetFramebufferSize(window, &display_w, &display_h);
-			glViewport(0, 0, display_w, display_h);
-			glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 			//
@@ -216,23 +259,22 @@ namespace Loom
 				glfwMakeContextCurrent(backup_current_context);
 			};
 
-			BufferCopy(CPU_buffer, GPU_buffer, buffer_size);
-			glDrawPixels(f_w, f_h, GL_RGBA, GL_UNSIGNED_BYTE, CPU_buffer);
+			for (auto& scene : Scene::allScenes)
+				scene->root.Render();
 
-			glfwSwapBuffers(window);
+			barrier.arrive_and_wait();
 		};
 #ifdef __EMSCRIPTEN__
 		EMSCRIPTEN_MAINLOOP_END;
 #endif
-		for (auto& scene : Scene::allScenes)
-		{
-			scene->running = false;
-			if (scene->thread.joinable())
-				scene->thread.join();
-		};
+		isRunning = false;
 
-		BufferFree(GPU_buffer);
-		free(CPU_buffer);
+		barrier.arrive_and_drop();
+
+		DoTasks();
+
+		for (auto& thread : threads)
+			thread.join();
 
 		// Cleanup
 		ImGui_ImplOpenGL3_Shutdown();

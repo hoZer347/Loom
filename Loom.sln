@@ -7,8 +7,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom", "Loom\Loom.vcxproj",
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Networking", "Loom Networking\Loom Networking.vcxproj", "{D4DB8697-7347-441E-B0F5-EC0886CD8B7A}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Utility", "Loom Utiliy\Loom Utiliy.vcxproj", "{A5B5D9EE-0327-459C-9D9D-D7FA1B4E35E1}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -23,10 +21,6 @@ Global
 		{D4DB8697-7347-441E-B0F5-EC0886CD8B7A}.Debug|x64.Build.0 = Debug|x64
 		{D4DB8697-7347-441E-B0F5-EC0886CD8B7A}.Release|x64.ActiveCfg = Release|x64
 		{D4DB8697-7347-441E-B0F5-EC0886CD8B7A}.Release|x64.Build.0 = Release|x64
-		{A5B5D9EE-0327-459C-9D9D-D7FA1B4E35E1}.Debug|x64.ActiveCfg = Debug|x64
-		{A5B5D9EE-0327-459C-9D9D-D7FA1B4E35E1}.Debug|x64.Build.0 = Debug|x64
-		{A5B5D9EE-0327-459C-9D9D-D7FA1B4E35E1}.Release|x64.ActiveCfg = Release|x64
-		{A5B5D9EE-0327-459C-9D9D-D7FA1B4E35E1}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
