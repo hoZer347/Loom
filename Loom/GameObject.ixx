@@ -121,12 +121,13 @@ namespace Loom
 		static inline std::atomic<size_t> id_counter = 0;
 
 		bool m_inherit_thread_id;
-		int m_thread_id = 0;
+		int m_threadID = 0;
 
-		std::vector<GameObject*> m_children{ };
+		std::vector<GameObject*>	m_children{ };
 		std::vector<ComponentBase*> m_components{ };
-		std::vector<ComponentBase*> m_renderables{ };
 		std::vector<ComponentBase*> m_updateables{ };
+		std::vector<ComponentBase*> m_renderables{ };
+		std::vector<ComponentBase*> m_physicsables{ };
 
 	private:
 		GameObject* parent;
@@ -135,8 +136,12 @@ namespace Loom
 		char newName[128];
 		const char* name;
 		
-		void Render();
 		void Update(const int& thread);
+		void Render();
+		void Physics();
 		void Gui();
+		
+		virtual void Gui() { };
+		virtual void _Gui();
 	};
 };

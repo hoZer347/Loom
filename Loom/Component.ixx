@@ -16,6 +16,7 @@ namespace Loom
 		virtual void OnGui()		{ };
 		virtual void OnUpdate()		{ };
 		virtual void OnRender()		{ };
+		virtual void OnPhysics()	{ };
 		virtual void OnPopOutGui()	{ };
 
 		virtual ~ComponentBase()	{ };
@@ -24,12 +25,6 @@ namespace Loom
 		friend struct GameObject;
 		virtual void Gui() { };
 		size_t type_id;
-	};
-
-	template <typename T>
-	const char* disp()
-	{
-		return typeid(T).name();
 	};
 
 	export template <typename T>

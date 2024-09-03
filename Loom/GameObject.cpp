@@ -18,7 +18,7 @@ namespace Loom
 		engine(engine),
 		parent(parent),
 		name(name),
-		m_thread_id(thread_id)
+		m_threadID(thread_id)
 	{
 		newName[0] = '\0';
 
@@ -62,7 +62,7 @@ namespace Loom
 
 	void GameObject::SetThreadID(int thread_id)
 	{
-		this->m_thread_id = thread_id;
+		this->m_threadID = thread_id;
 		for (auto& child : m_children)
 			if (child->m_inherit_thread_id)
 				child->SetThreadID(thread_id);
@@ -85,7 +85,7 @@ namespace Loom
 
 	GameObject* GameObject::AddChild(const char* name = "New GameObject")
 	{
-		GameObject* gameObject = new GameObject(engine, this, name, m_thread_id);
+		GameObject* gameObject = new GameObject(engine, this, name, m_threadID);
 
 		engine->QueueTask(
 			[gameObject, this]()
@@ -99,7 +99,7 @@ namespace Loom
 	void GameObject::Update(const int& thread)
 	{
 		for (ComponentBase* updateable : m_updateables)
-			if (thread == m_thread_id)
+			if (thread == m_threadID)
 				updateable->OnUpdate();
 		for (GameObject* child : m_children)
 			child->Update(thread);
@@ -108,9 +108,19 @@ namespace Loom
 	void GameObject::Render()
 	{
 		for (auto& renderable : m_renderables)
-			renderable->OnRender();
+			if (m_threadID != -1)
+				renderable->OnRender();
 		for (auto& child : m_children)
 			child->Render();
+	};
+
+	void GameObject::Physics()
+	{
+		for (auto& renderable : m_physicsables)
+			if (m_threadID != -1)
+				renderable->OnPhysics();
+		for (auto& child : m_children)
+			child->Physics();
 	};
 
 	void GameObject::Gui()
@@ -135,18 +145,18 @@ namespace Loom
 				ImGui::PushItemWidth(200);
 				ImGui::Text("Thread ID (-1 is not processed): ");
 				ImGui::SameLine();
-				if (ImGui::SliderInt(" ", &m_thread_id, -1, std::thread::hardware_concurrency()))
-					SetThreadID(m_thread_id);
+				if (ImGui::SliderInt(" ", &m_threadID, -1, std::thread::hardware_concurrency()))
+					SetThreadID(m_threadID);
 				ImGui::PopItemWidth();
 				ImGui::SameLine();
 			}
-			else ImGui::Text("Thread ID: %i", m_thread_id);
+			else ImGui::Text("Thread ID: %i", m_threadID);
 
 			ImGui::SameLine();
 			
 			if (ImGui::Checkbox("Inherit Host Thread", &m_inherit_thread_id))
 				if (m_inherit_thread_id)
-					SetThreadID(m_thread_id);
+					SetThreadID(m_threadID);
 
 			ImGui::Text("Name: ");
 			ImGui::SameLine();

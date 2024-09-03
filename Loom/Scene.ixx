@@ -12,15 +12,14 @@ import <functional>;
 namespace Loom
 {
 	export struct Engine;
-	export struct Scene;
-
+	
 	export struct Scene final
 	{
 		Scene(Engine* engine, const char* name, int thread_id = 0);
 		virtual ~Scene();
 
 		template <typename T>
-		constexpr T* Attach(auto&&... args) const { root.Attach<T>(args...); };
+		T* Attach(auto&&... args) { return root.Attach<T>(args...); };
 
 		GameObject* AddChild(const char* name = "New GameObject") { return root.AddChild(name); };
 
@@ -33,6 +32,8 @@ namespace Loom
 		friend struct Engine;
 		Engine* engine;
 		int thread_id;
+
+		GameObject root;
 
 		GameObject root;
 

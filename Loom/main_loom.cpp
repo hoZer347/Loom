@@ -27,12 +27,8 @@ int main()
 	Scene scene2 { &engine, "Scene 3" };
 	Scene scene3 { &engine, "Scene 4" };
 
-	{
-		GameObject* gameObject = scene0.AddChild("Rectangle");
-
-		gameObject->Attach<Rect>(100.0f, 100.0f, 100.0f, 100.0f, vec4(0.5, 0, 0, 0.5));
-		gameObject->Attach<Rect>(100.0f, 100.0f, 100.0f, 100.0f, vec4(0, 0.5, 0, 0.5));
-	};
+	scene0.Attach<Rect>(100.0f, 100.0f, 100.0f, 100.0f, vec4(0, 0.5f, 0, 1));
+	scene1.Attach<Rect>(300.0f, 100.0f, 100.0f, 100.0f, vec4(0.5f, 0, 0, 1));
 
 	engine.Start();
 

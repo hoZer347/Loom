@@ -65,6 +65,12 @@
     <ClCompile Include="Geometry.ixx">
       <Filter>Geometry</Filter>
     </ClCompile>
+    <ClCompile Include="Main Menu.cpp">
+      <Filter>Main Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="Main Menu.ixx">
+      <Filter>Main Menu</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DLLs">
@@ -99,6 +105,9 @@
     </Filter>
     <Filter Include="Geometry">
       <UniqueIdentifier>{ffad4dc7-a36f-407e-9a94-03f7dc6d0136}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Main Menu">
+      <UniqueIdentifier>{99f0d1b9-7f91-4c22-a255-e4490f70ea4a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -146,6 +155,9 @@
     </ClInclude>
     <ClInclude Include="Geometry.cuh">
       <Filter>Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="imfilebrowser.h">
+      <Filter>UI\imgui</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

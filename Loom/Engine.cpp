@@ -3,6 +3,7 @@ import Engine;
 import Timer;
 import Scene;
 import Buffer;
+import MainMenu;
 import GameObject;
 
 import <iostream>;
@@ -64,28 +65,10 @@ namespace Loom
 		};
 	};
 
-	void DoImGui_MainMenu()
+	void Engine::QueueTask(const Task& task)
 	{
-		static std::list<float> deltaTimes{ };
-
-		if (ImGui::Begin("Menu"))
-		{
-			ImGui::Text("FPS: ");
-			ImGui::SameLine();
-
-			// Showing FPS
-			float total = 0;
-			deltaTimes.emplace_back(ImGui::GetIO().DeltaTime);
-			if (deltaTimes.size() > 100)
-				deltaTimes.pop_front();
-			for (auto& i : deltaTimes)
-				total += i;
-			//
-
-			ImGui::Text(std::to_string(1/(total / deltaTimes.size())).c_str());
-		};
-
-		ImGui::End();
+		std::lock_guard lock{ mutex };
+		taskQueue.push(task);
 	};
 
 	void Engine::QueueTask(const Task& task)
@@ -99,11 +82,6 @@ namespace Loom
 		glfwSetErrorCallback(glfw_error_callback);
 		
 		glfwInit();
-
-		glClearColor(0.5f, 0.5f, 0.5f, 0.0f);
-
-		glEnable(GL_TEXTURE_2D);
-		glEnable(GL_BLEND);
 
 		// Decide GL+GLSL versions
 #if defined(IMGUI_IMPL_OPENGL_ES2)
@@ -133,6 +111,12 @@ namespace Loom
 		glfwMakeContextCurrent(window);
 		glfwSwapInterval(0);
 		glewInit();
+
+		glClearColor(0.5f, 0.5f, 0.5f, 0.0f);
+
+		glEnable(GL_TEXTURE_2D);
+		glEnable(GL_BLEND);
+		glEnable(GL_DEPTH);
 
 		glfwSetWindowSizeCallback(window,
 			[](GLFWwindow* window, int w, int h)
@@ -179,13 +163,10 @@ namespace Loom
 
 		std::barrier barrier
 		{
-			std::thread::hardware_concurrency(),
+			std::thread::hardware_concurrency() + 2,
 			[&]() noexcept
 			{
-				{
-					DoTasks();
-				};
-
+				DoTasks();
 				glfwSwapBuffers(window);
 			}
 		};
@@ -193,7 +174,7 @@ namespace Loom
 		isRunning = true;
 
 		std::vector<std::thread> threads;
-		for (unsigned int i = 0; i < std::thread::hardware_concurrency() - 1; i++)
+		for (unsigned int i = 0; i < std::thread::hardware_concurrency(); i++)
 			threads.emplace_back(
 				[&, i]()
 				{
@@ -207,6 +188,19 @@ namespace Loom
 
 					barrier.arrive_and_drop();
 				});
+
+		threads.emplace_back(
+			[&]()
+			{
+				while (isRunning)
+				{
+					barrier.arrive_and_wait();
+					for (auto& scene : Scene::allScenes)
+						scene->root.Render();
+				};
+
+				barrier.arrive_and_drop();
+			});
 
 		// Main loop
 #ifdef __EMSCRIPTEN__
@@ -228,14 +222,13 @@ namespace Loom
 
 
 			// GUI
-			DoImGui_MainMenu();
+			MainMenu::Gui();
 
 			if (doGUI)
 				for (auto& scene : Scene::allScenes)
 				{
 					if (ImGui::Begin(scene->name))
 						scene->root.Gui();
-					
 					ImGui::End();
 				};
 			//
@@ -267,14 +260,14 @@ namespace Loom
 #ifdef __EMSCRIPTEN__
 		EMSCRIPTEN_MAINLOOP_END;
 #endif
-		isRunning = false;
-
 		barrier.arrive_and_drop();
 
-		DoTasks();
+		isRunning = false;
 
 		for (auto& thread : threads)
 			thread.join();
+
+		DoTasks();
 
 		// Cleanup
 		ImGui_ImplOpenGL3_Shutdown();
