@@ -71,12 +71,6 @@ namespace Loom
 		taskQueue.push(task);
 	};
 
-	void Engine::QueueTask(const Task& task)
-	{
-		std::lock_guard lock{ mutex };
-		taskQueue.push(task);
-	};
-
 	void Engine::Start()
 	{
 		glfwSetErrorCallback(glfw_error_callback);

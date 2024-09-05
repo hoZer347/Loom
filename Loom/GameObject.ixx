@@ -140,8 +140,5 @@ namespace Loom
 		void Render();
 		void Physics();
 		void Gui();
-		
-		virtual void Gui() { };
-		virtual void _Gui();
 	};
 };

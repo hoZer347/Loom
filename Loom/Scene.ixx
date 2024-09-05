@@ -35,8 +35,6 @@ namespace Loom
 
 		GameObject root;
 
-		GameObject root;
-
 		static inline std::recursive_mutex mutex{ };
 		static inline std::vector<Scene*> allScenes{ };
 	};
