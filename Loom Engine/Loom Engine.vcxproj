@@ -10,10 +10,53 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Buffer.cpp" />
+    <ClCompile Include="Buffer.ixx" />
+    <ClCompile Include="Component.ixx" />
+    <ClCompile Include="Demos.cpp" />
+    <ClCompile Include="Demos.ixx" />
+    <ClCompile Include="Engine.cpp" />
+    <ClCompile Include="Engine.ixx" />
+    <ClCompile Include="GameObject.cpp" />
+    <ClCompile Include="GameObject.ixx" />
+    <ClCompile Include="Geometry.cpp" />
+    <ClCompile Include="Geometry.ixx" />
+    <ClCompile Include="LoomObject.cpp" />
+    <ClCompile Include="LoomObject.ixx" />
+    <ClCompile Include="Main Menu.cpp" />
+    <ClCompile Include="Main Menu.ixx" />
+    <ClCompile Include="loom_main.cpp" />
+    <ClCompile Include="Mesh.ixx" />
+    <ClCompile Include="Scene.cpp" />
+    <ClCompile Include="Scene.ixx" />
+    <ClCompile Include="Serialize.ixx" />
+    <ClCompile Include="Timer.ixx" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="glew32.dll" />
+    <None Include="glfw3.dll" />
+    <None Include="opengl32.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Buffer.cuh" />
+    <ClInclude Include="Geometry.cuh" />
+    <ClInclude Include="Macro Helpers.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="Buffer.cu" />
+    <CudaCompile Include="Geometry.cu" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Loom ImGui\Loom ImGui.vcxproj">
+      <Project>{d58e30f6-a1a0-4a69-a043-d8d4cd47e0b8}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{D4DB8697-7347-441E-B0F5-EC0886CD8B7A}</ProjectGuid>
-    <RootNamespace>Loom_Networking</RootNamespace>
+    <ProjectGuid>{3813DE5F-D426-4B1E-9638-7CE2259E5C3F}</ProjectGuid>
+    <RootNamespace>Loom</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>Loom Engine</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -35,9 +78,13 @@
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\property files\GLFW.props" />
+    <Import Project="..\property files\OpenGL.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\property files\GLFW.props" />
+    <Import Project="..\property files\OpenGL.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -47,15 +94,18 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\Desktop\Loom\Loom Utiliy;C:\Dev\boost;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PreprocessorDefinitions>_WIN32_WINNT=0x0601;WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpplatest</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>C:\Desktop\Loom\Loom ImGui;C:\Dev\boost;C:\Dev\glm;C:\Dev\glew\include;C:\Dev\glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>OpenGL32.Lib;glfw3.lib;cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files (x86)\Windows Kits\10\Lib\10.0.22621.0\um\x64;C:\Dev\glew\lib;C:\Dev\glfw\lib-vc2022;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <IgnoreSpecificDefaultLibraries>
+      </IgnoreSpecificDefaultLibraries>
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
@@ -67,32 +117,25 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\Desktop\Loom\Loom Utiliy;C:\Dev\boost;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PreprocessorDefinitions>_WIN32_WINNT=0x0601;WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpplatest</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>C:\Desktop\Loom\Loom ImGui;C:\Dev\boost;C:\Dev\glm;C:\Dev\glew\include;C:\Dev\glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>OpenGL32.Lib;glfw3.lib;cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files (x86)\Windows Kits\10\Lib\10.0.22621.0\um\x64;C:\Dev\glew\lib;C:\Dev\glfw\lib-vc2022;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <IgnoreSpecificDefaultLibraries>
+      </IgnoreSpecificDefaultLibraries>
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
     </CudaCompile>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="main_networking.cpp" />
-    <ClCompile Include="Networking.cpp" />
-    <ClCompile Include="Networking.ixx" />
-    <ClCompile Include="Standard Handles.ixx" />
-    <ClCompile Include="Standard Handles.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="Definitions.hpp" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.5.targets" />

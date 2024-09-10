@@ -1,0 +1,42 @@
+export module Scene;
+
+import GameObject;
+import LoomObject;
+
+import <thread>;
+import <mutex>;
+import <latch>;
+import <semaphore>;
+import <functional>;
+
+
+namespace Loom
+{
+	export struct Engine;
+	
+	export struct Scene final :
+		public LoomObject
+	{
+		Scene(const std::string& name = "Scene", int thread_id = 0);
+		virtual ~Scene();
+
+		void OnSerialize();
+
+		template <typename T>
+		T* Attach(auto&&... args) { return root.Attach<T>(args...); };
+
+		GameObject* AddChild(const std::string& m_name = "New GameObject") { return root.AddChild(m_name); };
+
+		static inline std::atomic<bool> is_engine_running = false;
+
+	protected:
+		friend struct MainMenu;
+		friend struct Engine;
+		int thread_id;
+
+		GameObject root;
+
+		static inline std::recursive_mutex mutex{ };
+		static inline std::vector<Scene*> allScenes{ };
+	};
+};
