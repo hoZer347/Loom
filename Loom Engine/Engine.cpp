@@ -1,16 +1,5 @@
 import Engine;
 
-import Timer;
-import Scene;
-import Buffer;
-import MainMenu;
-import GameObject;
-
-import <iostream>;
-#include <barrier>
-
-// Borrowed + modified from imgui examples
-
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -22,6 +11,19 @@ import <iostream>;
 #endif
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+
+#include "Debug.hpp"
+
+import Timer;
+import Scene;
+import Buffer;
+import MainMenu;
+import GameObject;
+
+import <iostream>;
+#include <barrier>
+
+// Borrowed + modified from imgui examples
 
 #include <string>
 #include <list>
@@ -156,119 +158,121 @@ namespace Loom
 #endif
 		ImGui_ImplOpenGL3_Init(glsl_version);
 
-		// Our state
-		ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
 		DoTasks();
 
 		Scene::is_engine_running = true;
 
-		std::barrier barrier
 		{
-			std::thread::hardware_concurrency() + 2,
-			[&]() noexcept
+			ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+			std::barrier barrier
 			{
-				DoTasks();
-				glfwSwapBuffers(window);
-			}
-		};
+				std::thread::hardware_concurrency() + 2,
+				[&]() noexcept
+				{
+					DoTasks();
+					glfwSwapBuffers(window);
+				}
+			};
 
-		isRunning = true;
+			isRunning = true;
 
-		std::vector<std::thread> threads;
-		for (unsigned int i = 0; i < std::thread::hardware_concurrency(); i++)
+			std::vector<std::thread> threads;
+			threads.reserve(std::thread::hardware_concurrency());
+			for (unsigned int i = 0; i < std::thread::hardware_concurrency(); i++)
+				threads.emplace_back(
+					[&, i]()
+					{
+						while (isRunning)
+						{
+							barrier.arrive_and_wait();
+							for (auto& scene : Scene::allScenes)
+								if (scene->thread_id == i)
+									scene->root.Update(i);
+						};
+
+						barrier.arrive_and_drop();
+					});
+
 			threads.emplace_back(
-				[&, i]()
+				[&]()
 				{
 					while (isRunning)
 					{
 						barrier.arrive_and_wait();
 						for (auto& scene : Scene::allScenes)
-							if (scene->thread_id == i)
-								scene->root.Update(i);
+							scene->root.Physics();
 					};
 
 					barrier.arrive_and_drop();
 				});
 
-		threads.emplace_back(
-			[&]()
-			{
-				while (isRunning)
-				{
-					barrier.arrive_and_wait();
-					for (auto& scene : Scene::allScenes)
-						scene->root.Render();
-				};
-
-				barrier.arrive_and_drop();
-			});
-
-		// Main loop
+			// Main loop
 #ifdef __EMSCRIPTEN__
 	// For an Emscripten build we are disabling file-system access, so let's not attempt to do a fopen() of the imgui.ini file.
 	// You may manually call LoadIniSettingsFromMemory() to load settings from your own storage.
-		io.IniFilename = nullptr;
-		EMSCRIPTEN_MAINLOOP_BEGIN
+			io.IniFilename = nullptr;
+			EMSCRIPTEN_MAINLOOP_BEGIN
 #else
-		while (!glfwWindowShouldClose(window))
+			while (!glfwWindowShouldClose(window))
 #endif
-		{
-			glfwPollEvents();
-
-			// Start the Dear ImGui frame
-			ImGui_ImplOpenGL3_NewFrame();
-			ImGui_ImplGlfw_NewFrame();
-			ImGui::NewFrame();
-			//
-
-
-			// GUI
-			MainMenu::Gui();
-
-			if (doGUI)
-				for (auto& scene : Scene::allScenes)
-				{
-
-					if (ImGui::Begin(scene->NameAndID().c_str()))
-						scene->root.Gui();
-					ImGui::End();
-				};
-			//
-
-
-			// Rendering
-			ImGui::Render();
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-			//
-
-
-			// Update and Render additional Platform Windows
-			// (Platform functions may change the current OpenGL context, so we save/restore it to make it easier to paste this code elsewhere.
-			//  For this specific demo app we could also call glfwMakeContextCurrent(window) directly)
-			if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 			{
-				GLFWwindow* backup_current_context = glfwGetCurrentContext();
-				ImGui::UpdatePlatformWindows();
-				ImGui::RenderPlatformWindowsDefault();
-				glfwMakeContextCurrent(backup_current_context);
+				glfwPollEvents();
+
+				// Start the Dear ImGui frame
+				ImGui_ImplOpenGL3_NewFrame();
+				ImGui_ImplGlfw_NewFrame();
+				ImGui::NewFrame();
+				//
+
+
+				// GUI
+				MainMenu::Gui();
+
+				if (doGUI)
+					for (auto& scene : Scene::allScenes)
+					{
+
+						if (ImGui::Begin(scene->NameAndID().c_str()))
+							scene->root.Gui();
+						ImGui::End();
+					};
+				//
+
+
+				// Rendering
+				ImGui::Render();
+				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+				ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+				//
+
+
+				// Update and Render additional Platform Windows
+				// (Platform functions may change the current OpenGL context, so we save/restore it to make it easier to paste this code elsewhere.
+				//  For this specific demo app we could also call glfwMakeContextCurrent(window) directly)
+				if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+				{
+					GLFWwindow* backup_current_context = glfwGetCurrentContext();
+					ImGui::UpdatePlatformWindows();
+					ImGui::RenderPlatformWindowsDefault();
+					glfwMakeContextCurrent(backup_current_context);
+				};
+
+				for (auto& scene : Scene::allScenes)
+					scene->root.Render();
+
+				barrier.arrive_and_wait();
 			};
-
-			for (auto& scene : Scene::allScenes)
-				scene->root.Render();
-
-			barrier.arrive_and_wait();
-		};
 #ifdef __EMSCRIPTEN__
-		EMSCRIPTEN_MAINLOOP_END;
+			EMSCRIPTEN_MAINLOOP_END;
 #endif
-		barrier.arrive_and_drop();
+			barrier.arrive_and_drop();
 
-		isRunning = false;
+			isRunning = false;
 
-		for (auto& thread : threads)
-			thread.join();
+			for (auto& thread : threads)
+				thread.join();
+		};
 
 		DoTasks();
 

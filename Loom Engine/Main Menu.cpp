@@ -4,6 +4,9 @@ import Serialize;
 import Scene;
 
 #include "imgui.h"
+
+#include "Debug.hpp"
+
 #include "imfilebrowser.h"
 
 #include <string>

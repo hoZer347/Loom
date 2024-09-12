@@ -54,8 +54,12 @@
       <Filter>Engine</Filter>
     </ClCompile>
     <ClCompile Include="Serialize.ixx" />
-    <ClCompile Include="LoomObject.ixx" />
-    <ClCompile Include="LoomObject.cpp" />
+    <ClCompile Include="LoomObject.cpp">
+      <Filter>Loom Object</Filter>
+    </ClCompile>
+    <ClCompile Include="LoomObject.ixx">
+      <Filter>Loom Object</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="DLLs">
@@ -88,6 +92,9 @@
     <Filter Include="Main Menu">
       <UniqueIdentifier>{99f0d1b9-7f91-4c22-a255-e4490f70ea4a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Loom Object">
+      <UniqueIdentifier>{9af156b8-2595-4462-a560-fae2517d09c9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="glfw3.dll">
@@ -108,6 +115,7 @@
       <Filter>Geometry</Filter>
     </ClInclude>
     <ClInclude Include="Macro Helpers.h" />
+    <ClInclude Include="Debug.hpp" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="Buffer.cu">

@@ -1,11 +1,14 @@
 import GameObject;
 
+#include "imgui.h"
+
+#include "Debug.hpp"
+
 import Engine;
 import Scene;
 
 #include <thread>
 #include <string>
-#include "imgui.h"
 
 
 namespace Loom

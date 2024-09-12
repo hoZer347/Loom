@@ -52,43 +52,21 @@ namespace Loom
 
 			// Print the name if it has one, otherwise type, along with it's ID
 			if constexpr (HAS_VARIABLE_TEST(T, m_name))
-				SAVE_STREAM << indent << t->m_name << std::endl;
-			else SAVE_STREAM << indent << typeid(T).name() << std::endl;
+				SAVE_STREAM << t->m_name << std::endl;
+			else SAVE_STREAM << typeid(T).name() << std::endl;
 
 			if constexpr (HAS_VARIABLE_TEST(T, m_id))
-				SAVE_STREAM << indent << "ID: " << t->m_id << std::endl;
+				SAVE_STREAM << "ID: " << t->m_id << std::endl;
 			//
 
+
+			// If it has a serialize function, call it
 			if constexpr (HAS_FUNCTION_TEST(T, OnSerialize))
-			{
-				indent += '\t';
 				t->OnSerialize();
-				indent.pop_back();
-			};
-
-			file.close();
 			//
-		};
-
-		static void Push(const std::string string)
-		{
-			SAVE_STREAM << indent << string;
-		};
-
-	protected:
-		friend struct MainMenu;
-
-		static inline void SetProjectFile(std::string file_path)
-		{
-			if (file.is_open())
-				file.close();
-
-			file.open(file_path);
 		};
 
 	private:
-		static inline thread_local std::string indent{ };
-		static inline thread_local std::fstream file{ };
 		static inline std::unordered_map<std::string, void(*)(void*)> registered_types{ };
 		static inline std::recursive_mutex registry_mutex{ };
 	};

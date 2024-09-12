@@ -28,7 +28,6 @@ namespace Loom
 
 	private:
 		static void DoTasks() noexcept;
-
 		
 		static inline std::recursive_mutex mutex;
 		static inline std::queue<Task> taskQueue;

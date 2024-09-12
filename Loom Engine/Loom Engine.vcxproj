@@ -40,6 +40,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Buffer.cuh" />
+    <ClInclude Include="Debug.hpp" />
     <ClInclude Include="Geometry.cuh" />
     <ClInclude Include="Macro Helpers.h" />
   </ItemGroup>

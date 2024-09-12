@@ -1,6 +1,8 @@
 import LoomObject;
 import Engine;
 
+#include "Debug.hpp"
+
 import <string>;
 import <iostream>;
 

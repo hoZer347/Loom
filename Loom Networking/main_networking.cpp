@@ -7,8 +7,9 @@ using namespace Loom;
 
 int main()
 {
-	std::thread(StartServer).detach();
-	std::thread(StartClient).detach();
+	std::thread(OpenServerOnThisThread).detach();
+	std::this_thread::sleep_for(std::chrono::seconds(1));
+	std::thread(OpenClientOnThisThread).detach();
 
 	while (true);
 };

@@ -111,7 +111,7 @@ namespace Loom
 
 		GameObject(GameObject* parent, const std::string& name, const int& thread_id);
 
-		~GameObject();
+		virtual ~GameObject();
 
 		static inline std::atomic<size_t> num_objects = 0;
 		static inline std::atomic<size_t> id_counter = 0;
