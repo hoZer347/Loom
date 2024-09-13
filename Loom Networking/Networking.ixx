@@ -10,8 +10,23 @@ namespace Loom
 	typedef size_t MessageType;
 	typedef size_t RequestType;
 
-	export void OpenServerOnThisThread();
-	export void OpenClientOnThisThread();
+	export void OpenUDPServerOnThisThread();
+	export void OpenUDPClientOnThisThread();
+
+	export void OpenTCPServerOnThisThread();
+	export void OpenTCPClientOnThisThread();
+
+	export void StopUDPServer();
+	export void StopUDPClient();
+
+	export void StopTCPServer();
+	export void StopTCPClient();
+
+	export const bool& GetIsUDPServerOn();
+	export const bool& GetIsUDPClientOn();
+
+	export const bool& GetIsTCPServerOn();
+	export const bool& GetIsTCPClientOn();
 
 	export struct Message
 	{
@@ -34,16 +49,6 @@ namespace Loom
 	};
 
 	export void Send(MessageType message_type, Message* message, size_t size);
-
-	export template <MessageType message_type, typename S, typename T>
-	constexpr void Request(S* sent, T* receive) noexcept
-	{
-		static_assert(sizeof(S) <= MAX_CHUNK_SIZE, "Type S too large; increase MAX_CHUNK_SIZE or decrease S size");
-		static_assert(sizeof(T) <= MAX_CHUNK_SIZE, "Type T too large; increase MAX_CHUNK_SIZE or decrease T size");
-		Request(message_type, (Message*)sent, sizeof(S), (Message*)receive, sizeof(T));
-	};
-
-	//export void Request(RequestType request_type, Message* sent, size_t sent_size, Message* receive, size_t receive_size);
 
 	export void SetHandle(MessageType message_type, void(*message_interpretter)(Message*));
 };

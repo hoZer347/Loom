@@ -13,6 +13,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom ImGui", "Loom ImGui\Lo
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Engine", "Loom Engine\Loom Engine.vcxproj", "{3813DE5F-D426-4B1E-9638-7CE2259E5C3F}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Testing", "Loom Testing\Loom Testing.vcxproj", "{8B7F2B81-7939-4DC7-BB27-365D517AF856}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Sound", "Loom Sound\Loom Sound.vcxproj", "{4752FB84-AF84-41B8-BFB1-404F35C7656A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -39,6 +43,14 @@ Global
 		{3813DE5F-D426-4B1E-9638-7CE2259E5C3F}.Debug|x64.Build.0 = Debug|x64
 		{3813DE5F-D426-4B1E-9638-7CE2259E5C3F}.Release|x64.ActiveCfg = Release|x64
 		{3813DE5F-D426-4B1E-9638-7CE2259E5C3F}.Release|x64.Build.0 = Release|x64
+		{8B7F2B81-7939-4DC7-BB27-365D517AF856}.Debug|x64.ActiveCfg = Debug|x64
+		{8B7F2B81-7939-4DC7-BB27-365D517AF856}.Debug|x64.Build.0 = Debug|x64
+		{8B7F2B81-7939-4DC7-BB27-365D517AF856}.Release|x64.ActiveCfg = Release|x64
+		{8B7F2B81-7939-4DC7-BB27-365D517AF856}.Release|x64.Build.0 = Release|x64
+		{4752FB84-AF84-41B8-BFB1-404F35C7656A}.Debug|x64.ActiveCfg = Debug|x64
+		{4752FB84-AF84-41B8-BFB1-404F35C7656A}.Debug|x64.Build.0 = Debug|x64
+		{4752FB84-AF84-41B8-BFB1-404F35C7656A}.Release|x64.ActiveCfg = Release|x64
+		{4752FB84-AF84-41B8-BFB1-404F35C7656A}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

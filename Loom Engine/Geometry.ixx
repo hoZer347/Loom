@@ -16,7 +16,7 @@ namespace Loom::Geometry
 			const float& y,
 			const float& w,
 			const float& h,
-			const vec4& color);
+			const vec4& color = vec4(0.5, 0, 0, 1));
 
 		~Rect();
 

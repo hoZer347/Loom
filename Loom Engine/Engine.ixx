@@ -4,6 +4,7 @@ import <GLFW/glfw3.h>;
 import <functional>;
 import <mutex>;
 import <queue>;
+import <iostream>;
 
 
 namespace Loom
@@ -25,6 +26,13 @@ namespace Loom
 		static const size_t& GetUniqueID();
 
 		Engine() = delete;
+
+		template <typename T>
+		static void Register()
+		{
+			std::cout << "Registered " << typeid(T).name() << std::endl;
+			// TODO: Finish this
+		};
 
 	private:
 		static void DoTasks() noexcept;

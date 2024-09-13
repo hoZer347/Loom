@@ -37,7 +37,6 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-
 #define HAS_VARIABLE_DECL(member_variable_name) \
     template <typename T> \
     class has_##member_variable_name## { \
@@ -58,3 +57,19 @@
         static constexpr bool value = decltype(check<T>(0))::value; \
     };
 #define HAS_VARIABLE_TEST(class_name, member_variable_name) has_##member_variable_name##<class_name>::value
+
+
+// Registers a variable to be serialized
+#define REGISTER(variable_name)\
+
+
+// Declares a variable to be serialized
+// TODO: Implement this
+#define SERIALIZED(variable_type, variable_name, default_value)\
+variable_type variable_name## = std::function<##variable_type##()>([]()\
+	{\
+\
+		return default_value##;\
+	})();\
+
+#define SERIALIZED_VARIABLE(type, variable_name, default_value) SERIALIZED(type, variable_name, default_value);

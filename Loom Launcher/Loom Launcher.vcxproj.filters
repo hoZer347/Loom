@@ -3,6 +3,5 @@
   <ItemGroup>
     <ClCompile Include="Launcher.cpp" />
     <ClCompile Include="Launcher.ixx" />
-    <ClCompile Include="main_launcher.cpp" />
   </ItemGroup>
 </Project>
