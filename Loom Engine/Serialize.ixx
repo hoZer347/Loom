@@ -2,6 +2,8 @@
 
 export module Serialize;
 
+import LoomObject;
+
 import <mutex>;
 import <string>;
 import <fstream>;
@@ -25,18 +27,29 @@ namespace Loom
 	{
 		Serialize() = delete;
 		
-		template <typename T>
-		static void Register()
+		static void Start(const std::string& path)
 		{
-			std::lock_guard lock{ registry_mutex };
 
-			if (!registered_types.contains(typeid(T).name()))
-				registered_types = typeid(T).name();
+		};
+
+		static void Close()
+		{
+
 		};
 
 		template <typename T>
 		static void Push(T* t)
 		{
+			// Print the name if it has one, otherwise type, along with its ID
+			if constexpr (HAS_VARIABLE_TEST(T, m_name))
+				SAVE_STREAM << t->m_name << std::endl;
+			else SAVE_STREAM << typeid(T).name() << std::endl;
+
+			if constexpr (HAS_VARIABLE_TEST(T, m_id))
+				SAVE_STREAM << "ID: " << t->m_id << std::endl;
+			//
+
+
 			// If a collection, cascade for each item
 			if constexpr (
 				HAS_FUNCTION_TEST(T, begin) &&
@@ -50,24 +63,25 @@ namespace Loom
 			//
 
 
-			// Print the name if it has one, otherwise type, along with it's ID
-			if constexpr (HAS_VARIABLE_TEST(T, m_name))
-				SAVE_STREAM << t->m_name << std::endl;
-			else SAVE_STREAM << typeid(T).name() << std::endl;
-
-			if constexpr (HAS_VARIABLE_TEST(T, m_id))
-				SAVE_STREAM << "ID: " << t->m_id << std::endl;
-			//
-
-
 			// If it has a serialize function, call it
 			if constexpr (HAS_FUNCTION_TEST(T, OnSerialize))
 				t->OnSerialize();
 			//
+
+
+			//
+			char* buffer = (char*)malloc(sizeof(T) + 1);
+			memcpy(buffer, t, sizeof(T));
+			buffer[sizeof(T)] = '\0';
+			SAVE_STREAM << buffer << std::endl;
+			SAVE_STREAM << std::endl;
+			//
 		};
 
-	private:
-		static inline std::unordered_map<std::string, void(*)(void*)> registered_types{ };
-		static inline std::recursive_mutex registry_mutex{ };
+		template <typename T>
+		static void Pull(T* t)
+		{
+
+		};
 	};
 };

@@ -39,7 +39,7 @@ namespace Loom
 			ImGui::Text(std::to_string(1 / (total / deltaTimes.size())).c_str());
 		};
 
-		if (ImGui::Button("Open File Dialog")) 
+		if (ImGui::Button("Open File Dialog"))
 			fileDialog.Open();
 
 		// Show the file dialog
@@ -61,10 +61,27 @@ namespace Loom
 
 		// Save Button
 		if (ImGui::Button("Save"))
-			Serialize::Push(&Scene::allScenes);
+			Save();
+		//
+
+		// Load Button
+		if (ImGui::Button("Load"))
+			Load();
 		//
 
 
 		ImGui::End();
+	};
+
+	void MainMenu::Save()
+	{
+		for (Scene* scene : Scene::allScenes)
+			Serialize::Push(scene);
+	};
+
+	void MainMenu::Load()
+	{
+		for (Scene* scene : Scene::allScenes)
+			Serialize::Pull(scene);
 	};
 };

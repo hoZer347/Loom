@@ -115,6 +115,7 @@
     </ClInclude>
     <ClInclude Include="Macro Helpers.h" />
     <ClInclude Include="Debug.hpp" />
+    <ClInclude Include="Loom.h" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="Buffer.cu">

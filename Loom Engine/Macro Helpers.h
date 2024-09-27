@@ -66,7 +66,8 @@
 // Declares a variable to be serialized
 // TODO: Implement this
 #define SERIALIZED(variable_type, variable_name, default_value)\
-variable_type variable_name## = std::function<##variable_type##()>([]()\
+variable_type variable_name## =\
+	std::function<##variable_type##()>([]()\
 	{\
 \
 		return default_value##;\

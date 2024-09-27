@@ -20,7 +20,7 @@ int main()
 	//Scene scene2{ };
 	//Scene scene3{ };
 
-	//Geometry::Rect* rect = scene0.Attach<Geometry::Rect>(100, 100, 100, 100);
+	Geometry::Rect* rect = scene0.Attach<Geometry::Rect>(100, 100, 100, 100);
 
 	scene0.Attach<TCP_Server>();
 
