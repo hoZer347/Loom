@@ -6,6 +6,7 @@ import GameObject;
 
 import Engine;
 import Scene;
+import Serialize;
 
 #include <thread>
 #include <string>
@@ -175,11 +176,5 @@ namespace Loom
 		};
 
 		ImGui::PopID();
-	};
-
-	void GameObject::OnSerialize()
-	{
-		Serialize::Push(&m_components);
-		Serialize::Push(&m_children);
 	};
 };

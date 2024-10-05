@@ -13,9 +13,10 @@ namespace Loom
 	export struct Buffer;
 	export struct Scene;
 
+	// TODO: Make this not static
 	export struct Engine final
 	{
-		static void Start(const char* project_directory);
+		static void Start(const char* projectDirectory);
 		static void Stop();
 
 		static void QueueTask(const Task& task);
@@ -27,16 +28,11 @@ namespace Loom
 
 		Engine() = delete;
 
-		template <typename T>
-		static void Register()
-		{
-			std::cout << "Registered " << typeid(T).name() << std::endl;
-			// TODO: Finish this
-		};
-
 	private:
 		static void DoTasks() noexcept;
 		
+		static inline const char* projectDirectory;
+
 		static inline std::recursive_mutex mutex;
 		static inline std::queue<Task> taskQueue;
 	};

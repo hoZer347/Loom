@@ -1,9 +1,14 @@
+#include "Macro Helpers.h"
+
 export module Geometry;
 
 import Component;
+import Serialize;
 
 import <glm/glm.hpp>;
 using namespace glm;
+
+import <iostream>;
 
 
 namespace Loom::Geometry
@@ -25,6 +30,8 @@ namespace Loom::Geometry
 
 		vec4 color;
 		float x, y, w, h;
+
+		SERIALIZE(&color, &x, &y, &w, &h);
 	};
 
 	export struct Cube

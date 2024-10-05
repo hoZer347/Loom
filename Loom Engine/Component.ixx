@@ -1,7 +1,6 @@
 export module Component;
 
 import LoomObject;
-import Serialize;
 
 import "imgui.h";
 import "typeinfo";
@@ -22,15 +21,12 @@ namespace Loom
 		virtual void OnRender()		 { };
 		virtual void OnPhysics()	 { };
 		virtual void OnPopOutGui()	 { };
-		virtual void OnSerialize()   { };
 		virtual void OnRefresh()     { };
 
 		virtual ~ComponentBase()	 { };
 
 	protected:
-		std::string file_name;
-
-		friend struct Serialize;
+		friend struct Serializer;
 		friend struct GameObject;
 		virtual void Gui() { };
 		size_t type_id;

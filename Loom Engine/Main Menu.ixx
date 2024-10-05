@@ -15,8 +15,5 @@ namespace Loom
 
 	private:
 		MainMenu() = delete;
-		
-		static void Load();
-		static void Save();
 	};
 };

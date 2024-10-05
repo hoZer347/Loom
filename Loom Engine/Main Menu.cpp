@@ -1,7 +1,7 @@
 import MainMenu;
 
-import Serialize;
 import Scene;
+import Serialize;
 
 #include "imgui.h"
 
@@ -59,29 +59,19 @@ namespace Loom
 		//
 
 
-		// Save Button
 		if (ImGui::Button("Save"))
-			Save();
-		//
+		{
+			for (auto& scene : Scene::allScenes)
+				scene->OnSerialize();
+		};
 
-		// Load Button
+
 		if (ImGui::Button("Load"))
-			Load();
-		//
+		{
+
+		};
 
 
 		ImGui::End();
-	};
-
-	void MainMenu::Save()
-	{
-		for (Scene* scene : Scene::allScenes)
-			Serialize::Push(scene);
-	};
-
-	void MainMenu::Load()
-	{
-		for (Scene* scene : Scene::allScenes)
-			Serialize::Pull(scene);
 	};
 };

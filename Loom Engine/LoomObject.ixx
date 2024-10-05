@@ -32,6 +32,8 @@ namespace Loom
 
 		virtual ~LoomObject();
 
+		constexpr std::string NameAndID() const;
+
 	protected:
 		std::string m_name;
 		static inline std::recursive_mutex mutex;
@@ -40,7 +42,10 @@ namespace Loom
 
 		uint64_t Initialize();
 
-		constexpr std::string NameAndID() const;
+		// Use the SERIALIZE(...) macro to serialize members
+		virtual void OnSerialize() { };
+		virtual void OnDeserialize() { };
+		//
 
 	private:
 		static LoomObject* _GetByID(const uint64_t& ID);

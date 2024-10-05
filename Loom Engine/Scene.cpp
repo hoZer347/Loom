@@ -4,7 +4,6 @@ import Scene;
 
 #include "Debug.hpp"
 
-import Serialize;
 import Engine;
 
 import <vector>;
@@ -35,14 +34,9 @@ namespace Loom
 			{
 				allScenes.erase(
 					std::remove(
-						allScenes.begin(), 
+						allScenes.begin(),
 						allScenes.end(), this),
 					allScenes.end());
 			});
-	};
-
-	void Scene::OnSerialize()
-	{
-		Serialize::Push(&root);
 	};
 };

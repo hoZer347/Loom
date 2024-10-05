@@ -59,18 +59,14 @@
 #define HAS_VARIABLE_TEST(class_name, member_variable_name) has_##member_variable_name##<class_name>::value
 
 
-// Registers a variable to be serialized
-#define REGISTER(variable_name)\
-
-
-// Declares a variable to be serialized
-// TODO: Implement this
-#define SERIALIZED(variable_type, variable_name, default_value)\
-variable_type variable_name## =\
-	std::function<##variable_type##()>([]()\
-	{\
-\
-		return default_value##;\
-	})();\
-
-#define SERIALIZED_VARIABLE(type, variable_name, default_value) SERIALIZED(type, variable_name, default_value);
+#define SERIALIZE(...)\
+void OnSerialize() override\
+{\
+	std::cout << "Serializing: " << typeid(*this).name() << std::endl;\
+	Serialize(m_name.c_str(), this, __VA_ARGS__);\
+};\
+void OnDeserialize() override\
+{\
+	std::cout << "Deserializing: " << typeid(*this).name() << std::endl;\
+	Deserialize(m_name.c_str(), this, __VA_ARGS__);\
+};\

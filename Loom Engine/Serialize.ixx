@@ -1,16 +1,15 @@
 #include "Macro Helpers.h"
 
+
 export module Serialize;
 
-import LoomObject;
+import <iostream>;
 
 import <mutex>;
 import <string>;
 import <fstream>;
-import <iostream>;
+import <functional>;
 import <unordered_map>;
-
-#define SAVE_STREAM std::cout
 
 
 namespace Loom
@@ -19,69 +18,77 @@ namespace Loom
 	HAS_FUNCTION_DECL(end);
 
 	HAS_FUNCTION_DECL(OnSerialize);
+	HAS_FUNCTION_DECL(OnDeserialize);
 
-	HAS_VARIABLE_DECL(m_name);
-	HAS_VARIABLE_DECL(m_id);
 
-	export struct Serialize
+
+	inline void SubSerialize(std::ofstream& stream)
+	{ };
+
+	template <typename ARG, typename... ARGS>
+	inline void SubSerialize(std::ofstream& stream, ARG* arg, ARGS*... args)
 	{
-		Serialize() = delete;
-		
-		static void Start(const std::string& path)
+		if constexpr (HAS_FUNCTION_TEST(ARG, OnSerialize))
+			arg->OnSerialize();
+
+		if constexpr (
+			HAS_FUNCTION_TEST(ARG, begin) &&
+			HAS_FUNCTION_TEST(ARG, end))
 		{
+			size_t size = arg->size();
+			stream.write(reinterpret_cast<char*>(&size), sizeof(size));
+			arg->reserve(size);
+			stream.write(reinterpret_cast<char*>(arg->data()), sizeof(ARG::value_type) * size);
+		}
 
-		};
+		else stream.write(reinterpret_cast<char*>(arg), sizeof(ARG));
 
-		static void Close()
+		SubSerialize(stream, args...);
+	};
+
+	export template <typename T, typename... ARGS>
+	inline void Serialize(const char* path, T* t, ARGS*... args)
+	{
+		std::ofstream stream{ path, std::ios::binary };
+
+		SubSerialize(stream, args...);
+
+		stream.close();
+	};
+
+
+
+	inline void SubDeserialize(std::ifstream& stream)
+	{ };
+
+	template <typename ARG, typename... ARGS>
+	inline void SubDeserialize(std::ifstream& stream, ARG* arg, ARGS*... args)
+	{
+		if constexpr (HAS_FUNCTION_TEST(ARG, OnDeserialize))
+			arg->OnDeserialize();
+
+		if constexpr (
+			HAS_FUNCTION_TEST(ARG, begin) &&
+			HAS_FUNCTION_TEST(ARG, end))
 		{
+			size_t size;
+			stream.read(reinterpret_cast<char*>(&size), sizeof(size_t));
+			arg->reserve(size);
+			stream.read(reinterpret_cast<char*>(arg->data()), sizeof(ARG::value_type) * size);
+		}
 
-		};
+		else stream.read(reinterpret_cast<char*>(arg), sizeof(ARG));
 
-		template <typename T>
-		static void Push(T* t)
-		{
-			// Print the name if it has one, otherwise type, along with its ID
-			if constexpr (HAS_VARIABLE_TEST(T, m_name))
-				SAVE_STREAM << t->m_name << std::endl;
-			else SAVE_STREAM << typeid(T).name() << std::endl;
+		SubDeserialize(stream, args...);
+	};
 
-			if constexpr (HAS_VARIABLE_TEST(T, m_id))
-				SAVE_STREAM << "ID: " << t->m_id << std::endl;
-			//
+	export template <typename T, typename... ARGS>
+	inline void Deserialize(const char* path, T* t, ARGS*... args)
+	{
+		std::ifstream stream{ path, std::ios::binary };
 
+		SubDeserialize(stream, args...);
 
-			// If a collection, cascade for each item
-			if constexpr (
-				HAS_FUNCTION_TEST(T, begin) &&
-				HAS_FUNCTION_TEST(T, end))
-			{
-				for (auto& i : *t)
-					Push(i);
-
-				return;
-			};
-			//
-
-
-			// If it has a serialize function, call it
-			if constexpr (HAS_FUNCTION_TEST(T, OnSerialize))
-				t->OnSerialize();
-			//
-
-
-			//
-			char* buffer = (char*)malloc(sizeof(T) + 1);
-			memcpy(buffer, t, sizeof(T));
-			buffer[sizeof(T)] = '\0';
-			SAVE_STREAM << buffer << std::endl;
-			SAVE_STREAM << std::endl;
-			//
-		};
-
-		template <typename T>
-		static void Pull(T* t)
-		{
-
-		};
+		stream.close();
 	};
 };

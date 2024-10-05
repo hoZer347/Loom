@@ -81,8 +81,10 @@ namespace Loom
 		return id_counter++;
 	};
 
-	void Engine::Start(const char* project_directory)
+	void Engine::Start(const char* projectDirectory)
 	{
+		Engine::projectDirectory = projectDirectory;
+
 		glfwSetErrorCallback(glfw_error_callback);
 		
 		glfwInit();

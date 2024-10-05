@@ -1,7 +1,10 @@
+#include "Macro Helpers.h"
+
 export module Scene;
 
 import GameObject;
 import LoomObject;
+import Serialize;
 
 import <thread>;
 import <mutex>;
@@ -19,8 +22,8 @@ namespace Loom
 	{
 		Scene(const std::string& name = "Scene", int thread_id = 0);
 		virtual ~Scene();
-
-		void OnSerialize();
+		
+		SERIALIZE(&root);
 
 		template <typename T>
 		T* Attach(auto&&... args) { return root.Attach<T>(args...); };

@@ -1,3 +1,5 @@
+#include "Macro Helpers.h"
+
 export module GameObject;
 
 import LoomObject;
@@ -125,7 +127,13 @@ namespace Loom
 		std::vector<ComponentBase*> m_renderables{ };
 		std::vector<ComponentBase*> m_physicsables{ };
 
-		void OnSerialize();
+		SERIALIZE(
+			&m_inherit_thread_id,
+			&m_children,
+			&m_components,
+			&m_updateables,
+			&m_renderables,
+			&m_physicsables);
 
 	private:
 		GameObject* parent;

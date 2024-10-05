@@ -11,9 +11,14 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Editor.cpp" />
+    <ClCompile Include="Editor.ixx" />
     <ClCompile Include="main_editor.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Loom Engine\Loom Engine.vcxproj">
+      <Project>{3813de5f-d426-4b1e-9638-7ce2259e5c3f}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\Loom ImGui\Loom ImGui.vcxproj">
       <Project>{d58e30f6-a1a0-4a69-a043-d8d4cd47e0b8}</Project>
     </ProjectReference>
@@ -43,13 +48,11 @@
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="..\property files\GLFW.props" />
     <Import Project="..\property files\OpenGL.props" />
     <Import Project="..\property files\Loom.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="..\property files\GLFW.props" />
     <Import Project="..\property files\OpenGL.props" />
     <Import Project="..\property files\Loom.props" />
   </ImportGroup>
