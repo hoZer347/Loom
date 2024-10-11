@@ -23,11 +23,13 @@ namespace Loom
 			static_assert(std::is_base_of_v<Component<T>, T>, "Must be a component");
 			
 			T* component = new T(args...);
-			((ComponentBase*)component)->type_id = typeid(T).hash_code();
+			((ComponentBase*)component)->m_type_id = typeid(T).hash_code();
 
 			Engine::QueueTask(
 				[this, component]()
 				{
+					//((ComponentBase*)component)->m_game_object = (GameObject*)this;
+
 					m_components.emplace_back(component);
 
 					if constexpr (&T::OnUpdate != &ComponentBase::OnUpdate)
@@ -49,7 +51,7 @@ namespace Loom
 			static_assert(std::is_base_of_v<Component<T>, T>, "Must be a component");
 
 			for (auto& component : m_components)
-				if (component->type_id = typeid(T).hash_code())
+				if (component->m_type_id = typeid(T).hash_code())
 					return (T*)component;
 
 			return nullptr;
@@ -61,7 +63,7 @@ namespace Loom
 			static_assert(std::is_base_of_v<Component<T>, T>, "Must be a component");
 
 			for (auto& component : m_components)
-				if (component->type_id = typeid(T).hash_code())
+				if (component->m_type_id = typeid(T).hash_code())
 				{
 					Engine::QueueTask(
 						[component]()

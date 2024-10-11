@@ -6,64 +6,27 @@
 #include "imgui.h"
 #include "Macro Helpers.h"
 
-import Engine;
+import Mesh;
 import Scene;
-import Server;
-import Geometry;
-import Component;
-import Serialize;
+import Engine;
+import GameObject;
 
 import <vector>;
 
 using namespace Loom;
 
 
-struct Test : Component<Test>
-{
-	int i = 0;
-	int j = 5;
-
-	std::vector<int> v = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-};
-
 int main()
 {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
-	Scene scene{ };
+	Scene scene{ "Scene1" };
 
-	scene.Attach<Geometry::Rect>(100, 100, 100, 100);
+	GameObject* gameObject = scene.AddChild("GameObject1");
 
-	Test* test0 = scene.Attach<Test>();
-	Test* test1 = scene.Attach<Test>();
+	gameObject->Attach<Mesh>();
 
-	test0->i = 423526;
-	test0->j = 37746;
-
-	std::cout << test1->i << std::endl;
-	std::cout << test1->j << std::endl;
-
-	//Serialize(
-	//	"C:/Users/3hoze/Desktop/Loom Project 1/Serialize.txt",
-	//	test0,
-	//	&test0->i,
-	//	&test0->j,
-	//	&test0->v);
-
-	//Deserialize(
-	//	"C:/Users/3hoze/Desktop/Loom Project 1/Serialize.txt",
-	//	test1,
-	//	&test1->i,
-	//	&test1->j,
-	//	&test1->v);
-
-	std::cout << test1->i << std::endl;
-	std::cout << test1->j << std::endl;
-
-	for (auto& i : test1->v)
-		std::cout << i << std::endl;
-
-	Engine::Start("C:/Users/3hoze/Desktop/Loom Project 1");
+	Engine::Start("");
 
 	return 0;
 };

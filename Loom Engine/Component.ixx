@@ -25,11 +25,14 @@ namespace Loom
 
 		virtual ~ComponentBase()	 { };
 
+		GameObject const* GetGameObject() const { return m_game_object; };
+		const std::string& GetName() const { return m_name; };
+
 	protected:
-		friend struct Serializer;
 		friend struct GameObject;
 		virtual void Gui() { };
-		size_t type_id;
+		size_t m_type_id;
+		GameObject* m_game_object;
 	};
 
 	export template <typename T>

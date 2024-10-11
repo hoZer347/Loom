@@ -1,9 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="Engine.cpp">
-      <Filter>Engine</Filter>
-    </ClCompile>
     <ClCompile Include="Engine.ixx">
       <Filter>Engine</Filter>
     </ClCompile>
@@ -31,12 +28,6 @@
     <ClCompile Include="Component.ixx">
       <Filter>Engine\Component</Filter>
     </ClCompile>
-    <ClCompile Include="Buffer.ixx">
-      <Filter>Buffer</Filter>
-    </ClCompile>
-    <ClCompile Include="Buffer.cpp">
-      <Filter>Buffer</Filter>
-    </ClCompile>
     <ClCompile Include="Geometry.cpp">
       <Filter>Geometry</Filter>
     </ClCompile>
@@ -58,6 +49,21 @@
     </ClCompile>
     <ClCompile Include="LoomObject.ixx">
       <Filter>Loom Object</Filter>
+    </ClCompile>
+    <ClCompile Include="Mesh.ixx">
+      <Filter>Mesh</Filter>
+    </ClCompile>
+    <ClCompile Include="Mesh.cpp">
+      <Filter>Mesh</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer.cpp">
+      <Filter>Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer.ixx">
+      <Filter>Renderer</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -82,9 +88,6 @@
     <Filter Include="Engine\Component">
       <UniqueIdentifier>{d94a1dea-6721-415a-ba5f-6716f9e06bbb}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Buffer">
-      <UniqueIdentifier>{e98a62ce-c484-452c-8233-830dbecf5565}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Geometry">
       <UniqueIdentifier>{ffad4dc7-a36f-407e-9a94-03f7dc6d0136}</UniqueIdentifier>
     </Filter>
@@ -93,6 +96,12 @@
     </Filter>
     <Filter Include="Loom Object">
       <UniqueIdentifier>{9af156b8-2595-4462-a560-fae2517d09c9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Mesh">
+      <UniqueIdentifier>{28d35c69-b570-4867-be73-555ac01255dd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Renderer">
+      <UniqueIdentifier>{4afc8a50-ed14-4887-966a-8d5ff63a8b60}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -107,9 +116,6 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Buffer.cuh">
-      <Filter>Buffer</Filter>
-    </ClInclude>
     <ClInclude Include="Geometry.cuh">
       <Filter>Geometry</Filter>
     </ClInclude>
@@ -118,9 +124,6 @@
     <ClInclude Include="Loom.h" />
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="Buffer.cu">
-      <Filter>Buffer</Filter>
-    </CudaCompile>
     <CudaCompile Include="Geometry.cu">
       <Filter>Geometry</Filter>
     </CudaCompile>

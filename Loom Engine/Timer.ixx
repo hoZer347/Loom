@@ -1,11 +1,20 @@
+#include "Macro Helpers.h"
+
 export module Timer;
 
-import <chrono>;
 import <iostream>;
+import <chrono>;
 
 
 namespace Loom
 {
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	//
+	// Str: A template struct that holds a string literal
+	// - Example:
+	//		Str<"Hello, World!"> str;
+	//		std::cout << str.value; // Hello, World!
+	//
 	export template<size_t N>
 		struct Str final
 	{
@@ -15,6 +24,8 @@ namespace Loom
 		};
 		char value[N];
 	};
+	//
+	////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	template <Str m_name = "Default">
 	struct Timer

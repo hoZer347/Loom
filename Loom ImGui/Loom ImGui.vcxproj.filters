@@ -18,12 +18,6 @@
     <ClInclude Include="imgui_impl_glfw.h">
       <Filter>ImGui Files</Filter>
     </ClInclude>
-    <ClInclude Include="imgui_impl_opengl3.h">
-      <Filter>ImGui Files</Filter>
-    </ClInclude>
-    <ClInclude Include="imgui_impl_opengl3_loader.h">
-      <Filter>ImGui Files</Filter>
-    </ClInclude>
     <ClInclude Include="imgui_internal.h">
       <Filter>ImGui Files</Filter>
     </ClInclude>
@@ -34,6 +28,9 @@
       <Filter>ImGui Files</Filter>
     </ClInclude>
     <ClInclude Include="imstb_truetype.h">
+      <Filter>ImGui Files</Filter>
+    </ClInclude>
+    <ClInclude Include="imgui_impl_vulkan.h">
       <Filter>ImGui Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -50,13 +47,13 @@
     <ClCompile Include="imgui_impl_glfw.cpp">
       <Filter>ImGui Files</Filter>
     </ClCompile>
-    <ClCompile Include="imgui_impl_opengl3.cpp">
-      <Filter>ImGui Files</Filter>
-    </ClCompile>
     <ClCompile Include="imgui_tables.cpp">
       <Filter>ImGui Files</Filter>
     </ClCompile>
     <ClCompile Include="imgui_widgets.cpp">
+      <Filter>ImGui Files</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui_impl_vulkan.cpp">
       <Filter>ImGui Files</Filter>
     </ClCompile>
   </ItemGroup>
