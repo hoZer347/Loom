@@ -37,6 +37,8 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\property files\JSON.props" />
     <Import Project="..\property files\Loom Engine.props" />
+    <Import Project="..\Property Files\OpenGL.props" />
+    <Import Project="..\Property Files\GLFW.props" />
     <Import Project="..\property files\Boost.props" />
     <Import Project="..\Property Files\UserMacros.props" />
   </ImportGroup>
@@ -44,6 +46,8 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\property files\JSON.props" />
     <Import Project="..\property files\Loom Engine.props" />
+    <Import Project="..\Property Files\OpenGL.props" />
+    <Import Project="..\Property Files\GLFW.props" />
     <Import Project="..\property files\Boost.props" />
     <Import Project="..\Property Files\UserMacros.props" />
   </ImportGroup>

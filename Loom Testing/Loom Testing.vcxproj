@@ -49,7 +49,7 @@
     <Import Project="..\property files\ImGui.props" />
     <Import Project="..\property files\Loom Networking.props" />
     <Import Project="..\property files\Loom Engine.props" />
-    <Import Project="..\Property Files\Vulkan.props" />
+    <Import Project="..\Property Files\OpenGL.props" />
     <Import Project="..\Property Files\GLFW.props" />
     <Import Project="..\Property Files\Assimp.props" />
     <Import Project="..\Property Files\UserMacros.props" />
@@ -59,7 +59,7 @@
     <Import Project="..\property files\ImGui.props" />
     <Import Project="..\property files\Loom Networking.props" />
     <Import Project="..\property files\Loom Engine.props" />
-    <Import Project="..\Property Files\Vulkan.props" />
+    <Import Project="..\Property Files\OpenGL.props" />
     <Import Project="..\Property Files\GLFW.props" />
     <Import Project="..\Property Files\Assimp.props" />
     <Import Project="..\Property Files\UserMacros.props" />

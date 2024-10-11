@@ -11,6 +11,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Asset Manager.cpp" />
+    <ClCompile Include="Asset Manager.ixx" />
     <ClCompile Include="Component.ixx" />
     <ClCompile Include="Demos.cpp" />
     <ClCompile Include="Demos.ixx" />
@@ -18,8 +20,6 @@
     <ClCompile Include="Engine.ixx" />
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="GameObject.ixx" />
-    <ClCompile Include="Geometry.cpp" />
-    <ClCompile Include="Geometry.ixx" />
     <ClCompile Include="LoomObject.cpp" />
     <ClCompile Include="LoomObject.ixx" />
     <ClCompile Include="Main Menu.cpp" />
@@ -40,12 +40,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Debug.hpp" />
-    <ClInclude Include="Geometry.cuh" />
     <ClInclude Include="Loom.h" />
     <ClInclude Include="Macro Helpers.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <CudaCompile Include="Geometry.cu" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Loom ImGui\Loom ImGui.vcxproj">
@@ -79,19 +75,19 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\property files\Loom Networking.props" />
-    <Import Project="..\property files\GLFW.props" />
     <Import Project="..\property files\ImGui.props" />
-    <Import Project="..\Property Files\Vulkan.props" />
     <Import Project="..\property files\Assimp.props" />
+    <Import Project="..\Property Files\OpenGL.props" />
+    <Import Project="..\property files\GLFW.props" />
     <Import Project="..\Property Files\UserMacros.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\property files\Loom Networking.props" />
-    <Import Project="..\property files\GLFW.props" />
     <Import Project="..\property files\ImGui.props" />
-    <Import Project="..\Property Files\Vulkan.props" />
     <Import Project="..\property files\Assimp.props" />
+    <Import Project="..\Property Files\OpenGL.props" />
+    <Import Project="..\property files\GLFW.props" />
     <Import Project="..\Property Files\UserMacros.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />

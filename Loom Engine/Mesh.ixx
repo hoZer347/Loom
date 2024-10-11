@@ -1,35 +1,29 @@
-#include <assimp/Importer.hpp>;
-
 export module Mesh;
 
 import Component;
 import "imgui.h";
+import <assimp/Importer.hpp>;
 
-import <vector>;
-
-import <string>;
-import <glm/glm.hpp>;
-using namespace glm;
-
+import <gl/glew.h>;
+import <GLFW/glfw3.h>;
 
 #define MAX_FILE_NAME_SIZE 256
+
 
 namespace Loom
 {
 	export struct Mesh : Component<Mesh>
 	{
-		Mesh()
+		void OnGui() override
 		{
-			file_name[0] = '\0';
+			ImGui::Text("Mesh");
 		};
 
-		void OnGui()
+		void OnRender() override
 		{
-			ImGui::InputText("File Name", file_name, MAX_FILE_NAME_SIZE);
+
 		};
 
-		char file_name[256];
-
-		Assimp::Importer importer{ };
+		Assimp::Importer importer;
 	};
 };
