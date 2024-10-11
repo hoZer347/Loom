@@ -1,0 +1,48 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Networking">
+      <UniqueIdentifier>{ee2c2bd8-9402-42c5-9dae-47db86e9c948}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Handles">
+      <UniqueIdentifier>{ac3ec89e-bf2c-4f9e-a4eb-2dc10837d2fd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Client">
+      <UniqueIdentifier>{ede63363-a821-42e4-919f-9d81fd96d872}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Server">
+      <UniqueIdentifier>{e4de4739-35c2-4709-8b32-b81ca6b480e4}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Networking.cpp">
+      <Filter>Networking</Filter>
+    </ClCompile>
+    <ClCompile Include="Networking.ixx">
+      <Filter>Networking</Filter>
+    </ClCompile>
+    <ClCompile Include="Standard Handles.ixx">
+      <Filter>Handles</Filter>
+    </ClCompile>
+    <ClCompile Include="Standard Handles.cpp">
+      <Filter>Handles</Filter>
+    </ClCompile>
+    <ClCompile Include="Server.cpp">
+      <Filter>Server</Filter>
+    </ClCompile>
+    <ClCompile Include="Server.ixx">
+      <Filter>Server</Filter>
+    </ClCompile>
+    <ClCompile Include="Client.cpp">
+      <Filter>Client</Filter>
+    </ClCompile>
+    <ClCompile Include="Client.ixx">
+      <Filter>Client</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Definitions.hpp">
+      <Filter>Networking</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
