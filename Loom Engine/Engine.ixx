@@ -4,6 +4,7 @@ import <GLFW/glfw3.h>;
 import <functional>;
 import <mutex>;
 import <queue>;
+import <string>;
 import <iostream>;
 
 
@@ -16,7 +17,7 @@ namespace Loom
 	// TODO: Make this not static
 	export struct Engine final
 	{
-		static void Start(const char* projectDirectory);
+		static void Start(const std::string& projectDirectory);
 		static void Stop();
 
 		static void QueueTask(const Task& task);
@@ -25,6 +26,10 @@ namespace Loom
 		static inline bool isRunning;
 
 		static const size_t& GetUniqueID();
+
+		static inline GLuint m_VAO = 0;
+		static inline GLuint m_VTXS = 0;
+		static inline GLuint m_INDS = 0;
 
 		Engine() = delete;
 

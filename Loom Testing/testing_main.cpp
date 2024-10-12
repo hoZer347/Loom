@@ -26,7 +26,7 @@ int main()
 
 	gameObject->Attach<Mesh>();
 
-	Engine::Start("");
+	Engine::Start("C:/Users/3hoze/Desktop/Loom Project 1/");
 
 	return 0;
 };

@@ -1,8 +1,10 @@
 export module AssetManager;
 
+import <assimp/Importer.hpp>;
 import <unordered_map>;
 import <string>;
 import <thread>;
+
 
 namespace Loom
 {
@@ -12,7 +14,7 @@ namespace Loom
 		static void Stop();
 
 	private:
-		static inline std::string file_path = "";
+		static inline Assimp::Importer importer{ };
 		static inline std::unordered_map<std::string, void*> assets{ };
 		static inline bool isRunning = false;
 		static inline std::thread thread;

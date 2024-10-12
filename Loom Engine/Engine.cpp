@@ -14,7 +14,6 @@ import Engine;
 
 #include "Debug.hpp"
 
-import Timer;
 import Scene;
 import MainMenu;
 import GameObject;
@@ -81,10 +80,8 @@ namespace Loom
 		return id_counter++;
 	};
 
-	void Engine::Start(const char* projectDirectory)
+	void Engine::Start(const std::string& projectDirectory)
 	{
-		Engine::projectDirectory = projectDirectory;
-
 		glfwSetErrorCallback(glfw_error_callback);
 
 		glfwInit();
@@ -211,6 +208,14 @@ namespace Loom
 
 			AssetManager::Start(projectDirectory);
 
+			glGenVertexArrays(1, &m_VAO);
+			glGenBuffers(1, &m_VTXS);
+			glGenBuffers(1, &m_INDS);
+			
+			glBindVertexArray(m_VAO);
+			glBindBuffer(GL_ARRAY_BUFFER, m_VTXS);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_INDS);
+
 			// Main loop
 #ifdef __EMSCRIPTEN__
 	// For an Emscripten build we are disabling file-system access, so let's not attempt to do a fopen() of the imgui.ini file.
@@ -279,6 +284,8 @@ namespace Loom
 		};
 
 		DoTasks();
+
+		AssetManager::Stop();
 
 		// Cleanup
 		ImGui_ImplOpenGL3_Shutdown();
