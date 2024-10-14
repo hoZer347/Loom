@@ -40,7 +40,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Debug.hpp" />
-    <ClInclude Include="Loom.h" />
     <ClInclude Include="Macro Helpers.h" />
   </ItemGroup>
   <ItemGroup>

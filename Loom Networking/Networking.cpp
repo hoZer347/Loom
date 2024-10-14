@@ -140,24 +140,24 @@ namespace Loom
 	static inline std::string make_http_response()
 	{
 		std::string response = "HTTP/1.1 200 OK\r\n";
-		response += "Content-Type: text/plain\r\n";
-		response += "Content-Length: 13\r\n";
-		response += "\r\n";
-		response += "Hello, World!";
-		//std::string html;
-		//html += "<!DOCTYPE html>\n";
-		//html += "<html>\n";
-		//html += "<body>\n";
-		//html += "<h1>My First Heading</h1>\n";
-		//html += "<p>My first paragraph.</p>\n";
-		//html += "</body>\n";
-		//html += "</html>\r\n\0";
+		//response += "Content-Type: text/plain\r\n";
+		//response += "Content-Length: 13\r\n";
+		//response += "\r\n";
+		//response += "Hello, World!";
+		std::string html;
+		html += "<!DOCTYPE html>\n";
+		html += "<html>\n";
+		html += "<body>\n";
+		html += "<h1>My First Heading</h1>\n";
+		html += "<p>My first paragraph.</p>\n";
+		html += "</body>\n";
+		html += "</html>\r\n\0";
 
-		//std::cout << "Sending: " << html << std::endl; 
+		std::cout << "Sending: " << html << std::endl; 
 
-		//response += "Content-Type: text/html\r\n";
-		//response += "Content-Length: " + std::to_string(html.length() + 1) + "\r\n";
-		//response += html;
+		response += "Content-Type: text/html\r\n";
+		response += "Content-Length: " + std::to_string(html.length() + 1) + "\r\n";
+		response += html;
 
 		return response;
 	};
@@ -215,13 +215,13 @@ namespace Loom
 				{
 					// Log if any error occurs in the connection handling
 					std::cerr << "Error handling connection: " << e.what() << std::endl;
-				}
-			}
+				};
+			};
 		}
 		catch (std::exception& e)
 		{
 			std::cerr << "Error: " << e.what() << std::endl;
-		}
+		};
 
 		tcp_server_on = false;
 	};

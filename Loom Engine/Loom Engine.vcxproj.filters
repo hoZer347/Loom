@@ -56,10 +56,14 @@
     <ClCompile Include="Renderer.ixx">
       <Filter>Renderer</Filter>
     </ClCompile>
-    <ClCompile Include="Asset Manager.ixx" />
-    <ClCompile Include="Asset Manager.cpp" />
     <ClCompile Include="Engine.cpp">
       <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="Asset Manager.cpp">
+      <Filter>Asset Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="Asset Manager.ixx">
+      <Filter>Asset Manager</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -96,6 +100,9 @@
     <Filter Include="Renderer">
       <UniqueIdentifier>{4afc8a50-ed14-4887-966a-8d5ff63a8b60}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Asset Manager">
+      <UniqueIdentifier>{d28d8ff8-3181-4641-9c03-a14cc2eeb351}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="glfw3.dll">
@@ -111,6 +118,5 @@
   <ItemGroup>
     <ClInclude Include="Macro Helpers.h" />
     <ClInclude Include="Debug.hpp" />
-    <ClInclude Include="Loom.h" />
   </ItemGroup>
 </Project>

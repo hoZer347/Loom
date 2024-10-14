@@ -9,9 +9,11 @@
 import Mesh;
 import Scene;
 import Engine;
+import Networking;
 import GameObject;
 
 import <vector>;
+import <thread>;
 
 using namespace Loom;
 
@@ -20,13 +22,10 @@ int main()
 {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
-	Scene scene{ "Scene1" };
+	auto thread = std::thread(OpenTCPServerOnThisThread);
 
-	GameObject* gameObject = scene.AddChild("GameObject1");
-
-	gameObject->Attach<Mesh>();
-
-	Engine::Start("C:/Users/3hoze/Desktop/Loom Project 1/");
+	if (thread.joinable())
+		thread.join();
 
 	return 0;
 };
