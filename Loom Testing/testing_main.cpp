@@ -17,15 +17,16 @@ import <thread>;
 
 using namespace Loom;
 
+extern void GL3D_Test();
 
 int main()
 {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
-	auto thread = std::thread(OpenTCPServerOnThisThread);
+	//Scene scene;
+	//Engine::Start("bruh");
 
-	if (thread.joinable())
-		thread.join();
+	GL3D_Test();
 
 	return 0;
 };
