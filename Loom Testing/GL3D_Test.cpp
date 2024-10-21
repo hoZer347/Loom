@@ -1,5 +1,6 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+
 import Loom.TypedOGL;
 
 void GL3D_Test()
@@ -27,10 +28,6 @@ void GL3D_Test()
 		"   gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
 		"}\0";
 
-	auto vertexShader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertexShader, 1, &vertexShaderSource, nullptr);
-	glCompileShader(vertexShader);
-
 	const char* fragmentShaderSource = "#version 330 core\n"
 		"out vec4 FragColor;\n"
 		"void main()\n"
@@ -38,41 +35,54 @@ void GL3D_Test()
 		"FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
 		"}\0";
 
-	auto fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragmentShader, 1, &fragmentShaderSource, nullptr);
-	glCompileShader(fragmentShader);
-
-	auto shaderProgram = glCreateProgram();
-	glAttachShader(shaderProgram, vertexShader);
-	glAttachShader(shaderProgram, fragmentShader);
-	glLinkProgram(shaderProgram);
+	auto vertexShader = Loom::Device::CreateAndCompileVertexShader(vertexShaderSource);
+	auto fragmentShader = Loom::Device::CreateAndCompileFragmentShader(fragmentShaderSource);
+	auto shaderProgram = Loom::Device::CreateShaderProgram(&vertexShader, nullptr, &fragmentShader);
 
 
 	float vertices[] = {
-		-0.5f, -0.5f, 0.0f,
-		 0.5f, -0.5f, 0.0f,
-		 0.0f,  0.5f, 0.0f
+		 0.5f,  0.5f, 0.0f,  // top right
+		 0.5f, -0.5f, 0.0f,  // bottom right
+		-0.5f, -0.5f, 0.0f,  // bottom left
+		-0.5f,  0.5f, 0.0f   // top left 
 	};
 
-	Loom::Device::ArrayBufferID vertexBuffer = Loom::Device::CreateArrayBuffer(vertices, Loom::Device::Static_Draw);
+	Loom::Device::UniqueID<Loom::Device::ArrayBufferID> vertexBuffer = Loom::Device::CreateArrayBuffer(vertices, Loom::Device::BufferUsage::Static_Draw);
 
-	unsigned int VAO;
-	glGenVertexArrays(1, &VAO);
-	glBindVertexArray(VAO);
+	auto VAO = Loom::Device::CreateVertexArrayObject(std::array{ Loom::Device::VertexAttribute
+		{ 
+			.index = 0,
+			.size = 3,
+			.type = Loom::Device::VertexAttributeType::Float,
+			.normalized = false,
+			.stride = sizeof(float) * 3,
+			.offset = 0
+		} });
 
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
-	glEnableVertexAttribArray(0);
+	unsigned int indices[] = {  // note that we start from 0!
+		0, 1, 3, };   // first triangle
+
+	unsigned int indices2[] = {  // note that we start from 0!
+		1, 2, 3, };   // first triangle
+
+	auto EBO = Loom::Device::CreateElementArrayBuffer(indices, Loom::Device::BufferUsage::Static_Draw);
+	auto EBO2 = Loom::Device::CreateElementArrayBuffer(indices2, Loom::Device::BufferUsage::Static_Draw);
 
 	while(!glfwWindowShouldClose(window))
 	{
 		glfwPollEvents();
 		Loom::Rendering::Clear(Loom::Rendering::ClearFlag::Color_Buffer);
 
-		glUseProgram(shaderProgram);
-		glBindVertexArray(VAO);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		Loom::Rendering::BindShaderProgram(shaderProgram);
+		Loom::Rendering::BindVertexArray(VAO);
+		Loom::Rendering::BindBuffer(EBO.get());
+		Loom::Rendering::DrawElements(Loom::Rendering::DrawMode::Triangles, 3, Loom::Rendering::ElementType::Unsigned_Int, 0);
+		Loom::Rendering::BindBuffer(EBO2.get());
+		Loom::Rendering::DrawElements(Loom::Rendering::DrawMode::Triangles, 3, Loom::Rendering::ElementType::Unsigned_Int, 0);
+		Loom::Rendering::BindVertexArray({});
 		glfwSwapBuffers(window);
 	}
 
 	glfwTerminate();
 }
+

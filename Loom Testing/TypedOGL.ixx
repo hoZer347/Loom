@@ -6,8 +6,10 @@ module;
 #include <array>
 #include <span>
 #include <bit>
+#include <string_view>
 
 #include <concepts>
+#include <utility>
 
 export module Loom.TypedOGL;
 
@@ -15,16 +17,75 @@ namespace Loom
 {
 	namespace Device
 	{
-		export enum BufferID : GLuint {};
-		export enum ArrayBufferID : GLuint {};
-		export enum CopyReadBufferID : GLuint {};
-		export enum CopyWriteBufferID : GLuint {};
-		export enum ElementArrayBufferID : GLuint {};
-		export enum PixelPackBufferID : GLuint {};
-		export enum PixelUnpackBufferID : GLuint {};
-		export enum TextureBufferID : GLuint {};
-		export enum TransformFeedbackBufferID : GLuint {};
-		export enum UniformBufferID : GLuint {};
+		export template<class Ty>
+		struct DefaultDeleter;
+
+		export template<class Ty, class Deleter = DefaultDeleter<Ty>>
+		class UniqueID
+		{
+		private:
+			Ty id = Ty{ 0 };
+			[[msvc::no_unique_address]] Deleter deleter = Deleter{};
+		public:
+			UniqueID() = default;
+			UniqueID(std::nullptr_t) {}
+			UniqueID(Ty id) :
+				id{ id }
+			{
+
+			}
+
+			UniqueID(Ty id, Deleter deleter) :
+				id{ id },
+				deleter{ std::move(deleter) }
+			{
+
+			}
+			UniqueID(const UniqueID&) = delete;
+			UniqueID(UniqueID&& other) noexcept :
+				id{ std::exchange(other.id, Ty{ 0 }) }
+			{
+
+			}
+
+			UniqueID& operator=(std::nullptr_t) noexcept
+			{
+				UniqueID temp;
+				swap(temp);
+				return *this;
+			}
+			UniqueID& operator=(const UniqueID&) = delete;
+			UniqueID& operator=(UniqueID&& other) noexcept
+			{
+				id = std::exchange(other.id, Ty{ 0 });
+				return *this;
+			}
+
+			~UniqueID()
+			{
+				deleter(id);
+			}
+
+			void swap(UniqueID& other) noexcept
+			{
+				std::swap(id, other.id);
+			}
+
+		public:
+			Ty release() { return std::exchange(id, Ty{ 0 }); }
+			Ty get() const { return id; }
+		};
+
+		export enum class BufferID : GLuint {};
+		export enum class ArrayBufferID : GLuint {};
+		export enum class CopyReadBufferID : GLuint {};
+		export enum class CopyWriteBufferID : GLuint {};
+		export enum class ElementArrayBufferID : GLuint {};
+		export enum class PixelPackBufferID : GLuint {};
+		export enum class PixelUnpackBufferID : GLuint {};
+		export enum class TextureBufferID : GLuint {};
+		export enum class TransformFeedbackBufferID : GLuint {};
+		export enum class UniformBufferID : GLuint {};
 
 		template<class Ty>
 		concept IsTypedBuffer = std::same_as<Ty, ArrayBufferID> ||
@@ -39,7 +100,25 @@ namespace Loom
 
 		template<class Ty>
 		concept IsBufferType = std::same_as<Ty, BufferID> || IsTypedBuffer<Ty>;
-;
+
+		export template<IsBufferType Ty>
+		void DeleteBuffer(Ty buffer)
+		{
+			GLuint untypedBuffer = static_cast<GLuint>(buffer);
+			glDeleteBuffers(1, &untypedBuffer);
+		}
+
+		export template<IsBufferType Ty>
+		void DeleteBuffers(std::span<const Ty> buffers)
+		{
+			glDeleteBuffers(buffers.size(), reinterpret_cast<const GLuint*>(buffers.data()));
+		}
+
+		template<IsBufferType Ty>
+		struct DefaultDeleter<Ty>
+		{
+			void operator()(Ty id) { DeleteBuffer(id); }
+		};
 
 		template<IsBufferType Ty>
 		constexpr GLenum bufferTypeToTarget = 0;
@@ -71,7 +150,7 @@ namespace Loom
 		template<>
 		constexpr GLenum bufferTypeToTarget<UniformBufferID> = GL_UNIFORM_BUFFER;
 
-		export enum BufferUsage : GLenum
+		export enum class BufferUsage : GLenum
 		{
 			Stream_Draw = GL_STREAM_DRAW,
 			Stream_Read = GL_STREAM_READ,
@@ -84,7 +163,40 @@ namespace Loom
 			Dynamic_Copy = GL_DYNAMIC_COPY
 		};
 
-		export BufferID GenBuffer()
+		export enum class VertexArrayObjectID : GLuint {};
+
+		void DeleteVertexArray(VertexArrayObjectID id)
+		{
+			GLuint untypedId = static_cast<GLuint>(id);
+			glDeleteVertexArrays(1, &untypedId);
+		}
+
+		template<>
+		struct DefaultDeleter<VertexArrayObjectID>
+		{
+			void operator()(VertexArrayObjectID id) { DeleteVertexArray(id); }
+		};
+
+	}
+
+	namespace Rendering
+	{
+		export template<Device::IsTypedBuffer Ty>
+		void BindBuffer(Ty id)
+		{
+			glBindBuffer(Device::bufferTypeToTarget<Ty>, static_cast<GLuint>(id));
+		}
+
+		export void BindVertexArray(Device::VertexArrayObjectID id)
+		{
+			glBindVertexArray(static_cast<GLuint>(id));
+		}
+	}
+
+
+	namespace Device
+	{
+		export UniqueID<BufferID> GenBuffer()
 		{
 			GLuint buffer;
 			glGenBuffers(1, &buffer);
@@ -100,22 +212,16 @@ namespace Loom
 		}
 
 		export template<IsTypedBuffer Ty>
-		void BindBuffer(Ty id)
-		{
-			glBindBuffer(bufferTypeToTarget<Ty>, static_cast<GLuint>(id));
-		}
-
-		export template<IsTypedBuffer Ty>
 		void RecreateBuffer(Ty id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
 		{
-			BindBuffer(id);
-			glBufferData(bufferTypeToTarget<Ty>, size, optionalInitialData, usage);
+			Rendering::BindBuffer(id);
+			glBufferData(bufferTypeToTarget<Ty>, size, optionalInitialData, static_cast<GLenum>(usage));
 		}
 
 		template<IsTypedBuffer Ty>
-		Ty CreateBuffer(BufferID id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
+		UniqueID<Ty> CreateBuffer(UniqueID<BufferID> id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
 		{
-			Ty typedID{ static_cast<GLuint>(id) };
+			Ty typedID{ static_cast<GLuint>(id.release()) };
 			RecreateBuffer(typedID, size, optionalInitialData, usage);
 			return typedID;
 		}
@@ -123,28 +229,28 @@ namespace Loom
 		template<IsTypedBuffer Ty>
 		void UpdateBuffer(Ty id, GLintptr offset, GLsizeiptr size, const GLvoid* data)
 		{
-			BindBuffer(id);
+			Rendering::BindBuffer(id);
 			glBufferSubData(bufferTypeToTarget<Ty>, offset, size, data);
 		}
 
-		export ArrayBufferID CreateArrayBuffer(BufferID id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
+		export UniqueID<ArrayBufferID> CreateArrayBuffer(UniqueID<BufferID> id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
 		{
-			return CreateBuffer<ArrayBufferID>(id, size, optionalInitialData, usage);
+			return CreateBuffer<ArrayBufferID>(std::move(id), size, optionalInitialData, usage);
 		}
 
 		export template<class Ty>
-		ArrayBufferID CreateArrayBuffer(BufferID id, const Ty& data, BufferUsage usage)
+		UniqueID<ArrayBufferID> CreateArrayBuffer(UniqueID<BufferID> id, const Ty& data, BufferUsage usage)
 		{
-			return CreateArrayBuffer(id, sizeof(Ty), &data, usage);
+			return CreateArrayBuffer(std::move(id), sizeof(Ty), &data, usage);
 		}
 
-		export ArrayBufferID CreateArrayBuffer(GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
+		export UniqueID<ArrayBufferID> CreateArrayBuffer(GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
 		{
 			return CreateArrayBuffer(GenBuffer(), size, optionalInitialData, usage);
 		}
 
 		export template<class Ty>
-		ArrayBufferID CreateArrayBuffer(const Ty& data, BufferUsage usage)
+		UniqueID<ArrayBufferID> CreateArrayBuffer(const Ty& data, BufferUsage usage)
 		{
 			return CreateArrayBuffer(GenBuffer(), sizeof(Ty), &data, usage);
 		}
@@ -160,24 +266,24 @@ namespace Loom
 			UpdateArrayBuffer(id, offset, sizeof(data), &data);
 		}
 
-		export CopyReadBufferID CreateCopyReadBuffer(BufferID id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
+		export UniqueID<CopyReadBufferID> CreateCopyReadBuffer(UniqueID<BufferID> id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
 		{
-			return CreateBuffer<CopyReadBufferID>(id, size, optionalInitialData, usage);
+			return CreateBuffer<CopyReadBufferID>(std::move(id), size, optionalInitialData, usage);
 		}
 
 		export template<class Ty>
-		CopyReadBufferID CreateCopyReadBuffer(BufferID id, const Ty& data, BufferUsage usage)
+			UniqueID<CopyReadBufferID> CreateCopyReadBuffer(UniqueID<BufferID> id, const Ty& data, BufferUsage usage)
 		{
-			return CreateCopyReadBuffer(id, sizeof(Ty), &data, usage);
+			return CreateCopyReadBuffer(std::move(id), sizeof(Ty), &data, usage);
 		}
 
-		export CopyReadBufferID CreateCopyReadBuffer(GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
+		export UniqueID<CopyReadBufferID> CreateCopyReadBuffer(GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
 		{
 			return CreateCopyReadBuffer(GenBuffer(), size, optionalInitialData, usage);
 		}
 
 		export template<class Ty>
-		CopyReadBufferID CreateCopyReadBuffer(const Ty& data, BufferUsage usage)
+		UniqueID<CopyReadBufferID> CreateCopyReadBuffer(const Ty& data, BufferUsage usage)
 		{
 			return CreateCopyReadBuffer(GenBuffer(), sizeof(Ty), &data, usage);
 		}
@@ -193,24 +299,24 @@ namespace Loom
 			UpdateCopyReadBuffer(id, offset, sizeof(data), &data);
 		}
 
-		export CopyWriteBufferID CreateCopyWriteBuffer(BufferID id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
+		export UniqueID<CopyWriteBufferID> CreateCopyWriteBuffer(UniqueID<BufferID> id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
 		{
-			return CreateBuffer<CopyWriteBufferID>(id, size, optionalInitialData, usage);
+			return CreateBuffer<CopyWriteBufferID>(std::move(id), size, optionalInitialData, usage);
 		}
 
 		export template<class Ty>
-		CopyWriteBufferID CreateCopyWriteBuffer(BufferID id, const Ty& data, BufferUsage usage)
+		UniqueID<CopyWriteBufferID> CreateCopyWriteBuffer(UniqueID<BufferID> id, const Ty& data, BufferUsage usage)
 		{
-			return CreateCopyWriteBuffer(id, sizeof(Ty), &data, usage);
+			return CreateCopyWriteBuffer(std::move(id), sizeof(Ty), &data, usage);
 		}
 
-		export CopyWriteBufferID CreateCopyWriteBuffer(GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
+		export UniqueID<CopyWriteBufferID> CreateCopyWriteBuffer(GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
 		{
 			return CreateCopyWriteBuffer(GenBuffer(), size, optionalInitialData, usage);
 		}
 
 		export template<class Ty>
-		CopyWriteBufferID CreateCopyWriteBuffer(const Ty& data, BufferUsage usage)
+			UniqueID<CopyWriteBufferID> CreateCopyWriteBuffer(const Ty& data, BufferUsage usage)
 		{
 			return CreateCopyWriteBuffer(GenBuffer(), sizeof(Ty), &data, usage);
 		}
@@ -226,24 +332,24 @@ namespace Loom
 			UpdateCopyWriteBuffer(id, offset, sizeof(data), &data);
 		}
 
-		export ElementArrayBufferID CreateElementArrayBuffer(BufferID id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
+		export UniqueID<ElementArrayBufferID> CreateElementArrayBuffer(UniqueID<BufferID> id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
 		{
-			return CreateBuffer<ElementArrayBufferID>(id, size, optionalInitialData, usage);
+			return CreateBuffer<ElementArrayBufferID>(std::move(id), size, optionalInitialData, usage);
 		}
 
 		export template<class Ty>
-		ElementArrayBufferID CreateElementArrayBuffer(BufferID id, const Ty& data, BufferUsage usage)
+		UniqueID<ElementArrayBufferID> CreateElementArrayBuffer(UniqueID<BufferID> id, const Ty& data, BufferUsage usage)
 		{
-			return CreateElementArrayBuffer(id, sizeof(Ty), &data, usage);
+			return CreateElementArrayBuffer(std::move(id), sizeof(Ty), &data, usage);
 		}
 
-		export ElementArrayBufferID CreateElementArrayBuffer(GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
+		export UniqueID<ElementArrayBufferID> CreateElementArrayBuffer(GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
 		{
 			return CreateElementArrayBuffer(GenBuffer(), size, optionalInitialData, usage);
 		}
 
 		export template<class Ty>
-		ElementArrayBufferID CreateElementArrayBuffer(const Ty& data, BufferUsage usage)
+		UniqueID<ElementArrayBufferID> CreateElementArrayBuffer(const Ty& data, BufferUsage usage)
 		{
 			return CreateElementArrayBuffer(GenBuffer(), sizeof(Ty), &data, usage);
 		}
@@ -259,24 +365,24 @@ namespace Loom
 			UpdateElementArrayBuffer(id, offset, sizeof(data), &data);
 		}
 
-		export PixelPackBufferID CreatePixelPackBuffer(BufferID id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
+		export UniqueID<PixelPackBufferID> CreatePixelPackBuffer(UniqueID<BufferID> id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
 		{
-			return CreateBuffer<PixelPackBufferID>(id, size, optionalInitialData, usage);
+			return CreateBuffer<PixelPackBufferID>(std::move(id), size, optionalInitialData, usage);
 		}
 
 		export template<class Ty>
-		PixelPackBufferID CreatePixelPackBuffer(BufferID id, const Ty& data, BufferUsage usage)
+		UniqueID<PixelPackBufferID> CreatePixelPackBuffer(UniqueID<BufferID> id, const Ty& data, BufferUsage usage)
 		{
-			return CreatePixelPackBuffer(id, sizeof(Ty), &data, usage);
+			return CreatePixelPackBuffer(std::move(id), sizeof(Ty), &data, usage);
 		}
 
-		export PixelPackBufferID CreatePixelPackBuffer(GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
+		export UniqueID<PixelPackBufferID> CreatePixelPackBuffer(GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
 		{
 			return CreatePixelPackBuffer(GenBuffer(), size, optionalInitialData, usage);
 		}
 
 		export template<class Ty>
-		PixelPackBufferID CreatePixelPackBuffer(const Ty& data, BufferUsage usage)
+			UniqueID<PixelPackBufferID> CreatePixelPackBuffer(const Ty& data, BufferUsage usage)
 		{
 			return CreatePixelPackBuffer(GenBuffer(), sizeof(Ty), &data, usage);
 		}
@@ -292,24 +398,24 @@ namespace Loom
 			UpdatePixelPackBuffer(id, offset, sizeof(data), &data);
 		}
 
-		export PixelUnpackBufferID CreatePixelUnpackBuffer(BufferID id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
+		export UniqueID<PixelUnpackBufferID> CreatePixelUnpackBuffer(UniqueID<BufferID> id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
 		{
-			return CreateBuffer<PixelUnpackBufferID>(id, size, optionalInitialData, usage);
+			return CreateBuffer<PixelUnpackBufferID>(std::move(id), size, optionalInitialData, usage);
 		}
 
 		export template<class Ty>
-		PixelUnpackBufferID CreatePixelUnpackBuffer(BufferID id, const Ty& data, BufferUsage usage)
+		UniqueID<PixelUnpackBufferID> CreatePixelUnpackBuffer(UniqueID<BufferID> id, const Ty& data, BufferUsage usage)
 		{
-			return CreatePixelUnpackBuffer(id, sizeof(Ty), &data, usage);
+			return CreatePixelUnpackBuffer(std::move(id), sizeof(Ty), &data, usage);
 		}
 
-		export PixelUnpackBufferID CreatePixelUnpackBuffer(GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
+		export UniqueID<PixelUnpackBufferID> CreatePixelUnpackBuffer(GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
 		{
 			return CreatePixelUnpackBuffer(GenBuffer(), size, optionalInitialData, usage);
 		}
 
 		export template<class Ty>
-		PixelUnpackBufferID CreatePixelUnpackBuffer(const Ty& data, BufferUsage usage)
+		UniqueID<PixelUnpackBufferID> CreatePixelUnpackBuffer(const Ty& data, BufferUsage usage)
 		{
 			return CreatePixelUnpackBuffer(GenBuffer(), sizeof(Ty), &data, usage);
 		}
@@ -325,24 +431,24 @@ namespace Loom
 			UpdatePixelUnpackBuffer(id, offset, sizeof(data), &data);
 		}
 
-		export TextureBufferID CreateTextureBuffer(BufferID id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
+		export UniqueID<TextureBufferID> CreateTextureBuffer(UniqueID<BufferID> id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
 		{
-			return CreateBuffer<TextureBufferID>(id, size, optionalInitialData, usage);
+			return CreateBuffer<TextureBufferID>(std::move(id), size, optionalInitialData, usage);
 		}
 
 		export template<class Ty>
-		TextureBufferID CreateTextureBuffer(BufferID id, const Ty& data, BufferUsage usage)
+		UniqueID<TextureBufferID> CreateTextureBuffer(UniqueID<BufferID> id, const Ty& data, BufferUsage usage)
 		{
-			return CreateTextureBuffer(id, sizeof(Ty), &data, usage);
+			return CreateTextureBuffer(std::move(id), sizeof(Ty), &data, usage);
 		}
 
-		export TextureBufferID CreateTextureBuffer(GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
+		export UniqueID<TextureBufferID> CreateTextureBuffer(GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
 		{
 			return CreateTextureBuffer(GenBuffer(), size, optionalInitialData, usage);
 		}
 
 		export template<class Ty>
-		TextureBufferID CreateTextureBuffer(const Ty& data, BufferUsage usage)
+		UniqueID<TextureBufferID> CreateTextureBuffer(const Ty& data, BufferUsage usage)
 		{
 			return CreateTextureBuffer(GenBuffer(), sizeof(Ty), &data, usage);
 		}
@@ -358,24 +464,24 @@ namespace Loom
 			UpdateTextureBuffer(id, offset, sizeof(data), &data);
 		}
 
-		export TransformFeedbackBufferID CreateTransformFeedbackBuffer(BufferID id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
+		export UniqueID<TransformFeedbackBufferID> CreateTransformFeedbackBuffer(UniqueID<BufferID> id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
 		{
-			return CreateBuffer<TransformFeedbackBufferID>(id, size, optionalInitialData, usage);
+			return CreateBuffer<TransformFeedbackBufferID>(std::move(id), size, optionalInitialData, usage);
 		}
 
 		export template<class Ty>
-		TransformFeedbackBufferID CreateTransformFeedbackBuffer(BufferID id, const Ty& data, BufferUsage usage)
+		UniqueID<TransformFeedbackBufferID> CreateTransformFeedbackBuffer(UniqueID<BufferID> id, const Ty& data, BufferUsage usage)
 		{
-			return CreateTransformFeedbackBuffer(id, sizeof(Ty), &data, usage);
+			return CreateTransformFeedbackBuffer(std::move(id), sizeof(Ty), &data, usage);
 		}
 
-		export TransformFeedbackBufferID CreateTransformFeedbackBuffer(GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
+		export UniqueID<TransformFeedbackBufferID> CreateTransformFeedbackBuffer(GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
 		{
 			return CreateTransformFeedbackBuffer(GenBuffer(), size, optionalInitialData, usage);
 		}
 
 		export template<class Ty>
-		TransformFeedbackBufferID CreateTransformFeedbackBuffer(const Ty& data, BufferUsage usage)
+		UniqueID<TransformFeedbackBufferID> CreateTransformFeedbackBuffer(const Ty& data, BufferUsage usage)
 		{
 			return CreateTransformFeedbackBuffer(GenBuffer(), sizeof(Ty), &data, usage);
 		}
@@ -391,24 +497,24 @@ namespace Loom
 			UpdateTransformFeedbackBuffer(id, offset, sizeof(data), &data);
 		}
 
-		export UniformBufferID CreateUniformBuffer(BufferID id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
+		export UniqueID<UniformBufferID> CreateUniformBuffer(UniqueID<BufferID> id, GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
 		{
-			return CreateBuffer<UniformBufferID>(id, size, optionalInitialData, usage);
+			return CreateBuffer<UniformBufferID>(std::move(id), size, optionalInitialData, usage);
 		}
 
 		export template<class Ty>
-		UniformBufferID CreateUniformBuffer(BufferID id, const Ty& data, BufferUsage usage)
+		UniqueID<UniformBufferID> CreateUniformBuffer(UniqueID<BufferID> id, const Ty& data, BufferUsage usage)
 		{
-			return CreateUniformBuffer(id, sizeof(Ty), &data, usage);
+			return CreateUniformBuffer(std::move(id), sizeof(Ty), &data, usage);
 		}
 
-		export UniformBufferID CreateUniformBuffer(GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
+		export UniqueID<UniformBufferID> CreateUniformBuffer(GLsizeiptr size, const GLvoid* optionalInitialData, BufferUsage usage)
 		{
 			return CreateUniformBuffer(GenBuffer(), size, optionalInitialData, usage);
 		}
 
 		export template<class Ty>
-		UniformBufferID CreateUniformBuffer(const Ty& data, BufferUsage usage)
+		UniqueID<UniformBufferID> CreateUniformBuffer(const Ty& data, BufferUsage usage)
 		{
 			return CreateUniformBuffer(GenBuffer(), sizeof(Ty), &data, usage);
 		}
@@ -424,23 +530,232 @@ namespace Loom
 			UpdateUniformBuffer(id, offset, sizeof(data), &data);
 		}
 
-		export template<IsBufferType Ty>
-		void DeleteBuffer(Ty buffer)
+		enum class ShaderType : GLenum
 		{
-			GLuint untypedBuffer = static_cast<GLuint>(buffer);
-			glDeleteBuffers(1, &untypedBuffer);
+			Vertex = GL_VERTEX_SHADER,
+			Geometry = GL_GEOMETRY_SHADER,
+			Fragment = GL_FRAGMENT_SHADER
+		};
+
+		export enum class VertexShaderID : GLuint {};
+		export enum class GeometryShaderID : GLuint {};
+		export enum class FragmentShaderID : GLuint {};
+
+		template<class Ty>
+		concept IsTypedShader = std::same_as<Ty, VertexShaderID> || std::same_as<Ty, GeometryShaderID> || std::same_as<Ty, FragmentShaderID>;
+
+		export template<IsTypedShader Ty>
+		void DeleteShader(Ty id)
+		{
+			glDeleteShader(static_cast<GLuint>(id));
 		}
 
-		export template<IsBufferType Ty>
-		void DeleteBuffers(std::span<const Ty> buffers)
+		template<IsTypedShader Ty>
+		struct DefaultDeleter<Ty>
 		{
-			glDeleteBuffers(buffers.size(), reinterpret_cast<const GLuint*>(buffers.data()));
+			void operator()(Ty id) { DeleteShader(id); }
+		};
+
+		template<ShaderType Ty>
+		struct ShaderEnumToType;
+
+		template<>
+		struct ShaderEnumToType<ShaderType::Vertex>
+		{
+			using type = VertexShaderID;
+		};
+
+		template<>
+		struct ShaderEnumToType<ShaderType::Geometry>
+		{
+			using type = GeometryShaderID;
+		};
+
+		template<>
+		struct ShaderEnumToType<ShaderType::Fragment>
+		{
+			using type = FragmentShaderID;
+		};
+
+		template<ShaderType Ty>
+		using ToShaderType_t = ShaderEnumToType<Ty>::type;
+
+		template<ShaderType Ty>
+		ToShaderType_t<Ty> CreateShader()
+		{
+			return ToShaderType_t<Ty>{ glCreateShader(static_cast<GLenum>(Ty)) };
+		}
+
+		export template<IsTypedShader Ty, size_t Extent>
+		void SetShaderSource(Ty shaderID, std::span<std::string_view, Extent> sources)
+		{
+			std::array<const char*, Extent> strings;
+			std::array<GLint, Extent> stringSizes;
+			for(size_t i = 0; i < Extent; i++)
+			{
+				stringSizes[i] = sources[i].size();
+				strings[i] = sources[i].data();
+			}
+
+			glShaderSource(static_cast<GLenum>(shaderID), sources.size(), strings.data(), stringSizes.data());
+		}
+
+		export template<IsTypedShader Ty>
+		void SetShaderSource(Ty shaderID, std::string_view sources)
+		{
+			std::array<std::string_view, 1> tempSources{ sources };
+			SetShaderSource(shaderID, std::span{ tempSources });
+		}
+
+		export template<IsTypedShader Ty>
+		void CompileShader(Ty shaderID)
+		{
+			glCompileShader(static_cast<GLenum>(shaderID));
+		}
+
+
+		export VertexShaderID CreateVertexShader() { return CreateShader<ShaderType::Vertex>(); }
+		export VertexShaderID CreateAndCompileVertexShader(std::string_view sources)
+		{
+			VertexShaderID id = CreateVertexShader();
+			SetShaderSource(id, sources);
+			CompileShader(id);
+			return id;
+		}
+		export template<size_t Extent>
+		VertexShaderID CreateAndCompileVertexShader(std::span<std::string_view, Extent> sources)
+		{
+			VertexShaderID id = CreateVertexShader();
+			SetShaderSource(id, sources);
+			CompileShader(id);
+			return id;
+		}
+		export GeometryShaderID CreateGeometryShader() { return CreateShader<ShaderType::Geometry>(); }
+		export GeometryShaderID CreateAndCompileGeometryShader(std::string_view sources)
+		{
+			GeometryShaderID id = CreateGeometryShader();
+			SetShaderSource(id, sources);
+			CompileShader(id);
+			return id;
+		}
+		export template<size_t Extent>
+		GeometryShaderID CreateAndCompileGeometryShader(std::span<std::string_view, Extent> sources)
+		{
+			GeometryShaderID id = CreateGeometryShader();
+			SetShaderSource(id, sources);
+			CompileShader(id);
+			return id;
+		}
+		export FragmentShaderID CreateFragmentShader() { return CreateShader<ShaderType::Fragment>(); }
+		export FragmentShaderID CreateAndCompileFragmentShader(std::string_view sources)
+		{
+			FragmentShaderID id = CreateFragmentShader();
+			SetShaderSource(id, sources);
+			CompileShader(id);
+			return id;
+		}
+		export template<size_t Extent>
+		FragmentShaderID CreateAndCompileFragmentShader(std::span<std::string_view, Extent> sources)
+		{
+			FragmentShaderID id = CreateFragmentShader();
+			SetShaderSource(id, sources);
+			CompileShader(id);
+			return id;
+		}
+
+		export enum class ShaderProgramID : GLenum {};
+
+		void DeleteProgram(ShaderProgramID id)
+		{
+			glDeleteProgram(static_cast<GLuint>(id));
+		}
+
+		template<>
+		struct DefaultDeleter<ShaderProgramID>
+		{
+			void operator()(ShaderProgramID id) { DeleteProgram(id); }
+		};
+
+		export ShaderProgramID CreateShaderProgram(VertexShaderID* optionalVertexShader, GeometryShaderID* optionalGeometryShader, FragmentShaderID* optionalFragmentShader)
+		{
+			auto program = glCreateProgram();
+			if(optionalVertexShader)
+				glAttachShader(program, static_cast<GLuint>(*optionalVertexShader));
+			if(optionalGeometryShader)
+				glAttachShader(program, static_cast<GLuint>(*optionalGeometryShader));
+			if(optionalFragmentShader)
+				glAttachShader(program, static_cast<GLuint>(*optionalFragmentShader));
+			glLinkProgram(program);
+			return ShaderProgramID{ program };
+		}
+
+		export enum class VertexAttributeType : GLenum
+		{
+			Byte = GL_BYTE,
+			Unsigned_Byte = GL_UNSIGNED_BYTE,
+			Short = GL_SHORT,
+			Unsigned_Short = GL_UNSIGNED_SHORT,
+			Int = GL_INT,
+			Unsigned_Int = GL_UNSIGNED_INT,
+			Half_Float = GL_HALF_FLOAT,
+			Float = GL_FLOAT,
+			Double = GL_DOUBLE,
+			Int_2_10_10_10_Rev = GL_INT_2_10_10_10_REV,
+			Unsigned_Int_2_10_10_10_Rev = GL_UNSIGNED_INT_2_10_10_10_REV
+		};
+
+		export struct VertexAttribute
+		{
+			GLuint index;
+			GLint size;
+			VertexAttributeType type;
+			bool normalized;
+			GLsizei stride;
+			GLintptr offset;
+		};
+
+		export void SetVertexAttributePointer(Device::VertexArrayObjectID id, std::span<VertexAttribute> attributes)
+		{
+			Rendering::BindVertexArray(id);
+			for(const auto& attribute : attributes)
+			{
+				glVertexAttribPointer(attribute.index, attribute.size, static_cast<GLenum>(attribute.type), attribute.normalized, attribute.stride, reinterpret_cast<void*>(attribute.offset));
+				glEnableVertexAttribArray(attribute.index);
+			}
+		}
+
+		export template<size_t Extent>
+		void SetVertexAttributePointer(Device::VertexArrayObjectID id, std::array<VertexAttribute, Extent> attributes)
+		{
+			SetVertexAttributePointer(id, std::span{ attributes });
+		}
+
+		export VertexArrayObjectID CreateVertexArrayObject()
+		{
+			GLuint id ;
+			glGenVertexArrays(1, &id);
+			return VertexArrayObjectID{ id };
+		}
+
+		export VertexArrayObjectID CreateVertexArrayObject(std::span<VertexAttribute> attributes)
+		{
+			auto id = CreateVertexArrayObject();
+			SetVertexAttributePointer(id, attributes);
+			return id;
+		}
+
+		export template<size_t Extent>
+		VertexArrayObjectID CreateVertexArrayObject(std::array<VertexAttribute, Extent> attributes)
+		{
+			auto id = CreateVertexArrayObject();
+			SetVertexAttributePointer(id, attributes);
+			return id;
 		}
 	}
 
 	namespace Rendering
 	{
-		export enum ClearFlag : GLbitfield
+		export enum class ClearFlag : GLbitfield
 		{
 			Color_Buffer =  GL_COLOR_BUFFER_BIT,
 			Depth_Buffer = GL_DEPTH_BUFFER_BIT,
@@ -487,7 +802,7 @@ namespace Loom
 			glClearStencil(value);
 		}
 
-		export enum Feature : GLenum
+		export enum class Feature : GLenum
 		{
 			Blend = GL_BLEND,
 			Clip_Distance0 = GL_CLIP_DISTANCE0,
@@ -573,6 +888,42 @@ namespace Loom
 		{
 			return glIsEnabledi(static_cast<GLenum>(feature), index);
 		}
-	}
 
+		export void BindShaderProgram(Device::ShaderProgramID id)
+		{
+			glUseProgram(static_cast<GLuint>(id));
+		}
+
+		export enum class DrawMode : GLenum
+		{
+			Points = GL_POINTS,
+			Line_Strip = GL_LINE_STRIP,
+			Line_Loop = GL_LINE_LOOP,
+			Lines = GL_LINES,
+			Line_Strip_Adjaceny = GL_LINE_STRIP_ADJACENCY,
+			Lines_Adjaceny = GL_LINES_ADJACENCY,
+			Triangle_Strip = GL_TRIANGLE_STRIP,
+			Triangle_Fan = GL_TRIANGLE_FAN,
+			Triangles = GL_TRIANGLES,
+			Triangle_Strip_Adjaceny = GL_TRIANGLE_STRIP_ADJACENCY,
+			Triangles_Adjaceny = GL_TRIANGLES_ADJACENCY
+		};
+
+		export enum class ElementType : GLenum
+		{
+			Unsigned_Byte = GL_UNSIGNED_BYTE,
+			Unsigned_Short = GL_UNSIGNED_SHORT,
+			Unsigned_Int = GL_UNSIGNED_INT
+		};
+
+		export void DrawArrays(DrawMode mode, GLint first, GLsizei count)
+		{
+			glDrawArrays(static_cast<GLenum>(mode), first, count);
+		}
+
+		export void DrawElements(DrawMode mode, GLint count, ElementType type, const GLvoid* indices)
+		{
+			glDrawElements(static_cast<GLenum>(mode), count, static_cast<GLenum>(type), indices);
+		}
+	}
 }
