@@ -5,17 +5,13 @@ VisualStudioVersion = 17.10.35122.118
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Networking", "Loom Networking\Loom Networking.vcxproj", "{D4DB8697-7347-441E-B0F5-EC0886CD8B7A}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Launcher", "Loom Launcher\Loom Launcher.vcxproj", "{95CC3047-B8DB-4A2C-9839-30F0F4C5CA56}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Editor", "Loom Editor\Loom Editor.vcxproj", "{17AACCDA-214B-4483-B9B9-F5F23312472F}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom ImGui", "Loom ImGui\Loom ImGui.vcxproj", "{D58E30F6-A1A0-4A69-A043-D8D4CD47E0B8}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Engine", "Loom Engine\Loom Engine.vcxproj", "{3813DE5F-D426-4B1E-9638-7CE2259E5C3F}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Testing", "Loom Testing\Loom Testing.vcxproj", "{8B7F2B81-7939-4DC7-BB27-365D517AF856}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Sound", "Loom Sound\Loom Sound.vcxproj", "{4752FB84-AF84-41B8-BFB1-404F35C7656A}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Client", "Loom Client\Loom Client.vcxproj", "{D11B0D69-BD83-4720-950B-C49F3D151704}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -27,14 +23,6 @@ Global
 		{D4DB8697-7347-441E-B0F5-EC0886CD8B7A}.Debug|x64.Build.0 = Debug|x64
 		{D4DB8697-7347-441E-B0F5-EC0886CD8B7A}.Release|x64.ActiveCfg = Release|x64
 		{D4DB8697-7347-441E-B0F5-EC0886CD8B7A}.Release|x64.Build.0 = Release|x64
-		{95CC3047-B8DB-4A2C-9839-30F0F4C5CA56}.Debug|x64.ActiveCfg = Debug|x64
-		{95CC3047-B8DB-4A2C-9839-30F0F4C5CA56}.Debug|x64.Build.0 = Debug|x64
-		{95CC3047-B8DB-4A2C-9839-30F0F4C5CA56}.Release|x64.ActiveCfg = Release|x64
-		{95CC3047-B8DB-4A2C-9839-30F0F4C5CA56}.Release|x64.Build.0 = Release|x64
-		{17AACCDA-214B-4483-B9B9-F5F23312472F}.Debug|x64.ActiveCfg = Debug|x64
-		{17AACCDA-214B-4483-B9B9-F5F23312472F}.Debug|x64.Build.0 = Debug|x64
-		{17AACCDA-214B-4483-B9B9-F5F23312472F}.Release|x64.ActiveCfg = Release|x64
-		{17AACCDA-214B-4483-B9B9-F5F23312472F}.Release|x64.Build.0 = Release|x64
 		{D58E30F6-A1A0-4A69-A043-D8D4CD47E0B8}.Debug|x64.ActiveCfg = Debug|x64
 		{D58E30F6-A1A0-4A69-A043-D8D4CD47E0B8}.Debug|x64.Build.0 = Debug|x64
 		{D58E30F6-A1A0-4A69-A043-D8D4CD47E0B8}.Release|x64.ActiveCfg = Release|x64
@@ -47,10 +35,10 @@ Global
 		{8B7F2B81-7939-4DC7-BB27-365D517AF856}.Debug|x64.Build.0 = Debug|x64
 		{8B7F2B81-7939-4DC7-BB27-365D517AF856}.Release|x64.ActiveCfg = Release|x64
 		{8B7F2B81-7939-4DC7-BB27-365D517AF856}.Release|x64.Build.0 = Release|x64
-		{4752FB84-AF84-41B8-BFB1-404F35C7656A}.Debug|x64.ActiveCfg = Debug|x64
-		{4752FB84-AF84-41B8-BFB1-404F35C7656A}.Debug|x64.Build.0 = Debug|x64
-		{4752FB84-AF84-41B8-BFB1-404F35C7656A}.Release|x64.ActiveCfg = Release|x64
-		{4752FB84-AF84-41B8-BFB1-404F35C7656A}.Release|x64.Build.0 = Release|x64
+		{D11B0D69-BD83-4720-950B-C49F3D151704}.Debug|x64.ActiveCfg = Debug|x64
+		{D11B0D69-BD83-4720-950B-C49F3D151704}.Debug|x64.Build.0 = Debug|x64
+		{D11B0D69-BD83-4720-950B-C49F3D151704}.Release|x64.ActiveCfg = Release|x64
+		{D11B0D69-BD83-4720-950B-C49F3D151704}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

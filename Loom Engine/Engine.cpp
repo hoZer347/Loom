@@ -17,7 +17,6 @@ import Engine;
 import Scene;
 import MainMenu;
 import GameObject;
-import AssetManager;
 
 import <iostream>;
 #include <barrier>
@@ -206,7 +205,7 @@ namespace Loom
 					barrier.arrive_and_drop();
 				});
 
-			AssetManager::Start(projectDirectory);
+			//AssetManager::Start(projectDirectory);
 
 			glGenVertexArrays(1, &m_VAO);
 			glGenBuffers(1, &m_VTXS);
@@ -241,7 +240,6 @@ namespace Loom
 				if (doGUI)
 					for (auto& scene : Scene::allScenes)
 					{
-
 						if (ImGui::Begin(scene->NameAndID().c_str()))
 							scene->root.Gui();
 						ImGui::End();
@@ -285,7 +283,7 @@ namespace Loom
 
 		DoTasks();
 
-		AssetManager::Stop();
+		//AssetManager::Stop();
 
 		// Cleanup
 		ImGui_ImplOpenGL3_Shutdown();

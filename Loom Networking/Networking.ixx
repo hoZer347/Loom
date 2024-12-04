@@ -3,6 +3,7 @@ export module Networking;
 #include "Definitions.hpp"
 
 import <typeinfo>;
+import <string>;
 
 
 namespace Loom
@@ -10,11 +11,11 @@ namespace Loom
 	typedef size_t MessageType;
 	typedef size_t RequestType;
 
-	export void OpenUDPServerOnThisThread();
-	export void OpenUDPClientOnThisThread();
+	export void OpenUDPServerOnThisThread(std::string project_directory);
+	export void OpenUDPClientOnThisThread(std::string project_directory);
 
-	export void OpenTCPServerOnThisThread();
-	export void OpenTCPClientOnThisThread();
+	export void OpenTCPServerOnThisThread(std::string project_directory);
+	export void OpenTCPClientOnThisThread(std::string project_directory);
 
 	export void StopUDPServer();
 	export void StopUDPClient();

@@ -11,11 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Asset Manager.cpp" />
-    <ClCompile Include="Asset Manager.ixx" />
     <ClCompile Include="Component.ixx" />
-    <ClCompile Include="Demos.cpp" />
-    <ClCompile Include="Demos.ixx" />
     <ClCompile Include="Engine.cpp" />
     <ClCompile Include="Engine.ixx" />
     <ClCompile Include="GameObject.cpp" />
@@ -26,8 +22,6 @@
     <ClCompile Include="Main Menu.ixx" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Mesh.ixx" />
-    <ClCompile Include="Renderer.cpp" />
-    <ClCompile Include="Renderer.ixx" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="Scene.ixx" />
     <ClCompile Include="Serialize.ixx" />

@@ -1,6 +1,7 @@
 import Networking;
 
 #include "Definitions.hpp"
+#include <fstream>
 #include <string>
 #include <queue>
 #include <vector>
@@ -13,6 +14,7 @@ import Networking;
 using boost::asio::ip::udp;
 
 #define MIN_BUFFER_SIZE 4
+#define TCP_HOST_IP_PORT 80
 
 
 namespace Loom
@@ -29,7 +31,7 @@ namespace Loom
 
 	static inline std::unordered_map<MessageType, void(*)(Message*)> handles{ };
 
-	void OpenUDPServerOnThisThread()
+	void OpenUDPServerOnThisThread(std::string project_directory)
 	{
 		//try
 		//{
@@ -68,7 +70,7 @@ namespace Loom
 		//udp_server_on = false;
 	};
 
-	void OpenUDPClientOnThisThread()
+	void OpenUDPClientOnThisThread(std::string project_directory)
 	{
 		//try
 		//{
@@ -136,84 +138,101 @@ namespace Loom
 
 		//udp_client_on = false;
 	};
-
-	static inline std::string make_http_response()
-	{
-		std::string response = "HTTP/1.1 200 OK\r\n";
-		//response += "Content-Type: text/plain\r\n";
-		//response += "Content-Length: 13\r\n";
-		//response += "\r\n";
-		//response += "Hello, World!";
-		std::string html;
-		html += "<!DOCTYPE html>\n";
-		html += "<html>\n";
-		html += "<body>\n";
-		html += "<h1>My First Heading</h1>\n";
-		html += "<p>My first paragraph.</p>\n";
-		html += "</body>\n";
-		html += "</html>\r\n\0";
-
-		std::cout << "Sending: " << html << std::endl; 
-
-		response += "Content-Type: text/html\r\n";
-		response += "Content-Length: " + std::to_string(html.length() + 1) + "\r\n";
-		response += html;
-
-		return response;
-	};
-
-	void OpenTCPServerOnThisThread()
+	
+	void OpenTCPServerOnThisThread(std::string project_directory)
 	{
 		using boost::asio::ip::tcp;
 
 		try
 		{
-			boost::asio::io_service io_service;
+			boost::asio::io_service io_service{ };
 
-			// Log the startup information
-			std::cout << "Starting server on port 1111..." << std::endl;
+			std::cout << "Starting server on port " + std::to_string(TCP_HOST_IP_PORT) + "..." << std::endl;
 
-			// Create an acceptor to listen for incoming connections
-			tcp::acceptor acceptor(io_service, tcp::endpoint(tcp::v4(), 1111));
-
+			tcp::acceptor acceptor(io_service, tcp::endpoint(tcp::v4(), TCP_HOST_IP_PORT));
 			tcp_server_on = true;
 
 			while (tcp_server_on)
 			{
 				try
 				{
-					// Create a socket for the incoming connection
 					tcp::socket socket(io_service);
 
-					// Log that we are waiting for a connection
 					std::cout << "Waiting for a connection..." << std::endl;
-
-					// Wait and accept an incoming connection
 					acceptor.accept(socket);
 
-					// Log the client's IP address
 					std::cout << "Accepted connection from: "
 						<< socket.remote_endpoint().address().to_string() << std::endl;
 
-					// Generate the HTTP response
-					std::string response = make_http_response();
+					// Read request from the client
+					boost::asio::streambuf request;
+					boost::asio::read_until(socket, request, "\r\n");
+					std::istream request_stream(&request);
 
-					// Write the response to the socket
-					boost::asio::write(socket, boost::asio::buffer(response));
+					std::string method, path, version;
+					request_stream >> method >> path >> version;
+					std::cout << "Request path: " << path << std::endl;
 
-					// Log that the response was sent
-					std::cout << "Sent response to client." << std::endl;
+					// Map request to file type (adjust paths if necessary)
+					std::string file_path = project_directory + (path == "/" ? "/index.html" : path);
 
-					// Close the socket (it automatically closes after sending the response)
+					//
+					std::string toFind = "%20";
+					std::string toReplace = " ";
+					size_t pos = file_path.find(toFind);
+
+					while (pos != std::string::npos)
+					{
+						file_path.replace(pos, toFind.length(), toReplace);
+						pos = file_path.find(toFind, pos + toReplace.length());
+					};
+					//
+
+					std::ifstream file(file_path, std::ios::binary);
+					if (!file.is_open())
+					{
+						std::cerr << "Failed to open the file: " << file_path << std::endl;
+						std::string not_found_response = "HTTP/1.1 404 Not Found\r\n\r\nFile not found.";
+						boost::asio::write(socket, boost::asio::buffer(not_found_response));
+					}
+					else
+					{
+						std::stringstream buffer;
+						buffer << file.rdbuf();
+						std::string content = buffer.str();
+
+						// Set Content-Type based on the requested file
+						std::string content_type;
+						if (file_path.ends_with(".html"))
+							content_type = "text/html";
+						else if (file_path.ends_with(".js"))
+							content_type = "application/javascript";
+						else if (file_path.ends_with(".wasm"))
+							content_type = "application/wasm";
+						else if (file_path.ends_with(".data.gz") || file_path.ends_with(".framework.js.gz"))
+							content_type = "application/octet-stream";
+						else
+							content_type = "text/plain";
+
+						// Send the HTTP response
+						std::string response = "HTTP/1.1 200 OK\r\n";
+						response += "Content-Type: " + content_type + "\r\n";
+						response += "Content-Length: " + std::to_string(content.size()) + "\r\n";
+						// Add this line for gzip files
+						if (file_path.ends_with(".gz")) response += "Content-Encoding: gzip\r\n";
+						response += "\r\n"; // Blank line between headers and body
+						response += content;
+
+						boost::asio::write(socket, boost::asio::buffer(response));
+						std::cout << "Sent response for " << path << std::endl;
+					};
+
+					// Close the socket
 					socket.shutdown(tcp::socket::shutdown_both);
 					socket.close();
-
-					// Log that the connection is closed
-					std::cout << "Connection closed." << std::endl;
 				}
 				catch (std::exception& e)
 				{
-					// Log if any error occurs in the connection handling
 					std::cerr << "Error handling connection: " << e.what() << std::endl;
 				};
 			};
@@ -224,9 +243,9 @@ namespace Loom
 		};
 
 		tcp_server_on = false;
-	};
+	}
 
-	void OpenTCPClientOnThisThread()
+	void OpenTCPClientOnThisThread(std::string project_directory)
 	{
 		
 	};

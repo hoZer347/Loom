@@ -26,7 +26,10 @@ namespace Loom
 		SERIALIZE(&root);
 
 		template <typename T>
-		T* Attach(auto&&... args) { return root.Attach<T>(args...); };
+		T* Attach(auto&&... args)
+		{
+			return root.Attach<T>(args...);
+		};
 
 		GameObject* AddChild(const std::string& m_name = "New GameObject") { return root.AddChild(m_name); };
 

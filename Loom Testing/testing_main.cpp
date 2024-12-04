@@ -9,8 +9,9 @@
 import Mesh;
 import Scene;
 import Engine;
-import Networking;
 import GameObject;
+import Networking;
+import Component;
 
 import <vector>;
 import <thread>;
@@ -18,14 +19,29 @@ import <thread>;
 using namespace Loom;
 
 
+struct Test : Component<Test>
+{
+	void OnGui() override
+	{
+		ImGui::Text("Test");
+	};
+};
+
 int main()
 {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
-	auto thread = std::thread(OpenTCPServerOnThisThread);
+	//OpenTCPServerOnThisThread("C:/Users/3hoze/Desktop/Vanguards WebGL");
+	
+	//OpenTCPServerOnThisThread("C:/Users/3hoze/Desktop/Loom Project");
 
-	if (thread.joinable())
-		thread.join();
+	GameObject::RegisterComponent<Test>();
+
+	Scene scene{ "Gump" };
+
+	Test* test = scene.Attach<Test>();
+
+	Engine::Start("C:/Users/3hoze/Desktop/Loom Test Project 1");
 
 	return 0;
 };

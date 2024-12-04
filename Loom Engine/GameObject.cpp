@@ -167,6 +167,37 @@ namespace Loom
 			if (ImGui::InputText(std::to_string(m_ID).c_str(), newName, 128))
 				m_name = newName;
 
+			// Adding components
+			if (ImGui::TreeNode("Add Component: "))
+			{
+				for (auto& [name, func] : reg_component_attachers)
+				{
+					for (auto& component : m_components)
+						if (component->GetClassName() == name)
+							continue;
+
+					if (ImGui::Button(name.c_str()))
+						func(this);
+				};
+
+				ImGui::TreePop();
+			};
+
+			// TODO: Add a way to detach by component / name rather than by component type
+
+			// Removing components
+			if (ImGui::TreeNode("Remove Component: "))
+			{
+				for (auto& [name, func] : reg_component_detachers)
+					if (ImGui::Button(name.c_str()))
+					{
+						reg_component_detachers[name](this);
+						break;
+					};
+
+				ImGui::TreePop();
+			};
+
 			for (ComponentBase* component : m_components)
 				component->Gui();
 			for (GameObject* child : m_children)

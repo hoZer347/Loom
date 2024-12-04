@@ -65,12 +65,10 @@ namespace Loom
 				scene->OnSerialize();
 		};
 
-
 		if (ImGui::Button("Load"))
 		{
 
 		};
-
 
 		ImGui::End();
 	};

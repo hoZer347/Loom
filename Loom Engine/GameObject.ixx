@@ -10,6 +10,7 @@ import <string>;
 import <vector>;
 import <atomic>;
 import <iostream>;
+import <functional>;
 
 
 namespace Loom
@@ -28,7 +29,7 @@ namespace Loom
 			Engine::QueueTask(
 				[this, component]()
 				{
-					//((ComponentBase*)component)->m_game_object = (GameObject*)this;
+					((ComponentBase*)component)->m_gameObject = (decltype(((ComponentBase*)component)->m_gameObject))(void*)this;
 
 					m_components.emplace_back(component);
 
@@ -46,7 +47,7 @@ namespace Loom
 		};
 
 		template <typename T>
-		_NODISCARD T* GetComponent()
+		[[nodiscard]] T* GetComponent()
 		{
 			static_assert(std::is_base_of_v<Component<T>, T>, "Must be a component");
 
@@ -58,7 +59,7 @@ namespace Loom
 		};
 
 		template <typename T>
-		bool RmvComponent()
+		bool Detach()
 		{
 			static_assert(std::is_base_of_v<Component<T>, T>, "Must be a component");
 
@@ -66,7 +67,7 @@ namespace Loom
 				if (component->m_type_id = typeid(T).hash_code())
 				{
 					Engine::QueueTask(
-						[component]()
+						[this, component]()
 						{
 							m_components.erase(
 								std::remove(
@@ -108,6 +109,24 @@ namespace Loom
 
 		GameObject* AddChild(const std::string& name = "New GameObject");
 
+		template <typename T>
+		static inline void RegisterComponent()
+		{
+			std::cout << "Registered: " << boost::typeindex::type_id<T>().pretty_name() << std::endl;
+
+			reg_component_attachers[boost::typeindex::type_id<T>().pretty_name()] =
+				[](void* gameObject)
+				{
+					((GameObject*)gameObject)->Attach<T>();
+				};
+
+			reg_component_detachers[boost::typeindex::type_id<T>().pretty_name()] =
+				[](void* gameObject)
+				{
+					((GameObject*)gameObject)->Detach<T>();
+				};
+		};
+
 	protected:
 		friend struct Scene;
 		friend struct Engine;
@@ -138,6 +157,14 @@ namespace Loom
 			&m_physicsables);
 
 	private:
+		static inline std::unordered_map<
+			std::string,								// Name
+			void(*)(void*)> reg_component_attachers{ };	// Attach function for attaching / detaching components
+
+		static inline std::unordered_map<
+			std::string,								// Name
+			void(*)(void*)> reg_component_detachers{ };	// Detach function for attaching / detaching components
+
 		GameObject* parent;
 
 		char newName[128];

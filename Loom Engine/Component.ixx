@@ -4,12 +4,16 @@ import LoomObject;
 
 import "imgui.h";
 import "typeinfo";
+
+import <iostream>;
 import <boost/type_index.hpp>;
+
 
 
 namespace Loom
 {
 	struct GameObject;
+
 
 	export struct ComponentBase :
 		public LoomObject
@@ -25,14 +29,15 @@ namespace Loom
 
 		virtual ~ComponentBase()	 { };
 
-		GameObject const* GetGameObject() const { return m_game_object; };
-		const std::string& GetName() const { return m_name; };
+		const std::string& GetClassName() const { return m_name; };
+		GameObject const* GetGameObject() const { return m_gameObject; };
 
 	protected:
 		friend struct GameObject;
+		GameObject* m_gameObject;
+
 		virtual void Gui() { };
 		size_t m_type_id;
-		GameObject* m_game_object;
 	};
 
 	export template <typename T>
@@ -40,6 +45,9 @@ namespace Loom
 		public ComponentBase
 	{
 		virtual ~Component() { };
+
+	protected:
+		Component() { };
 
 	private:
 		void Gui() override
