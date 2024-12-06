@@ -25,7 +25,6 @@
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="Scene.ixx" />
     <ClCompile Include="Serialize.ixx" />
-    <ClCompile Include="Timer.ixx" />
   </ItemGroup>
   <ItemGroup>
     <None Include="glew32.dll" />

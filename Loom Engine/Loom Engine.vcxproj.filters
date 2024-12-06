@@ -4,9 +4,6 @@
     <ClCompile Include="Engine.ixx">
       <Filter>Engine</Filter>
     </ClCompile>
-    <ClCompile Include="Timer.ixx">
-      <Filter>Timer</Filter>
-    </ClCompile>
     <ClCompile Include="GameObject.ixx">
       <Filter>Engine\GameObject</Filter>
     </ClCompile>
@@ -54,9 +51,6 @@
     </Filter>
     <Filter Include="Engine">
       <UniqueIdentifier>{4f94141a-f048-4d6b-aae1-53776a304f44}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Timer">
-      <UniqueIdentifier>{e0e155f3-797f-43db-a42a-300a9fa355b4}</UniqueIdentifier>
     </Filter>
     <Filter Include="Engine\GameObject">
       <UniqueIdentifier>{7fcc9bc6-06ea-4e15-8348-2d9e927ddc3f}</UniqueIdentifier>

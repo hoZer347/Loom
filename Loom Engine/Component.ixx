@@ -9,7 +9,6 @@ import <iostream>;
 import <boost/type_index.hpp>;
 
 
-
 namespace Loom
 {
 	struct GameObject;

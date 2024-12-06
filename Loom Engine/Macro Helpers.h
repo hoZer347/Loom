@@ -2,6 +2,7 @@
 
 #pragma warning(disable : 5103)
 
+#include <algorithm>
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -73,7 +74,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
+// TODO: Likely not the optimal way to implement serialization
 #define SERIALIZE(...)\
 void OnSerialize() override\
 {\
@@ -85,3 +86,26 @@ void OnDeserialize() override\
 	std::cout << "Deserializing: " << typeid(*this).name() << std::endl;\
 	Deserialize(GetName().c_str(), this, __VA_ARGS__);\
 };\
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Str: Used to put unsigned char*'s as template arguments
+// - Example:
+//		template <Str str> void Print<Str str>()
+//		{
+//			std::cout << str << std::endl;
+//		};
+// 
+//		Print<"Hello World">(); => Hello World!
+//
+template<size_t N>
+struct Str final
+{
+	constexpr Str(const char(&str)[N])
+	{
+		std::copy_n(str, N, value);
+	};
+	char value[N];
+};
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////

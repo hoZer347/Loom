@@ -1,3 +1,5 @@
+module;
+
 #include "Macro Helpers.h"
 
 
@@ -39,9 +41,9 @@ namespace Loom
 			stream.write(reinterpret_cast<char*>(&size), sizeof(size));
 			arg->reserve(size);
 			stream.write(reinterpret_cast<char*>(arg->data()), sizeof(ARG::value_type) * size);
-		}
+		};
 
-		else stream.write(reinterpret_cast<char*>(arg), sizeof(ARG));
+		//else stream.write(reinterpret_cast<char*>(arg), sizeof(ARG));
 
 		SubSerialize(stream, args...);
 	};

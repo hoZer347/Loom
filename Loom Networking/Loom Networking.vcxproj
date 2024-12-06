@@ -96,13 +96,13 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Networking.cpp" />
-    <ClCompile Include="Networking.ixx" />
+    <ClCompile Include="Server.cpp" />
+    <ClCompile Include="Server.ixx" />
     <ClCompile Include="Standard Handles.ixx" />
     <ClCompile Include="Standard Handles.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Definitions.hpp" />
+    <ClInclude Include="Server.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Loom Engine\Loom Engine.vcxproj">

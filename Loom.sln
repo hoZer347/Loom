@@ -11,7 +11,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Engine", "Loom Engine\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Testing", "Loom Testing\Loom Testing.vcxproj", "{8B7F2B81-7939-4DC7-BB27-365D517AF856}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Client", "Loom Client\Loom Client.vcxproj", "{D11B0D69-BD83-4720-950B-C49F3D151704}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom SQL", "Loom SQL\Loom SQL.vcxproj", "{61AC63F1-3BC9-4824-971E-C7B370288886}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -35,10 +35,10 @@ Global
 		{8B7F2B81-7939-4DC7-BB27-365D517AF856}.Debug|x64.Build.0 = Debug|x64
 		{8B7F2B81-7939-4DC7-BB27-365D517AF856}.Release|x64.ActiveCfg = Release|x64
 		{8B7F2B81-7939-4DC7-BB27-365D517AF856}.Release|x64.Build.0 = Release|x64
-		{D11B0D69-BD83-4720-950B-C49F3D151704}.Debug|x64.ActiveCfg = Debug|x64
-		{D11B0D69-BD83-4720-950B-C49F3D151704}.Debug|x64.Build.0 = Debug|x64
-		{D11B0D69-BD83-4720-950B-C49F3D151704}.Release|x64.ActiveCfg = Release|x64
-		{D11B0D69-BD83-4720-950B-C49F3D151704}.Release|x64.Build.0 = Release|x64
+		{61AC63F1-3BC9-4824-971E-C7B370288886}.Debug|x64.ActiveCfg = Debug|x64
+		{61AC63F1-3BC9-4824-971E-C7B370288886}.Debug|x64.Build.0 = Debug|x64
+		{61AC63F1-3BC9-4824-971E-C7B370288886}.Release|x64.ActiveCfg = Release|x64
+		{61AC63F1-3BC9-4824-971E-C7B370288886}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

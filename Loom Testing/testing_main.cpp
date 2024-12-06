@@ -6,42 +6,30 @@
 #include "imgui.h"
 #include "Macro Helpers.h"
 
-import Mesh;
-import Scene;
-import Engine;
-import GameObject;
-import Networking;
-import Component;
+#include "../Loom Networking/Server.h"
 
+import SQLite;
 import <vector>;
 import <thread>;
 
 using namespace Loom;
 
 
-struct Test : Component<Test>
-{
-	void OnGui() override
-	{
-		ImGui::Text("Test");
-	};
-};
-
 int main()
 {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
-	//OpenTCPServerOnThisThread("C:/Users/3hoze/Desktop/Vanguards WebGL");
-	
-	//OpenTCPServerOnThisThread("C:/Users/3hoze/Desktop/Loom Project");
+	std::string project_directory = "C:/Users/3hoze/Desktop/Loom Test Project 1";
+	auto server = TCPServer(project_directory);
+	auto db = SQLDB(project_directory + "/database.db");
 
-	GameObject::RegisterComponent<Test>();
+	db.Request("CREATE TABLE IF NOT EXISTS test (id INTEGER PRIMARY KEY, name TEXT);");
+	db.Request("INSERT INTO test (name) VALUES ('test');");
+	db.Request("SELECT * FROM test;");
 
-	Scene scene{ "Gump" };
-
-	Test* test = scene.Attach<Test>();
-
-	Engine::Start("C:/Users/3hoze/Desktop/Loom Test Project 1");
+	std::string str;
+	std::cout << "Enter q to quit" << std::endl;
+	while (str != "q") std::cin >> str;
 
 	return 0;
 };
