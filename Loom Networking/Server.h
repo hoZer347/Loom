@@ -2,6 +2,7 @@
 
 #define BOOST_ASIO_DISABLE_MODULE
 #include <boost/asio.hpp>
+#include <boost/asio/ssl.hpp>
 #include <iostream>
 #include <string>
 #include <queue>
@@ -9,6 +10,8 @@
 #ifndef TCP_HOST_IP_PORT
 #define TCP_HOST_IP_PORT 80
 #endif
+
+// This file is here because of boost not working with C++ 20+ modules
 
 
 namespace Loom
@@ -32,6 +35,7 @@ namespace Loom
 		std::recursive_mutex mutex{ };
 		bool isRunning = false;
 		std::thread thread;
+		SSL_CTX* ctx;
 	};
 
 	struct TCPServer final : Server

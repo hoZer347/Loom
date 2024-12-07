@@ -56,6 +56,7 @@
     <Import Project="..\Property Files\GLFW.props" />
     <Import Project="..\Property Files\Assimp.props" />
     <Import Project="..\Property Files\Boost.props" />
+    <Import Project="..\Property Files\OpenSSL.props" />
     <Import Project="..\Property Files\UserMacros.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -67,6 +68,7 @@
     <Import Project="..\Property Files\GLFW.props" />
     <Import Project="..\Property Files\Assimp.props" />
     <Import Project="..\Property Files\Boost.props" />
+    <Import Project="..\Property Files\OpenSSL.props" />
     <Import Project="..\Property Files\UserMacros.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />

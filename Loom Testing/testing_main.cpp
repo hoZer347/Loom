@@ -19,7 +19,7 @@ int main()
 {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
-	std::string project_directory = "C:/Users/3hoze/Desktop/Loom Test Project 1";
+	std::string project_directory = "C:/Users/3hoze/Desktop/Loom Server Files";
 	auto server = TCPServer(project_directory);
 	auto db = SQLDB(project_directory + "/database.db");
 
