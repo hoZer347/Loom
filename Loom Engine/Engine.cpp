@@ -73,7 +73,7 @@ namespace Loom
 		taskQueue.push(task);
 	};
 
-	const size_t& Engine::GetUniqueID()
+	const size_t Engine::GetUniqueID()
 	{
 		static std::atomic<size_t> id_counter = 0;
 		return id_counter++;

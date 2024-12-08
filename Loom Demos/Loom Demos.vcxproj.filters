@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="Demos.ixx">
+      <Filter>Demos</Filter>
+    </ClCompile>
+    <ClCompile Include="Demos.cpp">
+      <Filter>Demos</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Demos">
+      <UniqueIdentifier>{962aca8a-64eb-4e1f-99c5-6de3235c0cc7}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

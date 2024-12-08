@@ -25,7 +25,7 @@ namespace Loom
 		static inline bool doGUI = true;
 		static inline bool isRunning;
 
-		static const size_t& GetUniqueID();
+		static const size_t GetUniqueID();
 
 		static inline GLuint m_VAO = 0;
 		static inline GLuint m_VTXS = 0;

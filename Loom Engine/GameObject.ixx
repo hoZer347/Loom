@@ -1,3 +1,5 @@
+module;
+
 #include "Macro Helpers.h"
 
 export module GameObject;
