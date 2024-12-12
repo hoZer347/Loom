@@ -10,6 +10,9 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link />
+    <Link>
+      <AdditionalLibraryDirectories>$(SolutionDir)Loom\Loom Engine\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
   </ItemDefinitionGroup>
   <ItemGroup />
 </Project>

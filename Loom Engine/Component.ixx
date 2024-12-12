@@ -53,7 +53,9 @@ namespace Loom
 		{
 			ImGui::PushID(this);
 			
-			if (ImGui::TreeNode((void*)this, boost::typeindex::type_id<T>().pretty_name().c_str()))
+			if (ImGui::TreeNode(
+				(void*)this,
+				boost::typeindex::type_id<T>().pretty_name().c_str()))
 			{
 				OnGui();
 				ImGui::TreePop();

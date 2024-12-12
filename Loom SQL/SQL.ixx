@@ -1,3 +1,5 @@
+module;
+
 #include <stdio.h>
 #include "sqlite/sqlite3.h"
 

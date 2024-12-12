@@ -15,6 +15,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom SQL", "Loom SQL\Loom S
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Demos", "Loom Demos\Loom Demos.vcxproj", "{FE0BB4E8-806A-422B-8964-EC0C26D58589}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Emscripten Testing", "Loom Emscripten Testing\Loom Emscripten Testing.vcxproj", "{7573054A-30A9-427C-87D0-7A2D67C22891}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -45,6 +47,10 @@ Global
 		{FE0BB4E8-806A-422B-8964-EC0C26D58589}.Debug|x64.Build.0 = Debug|x64
 		{FE0BB4E8-806A-422B-8964-EC0C26D58589}.Release|x64.ActiveCfg = Release|x64
 		{FE0BB4E8-806A-422B-8964-EC0C26D58589}.Release|x64.Build.0 = Release|x64
+		{7573054A-30A9-427C-87D0-7A2D67C22891}.Debug|x64.ActiveCfg = Debug|x64
+		{7573054A-30A9-427C-87D0-7A2D67C22891}.Debug|x64.Build.0 = Debug|x64
+		{7573054A-30A9-427C-87D0-7A2D67C22891}.Release|x64.ActiveCfg = Release|x64
+		{7573054A-30A9-427C-87D0-7A2D67C22891}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
