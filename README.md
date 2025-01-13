@@ -1,30 +1,43 @@
-Welcome To the Loom Codebase!
+## Welcome To the Loom Codebase!
 
-You'll find the most interesting code in Loom Engine and Loom Networking
+This is the Codebase I use to store any C++ projects I'm working on
 
-External Libraries:
+You'll find the most interesting code in Loom Engine, Networking, and WASM
+
+
+### Included Libraries:
+
+*External Libraries:*
 - Having the libraries come with the codebase makes it more convenient than having a package manager
 
-Loom Demos:
+*Loom Demos:*
 - Where I plan to put tests and demos for my projects
 
-Loom Emscripten Testing
+*Loom WASM*
 - Project for compiling and running WASM programs in the browser
 - compile.py: automatically compiles WASM projects based on a "Source Directories.txt", or its containing folder
 
-Loom Engine:
+*Loom Engine:*
 - Skeleton for a Modern C++ Game Engine, built with ImGui and OpenGL as a backend
 - Features thread safe memory management, and an Entity-Component system
 - Uses modern C++ features such as modules and std::barrier
+- Currently postponed due to modules not being supported with WASM
 
-Loom ImGui:
+*Loom ImGui:*
 - Imported ImGui implementation using an OpenGL backend
 
-Loom Networking:
+*Loom Math*
+- glm substitute for WASM projects
+
+*Loom Networking:*
 - Backend server code using boost::asio sockets
 
-Loom SQL:
+*Loom SQL:*
 - Basic SQL Server set up
 
-Property Files:
+*Property Files:*
 - Various .prop files for easily importing libraries / projects into each other
+
+### Bugs To Fix:
+- Take glViewport out of the renderLoop (right now it's there so the window takes up the whole browser page on load)
+

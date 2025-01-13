@@ -20,7 +20,6 @@ namespace Loom
 		virtual void OnAttach()		 { };
 		virtual void OnDetach()		 { };
 		virtual void OnGui()		 { };
-		virtual void OnUpdate()		 { };
 		virtual void OnRender()		 { };
 		virtual void OnPhysics()	 { };
 		virtual void OnPopOutGui()	 { };
@@ -36,7 +35,7 @@ namespace Loom
 		GameObject* m_gameObject;
 
 		virtual void Gui() { };
-		size_t m_type_id;
+		size_t m_type_name;
 	};
 
 	export template <typename T>

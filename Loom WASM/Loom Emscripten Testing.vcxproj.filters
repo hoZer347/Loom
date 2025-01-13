@@ -1,0 +1,110 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="Engine.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="Shaders.cpp">
+      <Filter>Shaders</Filter>
+    </ClCompile>
+    <ClCompile Include="Textures.cpp">
+      <Filter>Textures</Filter>
+    </ClCompile>
+    <ClCompile Include="GameObject.cpp">
+      <Filter>GameObject</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene.cpp">
+      <Filter>Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Component.cpp">
+      <Filter>Component</Filter>
+    </ClCompile>
+    <ClCompile Include="LoomObject.cpp">
+      <Filter>LoomObject</Filter>
+    </ClCompile>
+    <ClCompile Include="Mesh.cpp">
+      <Filter>Mesh</Filter>
+    </ClCompile>
+    <ClCompile Include="Material.cpp">
+      <Filter>Material</Filter>
+    </ClCompile>
+    <ClCompile Include="Geo.cpp">
+      <Filter>Mesh\Geo</Filter>
+    </ClCompile>
+    <ClCompile Include="Input.cpp">
+      <Filter>Input</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Engine">
+      <UniqueIdentifier>{d68380b0-9ec1-4fef-8c12-5ad5b4f6e9a1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{7426a2f4-d5ee-4af2-9f47-9b00f910a0d8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Textures">
+      <UniqueIdentifier>{ebdbd59a-850e-4312-a29a-cadf8029f34c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GameObject">
+      <UniqueIdentifier>{db635e61-683c-409c-8699-ce4d4b3c62ea}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Scene">
+      <UniqueIdentifier>{7db4ecc2-6272-47a5-8ee6-bbde35551518}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Component">
+      <UniqueIdentifier>{ba645ed9-dd21-4996-ae99-2d84e036fa4f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="LoomObject">
+      <UniqueIdentifier>{da5e6d83-c126-402d-9369-f5608d3305a6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Mesh">
+      <UniqueIdentifier>{8b6dc36d-46e9-4067-99f0-6d491f5b01cf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Material">
+      <UniqueIdentifier>{b527e8c1-d56b-4349-9a6d-dc47dd2ccded}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Mesh\Geo">
+      <UniqueIdentifier>{f75128ee-8771-4c30-a14d-12592a33a57c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Input">
+      <UniqueIdentifier>{5f3ab2bf-b23a-4466-9a82-86ce58a9e896}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Engine.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Shaders.h">
+      <Filter>Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="OpenGL.h" />
+    <ClInclude Include="Textures.h">
+      <Filter>Textures</Filter>
+    </ClInclude>
+    <ClInclude Include="GameObject.h">
+      <Filter>GameObject</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene.h">
+      <Filter>Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Component.h">
+      <Filter>Component</Filter>
+    </ClInclude>
+    <ClInclude Include="LoomObject.h">
+      <Filter>LoomObject</Filter>
+    </ClInclude>
+    <ClInclude Include="Mesh.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="Material.h">
+      <Filter>Material</Filter>
+    </ClInclude>
+    <ClInclude Include="Geo.h">
+      <Filter>Mesh\Geo</Filter>
+    </ClInclude>
+    <ClInclude Include="Macro Helpers.h" />
+    <ClInclude Include="Input.h">
+      <Filter>Input</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

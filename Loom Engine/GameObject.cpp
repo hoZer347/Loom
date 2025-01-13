@@ -101,7 +101,7 @@ namespace Loom
 	{
 		for (ComponentBase* updateable : m_updateables)
 			if (thread == m_threadID)
-				updateable->OnUpdate();
+				updateable->OnRender();
 		for (GameObject* child : m_children)
 			child->Update(thread);
 	};

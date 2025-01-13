@@ -26,7 +26,7 @@ namespace Loom
 			static_assert(std::is_base_of_v<Component<T>, T>, "Must be a component");
 			
 			T* component = new T(args...);
-			((ComponentBase*)component)->m_type_id = typeid(T).hash_code();
+			((ComponentBase*)component)->m_type_name = typeid(T).hash_code();
 
 			Engine::QueueTask(
 				[this, component]()
@@ -35,7 +35,7 @@ namespace Loom
 
 					m_components.emplace_back(component);
 
-					if constexpr (&T::OnUpdate != &ComponentBase::OnUpdate)
+					if constexpr (&T::OnRender != &ComponentBase::OnRender)
 						m_updateables.emplace_back(component);
 					
 					if constexpr (&T::OnRender != &ComponentBase::OnRender)
@@ -54,7 +54,7 @@ namespace Loom
 			static_assert(std::is_base_of_v<Component<T>, T>, "Must be a component");
 
 			for (auto& component : m_components)
-				if (component->m_type_id = typeid(T).hash_code())
+				if (component->m_type_name = typeid(T).hash_code())
 					return (T*)component;
 
 			return nullptr;
@@ -66,7 +66,7 @@ namespace Loom
 			static_assert(std::is_base_of_v<Component<T>, T>, "Must be a component");
 
 			for (auto& component : m_components)
-				if (component->m_type_id = typeid(T).hash_code())
+				if (component->m_type_name = typeid(T).hash_code())
 				{
 					Engine::QueueTask(
 						[this, component]()
@@ -77,7 +77,7 @@ namespace Loom
 									m_components.end(),
 									component));
 
-							if constexpr (&T::OnUpdate != &ComponentBase::OnUpdate)
+							if constexpr (&T::OnRender != &ComponentBase::OnRender)
 								m_updateables.erase(
 									std::remove(
 										m_updateables.begin(),

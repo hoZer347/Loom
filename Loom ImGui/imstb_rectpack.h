@@ -119,7 +119,7 @@ STBRP_DEF int stbrp_pack_rects (stbrp_context *context, stbrp_rect *rects, int n
 struct stbrp_rect
 {
    // reserved for your use:
-   int            id;
+   int            m_id;
 
    // input:
    stbrp_coord    w, h;

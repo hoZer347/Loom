@@ -15,7 +15,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom SQL", "Loom SQL\Loom S
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Demos", "Loom Demos\Loom Demos.vcxproj", "{FE0BB4E8-806A-422B-8964-EC0C26D58589}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Emscripten Testing", "Loom Emscripten Testing\Loom Emscripten Testing.vcxproj", "{7573054A-30A9-427C-87D0-7A2D67C22891}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Math", "Loom Math\Loom Math.vcxproj", "{B9FFE5B1-3FC5-444D-845F-2A5B577527DA}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom WASM", "Loom WASM\Loom Emscripten Testing.vcxproj", "{7573054A-30A9-427C-87D0-7A2D67C22891}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Fractal Background", "Loom Fractal Background\Loom Fractal Background.vcxproj", "{26F4E897-2377-4B28-9E24-5C61ADF3DAEA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -47,10 +51,18 @@ Global
 		{FE0BB4E8-806A-422B-8964-EC0C26D58589}.Debug|x64.Build.0 = Debug|x64
 		{FE0BB4E8-806A-422B-8964-EC0C26D58589}.Release|x64.ActiveCfg = Release|x64
 		{FE0BB4E8-806A-422B-8964-EC0C26D58589}.Release|x64.Build.0 = Release|x64
+		{B9FFE5B1-3FC5-444D-845F-2A5B577527DA}.Debug|x64.ActiveCfg = Debug|x64
+		{B9FFE5B1-3FC5-444D-845F-2A5B577527DA}.Debug|x64.Build.0 = Debug|x64
+		{B9FFE5B1-3FC5-444D-845F-2A5B577527DA}.Release|x64.ActiveCfg = Release|x64
+		{B9FFE5B1-3FC5-444D-845F-2A5B577527DA}.Release|x64.Build.0 = Release|x64
 		{7573054A-30A9-427C-87D0-7A2D67C22891}.Debug|x64.ActiveCfg = Debug|x64
 		{7573054A-30A9-427C-87D0-7A2D67C22891}.Debug|x64.Build.0 = Debug|x64
 		{7573054A-30A9-427C-87D0-7A2D67C22891}.Release|x64.ActiveCfg = Release|x64
 		{7573054A-30A9-427C-87D0-7A2D67C22891}.Release|x64.Build.0 = Release|x64
+		{26F4E897-2377-4B28-9E24-5C61ADF3DAEA}.Debug|x64.ActiveCfg = Debug|x64
+		{26F4E897-2377-4B28-9E24-5C61ADF3DAEA}.Debug|x64.Build.0 = Debug|x64
+		{26F4E897-2377-4B28-9E24-5C61ADF3DAEA}.Release|x64.ActiveCfg = Release|x64
+		{26F4E897-2377-4B28-9E24-5C61ADF3DAEA}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

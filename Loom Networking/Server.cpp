@@ -73,6 +73,7 @@ namespace Loom
 		std::cout
 			<< std::endl
 			<< "Waiting for connection..."
+			<< std::endl
 			<< std::endl;
 
 
@@ -105,8 +106,14 @@ namespace Loom
 
 
 		// Sanitization
-		if (path == "/") path = project_directory + "/index.html";
+		//std::string misc_headers;
+		//misc_headers += "Cross-Origin-Embedder-Policy: require-corp\r\n";
+		//misc_headers += "Cross-Origin-Opener-Policy: same-origin\r\n";
 
+		if (path == "/")
+		{
+			path = project_directory + "/index.html";
+		}
 		else
 		{
 			ReplaceSubstrings(path, "%20", " ");
@@ -144,7 +151,7 @@ namespace Loom
 		std::string content_type;
 		std::string content_encoding;
 
-		if      (path.ends_with(".html"))											content_type = "text/html";\
+		if (path.ends_with(".html"))												content_type = "text/html"; \
 		else if (path.ends_with(".css"))											content_type = "text/css";
 		else if (path.ends_with(".js"))												content_type = "application/javascript";
 		else if (path.ends_with(".wasm"))											content_type = "application/wasm";
@@ -153,6 +160,7 @@ namespace Loom
 		else if (path.ends_with(".txt"))											content_type = "text/plain";
 		else if (path.ends_with(".ico"))											content_type = "image/x-icon";
 		else if (path.ends_with(".wasm.map"))										content_type = "application/wasm";
+		else if (path.ends_with(".frag") || path.ends_with(".vert"))				content_type = "text/plain";
 		else if (path.ends_with(".wasm.gz"))
 		{
 			content_type = "application/wasm";
@@ -186,6 +194,10 @@ namespace Loom
 			response += challenge_content;
 			boost::asio::write(socket, boost::asio::buffer(response));
 
+			std::cout << std::endl
+				<< "Sent: " << std::endl
+				<< response << std::endl;
+
 			return;
 		}
 		else
@@ -205,11 +217,19 @@ namespace Loom
 		std::string response = "HTTP/1.1 200 OK\r\n";
 		response += "Content-Type: " + content_type + "\r\n";
 		response += "Content-Length: " + std::to_string(content.size()) + "\r\n";
+		//response += misc_headers;
 		if (content_encoding != "") response += "Content-Encoding: " + content_encoding + "\r\n";
+		
+		std::cout << std::endl
+			<< "Sent: " << std::endl
+			<< response
+			<< path << std::endl;
+		
 		response += "\r\n";
 		response += content + "\r\n";
 		boost::asio::write(socket, boost::asio::buffer(response));
-		std::cout << "Sent:               " << path << std::endl;
+		//std::cout << "Sent:               " << path << std::endl;
+
 		//
 	};
 
