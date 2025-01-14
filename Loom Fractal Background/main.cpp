@@ -1,3 +1,4 @@
+#include "Macro Helpers.h"
 #include "Engine.h"
 #include "Scene.h"
 #include "GameObject.h"
@@ -43,7 +44,6 @@ int main()
 	mesh->m_vertices = vertices;
 	mesh->m_indices = indices;
 
-
 	std::vector<float> view
 	{
 		1, 0, 0, 0,
@@ -63,23 +63,21 @@ int main()
 	Engine::SetUpdateFunction(
 		[&]()
 		{
-			static std::array<float, 2> screenDims;
-			screenDims[0] = Input::screen_width;
-			screenDims[1] = Input::screen_height;
+			static std::array<float, 2> screenDimensions;
+			screenDimensions[0] = (float)Input::screen_width;
+			screenDimensions[1] = (float)Input::screen_height;
+
+			static std::array<float, 2> mousePosition;
+			mousePosition[0] = (float)Input::mouse_x;
+			mousePosition[1] = (float)Input::mouse_y;
 
 			shader.SetShaderVec2(
 				"screen_dimensions",
-				&screenDims);
-
-
-			static std::array<float, 2> mousePosition;
-			mousePosition[0] = Input::mouse_x;
-			mousePosition[1] = Input::mouse_y;
+				&screenDimensions);
 
 			shader.SetShaderVec2(
 				"mouse_position",
 				&mousePosition);
-
 
 			shader.SetShaderMat4(
 				"mvp",

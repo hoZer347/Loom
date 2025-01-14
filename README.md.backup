@@ -1,9 +1,8 @@
 ## Welcome To the Loom Codebase!
 
-This is the Codebase I use to store any C++ projects I'm working on
+This is where I store any C++ projects I'm working on
 
 You'll find the most interesting code in Loom Engine, Networking, and WASM
-
 
 ### Included Libraries:
 
@@ -26,18 +25,14 @@ You'll find the most interesting code in Loom Engine, Networking, and WASM
 *Loom ImGui:*
 - Imported ImGui implementation using an OpenGL backend
 
-
 *Loom Math*
 - glm substitute for WASM projects
-
 
 *Loom Networking:*
 - Backend server code using boost::asio sockets
 
-
 *Loom SQL:*
 - Basic SQL Server set up
-
 
 *Property Files:*
 - Various .prop files for easily importing libraries / projects into each other
@@ -45,13 +40,27 @@ You'll find the most interesting code in Loom Engine, Networking, and WASM
 
 ### Bugs To Fix:
 
-- Take glViewport out of the renderLoop (right now it's there so the window takes up the whole browser page on load)
+~~- Take glViewport out of the renderLoop (right now it's there so the window takes up the whole browser page on load)~~
 
 
 ### Planned Features:
 
+#### Shader Improvements
 - Automatic shader compilation
 - Shader conversion (GLSL core 330 and es 300)
 - Shader file combination (Unifying vertex / fragment etc, into a single file)
 - Shader file template generation / automatic uniform updating (Generating a template shader file based on the uniforms connected to the shader)
 
+#### Networking
+- Implement SSL into Server struct
+- Implement UDPServer
+- Implement multi-threading on the browser
+
+#### Miscellaneous
+- Implement SQL
+- ImGui implementation for debugging
+- Add a CUDA Library
+
+### What I'm working on right now:
+- Adding a Fractal Background to loomhoZer.ca
+- Adding shader features mentioned above

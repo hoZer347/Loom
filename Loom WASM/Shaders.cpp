@@ -24,7 +24,7 @@ namespace Loom
         gl_Position = vec4(aPos, 1.0f);
     })";
 #else
-		R"(#version 330 core
+		R"(#version 460 core
 	layout(location = 0) in vec3 aPos;
 	void main() {
 		gl_Position = vec4(aPos, 1.0f);
@@ -40,7 +40,7 @@ namespace Loom
         FragColor = vec4(0.0f, 1.0f, 0.0f, 1.0f); // Green color
     })";
 #else
-		R"(#version 330 core
+		R"(#version 460 core
 	out vec4 FragColor;
 	void main() {
 		FragColor = vec4(0.0f, 1.0f, 0.0f, 1.0f); // Green color
@@ -49,12 +49,11 @@ namespace Loom
 
 	// TODO: Add geometry and tessellation shaders
 
-	Shader::Shader()
-	{
-		CompileSource(
+	Shader::Shader() :
+		m_id(CompileSource(
 			defaultVertexShader,
-			defaultFragmentShader);
-	};
+			defaultFragmentShader))
+	{ };
 
 	Shader::Shader(const std::string& file_path) :
 		m_file_path(file_path)
@@ -94,7 +93,7 @@ namespace Loom
 		};
 #endif
 
-		CompileSource(
+		m_id = CompileSource(
 			vertex_shader_source,
 			fragment_shader_source);
 	};
@@ -151,49 +150,6 @@ namespace Loom
 	};
 #endif
 
-	void Shader::SetShaderMat4(
-		const std::string& name,
-		const void* data)
-	{
-		glUseProgram(m_id);
-
-		GLuint location = glGetUniformLocation(m_id, name.c_str());
-
-		glUniformMatrix4fv(
-			location,
-			1,
-			GL_FALSE,
-			(float*)data);
-	};
-
-	void Shader::SetShaderVec3(
-		const std::string& name,
-		const void* data)
-	{
-		glUseProgram(m_id);
-
-		GLuint location = glGetUniformLocation(m_id, name.c_str());
-
-		glUniform3fv(
-			location,
-			1,
-			(float*)data);
-	};
-
-	void Shader::SetShaderVec2(
-		const std::string& name,
-		const void* data)
-	{
-		glUseProgram(m_id);
-
-		GLuint location = glGetUniformLocation(m_id, name.c_str());
-
-		glUniform2fv(
-			location,
-			1,
-			(float*)data);
-	};
-
 	void Shader::GetShaderVec2(
 		const std::string& name,
 		void*& data)
@@ -208,7 +164,75 @@ namespace Loom
 			(float*)data);
 	};
 
-	void Shader::CompileSource(
+	void Shader::SetShaderVec2(
+		const std::string& name,
+		const void* data,
+		bool shouldUpdate)
+	{
+		glUseProgram(m_id);
+
+		GLuint location = glGetUniformLocation(m_id, name.c_str());
+
+		glUniform2fv(
+			location,
+			1,
+			(float*)data);
+
+		if (shouldUpdate)
+			m_uniforms[m_id][ID_Type(location, 2, GL_FLOAT).as_uint64()] = data;
+	};
+	
+	void Shader::SetShaderVec3(
+		const std::string& name,
+		const void* data,
+		bool shouldUpdate)
+	{
+		glUseProgram(m_id);
+
+		GLuint location = glGetUniformLocation(m_id, name.c_str());
+
+		glUniform3fv(
+			location,
+			1,
+			(float*)data);
+
+		if (shouldUpdate)
+			m_uniforms[m_id][ID_Type(location, 3, GL_FLOAT).as_uint64()] = data;
+	};
+
+	void Shader::SetShaderMat4(
+		const std::string& name,
+		const void* data,
+		bool shouldUpdate)
+	{
+		glUseProgram(m_id);
+
+		GLuint location = glGetUniformLocation(m_id, name.c_str());
+
+		glUniformMatrix4fv(
+			location,
+			1,
+			GL_FALSE,
+			(float*)data);
+
+		if (shouldUpdate)
+			m_uniforms[m_id][ID_Type(location, 16, GL_FLOAT).as_uint64()] = data;
+	};
+
+	void Shader::SetUniforms()
+	{
+		for (auto& i : m_uniforms)
+		{
+			glUseProgram(i.first);
+
+			for (auto& j : i.second)
+			{
+				
+			};
+		};
+	};
+
+	uint32_t Shader::CompileSource(
 		const std::string& vertex_shader_source,
 		const std::string& fragment_shader_source)
 	{
@@ -234,17 +258,19 @@ namespace Loom
 			glGetShaderInfoLog(fragment_shader, 512, NULL, infoLog);
 			std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
 		};
-		m_id = glCreateProgram();
-		glAttachShader(m_id, vertex_shader);
-		glAttachShader(m_id, fragment_shader);
-		glLinkProgram(m_id);
-		glGetProgramiv(m_id, GL_LINK_STATUS, &success);
+		GLuint shader_id = glCreateProgram();
+		glAttachShader(shader_id, vertex_shader);
+		glAttachShader(shader_id, fragment_shader);
+		glLinkProgram(shader_id);
+		glGetProgramiv(shader_id, GL_LINK_STATUS, &success);
 		if (!success)
 		{
-			glGetProgramInfoLog(m_id, 512, NULL, infoLog);
+			glGetProgramInfoLog(shader_id, 512, NULL, infoLog);
 			std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
 		};
 		glDeleteShader(vertex_shader);
 		glDeleteShader(fragment_shader);
+
+		return shader_id;
 	};
 };

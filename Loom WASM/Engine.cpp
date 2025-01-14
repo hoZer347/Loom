@@ -3,6 +3,7 @@
 #include "OpenGL.h"
 #include "Scene.h"
 #include "Input.h"
+#include "Shaders.h"
 
 #include <iostream>
 #include <atomic>
@@ -16,17 +17,28 @@ namespace Loom
 
 	void resizeCanvas()
 	{
-#if __EMSCRIPTEN__
 		int width, height;
+
+#if __EMSCRIPTEN__
 		// Get the current size of the canvas
 		emscripten_get_canvas_element_size("#canvas", &width, &height);
 
 		// Update GLFW's window size
-		glfwSetWindowSize(Engine::window, width, height);
+		glfwSetWindowSize(
+			Engine::window,
+			width,
+			height);
+#else
+		glfwGetWindowSize(
+			Engine::window,
+			&width,
+			&height);
+#endif
+		Input::screen_width = width;
+		Input::screen_height = height;
 
 		// Explicitly update the OpenGL viewport
 		glViewport(0, 0, width, height);
-#endif
 	};
 
 
@@ -94,6 +106,7 @@ namespace Loom
 
 
 #ifndef __EMSCRIPTEN__
+#ifndef NDEBUG
 		glEnable(GL_DEBUG_OUTPUT);
 		glDebugMessageCallback(
 			[](GLenum source, GLenum type, GLuint m_id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
@@ -101,6 +114,7 @@ namespace Loom
 				std::cerr << "OpenGL Debug: " << message << std::endl;
 			},
 			nullptr);
+#endif
 #endif
 
 		if (!glfwGetCurrentContext())
@@ -155,7 +169,7 @@ namespace Loom
 
 	void Engine::renderFrame()
 	{
-		resizeCanvas();
+		//resizeCanvas();
 
 		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -169,6 +183,8 @@ namespace Loom
 		};
 
 		onUpdate();
+
+		Shader::SetUniforms();
 
 		for (auto& scene : Scene::allScenes)
 			scene->root.Render();

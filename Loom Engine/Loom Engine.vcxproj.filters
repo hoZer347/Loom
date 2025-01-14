@@ -83,7 +83,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Macro Helpers.h" />
     <ClInclude Include="Debug.hpp" />
+    <ClInclude Include="Macro Helpers.h" />
   </ItemGroup>
 </Project>
