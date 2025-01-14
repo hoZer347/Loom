@@ -5,7 +5,10 @@
 #include "Material.h"
 #include "OpenGL.h"
 #include "Globals.h"
+#include "Input.h"
 #include "Mesh.h"
+
+#include <array>
 
 using namespace Loom;
 
@@ -60,6 +63,24 @@ int main()
 	Engine::SetUpdateFunction(
 		[&]()
 		{
+			static std::array<float, 2> screenDims;
+			screenDims[0] = Input::screen_width;
+			screenDims[1] = Input::screen_height;
+
+			shader.SetShaderVec2(
+				"screen_dimensions",
+				&screenDims);
+
+
+			static std::array<float, 2> mousePosition;
+			mousePosition[0] = Input::mouse_x;
+			mousePosition[1] = Input::mouse_y;
+
+			shader.SetShaderVec2(
+				"mouse_position",
+				&mousePosition);
+
+
 			shader.SetShaderMat4(
 				"mvp",
 				transform.data());

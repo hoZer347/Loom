@@ -14,14 +14,6 @@ namespace Loom
 	const unsigned int SCR_WIDTH = 800;
 	const unsigned int SCR_HEIGHT = 600;
 
-	void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-	void resizeCanvas();
-
-	void framebuffer_size_callback(GLFWwindow* window, int width, int height)
-	{
-		glViewport(0, 0, width, height);
-	};
-
 	void resizeCanvas()
 	{
 #if __EMSCRIPTEN__
@@ -34,9 +26,6 @@ namespace Loom
 
 		// Explicitly update the OpenGL viewport
 		glViewport(0, 0, width, height);
-
-		// Trigger framebuffer resize callback
-		framebuffer_size_callback(Engine::window, width, height);
 #endif
 	};
 
@@ -63,7 +52,6 @@ namespace Loom
 		};
 
 		glfwMakeContextCurrent(window);
-		glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
 
 #ifndef __EMSCRIPTEN__
@@ -98,6 +86,12 @@ namespace Loom
 		//
 
 		glEnable(GL_DEPTH_TEST);
+		//glEnable(GL_MULTISAMPLE);
+		glfwWindowHint(GLFW_SAMPLES, 4);
+
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 
 #ifndef __EMSCRIPTEN__
 		glEnable(GL_DEBUG_OUTPUT);
@@ -124,10 +118,6 @@ namespace Loom
 
 		std::cout << "OpenGL Version: " << glGetString(GL_VERSION) << std::endl;
 		std::cout << "GLSL Version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
-
-		int w, h;
-		glfwGetWindowSize(window, &w, &h);
-		framebuffer_size_callback(window, w, h);
 
 		glGenBuffers(1, &VBO);
 		glGenBuffers(1, &EBO);

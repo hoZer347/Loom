@@ -1,8 +1,8 @@
 #version 330 core
 
-precision mediump float;
-
 out vec4 FragColor;
+
+precision mediump float;
 
 void main()
 {

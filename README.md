@@ -21,7 +21,7 @@ You'll find the most interesting code in Loom Engine, Networking, and WASM
 - Skeleton for a Modern C++ Game Engine, built with ImGui and OpenGL as a backend
 - Features thread safe memory management, and an Entity-Component system
 - Uses modern C++ features such as modules and std::barrier
-- Currently postponed due to modules not being supported with WASM
+- NOTE: Currently postponed due to modules not being supported with WASM, see Loom WASM for a more developed version. I'm keeping it to show off my modern C++ skills
 
 *Loom ImGui:*
 - Imported ImGui implementation using an OpenGL backend
@@ -38,6 +38,16 @@ You'll find the most interesting code in Loom Engine, Networking, and WASM
 *Property Files:*
 - Various .prop files for easily importing libraries / projects into each other
 
+
 ### Bugs To Fix:
+
 - Take glViewport out of the renderLoop (right now it's there so the window takes up the whole browser page on load)
+
+
+### Planned Features:
+
+- Automatic shader compilation
+- Shader conversion (GLSL core 330 and es 300)
+- Shader file combination (Unifying vertex / fragment etc, into a single file)
+- Shader file template generation / automatic uniform updating (Generating a template shader file based on the uniforms connected to the shader)
 

@@ -18,7 +18,21 @@ namespace Loom
 
 		void SetShaderMat4(
 			const std::string& name,
-			void* data);
+			const void* data);
+
+		void SetShaderVec3(
+			const std::string& name,
+			const void* data);
+
+		void SetShaderVec2(
+			const std::string& name,
+			const void* data);
+
+		void GetShaderVec2(
+			const std::string& name,
+			void*& data);
+
+		// TODO: Add generic uniform getter / setter
 
 	private:
 		void CompileSource(

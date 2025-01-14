@@ -31,14 +31,17 @@ namespace Loom
 			if (res != EMSCRIPTEN_RESULT_SUCCESS)
 			{
 				std::cerr << "Failed to get window size!" << std::endl;
-				return EM_FALSE; // Indicate failure
-			}
+				return EM_FALSE;
+			};
 
-			// Normalize mouse position based on window size
-			transform[12] = (float)e->clientX / (float)windowWidth - 0.5f;
+			Input::screen_width = windowWidth;
+			Input::screen_height = windowHeight;
+
+			Input::mouse_x = e->clientX;
+			Input::mouse_y = e->clientY;
 		};
 
-		return EM_TRUE; // Prevent default behavior
+		return EM_TRUE;
 	};
 #else
 	void mouse_move_callback(
@@ -49,7 +52,11 @@ namespace Loom
 		int width, height;
 		glfwGetWindowSize(window, &width, &height);
 
-		transform[12] = (float)xpos / width - 0.5f;
+		Input::screen_width = width;
+		Input::screen_height = height;
+
+		Input::mouse_x = (int)xpos;
+		Input::mouse_y = (int)ypos;
 	};
 #endif
 

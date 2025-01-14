@@ -153,7 +153,7 @@ namespace Loom
 
 	void Shader::SetShaderMat4(
 		const std::string& name,
-		void* data)
+		const void* data)
 	{
 		glUseProgram(m_id);
 
@@ -163,6 +163,48 @@ namespace Loom
 			location,
 			1,
 			GL_FALSE,
+			(float*)data);
+	};
+
+	void Shader::SetShaderVec3(
+		const std::string& name,
+		const void* data)
+	{
+		glUseProgram(m_id);
+
+		GLuint location = glGetUniformLocation(m_id, name.c_str());
+
+		glUniform3fv(
+			location,
+			1,
+			(float*)data);
+	};
+
+	void Shader::SetShaderVec2(
+		const std::string& name,
+		const void* data)
+	{
+		glUseProgram(m_id);
+
+		GLuint location = glGetUniformLocation(m_id, name.c_str());
+
+		glUniform2fv(
+			location,
+			1,
+			(float*)data);
+	};
+
+	void Shader::GetShaderVec2(
+		const std::string& name,
+		void*& data)
+	{
+		glUseProgram(m_id);
+
+		GLuint location = glGetUniformLocation(m_id, name.c_str());
+
+		glGetUniformfv(
+			m_id,
+			location,
 			(float*)data);
 	};
 
