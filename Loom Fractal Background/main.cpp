@@ -21,10 +21,10 @@ int main()
 
 	std::vector<float> vertices
 	{
-		 0.5f,  0.5f, 0.0f,
-		 0.5f, -0.5f, 0.0f,
-		-0.5f, -0.5f, 0.0f,
-		-0.5f,  0.5f, 0.0f,
+		 1,  1, 0.0f,
+		 1, -1, 0.0f,
+		-1, -1, 0.0f,
+		-1,  1, 0.0f,
 	};
 
 	std::vector<uint32_t> indices
@@ -40,25 +40,10 @@ int main()
 	Material* material = scene.Attach<Material>();
 	material->m_shader = &shader;
 
-	Mesh* mesh = scene.Attach<Mesh>();
+	Mesh* mesh = scene.Attach<Mesh>(GL_TRIANGLES);
 	mesh->m_vertices = vertices;
 	mesh->m_indices = indices;
-
-	std::vector<float> view
-	{
-		1, 0, 0, 0,
-		0, 1, 0, 0,
-		0, 0, 1, 0,
-		0, 0, 0, 1
-	};
-
-	std::vector<float> perspective
-	{
-		1, 0, 0, 0,
-		0, 1, 0, 0,
-		0, 0, 1, 0,
-		0, 0, 0, 1
-	};
+	glPointSize(10);
 
 	Engine::SetUpdateFunction(
 		[&]()
@@ -78,10 +63,6 @@ int main()
 			shader.SetShaderVec2(
 				"mouse_position",
 				&mousePosition);
-
-			shader.SetShaderMat4(
-				"mvp",
-				transform.data());
 		});
 
 	engine.Start();

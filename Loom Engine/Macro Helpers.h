@@ -51,24 +51,24 @@
 //	HAS_VARIABLE_DECL(size)
 //	HAS_VARIABLE_TEST(std::vector<int>, size) -> TRUE
 //
-#define HAS_VARIABLE_DECL(member_variable_name) \
-	template <typename T> \
-	class has_##member_variable_name## { \
-	private: \
-		template <typename U> \
-		static constexpr auto check(int) -> decltype(std::declval<U>().member_variable_name, std::true_type{}) \
-		{ \
-			return std::true_type{}; \
-		} \
-		\
-		template <typename> \
-		static constexpr std::false_type check(...) \
-		{ \
-			return std::false_type{}; \
-		} \
-		\
-	public: \
-		static constexpr bool value = decltype(check<T>(0))::value; \
+#define HAS_VARIABLE_DECL(member_variable_name)\
+	template <typename T>\
+	class has_##member_variable_name## {\
+	private:\
+		template <typename U>\
+		static constexpr auto check(int) -> decltype(std::declval<U>().member_variable_name, std::true_type{})\
+		{\
+			return std::true_type{};\
+		}\
+\
+		template <typename>\
+		static constexpr std::false_type check(...)\
+		{\
+			return std::false_type{};\
+		}\
+\
+	public:\
+		static constexpr bool value = decltype(check<T>(0))::value;\
 	};
 #define HAS_VARIABLE_TEST(class_name, member_variable_name) has_##member_variable_name##<class_name>::value
 //

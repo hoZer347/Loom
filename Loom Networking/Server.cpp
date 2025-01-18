@@ -158,6 +158,7 @@ namespace Loom
 		else if (path.ends_with(".png"))											content_type = "image/png";
 		else if (path.ends_with(".jpg") || path.ends_with(".jpeg"))					content_type = "image/jpeg";
 		else if (path.ends_with(".txt"))											content_type = "text/plain";
+		else if (path.ends_with(".json"))											content_type = "text/json";
 		else if (path.ends_with(".ico"))											content_type = "image/x-icon";
 		else if (path.ends_with(".wasm.map"))										content_type = "application/wasm";
 		else if (path.ends_with(".frag") || path.ends_with(".vert"))				content_type = "text/plain";
@@ -215,6 +216,7 @@ namespace Loom
 		buffer << file.rdbuf();
 		std::string content = buffer.str();
 		std::string response = "HTTP/1.1 200 OK\r\n";
+		response += "Access-Control-Allow-Origin: *\r\n";
 		response += "Content-Type: " + content_type + "\r\n";
 		response += "Content-Length: " + std::to_string(content.size()) + "\r\n";
 		//response += misc_headers;

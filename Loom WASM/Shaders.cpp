@@ -227,7 +227,7 @@ namespace Loom
 
 			for (auto& j : i.second)
 			{
-				
+
 			};
 		};
 	};
