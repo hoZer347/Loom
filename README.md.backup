@@ -1,8 +1,11 @@
 ## Welcome To the Loom Codebase!
 
-This is where I store any C++ projects I'm working on
+- This is where I store any C++ projects I'm working on
 
-You'll find the most interesting code in Loom Engine, Networking, and WASM
+- You'll find the most interesting code in Loom Engine, Networking, and WASM
+
+- [Link to the documentation]("https://hozer347.github.io/Loom-Website/Loom%20Documentation/html/index.html") (mostly a skeleton outline for now)
+
 
 ### Included Libraries:
 

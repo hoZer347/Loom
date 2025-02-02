@@ -22,7 +22,7 @@ namespace Loom
 				allScenes.push_back(this);
 			});
 	};
-
+	
 	Scene::~Scene()
 	{
 		Engine::QueueTask(

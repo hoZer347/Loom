@@ -15,7 +15,12 @@ namespace Loom
 	struct Buffer;
 	struct Scene;
 
-	// TODO: Make this not static
+	/**
+	* Loom::Engine
+	* - Manages the runtime of the application
+	* - Updates all GameObjects
+	* - Manages the backend OpenGL and ImGui instances
+	*/
 	struct Engine final
 	{
 		Engine();
@@ -30,7 +35,6 @@ namespace Loom
 		static void QueueTask(const Task& task);
 
 		static inline bool doGUI = true;
-		static inline bool isRunning;
 
 		static inline unsigned int shaderProgram = 0, VAO = 0, VBO = 0, EBO = 0;
 
@@ -39,6 +43,8 @@ namespace Loom
 		static inline GLFWwindow* window = nullptr;
 
 		static void renderFrame();
+
+		static inline bool isRunning;
 
 	private:
 		static void DoTasks() noexcept;

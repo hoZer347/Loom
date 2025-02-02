@@ -16,13 +16,13 @@ namespace Loom
 		const std::string& GetName();
 		void SetName(const std::string& name);
 
-		template <typename T>
+		template <typename T = LoomObject>
 		constexpr static const T* GetByID(const uint64_t& ID)
 		{
 			return static_cast<T*>(_GetByID(ID));
 		};
 
-		template <typename T>
+		template <typename T = LoomObject>
 		constexpr static T* GetByName(const std::string& name)
 		{
 			return static_cast<T*>(_GetByName(name));

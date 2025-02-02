@@ -4,6 +4,9 @@
 
 - You'll find the most interesting code in Loom Engine, Networking, and WASM
 
+- [Link to the documentation]("https://hozer347.github.io/Loom-Website/Loom%20Documentation/html/index.html") (mostly a skeleton outline for now)
+
+
 ### Included Libraries:
 
 *External Libraries:*

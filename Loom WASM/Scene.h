@@ -18,11 +18,7 @@ namespace Loom
 		virtual ~Scene();
 		
 		template <typename T>
-		T* Attach(auto&&... args)
-		{
-			return root.Attach<T>(args...);
-		};
-
+		T* Attach(auto&&... args) { return root.Attach<T>(args...); };
 		GameObject* AddChild(const std::string& m_name = "New GameObject") { return root.AddChild(m_name); };
 
 		static inline std::atomic<bool> is_engine_running = false;

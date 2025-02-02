@@ -22,7 +22,6 @@ namespace Loom
 		virtual void OnGui()		 { };
 		virtual void OnRender()		 { };
 		virtual void OnPhysics()	 { };
-		virtual void OnPopOutGui()	 { };
 		virtual void OnRefresh()     { };
 
 		virtual ~ComponentBase()	 { };

@@ -20,8 +20,6 @@ namespace Loom
 		constexpr virtual void OnUpdate() {};
 		constexpr virtual void OnRender() {};
 		constexpr virtual void OnPhysics() {};
-		constexpr virtual void OnPopOutGui() {};
-		constexpr virtual void OnRefresh() {};
 
 		virtual ~ComponentBase() {};
 
