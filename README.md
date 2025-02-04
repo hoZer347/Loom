@@ -20,10 +20,10 @@
 - compile.py: automatically compiles WASM projects based on a "Source Directories.txt", or its containing folder
 
 *Loom Engine:*
+- NOTE: Currently postponed due to modules not being supported with WASM, see Loom WASM for a more developed version. I'm keeping it to show off my modern C++ skills
 - Skeleton for a Modern C++ Game Engine, built with ImGui and OpenGL as a backend
 - Features thread safe memory management, and an Entity-Component system
 - Uses modern C++ features such as modules and std::barrier
-- NOTE: Currently postponed due to modules not being supported with WASM, see Loom WASM for a more developed version. I'm keeping it to show off my modern C++ skills
 
 *Loom ImGui:*
 - Imported ImGui implementation using an OpenGL backend
