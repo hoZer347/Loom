@@ -1716,7 +1716,7 @@ struct ImGuiOldColumns
     ImGuiOldColumnFlags Flags;
     bool                IsFirstFrame;
     bool                IsBeingResized;
-    int                 Current;
+    int                 BorrowCurrentState;
     int                 Count;
     float               OffMinX, OffMaxX;       // Offsets from HostWorkRect.Min.x
     float               LineMinY, LineMaxY;

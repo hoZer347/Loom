@@ -106,6 +106,7 @@
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="Shaders.cpp" />
+    <ClCompile Include="State.cpp" />
     <ClCompile Include="Textures.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -115,6 +116,7 @@
     <ClInclude Include="GameObject.h" />
     <ClInclude Include="Geo.h" />
     <ClInclude Include="Input.h" />
+    <ClInclude Include="Loom.h" />
     <ClInclude Include="LoomObject.h" />
     <ClInclude Include="Macro Helpers.h" />
     <ClInclude Include="Material.h" />
@@ -122,6 +124,7 @@
     <ClInclude Include="OpenGL.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="Shaders.h" />
+    <ClInclude Include="State.h" />
     <ClInclude Include="Textures.h" />
   </ItemGroup>
   <ItemGroup>

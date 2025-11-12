@@ -14,6 +14,7 @@
 #include "Scene.h"
 #include "Input.h"
 #include "Shaders.h"
+#include "State.h"
 
 #include <iostream>
 #include <atomic>
@@ -133,7 +134,10 @@ namespace Loom
 		emscripten_set_main_loop(renderFrame, 0, true);
 #else
 		while (!glfwWindowShouldClose(window))
+		{
+			State::Update();
 			renderFrame();
+		};
 #endif
 
 		glDeleteBuffers(1, &VBO);

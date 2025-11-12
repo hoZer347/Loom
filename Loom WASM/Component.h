@@ -59,7 +59,6 @@ namespace Loom
 
 			if (ImGui::TreeNode(
 				(void*)this,
-				//boost::typeindex::type_id<T>().pretty_name().c_str()))
 				typeid(T).name()))
 			{
 				OnGui();

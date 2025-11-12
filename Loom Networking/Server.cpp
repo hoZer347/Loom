@@ -1,3 +1,4 @@
+#include "State.h"
 #include "Server.hpp"
 
 #include <boost/system/error_code.hpp>
@@ -64,7 +65,7 @@ namespace Loom
 				TCP_HOST_IP_PORT))
 	{ };
 
-	void TCPServer::Update()
+    void TCPServer::Update()
 	{
 		tcp::socket socket{ io_context };
 		//boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket(io_context, ssl_context);

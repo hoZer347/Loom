@@ -37,6 +37,9 @@
     <ClCompile Include="Collider.cpp">
       <Filter>Collider</Filter>
     </ClCompile>
+    <ClCompile Include="State.cpp">
+      <Filter>State</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Engine">
@@ -74,6 +77,9 @@
     </Filter>
     <Filter Include="Collider">
       <UniqueIdentifier>{79e5837d-8e79-40fa-9abb-3bae41f32636}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="State">
+      <UniqueIdentifier>{951f5181-3b26-4efc-b491-1b6912097593}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -115,5 +121,9 @@
     <ClInclude Include="Collider.h">
       <Filter>Collider</Filter>
     </ClInclude>
+    <ClInclude Include="State.h">
+      <Filter>State</Filter>
+    </ClInclude>
+    <ClInclude Include="Loom.h" />
   </ItemGroup>
 </Project>

@@ -4038,7 +4038,7 @@ void ImGui::SetWindowClipRectBeforeSetChannel(ImGuiWindow* window, const ImRect&
 int ImGui::GetColumnIndex()
 {
     ImGuiWindow* window = GetCurrentWindowRead();
-    return window->DC.CurrentColumns ? window->DC.CurrentColumns->Current : 0;
+    return window->DC.CurrentColumns ? window->DC.CurrentColumns->BorrowCurrentState : 0;
 }
 
 int ImGui::GetColumnsCount()
@@ -4084,7 +4084,7 @@ float ImGui::GetColumnOffset(int column_index)
         return 0.0f;
 
     if (column_index < 0)
-        column_index = columns->Current;
+        column_index = columns->BorrowCurrentState;
     IM_ASSERT(column_index < columns->Columns.Size);
 
     const float t = columns->Columns[column_index].OffsetNorm;
@@ -4095,7 +4095,7 @@ float ImGui::GetColumnOffset(int column_index)
 static float GetColumnWidthEx(ImGuiOldColumns* columns, int column_index, bool before_resize = false)
 {
     if (column_index < 0)
-        column_index = columns->Current;
+        column_index = columns->BorrowCurrentState;
 
     float offset_norm;
     if (before_resize)
@@ -4114,7 +4114,7 @@ float ImGui::GetColumnWidth(int column_index)
         return GetContentRegionAvail().x;
 
     if (column_index < 0)
-        column_index = columns->Current;
+        column_index = columns->BorrowCurrentState;
     return GetColumnOffsetFromNorm(columns, columns->Columns[column_index + 1].OffsetNorm - columns->Columns[column_index].OffsetNorm);
 }
 
@@ -4126,7 +4126,7 @@ void ImGui::SetColumnOffset(int column_index, float offset)
     IM_ASSERT(columns != NULL);
 
     if (column_index < 0)
-        column_index = columns->Current;
+        column_index = columns->BorrowCurrentState;
     IM_ASSERT(column_index < columns->Columns.Size);
 
     const bool preserve_width = !(columns->Flags & ImGuiOldColumnFlags_NoPreserveWidths) && (column_index < columns->Count - 1);
@@ -4147,7 +4147,7 @@ void ImGui::SetColumnWidth(int column_index, float width)
     IM_ASSERT(columns != NULL);
 
     if (column_index < 0)
-        column_index = columns->Current;
+        column_index = columns->BorrowCurrentState;
     SetColumnOffset(column_index + 1, GetColumnOffset(column_index) + width);
 }
 
@@ -4156,7 +4156,7 @@ void ImGui::PushColumnClipRect(int column_index)
     ImGuiWindow* window = GetCurrentWindowRead();
     ImGuiOldColumns* columns = window->DC.CurrentColumns;
     if (column_index < 0)
-        column_index = columns->Current;
+        column_index = columns->BorrowCurrentState;
 
     ImGuiOldColumnData* column = &columns->Columns[column_index];
     PushClipRect(column->ClipRect.Min, column->ClipRect.Max, false);
@@ -4185,7 +4185,7 @@ void ImGui::PopColumnsBackground()
 
     // Optimization: avoid PopClipRect() + SetCurrentChannel()
     SetWindowClipRectBeforeSetChannel(window, columns->HostBackupClipRect);
-    columns->Splitter.SetCurrentChannel(window->DrawList, columns->Current + 1);
+    columns->Splitter.SetCurrentChannel(window->DrawList, columns->BorrowCurrentState + 1);
 }
 
 ImGuiOldColumns* ImGui::FindOrCreateColumns(ImGuiWindow* window, ImGuiID id)
@@ -4226,7 +4226,7 @@ void ImGui::BeginColumns(const char* str_id, int columns_count, ImGuiOldColumnFl
     ImGuiID id = GetColumnsID(str_id, columns_count);
     ImGuiOldColumns* columns = FindOrCreateColumns(window, id);
     IM_ASSERT(columns->m_ID == id);
-    columns->Current = 0;
+    columns->BorrowCurrentState = 0;
     columns->Count = columns_count;
     columns->Flags = flags;
     window->DC.CurrentColumns = columns;
@@ -4283,8 +4283,8 @@ void ImGui::BeginColumns(const char* str_id, int columns_count, ImGuiOldColumnFl
     }
 
     // We don't generally store Indent.x inside ColumnsOffset because it may be manipulated by the user.
-    float offset_0 = GetColumnOffset(columns->Current);
-    float offset_1 = GetColumnOffset(columns->Current + 1);
+    float offset_0 = GetColumnOffset(columns->BorrowCurrentState);
+    float offset_1 = GetColumnOffset(columns->BorrowCurrentState + 1);
     float width = offset_1 - offset_0;
     PushItemWidth(width * 0.65f);
     window->DC.ColumnsOffset.x = ImMax(column_padding - window->WindowPadding.x, 0.0f);
@@ -4305,29 +4305,29 @@ void ImGui::NextColumn()
     if (columns->Count == 1)
     {
         window->DC.CursorPos.x = IM_TRUNC(window->Pos.x + window->DC.Indent.x + window->DC.ColumnsOffset.x);
-        IM_ASSERT(columns->Current == 0);
+        IM_ASSERT(columns->BorrowCurrentState == 0);
         return;
     }
 
     // Next column
-    if (++columns->Current == columns->Count)
-        columns->Current = 0;
+    if (++columns->BorrowCurrentState == columns->Count)
+        columns->BorrowCurrentState = 0;
 
     PopItemWidth();
 
     // Optimization: avoid PopClipRect() + SetCurrentChannel() + PushClipRect()
     // (which would needlessly attempt to update commands in the wrong channel, then pop or overwrite them),
-    ImGuiOldColumnData* column = &columns->Columns[columns->Current];
+    ImGuiOldColumnData* column = &columns->Columns[columns->BorrowCurrentState];
     SetWindowClipRectBeforeSetChannel(window, column->ClipRect);
-    columns->Splitter.SetCurrentChannel(window->DrawList, columns->Current + 1);
+    columns->Splitter.SetCurrentChannel(window->DrawList, columns->BorrowCurrentState + 1);
 
     const float column_padding = g.Style.ItemSpacing.x;
     columns->LineMaxY = ImMax(columns->LineMaxY, window->DC.CursorPos.y);
-    if (columns->Current > 0)
+    if (columns->BorrowCurrentState > 0)
     {
         // Columns 1+ ignore IndentX (by canceling it out)
         // FIXME-COLUMNS: Unnecessary, could be locked?
-        window->DC.ColumnsOffset.x = GetColumnOffset(columns->Current) - window->DC.Indent.x + column_padding;
+        window->DC.ColumnsOffset.x = GetColumnOffset(columns->BorrowCurrentState) - window->DC.Indent.x + column_padding;
     }
     else
     {
@@ -4342,8 +4342,8 @@ void ImGui::NextColumn()
     window->DC.CurrLineTextBaseOffset = 0.0f;
 
     // FIXME-COLUMNS: Share code with BeginColumns() - move code on columns setup.
-    float offset_0 = GetColumnOffset(columns->Current);
-    float offset_1 = GetColumnOffset(columns->Current + 1);
+    float offset_0 = GetColumnOffset(columns->BorrowCurrentState);
+    float offset_1 = GetColumnOffset(columns->BorrowCurrentState + 1);
     float width = offset_1 - offset_0;
     PushItemWidth(width * 0.65f);
     window->WorkRect.Max.x = window->Pos.x + offset_1 - column_padding;
