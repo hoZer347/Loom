@@ -15,6 +15,6 @@ namespace Loom
 
 		};
 
-		Shader* m_shader;
+		Shader* shader;
 	};
 };

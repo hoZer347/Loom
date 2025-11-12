@@ -22,6 +22,7 @@ namespace Loom
 		GameObject* AddChild(const std::string& m_name = "New GameObject") { return root.AddChild(m_name); };
 
 		static inline std::atomic<bool> is_engine_running = false;
+		
 
 	protected:
 		friend struct MainMenu;
@@ -30,7 +31,7 @@ namespace Loom
 
 		GameObject root;
 
-		static inline std::recursive_mutex mutex{ };
 		static inline std::vector<Scene*> allScenes{ };
+		static inline std::recursive_mutex mutex{ };
 	};
 };

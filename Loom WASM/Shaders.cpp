@@ -16,91 +16,129 @@
 
 namespace Loom
 {
-	static inline std::string defaultVertexShader =
-#ifdef __EMSCRIPTEN__
-		R"(#version 300 es
-    layout(location = 0) in vec3 aPos;
-    void main() {
-        gl_Position = vec4(aPos, 1.0f);
-    })";
-#else
-		R"(#version 460 core
-	layout(location = 0) in vec3 aPos;
-	void main() {
-		gl_Position = vec4(aPos, 1.0f);
-	})";
-#endif
-
-	static inline std::string defaultFragmentShader =
-#ifdef __EMSCRIPTEN__
-		R"(#version 300 es
-	precision mediump float; // Add this line for WebGL compatibility
-    out vec4 FragColor;
-    void main() {
-        FragColor = vec4(0.0f, 1.0f, 0.0f, 1.0f); // Green color
-    })";
-#else
-		R"(#version 460 core
-	out vec4 FragColor;
-	void main() {
-		FragColor = vec4(0.0f, 1.0f, 0.0f, 1.0f); // Green color
-	})";
-#endif
-
-	// TODO: Add geometry and tessellation shaders
+	static inline std::string defaultShader;
 
 	Shader::Shader() :
-		m_id(CompileSource(
-			defaultVertexShader,
-			defaultFragmentShader))
+		id(CompileSource(defaultShader))
 	{ };
 
 	Shader::Shader(const std::string& file_path) :
-		m_file_path(file_path)
-	{
-		std::string vertex_shader_source;
-		std::string fragment_shader_source;
-
-#if __EMSCRIPTEN__
-		Request(m_file_path + ".vert", vertex_shader_source);
-		Request(m_file_path + ".frag", fragment_shader_source);
-#else
-		std::string vertex_shader_path = SHADER_PATH + m_file_path + ".vert";
-		std::string fragment_shader_path = SHADER_PATH + m_file_path + ".frag";
-		std::ifstream vertex_shader_file(vertex_shader_path);
-		std::ifstream fragment_shader_file(fragment_shader_path);
-		if (vertex_shader_file.is_open())
-		{
-			std::string line;
-			while (std::getline(vertex_shader_file, line))
-				vertex_shader_source += line + '\n';
-		}
-		else
-		{
-			std::cout << "Failed to open vertex shader file: " << vertex_shader_path << std::endl;
-			return;
-		};
-		if (fragment_shader_file.is_open())
-		{
-			std::string line;
-			while (std::getline(fragment_shader_file, line))
-				fragment_shader_source += line + '\n';
-		}
-		else
-		{
-			std::cout << "Failed to open fragment shader file: " << fragment_shader_path << std::endl;
-			return;
-		};
-#endif
-
-		m_id = CompileSource(
-			vertex_shader_source,
-			fragment_shader_source);
-	};
+		file_path(file_path.ends_with(".shader") ?
+			file_path :
+			file_path + ".shader"),
+		id(CompileSource(file_path))
+	{ };
 
 	Shader::~Shader()
 	{
-		glDeleteShader(m_id);
+		std::scoped_lock lock{ mutex };
+
+		shaders.erase(file_path);
+		glDeleteShader(id);
+	};
+
+#if __EMSCRIPTEN
+#define VERSION "#version 300 es"
+#else
+#define VERSION "#version 460 core"
+#endif
+
+	enum class ShaderType { NONE, COMMON, VERTEX, FRAGMENT, GEOMETRY, COMPUTE };
+
+	static inline std::unordered_map<std::string, GLenum> ShaderMap = {
+		{"VERTEX", GL_VERTEX_SHADER},
+		{"FRAGMENT", GL_FRAGMENT_SHADER},
+		{"GEOMETRY", GL_GEOMETRY_SHADER},
+		{"COMPUTE", GL_COMPUTE_SHADER}
+	};
+
+	uint32_t Shader::CompileSource(const std::string& file_path)
+	{
+		std::scoped_lock lock{ mutex };
+
+		if (shaders.contains(file_path))
+			return shaders[file_path];
+
+#if __EMSCRIPTEN__
+		Request(m_file_path, shader_raw);
+#endif
+
+		std::ifstream file(file_path);
+		if (!file)
+			throw std::runtime_error("Could not open shader file: " + file_path);
+
+		std::unordered_map<std::string, std::stringstream> sources;
+		ShaderType current = ShaderType::NONE;
+
+		std::string line;
+		while (std::getline(file, line))
+			if (line.find("===VERTEX===") != std::string::npos)
+				current = ShaderType::VERTEX;
+			else if (line.find("===FRAGMENT===") != std::string::npos)
+				current = ShaderType::FRAGMENT;
+			else if (line.find("===GEOMETRY===") != std::string::npos)
+				current = ShaderType::GEOMETRY;
+			else if (line.find("===COMPUTE===") != std::string::npos)
+				current = ShaderType::COMPUTE;
+			else if (line.find("===COMMON===") != std::string::npos)
+				current = ShaderType::COMMON;
+			else if (current != ShaderType::NONE)
+				sources[std::to_string(static_cast<int>(current))] << line << '\n';
+
+		std::string commonCode = sources.contains(std::to_string(static_cast<int>(ShaderType::COMMON))) ?
+			sources[std::to_string(static_cast<int>(ShaderType::COMMON))].str() : "";
+
+		std::vector<GLuint> shaderObjects;
+		GLuint program = glCreateProgram();
+
+		for (const auto& [typeStr, glShaderType] : ShaderMap)
+		{
+			auto key = std::to_string(static_cast<int>(
+				typeStr == "VERTEX" ? ShaderType::VERTEX :
+				typeStr == "FRAGMENT" ? ShaderType::FRAGMENT :
+				typeStr == "GEOMETRY" ? ShaderType::GEOMETRY :
+				ShaderType::COMPUTE));
+
+			if (!sources.contains(key))
+				continue;
+
+			std::string shaderSrc = std::string(VERSION) + "\n" + commonCode + sources[key].str();
+			const char* srcPtr = shaderSrc.c_str();
+
+			GLuint shader = glCreateShader(glShaderType);
+			glShaderSource(shader, 1, &srcPtr, nullptr);
+			glCompileShader(shader);
+
+			GLint success;
+			glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+			if (!success)
+			{
+				char log[512];
+				glGetShaderInfoLog(shader, 512, nullptr, log);
+				throw std::runtime_error("Shader compile error in " + typeStr + ":\n" + log);
+			};
+
+			glAttachShader(program, shader);
+			shaderObjects.push_back(shader);
+		};
+
+		glLinkProgram(program);
+
+		GLint success;
+		glGetProgramiv(program, GL_LINK_STATUS, &success);
+		if (!success)
+		{
+			char log[512];
+			glGetProgramInfoLog(program, 512, nullptr, log);
+			throw std::runtime_error("Shader link error:\n" + std::string(log));
+		};
+
+		for (GLuint shader : shaderObjects)
+			glDeleteShader(shader);
+
+		shaders.emplace(file_path, program);
+
+		return program;
 	};
 
 #ifdef __EMSCRIPTEN__
@@ -149,128 +187,4 @@ namespace Loom
 			std::cerr << "Error: Fetch failed or returned no data." << std::endl;
 	};
 #endif
-
-	void Shader::GetShaderVec2(
-		const std::string& name,
-		void*& data)
-	{
-		glUseProgram(m_id);
-
-		GLuint location = glGetUniformLocation(m_id, name.c_str());
-
-		glGetUniformfv(
-			m_id,
-			location,
-			(float*)data);
-	};
-
-	void Shader::SetShaderVec2(
-		const std::string& name,
-		const void* data,
-		bool shouldUpdate)
-	{
-		glUseProgram(m_id);
-
-		GLuint location = glGetUniformLocation(m_id, name.c_str());
-
-		glUniform2fv(
-			location,
-			1,
-			(float*)data);
-
-		if (shouldUpdate)
-			m_uniforms[m_id][ID_Type(location, 2, GL_FLOAT).as_uint64()] = data;
-	};
-	
-	void Shader::SetShaderVec3(
-		const std::string& name,
-		const void* data,
-		bool shouldUpdate)
-	{
-		glUseProgram(m_id);
-
-		GLuint location = glGetUniformLocation(m_id, name.c_str());
-
-		glUniform3fv(
-			location,
-			1,
-			(float*)data);
-
-		if (shouldUpdate)
-			m_uniforms[m_id][ID_Type(location, 3, GL_FLOAT).as_uint64()] = data;
-	};
-
-	void Shader::SetShaderMat4(
-		const std::string& name,
-		const void* data,
-		bool shouldUpdate)
-	{
-		glUseProgram(m_id);
-
-		GLuint location = glGetUniformLocation(m_id, name.c_str());
-
-		glUniformMatrix4fv(
-			location,
-			1,
-			GL_FALSE,
-			(float*)data);
-
-		if (shouldUpdate)
-			m_uniforms[m_id][ID_Type(location, 16, GL_FLOAT).as_uint64()] = data;
-	};
-
-	void Shader::SetUniforms()
-	{
-		for (auto& i : m_uniforms)
-		{
-			glUseProgram(i.first);
-
-			for (auto& j : i.second)
-			{
-
-			};
-		};
-	};
-
-	uint32_t Shader::CompileSource(
-		const std::string& vertex_shader_source,
-		const std::string& fragment_shader_source)
-	{
-		const char* vertex_shader_source_c = vertex_shader_source.c_str();
-		const char* fragment_shader_source_c = fragment_shader_source.c_str();
-		unsigned int vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-		glShaderSource(vertex_shader, 1, &vertex_shader_source_c, NULL);
-		glCompileShader(vertex_shader);
-		int success;
-		char infoLog[512];
-		glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
-		if (!success)
-		{
-			glGetShaderInfoLog(vertex_shader, 512, NULL, infoLog);
-			std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
-		};
-		unsigned int fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-		glShaderSource(fragment_shader, 1, &fragment_shader_source_c, NULL);
-		glCompileShader(fragment_shader);
-		glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success);
-		if (!success)
-		{
-			glGetShaderInfoLog(fragment_shader, 512, NULL, infoLog);
-			std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
-		};
-		GLuint shader_id = glCreateProgram();
-		glAttachShader(shader_id, vertex_shader);
-		glAttachShader(shader_id, fragment_shader);
-		glLinkProgram(shader_id);
-		glGetProgramiv(shader_id, GL_LINK_STATUS, &success);
-		if (!success)
-		{
-			glGetProgramInfoLog(shader_id, 512, NULL, infoLog);
-			std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
-		};
-		glDeleteShader(vertex_shader);
-		glDeleteShader(fragment_shader);
-
-		return shader_id;
-	};
 };

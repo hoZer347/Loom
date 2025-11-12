@@ -14,4 +14,9 @@
       <UniqueIdentifier>{962aca8a-64eb-4e1f-99c5-6de3235c0cc7}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Shader.frag" />
+    <None Include="Shader.shader" />
+    <None Include="Shader.vert" />
+  </ItemGroup>
 </Project>

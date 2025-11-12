@@ -400,7 +400,7 @@ typedef void (APIENTRYP PFNGLGETFLOATI_VPROC) (GLenum target, GLuint index, GLfl
 typedef void (APIENTRYP PFNGLGETDOUBLEI_VPROC) (GLenum target, GLuint index, GLdouble *data);
 #endif /* GL_VERSION_4_1 */
 #ifndef GL_VERSION_4_3
-typedef void (APIENTRY  *GLDEBUGPROC)(GLenum source,GLenum type,GLuint m_id,GLenum severity,GLsizei length,const GLchar *message,const void *userParam);
+typedef void (APIENTRY  *GLDEBUGPROC)(GLenum source,GLenum type,GLuint id,GLenum severity,GLsizei length,const GLchar *message,const void *userParam);
 #endif /* GL_VERSION_4_3 */
 #ifndef GL_VERSION_4_5
 #define GL_CLIP_ORIGIN                    0x935C
@@ -418,7 +418,7 @@ struct _cl_event;
 #define GL_ARB_clip_control 1
 #endif /* GL_ARB_clip_control */
 #ifndef GL_ARB_debug_output
-typedef void (APIENTRY  *GLDEBUGPROCARB)(GLenum source,GLenum type,GLuint m_id,GLenum severity,GLsizei length,const GLchar *message,const void *userParam);
+typedef void (APIENTRY  *GLDEBUGPROCARB)(GLenum source,GLenum type,GLuint id,GLenum severity,GLsizei length,const GLchar *message,const void *userParam);
 #endif /* GL_ARB_debug_output */
 #ifndef GL_EXT_EGL_image_storage
 typedef void *GLeglImageOES;

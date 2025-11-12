@@ -6,8 +6,15 @@
     <_PropertySheetDisplayName>Loom ImGui</_PropertySheetDisplayName>
   </PropertyGroup>
   <ItemDefinitionGroup>
+    <ClCompile />
+    <Link />
+    <Link />
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+    <ClCompile />
     <ClCompile>
-      <AdditionalIncludeDirectories>$(SolutionDir)Loom ImGui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Loom ImGui;</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup />

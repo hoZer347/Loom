@@ -38,8 +38,8 @@
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="..\property files\ImGui.props" />
-    <Import Project="..\Property Files\Loom Engine.props" />
+    <Import Project="..\Property Files\Loom WASM.props" />
+    <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\property files\Assimp.props" />
     <Import Project="..\Property Files\OpenGL.props" />
     <Import Project="..\property files\GLFW.props" />
@@ -47,8 +47,8 @@
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="..\Property Files\Loom Engine.props" />
-    <Import Project="..\property files\ImGui.props" />
+    <Import Project="..\Property Files\Loom WASM.props" />
+    <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\property files\Assimp.props" />
     <Import Project="..\Property Files\OpenGL.props" />
     <Import Project="..\property files\GLFW.props" />
@@ -66,6 +66,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(SolutionDir)x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -83,6 +84,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(SolutionDir)x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -91,12 +93,14 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Loom Engine\Loom Engine.vcxproj">
-      <Project>{3813de5f-d426-4b1e-9638-7ce2259e5c3f}</Project>
+    <ProjectReference Include="..\Loom WASM\Loom Emscripten Testing.vcxproj">
+      <Project>{7573054a-30a9-427c-87d0-7a2d67c22891}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\Loom ImGui\Loom ImGui.vcxproj">
-      <Project>{d58e30f6-a1a0-4a69-a043-d8d4cd47e0b8}</Project>
-    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shader.frag" />
+    <None Include="Shader.shader" />
+    <None Include="Shader.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

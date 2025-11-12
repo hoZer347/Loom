@@ -5,7 +5,6 @@
 #include "Shaders.h"
 #include "Material.h"
 #include "OpenGL.h"
-#include "Globals.h"
 #include "Input.h"
 #include "Mesh.h"
 
@@ -17,7 +16,6 @@ using namespace Loom;
 int main()
 {
 	Engine engine;
-	engine.Init();
 
 	std::vector<float> vertices
 	{
@@ -38,7 +36,7 @@ int main()
 	Shader shader{ "Shader" };
 
 	Material* material = scene.Attach<Material>();
-	material->m_shader = &shader;
+	material->shader = &shader;
 
 	Mesh* mesh = scene.Attach<Mesh>(GL_TRIANGLES);
 	mesh->m_vertices = vertices;

@@ -34,6 +34,9 @@
     <ClCompile Include="Input.cpp">
       <Filter>Input</Filter>
     </ClCompile>
+    <ClCompile Include="Collider.cpp">
+      <Filter>Collider</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Engine">
@@ -68,6 +71,9 @@
     </Filter>
     <Filter Include="Input">
       <UniqueIdentifier>{5f3ab2bf-b23a-4466-9a82-86ce58a9e896}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Collider">
+      <UniqueIdentifier>{79e5837d-8e79-40fa-9abb-3bae41f32636}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -105,6 +111,9 @@
     <ClInclude Include="Macro Helpers.h" />
     <ClInclude Include="Input.h">
       <Filter>Input</Filter>
+    </ClInclude>
+    <ClInclude Include="Collider.h">
+      <Filter>Collider</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

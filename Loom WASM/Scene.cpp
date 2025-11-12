@@ -31,7 +31,8 @@ namespace Loom
 				allScenes.erase(
 					std::remove(
 						allScenes.begin(),
-						allScenes.end(), this),
+						allScenes.end(),
+						this),
 					allScenes.end());
 			});
 	};

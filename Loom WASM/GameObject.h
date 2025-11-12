@@ -30,21 +30,21 @@ namespace Loom
 	struct overrides_on_attach
 		: std::integral_constant<bool,
 		has_method<T, void>::value &&
-		!std::is_same_v<decltype(&T::OnAttach), decltype(&ComponentBase::OnAttach)>> {};
+		!std::is_same_v<decltype(&T::OnAttach), decltype(&ComponentBase::OnAttach)>> { };
 
 	// Detect override of OnRender
 	template <typename T>
 	struct overrides_on_render
 		: std::integral_constant<bool,
 		has_method<T, void>::value &&
-		!std::is_same_v<decltype(&T::OnRender), decltype(&ComponentBase::OnRender)>> {};
+		!std::is_same_v<decltype(&T::OnRender), decltype(&ComponentBase::OnRender)>> { };
 
 	// Detect override of OnRender
 	template <typename T>
 	struct overrides_on_update
 		: std::integral_constant<bool,
 		has_method<T, void>::value &&
-		!std::is_same_v<decltype(&T::OnRender), decltype(&ComponentBase::OnUpdate)>> {};
+		!std::is_same_v<decltype(&T::OnRender), decltype(&ComponentBase::OnUpdate)>> { };
 
 	// TODO: Turn the above templates into a macro
 

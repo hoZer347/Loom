@@ -4025,54 +4025,54 @@ static void stbtt__h_prefilter(unsigned char *pixels, int w, int h, int stride_i
    STBTT_memset(buffer, 0, STBTT_MAX_OVERSAMPLE); // suppress bogus warning from VS2013 -analyze
    for (j=0; j < h; ++j) {
       int i;
-      unsigned int total;
+      unsigned int to_do;
       STBTT_memset(buffer, 0, kernel_width);
 
-      total = 0;
+      to_do = 0;
 
       // make kernel_width a constant in common cases so compiler can optimize out the divide
       switch (kernel_width) {
          case 2:
             for (i=0; i <= safe_w; ++i) {
-               total += pixels[i] - buffer[i & STBTT__OVER_MASK];
+               to_do += pixels[i] - buffer[i & STBTT__OVER_MASK];
                buffer[(i+kernel_width) & STBTT__OVER_MASK] = pixels[i];
-               pixels[i] = (unsigned char) (total / 2);
+               pixels[i] = (unsigned char) (to_do / 2);
             }
             break;
          case 3:
             for (i=0; i <= safe_w; ++i) {
-               total += pixels[i] - buffer[i & STBTT__OVER_MASK];
+               to_do += pixels[i] - buffer[i & STBTT__OVER_MASK];
                buffer[(i+kernel_width) & STBTT__OVER_MASK] = pixels[i];
-               pixels[i] = (unsigned char) (total / 3);
+               pixels[i] = (unsigned char) (to_do / 3);
             }
             break;
          case 4:
             for (i=0; i <= safe_w; ++i) {
-               total += pixels[i] - buffer[i & STBTT__OVER_MASK];
+               to_do += pixels[i] - buffer[i & STBTT__OVER_MASK];
                buffer[(i+kernel_width) & STBTT__OVER_MASK] = pixels[i];
-               pixels[i] = (unsigned char) (total / 4);
+               pixels[i] = (unsigned char) (to_do / 4);
             }
             break;
          case 5:
             for (i=0; i <= safe_w; ++i) {
-               total += pixels[i] - buffer[i & STBTT__OVER_MASK];
+               to_do += pixels[i] - buffer[i & STBTT__OVER_MASK];
                buffer[(i+kernel_width) & STBTT__OVER_MASK] = pixels[i];
-               pixels[i] = (unsigned char) (total / 5);
+               pixels[i] = (unsigned char) (to_do / 5);
             }
             break;
          default:
             for (i=0; i <= safe_w; ++i) {
-               total += pixels[i] - buffer[i & STBTT__OVER_MASK];
+               to_do += pixels[i] - buffer[i & STBTT__OVER_MASK];
                buffer[(i+kernel_width) & STBTT__OVER_MASK] = pixels[i];
-               pixels[i] = (unsigned char) (total / kernel_width);
+               pixels[i] = (unsigned char) (to_do / kernel_width);
             }
             break;
       }
 
       for (; i < w; ++i) {
          STBTT_assert(pixels[i] == 0);
-         total -= buffer[i & STBTT__OVER_MASK];
-         pixels[i] = (unsigned char) (total / kernel_width);
+         to_do -= buffer[i & STBTT__OVER_MASK];
+         pixels[i] = (unsigned char) (to_do / kernel_width);
       }
 
       pixels += stride_in_bytes;
@@ -4087,54 +4087,54 @@ static void stbtt__v_prefilter(unsigned char *pixels, int w, int h, int stride_i
    STBTT_memset(buffer, 0, STBTT_MAX_OVERSAMPLE); // suppress bogus warning from VS2013 -analyze
    for (j=0; j < w; ++j) {
       int i;
-      unsigned int total;
+      unsigned int to_do;
       STBTT_memset(buffer, 0, kernel_width);
 
-      total = 0;
+      to_do = 0;
 
       // make kernel_width a constant in common cases so compiler can optimize out the divide
       switch (kernel_width) {
          case 2:
             for (i=0; i <= safe_h; ++i) {
-               total += pixels[i*stride_in_bytes] - buffer[i & STBTT__OVER_MASK];
+               to_do += pixels[i*stride_in_bytes] - buffer[i & STBTT__OVER_MASK];
                buffer[(i+kernel_width) & STBTT__OVER_MASK] = pixels[i*stride_in_bytes];
-               pixels[i*stride_in_bytes] = (unsigned char) (total / 2);
+               pixels[i*stride_in_bytes] = (unsigned char) (to_do / 2);
             }
             break;
          case 3:
             for (i=0; i <= safe_h; ++i) {
-               total += pixels[i*stride_in_bytes] - buffer[i & STBTT__OVER_MASK];
+               to_do += pixels[i*stride_in_bytes] - buffer[i & STBTT__OVER_MASK];
                buffer[(i+kernel_width) & STBTT__OVER_MASK] = pixels[i*stride_in_bytes];
-               pixels[i*stride_in_bytes] = (unsigned char) (total / 3);
+               pixels[i*stride_in_bytes] = (unsigned char) (to_do / 3);
             }
             break;
          case 4:
             for (i=0; i <= safe_h; ++i) {
-               total += pixels[i*stride_in_bytes] - buffer[i & STBTT__OVER_MASK];
+               to_do += pixels[i*stride_in_bytes] - buffer[i & STBTT__OVER_MASK];
                buffer[(i+kernel_width) & STBTT__OVER_MASK] = pixels[i*stride_in_bytes];
-               pixels[i*stride_in_bytes] = (unsigned char) (total / 4);
+               pixels[i*stride_in_bytes] = (unsigned char) (to_do / 4);
             }
             break;
          case 5:
             for (i=0; i <= safe_h; ++i) {
-               total += pixels[i*stride_in_bytes] - buffer[i & STBTT__OVER_MASK];
+               to_do += pixels[i*stride_in_bytes] - buffer[i & STBTT__OVER_MASK];
                buffer[(i+kernel_width) & STBTT__OVER_MASK] = pixels[i*stride_in_bytes];
-               pixels[i*stride_in_bytes] = (unsigned char) (total / 5);
+               pixels[i*stride_in_bytes] = (unsigned char) (to_do / 5);
             }
             break;
          default:
             for (i=0; i <= safe_h; ++i) {
-               total += pixels[i*stride_in_bytes] - buffer[i & STBTT__OVER_MASK];
+               to_do += pixels[i*stride_in_bytes] - buffer[i & STBTT__OVER_MASK];
                buffer[(i+kernel_width) & STBTT__OVER_MASK] = pixels[i*stride_in_bytes];
-               pixels[i*stride_in_bytes] = (unsigned char) (total / kernel_width);
+               pixels[i*stride_in_bytes] = (unsigned char) (to_do / kernel_width);
             }
             break;
       }
 
       for (; i < h; ++i) {
          STBTT_assert(pixels[i*stride_in_bytes] == 0);
-         total -= buffer[i & STBTT__OVER_MASK];
-         pixels[i*stride_in_bytes] = (unsigned char) (total / kernel_width);
+         to_do -= buffer[i & STBTT__OVER_MASK];
+         pixels[i*stride_in_bytes] = (unsigned char) (to_do / kernel_width);
       }
 
       pixels += 1;
@@ -4856,8 +4856,8 @@ static int stbtt__matchpair(stbtt_uint8 *fc, stbtt_uint32 nm, stbtt_uint8 *m_nam
 
    for (i=0; i < count; ++i) {
       stbtt_uint32 loc = nm + 6 + 12 * i;
-      stbtt_int32 m_id = ttUSHORT(fc+loc+6);
-      if (m_id == target_id) {
+      stbtt_int32 id = ttUSHORT(fc+loc+6);
+      if (id == target_id) {
          // find the encoding
          stbtt_int32 platform = ttUSHORT(fc+loc+0), encoding = ttUSHORT(fc+loc+2), language = ttUSHORT(fc+loc+4);
 

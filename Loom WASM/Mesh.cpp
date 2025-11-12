@@ -20,7 +20,7 @@ namespace Loom
 		if (material == nullptr)
 			material = m_gameObject->GetComponent<Material>();
 
-		glUseProgram(material->m_shader->m_id);
+		glUseProgram(material->shader->id);
 		
 		glBindBuffer(GL_ARRAY_BUFFER, Engine::VBO);
 		glBufferData(GL_ARRAY_BUFFER, m_vertices.size() * sizeof(float), m_vertices.data(), GL_DYNAMIC_DRAW);

@@ -2,30 +2,37 @@
 
 namespace Loom
 {
-	struct alignas(sizeof(float) * 2) vec2
+namespace Math
+{
+	template <typename T = float>
+	struct alignas(sizeof(T) * 2) vec2
 	{
-		float data[2];
+		T data[2];
 	};
 
+	template <typename T = float>
 	struct vec3
 	{
-		vec3(float x, float y, float z)
+		vec3(const T& x, const T& y, const T& z)
 		{
 			data[0] = x;
 			data[1] = y;
 			data[2] = z;
 		};
 
-		float data[3];
+		T data[3];
 	};
 
-	struct alignas(sizeof(float) * 4) vec4
+	template <typename T = float>
+	struct alignas(sizeof(T) * 4) vec4
 	{
-		float data[4];
+		T data[4];
 	};
 
-	struct alignas(sizeof(float) * 16) mat4
+	template <typename T = float>
+	struct alignas(sizeof(T) * 16) mat4
 	{
-		float data[16];
+		T data[16];
 	};
+};
 };

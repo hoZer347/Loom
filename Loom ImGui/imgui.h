@@ -376,7 +376,7 @@ namespace ImGui
     //    such as BeginMenu/EndMenu, BeginPopup/EndPopup, etc. where the EndXXX call should only be called if the corresponding
     //    BeginXXX function returned true. Begin and BeginChild are the only odd ones out. Will be fixed in a future update.]
     IMGUI_API bool          BeginChild(const char* str_id, const ImVec2& size = ImVec2(0, 0), ImGuiChildFlags child_flags = 0, ImGuiWindowFlags window_flags = 0);
-    IMGUI_API bool          BeginChild(ImGuiID m_id, const ImVec2& size = ImVec2(0, 0), ImGuiChildFlags child_flags = 0, ImGuiWindowFlags window_flags = 0);
+    IMGUI_API bool          BeginChild(ImGuiID id, const ImVec2& size = ImVec2(0, 0), ImGuiChildFlags child_flags = 0, ImGuiWindowFlags window_flags = 0);
     IMGUI_API void          EndChild();
 
     // Windows Utilities
@@ -750,7 +750,7 @@ namespace ImGui
     //  - Use IsWindowAppearing() after BeginPopup() to tell if a window just opened.
     //  - IMPORTANT: Notice that for OpenPopupOnItemClick() we exceptionally default flags to 1 (== ImGuiPopupFlags_MouseButtonRight) for backward compatibility with older API taking 'int mouse_button = 1' parameter
     IMGUI_API void          OpenPopup(const char* str_id, ImGuiPopupFlags popup_flags = 0);                     // call to mark popup as open (don't call every frame!).
-    IMGUI_API void          OpenPopup(ImGuiID m_id, ImGuiPopupFlags popup_flags = 0);                             // id overload to facilitate calling from nested stacks
+    IMGUI_API void          OpenPopup(ImGuiID id, ImGuiPopupFlags popup_flags = 0);                             // id overload to facilitate calling from nested stacks
     IMGUI_API void          OpenPopupOnItemClick(const char* str_id = NULL, ImGuiPopupFlags popup_flags = 1);   // helper to open popup when clicked on last item. Default to ImGuiPopupFlags_MouseButtonRight == 1. (note: actually triggers on the mouse _released_ event to be consistent with popup behaviors)
     IMGUI_API void          CloseCurrentPopup();                                                                // manually close the popup we have begin-ed into.
 
@@ -828,7 +828,7 @@ namespace ImGui
 
     // Legacy Columns API (prefer using Tables!)
     // - You can also use SameLine(pos_x) to mimic simplified columns.
-    IMGUI_API void          Columns(int count = 1, const char* m_id = NULL, bool border = true);
+    IMGUI_API void          Columns(int count = 1, const char* id = NULL, bool border = true);
     IMGUI_API void          NextColumn();                                                       // next column, defaults to current row or next row if the current row is finished
     IMGUI_API int           GetColumnIndex();                                                   // get current column index
     IMGUI_API float         GetColumnWidth(int column_index = -1);                              // get column width (in pixels). pass -1 to use current column
@@ -1053,7 +1053,7 @@ namespace ImGui
     IMGUI_API void              UpdatePlatformWindows();                                        // call in main loop. will call CreateWindow/ResizeWindow/etc. platform functions for each secondary viewport, and DestroyWindow for each inactive viewport.
     IMGUI_API void              RenderPlatformWindowsDefault(void* platform_render_arg = NULL, void* renderer_render_arg = NULL); // call in main loop. will call RenderWindow/SwapBuffers platform functions for each secondary viewport which doesn't have the ImGuiViewportFlags_Minimized flag set. May be reimplemented by user for custom rendering needs.
     IMGUI_API void              DestroyPlatformWindows();                                       // call DestroyWindow platform functions for all viewports. call from backend Shutdown() if you need to close platform windows before imgui shutdown. otherwise will be called by DestroyContext().
-    IMGUI_API ImGuiViewport*    FindViewportByID(ImGuiID m_id);                                   // this is a helper for backends.
+    IMGUI_API ImGuiViewport*    FindViewportByID(ImGuiID id);                                   // this is a helper for backends.
     IMGUI_API ImGuiViewport*    FindViewportByPlatformHandle(void* platform_handle);            // this is a helper for backends. the type platform_handle is decided by the backend (e.g. HWND, MyWindow*, GLFWwindow* etc.)
 
 } // namespace ImGui
@@ -2359,7 +2359,7 @@ struct ImGuiIO
     IMGUI_API void  AddMouseButtonEvent(int button, bool down);             // Queue a mouse button change
     IMGUI_API void  AddMouseWheelEvent(float wheel_x, float wheel_y);       // Queue a mouse wheel update. wheel_y<0: scroll down, wheel_y>0: scroll up, wheel_x<0: scroll right, wheel_x>0: scroll left.
     IMGUI_API void  AddMouseSourceEvent(ImGuiMouseSource source);           // Queue a mouse source change (Mouse/TouchScreen/Pen)
-    IMGUI_API void  AddMouseViewportEvent(ImGuiID m_id);                      // Queue a mouse hovered viewport. Requires backend to set ImGuiBackendFlags_HasMouseHoveredViewport to call this (for multi-viewport support).
+    IMGUI_API void  AddMouseViewportEvent(ImGuiID id);                      // Queue a mouse hovered viewport. Requires backend to set ImGuiBackendFlags_HasMouseHoveredViewport to call this (for multi-viewport support).
     IMGUI_API void  AddFocusEvent(bool focused);                            // Queue a gain/loss of focus for the application (generally based on OS/platform focus of your window)
     IMGUI_API void  AddInputCharacter(unsigned int c);                      // Queue a new character input
     IMGUI_API void  AddInputCharacterUTF16(ImWchar16 c);                    // Queue a new character input from a UTF-16 character, it can be a surrogate
@@ -3220,7 +3220,7 @@ struct ImFontAtlas
     IMGUI_API void              GetTexDataAsAlpha8(unsigned char** out_pixels, int* out_width, int* out_height, int* out_bytes_per_pixel = NULL);  // 1 byte per-pixel
     IMGUI_API void              GetTexDataAsRGBA32(unsigned char** out_pixels, int* out_width, int* out_height, int* out_bytes_per_pixel = NULL);  // 4 bytes-per-pixel
     bool                        IsBuilt() const             { return Fonts.Size > 0 && TexReady; } // Bit ambiguous: used to detect when user didn't build texture but effectively we should check TexID != 0 except that would be backend dependent...
-    void                        SetTexID(ImTextureID m_id)    { TexID = m_id; }
+    void                        SetTexID(ImTextureID id)    { TexID = id; }
 
     //-------------------------------------------
     // Glyph Ranges
@@ -3252,7 +3252,7 @@ struct ImFontAtlas
     // - Read docs/FONTS.md for more details about using colorful icons.
     // - Note: this API may be redesigned later in order to support multi-monitor varying DPI settings.
     IMGUI_API int               AddCustomRectRegular(int width, int height);
-    IMGUI_API int               AddCustomRectFontGlyph(ImFont* font, ImWchar m_id, int width, int height, float advance_x, const ImVec2& offset = ImVec2(0, 0));
+    IMGUI_API int               AddCustomRectFontGlyph(ImFont* font, ImWchar id, int width, int height, float advance_x, const ImVec2& offset = ImVec2(0, 0));
     ImFontAtlasCustomRect*      GetCustomRectByIndex(int index) { IM_ASSERT(index >= 0); return &CustomRects[index]; }
 
     // [Internal]
@@ -3562,7 +3562,7 @@ struct ImGuiPlatformImeData
 namespace ImGui
 {
     // OBSOLETED in 1.90.0 (from September 2023)
-    static inline bool  BeginChildFrame(ImGuiID m_id, const ImVec2& size, ImGuiWindowFlags window_flags = 0)                 { return BeginChild(m_id, size, ImGuiChildFlags_FrameStyle, window_flags); }
+    static inline bool  BeginChildFrame(ImGuiID id, const ImVec2& size, ImGuiWindowFlags window_flags = 0)                 { return BeginChild(id, size, ImGuiChildFlags_FrameStyle, window_flags); }
     static inline void  EndChildFrame()                                                                                    { EndChild(); }
     //static inline bool BeginChild(const char* str_id, const ImVec2& size_arg, bool border, ImGuiWindowFlags window_flags){ return BeginChild(str_id, size_arg, border ? ImGuiChildFlags_Border : ImGuiChildFlags_None, window_flags); } // Unnecessary as true == ImGuiChildFlags_Border
     //static inline bool BeginChild(ImGuiID id, const ImVec2& size_arg, bool border, ImGuiWindowFlags window_flags)        { return BeginChild(id, size_arg, border ? ImGuiChildFlags_Border : ImGuiChildFlags_None, window_flags);     } // Unnecessary as true == ImGuiChildFlags_Border

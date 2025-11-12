@@ -3,6 +3,8 @@
 #include "Engine.h"
 #include "Scene.h"
 
+#include "imgui.h"
+
 #include <thread>
 #include <string>
 
@@ -121,86 +123,86 @@ namespace Loom
 
 	void GameObject::Gui()
 	{
-		//ImGui::PushID(this);
+		ImGui::PushID(this);
 
-		//if (ImGui::TreeNode((void*)this, m_name.c_str()))
-		//{
-		//	ImGui::SameLine();
-		//	if (ImGui::Button("Add Child"))
-		//		AddChild();
+		if (ImGui::TreeNode((void*)this, m_name.c_str()))
+		{
+			ImGui::SameLine();
+			if (ImGui::Button("Add Child"))
+				AddChild();
 
-		//	if (parent)
-		//	{
-		//		ImGui::SameLine();
-		//		if (ImGui::Button("Delete"))
-		//			Destroy();
-		//	};
+			if (parent)
+			{
+				ImGui::SameLine();
+				if (ImGui::Button("Delete"))
+					Destroy();
+			};
 
-		//	ImGui::SameLine();
+			ImGui::SameLine();
 
-		//	if (!m_inherit_thread_id)
-		//	{
-		//		ImGui::PushItemWidth(200);
-		//		ImGui::Text("Thread ID (-1 is not processed): ");
-		//		ImGui::SameLine();
-		//		if (ImGui::SliderInt(" ", &m_threadID, -1, std::thread::hardware_concurrency()))
-		//			SetThreadID(m_threadID);
-		//		ImGui::PopItemWidth();
-		//		ImGui::SameLine();
-		//	}
-		//	else ImGui::Text("Thread ID: %i", m_threadID);
+			if (!m_inherit_thread_id)
+			{
+				ImGui::PushItemWidth(200);
+				ImGui::Text("Thread ID (-1 is not processed): ");
+				ImGui::SameLine();
+				if (ImGui::SliderInt(" ", &m_threadID, -1, std::thread::hardware_concurrency()))
+					SetThreadID(m_threadID);
+				ImGui::PopItemWidth();
+				ImGui::SameLine();
+			}
+			else ImGui::Text("Thread ID: %i", m_threadID);
 
-		//	ImGui::SameLine();
+			ImGui::SameLine();
 
-		//	if (ImGui::Checkbox("Inherit Host Thread", &m_inherit_thread_id))
-		//		if (m_inherit_thread_id)
-		//			SetThreadID(m_threadID);
+			if (ImGui::Checkbox("Inherit Host Thread", &m_inherit_thread_id))
+				if (m_inherit_thread_id)
+					SetThreadID(m_threadID);
 
-		//	ImGui::Text("Name: ");
-		//	ImGui::SameLine();
+			ImGui::Text("Name: ");
+			ImGui::SameLine();
 
-		//	if (ImGui::InputText(std::to_string(m_ID).c_str(), newName, 128))
-		//		m_name = newName;
+			if (ImGui::InputText(std::to_string(m_ID).c_str(), newName, 128))
+				m_name = newName;
 
-		//	// Adding components
-		//	if (ImGui::TreeNode("Add Component: "))
-		//	{
-		//		for (auto& [name, func] : reg_component_attachers)
-		//		{
-		//			for (auto& component : m_components)
-		//				if (component->GetClassName() == name)
-		//					continue;
+			// Adding components
+			if (ImGui::TreeNode("Add Component: "))
+			{
+				for (auto& [name, func] : reg_component_attachers)
+				{
+					for (auto& component : m_components)
+						if (component->GetClassName() == name)
+							continue;
 
-		//			if (ImGui::Button(name.c_str()))
-		//				func(this);
-		//		};
+					if (ImGui::Button(name.c_str()))
+						func(this);
+				};
 
-		//		ImGui::TreePop();
-		//	};
+				ImGui::TreePop();
+			};
 
-		//	// TODO: Add a way to detach by component / name rather than by component type
+			// TODO: Add a way to detach by component / name rather than by component type
 
-		//	// Removing components
-		//	if (ImGui::TreeNode("Remove Component: "))
-		//	{
-		//		for (auto& [name, func] : reg_component_detachers)
-		//			if (ImGui::Button(name.c_str()))
-		//			{
-		//				reg_component_detachers[name](this);
-		//				break;
-		//			};
+			// Removing components
+			if (ImGui::TreeNode("Remove Component: "))
+			{
+				for (auto& [name, func] : reg_component_detachers)
+					if (ImGui::Button(name.c_str()))
+					{
+						reg_component_detachers[name](this);
+						break;
+					};
 
-		//		ImGui::TreePop();
-		//	};
+				ImGui::TreePop();
+			};
 
-		//	for (ComponentBase* component : m_components)
-		//		component->Gui();
-		//	for (GameObject* child : m_children)
-		//		child->Gui();
+			for (ComponentBase* component : m_components)
+				component->Gui();
+			for (GameObject* child : m_children)
+				child->Gui();
 
-		//	ImGui::TreePop();
-		//};
+			ImGui::TreePop();
+		};
 
-		//ImGui::PopID();
+		ImGui::PopID();
 	};
 };

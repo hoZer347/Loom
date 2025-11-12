@@ -5,7 +5,7 @@ using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 
 
-string directory = "C:/Users/3hoze/Desktop/Loom Server Files/Server Environment";
+string directory = "C:\\Users\\3hoze\\Desktop\\Loom Server Files";
 string pfxFilePath = "C:/Users/3hoze/Desktop/Win-ACME/Certs/loomhozer.ca.pfx";
 HashSet<string> uniqueIPs = new();
 

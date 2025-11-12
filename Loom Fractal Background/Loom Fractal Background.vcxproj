@@ -39,15 +39,17 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Property Files\Loom WASM.props" />
-    <Import Project="..\Property Files\Loom Math.props" />
+    <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenGL.props" />
+    <Import Project="..\Property Files\GLFW.props" />
     <Import Project="..\Property Files\UserMacros.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Property Files\Loom WASM.props" />
-    <Import Project="..\Property Files\Loom Math.props" />
+    <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenGL.props" />
+    <Import Project="..\Property Files\GLFW.props" />
     <Import Project="..\Property Files\UserMacros.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
@@ -63,6 +65,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>
+      </AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -81,12 +85,17 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>
+      </AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Loom ImGui\Loom ImGui.vcxproj">
+      <Project>{d58e30f6-a1a0-4a69-a043-d8d4cd47e0b8}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\Loom Math\Loom Math.vcxproj">
       <Project>{b9ffe5b1-3fc5-444d-845f-2a5b577527da}</Project>
     </ProjectReference>

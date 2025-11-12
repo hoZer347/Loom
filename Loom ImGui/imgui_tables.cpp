@@ -294,20 +294,20 @@ inline ImGuiTableFlags TableFixFlags(ImGuiTableFlags flags, ImGuiWindow* outer_w
     return flags;
 }
 
-ImGuiTable* ImGui::TableFindByID(ImGuiID m_id)
+ImGuiTable* ImGui::TableFindByID(ImGuiID id)
 {
     ImGuiContext& g = *GImGui;
-    return g.Tables.GetByKey(m_id);
+    return g.Tables.GetByKey(id);
 }
 
 // Read about "TABLE SIZING" at the top of this file.
 bool    ImGui::BeginTable(const char* str_id, int columns_count, ImGuiTableFlags flags, const ImVec2& outer_size, float inner_width)
 {
-    ImGuiID m_id = GetID(str_id);
-    return BeginTableEx(str_id, m_id, columns_count, flags, outer_size, inner_width);
+    ImGuiID id = GetID(str_id);
+    return BeginTableEx(str_id, id, columns_count, flags, outer_size, inner_width);
 }
 
-bool    ImGui::BeginTableEx(const char* m_name, ImGuiID m_id, int columns_count, ImGuiTableFlags flags, const ImVec2& outer_size, float inner_width)
+bool    ImGui::BeginTableEx(const char* m_name, ImGuiID id, int columns_count, ImGuiTableFlags flags, const ImVec2& outer_size, float inner_width)
 {
     ImGuiContext& g = *GImGui;
     ImGuiWindow* outer_window = GetCurrentWindow();
@@ -334,16 +334,16 @@ bool    ImGui::BeginTableEx(const char* m_name, ImGuiID m_id, int columns_count,
     if (use_child_window && IsClippedEx(outer_rect, 0) && !outer_window_is_measuring_size)
     {
         ItemSize(outer_rect);
-        ItemAdd(outer_rect, m_id);
+        ItemAdd(outer_rect, id);
         return false;
     }
 
     // [DEBUG] Debug break requested by user
-    if (g.DebugBreakInTable == m_id)
+    if (g.DebugBreakInTable == id)
         IM_DEBUG_BREAK();
 
     // Acquire storage for the table
-    ImGuiTable* table = g.Tables.GetOrAddByKey(m_id);
+    ImGuiTable* table = g.Tables.GetOrAddByKey(id);
 
     // Acquire temporary buffers
     const int table_idx = g.Tables.GetIndex(table);
@@ -362,7 +362,7 @@ bool    ImGui::BeginTableEx(const char* m_name, ImGuiID m_id, int columns_count,
     const int previous_frame_active = table->LastFrameActive;
     const int instance_no = (previous_frame_active != g.FrameCount) ? 0 : table->InstanceCurrent + 1;
     const ImGuiTableFlags previous_flags = table->Flags;
-    table->m_ID = m_id;
+    table->m_ID = id;
     table->Flags = flags;
     table->LastFrameActive = g.FrameCount;
     table->OuterWindow = table->InnerWindow = outer_window;
@@ -379,11 +379,11 @@ bool    ImGui::BeginTableEx(const char* m_name, ImGuiID m_id, int columns_count,
         IM_ASSERT(table->ColumnsCount == columns_count && "BeginTable(): Cannot change columns count mid-frame while preserving same ID");
         if (table->InstanceDataExtra.Size < instance_no)
             table->InstanceDataExtra.push_back(ImGuiTableInstanceData());
-        instance_id = GetIDWithSeed(instance_no, GetIDWithSeed("##Instances", NULL, m_id)); // Push "##Instances" followed by (int)instance_no in ID stack.
+        instance_id = GetIDWithSeed(instance_no, GetIDWithSeed("##Instances", NULL, id)); // Push "##Instances" followed by (int)instance_no in ID stack.
     }
     else
     {
-        instance_id = m_id;
+        instance_id = id;
     }
     ImGuiTableInstanceData* table_instance = TableGetInstanceData(table, table->InstanceCurrent);
     table_instance->TableInstanceID = instance_id;
@@ -441,7 +441,7 @@ bool    ImGui::BeginTableEx(const char* m_name, ImGuiID m_id, int columns_count,
     }
 
     // Push a standardized ID for both child-using and not-child-using tables
-    PushOverrideID(m_id);
+    PushOverrideID(id);
     if (instance_no > 0)
         PushOverrideID(instance_id); // FIXME: Somehow this is not resolved by stack-tool, even tho GetIDWithSeed() submitted the symbol.
 
@@ -3096,10 +3096,10 @@ void ImGui::TableHeader(const char* label)
     column->ContentMaxXHeadersIdeal = ImMax(column->ContentMaxXHeadersIdeal, max_pos_x);
 
     // Keep header highlighted when context menu is open.
-    ImGuiID m_id = window->GetID(label);
+    ImGuiID id = window->GetID(label);
     ImRect bb(cell_r.Min.x, cell_r.Min.y, cell_r.Max.x, ImMax(cell_r.Max.y, cell_r.Min.y + label_height + g.Style.CellPadding.y * 2.0f));
     ItemSize(ImVec2(0.0f, label_height)); // Don't declare unclipped width, it'll be fed ContentMaxPosHeadersIdeal
-    if (!ItemAdd(bb, m_id))
+    if (!ItemAdd(bb, id))
         return;
 
     //GetForegroundDrawList()->AddRect(cell_r.Min, cell_r.Max, IM_COL32(255, 0, 0, 255)); // [DEBUG]
@@ -3108,7 +3108,7 @@ void ImGui::TableHeader(const char* label)
     // Using AllowOverlap mode because we cover the whole cell, and we want user to be able to submit subsequent items.
     const bool highlight = (table->HighlightColumnHeader == column_n);
     bool hovered, held;
-    bool pressed = ButtonBehavior(bb, m_id, &hovered, &held, ImGuiButtonFlags_AllowOverlap);
+    bool pressed = ButtonBehavior(bb, id, &hovered, &held, ImGuiButtonFlags_AllowOverlap);
     if (held || hovered || highlight)
     {
         const ImU32 col = GetColorU32(held ? ImGuiCol_HeaderActive : hovered ? ImGuiCol_HeaderHovered : ImGuiCol_Header);
@@ -3121,7 +3121,7 @@ void ImGui::TableHeader(const char* label)
         if ((table->RowFlags & ImGuiTableRowFlags_Headers) == 0)
             TableSetBgColor(ImGuiTableBgTarget_CellBg, GetColorU32(ImGuiCol_TableHeaderBg), table->CurrentColumn);
     }
-    RenderNavHighlight(bb, m_id, ImGuiNavHighlightFlags_Compact | ImGuiNavHighlightFlags_NoRounding);
+    RenderNavHighlight(bb, id, ImGuiNavHighlightFlags_Compact | ImGuiNavHighlightFlags_NoRounding);
     if (held)
         table->HeldHeaderColumn = (ImGuiTableColumnIdx)column_n;
     window->DC.CursorPos.y -= g.Style.ItemSpacing.y * 0.5f;
@@ -3520,13 +3520,13 @@ void ImGui::TableDrawDefaultContextMenu(ImGuiTable* table, ImGuiTableFlags flags
 //-------------------------------------------------------------------------
 
 // Clear and initialize empty settings instance
-static void TableSettingsInit(ImGuiTableSettings* settings, ImGuiID m_id, int columns_count, int columns_count_max)
+static void TableSettingsInit(ImGuiTableSettings* settings, ImGuiID id, int columns_count, int columns_count_max)
 {
     IM_PLACEMENT_NEW(settings) ImGuiTableSettings();
     ImGuiTableColumnSettings* settings_column = settings->GetColumnSettings();
     for (int n = 0; n < columns_count_max; n++, settings_column++)
         IM_PLACEMENT_NEW(settings_column) ImGuiTableColumnSettings();
-    settings->m_ID = m_id;
+    settings->m_ID = id;
     settings->ColumnsCount = (ImGuiTableColumnIdx)columns_count;
     settings->ColumnsCountMax = (ImGuiTableColumnIdx)columns_count_max;
     settings->WantApply = true;
@@ -3537,21 +3537,21 @@ static size_t TableSettingsCalcChunkSize(int columns_count)
     return sizeof(ImGuiTableSettings) + (size_t)columns_count * sizeof(ImGuiTableColumnSettings);
 }
 
-ImGuiTableSettings* ImGui::TableSettingsCreate(ImGuiID m_id, int columns_count)
+ImGuiTableSettings* ImGui::TableSettingsCreate(ImGuiID id, int columns_count)
 {
     ImGuiContext& g = *GImGui;
     ImGuiTableSettings* settings = g.SettingsTables.alloc_chunk(TableSettingsCalcChunkSize(columns_count));
-    TableSettingsInit(settings, m_id, columns_count, columns_count);
+    TableSettingsInit(settings, id, columns_count, columns_count);
     return settings;
 }
 
 // Find existing settings
-ImGuiTableSettings* ImGui::TableSettingsFindByID(ImGuiID m_id)
+ImGuiTableSettings* ImGui::TableSettingsFindByID(ImGuiID id)
 {
     // FIXME-OPT: Might want to store a lookup map for this?
     ImGuiContext& g = *GImGui;
     for (ImGuiTableSettings* settings = g.SettingsTables.begin(); settings != NULL; settings = g.SettingsTables.next_chunk(settings))
-        if (settings->m_ID == m_id)
+        if (settings->m_ID == id)
             return settings;
     return NULL;
 }
@@ -3723,21 +3723,21 @@ static void TableSettingsHandler_ApplyAll(ImGuiContext* ctx, ImGuiSettingsHandle
 
 static void* TableSettingsHandler_ReadOpen(ImGuiContext*, ImGuiSettingsHandler*, const char* m_name)
 {
-    ImGuiID m_id = 0;
+    ImGuiID id = 0;
     int columns_count = 0;
-    if (sscanf(m_name, "0x%08X,%d", &m_id, &columns_count) < 2)
+    if (sscanf(m_name, "0x%08X,%d", &id, &columns_count) < 2)
         return NULL;
 
-    if (ImGuiTableSettings* settings = ImGui::TableSettingsFindByID(m_id))
+    if (ImGuiTableSettings* settings = ImGui::TableSettingsFindByID(id))
     {
         if (settings->ColumnsCountMax >= columns_count)
         {
-            TableSettingsInit(settings, m_id, columns_count, settings->ColumnsCountMax); // Recycle
+            TableSettingsInit(settings, id, columns_count, settings->ColumnsCountMax); // Recycle
             return settings;
         }
         settings->m_ID = 0; // Invalidate storage, we won't fit because of a count change
     }
-    return ImGui::TableSettingsCreate(m_id, columns_count);
+    return ImGui::TableSettingsCreate(id, columns_count);
 }
 
 static void TableSettingsHandler_ReadLine(ImGuiContext*, ImGuiSettingsHandler*, void* entry, const char* line)
@@ -4188,16 +4188,16 @@ void ImGui::PopColumnsBackground()
     columns->Splitter.SetCurrentChannel(window->DrawList, columns->Current + 1);
 }
 
-ImGuiOldColumns* ImGui::FindOrCreateColumns(ImGuiWindow* window, ImGuiID m_id)
+ImGuiOldColumns* ImGui::FindOrCreateColumns(ImGuiWindow* window, ImGuiID id)
 {
     // We have few columns per window so for now we don't need bother much with turning this into a faster lookup.
     for (int n = 0; n < window->ColumnsStorage.Size; n++)
-        if (window->ColumnsStorage[n].m_ID == m_id)
+        if (window->ColumnsStorage[n].m_ID == id)
             return &window->ColumnsStorage[n];
 
     window->ColumnsStorage.push_back(ImGuiOldColumns());
     ImGuiOldColumns* columns = &window->ColumnsStorage.back();
-    columns->m_ID = m_id;
+    columns->m_ID = id;
     return columns;
 }
 
@@ -4208,10 +4208,10 @@ ImGuiID ImGui::GetColumnsID(const char* str_id, int columns_count)
     // Differentiate column ID with an arbitrary prefix for cases where users name their columns set the same as another widget.
     // In addition, when an identifier isn't explicitly provided we include the number of columns in the hash to make it uniquer.
     PushID(0x11223347 + (str_id ? 0 : columns_count));
-    ImGuiID m_id = window->GetID(str_id ? str_id : "columns");
+    ImGuiID id = window->GetID(str_id ? str_id : "columns");
     PopID();
 
-    return m_id;
+    return id;
 }
 
 void ImGui::BeginColumns(const char* str_id, int columns_count, ImGuiOldColumnFlags flags)
@@ -4223,9 +4223,9 @@ void ImGui::BeginColumns(const char* str_id, int columns_count, ImGuiOldColumnFl
     IM_ASSERT(window->DC.CurrentColumns == NULL);   // Nested columns are currently not supported
 
     // Acquire storage for the columns set
-    ImGuiID m_id = GetColumnsID(str_id, columns_count);
-    ImGuiOldColumns* columns = FindOrCreateColumns(window, m_id);
-    IM_ASSERT(columns->m_ID == m_id);
+    ImGuiID id = GetColumnsID(str_id, columns_count);
+    ImGuiOldColumns* columns = FindOrCreateColumns(window, id);
+    IM_ASSERT(columns->m_ID == id);
     columns->Current = 0;
     columns->Count = columns_count;
     columns->Flags = flags;
@@ -4425,7 +4425,7 @@ void ImGui::EndColumns()
     NavUpdateCurrentWindowIsScrollPushableX();
 }
 
-void ImGui::Columns(int columns_count, const char* m_id, bool border)
+void ImGui::Columns(int columns_count, const char* id, bool border)
 {
     ImGuiWindow* window = GetCurrentWindow();
     IM_ASSERT(columns_count >= 1);
@@ -4440,7 +4440,7 @@ void ImGui::Columns(int columns_count, const char* m_id, bool border)
         EndColumns();
 
     if (columns_count != 1)
-        BeginColumns(m_id, columns_count, flags);
+        BeginColumns(id, columns_count, flags);
 }
 
 //-------------------------------------------------------------------------

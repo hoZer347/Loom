@@ -6,27 +6,26 @@
 #include <string>
 #include <iostream>
 
-
 struct GLFWwindow;
+
 
 namespace Loom
 {
 	typedef std::function<void()> Task;
-	struct Buffer;
 	struct Scene;
 
 	/**
 	* Loom::Engine
 	* - Manages the runtime of the application
 	* - Updates all GameObjects
-	* - Manages the backend OpenGL and ImGui instances
+	* - Manages the backend OpenGL and ImGui loops
+	* - Should decouple OpenGL and ImGui, but currently does not
 	*/
 	struct Engine final
 	{
 		Engine();
 		~Engine();
 
-		void Init();
 		void Start();
 		void Stop();
 
@@ -47,6 +46,8 @@ namespace Loom
 		static inline bool isRunning;
 
 	private:
+		static void InitImGui();
+		static void RenderImGui();
 		static void DoTasks() noexcept;
 
 		static inline const char* projectDirectory;
