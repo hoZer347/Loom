@@ -16,6 +16,9 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoomSharp Networking", "LoomSharp Networking\LoomSharp Networking.csproj", "{62BE2C65-FDCF-43BE-9DDA-4B5E079182CE}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Networking", "Loom Networking\Loom Networking.vcxproj", "{D4DB8697-7347-441E-B0F5-EC0886CD8B7A}"
+	ProjectSection(ProjectDependencies) = postProject
+		{7573054A-30A9-427C-87D0-7A2D67C22891} = {7573054A-30A9-427C-87D0-7A2D67C22891}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Space Explorers", "Space Explorers\Space Explorers.vcxproj", "{AF1DB7C1-E172-48E5-9A80-5066204592C1}"
 EndProject

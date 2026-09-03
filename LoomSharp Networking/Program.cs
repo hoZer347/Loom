@@ -6,7 +6,8 @@ using System.Security.Cryptography.X509Certificates;
 
 
 string directory = "C:\\Users\\3hoze\\Desktop\\Loom Server Files";
-string pfxFilePath = "C:/Users/3hoze/Desktop/Win-ACME/Certs/loomhozer.ca.pfx";
+//string directory = "C:\\Users\\3hoze\\Desktop\\Vanguards WebGL";
+string pfxFilePath = "C:\\Users\\3hoze\\Desktop\\Win-ACME\\Certs\\loomhozer.ca.pfx";
 HashSet<string> uniqueIPs = new();
 
 string pfxPassword = "";
@@ -22,27 +23,26 @@ Console.WriteLine("SSL server is running and listening for connections...");
 
 while (true)
 {
+	TcpClient client = new();
+
 	try
 	{
 		listener.Start();
-		Console.WriteLine($"HTTPS server running on https://localhost:{port}");
+		Console.WriteLine($"HTTPS server running on https://localhost:{ port }");
 
 		while (true)
 		{
 			// Accept incoming client connections
-			TcpClient client = listener.AcceptTcpClient();
+			client = listener.AcceptTcpClient();
 
-			Console.WriteLine($"Connection from: {client.Client.RemoteEndPoint}");
+			Console.WriteLine($"Connection from: { client.Client.RemoteEndPoint }");
 
 			// Handle the client in a new task
 			_ = HandleClientAsync(client, certificate);
 			//HandleClient(client, certificate);
 		};
 	}
-	catch (Exception ex)
-	{
-		Console.WriteLine($"SSL error: {ex.Message}");
-	};
+	 catch { };
 };
 
 async Task HandleClientAsync(TcpClient client, X509Certificate2 certificate)
@@ -137,7 +137,7 @@ void HandleGet(
 {
 	path = path.Replace("%20", " ");
 
-	Console.WriteLine($"Requested:       {path}");
+	Console.WriteLine($"Requested:       { path }");
 
 	// Shortcut to index.html
 	if (path == "/")
@@ -196,7 +196,7 @@ void SendGet(
 			content_type = "text/json";
 		else if (path.EndsWith(".js"))
 			content_type = "application/javascript";
-		else if (path.EndsWith(".txt") || path.EndsWith(".frag") || path.EndsWith(".vert"))
+		else if (path.EndsWith(".txt") || path.EndsWith(".frag") || path.EndsWith(".vert") || path.EndsWith(".shader"))
 			content_type = "text/plain";
 		else if (path.EndsWith(".wasm"))
 		{
@@ -283,7 +283,7 @@ void SendGet(
 	}
 	catch (Exception ex)
 	{
-		Console.WriteLine($"Error handling GET request for {path}: {ex.Message}");
+		Console.WriteLine($"Error handling GET request for { path }: { ex.Message }");
 		writer.WriteLine("HTTP/1.1 500 Internal Server Error\r\n\r\n");
 		writer.Flush();
 	}
