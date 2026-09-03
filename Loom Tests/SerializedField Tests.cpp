@@ -1,0 +1,342 @@
+#include "doctest.h"
+
+#include "Test Support.h"
+
+#include "GameObject.h"
+#include "LoomObject.h"
+#include "Material.h"
+#include "Mesh.h"
+#include "Scene.h"
+#include "SceneSerializer.h"
+#include "SerializedField.h"
+
+#include <string>
+#include <vector>
+
+using LoomTests::Pump;
+
+namespace
+{
+	// One member of every type the format knows about, so a single object can
+	// stand in for all of them.
+	struct EveryField final : Loom::Component<EveryField>
+	{
+		Loom::Serial<bool> flag;
+		Loom::Serial<int> count;
+		Loom::Serial<unsigned int> unsigned_count;
+		Loom::Serial<long long> big;
+		Loom::Serial<unsigned long long> unsigned_big;
+		Loom::Serial<float> ratio;
+		Loom::Serial<double> precise;
+		Loom::Serial<std::string> label;
+		Loom::Serial<Loom::Math::vec2<float>> pair;
+		Loom::Serial<Loom::Math::vec3<float>> triple;
+		Loom::Serial<Loom::Math::vec4<float>> quad;
+		Loom::Serial<std::vector<float>> numbers;
+	};
+
+	struct Pointer final : Loom::Component<Pointer>
+	{
+		Loom::Serial<Loom::GameObject*> target;
+	};
+
+	// A field belongs to the object being built around it, whichever class in
+	// the hierarchy declared it.
+	struct Base : Loom::LoomObject
+	{
+		Loom::Serial<int> first = 1;
+	};
+
+	struct Derived final : Base
+	{
+		Loom::Serial<int> second = 2;
+	};
+
+	// The shape Scene has: a LoomObject of its own, declared after the fields of
+	// the object that owns it.
+	struct Host final : Loom::LoomObject
+	{
+		Loom::Serial<int> mine = 3;
+
+		Derived owned;
+	};
+
+	// The same object the other way round, which is the rule Serial documents:
+	// everything declared after the LoomObject member belongs to that member.
+	struct LateHost final : Loom::LoomObject
+	{
+		Derived owned;
+
+		Loom::Serial<int> late;
+	};
+
+	// Fields are numbered by declaration order; these are EveryField's.
+	enum Every { Flag, Count, UnsignedCount, Big, UnsignedBig, Ratio, Precise, Label, Pair, Triple, Quad, Numbers };
+
+	const Loom::SerializedField& Field(const Loom::LoomObject& object, size_t index)
+	{
+		REQUIRE(index < object.GetFields().size());
+
+		return object.GetFields()[index];
+	};
+};
+
+
+TEST_SUITE("SerializedField")
+{
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "fields are declared in the order they are registered")
+	{
+		EveryField object;
+		Pump();
+
+		REQUIRE(object.GetFields().size() == 12);
+
+		CHECK(Field(object, Flag).type == Loom::FieldType::Bool);
+		CHECK(Field(object, Ratio).type == Loom::FieldType::Float);
+		CHECK(Field(object, Numbers).type == Loom::FieldType::FloatArray);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a base class and the type deriving from it declare onto the same object")
+	{
+		Derived object;
+		Pump();
+
+		REQUIRE(object.GetFields().size() == 2);
+
+		// The base's field is numbered first, because it was built first.
+		CHECK(Field(object, 0).Write() == "1");
+		CHECK(Field(object, 1).Write() == "2");
+
+		REQUIRE(Field(object, 1).Read("9"));
+		CHECK(object.second == 9);
+	};
+
+	// Which is what keeps a Scene's root GameObject from taking the fields of
+	// the object that owns it.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an object that owns another keeps its own fields")
+	{
+		Host host;
+		Pump();
+
+		REQUIRE(host.GetFields().size() == 1);
+		CHECK(Field(host, 0).Write() == "3");
+
+		CHECK(host.owned.GetFields().size() == 2);
+	};
+
+	// Documented rather than fixed: there is no hook for the end of a
+	// constructor, so a field declared past a nested object cannot tell that the
+	// object it is landing on has finished being built.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a field declared after a LoomObject member lands on that member")
+	{
+		LateHost host;
+		Pump();
+
+		CHECK(host.GetFields().empty());
+		CHECK(host.owned.GetFields().size() == 3);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a field points at the member it was declared from")
+	{
+		EveryField object;
+		Pump();
+
+		object.count = 7;
+		CHECK(Field(object, Count).Write() == "7");
+
+		REQUIRE(Field(object, Count).Read("12"));
+		CHECK(object.count == 12);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "every type survives being written and read back")
+	{
+		EveryField written;
+		Pump();
+
+		written.flag = true;
+		written.count = -42;
+		written.unsigned_count = 4000000000u;
+		written.big = -9000000000LL;
+		written.unsigned_big = 18000000000000000000ull;
+		written.ratio = 0.1f;
+		written.precise = 0.1;
+		written.label = "a name with spaces";
+		written.pair = { 1.5f, -2.5f };
+		written.triple = { 1.0f, 2.0f, 3.0f };
+		written.quad = { 0.25f, 0.0f, 0.0f, 4.0f };
+		written.numbers = { -1.0f, 0.0f, 0.5f, 2.0f };
+
+		EveryField read;
+		Pump();
+
+		for (size_t i = 0; i < written.GetFields().size(); i++)
+			REQUIRE(Field(read, i).Read(Field(written, i).Write()));
+
+		CHECK(read.flag == written.flag);
+		CHECK(read.count == written.count);
+		CHECK(read.unsigned_count == written.unsigned_count);
+		CHECK(read.big == written.big);
+		CHECK(read.unsigned_big == written.unsigned_big);
+		CHECK(read.ratio == doctest::Approx(written.ratio));
+		CHECK(read.precise == doctest::Approx(written.precise));
+		CHECK(*read.label == *written.label);
+		CHECK(read.pair->data[1] == doctest::Approx(-2.5f));
+		CHECK(read.triple->data[2] == doctest::Approx(3.0f));
+		CHECK(read.quad->data[3] == doctest::Approx(4.0f));
+		CHECK(*read.numbers == *written.numbers);
+	};
+
+	// The value has to come back exactly, not nearly: a scene saved and loaded
+	// twice should not drift.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "floating point round trips exactly")
+	{
+		EveryField object;
+		Pump();
+
+		object.ratio = 3.14159274f;
+		object.precise = 2.718281828459045;
+
+		const std::string ratio = Field(object, Ratio).Write();
+		const std::string precise = Field(object, Precise).Write();
+
+		object.ratio = 0.0f;
+		object.precise = 0.0;
+
+		REQUIRE(Field(object, Ratio).Read(ratio));
+		REQUIRE(Field(object, Precise).Read(precise));
+
+		CHECK(object.ratio == 3.14159274f);
+		CHECK(object.precise == 2.718281828459045);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a string keeps the characters that would break the format")
+	{
+		EveryField object;
+		Pump();
+
+		object.label = "tab\there \"quoted\" and\nnewline";
+
+		const std::string written = Field(object, Label).Write();
+
+		CHECK(written.find('\n') == std::string::npos);
+		CHECK(written.find('\t') == std::string::npos);
+
+		object.label->clear();
+
+		REQUIRE(Field(object, Label).Read(written));
+
+		CHECK(*object.label == "tab\there \"quoted\" and\nnewline");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an empty float list is still a float list")
+	{
+		EveryField object;
+		Pump();
+
+		CHECK(Field(object, Numbers).Write() == "[]");
+
+		object.numbers = { 1.0f };
+
+		REQUIRE(Field(object, Numbers).Read("[]"));
+		CHECK(object.numbers->empty());
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a reference is written as the guid of what it points at")
+	{
+		Loom::Scene scene("references");
+		Pump();
+
+		Pointer* pointer = scene.GetRoot().Attach<Pointer>();
+		Pump();
+
+		CHECK(Field(*pointer, 0).Write() == "null");
+
+		pointer->target = &scene.GetRoot();
+
+		CHECK(Field(*pointer, 0).Write() == scene.GetRoot().GetGuid().ToString());
+
+		pointer->target = nullptr;
+
+		REQUIRE(Field(*pointer, 0).Read(scene.GetRoot().GetGuid().ToString()));
+		CHECK(pointer->target == &scene.GetRoot());
+
+		REQUIRE(Field(*pointer, 0).Read("null"));
+		CHECK(pointer->target == nullptr);
+	};
+
+	// The loader leans on this: a reference to something further down the file
+	// is not an error, it is a fixup to come back to.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a reference to nothing yet reads as unresolved")
+	{
+		Loom::Scene scene("unresolved");
+		Pump();
+
+		Pointer* pointer = scene.GetRoot().Attach<Pointer>();
+		Pump();
+
+		CHECK_FALSE(Field(*pointer, 0).Read(Loom::Guid::New().ToString()));
+		CHECK(pointer->target == nullptr);
+	};
+
+	// Detaching a component, or destroying a GameObject, has to take every
+	// reference to it with it. One left behind is read again the next frame -
+	// by the serializer writing its guid, by the inspector drawing its name -
+	// and by then the object is gone.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "detaching a component clears references to it")
+	{
+		Loom::Scene scene("detached target");
+		Pump();
+
+		Pointer* pointer = scene.GetRoot().Attach<Pointer>();
+		Loom::GameObject* target = scene.AddChild("Target");
+		Pump();
+
+		pointer->target = target;
+
+		REQUIRE(pointer->target == target);
+
+		target->Destroy();
+		Pump();
+
+		CHECK(pointer->target == nullptr);
+		CHECK(Field(*pointer, 0).Write() == "null");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a component pointed at by another clears it on the way out")
+	{
+		Loom::Scene scene("detached component");
+		Pump();
+
+		Loom::Mesh* mesh = scene.GetRoot().Attach<Loom::Mesh>((uint32_t)4);
+		Loom::Material* material = scene.GetRoot().Attach<Loom::Material>();
+		Pump();
+
+		mesh->material = material;
+
+		scene.GetRoot().DetachComponent(material);
+		Pump();
+
+		CHECK(mesh->material == nullptr);
+
+		// And the scene it writes out says so, rather than the guid of something
+		// that is no longer there. The mesh declares its material first, so the
+		// field is number zero.
+		CHECK(Loom::SceneSerializer::Serialize(scene).find("0 = null") != std::string::npos);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a reference only accepts what it can point at")
+	{
+		Loom::Scene scene("wrong type");
+		Pump();
+
+		Pointer* pointer = scene.GetRoot().Attach<Pointer>();
+		Pump();
+
+		pointer->target = &scene.GetRoot();
+
+		// The scene is a LoomObject, but it is not a GameObject: the field
+		// declines rather than handing back something of the wrong type.
+		CHECK_FALSE(Field(*pointer, 0).Read(scene.GetGuid().ToString()));
+		CHECK(pointer->target == nullptr);
+	};
+};

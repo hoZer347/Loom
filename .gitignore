@@ -364,3 +364,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Test suite build outputs
+Loom Tests/x64/
+x64/Web*/

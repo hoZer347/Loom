@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{7C3E1A42-9B0D-4F58-A1E6-2D5C8B7F0431}</ProjectGuid>
+    <RootNamespace>LoomTests</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <!-- The shared property sheets are written in terms of $(SolutionDir).
+         Fill it in when this project is built on its own (run-tests.ps1, CI)
+         rather than through Loom.sln. -->
+    <SolutionDir Condition="'$(SolutionDir)' == '' or '$(SolutionDir)' == '*Undefined*'">$(MSBuildThisFileDirectory)..\</SolutionDir>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\Property Files\doctest.props" />
+    <Import Project="..\Property Files\Loom Math.props" />
+    <Import Project="..\Property Files\Loom ImGui.props" />
+    <Import Project="..\Property Files\OpenGL.props" />
+    <Import Project="..\Property Files\UserMacros.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\Property Files\doctest.props" />
+    <Import Project="..\Property Files\Loom Math.props" />
+    <Import Project="..\Property Files\Loom ImGui.props" />
+    <Import Project="..\Property Files\OpenGL.props" />
+    <Import Project="..\Property Files\UserMacros.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(SolutionDir)Loom Networking;$(SolutionDir)Loom WASM;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(SolutionDir)Loom Networking;$(SolutionDir)Loom WASM;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <SubSystem>Console</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="Platform Tests.cpp" />
+    <ClCompile Include="Math Tests.cpp" />
+    <ClCompile Include="Macro Helpers Tests.cpp" />
+    <ClCompile Include="DataPackage Tests.cpp" />
+    <ClCompile Include="Engine Tests.cpp" />
+    <ClCompile Include="LoomObject Tests.cpp" />
+    <ClCompile Include="ComponentRegistry Tests.cpp" />
+    <ClCompile Include="SceneSerializer Tests.cpp" />
+    <ClCompile Include="SerializedField Tests.cpp" />
+    <ClCompile Include="Guid Tests.cpp" />
+    <ClCompile Include="Component Tests.cpp" />
+    <ClCompile Include="GameObject Tests.cpp" />
+    <ClCompile Include="Scene Tests.cpp" />
+    <ClCompile Include="Mesh Tests.cpp" />
+    <ClCompile Include="Material Tests.cpp" />
+    <ClCompile Include="Shaders Tests.cpp" />
+    <ClCompile Include="Textures Tests.cpp" />
+    <ClCompile Include="Collider Tests.cpp" />
+    <ClCompile Include="Input Tests.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Test Support.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The engine sources under test are compiled straight into the test
+         binary rather than linked from Loom WASM.lib, so the suite keeps
+         building while other parts of that project are mid-refactor. The web
+         build reads this same list back out of this file and hands it to
+         emcc, so both builds cover exactly the same code.
+         Wildcards rather than a fixed list: files come and go in Loom WASM
+         often enough that a hand-maintained copy would be stale within a day.
+         Nothing here constructs an Engine, so no window and no GL context is
+         ever created; the tests drive the parts that do not need one. -->
+    <ClCompile Include="..\Loom WASM\*.cpp" />
+    <ClCompile Include="..\Loom WASM\Utilities\*.cpp" Exclude="..\Loom WASM\Utilities\_*.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- ImGui is linked rather than recompiled: Component<T>::Gui and
+         GameObject::Gui call into it, and it builds cleanly as a library. -->
+    <ProjectReference Include="..\Loom ImGui\Loom ImGui.vcxproj">
+      <Project>{d58e30f6-a1a0-4a69-a043-d8d4cd47e0b8}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="CopyRuntimeDependencies" AfterTargets="Build">
+    <!-- The suite never calls into GLEW, but it links glew32.lib through
+         OpenGL.props, so the loader still wants glew32.dll beside the
+         executable. Without this the binary dies with STATUS_DLL_NOT_FOUND
+         before main runs, in whichever configuration has not had the DLL
+         dropped in by some other project. -->
+    <Copy SourceFiles="$(DevDirectory)\glew\bin\Release\x64\glew32.dll"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(DevDirectory)\glew\bin\Release\x64\glew32.dll')" />
+  </Target>
+</Project>
