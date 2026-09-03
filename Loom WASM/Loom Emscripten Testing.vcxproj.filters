@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="Engine.cpp">
@@ -40,6 +40,42 @@
     <ClCompile Include="State.cpp">
       <Filter>State</Filter>
     </ClCompile>
+    <ClCompile Include="Utilities\StateMachine.cpp">
+      <Filter>Utilities\State Machine</Filter>
+    </ClCompile>
+    <ClCompile Include="Utilities\StateMachineMonitor.cpp">
+      <Filter>Utilities\State Machine</Filter>
+    </ClCompile>
+    <ClCompile Include="Utilities\StaticStateMachine.cpp">
+      <Filter>Utilities\State Machine</Filter>
+    </ClCompile>
+    <ClCompile Include="Utilities\AttributeFields.cpp">
+      <Filter>Utilities\Attributes</Filter>
+    </ClCompile>
+    <ClCompile Include="Utilities\AttributeGui.cpp">
+      <Filter>Utilities\Attributes</Filter>
+    </ClCompile>
+    <ClCompile Include="Utilities\DialogueManager.cpp">
+      <Filter>Utilities\Dialogue Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="Utilities\DialogueStates.cpp">
+      <Filter>Utilities\Dialogue Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="Utilities\DialogueArgs.cpp">
+      <Filter>Utilities\Dialogue Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="Utilities\DialogueInput.cpp">
+      <Filter>Utilities\Dialogue Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="Utilities\SpriteManager.cpp">
+      <Filter>Utilities\Sprite Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="Utilities\SpriteSheetScanner.cpp">
+      <Filter>Utilities\Sprite Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="Utilities\Clock.cpp">
+      <Filter>Utilities\General</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Engine">
@@ -77,6 +113,24 @@
     </Filter>
     <Filter Include="Collider">
       <UniqueIdentifier>{79e5837d-8e79-40fa-9abb-3bae41f32636}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utilities">
+      <UniqueIdentifier>{84e47e40-db34-4f36-b95c-95ec3a781700}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utilities\State Machine">
+      <UniqueIdentifier>{5595cfab-37e2-4566-8d25-66c79eda6453}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utilities\Attributes">
+      <UniqueIdentifier>{8e366e81-858c-4311-9de0-a816a1cb04d5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utilities\Dialogue Manager">
+      <UniqueIdentifier>{e1743970-c75d-45ea-8232-b59ddc3a78c4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utilities\Sprite Manager">
+      <UniqueIdentifier>{49b40d3b-34d0-417d-9be7-23f7ee4d7bd9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utilities\General">
+      <UniqueIdentifier>{2c25cb42-cb0a-4ce4-844a-0d2a1567c1c3}</UniqueIdentifier>
     </Filter>
     <Filter Include="State">
       <UniqueIdentifier>{951f5181-3b26-4efc-b491-1b6912097593}</UniqueIdentifier>
@@ -125,5 +179,76 @@
       <Filter>State</Filter>
     </ClInclude>
     <ClInclude Include="Loom.h" />
+    <ClInclude Include="Utilities\hoZer.h">
+      <Filter>Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\State.h">
+      <Filter>Utilities\State Machine</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\StateMachine.h">
+      <Filter>Utilities\State Machine</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\StateMachineMonitor.h">
+      <Filter>Utilities\State Machine</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\StateReference.h">
+      <Filter>Utilities\State Machine</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\StaticStateMachine.h">
+      <Filter>Utilities\State Machine</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\CustomState.h">
+      <Filter>Utilities\State Machine</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\Attributes.h">
+      <Filter>Utilities\Attributes</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\AttributeFields.h">
+      <Filter>Utilities\Attributes</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\AttributeTriggers.h">
+      <Filter>Utilities\Attributes</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\Modifiers.h">
+      <Filter>Utilities\Attributes</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\AttributeGui.h">
+      <Filter>Utilities\Attributes</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\DialogueManager.h">
+      <Filter>Utilities\Dialogue Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\DialogueStates.h">
+      <Filter>Utilities\Dialogue Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\DialogueArgs.h">
+      <Filter>Utilities\Dialogue Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\DialogueInput.h">
+      <Filter>Utilities\Dialogue Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\SpriteManager.h">
+      <Filter>Utilities\Sprite Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\SpriteSheetScanner.h">
+      <Filter>Utilities\Sprite Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\Duration.h">
+      <Filter>Utilities\General</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\Gait.h">
+      <Filter>Utilities\General</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\SpeedManager.h">
+      <Filter>Utilities\General</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\Clock.h">
+      <Filter>Utilities\General</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Utilities\Flipbook.shader">
+      <Filter>Utilities\Sprite Manager</Filter>
+    </None>
   </ItemGroup>
 </Project>

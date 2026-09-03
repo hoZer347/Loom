@@ -61,6 +61,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
+      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <EnableModules>
       </EnableModules>
       <BuildStlModules>
@@ -81,6 +82,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
+      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <EnableModules>
       </EnableModules>
       <BuildStlModules>
@@ -108,6 +110,19 @@
     <ClCompile Include="Shaders.cpp" />
     <ClCompile Include="State.cpp" />
     <ClCompile Include="Textures.cpp" />
+    <ClCompile Include="Utilities\AttributeFields.cpp" />
+    <ClCompile Include="Utilities\AttributeGui.cpp" />
+    <ClCompile Include="Utilities\DialogueArgs.cpp" />
+    <ClCompile Include="Utilities\DialogueInput.cpp" />
+    <ClCompile Include="Utilities\DialogueManager.cpp" />
+    <ClCompile Include="Utilities\DialogueStates.cpp" />
+    <ClCompile Include="Utilities\SpriteManager.cpp" />
+    <ClCompile Include="Utilities\SpriteSheetScanner.cpp" />
+    <ClCompile Include="Utilities\StateMachine.cpp" />
+    <ClCompile Include="Utilities\StateMachineMonitor.cpp" />
+    <ClCompile Include="Utilities\StaticStateMachine.cpp" />
+    <ClCompile Include="Utilities\Clock.cpp" />
+
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Collider.h" />
@@ -126,6 +141,31 @@
     <ClInclude Include="Shaders.h" />
     <ClInclude Include="State.h" />
     <ClInclude Include="Textures.h" />
+    <ClInclude Include="Utilities\AttributeFields.h" />
+    <ClInclude Include="Utilities\AttributeGui.h" />
+    <ClInclude Include="Utilities\Attributes.h" />
+    <ClInclude Include="Utilities\AttributeTriggers.h" />
+    <ClInclude Include="Utilities\CustomState.h" />
+    <ClInclude Include="Utilities\DialogueArgs.h" />
+    <ClInclude Include="Utilities\DialogueInput.h" />
+    <ClInclude Include="Utilities\DialogueManager.h" />
+    <ClInclude Include="Utilities\DialogueStates.h" />
+    <ClInclude Include="Utilities\Duration.h" />
+    <ClInclude Include="Utilities\Gait.h" />
+    <ClInclude Include="Utilities\hoZer.h" />
+    <ClInclude Include="Utilities\Modifiers.h" />
+    <ClInclude Include="Utilities\SpeedManager.h" />
+    <ClInclude Include="Utilities\SpriteManager.h" />
+    <ClInclude Include="Utilities\SpriteSheetScanner.h" />
+    <ClInclude Include="Utilities\State.h" />
+    <ClInclude Include="Utilities\StateMachine.h" />
+    <ClInclude Include="Utilities\StateMachineMonitor.h" />
+    <ClInclude Include="Utilities\StateReference.h" />
+    <ClInclude Include="Utilities\StaticStateMachine.h" />
+    <ClInclude Include="Utilities\Clock.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Utilities\Flipbook.shader" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Loom ImGui\Loom ImGui.vcxproj">
