@@ -11,15 +11,13 @@ struct TestState : State
 		: i(std::move(i))
 	{ };
 
-	void OnEnter() override
+	void OnEnter(State* lastState) override
 	{ };
 
 	void OnUpdate() override
-	{
-		std::cout << "TestState Update: " << i << std::endl;
-	};
+	{ };
 
-	void OnExit() override
+	void OnExit(State* nextState) override
 	{ };
 
 private:
@@ -32,9 +30,11 @@ int main()
 	Engine engine;
 	Scene scene{ "Test" };
 
-	auto* state = State::Queue<TestState>(5);
+	// The always-on machine, which is what the old global State stack was: nothing to
+	// place, nothing to wire, and the engine pumps it every frame.
+	const TestState* state = StaticStateMachine::Instance().Push<TestState>(5);
 
-	State::Proceed();
+	StaticStateMachine::Instance().Proceed();
 
 	engine.Start();
 

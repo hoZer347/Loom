@@ -2,5 +2,18 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Ship.cpp">
+      <Filter>Ship</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Ship">
+      <UniqueIdentifier>{21ea0ff4-9244-4a80-a7ba-4d2af3cff530}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Ship.h">
+      <Filter>Ship</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
