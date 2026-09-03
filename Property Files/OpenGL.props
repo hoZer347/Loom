@@ -7,6 +7,7 @@
     <ClCompile>
       <AdditionalIncludeDirectories>$(DevDirectory)\glm;$(DevDirectory)\glew\include;$(DevDirectory)\glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PreprocessorDefinitions>_WIN32_WINNT=0x0601;%(PreprocessorDefinitions);GLFW_STATIC</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(DevDirectory)\glew\lib\Release\x64;$(DevDirectory)\glfw\lib-vc2022;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
