@@ -1,0 +1,467 @@
+#include "ProjectTemplate.h"
+
+#include "Guid.h"
+#include "SceneSerializer.h"
+
+#include <cctype>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+
+namespace Loom
+{
+	namespace
+	{
+		std::string Replace(std::string text, const std::string& token, const std::string& value)
+		{
+			// Resuming past the replacement, not at it: a value that contains its
+			// own token would otherwise be substituted forever.
+			for (size_t at = text.find(token); at != std::string::npos; at = text.find(token, at + value.size()))
+				text.replace(at, token.size(), value);
+
+			return text;
+		};
+
+		bool Write(const std::filesystem::path& path, const std::string& text, std::string* error)
+		{
+			std::error_code code;
+			std::filesystem::create_directories(path.parent_path(), code);
+
+			std::ofstream out(path, std::ios::binary);
+
+			if (!out)
+			{
+				if (error)
+					*error = "Could not write " + path.string();
+
+				return false;
+			};
+
+			out << text;
+
+			return true;
+		};
+
+		// A guid in the shape MSBuild wants: braced and upper case.
+		std::string ProjectGuid()
+		{
+			std::string text = Guid::New().ToString();
+
+			for (char& c : text)
+				c = (char)toupper((unsigned char)c);
+
+			return '{' + text + '}';
+		};
+
+		const char* const loomproject = R"(name={NAME}
+scripts=Scripts/{NAME}Scripts.vcxproj
+library=Build/{NAME}Scripts.dll
+)";
+
+		const char* const shader = R"(
+// ===VERTEX===
+
+layout(location = 0) in vec3 aPos;
+
+void main()
+{
+    gl_Position = vec4(aPos, 1.0);
+};
+
+
+// ===FRAGMENT===
+
+out vec4 FragColor;
+
+void main()
+{
+    FragColor = vec4(0.35, 0.8, 0.45, 1.0);
+};
+)";
+
+		const char* const script_header = R"(#pragma once
+
+#include "Component.h"
+#include "Mesh.h"
+
+#include <string>
+
+
+namespace {NAME}Scripts
+{
+	// A script is an ordinary Loom component. Serial members show up in the
+	// inspector and are written to the scene file, with no editor code to write
+	// for them.
+	struct SpinningTriangle : Loom::Component<SpinningTriangle>
+	{
+		void OnAttach() override;
+		void OnUpdate() override;
+
+	private:
+		void Rebuild();
+
+		Loom::Serial<float> m_speed = 0.02f;
+		Loom::Serial<float> m_radius = 0.6f;
+		Loom::Serial<float> m_angle;
+		Loom::Serial<bool> m_spinning = true;
+		Loom::Serial<std::string> m_shader = "Assets/Shader.shader";
+
+		Loom::Mesh* m_mesh = nullptr;
+	};
+};
+)";
+
+		const char* const script_source = R"(#include "SpinningTriangle.h"
+
+#include "GameObject.h"
+#include "Material.h"
+#include "Mesh.h"
+
+#include <cmath>
+
+
+namespace {NAME}Scripts
+{
+	// GL_TRIANGLES, without dragging a GL header into a script.
+	static const uint32_t triangles = 0x0004;
+
+	void SpinningTriangle::OnAttach()
+	{
+		Loom::Material* material = m_gameObject->GetComponent<Loom::Material>();
+
+		if (material == nullptr)
+			material = m_gameObject->Attach<Loom::Material>();
+
+		// Named, not built here: the engine compiles one shader per path and
+		// shares it, so a script hands over the name and lets it do that.
+		material->SetShaderPath(m_shader);
+
+		m_mesh = m_gameObject->GetComponent<Loom::Mesh>();
+
+		if (m_mesh == nullptr)
+			m_mesh = m_gameObject->Attach<Loom::Mesh>(triangles);
+
+		m_mesh->material = material;
+
+		Rebuild();
+	};
+
+	void SpinningTriangle::OnUpdate()
+	{
+		if (!m_spinning)
+			return;
+
+		m_angle += m_speed;
+
+		Rebuild();
+	};
+
+	void SpinningTriangle::Rebuild()
+	{
+		if (m_mesh == nullptr)
+			return;
+
+		m_mesh->m_vertices->clear();
+
+		for (int corner = 0; corner < 3; corner++)
+		{
+			const float turn = m_angle + (float)corner * 2.0944f;
+
+			m_mesh->m_vertices->push_back(std::cos(turn) * m_radius);
+			m_mesh->m_vertices->push_back(std::sin(turn) * m_radius);
+			m_mesh->m_vertices->push_back(0.0f);
+		};
+	};
+};
+)";
+
+		const char* const script_module = R"(#include "SpinningTriangle.h"
+
+#include "ComponentRegistry.h"
+
+
+// The editor calls this once, right after it loads the library. Everything the
+// project wants to see in Add Component (and in scene files) is named here.
+extern "C" __declspec(dllexport) void LoomRegisterScripts()
+{
+	Loom::ComponentRegistry::Register<{NAME}Scripts::SpinningTriangle>("SpinningTriangle");
+};
+)";
+
+		const char* const vcxproj = R"(<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{PROJECT_GUID}</ProjectGuid>
+    <RootNamespace>{NAME}Scripts</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>{NAME}Scripts</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <OutDir>{PROJECT}\Build\</OutDir>
+    <IntDir>{PROJECT}\Build\Intermediate\$(Configuration)\</IntDir>
+    <TargetName>{NAME}Scripts</TargetName>
+  </PropertyGroup>
+  <!-- Here rather than in a .vcxproj.user, which is per-user and is not
+       written out with the project: these are what F5 does on a fresh
+       checkout, and the Debugging property page shadows them. -->
+  <PropertyGroup>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerCommand>{ENGINE}\x64\$(Configuration)\Loom Editor.exe</LocalDebuggerCommand>
+    <LocalDebuggerCommandArguments>"{PROJECT}" --play</LocalDebuggerCommandArguments>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <ConformanceMode>true</ConformanceMode>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <DisableSpecificWarnings>4251;4275</DisableSpecificWarnings>
+      <PreprocessorDefinitions>LOOM_SCRIPT_MODULE;_WIN32_WINNT=0x0601;WIN32;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>{ENGINE}\Loom WASM;{ENGINE}\Loom Math;{ENGINE}\Loom ImGui;{ENGINE}\External Libraries\glm;{ENGINE}\External Libraries\glew\include;{ENGINE}\External Libraries\glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>{ENGINE}\x64\$(Configuration);{ENGINE}\External Libraries\glew\lib\Release\x64;{ENGINE}\External Libraries\glfw\lib-vc2022;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>Loom Editor.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
+    <ClCompile>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
+    <ClCompile>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="SpinningTriangle.cpp" />
+    <ClCompile Include="ScriptModule.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="SpinningTriangle.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>
+)";
+
+		const char* const filters = R"(<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="SpinningTriangle.cpp" />
+    <ClCompile Include="ScriptModule.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="SpinningTriangle.h" />
+  </ItemGroup>
+</Project>
+)";
+
+		const char* const solution = R"(
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "{NAME}Scripts", "{NAME}Scripts.vcxproj", "{PROJECT_GUID}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{PROJECT_GUID}.Debug|x64.ActiveCfg = Debug|x64
+		{PROJECT_GUID}.Debug|x64.Build.0 = Debug|x64
+		{PROJECT_GUID}.Release|x64.ActiveCfg = Release|x64
+		{PROJECT_GUID}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
+)";
+
+		// The tabs and newlines are the scene format's syntax, so they are spelled
+		// out rather than left to whatever a raw string would preserve.
+		const char* const starter_scene =
+			"Main({SCENE_GUID}):\n"
+			"\tGameObject Root({ROOT_GUID})\n"
+			"\t\t0 = 0\n"
+			"\t\t1 = false\n"
+			"\t\tGameObject Triangle({TRIANGLE_GUID})\n"
+			"\t\t\t0 = 0\n"
+			"\t\t\t1 = false\n"
+			"\t\t\tComponent SpinningTriangle({SCRIPT_GUID})\n"
+			"\t\t\t\t0 = 0.02\n"
+			"\t\t\t\t1 = 0.6\n"
+			"\t\t\t\t2 = 0\n"
+			"\t\t\t\t3 = true\n"
+			"\t\t\t\t4 = \"Assets/Shader.shader\"\n";
+
+		const char* const readme = R"({NAME}
+{UNDERLINE}
+
+A Loom project. The editor opens the folder; the scenes are in Scenes/ and the
+scripts are an ordinary C++ project in Scripts/.
+
+    Scenes/Main{SCENE_EXTENSION}     opened when the project loads
+    Scripts/{NAME}Scripts.sln    open this in Visual Studio to write scripts
+    Assets/Shader.shader         what the starter scene draws with
+    Build/                       where the compiled script library lands
+
+Scripts are Loom components. Compile them from the editor (the Compile button in
+the Project panel, or just press Play) or build the solution in Visual Studio -
+they are the same build. The library links the editor's import library, so there
+is one engine in the process rather than one per module.
+
+Start Debugging (F5) builds the scripts and then starts the editor on this
+project with the scene running, so breakpoints in them are hit.
+
+Members declared as Serial<T> appear in the inspector and are written into the
+scene file, in the order they were declared - which is also how the file names
+them, so inserting one in the middle shifts the values already saved.
+SpinningTriangle is there as a worked example.
+)";
+	};
+
+	std::string ProjectTemplate::EngineRoot()
+	{
+		char buffer[MAX_PATH]{ };
+
+		GetModuleFileNameA(nullptr, buffer, MAX_PATH);
+
+		// <engine>/x64/<configuration>/Loom Editor.exe
+		std::filesystem::path root =
+			std::filesystem::path(buffer).parent_path().parent_path().parent_path();
+
+		std::error_code code;
+
+		if (std::filesystem::exists(root / "Loom WASM" / "Loom.h", code))
+			return root.lexically_normal().string();
+
+		return std::filesystem::current_path(code).string();
+	};
+
+	bool ProjectTemplate::IsValidName(const std::string& name)
+	{
+		if (name.empty() || name.size() > 64)
+			return false;
+
+		for (const char c : name)
+			if (!isalnum((unsigned char)c) && c != '_' && c != '-')
+				return false;
+
+		return !isdigit((unsigned char)name.front());
+	};
+
+	std::string ProjectTemplate::Create(
+		const std::string& folder,
+		const std::string& name,
+		std::string* error)
+	{
+		if (!IsValidName(name))
+		{
+			if (error)
+				*error = "'" + name + "' is not a usable project name (letters, digits, _ and - only)";
+
+			return "";
+		};
+
+		const std::filesystem::path root = std::filesystem::path(folder) / name;
+
+		std::error_code code;
+
+		if (std::filesystem::exists(root / (name + extension), code))
+		{
+			if (error)
+				*error = "There is already a project in " + root.string();
+
+			return "";
+		};
+
+		std::filesystem::create_directories(root / "Scenes", code);
+		std::filesystem::create_directories(root / "Scripts", code);
+		std::filesystem::create_directories(root / "Assets", code);
+		std::filesystem::create_directories(root / "Build", code);
+
+		if (code)
+		{
+			if (error)
+				*error = "Could not create " + root.string() + ": " + code.message();
+
+			return "";
+		};
+
+		const std::string engine = EngineRoot();
+		const std::string project_guid = ProjectGuid();
+		const std::string project = root.lexically_normal().string();
+
+		const auto fill =
+			[&](const char* text)
+			{
+				std::string filled = Replace(text, "{NAME}", name);
+				filled = Replace(filled, "{ENGINE}", engine);
+				filled = Replace(filled, "{PROJECT}", project);
+				filled = Replace(filled, "{PROJECT_GUID}", project_guid);
+				filled = Replace(filled, "{SCENE_EXTENSION}", SceneSerializer::extension);
+				filled = Replace(filled, "{UNDERLINE}", std::string(name.size(), '='));
+				filled = Replace(filled, "{SCENE_GUID}", Guid::New().ToString());
+				filled = Replace(filled, "{ROOT_GUID}", Guid::New().ToString());
+				filled = Replace(filled, "{TRIANGLE_GUID}", Guid::New().ToString());
+				filled = Replace(filled, "{SCRIPT_GUID}", Guid::New().ToString());
+
+				return filled;
+			};
+
+		const bool written =
+			Write(root / (name + extension), fill(loomproject), error) &&
+			Write(root / "Assets" / "Shader.shader", fill(shader), error) &&
+			Write(root / "Scenes" / (std::string("Main") + SceneSerializer::extension), fill(starter_scene), error) &&
+			Write(root / "README.txt", fill(readme), error) &&
+			Write(root / "Scripts" / "SpinningTriangle.h", fill(script_header), error) &&
+			Write(root / "Scripts" / "SpinningTriangle.cpp", fill(script_source), error) &&
+			Write(root / "Scripts" / "ScriptModule.cpp", fill(script_module), error) &&
+			Write(root / "Scripts" / (name + "Scripts.vcxproj"), fill(vcxproj), error) &&
+			Write(root / "Scripts" / (name + "Scripts.vcxproj.filters"), fill(filters), error) &&
+			Write(root / "Scripts" / (name + "Scripts.sln"), fill(solution), error);
+
+		if (!written)
+			return "";
+
+		std::cout << "Created project " << project << std::endl;
+
+		return (root / (name + extension)).string();
+	};
+};

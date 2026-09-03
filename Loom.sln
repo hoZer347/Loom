@@ -24,6 +24,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Space Explorers", "Space Ex
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Tests", "Loom Tests\Loom Tests.vcxproj", "{7C3E1A42-9B0D-4F58-A1E6-2D5C8B7F0431}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Editor", "Loom Editor\Loom Editor.vcxproj", "{C3F1A6D2-5B47-4E1C-9A62-7E0B4D8F1C33}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -104,6 +106,14 @@ Global
 		{7C3E1A42-9B0D-4F58-A1E6-2D5C8B7F0431}.Release|Any CPU.Build.0 = Release|x64
 		{7C3E1A42-9B0D-4F58-A1E6-2D5C8B7F0431}.Release|x64.ActiveCfg = Release|x64
 		{7C3E1A42-9B0D-4F58-A1E6-2D5C8B7F0431}.Release|x64.Build.0 = Release|x64
+		{C3F1A6D2-5B47-4E1C-9A62-7E0B4D8F1C33}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{C3F1A6D2-5B47-4E1C-9A62-7E0B4D8F1C33}.Debug|Any CPU.Build.0 = Debug|x64
+		{C3F1A6D2-5B47-4E1C-9A62-7E0B4D8F1C33}.Debug|x64.ActiveCfg = Debug|x64
+		{C3F1A6D2-5B47-4E1C-9A62-7E0B4D8F1C33}.Debug|x64.Build.0 = Debug|x64
+		{C3F1A6D2-5B47-4E1C-9A62-7E0B4D8F1C33}.Release|Any CPU.ActiveCfg = Release|x64
+		{C3F1A6D2-5B47-4E1C-9A62-7E0B4D8F1C33}.Release|Any CPU.Build.0 = Release|x64
+		{C3F1A6D2-5B47-4E1C-9A62-7E0B4D8F1C33}.Release|x64.ActiveCfg = Release|x64
+		{C3F1A6D2-5B47-4E1C-9A62-7E0B4D8F1C33}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
