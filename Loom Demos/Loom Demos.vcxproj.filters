@@ -2,7 +2,7 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Demos.ixx">
+    <ClCompile Include="Demos.h">
       <Filter>Demos</Filter>
     </ClCompile>
     <ClCompile Include="Demos.cpp">
@@ -15,8 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Shader.frag" />
     <None Include="Shader.shader" />
-    <None Include="Shader.vert" />
   </ItemGroup>
 </Project>

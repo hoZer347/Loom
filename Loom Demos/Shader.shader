@@ -3,7 +3,7 @@
 
 layout(location = 0) in vec3 aPos;
 
-uniform mat4 mvp = mat4(1);
+uniform mat4 mvp = mat4(1.0);
 
 void main()
 {

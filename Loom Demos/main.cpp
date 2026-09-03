@@ -1,111 +1,78 @@
-import Demos;
+#define BOOST_ALL_NO_LIB
+#define BOOST_DISABLE_ABI_HEADERS
+#pragma comment(lib, "glfw3.lib")
+#pragma comment(lib, "gdi32.lib")
+#pragma comment(lib, "opengl32.lib")
+#pragma comment(lib, "user32.lib")
+#pragma comment(lib, "shell32.lib")
+#pragma comment(lib, "advapi32.lib")
+#pragma comment(lib, "winmm.lib")
+#pragma comment(lib, "comdlg32.lib")
+#pragma comment(lib, "ole32.lib")
 
+#include "OpenGL.h"
 #include "Engine.h"
+#include "Component.h"
+#include "Demos.h"
 #include "Scene.h"
-
-#include <vector>
-#include <unordered_map>
-#include <iostream>
-
-#include "Mesh.h"
 #include "Shaders.h"
+#include "Mesh.h"
 #include "Material.h"
-#include "Collider.h"
+#include "DataPackage.h"
+#include "UDPServer.h"
+#include "TCPServer.h"
+#include "TCPClient.h"
+
+#include "glm/glm.hpp"
+#include <filesystem>
 
 using namespace Loom;
+using namespace glm;
 
 
-GameObject* PrepCube(Scene* scene, std::string name)
+struct Buh : public DataPackage<Buh, 0>, public Component<Buh>
 {
-	GameObject* go = scene->AddChild(name);
-
-	Mesh* mesh = go->Attach<Mesh>(GL_QUADS);
-
-	// Define 8 corners of the cube
-	const float x0 = 0, x1 = 1;
-	const float y0 = 0, y1 = 0.5f;
-	const float z0 = 0, z1 = 1;
-
-	// Define vertices for all 6 faces
-	mesh->m_vertices =
+	void Handle() override
 	{
-		// Front face
-		x0, y0, z1,
-		x1, y0, z1,
-		x1, y1, z1,
-		x0, y1, z1,
-
-		// Back face
-		x1, y0, z0,
-		x0, y0, z0,
-		x0, y1, z0,
-		x1, y1, z0,
-
-		// Left face
-		x0, y0, z0,
-		x0, y0, z1,
-		x0, y1, z1,
-		x0, y1, z0,
-
-		// Right face
-		x1, y0, z1,
-		x1, y0, z0,
-		x1, y1, z0,
-		x1, y1, z1,
-
-		// Top face
-		x0, y1, z1,
-		x1, y1, z1,
-		x1, y1, z0,
-		x0, y1, z0,
-
-		// Bottom face
-		x0, y0, z0,
-		x1, y0, z0,
-		x1, y0, z1,
-		x0, y0, z1,
+		std::cout << c << std::endl;
+	};
+	
+	void OnUpdate() override
+	{
+		if (glfwGetKey(Engine::window, GLFW_KEY_SPACE))
+		{
+			TCPClient::Send(this);
+		};
 	};
 
-	// 6 faces × 4 vertices each
-	mesh->m_indices =
-	{
-		// Front
-		0, 1, 2, 3,
-		// Back
-		4, 5, 6, 7,
-		// Left
-		8, 9, 10, 11,
-		// Right
-		12, 13, 14, 15,
-		// Top
-		16, 17, 18, 19,
-		// Bottom
-		20, 21, 22, 23,
-	};
-
-	Material* mat = go->Attach<Material>();
-	mat->shader = new Shader("Shader.shader");
-
-	return go;
+	char c[5] = "Test";
 };
 
+struct InitialConnection : public DataPackage<InitialConnection, 1>
+{
+	void Handle() override
+	{
+		std::cout << "Initial connection received!" << std::endl;
+	};
+};
 
 int main()
 {
 	Engine engine;
+	Scene scene{ "Server" };
+	
+	auto* server = scene.Attach<TCPServer>();
+	auto* client = scene.Attach<TCPClient>();
 
-	Scene scene;
-	scene.Attach<DemosWindow>();
+	Buh* buh = scene.Attach<Buh>();
+	buh->c[0] = 'A';
+	buh->c[1] = 'A';
+	buh->c[2] = 'A';
+	buh->c[3] = 'A';
+	buh->c[4] = 'A';
 
-	auto* cube1 = PrepCube(&scene, "Cube1");
-	//auto* cube2 = PrepCube(&scene, "Cube2");
-	//auto* cube3 = PrepCube(&scene, "Cube3");
-	//auto* cube4 = PrepCube(&scene, "Cube4");
-
-	//for (const auto& [i, j] : Shader::shaders)
-	//	std::cout << j << ": " << i << std::endl;
+	TCPClient::Send(buh);
 
 	engine.Start();
-
 	return 0;
 };
