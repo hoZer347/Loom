@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Self-contained: claim an empty icon rather than 404 on /favicon.ico. -->
+    <link rel="icon" href="data:," />
+    <title>Loom</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #020617; /* slate-950, matching the portfolio behind it */
+        overflow: hidden;
+      }
+
+      /* The engine hard-codes the "#canvas" selector, so the id is load-bearing. */
+      #canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        outline: none;
+        touch-action: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas" tabindex="0"></canvas>
+
+    <script>
+      // Emscripten reuses a pre-existing Module, so this has to be defined
+      // before index.js runs.
+      var Module = {
+        canvas: document.getElementById("canvas"),
+        // The engine prints GL versions and shader errors here; keep them out
+        // of the parent page's console noise but don't lose them.
+        print: (text) => console.log("[loom]", text),
+        printErr: (text) => console.warn("[loom]", text),
+      };
+
+      // Keep the canvas backing store matched to its CSS size.
+      //
+      // This runs every frame rather than only on resize, because Emscripten's
+      // GLFW3 shim sets the canvas to the size passed to glfwCreateWindow when
+      // the engine starts up, which happens well after load and would otherwise
+      // leave the scene rendering at 800x600 stretched across the window.
+      //
+      // Dispatching a resize event is what tells the engine to re-read the
+      // canvas and update its GL viewport; it listens on the window for it.
+      (function watchCanvasSize() {
+        const canvas = Module.canvas;
+
+        const tick = () => {
+          const ratio = window.devicePixelRatio || 1;
+          const width = Math.max(1, Math.round(canvas.clientWidth * ratio));
+          const height = Math.max(1, Math.round(canvas.clientHeight * ratio));
+
+          if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+            window.dispatchEvent(new Event("resize"));
+          }
+
+          requestAnimationFrame(tick);
+        };
+
+        requestAnimationFrame(tick);
+      })();
+
+      // The engine's ImGui setup focuses the canvas and swallows the context
+      // menu, but only once it reaches that code; do it up front so a click
+      // lands on the canvas from the first frame.
+      Module.canvas.addEventListener("click", () => Module.canvas.focus());
+      Module.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+    </script>
+    <script async src="index.js"></script>
+  </body>
+</html>
