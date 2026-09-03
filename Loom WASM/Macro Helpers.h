@@ -18,10 +18,10 @@
 //
 #define HAS_FUNCTION_DECL(function_name)\
 	template <typename T>\
-	class has_##function_name## {\
+	class has_##function_name {\
 	private:\
 		template <typename U>\
-		static constexpr auto check(int) -> decltype(std::declval<U>().##function_name##(), std::true_type{})\
+		static constexpr auto check(int) -> decltype(std::declval<U>().function_name(), std::true_type{})\
 		{\
 			return std::true_type{};\
 		};\
@@ -53,7 +53,7 @@
 //
 #define HAS_VARIABLE_DECL(member_variable_name) \
 	template <typename T> \
-	class has_##member_variable_name## { \
+	class has_##member_variable_name { \
 	private: \
 		template <typename U> \
 		static constexpr auto check(int) -> decltype(std::declval<U>().member_variable_name, std::true_type{}) \
@@ -70,22 +70,9 @@
 	public: \
 		static constexpr bool value = decltype(check<T>(0))::value; \
 	};
-#define HAS_VARIABLE_TEST(class_name, member_variable_name) has_##member_variable_name##<class_name>::value
+#define HAS_VARIABLE_TEST(class_name, member_variable_name) has_##member_variable_name<class_name>::value
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// TODO: Likely not the optimal way to implement serialization
-#define SERIALIZE(...)\
-void OnSerialize() override\
-{\
-	std::cout << "Serializing: " << typeid(*this).name() << std::endl;\
-	Serialize(GetName().c_str(), this, __VA_ARGS__);\
-};\
-void OnDeserialize() override\
-{\
-	std::cout << "Deserializing: " << typeid(*this).name() << std::endl;\
-	Deserialize(GetName().c_str(), this, __VA_ARGS__);\
-};\
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //

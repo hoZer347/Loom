@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Loom API.h"
+
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -7,7 +9,7 @@
 
 namespace Loom
 {
-	struct Shader final
+	struct LOOM_API Shader final
 	{
 		Shader();
 		Shader(const std::string& file_path);

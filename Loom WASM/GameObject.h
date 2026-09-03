@@ -1,13 +1,17 @@
 #pragma once
 
+#include "Loom API.h"
+
 #include "Engine.h"
 #include "Component.h"
 #include "LoomObject.h"
 
+#include <cstring>
 #include <string>
 #include <atomic>
 #include <vector>
 
+#include <typeinfo>
 #include <type_traits>
 
 
@@ -39,16 +43,16 @@ namespace Loom
 		has_method<T, void>::value &&
 		!std::is_same_v<decltype(&T::OnRender), decltype(&ComponentBase::OnRender)>> { };
 
-	// Detect override of OnRender
+	// Detect override of OnUpdate
 	template <typename T>
 	struct overrides_on_update
 		: std::integral_constant<bool,
 		has_method<T, void>::value &&
-		!std::is_same_v<decltype(&T::OnRender), decltype(&ComponentBase::OnUpdate)>> { };
+		!std::is_same_v<decltype(&T::OnUpdate), decltype(&ComponentBase::OnUpdate)>> { };
 
 	// TODO: Turn the above templates into a macro
 
-	struct GameObject final :
+	struct LOOM_API GameObject final :
 		public LoomObject
 	{
 		template <typename T>
@@ -57,15 +61,22 @@ namespace Loom
 			static_assert(std::is_base_of_v<Component<T>, T>, "Must be a component");
 
 			T* component = new T(args...);
-			((ComponentBase*)component)->m_type_name = typeid(T).name();
 
+			// The type name is Component<T>'s doing; what Attach adds is the owner.
+			((ComponentBase*)component)->m_gameObject = this;
+
+			// On the object immediately, so GetComponent finds it. Two components
+			// attached in the same frame - by a scene load, or by one component's
+			// OnAttach reaching for another - are siblings as soon as they exist,
+			// not a frame later.
+			m_components.emplace_back(component);
+
+			// What has to wait is the work that runs them: the update and render
+			// lists are walked mid-frame, and OnAttach expects the rest of the
+			// object to be there.
 			Engine::QueueTask(
 				[this, component]()
 				{
-					((ComponentBase*)component)->m_gameObject = (decltype(((ComponentBase*)component)->m_gameObject))(void*)this;
-
-					m_components.emplace_back(component);
-
 					if constexpr (overrides_on_update<T>::value)
 						m_updateables.emplace_back(component);
 
@@ -84,55 +95,24 @@ namespace Loom
 		{
 			static_assert(std::is_base_of_v<Component<T>, T>, "Must be a component");
 
+			// Compared by value, not by pointer: a script library carries its own
+			// copy of the type name, so the addresses differ across the module
+			// boundary even though the type is the same one.
 			for (auto& component : m_components)
-				if (component->m_type_name == typeid(T).name())
+				if (strcmp(component->m_type_name, typeid(T).name()) == 0)
 					return (T*)component;
 
 			return nullptr;
 		};
 
-		template <typename T>
-		bool Detach()
-		{
-			static_assert(std::is_base_of_v<Component<T>, T>, "Must be a component");
+		// Read-only views of the hierarchy, for tooling that draws it (the editor).
+		const std::vector<GameObject*>& GetChildren() const { return m_children; };
+		const std::vector<ComponentBase*>& GetComponents() const { return m_components; };
+		GameObject* GetParent() const { return parent; };
 
-			for (auto& component : m_components)
-				if ((component->m_type_name = typeid(T).hash_code()))
-				{
-					Engine::QueueTask(
-						[this, component]()
-						{
-							m_components.erase(
-								std::remove(
-									m_components.begin(),
-									m_components.end(),
-									component));
-
-							if constexpr (&T::OnRender != &ComponentBase::OnRender)
-								m_updateables.erase(
-									std::remove(
-										m_updateables.begin(),
-										m_updateables.end(),
-										component));
-
-							if constexpr (&T::OnRender != &ComponentBase::OnRender)
-								m_renderables.erase(
-									std::remove(
-										m_renderables.begin(),
-										m_renderables.end(),
-										component));
-
-							if constexpr (&T::OnDetach != &ComponentBase::OnDetach)
-								component->OnDetach();
-
-							delete component;
-						});
-
-					return true;
-				};
-
-			return false;
-		};
+		// Removes one component instance. By instance rather than by type: a
+		// GameObject is free to carry two of the same kind.
+		void DetachComponent(ComponentBase* component);
 
 		void RemoveChild(GameObject* gameObject);
 
@@ -142,23 +122,7 @@ namespace Loom
 
 		GameObject* AddChild(const std::string& name = "New GameObject");
 
-		template <typename T>
-		static inline void RegisterComponent()
-		{
-			//std::cout << "Registered: " << boost::typeindex::type_id<T>().pretty_name() << std::endl;
-
-			//reg_component_attachers[boost::typeindex::type_id<T>().pretty_name()] =
-			//	[](void* gameObject)
-			//	{
-			//		((GameObject*)gameObject)->Attach<T>();
-			//	};
-
-			//reg_component_detachers[boost::typeindex::type_id<T>().pretty_name()] =
-			//	[](void* gameObject)
-			//	{
-			//		((GameObject*)gameObject)->Detach<T>();
-			//	};
-		};
+		static size_t GetObjectCount() { return num_objects.load(); };
 
 	protected:
 		friend struct Scene;
@@ -171,8 +135,8 @@ namespace Loom
 		static inline std::atomic<size_t> num_objects = 0;
 		static inline std::atomic<size_t> id_counter = 0;
 
-		bool m_inherit_thread_id;
-		int m_threadID = 0;
+		Serial<int> m_threadID;
+		Serial<bool> m_inherit_thread_id;
 
 		std::vector<GameObject*>	m_children{ };
 		std::vector<ComponentBase*> m_components{ };
@@ -180,23 +144,7 @@ namespace Loom
 		std::vector<ComponentBase*> m_renderables{ };
 		std::vector<ComponentBase*> m_physicsables{ };
 
-		//SERIALIZE(
-		//	&m_inherit_thread_id,
-		//	&m_children,
-		//	&m_components,
-		//	&m_updateables,
-		//	&m_renderables,
-		//	&m_physicsables);
-
 	private:
-		static inline std::unordered_map<
-			std::string,								// Name
-			void(*)(void*)> reg_component_attachers{ };	// Attach function for attaching / detaching components
-
-		static inline std::unordered_map<
-			std::string,								// Name
-			void(*)(void*)> reg_component_detachers{ };	// Detach function for attaching / detaching components
-
 		GameObject* parent;
 
 		char newName[128];

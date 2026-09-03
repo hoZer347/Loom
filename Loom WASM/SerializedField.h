@@ -1,0 +1,64 @@
+#pragma once
+
+#include "Loom API.h"
+
+#include "Guid.h"
+
+#include <string>
+
+
+namespace Loom
+{
+	struct LoomObject;
+
+	enum struct FieldType
+	{
+		Bool,
+		Int,
+		UInt,
+		Int64,
+		UInt64,
+		Float,
+		Double,
+		String,
+		Vec2,
+		Vec3,
+		Vec4,
+		FloatArray,
+
+		// A pointer to another LoomObject. Written as that object's guid, which
+		// is the whole reason objects carry one.
+		Reference,
+	};
+
+	/**
+	* Loom::SerializedField
+	* - One member of a LoomObject that the scene format knows about
+	* - Holds what type it is and where it lives; the pointer is into the object
+	*   that registered the field, so a field never outlives its owner
+	* - It has no name of its own: a field is identified by where it sits in the
+	*   list, which is the order the Serial members were declared in
+	*/
+	struct LOOM_API SerializedField final
+	{
+		FieldType type = FieldType::Int;
+		void* data = nullptr;
+
+		// Reference fields only. A member declared as some derived type cannot
+		// be assigned through a LoomObject** - its LoomObject subobject is not
+		// necessarily at offset zero - so the casts are generated where the real
+		// type is still known.
+		LoomObject* (*get_reference)(void*) = nullptr;
+		void (*set_reference)(void*, LoomObject*) = nullptr;
+
+		// The scene-file text for the current value, and the reverse. Reading a
+		// reference resolves the guid against the objects that exist right now
+		// and answers false when the target has not been built yet, which is the
+		// loader's cue to come back to it.
+		std::string Write() const;
+		bool Read(const std::string& text) const;
+
+		LoomObject* GetReference() const;
+		void SetReference(LoomObject* object) const;
+	};
+};

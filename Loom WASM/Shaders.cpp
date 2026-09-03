@@ -1,12 +1,13 @@
 #include "Shaders.h"
 
+#include "OpenGL.h"
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/fetch.h>
 #endif
 
-#include "OpenGL.h"
-
+#include <sstream>
 #include <iostream>
 #include <fstream>
 #include <filesystem>
@@ -37,7 +38,7 @@ namespace Loom
 		glDeleteShader(id);
 	};
 
-#if __EMSCRIPTEN
+#if __EMSCRIPTEN__
 #define VERSION "#version 300 es"
 #else
 #define VERSION "#version 460 core"
@@ -46,10 +47,10 @@ namespace Loom
 	enum class ShaderType { NONE, COMMON, VERTEX, FRAGMENT, GEOMETRY, COMPUTE };
 
 	static inline std::unordered_map<std::string, GLenum> ShaderMap = {
-		{"VERTEX", GL_VERTEX_SHADER},
-		{"FRAGMENT", GL_FRAGMENT_SHADER},
-		{"GEOMETRY", GL_GEOMETRY_SHADER},
-		{"COMPUTE", GL_COMPUTE_SHADER}
+		{ "VERTEX", GL_VERTEX_SHADER     },
+		{ "FRAGMENT", GL_FRAGMENT_SHADER },
+		//{ "GEOMETRY", GL_GEOMETRY_SHADER },
+		//{ "COMPUTE", GL_COMPUTE_SHADER   },
 	};
 
 	uint32_t Shader::CompileSource(const std::string& file_path)
@@ -60,12 +61,14 @@ namespace Loom
 			return shaders[file_path];
 
 #if __EMSCRIPTEN__
-		Request(m_file_path, shader_raw);
-#endif
-
+		std::string shader_raw;
+		Request(file_path, shader_raw);
+		std::istringstream file(shader_raw);
+#else
 		std::ifstream file(file_path);
 		if (!file)
 			throw std::runtime_error("Could not open shader file: " + file_path);
+#endif
 
 		std::unordered_map<std::string, std::stringstream> sources;
 		ShaderType current = ShaderType::NONE;
@@ -76,14 +79,15 @@ namespace Loom
 				current = ShaderType::VERTEX;
 			else if (line.find("===FRAGMENT===") != std::string::npos)
 				current = ShaderType::FRAGMENT;
-			else if (line.find("===GEOMETRY===") != std::string::npos)
-				current = ShaderType::GEOMETRY;
-			else if (line.find("===COMPUTE===") != std::string::npos)
-				current = ShaderType::COMPUTE;
+		//else if (line.find("===GEOMETRY===") != std::string::npos)
+		//	current = ShaderType::GEOMETRY;
+		//else if (line.find("===COMPUTE===") != std::string::npos)
+		//	current = ShaderType::COMPUTE;
 			else if (line.find("===COMMON===") != std::string::npos)
 				current = ShaderType::COMMON;
 			else if (current != ShaderType::NONE)
 				sources[std::to_string(static_cast<int>(current))] << line << '\n';
+
 
 		std::string commonCode = sources.contains(std::to_string(static_cast<int>(ShaderType::COMMON))) ?
 			sources[std::to_string(static_cast<int>(ShaderType::COMMON))].str() : "";
@@ -94,10 +98,11 @@ namespace Loom
 		for (const auto& [typeStr, glShaderType] : ShaderMap)
 		{
 			auto key = std::to_string(static_cast<int>(
-				typeStr == "VERTEX" ? ShaderType::VERTEX :
-				typeStr == "FRAGMENT" ? ShaderType::FRAGMENT :
-				typeStr == "GEOMETRY" ? ShaderType::GEOMETRY :
-				ShaderType::COMPUTE));
+				typeStr == "VERTEX" ? ShaderType::VERTEX : ShaderType::FRAGMENT
+				//: typeStr == "FRAGMENT" ? ShaderType::FRAGMENT
+				//: typeStr == "GEOMETRY" ? ShaderType::GEOMETRY
+				//: ShaderType::COMPUTE
+				));
 
 			if (!sources.contains(key))
 				continue;

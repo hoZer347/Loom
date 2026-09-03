@@ -10,11 +10,12 @@
 #include <GLES2/gl2.h>
 #endif
 
+#include "ComponentRegistry.h"
 #include "OpenGL.h"
 #include "Scene.h"
 #include "Input.h"
 #include "Shaders.h"
-#include "State.h"
+#include "Utilities/Clock.h"
 
 #include <iostream>
 #include <atomic>
@@ -35,16 +36,25 @@ namespace Loom
 		// Setup Dear ImGui context
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
+
 		io = &ImGui::GetIO(); (void)io;
+
 		io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 		io->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 		io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
-		io->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable Multi-Viewport / Platform Windows
-		io->ConfigViewportsNoAutoMerge = true;
-		//io.ConfigViewportsNoTaskBarIcon = true;
+
+#ifndef __EMSCRIPTEN__
+		// Multi-viewport (native only). Not while the window is hidden: a panel
+		// dragged out in an earlier session is remembered in the layout, and a
+		// viewport is a real window that ImGui shows whatever this one does.
+		if (showWindow)
+		{
+			io->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;   // Enable Multi-Viewport / Platform Windows
+			io->ConfigViewportsNoAutoMerge = true;
+		};
+#endif
 
 		// Setup Dear ImGui style
-		//ImGui::StyleColorsDark();
 		ImGui::StyleColorsLight();
 
 		// When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
@@ -56,10 +66,29 @@ namespace Loom
 		};
 
 		// Setup Platform/Renderer backends
-		ImGui_ImplGlfw_InitForOpenGL(Engine::window, true);
 #ifdef __EMSCRIPTEN__
-		ImGui_ImplGlfw_InstallEmscriptenCallbacks(window, "#canvas");
+	// Emscripten: avoid double-callback wiring
+		ImGui_ImplGlfw_InitForOpenGL(Engine::window, false);
+		ImGui_ImplGlfw_InstallEmscriptenCallbacks(Engine::window, "#canvas");
+
+		// Make canvas focusable + stop browser stealing input
+		emscripten_run_script(R"JS(
+		(function(){
+			var c = Module['canvas'];
+			if (!c) return;
+			c.tabIndex = 0;
+			c.style.outline = 'none';
+			c.style.touchAction = 'none';
+			c.focus();
+			c.addEventListener('click', () => c.focus());
+			c.addEventListener('contextmenu', e => e.preventDefault());
+			c.addEventListener('wheel', e => e.preventDefault(), { passive: false });
+		})();
+	)JS");
+#else
+		ImGui_ImplGlfw_InitForOpenGL(Engine::window, true);
 #endif
+
 		ImGui_ImplOpenGL3_Init(glsl_version);
 	};
 
@@ -69,30 +98,24 @@ namespace Loom
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
-		//
 
 		// GUI
-		//MainMenu::Gui();
-
-		if (Engine::doGUI)
+		if (onGui)
+			onGui();
+		else if (Engine::doGUI)
 			for (auto& scene : Scene::allScenes)
 			{
 				if (ImGui::Begin(scene->NameAndID().c_str()))
 					scene->root.Gui();
 				ImGui::End();
 			};
-		//
 
 		// Rendering
 		ImGui::Render();
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-		//
 
-
-		// Update and Render additional Platform Windows
-		// (Platform functions may change the current OpenGL context, so we save/restore it to make it easier to paste this code elsewhere.
-		//  For this specific demo app we could also call glfwMakeContextCurrent(window) directly)
+#ifndef __EMSCRIPTEN__
+		// Multi-viewport rendering (native only)
 		if (io->ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 		{
 			GLFWwindow* backup_current_context = glfwGetCurrentContext();
@@ -100,6 +123,7 @@ namespace Loom
 			ImGui::RenderPlatformWindowsDefault();
 			glfwMakeContextCurrent(backup_current_context);
 		};
+#endif
 	};
 
 	void resizeCanvas()
@@ -134,10 +158,7 @@ namespace Loom
 		emscripten_set_main_loop(renderFrame, 0, true);
 #else
 		while (!glfwWindowShouldClose(window))
-		{
-			State::Update();
 			renderFrame();
-		};
 #endif
 
 		glDeleteBuffers(1, &VBO);
@@ -156,30 +177,37 @@ namespace Loom
 
 	void Engine::renderFrame()
 	{
-		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+		glfwPollEvents();
+
+		// The frame clock, the edge-detected dialogue input and the StaticStateMachine.
+		// First thing in the frame, so everything ticked below reads the same delta and
+		// the same key presses.
+		Utilities::Tick();
+
+		glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		while (taskQueue.size())
-		{
-			std::scoped_lock lock(mutex);
-			Task task = taskQueue.front();
-			task();
-			taskQueue.pop();
-		};
+		DoTasks();
 
 		onUpdate();
 
 		//Shader::SetUniforms();
 
+#ifndef __EMSCRIPTEN__
 		RenderImGui();
+#endif
 
-		for (auto& scene : Scene::allScenes)
-			scene->root.Render();
+		if (updateScenes)
+			for (auto& scene : Scene::allScenes)
+				scene->Update();
+
+		if (renderScenes)
+			for (auto& scene : Scene::allScenes)
+				scene->Render();
 
 		glFlush();
 
 		glfwSwapBuffers(window);
-		glfwPollEvents();
 	};
 
 	void Engine::SetUpdateFunction(const Task& task)
@@ -188,10 +216,49 @@ namespace Loom
 		onUpdate = task;
 	};
 
+	void Engine::SetGuiFunction(const Task& task)
+	{
+		std::lock_guard<std::recursive_mutex> lock(mutex);
+		onGui = task;
+	};
+
 	void Engine::QueueTask(const Task& task)
 	{
 		std::lock_guard<std::recursive_mutex> lock(mutex);
 		taskQueue.push(task);
+	};
+
+	void Engine::DoTasks() noexcept
+	{
+		// Each task is popped under the lock but run outside it, so a task is
+		// free to queue more work (Attach doing so from OnAttach is normal) and
+		// the follow-up still runs in this same drain.
+		while (true)
+		{
+			Task task;
+
+			{
+				std::lock_guard<std::recursive_mutex> lock(mutex);
+
+				if (taskQueue.empty())
+					return;
+
+				task = taskQueue.front();
+				taskQueue.pop();
+			};
+
+			// DoTasks is noexcept because it runs from the frame loop, where an
+			// escaping exception would take the whole application down.
+			try { task(); }
+			catch (const std::exception& e)
+			{
+				std::cerr << "Queued task threw: " << e.what() << std::endl;
+			}
+			catch (...)
+			{
+				std::cerr << "Queued task threw an unknown exception" << std::endl;
+			};
+		};
 	};
 
 	const size_t Engine::GetUniqueID()
@@ -227,6 +294,9 @@ namespace Loom
 		//glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
 		//glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
 #endif
+
+		if (!showWindow)
+			glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
 		window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "", NULL, NULL);
 		if (window == NULL)
@@ -283,6 +353,12 @@ namespace Loom
 		glDebugMessageCallback(
 			[](GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
 			{
+				// Notifications are per-buffer-upload chatter from the driver;
+				// they drown out anything worth reading (the editor console in
+				// particular) without ever saying anything actionable.
+				if (severity == GL_DEBUG_SEVERITY_NOTIFICATION)
+					return;
+
 				std::cerr << "OpenGL Debug: " << message << std::endl;
 			},
 			nullptr);
@@ -312,6 +388,8 @@ namespace Loom
 		glGenVertexArrays(1, &VAO);
 		glBindVertexArray(Engine::VAO);
 #endif
+
+		ComponentRegistry::RegisterBuiltins();
 
 		InitImGui();
 	};

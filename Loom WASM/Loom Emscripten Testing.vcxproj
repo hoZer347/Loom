@@ -99,16 +99,19 @@
   <ItemGroup>
     <ClCompile Include="Collider.cpp" />
     <ClCompile Include="Component.cpp" />
+    <ClCompile Include="ComponentRegistry.cpp" />
     <ClCompile Include="Engine.cpp" />
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="Geo.cpp" />
+    <ClCompile Include="Guid.cpp" />
     <ClCompile Include="Input.cpp" />
     <ClCompile Include="LoomObject.cpp" />
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Scene.cpp" />
+    <ClCompile Include="SerializedField.cpp" />
+    <ClCompile Include="SceneSerializer.cpp" />
     <ClCompile Include="Shaders.cpp" />
-    <ClCompile Include="State.cpp" />
     <ClCompile Include="Textures.cpp" />
     <ClCompile Include="Utilities\AttributeFields.cpp" />
     <ClCompile Include="Utilities\AttributeGui.cpp" />
@@ -127,10 +130,13 @@
   <ItemGroup>
     <ClInclude Include="Collider.h" />
     <ClInclude Include="Component.h" />
+    <ClInclude Include="ComponentRegistry.h" />
     <ClInclude Include="Engine.h" />
     <ClInclude Include="GameObject.h" />
     <ClInclude Include="Geo.h" />
+    <ClInclude Include="Guid.h" />
     <ClInclude Include="Input.h" />
+    <ClInclude Include="Loom API.h" />
     <ClInclude Include="Loom.h" />
     <ClInclude Include="LoomObject.h" />
     <ClInclude Include="Macro Helpers.h" />
@@ -138,8 +144,10 @@
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="OpenGL.h" />
     <ClInclude Include="Scene.h" />
+    <ClInclude Include="Serial.h" />
+    <ClInclude Include="SerializedField.h" />
+    <ClInclude Include="SceneSerializer.h" />
     <ClInclude Include="Shaders.h" />
-    <ClInclude Include="State.h" />
     <ClInclude Include="Textures.h" />
     <ClInclude Include="Utilities\AttributeFields.h" />
     <ClInclude Include="Utilities\AttributeGui.h" />

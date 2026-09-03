@@ -1,10 +1,12 @@
 #include "GameObject.h"
 
+#include "ComponentRegistry.h"
 #include "Engine.h"
 #include "Scene.h"
 
 #include "imgui.h"
 
+#include <algorithm>
 #include <thread>
 #include <string>
 
@@ -15,12 +17,13 @@ namespace Loom
 		GameObject* parent,
 		const std::string& name,
 		const int& thread_id) :
-		parent(parent),
-		m_threadID(thread_id)
+		parent(parent)
 	{
 		SetName(name);
 
 		newName[0] = '\0';
+
+		m_threadID = thread_id;
 
 		size_t i = num_objects.fetch_add(1);
 	};
@@ -41,6 +44,35 @@ namespace Loom
 
 		if (Engine::isRunning) Engine::QueueTask(task);
 		else task();
+	};
+
+	void GameObject::DetachComponent(ComponentBase* component)
+	{
+		if (component == nullptr)
+			return;
+
+		Engine::QueueTask(
+			[this, component]()
+			{
+				if (std::find(
+					m_components.begin(),
+					m_components.end(),
+					component) == m_components.end())
+					return;
+
+				for (std::vector<ComponentBase*>* list :
+					{ &m_components, &m_updateables, &m_renderables, &m_physicsables })
+					list->erase(
+						std::remove(
+							list->begin(),
+							list->end(),
+							component),
+						list->end());
+
+				component->OnDetach();
+
+				delete component;
+			});
 	};
 
 	void GameObject::RemoveChild(GameObject* child)
@@ -97,8 +129,8 @@ namespace Loom
 	void GameObject::Update(const int& thread)
 	{
 		for (ComponentBase* updateable : m_updateables)
-			if (thread == m_threadID)
-				updateable->OnRender();
+			//if (thread == m_threadID)
+				updateable->OnUpdate();
 		for (GameObject* child : m_children)
 			child->Update(thread);
 	};
@@ -106,7 +138,7 @@ namespace Loom
 	void GameObject::Render()
 	{
 		for (auto& renderable : m_renderables)
-			if (m_threadID != -1)
+			//if (m_threadID != -1)
 				renderable->OnRender();
 		for (auto& child : m_children)
 			child->Render();
@@ -125,7 +157,7 @@ namespace Loom
 	{
 		ImGui::PushID(this);
 
-		if (ImGui::TreeNode((void*)this, m_name.c_str()))
+		if (ImGui::TreeNode((void*)this, "%s", m_name.c_str()))
 		{
 			ImGui::SameLine();
 			if (ImGui::Button("Add Child"))
@@ -145,16 +177,16 @@ namespace Loom
 				ImGui::PushItemWidth(200);
 				ImGui::Text("Thread ID (-1 is not processed): ");
 				ImGui::SameLine();
-				if (ImGui::SliderInt(" ", &m_threadID, -1, std::thread::hardware_concurrency()))
+				if (ImGui::SliderInt(" ", &*m_threadID, -1, std::thread::hardware_concurrency()))
 					SetThreadID(m_threadID);
 				ImGui::PopItemWidth();
 				ImGui::SameLine();
 			}
-			else ImGui::Text("Thread ID: %i", m_threadID);
+			else ImGui::Text("Thread ID: %i", *m_threadID);
 
 			ImGui::SameLine();
 
-			if (ImGui::Checkbox("Inherit Host Thread", &m_inherit_thread_id))
+			if (ImGui::Checkbox("Inherit Host Thread", &*m_inherit_thread_id))
 				if (m_inherit_thread_id)
 					SetThreadID(m_threadID);
 
@@ -167,35 +199,35 @@ namespace Loom
 			// Adding components
 			if (ImGui::TreeNode("Add Component: "))
 			{
-				for (auto& [name, func] : reg_component_attachers)
-				{
-					for (auto& component : m_components)
-						if (component->GetClassName() == name)
-							continue;
-
+				for (auto& [name, factory] : ComponentRegistry::All())
 					if (ImGui::Button(name.c_str()))
-						func(this);
+						factory(*this);
+
+				ImGui::TreePop();
+			};
+
+			// Removing components, by instance rather than by type: a GameObject
+			// is free to carry two of the same kind.
+			if (ImGui::TreeNode("Remove Component: "))
+			{
+				for (ComponentBase* component : m_components)
+				{
+					ImGui::PushID(component);
+
+					if (ImGui::Button(ComponentRegistry::NameOf(*component).c_str()))
+						DetachComponent(component);
+
+					ImGui::PopID();
 				};
 
 				ImGui::TreePop();
 			};
 
-			// TODO: Add a way to detach by component / name rather than by component type
+			// A copy: a component's GUI can attach another one, and Attach now puts
+			// it straight into m_components rather than on the queue.
+			const std::vector<ComponentBase*> components = m_components;
 
-			// Removing components
-			if (ImGui::TreeNode("Remove Component: "))
-			{
-				for (auto& [name, func] : reg_component_detachers)
-					if (ImGui::Button(name.c_str()))
-					{
-						reg_component_detachers[name](this);
-						break;
-					};
-
-				ImGui::TreePop();
-			};
-
-			for (ComponentBase* component : m_components)
+			for (ComponentBase* component : components)
 				component->Gui();
 			for (GameObject* child : m_children)
 				child->Gui();

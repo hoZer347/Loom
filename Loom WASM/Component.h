@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Loom API.h"
+
 #include "imgui.h"
 #include "LoomObject.h"
 
@@ -17,7 +19,7 @@ namespace Loom
 	/// * - Defines the interface for all components
 	/// * - Tracks the parent GameObject and typeinfo as well
 	//
-	struct ComponentBase :
+	struct LOOM_API ComponentBase :
 		public LoomObject
 	{
 		constexpr virtual void OnAttach()	{ };
@@ -30,6 +32,10 @@ namespace Loom
 		virtual ~ComponentBase() { };
 
 		const std::string& GetClassName() const { return m_name; };
+
+		// The typeid name of the concrete component, filled in by Component<T>.
+		// This is what identifies a component in the editor's inspector.
+		const char* GetTypeName() const { return m_type_name; };
 		GameObject const* GetGameObject() const { return m_gameObject; };
 
 	protected:
@@ -37,6 +43,12 @@ namespace Loom
 		GameObject* m_gameObject;
 
 		virtual void Gui() { };
+
+		// The fold-out the built-in GUI wraps a component in. Lives here
+		// rather than in Component<T> so a script module instantiating a
+		// component of its own does not have to link a UI to do it.
+		void DrawDefaultGui();
+
 		const char* m_type_name;
 	};
 
@@ -55,17 +67,7 @@ namespace Loom
 
 		void Gui() override
 		{
-			ImGui::PushID(this);
-
-			if (ImGui::TreeNode(
-				(void*)this,
-				typeid(T).name()))
-			{
-				OnGui();
-				ImGui::TreePop();
-			};
-
-			ImGui::PopID();
+			DrawDefaultGui();
 		};
 	};
 };

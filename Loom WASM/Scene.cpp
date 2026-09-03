@@ -23,6 +23,21 @@ namespace Loom
 			});
 	};
 	
+	void Scene::Update(int thread)
+	{
+		root.Update(thread);
+	};
+
+	void Scene::Render()
+	{
+		root.Render();
+	};
+
+	void Scene::Physics()
+	{
+		root.Physics();
+	};
+
 	Scene::~Scene()
 	{
 		Engine::QueueTask(
