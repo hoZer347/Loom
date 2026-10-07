@@ -148,9 +148,11 @@ namespace
 			<< "  --import <file> [x y]          import a model, as if dropped on the window\n"
 			<< "  --preview <file>               select a model file, showing it in the Inspector\n"
 			<< "  --select <name>                select the first GameObject called that\n"
-			<< "  --open-scene-dialog            start with File > Open Scene... open\n"
+			<< "  --open-project-dialog          start with File > Open Project... open\n"
 			<< "  --settings                     start with the Settings window open\n"
 			<< "  --open-demo <name>             open a project from the engine's Demos folder\n"
+			<< "  --open-scene <file>            open a scene beside those already open, even\n"
+			<< "                                 one of them again\n"
 			<< "  --undo, --redo                 step the history once the imports have landed\n"
 			<< "  --vulkan, --opengl             run on that graphics API this time\n"
 			<< "  --screenshot <file> [frames]   write the editor to a bitmap and exit,\n"
@@ -291,7 +293,7 @@ int main(int argc, char** argv)
 	bool compile = false;
 	bool play = false;
 	bool play_web = false;
-	bool open_scene_dialog = false;
+	bool open_project_dialog = false;
 	bool settings = false;
 	std::string screenshot;
 	std::string preview;
@@ -415,10 +417,20 @@ int main(int argc, char** argv)
 			play = true;
 		else if (argument == "--play-web")
 			play_web = true;
-		else if (argument == "--open-scene-dialog")
-			open_scene_dialog = true;
+		else if (argument == "--open-project-dialog")
+			open_project_dialog = true;
 		else if (argument == "--settings")
 			settings = true;
+		else if (argument == "--open-scene")
+		{
+			if (i + 1 >= argc)
+			{
+				std::cerr << "--open-scene needs a scene file" << std::endl;
+				return 1;
+			};
+
+			editor.OpenScene(argv[++i]);
+		}
 		else if (argument == "--open-demo")
 		{
 			if (i + 1 >= argc)
@@ -454,8 +466,8 @@ int main(int argc, char** argv)
 	if (play_web)
 		editor.PlayWeb();
 
-	if (open_scene_dialog)
-		editor.ShowOpenSceneDialog();
+	if (open_project_dialog)
+		editor.ShowOpenProjectDialog();
 
 	if (settings)
 		editor.ShowSettings();

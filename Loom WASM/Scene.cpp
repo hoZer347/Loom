@@ -31,7 +31,7 @@ namespace Loom
 		root.Update(thread);
 	};
 
-	void Scene::Render()
+	void Scene::Render(Camera* camera)
 	{
 		// The shadow map has to be finished before the first mesh samples it.
 		Light* light = root.FindComponent<Light>();
@@ -40,7 +40,7 @@ namespace Loom
 			light->RenderShadowMap(root);
 
 		Light::current = light;
-		Camera::current = root.FindComponent<Camera>();
+		Camera::current = camera ? camera : root.FindComponent<Camera>();
 
 		root.Render();
 

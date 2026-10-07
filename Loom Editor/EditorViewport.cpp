@@ -35,16 +35,16 @@ namespace Loom
 		m_texture = Renderer::Get()->CreateColorTarget(m_width, m_height);
 	};
 
-	void EditorViewport::Render(int width, int height)
+	void EditorViewport::Render(int width, int height, const std::vector<Scene*>& scenes, Camera* camera)
 	{
 		Render(
 			width,
 			height,
 			Engine::clearColor,
-			[]()
+			[&]()
 			{
-				for (Scene* scene : Scene::GetScenes())
-					scene->Render();
+				for (Scene* scene : scenes)
+					scene->Render(camera);
 			});
 	};
 

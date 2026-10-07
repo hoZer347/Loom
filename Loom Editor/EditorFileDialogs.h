@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ProjectTemplate.h"
 #include "SceneSerializer.h"
 
 #include "imgui.h"
@@ -17,7 +18,7 @@ namespace Loom
 	// One browser per job, so each remembers where it was last pointed.
 	struct EditorFileDialogs final
 	{
-		ImGui::FileBrowser openScene{ ImGuiFileBrowserFlags_CloseOnEsc };
+		ImGui::FileBrowser openProject{ ImGuiFileBrowserFlags_CloseOnEsc };
 
 		ImGui::FileBrowser saveScene{
 			ImGuiFileBrowserFlags_EnterNewFilename |
@@ -36,8 +37,8 @@ namespace Loom
 
 		EditorFileDialogs()
 		{
-			openScene.SetTitle("Open Scene");
-			openScene.SetTypeFilters({ SceneSerializer::extension });
+			openProject.SetTitle("Open Project");
+			openProject.SetTypeFilters({ ProjectTemplate::extension });
 
 			saveScene.SetTitle("Save Scene As");
 			saveScene.SetTypeFilters({ SceneSerializer::extension });

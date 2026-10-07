@@ -2,10 +2,14 @@
 
 #include <cstdint>
 #include <functional>
+#include <vector>
 
 
 namespace Loom
 {
+	struct Camera;
+	struct Scene;
+
 	/**
 	* Loom::EditorViewport
 	* - An off-screen colour + depth target the open scenes are rendered into
@@ -20,12 +24,12 @@ namespace Loom
 		EditorViewport(const EditorViewport&) = delete;
 		EditorViewport& operator=(const EditorViewport&) = delete;
 
-		// Renders every open scene, in the order the runtime draws them, at the
-		// requested size, reallocating the target if the size changed. Safe to
-		// call while an ImGui frame is being built: the target is pushed and
-		// popped around the scenes, and ImGui only records the texture id until
-		// it draws.
-		void Render(int width, int height);
+		// Renders the scenes in the order given at the requested size,
+		// reallocating the target if the size changed, through camera when one
+		// is given and each scene's own otherwise. Safe to call while an ImGui
+		// frame is being built: the target is pushed and popped around the
+		// scenes, and ImGui only records the texture id until it draws.
+		void Render(int width, int height, const std::vector<Scene*>& scenes, Camera* camera = nullptr);
 
 		// The same, for anything that draws itself: draw runs with the target
 		// bound and cleared to clear_colour (RGBA).

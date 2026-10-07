@@ -425,7 +425,9 @@ namespace Loom
 		if (!m_scripts.HasProject())
 		{
 			ImGui::TextDisabled("No scripts project.");
-			ImGui::TextDisabled("File > New Project makes one.");
+			ImGui::TextDisabled(m_projectFile.empty()
+				? "File > New Project makes one."
+				: "Opening its .loomproject with File > Open Project makes one.");
 
 			return;
 		};

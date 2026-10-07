@@ -84,7 +84,7 @@ namespace Loom
 	{
 		const glm::mat4 world = m_gameObject
 			? m_gameObject->WorldMatrix()
-			: glm::mat4(1.0f);
+			: m_pose;
 
 		Aim aim;
 		aim.eye = glm::vec3(world[3]);

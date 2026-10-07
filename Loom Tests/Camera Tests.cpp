@@ -56,6 +56,49 @@ TEST_SUITE("Camera")
 		CHECK(Loom::Camera::current == nullptr);
 	};
 
+	// A component that notes which camera was current when it was drawn.
+	struct CameraWitness final : Loom::Component<CameraWitness>
+	{
+		void OnRender() override { seen = Loom::Camera::current; };
+
+		Loom::Camera* seen = nullptr;
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a camera handed to Render stands in for the scene's own")
+	{
+		Loom::Scene scene("camera from outside");
+		Pump();
+
+		Loom::Camera* own = scene.Attach<Loom::Camera>();
+		CameraWitness* witness = scene.Attach<CameraWitness>();
+		Pump();
+
+		scene.Render();
+		CHECK(witness->seen == own);
+
+		Loom::Camera outside;
+		Pump();
+
+		scene.Render(&outside);
+
+		CHECK(witness->seen == &outside);
+		CHECK(Loom::Camera::current == nullptr);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a camera on no GameObject sees from the pose it was given")
+	{
+		Loom::Camera camera;
+		Pump();
+
+		camera.SetPose(glm::translate(glm::mat4(1.0f), glm::vec3(10.0f, 0.0f, 5.0f)));
+
+		const glm::vec4 ahead = camera.ViewProjection(SQUARE) * glm::vec4(10.0f, 0.0f, 0.0f, 1.0f);
+
+		CHECK(std::abs(ahead.x / ahead.w) < EPSILON);
+		CHECK(std::abs(ahead.y / ahead.w) < EPSILON);
+		CHECK(ahead.w > 0.0f);
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a camera looks down its transform's -Z, nearer things in front")
 	{
 		Loom::Scene scene("transform camera");

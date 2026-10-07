@@ -23,6 +23,8 @@ namespace Loom
 		// Where the scripts build to, intermediates and all.
 		static constexpr const char* build_folder = "Build";
 
+		static constexpr const char* scripts_folder = "Scripts";
+
 		// Creates the project under folder/name. Returns the path of the
 		// .loomproject file, or an empty string with the reason in error.
 		static std::string Create(
@@ -30,13 +32,19 @@ namespace Loom
 			const std::string& name,
 			std::string* error = nullptr);
 
+		// Gives a project file a scripts project when it names none that is
+		// there: the first one under the project's folder, or failing that a
+		// new one from the template, and writes it into the file. Returns the
+		// .vcxproj, or an empty string with the reason in error.
+		static std::string EnsureScripts(const std::string& project_file, std::string* error = nullptr);
+
 		// Where the engine lives, worked out from the running executable
 		// (<engine>/x64/<configuration>/Loom Editor.exe).
 		static std::string EngineRoot();
 
-		// Creates a scripts project in the project in folder, named after it,
-		// and points its .loomproject at it, writing one if there is none.
-		// Returns the .vcxproj, or an empty string with the reason in error.
+		// EnsureScripts for the project in folder, writing it a .loomproject
+		// named after name first if it has none. Returns the .vcxproj, or an
+		// empty string with the reason in error.
 		static std::string AddScripts(
 			const std::string& folder,
 			const std::string& name,

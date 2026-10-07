@@ -1,5 +1,6 @@
 #pragma once
 
+#include "EditorCamera.h"
 #include "EditorViewport.h"
 #include "Guid.h"
 #include "EditorSettings.h"
@@ -54,8 +55,11 @@ namespace Loom
 	* Loom::Editor
 	* - A Unity-style shell around the Loom runtime
 	* - Owns one dock space holding the scene hierarchy, an inspector, a console
-	*   and, in the centre, whichever scene is selected, rendered into an
-	*   off-screen target so it sits inside the layout like any other panel
+	*   and, in the centre, three views rendered into off-screen targets so they
+	*   sit inside the layout like any other panel: the active scene on its own
+	*   in a window named after it, where editing it edits every copy of it
+	*   that is open, the way a prefab works; the game as its own cameras see
+	*   it; and everything loaded, from a camera the editor flies
 	* - Works out of a project folder: everything under it is listed in the
 	*   Project panel, which also creates new assets, and the scripts are a C++
 	*   project that builds into a library the editor loads
@@ -73,8 +77,8 @@ namespace Loom
 		Editor& operator=(const Editor&) = delete;
 
 		// Scenes created or loaded here are owned by the editor and can be
-		// closed from the File menu; scenes created anywhere else still show up
-		// in the hierarchy, they just cannot be closed from it.
+		// closed from the Hierarchy; scenes created anywhere else still show up
+		// in it, they just cannot be closed from it.
 		Scene* CreateScene(const std::string& name = "New Scene");
 		Scene* OpenScene(const std::string& path);
 		bool SaveScene(Scene* scene, const std::string& path);
@@ -83,8 +87,9 @@ namespace Loom
 		// The folder the editor works out of. Everything under it is listed in
 		// the Project panel; the choice is remembered between runs, so
 		// the folder prompt only shows up when there is nothing to remember.
-		// A .loomproject file opens the folder it is in, and a .loomscene file
-		// opens its project on that scene.
+		// A .loomproject file opens the folder it is in, after giving it a
+		// scripts project if it has none, and a .loomscene file opens its
+		// project on that scene.
 		bool OpenProject(const std::string& path, bool open_scene = true);
 
 		// Opens one of the projects in <engine>/Demos, by its folder name.
@@ -121,15 +126,15 @@ namespace Loom
 		void RequestScreenshot(const std::string& path, int after_frames, bool exit_after);
 
 		// Imports a model file once the next frame has drawn the panels, into
-		// whatever the mouse is over: a Hierarchy node, the Scene view, or
+		// whatever the mouse is over: a Hierarchy node, one of the views, or
 		// failing those the selection.
 		void QueueImport(const std::string& path);
 
 		// The same, with the mouse moved to x, y first, in ImGui's coordinates.
 		void Drop(const std::string& path, float x, float y);
 
-		// File > Open Scene..., starting beside the scene it last opened.
-		void ShowOpenSceneDialog();
+		// File > Open Project..., starting beside the project that is open.
+		void ShowOpenProjectDialog();
 
 		// Window > Settings.
 		void ShowSettings() { m_showSettings = true; };
@@ -214,6 +219,13 @@ namespace Loom
 		void DrawFields(LoomObject& object, const std::vector<std::string>& labels, float column);
 		void DrawModelPreview();
 		void DrawScene();
+		void DrawGame();
+		void DrawDebug();
+
+		// Fills the rest of the panel with the scenes, seen through camera, or
+		// through each scene's own when there is none. Only a view with a
+		// camera takes the mouse and keyboard, to fly it.
+		void DrawView(EditorViewport& view, const std::vector<Scene*>& scenes, EditorCamera* camera);
 		void DrawSceneData();
 		void DrawConsole();
 		void DrawStats();
@@ -228,6 +240,11 @@ namespace Loom
 
 		void RecordHistory();
 		bool CanStepHistory() const;
+
+		// Copies of one scene, opened twice and so sharing its guid, are one
+		// scene edited in several places: whichever has changed since the last
+		// call is written over the others.
+		void SyncSceneCopies();
 
 		// Swaps an owned scene for one built from text, in the same place: its
 		// file, whether it is active, and its slot among the owned scenes.
@@ -339,7 +356,13 @@ namespace Loom
 		// Where the given scene would be written if it were saved right now.
 		std::string DefaultPathFor(Scene* scene) const;
 
-		EditorViewport m_viewport;
+		EditorViewport m_sceneView;
+		EditorViewport m_gameView;
+		EditorViewport m_debugView;
+
+		EditorCamera m_sceneCamera;
+		EditorCamera m_debugCamera;
+
 		ScriptLibrary m_scripts;
 		WebPlayer m_webPlayer;
 
@@ -383,9 +406,6 @@ namespace Loom
 		// and then whichever one this session last made active.
 		std::string m_startupScene{ };
 
-		// What the Open Scene dialog last picked, so it reopens beside it.
-		std::string m_lastOpenedScene{ };
-
 		// The graphics API, font and look, edited in the Settings window.
 		EditorSettings m_settings;
 
@@ -404,6 +424,9 @@ namespace Loom
 
 		SceneHistory m_history{ };
 
+		// Each scene open more than once, as its copies last agreed it was.
+		std::unordered_map<Guid, std::string> m_copyTexts{ };
+
 		// Set when a click lands, a widget is let go of or a scene arrives; the
 		// scenes are compared on the first frame after that with nothing held down.
 		bool m_historyDirty = true;
@@ -413,6 +436,8 @@ namespace Loom
 		bool m_hierarchyFocused = false;
 		bool m_showInspector = true;
 		bool m_showScene = true;
+		bool m_showGame = true;
+		bool m_showDebug = true;
 		bool m_showSceneData = true;
 		bool m_showConsole = true;
 		bool m_showStats = true;
