@@ -53,6 +53,13 @@ namespace Loom
 		has_method<T, void>::value &&
 		!std::is_same_v<decltype(&T::OnUpdate), decltype(&ComponentBase::OnUpdate)>> { };
 
+	// Detect override of OnEditor
+	template <typename T>
+	struct overrides_on_editor
+		: std::integral_constant<bool,
+		has_method<T, void>::value &&
+		!std::is_same_v<decltype(&T::OnEditor), decltype(&ComponentBase::OnEditor)>> { };
+
 	// TODO: Turn the above templates into a macro
 
 	struct LOOM_API GameObject final :
@@ -85,6 +92,9 @@ namespace Loom
 
 					if constexpr (overrides_on_render<T>::value)
 						m_renderables.emplace_back(component);
+
+					if constexpr (overrides_on_editor<T>::value)
+						m_editables.emplace_back(component);
 
 					if constexpr (overrides_on_attach<T>::value)
 						component->OnAttach();
@@ -182,6 +192,7 @@ namespace Loom
 		std::vector<ComponentBase*> m_updateables{ };
 		std::vector<ComponentBase*> m_renderables{ };
 		std::vector<ComponentBase*> m_physicsables{ };
+		std::vector<ComponentBase*> m_editables{ };
 
 	private:
 		GameObject* parent;
@@ -191,6 +202,7 @@ namespace Loom
 		void Update(const int& thread);
 		void Render();
 		void Physics();
+		void EditorUpdate();
 		void Gui();
 	};
 };
