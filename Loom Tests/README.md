@@ -76,7 +76,7 @@ needs Chrome or Edge installed.
 | `Browser` | Run by `run-browser-tests.ps1` only: real mouse moves, buttons and the spacebar reaching `Input`, GLFW and `DialogueInput`; the page being cross-origin isolated |
 | `SceneHistory` | The editor's undo and redo: exact text both ways, redo cleared by a new edit, unrecorded edits, several scenes, closed scenes, the step cap, guids and references coming back, scene order |
 | `EditCommands` | The editor's Ctrl+Z/Y/X/C/V and Delete read from real ImGui key events, a text box keeping them, held keys not repeating, which object can be taken and where a paste lands, cut/copy/paste through undo |
-| `ProjectAssets` | Create > Script writing one self-registering header in the project's namespace, refusing a taken or non-C++ name |
+| `ProjectAssets` | Create > Script writing one self-registering header in the project's namespace, refusing a taken, registered or non-C++ name |
 | `AxisGui` | One axis-coloured stripe over each of the first three drag boxes, nothing else added beside ImGui's own `DragScalarN`, nothing drawn in a collapsed window |
 
 ## How it is wired up

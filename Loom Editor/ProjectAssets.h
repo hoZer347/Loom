@@ -38,8 +38,8 @@ namespace Loom
 		static bool IsValidName(const std::string& name);
 
 		// Why name cannot be a new script in the given project, or an empty
-		// string when it can: it has to be a C++ type name that no script is
-		// already using.
+		// string when it can: it has to be a C++ type name that no script or
+		// registered component is already using.
 		static std::string ScriptNameProblem(const std::string& scripts_project, const std::string& name);
 
 		static std::string Replace(std::string text, const std::string& token, const std::string& value);
