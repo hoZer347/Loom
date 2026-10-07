@@ -28,15 +28,33 @@ namespace Loom
 	// the file browser (and <filesystem>) into everything that includes it.
 	struct EditorFileDialogs;
 
+	// A file or folder under the project, as the Project panel lists it.
+	struct AssetNode
+	{
+		std::string path;
+		std::string name;
+		bool folder = false;
+		std::vector<AssetNode> children{ };
+	};
+
+	enum class AssetKind
+	{
+		Folder,
+		Scene,
+		Script,
+		Shader,
+		Texture,
+	};
+
 	/**
 	* Loom::Editor
 	* - A Unity-style shell around the Loom runtime
 	* - Owns one dock space holding the scene hierarchy, an inspector, a console
 	*   and, in the centre, whichever scene is selected, rendered into an
 	*   off-screen target so it sits inside the layout like any other panel
-	* - Works out of a project folder: the scenes under it are listed in the
-	*   Project panel, and the scripts beside them are a C++ project that builds
-	*   into a library the editor loads
+	* - Works out of a project folder: everything under it is listed in the
+	*   Project panel, which also creates new assets, and the scripts are a C++
+	*   project that builds into a library the editor loads
 	* - Reads and writes scenes through SceneSerializer, and shows the text form
 	*   of the open scene live in its Scene Data panel
 	* - Takes over Engine's GUI hook on construction and hands it back on
@@ -58,8 +76,8 @@ namespace Loom
 		bool SaveScene(Scene* scene, const std::string& path);
 		void CloseScene(Scene* scene);
 
-		// The folder the editor works out of. Every scene file under it is
-		// listed in the Project panel; the choice is remembered between runs, so
+		// The folder the editor works out of. Everything under it is listed in
+		// the Project panel; the choice is remembered between runs, so
 		// the folder prompt only shows up when there is nothing to remember.
 		// A .loomproject file opens the folder it is in, and a .loomscene file
 		// opens its project on that scene.
@@ -141,12 +159,19 @@ namespace Loom
 		void Paste();
 
 		void DeleteSelected();
+		// Selects the GameObject with this name once its scene has loaded, so a
+		// screenshot can show it in the inspector.
+		void RequestSelection(const std::string& name);
 
 	private:
 		void DrawGui();
 
 		void DrawMainMenuBar();
 		void DrawProject();
+		void DrawAssetNode(const AssetNode& node, int depth);
+		void DrawAssetContextMenu(const AssetNode& node);
+		void DrawCreateMenu(const std::string& folder);
+		void DrawCreateAssetPrompt();
 		void DrawScriptsSection();
 		void DrawHierarchy();
 		void DrawSceneNode(Scene* scene);
@@ -156,13 +181,21 @@ namespace Loom
 		// nodes above it, to be drawn open.
 		void ExpandGrownNodes(const std::vector<Scene*>& scenes);
 
-		// Lets the tree node just drawn be dragged, and takes a GameObject
-		// dropped on it: on its top or bottom edge to sit before or after it,
-		// anywhere else to become its last child. Only within one scene, since
-		// undo keeps one scene per step.
+		// Takes a GameObject dropped on the tree node just drawn: on its top or
+		// bottom edge to sit before or after it, anywhere else to become its last
+		// child. Only within one scene, since undo keeps one scene per step.
 		void DragAndDropNode(GameObject* gameObject, bool open);
 
+		void DrawRenameField(GameObject* gameObject);
+
+		// For the hierarchy node just drawn: whether it was clicked, judged on
+		// release so dragging a node into an inspector field leaves the inspector
+		// on the object that holds the field. A press on the arrow only opens it.
+		bool NodeReleased();
+
 		void DrawInspector();
+		void DrawTransform(GameObject* gameObject, float column);
+		void DrawThread(GameObject* gameObject, float column);
 		void DrawComponent(GameObject* gameObject, ComponentBase* component);
 		void DrawFields(LoomObject& object, float column);
 		void DrawModelPreview();
@@ -200,13 +233,29 @@ namespace Loom
 
 		void BuildDefaultLayout(unsigned int dockspace_id);
 
-		// Records the item just drawn as where a queued import goes, if the
-		// mouse is over it.
-		void TakeImportTarget(GameObject* gameObject);
-		void ImportQueued();
+		// Rescans the project folder: the asset tree the Project panel draws,
+		// and the scenes in it.
+		void RefreshProjectAssets();
 
-		// Lists the scene and model files under the project folder.
-		void RefreshProjectFiles();
+		// Scenes open in the editor; anything else goes to whatever Windows
+		// opens that kind of file with.
+		void OpenAsset(const std::string& path);
+
+		// Where the Create prompt's asset would be written: the file for most,
+		// the source for a script, which goes under the scripts project even
+		// when asked for somewhere else.
+		std::string NewAssetPath() const;
+		std::string NewAssetFolder() const;
+
+		// Why the Create prompt's name cannot be used, or an empty string.
+		std::string NewAssetProblem() const;
+		void CreateAsset();
+
+		// Points a change notification at the project folder, so the tree is
+		// rescanned when something under it is added, removed or renamed
+		// rather than on a timer.
+		void WatchProject();
+		bool ProjectChanged();
 
 		// Reads <folder>/*.loomproject, if there is one, and hooks up the script
 		// library it names.
@@ -256,6 +305,9 @@ namespace Loom
 
 		Scene* m_activeScene = nullptr;
 		GameObject* m_selected = nullptr;
+		bool m_nodePressOpened = false;
+		std::string m_pendingSelection{ };
+		int m_selectionFramesLeft = 0;
 		std::vector<Scene*> m_ownedScenes{ };
 
 		// Where each open scene came from, so a scene can be put back after the
@@ -266,12 +318,21 @@ namespace Loom
 		std::string m_projectFile{ };
 		std::string m_projectName{ };
 		std::vector<std::string> m_projectScenes{ };
-		std::vector<std::string> m_projectModels{ };
 
 		// A model file picked in the Project panel, previewed in the Inspector
 		// in place of a GameObject.
 		std::string m_selectedModel{ };
 		ModelPreview m_modelPreview;
+
+		// The project as it stood at the last scan.
+		AssetNode m_assets{ };
+		void* m_assetWatch = nullptr;
+		std::string m_assetWatchPath{ };
+		std::string m_selectedAsset{ };
+		bool m_revealSelectedAsset = false;
+
+		// How tall the scripts section under the tree came out last frame.
+		float m_scriptsSectionHeight = 0.0f;
 
 		// The scene a session opens with: what the settings file said last time,
 		// and then whichever one this session last made active.
@@ -330,6 +391,13 @@ namespace Loom
 		char m_newProjectFolder[512]{ };
 		char m_newProjectName[128]{ "MyGame" };
 
+		bool m_askForAsset = false;
+		bool m_focusAssetName = false;
+		AssetKind m_newAssetKind = AssetKind::Folder;
+		std::string m_newAssetFolder{ };
+		char m_newAssetName[128]{ };
+		std::string m_newAssetProblem{ };
+
 		bool m_consoleAutoScroll = true;
 		char m_consoleFilter[128]{ };
 
@@ -360,6 +428,10 @@ namespace Loom
 		// undo rebuilds a scene into new objects that keep their GUIDs.
 		std::unordered_map<Guid, size_t> m_childCounts{ };
 		std::unordered_set<Guid> m_expand{ };
+		// Double-clicking the selection in the hierarchy edits its name in place,
+		// in the same buffer as the inspector's name box.
+		bool m_renaming = false;
+		bool m_focusRename = false;
 
 		std::string m_screenshotPath{ };
 		int m_screenshotFrame = 0;

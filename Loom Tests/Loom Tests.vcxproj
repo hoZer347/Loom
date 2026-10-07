@@ -38,7 +38,6 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Property Files\doctest.props" />
     <Import Project="..\Property Files\stb.props" />
-    <Import Project="..\Property Files\Loom Math.props" />
     <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenGL.props" />
     <Import Project="..\Property Files\Vulkan.props" />
@@ -48,7 +47,6 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Property Files\doctest.props" />
     <Import Project="..\Property Files\stb.props" />
-    <Import Project="..\Property Files\Loom Math.props" />
     <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenGL.props" />
     <Import Project="..\Property Files\Vulkan.props" />
@@ -93,7 +91,6 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Platform Tests.cpp" />
-    <ClCompile Include="Math Tests.cpp" />
     <ClCompile Include="Macro Helpers Tests.cpp" />
     <ClCompile Include="Engine Tests.cpp" />
     <ClCompile Include="LoomObject Tests.cpp" />
@@ -119,6 +116,7 @@
     <ClCompile Include="Input Tests.cpp" />
     <ClCompile Include="Threading Tests.cpp" />
     <ClCompile Include="AxisGui Tests.cpp" />
+    <ClCompile Include="SpeedManager Tests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Test Support.h" />

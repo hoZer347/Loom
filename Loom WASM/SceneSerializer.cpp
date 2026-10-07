@@ -205,6 +205,10 @@ namespace Loom
 
 			std::string error{ };
 
+			// References are written as guids, and the object a guid names may
+			// not have been built yet when the line mentioning it is read.
+			SceneSerializer::PendingReferences pending{ };
+
 			bool Read(int depth, const std::string& content)
 			{
 				const auto fail =
@@ -347,30 +351,6 @@ namespace Loom
 				return true;
 			};
 
-			void ResolveReferences()
-			{
-				for (const auto& [field, guid] : pending)
-				{
-					LoomObject* target = LoomObject::GetByGuid(guid);
-
-					if (target == nullptr)
-					{
-						std::cerr
-							<< "Scene load: a reference points at " << guid.ToString()
-							<< ", which is not in the file" << std::endl;
-
-						continue;
-					};
-
-					field->SetReference(target);
-
-					if (field->GetReference() == nullptr)
-						std::cerr
-							<< "Scene load: a reference cannot point at " << guid.ToString()
-							<< ", which is not the type it holds" << std::endl;
-				};
-			};
-
 		private:
 			Guid Identity(const Guid& guid) const
 			{
@@ -381,9 +361,6 @@ namespace Loom
 					: found->second;
 			};
 
-			// References are written as guids, and the object a guid names may
-			// not have been built yet when the line mentioning it is read.
-			std::vector<std::pair<const SerializedField*, Guid>> pending{ };
 		};
 	};
 
@@ -450,7 +427,10 @@ namespace Loom
 		return Deserialize(buffer.str(), error);
 	};
 
-	Scene* SceneSerializer::Deserialize(const std::string& text, std::string* error)
+	Scene* SceneSerializer::Deserialize(
+		const std::string& text,
+		std::string* error,
+		PendingReferences* pending_out)
 	{
 		Scene* scene = nullptr;
 		bool root_claimed = false;
@@ -526,9 +506,35 @@ namespace Loom
 			return nullptr;
 		};
 
-		reader.ResolveReferences();
+		if (pending_out)
+			pending_out->insert(pending_out->end(), reader.pending.begin(), reader.pending.end());
+		else ResolveReferences(reader.pending);
 
 		return scene;
+	};
+
+	void SceneSerializer::ResolveReferences(const PendingReferences& pending)
+	{
+		for (const auto& [field, guid] : pending)
+		{
+			LoomObject* target = LoomObject::GetByGuid(guid);
+
+			if (target == nullptr)
+			{
+				std::cerr
+					<< "Scene load: a reference points at " << guid.ToString()
+					<< ", which is not loaded" << std::endl;
+
+				continue;
+			};
+
+			field->SetReference(target);
+
+			if (field->GetReference() == nullptr)
+				std::cerr
+					<< "Scene load: a reference cannot point at " << guid.ToString()
+					<< ", which is not the type it holds" << std::endl;
+		};
 	};
 
 	GameObject* SceneSerializer::Deserialize(const std::string& text, GameObject& parent, std::string* error)
@@ -579,7 +585,7 @@ namespace Loom
 
 		if (read && !built.empty())
 		{
-			reader.ResolveReferences();
+			SceneSerializer::ResolveReferences(reader.pending);
 			return built.front();
 		};
 

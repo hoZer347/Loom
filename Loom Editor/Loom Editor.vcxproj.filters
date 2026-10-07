@@ -19,6 +19,12 @@
     <ClCompile Include="ProjectTemplate.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
+    <ClCompile Include="ProjectAssets.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorProject.cpp">
+      <Filter>Panels</Filter>
+    </ClCompile>
     <ClCompile Include="ScriptLibrary.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
@@ -64,6 +70,9 @@
       <Filter>Scripts</Filter>
     </ClInclude>
     <ClInclude Include="ProjectTemplate.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="ProjectAssets.h">
       <Filter>Scripts</Filter>
     </ClInclude>
     <ClInclude Include="EditorFileDialogs.h">

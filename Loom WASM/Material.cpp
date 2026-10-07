@@ -66,6 +66,6 @@ namespace Loom
 	void Material::Apply(uint32_t program) const
 	{
 		if (Renderer* renderer = Renderer::Get())
-			renderer->SetUniform(program, "u_color", ToGlm(color));
+			renderer->SetUniform(program, "u_color", *color);
 	};
 };

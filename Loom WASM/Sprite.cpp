@@ -192,11 +192,6 @@ void main()
 			static const uint32_t program = Compile("Loom Sprite Depth", SPRITE_DEPTH_SHADER);
 			return program;
 		};
-
-		glm::vec4 ToGlm(const Math::vec4<float>& v)
-		{
-			return glm::vec4(v.data[0], v.data[1], v.data[2], v.data[3]);
-		};
 	};
 
 	Texture* Sprite::GetTexture()
@@ -216,10 +211,10 @@ void main()
 		const glm::vec2 pixels = texture ? glm::vec2(texture->width, texture->height) : glm::vec2(0.0f);
 		const glm::vec2 size = pixels / std::max((float)pixelsPerUnit, MIN_PIXELS_PER_UNIT);
 
-		const Math::vec2<float>& origin = pivot;
+		const glm::vec2& origin = pivot;
 
 		glm::mat4 quad = glm::scale(glm::mat4(1.0f), glm::vec3(size, 1.0f));
-		quad = glm::translate(quad, glm::vec3(-origin.data[0], -origin.data[1], 0.0f));
+		quad = glm::translate(quad, glm::vec3(-origin, 0.0f));
 
 		return m_gameObject->WorldMatrix() * quad;
 	};
@@ -263,7 +258,7 @@ void main()
 			return;
 
 		renderer->SetTexture(program, "u_texture", texture->handle);
-		renderer->SetUniform(program, "u_color", ToGlm(color));
+		renderer->SetUniform(program, "u_color", *color);
 		renderer->SetUniform(program, "u_alphaCutoff", (float)alphaCutoff);
 		renderer->SetUniform(program, "u_model", QuadMatrix());
 

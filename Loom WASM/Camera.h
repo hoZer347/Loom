@@ -42,7 +42,7 @@ namespace Loom
 
 		LOOM_SERIAL(bool, lookAtTarget);
 		// World space.
-		LOOM_SERIAL(Math::vec3<float>, target);
+		LOOM_SERIAL(glm::vec3, target);
 
 		// Vertical, in degrees.
 		LOOM_SERIAL(float, fieldOfView, 45.0f);

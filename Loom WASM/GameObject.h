@@ -5,6 +5,7 @@
 #include "Engine.h"
 #include "Component.h"
 #include "LoomObject.h"
+#include "Transform.h"
 
 #include "glm/glm.hpp"
 
@@ -132,7 +133,11 @@ namespace Loom
 
 		void RemoveChild(GameObject* gameObject);
 
+		int GetThreadID() const { return m_threadID; };
 		void SetThreadID(int thread_id);
+
+		bool InheritsThreadID() const { return m_inherit_thread_id; };
+		void SetInheritThreadID(bool inherit);
 
 		void Destroy();
 
@@ -167,13 +172,12 @@ namespace Loom
 		LOOM_SERIAL(bool, m_inherit_thread_id);
 
 	public:
-		// Declared after the fields above so scenes saved before them keep
-		// their indices. Rotation is Euler degrees, applied Z, then X, then Y.
-		LOOM_SERIAL(Math::vec3<float>, position);
-		LOOM_SERIAL(Math::vec3<float>, rotation);
-		LOOM_SERIAL(Math::vec3<float>, scale, Math::vec3<float>(1.0f, 1.0f, 1.0f));
+		// After the thread fields, since a field is its position in the scene
+		// file and scenes saved before it existed number those first.
+		Transform transform;
 
 	protected:
+
 		std::vector<GameObject*>	m_children{ };
 		std::vector<ComponentBase*> m_components{ };
 		std::vector<ComponentBase*> m_updateables{ };

@@ -4,8 +4,6 @@
 
 #include "OpenGL.h"
 
-#include "Globals.h"
-
 #include <array>
 #include <iostream>
 

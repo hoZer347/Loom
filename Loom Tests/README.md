@@ -57,13 +57,12 @@ needs Chrome or Edge installed.
 | Suite | Covers |
 | --- | --- |
 | `Platform` | What the two builds are allowed to differ on: pointer width, ID width, endianness, threading, how shaders load |
-| `Loom Math` | `vec2`/`vec3`/`vec4`/`mat4` size and alignment, the global `transform` |
 | `Macro Helpers` | `HAS_FUNCTION_*`, `HAS_VARIABLE_*`, `Str`, `VARIABLE_NAME` |
 | `Engine` | Unique IDs (including across threads), the task queue and `DoTasks`, frame-loop defaults |
 | `Threading` | Threads running at the same time, work queued from other threads running in order on the draining thread, objects built on other threads keeping their own fields |
 | `LoomObject` | ID allocation, naming, `NameAndID`, the `GetByID` registry, deregistration on destruction |
 | `Component` | Base callbacks as no-ops, virtual dispatch and destruction, type identity |
-| `GameObject` | Deferred `Attach`, `GetComponent` by type, selective update/render registration, children, `Destroy`, `DetachComponent`, local/world transform |
+| `GameObject` | Deferred `Attach`, `GetComponent` by type, selective update/render registration, children, `Destroy`, `DetachComponent`, thread inheritance, the transform's fields and matrix |
 | `Scene` | Registration in `GetScenes`, root delegation, `Update`/`Render`/`Physics` walking the hierarchy |
 | `Light` | Registration, `FindComponent` reaching it through the hierarchy, the shadow map's light-space transform |
 | `Camera` | Registration, aiming down the transform or at a target, depth order and aspect, a camera looking straight down, toggling the target without turning the view |
@@ -73,6 +72,7 @@ needs Chrome or Edge installed.
 | `Texture` | The type exists; it has no state yet |
 | `Collider` | Type-level only — see the note in the file |
 | `Input` | Button edges: down for one frame, held, up for one frame, a click inside one frame, buttons GLFW does not have; cursor and screen fields |
+| `SpeedManager` | `ClampMagnitude` and `MoveTowards`: clamping, no overshoot, zero-length input |
 | `Browser` | Run by `run-browser-tests.ps1` only: real mouse moves, buttons and the spacebar reaching `Input`, GLFW and `DialogueInput`; the page being cross-origin isolated |
 | `SceneHistory` | The editor's undo and redo: exact text both ways, redo cleared by a new edit, unrecorded edits, several scenes, closed scenes, the step cap, guids and references coming back, scene order |
 | `EditCommands` | The editor's Ctrl+Z/Y/X/C/V and Delete read from real ImGui key events, a text box keeping them, held keys not repeating, which object can be taken and where a paste lands, cut/copy/paste through undo |

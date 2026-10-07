@@ -43,9 +43,9 @@ namespace Loom
 
 		// Relative to the project folder, which is where the editor works from.
 		LOOM_SERIAL(std::string, texturePath);
-		LOOM_SERIAL(Math::vec4<float>, color, Math::vec4<float>{ { 1.0f, 1.0f, 1.0f, 1.0f } });
+		LOOM_SERIAL(glm::vec4, color, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
 		LOOM_SERIAL(float, pixelsPerUnit, 100.0f);
-		LOOM_SERIAL(Math::vec2<float>, pivot, Math::vec2<float>{ { 0.5f, 0.0f } });
+		LOOM_SERIAL(glm::vec2, pivot, glm::vec2(0.5f, 0.0f));
 		LOOM_SERIAL(float, alphaCutoff, 0.5f);
 		LOOM_SERIAL(bool, castShadows, true);
 

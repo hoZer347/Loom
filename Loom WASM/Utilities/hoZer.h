@@ -23,7 +23,7 @@
 ///
 ///	  Sprites              SpriteSheetScanner reads a raw RGBA buffer. SpriteManager is a
 ///	                       Component drawing the shared unit quad through Flipbook.shader
-///	                       and carrying its own position.
+///	                       and carrying its own position instead of its GameObject's transform.
 ///
 ///	  Timing               Duration, Gait and SpeedManager, measured against Clock.
 ///

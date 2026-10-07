@@ -40,6 +40,6 @@ namespace Loom
 
 	public:
 		// Declared after the path, which fixes its position in scene files.
-		LOOM_SERIAL(Math::vec3<float>, color, Math::vec3<float>(1.0f, 1.0f, 1.0f));
+		LOOM_SERIAL(glm::vec3, color, glm::vec3(1.0f, 1.0f, 1.0f));
 	};
 };

@@ -40,7 +40,6 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Property Files\Loom WASM.props" />
-    <Import Project="..\Property Files\Loom Math.props" />
     <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenGL.props" />
     <Import Project="..\Property Files\Vulkan.props" />
@@ -50,7 +49,6 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Property Files\Loom WASM.props" />
-    <Import Project="..\Property Files\Loom Math.props" />
     <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenGL.props" />
     <Import Project="..\Property Files\Vulkan.props" />
@@ -97,6 +95,8 @@
     <ClCompile Include="WebPlayer.cpp" />
     <ClCompile Include="ProjectTemplate.cpp" />
     <ClCompile Include="EditorScripts.cpp" />
+    <ClCompile Include="EditorProject.cpp" />
+    <ClCompile Include="ProjectAssets.cpp" />
     <ClCompile Include="EditorLog.cpp" />
     <ClCompile Include="EditorSettings.cpp" />
     <ClCompile Include="EditorSettingsWindow.cpp" />
@@ -113,6 +113,7 @@
     <ClInclude Include="ScriptLibrary.h" />
     <ClInclude Include="WebPlayer.h" />
     <ClInclude Include="ProjectTemplate.h" />
+    <ClInclude Include="ProjectAssets.h" />
     <ClInclude Include="EditorFileDialogs.h" />
     <ClInclude Include="EditorLog.h" />
     <ClInclude Include="EditorSettings.h" />

@@ -16,7 +16,6 @@
 
 #include <cctype>
 #include <cstdlib>
-#include <functional>
 #include <iostream>
 #include <string>
 
@@ -235,7 +234,7 @@ int main(int argc, char** argv)
 	bool settings = false;
 	std::string screenshot;
 	std::string preview;
-	std::string select;
+	std::string selection;
 	int frames = 240;
 
 	for (int i = 1; i < argc; i++)
@@ -311,7 +310,7 @@ int main(int argc, char** argv)
 				return 1;
 			};
 
-			select = argv[++i];
+			selection = argv[++i];
 		}
 		else if (argument == "--desktop")
 		{
@@ -377,34 +376,8 @@ int main(int argc, char** argv)
 	if (!preview.empty())
 		editor.SelectModel(preview);
 
-	// Queued, so it runs once the scene's GameObjects, which are queued
-	// themselves, are in place.
-	if (!select.empty())
-		Engine::QueueTask(
-			[&editor, select]()
-			{
-				const std::function<GameObject* (GameObject&)> find =
-					[&find, &select](GameObject& gameObject) -> GameObject*
-					{
-						if (gameObject.GetName() == select)
-							return &gameObject;
-
-						for (GameObject* child : gameObject.GetChildren())
-							if (GameObject* found = find(*child))
-								return found;
-
-						return nullptr;
-					};
-
-				for (Scene* scene : Scene::GetScenes())
-					if (GameObject* found = find(scene->GetRoot()))
-					{
-						editor.Select(found);
-						return;
-					};
-
-				std::cerr << "--select: no GameObject called " << select << std::endl;
-			});
+	if (!selection.empty())
+		editor.RequestSelection(selection);
 
 	if (!screenshot.empty())
 		editor.RequestScreenshot(screenshot, frames, true);

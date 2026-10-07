@@ -439,21 +439,69 @@ TEST_SUITE("GameObject")
 		CHECK(detachCount == 0);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "SetThreadID is callable on a live hierarchy")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "SetThreadID carries down to the children that inherit it")
 	{
-		// GameObject does not expose its thread ID, so this covers the call
-		// path. Note that m_inherit_thread_id, which decides whether children
-		// follow the parent, has no initialiser -- propagation is not
-		// deterministic yet and is deliberately not asserted on here.
+		constexpr int ROOT_THREAD = 2;
+		constexpr int OWN_THREAD = 3;
+
 		Loom::Scene scene("thread ids");
 		Pump();
 
-		scene.GetRoot().AddChild("Child");
+		Loom::GameObject* inheriting = scene.GetRoot().AddChild("Inheriting");
+		Loom::GameObject* independent = scene.GetRoot().AddChild("Independent");
 		Pump();
 
-		scene.GetRoot().SetThreadID(2);
+		inheriting->SetInheritThreadID(true);
+		independent->SetThreadID(OWN_THREAD);
 
-		CHECK(true);
+		scene.GetRoot().SetThreadID(ROOT_THREAD);
+
+		CHECK(inheriting->GetThreadID() == ROOT_THREAD);
+		CHECK(independent->GetThreadID() == OWN_THREAD);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "turning inheritance on takes the parent's thread at once")
+	{
+		constexpr int ROOT_THREAD = 2;
+		constexpr int OWN_THREAD = 3;
+
+		Loom::Scene scene("inherit");
+		Pump();
+
+		Loom::GameObject* child = scene.GetRoot().AddChild("Child");
+		Pump();
+
+		scene.GetRoot().SetThreadID(ROOT_THREAD);
+		child->SetThreadID(OWN_THREAD);
+
+		child->SetInheritThreadID(true);
+
+		CHECK(child->InheritsThreadID());
+		CHECK(child->GetThreadID() == ROOT_THREAD);
+	};
+
+	// Scenes saved before the transform existed number the thread fields 0 and
+	// 1, so the transform has to come after them.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the transform is serialized after the thread fields")
+	{
+		constexpr size_t THREAD_FIELDS = 2;
+		constexpr size_t TRANSFORM_FIELDS = 3;
+
+		Loom::Scene scene("transform fields");
+		Pump();
+
+		Loom::GameObject& root = scene.GetRoot();
+		const std::vector<Loom::SerializedField>& fields = root.GetFields();
+
+		REQUIRE(fields.size() == THREAD_FIELDS + TRANSFORM_FIELDS);
+
+		CHECK(fields[0].type == Loom::FieldType::Int);
+		CHECK(fields[1].type == Loom::FieldType::Bool);
+
+		for (size_t i = THREAD_FIELDS; i < fields.size(); i++)
+			CHECK(fields[i].type == Loom::FieldType::Vec3);
+
+		CHECK(fields[THREAD_FIELDS].data == &root.transform.position->x);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a GameObject is a LoomObject with its own ID and name")
@@ -487,9 +535,9 @@ TEST_SUITE("GameObject")
 		Loom::GameObject* object = scene.AddChild("Object");
 		Pump();
 
-		object->position = Loom::Math::vec3<float>(1.0f, 2.0f, 3.0f);
-		object->rotation = Loom::Math::vec3<float>(0.0f, 90.0f, 0.0f);
-		object->scale = Loom::Math::vec3<float>(2.0f, 2.0f, 2.0f);
+		object->transform.position = glm::vec3(1.0f, 2.0f, 3.0f);
+		object->transform.rotation = glm::vec3(0.0f, 90.0f, 0.0f);
+		object->transform.scale = glm::vec3(2.0f, 2.0f, 2.0f);
 
 		// +X, doubled, turned a quarter about Y to -Z, then moved.
 		const glm::vec4 moved = object->WorldMatrix() * glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
@@ -507,7 +555,7 @@ TEST_SUITE("GameObject")
 		Loom::GameObject* object = scene.AddChild("Object");
 		Pump();
 
-		object->rotation = Loom::Math::vec3<float>(90.0f, 90.0f, 0.0f);
+		object->transform.rotation = glm::vec3(90.0f, 90.0f, 0.0f);
 
 		// X turns +Z to -Y, which Y leaves alone. Y first would give +X.
 		const glm::vec4 turned = object->WorldMatrix() * glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
@@ -524,8 +572,8 @@ TEST_SUITE("GameObject")
 		Loom::GameObject* child = parent->AddChild("Child");
 		Pump();
 
-		parent->position = Loom::Math::vec3<float>(5.0f, 0.0f, 0.0f);
-		child->position = Loom::Math::vec3<float>(0.0f, 1.0f, 0.0f);
+		parent->transform.position = glm::vec3(5.0f, 0.0f, 0.0f);
+		child->transform.position = glm::vec3(0.0f, 1.0f, 0.0f);
 
 		const glm::vec4 origin = child->WorldMatrix() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 

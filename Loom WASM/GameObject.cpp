@@ -2,10 +2,7 @@
 
 #include "ComponentRegistry.h"
 #include "Engine.h"
-#include "RenderMath.h"
 #include "Scene.h"
-
-#include "glm/gtc/matrix_transform.hpp"
 
 #include "imgui.h"
 
@@ -101,6 +98,14 @@ namespace Loom
 				child->SetThreadID(thread_id);
 	};
 
+	void GameObject::SetInheritThreadID(bool inherit)
+	{
+		m_inherit_thread_id = inherit;
+
+		if (inherit && parent)
+			SetThreadID(parent->m_threadID);
+	};
+
 	void GameObject::Destroy()
 	{
 		if (parent == nullptr)
@@ -156,14 +161,7 @@ namespace Loom
 
 	glm::mat4 GameObject::LocalMatrix() const
 	{
-		const glm::vec3 degrees = ToGlm(rotation);
-
-		glm::mat4 matrix = glm::translate(glm::mat4(1.0f), ToGlm(position));
-		matrix = glm::rotate(matrix, glm::radians(degrees.y), Y_AXIS);
-		matrix = glm::rotate(matrix, glm::radians(degrees.x), X_AXIS);
-		matrix = glm::rotate(matrix, glm::radians(degrees.z), Z_AXIS);
-
-		return glm::scale(matrix, ToGlm(scale));
+		return transform.Matrix();
 	};
 
 	glm::mat4 GameObject::WorldMatrix() const
@@ -234,8 +232,7 @@ namespace Loom
 			ImGui::SameLine();
 
 			if (ImGui::Checkbox("Inherit Host Thread", &*m_inherit_thread_id))
-				if (m_inherit_thread_id)
-					SetThreadID(m_threadID);
+				SetInheritThreadID(m_inherit_thread_id);
 
 			ImGui::Text("Name: ");
 			ImGui::SameLine();

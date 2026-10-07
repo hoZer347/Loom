@@ -5,12 +5,10 @@
 $webRoot = $PSScriptRoot
 
 $webWasm = Join-Path $webRoot 'Loom WASM'
-$webMath = Join-Path $webRoot 'Loom Math'
 $webImGui = Join-Path $webRoot 'Loom ImGui'
 
 $webIncludes = @(
     $webWasm
-    $webMath
     (Join-Path $webRoot 'External Libraries\glm')
     (Join-Path $webRoot 'External Libraries\stb')
     $webImGui
@@ -129,14 +127,13 @@ function Build-WebEngine([string] $Emcc)
     $sources = @(
         Get-ChildItem -Path (Join-Path $webWasm '*.cpp')
         Get-ChildItem -Path (Join-Path $webWasm 'Utilities\*.cpp') -Exclude '_*.cpp'
-        Get-ChildItem -Path (Join-Path $webMath '*.cpp')
         'imgui.cpp', 'imgui_draw.cpp', 'imgui_tables.cpp', 'imgui_widgets.cpp',
             'imgui_impl_glfw.cpp', 'imgui_impl_opengl3.cpp' |
             ForEach-Object { Get-Item -LiteralPath (Join-Path $webImGui $_) }
     ) | ForEach-Object { $_.FullName }
 
     $inputs = @(
-        Get-ChildItem -Path $webWasm, $webMath, $webImGui -Recurse -File -Include '*.cpp', '*.h', '*.hpp'
+        Get-ChildItem -Path $webWasm, $webImGui -Recurse -File -Include '*.cpp', '*.h', '*.hpp'
         Get-Item -LiteralPath (Join-Path $webRoot 'WebBuild.ps1')
     )
 

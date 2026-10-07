@@ -93,7 +93,7 @@ namespace Loom
 
 		// A target on the eye has no direction, so the transform's stands.
 		if (atTarget)
-			aim.forward = Direction(ToGlm(target) - aim.eye, aim.forward);
+			aim.forward = Direction(*target - aim.eye, aim.forward);
 
 		glm::vec3 right = glm::cross(aim.forward, aim.up);
 
@@ -112,10 +112,10 @@ namespace Loom
 
 		if (lookAtTarget)
 		{
-			const float distance = glm::length(ToGlm(target) - was.eye);
+			const float distance = glm::length(*target - was.eye);
 			const glm::vec3 ahead = was.eye + was.forward * (distance > 0.0f ? distance : DEFAULT_TARGET_DISTANCE);
 
-			target = Math::vec3<float>(ahead.x, ahead.y, ahead.z);
+			target = ahead;
 			return;
 		};
 
@@ -150,6 +150,6 @@ namespace Loom
 		glm::extractEulerAngleYXZ(glm::mat4(local), radians.y, radians.x, radians.z);
 
 		const glm::vec3 degrees = glm::degrees(radians);
-		m_gameObject->rotation = Math::vec3<float>(degrees.x, degrees.y, degrees.z);
+		m_gameObject->transform.rotation = degrees;
 	};
 };

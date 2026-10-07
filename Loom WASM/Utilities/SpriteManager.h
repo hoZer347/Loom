@@ -4,7 +4,7 @@
 
 #include "Component.h"
 
-#include "Vector.h"
+#include "glm/glm.hpp"
 
 #include <string>
 #include <vector>
@@ -114,7 +114,7 @@ namespace Loom
 		#pragma region Draw
 
 		/// Where the sprite is, drawn without the GameObject's transform.
-		Math::vec3<float> position{ };
+		glm::vec3 position{ };
 
 		/// Mirrors horizontally about the pivot.
 		bool flipX = false;

@@ -50,7 +50,7 @@ if (-not $NoBuild)
     $msbuild = Find-MSBuild
     Write-Host "Building Loom Tests ($Configuration) with $msbuild"
 
-    # Built through the solution so the engine, ImGui and math projects are
+    # Built through the solution so the engine and ImGui projects are
     # rebuilt first and everything lands in the shared x64\<config> directory.
     # See the note in run-web-tests.ps1: a native command's stderr would
     # otherwise be raised as a terminating NativeCommandError.
