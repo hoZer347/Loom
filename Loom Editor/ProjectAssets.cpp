@@ -488,22 +488,4 @@ void main()
 
 		return !relative.empty() && *relative.begin() != "..";
 	};
-
-	ProjectAssets::OpenCommand ProjectAssets::OpenWith(
-		const std::string& path,
-		const std::string& scripts_folder,
-		const std::string& devenv)
-	{
-		if (devenv.empty() || !IsUnder(path, scripts_folder))
-			return { path, "" };
-
-		const std::filesystem::path extension = std::filesystem::path(path).extension();
-
-		// /Edit hands a source to a Visual Studio already running rather than
-		// starting another; a solution or project is opened as one.
-		if (extension == ".sln" || extension == ".vcxproj")
-			return { devenv, '"' + path + '"' };
-
-		return { devenv, "/Edit \"" + path + '"' };
-	};
 };
