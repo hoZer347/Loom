@@ -8,10 +8,12 @@
     taking the focus and flashes in the taskbar instead. Blocks until the user
     answers, then prints {"decision": "approve" | "deny", "feedback": "..."}
     and exits 0 on approve, 1 otherwise. Closing the window counts as deny.
+    Given -DemoProcessId, it closes that demo once the user answers.
 
 .EXAMPLE
     .\review.ps1 -Feature inspector-layout -Prompt 'Name should not be on a newline' `
-        -Changes 'Name sits beside its field' -Expect 'Select any object in Demos\Shadows'
+        -Changes 'Name sits beside its field' -Expect 'Select any object in Demos\Shadows' `
+        -DemoProcessId $demo.Id
 #>
 [CmdletBinding()]
 param(
@@ -19,6 +21,9 @@ param(
     [Parameter(Mandatory = $true)] [string] $Prompt,
     [Parameter(Mandatory = $true)] [string] $Changes,
     [Parameter(Mandatory = $true)] [string] $Expect,
+
+    # The demo left open for the review, closed once the user answers.
+    [int] $DemoProcessId,
 
     # For testing the window itself: no taskbar button, no flash, off every screen.
     [switch] $Offscreen
@@ -73,6 +78,7 @@ $ButtonWidth = 110
 $ButtonHeight = 34
 $FontSize = 10
 $OffscreenCoordinate = -32000
+$DemoCloseTimeoutMs = 5000
 
 $font = New-Object System.Drawing.Font('Segoe UI', $FontSize)
 
@@ -141,6 +147,16 @@ $form.Add_Shown({ $summary.SelectionLength = 0; if (-not $Offscreen) { $form.Fla
 $decision = 'deny'
 $written = ''
 [System.Windows.Forms.Application]::Run($form)
+
+if ($DemoProcessId)
+{
+    $demo = Get-Process -Id $DemoProcessId -ErrorAction SilentlyContinue
+
+    if ($demo -and -not ($demo.CloseMainWindow() -and $demo.WaitForExit($DemoCloseTimeoutMs)))
+    {
+        $demo.Kill()
+    }
+}
 
 [pscustomobject]@{ decision = $decision; feedback = $written } | ConvertTo-Json -Compress
 exit $(if ($decision -eq 'approve') { 0 } else { 1 })

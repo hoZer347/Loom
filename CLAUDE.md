@@ -42,11 +42,13 @@ A feature or bug fix, start to finish:
 
    ```powershell
    & "<slot>\review.ps1" -Feature <feature-name> -Prompt '<the request, verbatim>' `
-       -Changes '<what changed, per file>' -Expect '<where to look and what should happen>'
+       -Changes '<what changed, per file>' -Expect '<where to look and what should happen>' `
+       -DemoProcessId <the demo's process id>
    ```
 
-   Close the demo once it answers. On `deny`, rework the change from the
-   feedback and go back to step 3.
+   Given the demo's process id, it closes the demo once the user approves or
+   denies. On `deny`, rework the change from the feedback and go back to
+   step 3.
 6. On `approve`, `merge <feature-name>` rebases onto `master`, runs
    `run-tests.ps1` and `run-web-tests.ps1`, then fast-forwards `master`. If
    anything fails, nothing is merged. On rebase conflicts, resolve them and
