@@ -302,9 +302,9 @@ Explorer and pick Add > Loom Script... to write one there.
 
 Each header is compiled on its own and they may include one another, so
 anything defined outside a struct has to be inline. Pressing Play in the
-editor compiles them, or build the solution in Visual Studio. They are the same build. The library links
-the editor's import library, so there is one engine in the process rather
-than one per module.
+editor compiles them, or build the solution in Visual Studio. They are the
+same build. The library links the editor's import library, so there is one
+engine in the process rather than one per module.
 
 Start Debugging (F5) builds the scripts and then starts the editor on this
 project with the scene running, so breakpoints in them are hit.

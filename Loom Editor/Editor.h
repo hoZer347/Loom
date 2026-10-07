@@ -261,6 +261,9 @@ namespace Loom
 		std::vector<SceneSnapshot> TakeSnapshots() const;
 		void RestoreSnapshots(const std::vector<SceneSnapshot>& snapshots);
 
+		// The scenes, and what was selected in them, as a rebuild found them.
+		void RestoreAfterBuild();
+
 		void BuildDefaultLayout(unsigned int dockspace_id);
 
 		// Records the item just drawn as where a queued import goes, if the
@@ -409,6 +412,7 @@ namespace Loom
 		// One entry per scene that was open when a rebuild started, and what a
 		// Stop pressed during that rebuild leaves behind for it to come back to.
 		std::vector<SceneSnapshot> m_snapshots{ };
+		Guid m_selectedBeforeBuild{ };
 		bool m_playAfterCompile = false;
 
 		// The scenes as they were when Play was pressed, held for as long as the

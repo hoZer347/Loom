@@ -20,6 +20,9 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <shlwapi.h>
+#include <objbase.h>
+#include <oleauto.h>
+#include <wrl/client.h>
 
 #pragma comment(lib, "shlwapi.lib")
 
@@ -169,6 +172,154 @@ namespace Loom
 			else
 				OpenAsText(path);
 		};
+
+		using Microsoft::WRL::ComPtr;
+
+		// Calls an automation member by name, with at most one argument.
+		HRESULT Call(
+			IDispatch* object,
+			const wchar_t* member,
+			WORD kind,
+			VARIANT* result,
+			VARIANT* argument = nullptr)
+		{
+			DISPID id = 0;
+			LPOLESTR name = const_cast<LPOLESTR>(member);
+
+			const HRESULT found = object->GetIDsOfNames(IID_NULL, &name, 1, LOCALE_USER_DEFAULT, &id);
+
+			if (FAILED(found))
+				return found;
+
+			DISPPARAMS parameters{ argument, nullptr, argument != nullptr ? 1u : 0u, 0 };
+
+			return object->Invoke(id, IID_NULL, LOCALE_USER_DEFAULT, kind, &parameters, result, nullptr, nullptr);
+		};
+
+		ComPtr<IDispatch> Property(IDispatch* object, const wchar_t* member)
+		{
+			VARIANT value;
+			VariantInit(&value);
+
+			if (FAILED(Call(object, member, DISPATCH_PROPERTYGET, &value)) || value.vt != VT_DISPATCH)
+			{
+				VariantClear(&value);
+				return nullptr;
+			};
+
+			ComPtr<IDispatch> result;
+			result.Attach(value.pdispVal);
+
+			return result;
+		};
+
+		// Each running Visual Studio registers its automation object as
+		// "!VisualStudio.DTE.<version>:<process id>".
+		ComPtr<IDispatch> FindVisualStudioWith(const std::string& solution, DWORD& process)
+		{
+			ComPtr<IRunningObjectTable> table;
+			ComPtr<IEnumMoniker> monikers;
+			ComPtr<IBindCtx> context;
+
+			if (FAILED(GetRunningObjectTable(0, &table)) ||
+				FAILED(table->EnumRunning(&monikers)) ||
+				FAILED(CreateBindCtx(0, &context)))
+				return nullptr;
+
+			const std::wstring prefix = L"!VisualStudio.DTE.";
+
+			ComPtr<IMoniker> moniker;
+
+			while (monikers->Next(1, moniker.ReleaseAndGetAddressOf(), nullptr) == S_OK)
+			{
+				LPOLESTR name = nullptr;
+
+				if (FAILED(moniker->GetDisplayName(context.Get(), nullptr, &name)))
+					continue;
+
+				const std::wstring display = name;
+				CoTaskMemFree(name);
+
+				ComPtr<IUnknown> object;
+				ComPtr<IDispatch> dte;
+
+				if (display.rfind(prefix, 0) != 0 ||
+					FAILED(table->GetObject(moniker.Get(), &object)) ||
+					FAILED(object.As(&dte)))
+					continue;
+
+				const ComPtr<IDispatch> open = Property(dte.Get(), L"Solution");
+
+				VARIANT path;
+				VariantInit(&path);
+
+				std::error_code code;
+
+				const bool match =
+					open &&
+					SUCCEEDED(Call(open.Get(), L"FullName", DISPATCH_PROPERTYGET, &path)) &&
+					path.vt == VT_BSTR &&
+					SysStringLen(path.bstrVal) > 0 &&
+					std::filesystem::equivalent(std::filesystem::path(path.bstrVal), solution, code);
+
+				VariantClear(&path);
+
+				if (match)
+				{
+					process = wcstoul(display.substr(display.rfind(L':') + 1).c_str(), nullptr, 10);
+					return dte;
+				};
+			};
+
+			return nullptr;
+		};
+
+		// False when no Visual Studio has the solution open.
+		bool OpenInRunningVisualStudio(const std::string& solution, const std::string& file)
+		{
+			DWORD process = 0;
+
+			const ComPtr<IDispatch> dte = FindVisualStudioWith(solution, process);
+
+			if (!dte)
+				return false;
+
+			const ComPtr<IDispatch> operations = Property(dte.Get(), L"ItemOperations");
+			const ComPtr<IDispatch> window = Property(dte.Get(), L"MainWindow");
+
+			VARIANT path;
+			VariantInit(&path);
+			path.vt = VT_BSTR;
+			path.bstrVal = SysAllocString(std::filesystem::path(file).wstring().c_str());
+
+			VARIANT opened;
+			VariantInit(&opened);
+
+			const HRESULT result = operations
+				? Call(operations.Get(), L"OpenFile", DISPATCH_METHOD, &opened, &path)
+				: E_NOINTERFACE;
+
+			VariantClear(&opened);
+			VariantClear(&path);
+
+			if (FAILED(result))
+			{
+				std::cerr
+					<< "Visual Studio has " << solution << " open but would not open "
+					<< file << " (error 0x" << std::hex << result << std::dec << ')' << std::endl;
+
+				return true;
+			};
+
+			// The editor has the foreground, having just been clicked, and Windows
+			// only lets another process take it when the one holding it says so.
+			AllowSetForegroundWindow(process);
+
+			if (window)
+				Call(window.Get(), L"Activate", DISPATCH_METHOD, nullptr);
+
+			return true;
+		};
 	};
 
 	void Editor::RefreshProjectAssets()
@@ -246,7 +397,11 @@ namespace Loom
 				const float button_x = ImGui::GetContentRegionMax().x - button_width;
 
 				ImGui::AlignTextToFramePadding();
-				ImGui::PushTextWrapPos(button_x - ImGui::GetStyle().ItemSpacing.x);
+				// Zero or less would mean no wrapping at all on a panel narrower than
+				// the button.
+				ImGui::PushTextWrapPos((std::max)(
+					button_x - ImGui::GetStyle().ItemSpacing.x,
+					ImGui::GetCursorPosX() + ImGui::GetFontSize()));
 				ImGui::TextWrapped("%s", m_projectPath.c_str());
 				ImGui::PopTextWrapPos();
 
@@ -534,6 +689,29 @@ namespace Loom
 		return
 			(extension == ".hpp" || extension == ".h" || extension == ".cpp") &&
 			ProjectAssets::IsUnder(path, std::filesystem::path(m_scripts.GetProject()).parent_path().string());
+	};
+
+	void Editor::OpenScript(const std::string& path)
+	{
+		// A hand-written project need not have a solution beside it, even though
+		// every project the editor writes does.
+		const std::string solution =
+			std::filesystem::path(m_scripts.GetProject()).replace_extension(".sln").string();
+
+		std::error_code code;
+		const bool has_solution = std::filesystem::exists(solution, code);
+
+		if (has_solution && OpenInRunningVisualStudio(solution, path))
+			return;
+
+		const std::string& devenv = ScriptLibrary::FindVisualStudio();
+
+		if (devenv.empty())
+			Shell((has_solution ? solution : path).c_str(), "");
+		else if (has_solution)
+			Shell(devenv.c_str(), '"' + solution + "\" /Command \"File.OpenFile \\\"" + path + "\\\"\"");
+		else
+			Shell(devenv.c_str(), "/Edit \"" + path + '"');
 	};
 
 	void Editor::OpenAsset(const std::string& path)
