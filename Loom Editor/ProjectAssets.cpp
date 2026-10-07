@@ -1,7 +1,5 @@
 #include "ProjectAssets.h"
 
-#include "ProjectTemplate.h"
-
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -9,8 +7,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <functional>
-#include <sstream>
+#include <iterator>
 #include <vector>
 
 
@@ -20,16 +17,9 @@ namespace Loom
 	{
 		constexpr size_t maxNameLength = 64;
 
-		constexpr const char* const registerEntryPoint = "LoomRegisterScripts";
-		constexpr const char* const registerCall = "ComponentRegistry::Register<";
-
 		// Windows forbids the first lot in a file name; the rest mean something
 		// to MSBuild, or to the XML a project is written in.
 		constexpr const char* const forbiddenNameCharacters = "<>:\"/\\|?*&;%'$@()";
-
-		// Where a script's header could clash with the engine's: a quoted include
-		// looks beside the including file first, then in these.
-		constexpr const char* const engineIncludeFolders[] = { "Loom WASM", "Loom ImGui" };
 
 		constexpr const char* const keywords[] =
 		{
@@ -75,214 +65,43 @@ namespace Loom
 			return true;
 		};
 
-		// A text file as lines, remembering its line ending so an edit writes it
-		// back the way Visual Studio left it.
-		struct TextFile
+		// The namespace the scripts project puts its code in, or the project's
+		// own name when it does not say.
+		std::string RootNamespace(const std::filesystem::path& project)
 		{
-			std::filesystem::path path;
-			std::vector<std::string> lines;
-			bool crlf = false;
+			constexpr const char* open = "<RootNamespace>";
+			constexpr const char* close = "</RootNamespace>";
 
-			bool Read(const std::filesystem::path& from)
-			{
-				path = from;
+			std::ifstream in(project, std::ios::binary);
+			const std::string text{ std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>() };
 
-				std::ifstream in(path, std::ios::binary);
+			const size_t begin = text.find(open);
+			const size_t end = begin == std::string::npos ? begin : text.find(close, begin);
 
-				if (!in)
-					return false;
-
-				std::stringstream buffer;
-				buffer << in.rdbuf();
-
-				const std::string text = buffer.str();
-				crlf = text.find("\r\n") != std::string::npos;
-
-				std::string line;
-				std::istringstream stream(text);
-
-				while (std::getline(stream, line))
-				{
-					if (!line.empty() && line.back() == '\r')
-						line.pop_back();
-
-					lines.push_back(line);
-				};
-
-				return true;
-			};
-
-			bool Write() const
-			{
-				std::ofstream out(path, std::ios::binary);
-
-				if (!out)
-					return false;
-
-				for (const std::string& line : lines)
-					out << line << (crlf ? "\r\n" : "\n");
-
-				return true;
-			};
-
-			size_t FindLast(const std::function<bool(const std::string&)>& matches) const
-			{
-				for (size_t at = lines.size(); at-- > 0;)
-					if (matches(lines[at]))
-						return at;
-
-				return std::string::npos;
-			};
-
-			size_t FindLast(const std::string& text) const
-			{
-				return FindLast([&text](const std::string& line) { return line.find(text) != std::string::npos; });
-			};
+			return end == std::string::npos
+				? project.stem().string()
+				: text.substr(begin + strlen(open), end - begin - strlen(open));
 		};
 
-		std::string IndentOf(const std::string& line)
-		{
-			return line.substr(0, line.find_first_not_of(" \t"));
-		};
-
-		// Puts an item beside the last one of its kind in an MSBuild file, or
-		// in an item group of its own when there is none to sit beside.
-		void AddItem(TextFile& file, const std::string& element, const std::string& include)
-		{
-			const std::string opening = '<' + element + " Include=";
-
-			const size_t found = file.FindLast(opening);
-
-			if (found != std::string::npos)
-			{
-				size_t at = found;
-
-				// A filters file spells an item over several lines.
-				if (file.lines[at].find("/>") == std::string::npos)
-					while (at + 1 < file.lines.size() && file.lines[at].find("</" + element + '>') == std::string::npos)
-						at++;
-
-				file.lines.insert(
-					file.lines.begin() + (ptrdiff_t)at + 1,
-					IndentOf(file.lines[found]) + opening + '"' + include + "\" />");
-
-				return;
-			};
-
-			size_t anchor = file.FindLast("Microsoft.Cpp.targets");
-
-			if (anchor == std::string::npos)
-				anchor = file.FindLast("</Project>");
-
-			if (anchor == std::string::npos)
-				anchor = file.lines.size();
-
-			file.lines.insert(
-				file.lines.begin() + (ptrdiff_t)anchor,
-				{ "  <ItemGroup>", "    " + opening + '"' + include + "\" />", "  </ItemGroup>" });
-		};
-
-		std::string ValueBetween(const TextFile& file, const std::string& open, const std::string& close)
-		{
-			const size_t at = file.FindLast(open);
-
-			if (at == std::string::npos)
-				return "";
-
-			const std::string& line = file.lines[at];
-			const size_t begin = line.find(open) + open.size();
-			const size_t end = line.find(close, begin);
-
-			return end == std::string::npos ? "" : line.substr(begin, end - begin);
-		};
-
-		// The .cpp that holds LoomRegisterScripts, wherever under the scripts
-		// project it ended up.
-		bool FindModule(const std::filesystem::path& root, TextFile& module)
-		{
-			std::error_code code;
-
-			for (const auto& entry : std::filesystem::recursive_directory_iterator(root, code))
-			{
-				if (!entry.is_regular_file(code) || entry.path().extension() != ".cpp")
-					continue;
-
-				TextFile candidate;
-
-				if (candidate.Read(entry.path()) && candidate.FindLast(registerEntryPoint) != std::string::npos)
-				{
-					module = std::move(candidate);
-					return true;
-				};
-			};
-
-			return false;
-		};
-
-		bool Register(TextFile& module, const std::string& include, const std::string& type, const std::string& name)
-		{
-			size_t call = module.FindLast(registerCall);
-			std::string indent;
-
-			if (call != std::string::npos)
-				indent = IndentOf(module.lines[call]);
-			else
-			{
-				// No script registered yet: the first line inside the function.
-				const size_t entry = module.FindLast(registerEntryPoint);
-
-				for (call = entry; call < module.lines.size(); call++)
-					if (module.lines[call].find('{') != std::string::npos)
-						break;
-
-				if (call == module.lines.size())
-					return false;
-
-				indent = IndentOf(module.lines[call]) + '\t';
-			};
-
-			module.lines.insert(
-				module.lines.begin() + (ptrdiff_t)call + 1,
-				indent + "Loom::" + registerCall + type + ">(\"" + name + "\");");
-
-			const size_t last_include = module.FindLast(
-				[](const std::string& line) { return line.rfind("#include", 0) == 0; });
-
-			module.lines.insert(
-				module.lines.begin() + (ptrdiff_t)(last_include == std::string::npos ? 0 : last_include + 1),
-				"#include \"" + include + '"');
-
-			return true;
-		};
-
-		const char* const script_header = R"(#pragma once
+		// A whole script in one header, which the scripts project picks up by
+		// its **\*.hpp glob and which registers itself as a component.
+		const char* const script = R"(#pragma once
 
 #include "Component.h"
+#include "GameObject.h"
 
 
 namespace {NAMESPACE}
 {
 	struct {NAME} : Loom::Component<{NAME}>
 	{
-		void OnAttach() override;
-		void OnUpdate() override;
-	};
-};
-)";
+		void OnAttach() override
+		{
+		};
 
-		const char* const script_source = R"(#include "{NAME}.h"
-
-#include "GameObject.h"
-
-
-namespace {NAMESPACE}
-{
-	void {NAME}::OnAttach()
-	{
-	};
-
-	void {NAME}::OnUpdate()
-	{
+		void OnUpdate() override
+		{
+		};
 	};
 };
 )";
@@ -471,24 +290,13 @@ void main()
 				return "'" + name + "' is a C++ keyword.";
 
 		const std::filesystem::path root = std::filesystem::path(scripts_project).parent_path();
-		const std::string header = name + ".h";
+		const std::string header = name + ".hpp";
 
 		std::error_code code;
 
 		for (const auto& entry : std::filesystem::recursive_directory_iterator(root, code))
 			if (entry.path().filename() == header)
 				return "There is already a " + header + " in " + entry.path().parent_path().string() + '.';
-
-		const std::filesystem::path engine = ProjectTemplate::EngineRoot();
-
-		for (const char* folder : engineIncludeFolders)
-			if (std::filesystem::exists(engine / folder / header, code))
-				return header + " is an engine header; a script by that name would hide it.";
-
-		TextFile module;
-
-		if (FindModule(root, module) && module.FindLast("::" + name + '>') != std::string::npos)
-			return "A script called " + name + " is already registered.";
 
 		return "";
 	};
@@ -546,8 +354,7 @@ void main()
 		};
 
 		const std::filesystem::path root = std::filesystem::path(scripts_project).parent_path();
-		const std::filesystem::path header = std::filesystem::path(folder) / (name + ".h");
-		const std::filesystem::path source = std::filesystem::path(folder) / (name + ".cpp");
+		const std::filesystem::path header = std::filesystem::path(folder) / (name + ".hpp");
 
 		const std::filesystem::path relative = std::filesystem::path(folder).lexically_relative(root);
 
@@ -558,79 +365,18 @@ void main()
 		};
 
 		// A folder made outside the editor never went through IsValidName, and
-		// its name goes into the project as written.
+		// the project's glob hands its name to MSBuild as written.
 		for (const std::filesystem::path& part : relative)
 			if (part != "." && !IsValidName(part.string()))
 			{
-				Fail(error, "'" + part.string() + "' cannot hold scripts: folder names go into the project, which cannot take " + forbiddenNameCharacters);
+				Fail(error, "'" + part.string() + "' cannot hold scripts: folder names reach MSBuild, which cannot take " + forbiddenNameCharacters);
 				return "";
 			};
 
-		// Everything is read and edited before anything is written, so a
-		// project that cannot take the script is left as it was.
-		TextFile project, filters, module;
+		const std::string text = Replace(Replace(script, "{NAME}", name), "{NAMESPACE}", RootNamespace(scripts_project));
 
-		if (!project.Read(scripts_project))
-		{
-			Fail(error, "Could not read " + scripts_project);
-			return "";
-		};
-
-		if (!FindModule(root, module))
-		{
-			Fail(error, std::string("No .cpp under ") + root.string() + " defines " + registerEntryPoint);
-			return "";
-		};
-
-		std::string space = ValueBetween(project, "<RootNamespace>", "</RootNamespace>");
-
-		if (space.empty())
-			space = std::filesystem::path(scripts_project).stem().string();
-
-		const std::string project_header = header.lexically_relative(root).make_preferred().string();
-		const std::string project_source = source.lexically_relative(root).make_preferred().string();
-		const std::string include = header.lexically_relative(module.path.parent_path()).generic_string();
-
-		if (!Register(module, include, space + "::" + name, name))
-		{
-			Fail(error, "Could not find where " + module.path.string() + " registers its scripts");
-			return "";
-		};
-
-		AddItem(project, "ClCompile", project_source);
-		AddItem(project, "ClInclude", project_header);
-
-		const bool has_filters = filters.Read(scripts_project + ".filters");
-
-		if (has_filters)
-		{
-			AddItem(filters, "ClCompile", project_source);
-			AddItem(filters, "ClInclude", project_header);
-		};
-
-		const auto fill =
-			[&](const char* text)
-			{
-				return Replace(Replace(text, "{NAME}", name), "{NAMESPACE}", space);
-			};
-
-		if (!WriteNew(header, fill(script_header), error))
-			return "";
-
-		if (!WriteNew(source, fill(script_source), error))
-		{
-			std::error_code code;
-			std::filesystem::remove(header, code);
-
-			return "";
-		};
-
-		if (!project.Write() || !module.Write() || (has_filters && !filters.Write()))
-		{
-			Fail(error, "Wrote " + name + " but could not add it to " + scripts_project);
-			return "";
-		};
-
-		return source.string();
+		return WriteNew(header, text, error)
+			? header.string()
+			: "";
 	};
 };

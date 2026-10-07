@@ -275,6 +275,7 @@ namespace Loom
 			// A model shows in the Inspector, where it can be imported.
 			if (!node.folder && IsModelFile(node.path))
 				SelectModel(node.path);
+			else m_selectedModel.clear();
 		};
 
 		if (!node.folder &&
@@ -374,7 +375,7 @@ namespace Loom
 		switch (m_newAssetKind)
 		{
 		case AssetKind::Scene:		return (folder / (name + SceneSerializer::extension)).string();
-		case AssetKind::Script:		return (folder / (name + ".cpp")).string();
+		case AssetKind::Script:		return (folder / (name + ".hpp")).string();
 		case AssetKind::Shader:		return (folder / (name + ProjectAssets::shaderExtension)).string();
 		case AssetKind::Texture:	return (folder / (name + ProjectAssets::textureExtension)).string();
 		default:					return (folder / name).string();

@@ -33,7 +33,6 @@
 *Loom ImGui:*
 - Imported ImGui implementation using an OpenGL backend
 
-
 *Loom SQL:*
 - Basic SQL Server set up
 

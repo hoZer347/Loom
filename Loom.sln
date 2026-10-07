@@ -7,7 +7,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom ImGui", "Loom ImGui\Lo
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom SQL", "Loom SQL\Loom SQL.vcxproj", "{61AC63F1-3BC9-4824-971E-C7B370288886}"
 EndProject
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom WASM", "Loom WASM\Loom Emscripten Testing.vcxproj", "{7573054A-30A9-427C-87D0-7A2D67C22891}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Loom Tests", "Loom Tests\Loom Tests.vcxproj", "{7C3E1A42-9B0D-4F58-A1E6-2D5C8B7F0431}"

@@ -360,7 +360,6 @@ namespace Loom
 					? guid
 					: found->second;
 			};
-
 		};
 	};
 

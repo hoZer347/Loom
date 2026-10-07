@@ -177,7 +177,6 @@ namespace Loom
 		Transform transform;
 
 	protected:
-
 		std::vector<GameObject*>	m_children{ };
 		std::vector<ComponentBase*> m_components{ };
 		std::vector<ComponentBase*> m_updateables{ };

@@ -98,6 +98,7 @@
     <ClCompile Include="SceneSerializer Tests.cpp" />
     <ClCompile Include="SceneHistory Tests.cpp" />
     <ClCompile Include="EditorSettings Tests.cpp" />
+    <ClCompile Include="ProjectAssets Tests.cpp" />
     <ClCompile Include="EditCommands Tests.cpp" />
     <ClCompile Include="WebPlayer Tests.cpp" />
     <ClCompile Include="SerializedField Tests.cpp" />
@@ -141,6 +142,7 @@
     <ClCompile Include="..\Loom Editor\SceneHistory.cpp" />
     <ClCompile Include="..\Loom Editor\EditCommands.cpp" />
     <ClCompile Include="..\Loom Editor\EditorSettings.cpp" />
+    <ClCompile Include="..\Loom Editor\ProjectAssets.cpp" />
   </ItemGroup>
   <ItemGroup>
     <!-- ImGui is linked rather than recompiled: Component<T>::Gui and
