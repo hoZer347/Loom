@@ -1,5 +1,8 @@
 #include "doctest.h"
 
+// The editor only runs on Windows, but the web test build compiles this too.
+#ifndef __EMSCRIPTEN__
+
 #include "ProjectTemplate.h"
 
 #include <filesystem>
@@ -85,3 +88,5 @@ TEST_SUITE("ProjectTemplate")
 			Loom::ProjectTemplate::maxNameLength);
 	};
 };
+
+#endif

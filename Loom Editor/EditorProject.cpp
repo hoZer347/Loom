@@ -473,9 +473,20 @@ namespace Loom
 			break;
 
 		case AssetKind::Script:
-			if (m_scripts.HasProject() || !ProjectTemplate::AddScripts(m_projectPath, m_projectName, &error).empty())
-				path = ProjectAssets::CreateScript(ScriptsProject(), folder, name, &error);
+		{
+			const bool adding = !m_scripts.HasProject();
+
+			if (adding && ProjectTemplate::AddScripts(m_projectPath, m_projectName, &error).empty())
+				break;
+
+			path = ProjectAssets::CreateScript(ScriptsProject(), folder, name, &error);
+
+			// The project file names the scripts project now, script or not, so
+			// it is picked up and built.
+			if (adding)
+				LoadProjectFile();
 			break;
+		};
 
 		case AssetKind::Shader:
 			path = ProjectAssets::CreateShader(folder, name, &error);
@@ -494,15 +505,8 @@ namespace Loom
 
 		std::cout << "Created " << path << std::endl;
 
-		// A scripts project added just now is picked up and built, so the
-		// script is in Add Component without a trip to Compile.
 		if (m_newAssetKind == AssetKind::Script)
-		{
-			if (m_scripts.HasProject())
-				std::cout << name << " shows up in Add Component after the next compile." << std::endl;
-			else
-				LoadProjectFile();
-		};
+			std::cout << name << " shows up in Add Component after the next compile." << std::endl;
 
 		m_askForAsset = false;
 		m_selectedAsset = std::filesystem::path(path).lexically_normal().string();
