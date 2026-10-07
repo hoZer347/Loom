@@ -1,5 +1,7 @@
 #include "ProjectTemplate.h"
 
+#include "ProjectAssets.h"
+
 #include "Guid.h"
 #include "SceneSerializer.h"
 
@@ -16,16 +18,6 @@ namespace Loom
 {
 	namespace
 	{
-		std::string Replace(std::string text, const std::string& token, const std::string& value)
-		{
-			// Resuming past the replacement, not at it: a value that contains its
-			// own token would otherwise be substituted forever.
-			for (size_t at = text.find(token); at != std::string::npos; at = text.find(token, at + value.size()))
-				text.replace(at, token.size(), value);
-
-			return text;
-		};
-
 		bool Write(const std::filesystem::path& path, const std::string& text, std::string* error)
 		{
 			std::error_code code;
@@ -60,27 +52,6 @@ namespace Loom
 		const char* const loomproject = R"(name={NAME}
 scripts=Scripts/{NAME}Scripts.vcxproj
 library=Build/{NAME}Scripts.dll
-)";
-
-		const char* const shader = R"(
-// ===VERTEX===
-
-layout(location = 0) in vec3 aPos;
-
-void main()
-{
-    gl_Position = vec4(aPos, 1.0);
-};
-
-
-// ===FRAGMENT===
-
-out vec4 FragColor;
-
-void main()
-{
-    FragColor = vec4(0.35, 0.8, 0.45, 1.0);
-};
 )";
 
 		const char* const script_header = R"(#pragma once
@@ -431,23 +402,23 @@ SpinningTriangle is there as a worked example.
 		const auto fill =
 			[&](const char* text)
 			{
-				std::string filled = Replace(text, "{NAME}", name);
-				filled = Replace(filled, "{ENGINE}", engine);
-				filled = Replace(filled, "{PROJECT}", project);
-				filled = Replace(filled, "{PROJECT_GUID}", project_guid);
-				filled = Replace(filled, "{SCENE_EXTENSION}", SceneSerializer::extension);
-				filled = Replace(filled, "{UNDERLINE}", std::string(name.size(), '='));
-				filled = Replace(filled, "{SCENE_GUID}", Guid::New().ToString());
-				filled = Replace(filled, "{ROOT_GUID}", Guid::New().ToString());
-				filled = Replace(filled, "{TRIANGLE_GUID}", Guid::New().ToString());
-				filled = Replace(filled, "{SCRIPT_GUID}", Guid::New().ToString());
+				std::string filled = ProjectAssets::Replace(text, "{NAME}", name);
+				filled = ProjectAssets::Replace(filled, "{ENGINE}", engine);
+				filled = ProjectAssets::Replace(filled, "{PROJECT}", project);
+				filled = ProjectAssets::Replace(filled, "{PROJECT_GUID}", project_guid);
+				filled = ProjectAssets::Replace(filled, "{SCENE_EXTENSION}", SceneSerializer::extension);
+				filled = ProjectAssets::Replace(filled, "{UNDERLINE}", std::string(name.size(), '='));
+				filled = ProjectAssets::Replace(filled, "{SCENE_GUID}", Guid::New().ToString());
+				filled = ProjectAssets::Replace(filled, "{ROOT_GUID}", Guid::New().ToString());
+				filled = ProjectAssets::Replace(filled, "{TRIANGLE_GUID}", Guid::New().ToString());
+				filled = ProjectAssets::Replace(filled, "{SCRIPT_GUID}", Guid::New().ToString());
 
 				return filled;
 			};
 
 		const bool written =
 			Write(root / (name + extension), fill(loomproject), error) &&
-			Write(root / "Assets" / "Shader.shader", fill(shader), error) &&
+			Write(root / "Assets" / "Shader.shader", ProjectAssets::defaultShader, error) &&
 			Write(root / "Scenes" / (std::string("Main") + SceneSerializer::extension), fill(starter_scene), error) &&
 			Write(root / "README.txt", fill(readme), error) &&
 			Write(root / "Scripts" / "SpinningTriangle.h", fill(script_header), error) &&

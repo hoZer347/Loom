@@ -20,15 +20,33 @@ namespace Loom
 	// the file browser (and <filesystem>) into everything that includes it.
 	struct EditorFileDialogs;
 
+	// A file or folder under the project, as the Project panel lists it.
+	struct AssetNode
+	{
+		std::string path;
+		std::string name;
+		bool folder = false;
+		std::vector<AssetNode> children{ };
+	};
+
+	enum class AssetKind
+	{
+		Folder,
+		Scene,
+		Script,
+		Shader,
+		Texture,
+	};
+
 	/**
 	* Loom::Editor
 	* - A Unity-style shell around the Loom runtime
 	* - Owns one dock space holding the scene hierarchy, an inspector, a console
 	*   and, in the centre, whichever scene is selected, rendered into an
 	*   off-screen target so it sits inside the layout like any other panel
-	* - Works out of a project folder: the scenes under it are listed in the
-	*   Project panel, and the scripts beside them are a C++ project that builds
-	*   into a library the editor loads
+	* - Works out of a project folder: everything under it is listed in the
+	*   Project panel, which also creates new assets, and the scripts are a C++
+	*   project that builds into a library the editor loads
 	* - Reads and writes scenes through SceneSerializer, and shows the text form
 	*   of the open scene live in its Scene Data panel
 	* - Takes over Engine's GUI hook on construction and hands it back on
@@ -50,8 +68,8 @@ namespace Loom
 		bool SaveScene(Scene* scene, const std::string& path);
 		void CloseScene(Scene* scene);
 
-		// The folder the editor works out of. Every scene file under it is
-		// listed in the Project panel; the choice is remembered between runs, so
+		// The folder the editor works out of. Everything under it is listed in
+		// the Project panel; the choice is remembered between runs, so
 		// the folder prompt only shows up when there is nothing to remember.
 		bool OpenProject(const std::string& path, bool open_scene = true);
 
@@ -98,6 +116,10 @@ namespace Loom
 
 		void DrawMainMenuBar();
 		void DrawProject();
+		void DrawAssetNode(const AssetNode& node, int depth);
+		void DrawAssetContextMenu(const AssetNode& node);
+		void DrawCreateMenu(const std::string& folder);
+		void DrawCreateAssetPrompt();
 		void DrawScriptsSection();
 		void DrawHierarchy();
 		void DrawSceneNode(Scene* scene);
@@ -138,7 +160,29 @@ namespace Loom
 
 		void BuildDefaultLayout(unsigned int dockspace_id);
 
-		void RefreshProjectScenes();
+		// Rescans the project folder: the asset tree the Project panel draws,
+		// and the scenes in it.
+		void RefreshProjectAssets();
+
+		// Scenes open in the editor; anything else goes to whatever Windows
+		// opens that kind of file with.
+		void OpenAsset(const std::string& path);
+
+		// Where the Create prompt's asset would be written: the file for most,
+		// the source for a script, which goes under the scripts project even
+		// when asked for somewhere else.
+		std::string NewAssetPath() const;
+		std::string NewAssetFolder() const;
+
+		// Why the Create prompt's name cannot be used, or an empty string.
+		std::string NewAssetProblem() const;
+		void CreateAsset();
+
+		// Points a change notification at the project folder, so the tree is
+		// rescanned when something under it is added, removed or renamed
+		// rather than on a timer.
+		void WatchProject();
+		bool ProjectChanged();
 
 		// Reads <folder>/*.loomproject, if there is one, and hooks up the script
 		// library it names.
@@ -197,6 +241,16 @@ namespace Loom
 		std::string m_projectName{ };
 		std::vector<std::string> m_projectScenes{ };
 
+		// The project as it stood at the last scan.
+		AssetNode m_assets{ };
+		void* m_assetWatch = nullptr;
+		std::string m_assetWatchPath{ };
+		std::string m_selectedAsset{ };
+		bool m_revealSelectedAsset = false;
+
+		// How tall the scripts section under the tree came out last frame.
+		float m_scriptsSectionHeight = 0.0f;
+
 		// The scene a session opens with: what the settings file said last time,
 		// and then whichever one this session last made active.
 		std::string m_startupScene{ };
@@ -236,6 +290,13 @@ namespace Loom
 		bool m_askForNewProject = false;
 		char m_newProjectFolder[512]{ };
 		char m_newProjectName[128]{ "MyGame" };
+
+		bool m_askForAsset = false;
+		bool m_focusAssetName = false;
+		AssetKind m_newAssetKind = AssetKind::Folder;
+		std::string m_newAssetFolder{ };
+		char m_newAssetName[128]{ };
+		std::string m_newAssetProblem{ };
 
 		bool m_consoleAutoScroll = true;
 		char m_consoleFilter[128]{ };

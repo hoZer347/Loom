@@ -219,7 +219,7 @@ namespace Loom
 		RestoreSnapshots(m_snapshots);
 		m_snapshots.clear();
 
-		RefreshProjectScenes();
+		RefreshProjectAssets();
 
 		// Nothing open yet: the scene this project starts on was waiting for the
 		// scripts it mentions.
