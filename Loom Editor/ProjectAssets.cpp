@@ -29,7 +29,7 @@ namespace Loom
 
 		// Where a script's header could clash with the engine's: a quoted include
 		// looks beside the including file first, then in these.
-		constexpr const char* const engineIncludeFolders[] = { "Loom WASM", "Loom Math", "Loom ImGui" };
+		constexpr const char* const engineIncludeFolders[] = { "Loom WASM", "Loom ImGui" };
 
 		constexpr const char* const keywords[] =
 		{
