@@ -18,6 +18,7 @@
 #include "imgui_internal.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -1437,7 +1438,14 @@ namespace Loom
 		{
 			const ImGuiIO& io = ImGui::GetIO();
 
-			ImGui::Text("%.1f FPS (%.3f ms/frame)", io.Framerate, 1000.0f / io.Framerate);
+			constexpr float MillisecondsPerSecond = 1000.0f;
+
+			// ImGui already averages Framerate over its last 60 frames.
+			ImGui::Text(
+				"%d FPS (%d ms/frame)",
+				(int)std::ceil(io.Framerate),
+				(int)std::ceil(MillisecondsPerSecond / io.Framerate));
+
 			ImGui::Text("Scenes: %d", (int)Scene::GetScenes().size());
 			ImGui::Text("GameObjects: %d", (int)GameObject::GetObjectCount());
 			ImGui::Text("Registered components: %d", (int)ComponentRegistry::All().size());
