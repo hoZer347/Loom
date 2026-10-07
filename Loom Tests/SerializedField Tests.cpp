@@ -2,7 +2,9 @@
 
 #include "Test Support.h"
 
+#ifndef __EMSCRIPTEN__
 #include "FieldNames.h"
+#endif
 #include "GameObject.h"
 #include "LoomObject.h"
 #include "Material.h"
@@ -79,6 +81,18 @@ namespace
 		Loom::Serial<int> late;
 	};
 
+	// Serials in a plain struct member belong to the object holding it.
+	struct Settings
+	{
+		Loom::Serial<float> m_strength = 1.0f;
+	};
+
+	struct Nested final : Loom::LoomObject
+	{
+		Loom::Serial<int> m_before;
+		Settings settings;
+	};
+
 	// Fields are numbered by declaration order; these are EveryField's.
 	enum Every { Flag, Count, UnsignedCount, Big, UnsignedBig, Ratio, Precise, Label, Pair, Triple, Quad, Numbers };
 
@@ -101,14 +115,19 @@ TEST_SUITE("SerializedField")
 		CHECK(Loom::NameFromIdentifier("m_threadID") == "Thread ID");
 	};
 
+#ifndef __EMSCRIPTEN__
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the editor labels a field after its member")
 	{
 		EveryField object;
 		Pump();
 
-		CHECK(Loom::FieldNames::Of(object, Flag) == "Flag");
-		CHECK(Loom::FieldNames::Of(object, UnsignedCount) == "Unsigned Count");
-		CHECK(Loom::FieldNames::Of(object, Numbers) == "Numbers");
+		const std::vector<std::string> labels = Loom::FieldNames::Of(object);
+
+		REQUIRE(labels.size() == object.GetFields().size());
+
+		CHECK(labels[Flag] == "Flag");
+		CHECK(labels[UnsignedCount] == "Unsigned Count");
+		CHECK(labels[Numbers] == "Numbers");
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a field declared in a base class is labelled after its member")
@@ -116,11 +135,26 @@ TEST_SUITE("SerializedField")
 		Derived object;
 		Pump();
 
-		REQUIRE(object.GetFields().size() == 2);
-
-		CHECK(Loom::FieldNames::Of(object, 0) == "First");
-		CHECK(Loom::FieldNames::Of(object, 1) == "Second");
+		CHECK(Loom::FieldNames::Of(object) == std::vector<std::string>{ "First", "Second" });
 	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a field inside a struct member is labelled after its own member")
+	{
+		Nested object;
+		Pump();
+
+		CHECK(Loom::FieldNames::Of(object) == std::vector<std::string>{ "Before", "Strength" });
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a field that is not one of the object's members is numbered")
+	{
+		// late is LateHost's, but registered with owned, which was built last.
+		LateHost host;
+		Pump();
+
+		CHECK(Loom::FieldNames::Of(host.owned) == std::vector<std::string>{ "First", "Second", "Field 2" });
+	};
+#endif
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "fields are declared in the order they are registered")
 	{

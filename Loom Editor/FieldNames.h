@@ -3,6 +3,7 @@
 #include "LoomObject.h"
 
 #include <string>
+#include <vector>
 
 
 namespace Loom
@@ -19,7 +20,7 @@ namespace Loom
 	*/
 	struct FieldNames final
 	{
-		// The label for object.GetFields()[index].
-		static std::string Of(const LoomObject& object, size_t index);
+		// One label per entry of object.GetFields(), in the same order.
+		static std::vector<std::string> Of(const LoomObject& object);
 	};
 };

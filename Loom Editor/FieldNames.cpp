@@ -1,5 +1,8 @@
 #include "FieldNames.h"
 
+// The editor only runs on Windows, but the web test build compiles this too.
+#ifndef __EMSCRIPTEN__
+
 #include "SerializedField.h"
 
 #define WIN32_LEAN_AND_MEAN
@@ -115,11 +118,19 @@ namespace Loom
 				else if (tag == SymTagData)
 				{
 					DWORD kind = 0;
+					DWORD type_tag = 0;
 
-					if (TypeInfo(base, child, TI_GET_DATAKIND, kind) &&
-						kind == data_is_member &&
-						SymbolName(base, child_type).starts_with(serial_type))
+					if (!TypeInfo(base, child, TI_GET_DATAKIND, kind) ||
+						kind != data_is_member ||
+						!TypeInfo(base, child_type, TI_GET_SYMTAG, type_tag) ||
+						type_tag != SymTagUDT)
+						continue;
+
+					// A struct member can hold Serials of its own, which belong to
+					// this object all the same.
+					if (SymbolName(base, child_type).starts_with(serial_type))
 						members[offset + child_offset] = NameFromIdentifier(Narrow(SymbolName(base, child)).c_str());
+					else Collect(base, child_type, offset + child_offset, members);
 				};
 			};
 		};
@@ -164,9 +175,13 @@ namespace Loom
 			std::wstring path(UNICODE_STRING_MAX_CHARS, L'\0');
 			path.resize(GetModuleFileNameW(module, path.data(), (DWORD)path.size()));
 
-			const DWORD64 base = SymLoadModuleExW(
+			DWORD64 base = SymLoadModuleExW(
 				Session(), nullptr, path.c_str(), nullptr,
 				(DWORD64)module, headers.OptionalHeader.SizeOfImage, nullptr, 0);
+
+			// Already loaded, which the editor's own module stays.
+			if (base == 0 && GetLastError() == ERROR_SUCCESS)
+				base = (DWORD64)module;
 
 			if (base == 0)
 				return { };
@@ -186,15 +201,17 @@ namespace Loom
 			if (SymGetTypeFromNameW(Session(), base, wide.c_str(), &symbol))
 				Collect(base, symbol.TypeIndex, 0, members);
 
-			// Unloaded straight away: DbgHelp holds the .pdb open while it is
-			// loaded, and a script library's is rewritten by every build.
-			SymUnloadModule64(Session(), base);
+			// A script library's is unloaded straight away: DbgHelp holds the .pdb
+			// open while it is loaded, and every build of the scripts rewrites it.
+			// The editor's own is kept for the next type, it being most of them.
+			if (module != GetModuleHandleW(nullptr))
+				SymUnloadModule64(Session(), base);
 
 			return members;
 		};
 	};
 
-	std::string FieldNames::Of(const LoomObject& object, size_t index)
+	std::vector<std::string> FieldNames::Of(const LoomObject& object)
 	{
 		static std::mutex mutex;
 		static std::map<std::pair<const std::type_info*, DWORD>, Members> types;
@@ -224,10 +241,20 @@ namespace Loom
 			found = types.emplace(key, headers ? Read(type, module, *headers) : Members{ }).first;
 
 		const char* const complete = (const char*)dynamic_cast<const void*>(&object);
-		const auto member = found->second.find((const char*)object.GetFields()[index].data - complete);
 
-		return member != found->second.end()
-			? member->second
-			: "Field " + std::to_string(index);
+		std::vector<std::string> names;
+
+		for (const SerializedField& field : object.GetFields())
+		{
+			const auto member = found->second.find((const char*)field.data - complete);
+
+			names.push_back(member != found->second.end()
+				? member->second
+				: "Field " + std::to_string(names.size()));
+		};
+
+		return names;
 	};
 };
+
+#endif

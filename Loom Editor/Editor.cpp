@@ -255,10 +255,10 @@ namespace Loom
 		// Labels sit left of their widgets, Unity-style, in a column as wide as
 		// the longest one and no wider. longest seeds it with any label drawn
 		// beside the fields.
-		float LabelColumn(const LoomObject& object, float longest)
+		float LabelColumn(const std::vector<std::string>& labels, float longest)
 		{
-			for (size_t i = 0; i < object.GetFields().size(); i++)
-				longest = (std::max)(longest, ImGui::CalcTextSize(Shortened(FieldNames::Of(object, i), FLT_MAX).c_str()).x);
+			for (const std::string& label : labels)
+				longest = (std::max)(longest, ImGui::CalcTextSize(Shortened(label, FLT_MAX).c_str()).x);
 
 			return (std::min)(longest, ImGui::GetContentRegionAvail().x * max_label_share);
 		};
@@ -1734,7 +1734,7 @@ namespace Loom
 				constexpr const char* name_label = "Name";
 
 				const float column = LabelColumn(
-					*gameObject,
+					FieldNames::Of(*gameObject),
 					ImGui::CalcTextSize(name_label).x);
 
 				Label(name_label, column);
@@ -1917,14 +1917,16 @@ namespace Loom
 
 		// The Serial members the component declared, then whatever
 		// else it wants to draw for itself.
-		DrawFields(*component, LabelColumn(*component, 0.0f));
+		const std::vector<std::string> labels = FieldNames::Of(*component);
+
+		DrawFields(*component, labels, LabelColumn(labels, 0.0f));
 
 		component->OnGui();
 
 		ImGui::PopID();
 	};
 
-	void Editor::DrawFields(LoomObject& object, float column)
+	void Editor::DrawFields(LoomObject& object, const std::vector<std::string>& labels, float column)
 	{
 		ImGui::PushItemWidth(-FLT_MIN);
 
@@ -1934,7 +1936,7 @@ namespace Loom
 
 			ImGui::PushID(&field);
 
-			Label(FieldNames::Of(object, i), column);
+			Label(labels[i], column);
 
 			const char* label = "##value";
 			bool changed = false;
