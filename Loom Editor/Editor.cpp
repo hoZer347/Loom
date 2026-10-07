@@ -154,9 +154,15 @@ namespace Loom
 
 			const std::string shown = (target ? Describe(*target) : "none") + "###target";
 
+			const float spacing = ImGui::GetStyle().ItemInnerSpacing.x;
+			const float clear_width = ImGui::GetFrameHeight();
+
 			// A button for its frame: something the width of the other fields to
-			// drop onto.
-			ImGui::Button(shown.c_str(), ImVec2(ImGui::CalcItemWidth(), 0.0f));
+			// drop onto, sharing that width with the clear button when there is
+			// something to clear.
+			ImGui::Button(
+				shown.c_str(),
+				ImVec2(ImGui::CalcItemWidth() - (target ? clear_width + spacing : 0.0f), 0.0f));
 
 			if (target && ImGui::IsItemHovered())
 				ImGui::SetTooltip("%s", target->GetGuid().ToString().c_str());
@@ -172,13 +178,13 @@ namespace Loom
 
 			if (target)
 			{
-				ImGui::SameLine();
+				ImGui::SameLine(0.0f, spacing);
 
-				if (ImGui::SmallButton("x"))
+				if (ImGui::Button("x", ImVec2(clear_width, 0.0f)))
 					field.SetReference(nullptr);
 			};
 
-			ImGui::SameLine();
+			ImGui::SameLine(0.0f, spacing);
 			ImGui::TextUnformatted(label);
 		};
 	};

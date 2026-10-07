@@ -65,7 +65,8 @@ namespace Loom
 		// What handing this field an object would put in it: the object itself
 		// when the field holds its type, otherwise the first of a GameObject's
 		// components that fits, so a GameObject fills a field declared as one of
-		// its components. Null when nothing fits.
+		// its components. A scene stands in for its root GameObject, which the
+		// hierarchy draws as the scene. Null when nothing fits.
 		LoomObject* ReferenceFor(LoomObject* object) const;
 	};
 };

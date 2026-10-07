@@ -2,12 +2,17 @@
 
 #include "Loom API.h"
 
+#include "Guid.h"
+
 #include <string>
+#include <utility>
+#include <vector>
 
 
 namespace Loom
 {
 	struct Scene;
+	struct SerializedField;
 
 	/**
 	* Loom::SceneSerializer
@@ -31,6 +36,10 @@ namespace Loom
 	{
 		static constexpr const char* extension = ".loomscene";
 
+		// References written as guids whose objects did not exist yet when the
+		// line naming them was read.
+		using PendingReferences = std::vector<std::pair<const SerializedField*, Guid>>;
+
 		static std::string Serialize(Scene& scene);
 
 		// Writes the scene to a file, creating the directories leading to it.
@@ -41,7 +50,16 @@ namespace Loom
 		// not know, a field that no longer exists, a reference to something that
 		// was never written) is reported to std::cerr and skipped, so an
 		// out-of-date file still loads as far as it can.
-		static Scene* Deserialize(const std::string& text, std::string* error = nullptr);
+		//
+		// Given pending, the references the text leaves unresolved are added to
+		// it instead of being resolved at the end, so scenes that point into each
+		// other can all be built before ResolveReferences links them.
+		static Scene* Deserialize(
+			const std::string& text,
+			std::string* error = nullptr,
+			PendingReferences* pending = nullptr);
+
+		static void ResolveReferences(const PendingReferences& pending);
 		static Scene* LoadFromFile(const std::string& path, std::string* error = nullptr);
 	};
 };

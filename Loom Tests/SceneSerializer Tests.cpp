@@ -181,6 +181,50 @@ TEST_SUITE("SceneSerializer")
 		CHECK(marker->partner == loaded.scene->GetRoot().GetChildren().back());
 	};
 
+	// What the editor does to put its scenes back after Play: each is read on
+	// its own, and a reference into one read later only lands once all exist.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a reference into a scene loaded later lands once both are loaded")
+	{
+		MarkerRegistered registered;
+
+		const std::string target = Loom::Guid::New().ToString();
+
+		const std::string holding =
+			"Holding(" + Loom::Guid::New().ToString() + "):\n"
+			"\tGameObject Root(" + Loom::Guid::New().ToString() + ")\n"
+			"\t\tComponent Marker(" + Loom::Guid::New().ToString() + ")\n"
+			"\t\t\t2 = " + target + "\n";
+
+		const std::string held =
+			"Held(" + Loom::Guid::New().ToString() + "):\n"
+			"\tGameObject Root(" + Loom::Guid::New().ToString() + ")\n"
+			"\t\tGameObject Target(" + target + ")\n";
+
+		Loom::SceneSerializer::PendingReferences pending;
+
+		std::unique_ptr<Loom::Scene> first(Loom::SceneSerializer::Deserialize(holding, nullptr, &pending));
+		std::unique_ptr<Loom::Scene> second(Loom::SceneSerializer::Deserialize(held, nullptr, &pending));
+		Pump();
+
+		REQUIRE(first != nullptr);
+		REQUIRE(second != nullptr);
+		CHECK(pending.size() == 1);
+
+		Marker* marker = first->GetRoot().GetComponent<Marker>();
+
+		REQUIRE(marker != nullptr);
+		CHECK(marker->partner == nullptr);
+
+		Loom::SceneSerializer::ResolveReferences(pending);
+
+		REQUIRE(second->GetRoot().GetChildren().size() == 1);
+		CHECK(marker->partner == second->GetRoot().GetChildren().front());
+
+		first.reset();
+		second.reset();
+		Pump();
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "four spaces count as a tab")
 	{
 		const std::string text =

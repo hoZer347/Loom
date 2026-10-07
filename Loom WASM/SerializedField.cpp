@@ -2,6 +2,7 @@
 
 #include "GameObject.h"
 #include "LoomObject.h"
+#include "Scene.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -121,10 +122,20 @@ namespace Loom
 		if (accepts_reference(object))
 			return object;
 
-		if (const GameObject* gameObject = dynamic_cast<GameObject*>(object))
-			for (ComponentBase* component : gameObject->GetComponents())
-				if (accepts_reference(component))
-					return component;
+		GameObject* gameObject = dynamic_cast<GameObject*>(object);
+
+		if (Scene* scene = dynamic_cast<Scene*>(object))
+			gameObject = &scene->GetRoot();
+
+		if (gameObject == nullptr)
+			return nullptr;
+
+		if (accepts_reference(gameObject))
+			return gameObject;
+
+		for (ComponentBase* component : gameObject->GetComponents())
+			if (accepts_reference(component))
+				return component;
 
 		return nullptr;
 	};
