@@ -28,10 +28,6 @@ namespace Loom
 {
 	namespace
 	{
-		// The tree takes whatever the scripts section under it leaves, down to
-		// this many lines, past which the panel scrolls instead.
-		constexpr float minAssetTreeLines = 6.0f;
-
 		constexpr float namePromptWidth = 320.0f;
 		constexpr float promptButtonWidth = 120.0f;
 
@@ -243,17 +239,23 @@ namespace Loom
 				if (ProjectChanged())
 					RefreshProjectAssets();
 
-				ImGui::TextWrapped("%s", m_projectPath.c_str());
+				const char* const change = "Change...";
 
-				if (ImGui::Button("Change..."))
+				const float button_width =
+					ImGui::CalcTextSize(change).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+				const float button_x = ImGui::GetContentRegionMax().x - button_width;
+
+				ImGui::AlignTextToFramePadding();
+				ImGui::PushTextWrapPos(button_x - ImGui::GetStyle().ItemSpacing.x);
+				ImGui::TextWrapped("%s", m_projectPath.c_str());
+				ImGui::PopTextWrapPos();
+
+				ImGui::SameLine(button_x);
+
+				if (ImGui::Button(change))
 					m_dialogs->folder.Open();
 
-				ImGui::BeginChild(
-					"##assets",
-					ImVec2(0.0f, (std::max)(
-						ImGui::GetContentRegionAvail().y - m_scriptsSectionHeight,
-						ImGui::GetTextLineHeightWithSpacing() * minAssetTreeLines)),
-					ImGuiChildFlags_Border);
+				ImGui::BeginChild("##assets", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border);
 
 				if (m_assets.children.empty())
 					ImGui::TextDisabled("Nothing here yet. Right-click to create something.");
@@ -273,12 +275,6 @@ namespace Loom
 
 				ImGui::EndChild();
 			};
-
-			const float top = ImGui::GetCursorPosY();
-
-			DrawScriptsSection();
-
-			m_scriptsSectionHeight = ImGui::GetCursorPosY() - top;
 		};
 
 		ImGui::End();
@@ -528,25 +524,26 @@ namespace Loom
 		return path;
 	};
 
+	bool Editor::IsScriptFile(const std::string& path) const
+	{
+		if (!m_scripts.HasProject())
+			return false;
+
+		const std::filesystem::path extension = std::filesystem::path(path).extension();
+
+		return
+			(extension == ".hpp" || extension == ".h" || extension == ".cpp") &&
+			ProjectAssets::IsUnder(path, std::filesystem::path(m_scripts.GetProject()).parent_path().string());
+	};
+
 	void Editor::OpenAsset(const std::string& path)
 	{
 		if (std::filesystem::path(path).extension() == SceneSerializer::extension)
-		{
 			OpenScene(path);
-			return;
-		};
-
-		const ProjectAssets::OpenCommand command = ProjectAssets::OpenWith(
-			path,
-			std::filesystem::path(ScriptsProject()).parent_path().string(),
-			ScriptLibrary::FindVisualStudio2026());
-
-		// Anything OpenWith leaves to its association goes the way every other
-		// file does, which falls back to a text editor for one nothing claims.
-		if (command.file == path)
-			OpenFile(path);
+		else if (IsScriptFile(path))
+			OpenScript(path);
 		else
-			Shell(command.file.c_str(), command.parameters);
+			OpenFile(path);
 	};
 
 	bool Editor::OpenInShell(ImGuiContext*, const char* path)

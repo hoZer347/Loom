@@ -30,7 +30,6 @@ namespace Loom
 
 		// Text colours for the panels, picked to read on the theme's backgrounds.
 		extern const ImVec4 AccentText;
-		extern const ImVec4 WarningText;
 		extern const ImVec4 ErrorText;
 	};
 };

@@ -301,9 +301,8 @@ extension installed (Loom Visual Studio/install.ps1), right-click in Solution
 Explorer and pick Add > Loom Script... to write one there.
 
 Each header is compiled on its own and they may include one another, so
-anything defined outside a struct has to be inline. Compile them from the
-editor (the Compile button in the Project panel, or just press Play) or build
-the solution in Visual Studio. They are the same build. The library links
+anything defined outside a struct has to be inline. Pressing Play in the
+editor compiles them, or build the solution in Visual Studio. They are the same build. The library links
 the editor's import library, so there is one engine in the process rather
 than one per module.
 

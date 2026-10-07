@@ -195,15 +195,11 @@ namespace Loom
 		return "";
 	};
 
-	const std::string& ScriptLibrary::FindVisualStudio2026()
+	const std::string& ScriptLibrary::FindVisualStudio()
 	{
-		// The panel asks every frame and vswhere is a process, so the answer is
-		// kept: an installation does not come and go while the editor is up.
-		// 2026 is the 18.x line, and it sits beside a 2022 rather than replacing
-		// it, so the range narrows -latest to the newest 2026 rather than to the
-		// newest of anything.
-		static const std::string devenv =
-			VsWhere("-version \"[18.0,19.0)\" -find Common7\\IDE\\devenv.exe");
+		// vswhere is a process, so the answer is kept: an installation does not
+		// come and go while the editor is up.
+		static const std::string devenv = VsWhere("-find Common7\\IDE\\devenv.exe");
 
 		return devenv;
 	};
