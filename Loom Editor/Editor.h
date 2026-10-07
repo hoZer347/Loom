@@ -353,9 +353,6 @@ namespace Loom
 
 		bool IsOwned(Scene* scene) const;
 
-		// Where the given scene would be written if it were saved right now.
-		std::string DefaultPathFor(Scene* scene) const;
-
 		EditorViewport m_sceneView;
 		EditorViewport m_gameView;
 		EditorViewport m_debugView;
