@@ -15,6 +15,8 @@
 
 namespace Loom
 {
+	struct Camera;
+
 	struct LOOM_API Scene final :
 		public LoomObject
 	{
@@ -36,7 +38,10 @@ namespace Loom
 		// these every frame; the editor calls Render() itself when it is drawing
 		// the scene into its own framebuffer.
 		void Update(int thread = 0);
-		void Render();
+
+		// Seen through camera when one is given, in place of the first Camera in
+		// the hierarchy: the editor's views that look on from outside the game.
+		void Render(Camera* camera = nullptr);
 		void Physics();
 
 		static const std::vector<Scene*>& GetScenes() { return allScenes; };

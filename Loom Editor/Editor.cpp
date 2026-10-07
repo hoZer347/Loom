@@ -202,6 +202,21 @@ namespace Loom
 					glfwSetDropCallback((GLFWwindow*)viewport->PlatformHandle, callback);
 		};
 
+		// The Scene window's title is its scene's name; this part of it is what
+		// ImGui knows the window by, so it keeps its place in the layout.
+		constexpr const char* scene_window_id = "###Scene";
+		constexpr const char* game_window = "Game";
+		constexpr const char* debug_window = "Debug";
+
+		constexpr const char* view_windows[] = { scene_window_id, game_window, debug_window };
+
+		constexpr ImGuiWindowFlags view_flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+
+		constexpr const char* camera_controls =
+			"Right mouse: look, with WASD and QE to fly (Shift for faster)\n"
+			"Middle mouse: pan\n"
+			"Wheel: in and out";
+
 		constexpr const char* ellipsis = "...";
 
 		// Inspector field names longer than this are cut, however wide the panel.
@@ -501,9 +516,6 @@ namespace Loom
 			if (line.rfind("scene=", 0) == 0)
 				m_startupScene = line.substr(strlen("scene="));
 
-			if (line.rfind("opened=", 0) == 0)
-				m_lastOpenedScene = line.substr(strlen("opened="));
-
 			m_settings.Read(line);
 		};
 
@@ -530,9 +542,6 @@ namespace Loom
 		// leaving the scene behind.
 		if (!m_startupScene.empty())
 			out << "scene=" << m_startupScene << '\n';
-
-		if (!m_lastOpenedScene.empty())
-			out << "opened=" << m_lastOpenedScene << '\n';
 	};
 
 	std::string Editor::StartupScene() const
@@ -555,10 +564,18 @@ namespace Loom
 	{
 		std::error_code code;
 
-		// A project file stands for the folder it is in.
+		// A project file stands for the folder it is in, and is given scripts to
+		// go with it if it has none.
 		if (std::filesystem::path(path).extension() == ProjectTemplate::extension &&
 			std::filesystem::is_regular_file(path, code))
+		{
+			std::string error;
+
+			if (ProjectTemplate::EnsureScripts(path, &error).empty())
+				std::cerr << "No scripts project for " << path << ": " << error << std::endl;
+
 			return OpenProject(std::filesystem::absolute(path, code).parent_path().string(), open_scene);
+		};
 
 		// So does a scene file, for the project it belongs to, which then starts
 		// on that scene.
@@ -844,14 +861,16 @@ namespace Loom
 
 	void Editor::Undo()
 	{
-		if (CanStepHistory())
-			m_history.Undo(m_ownedScenes, [this](Scene* scene, const std::string& text) { return ReplaceScene(scene, text); });
+		if (CanStepHistory() &&
+			m_history.Undo(m_ownedScenes, [this](Scene* scene, const std::string& text) { return ReplaceScene(scene, text); }))
+			SyncSceneCopies();
 	};
 
 	void Editor::Redo()
 	{
-		if (CanStepHistory())
-			m_history.Redo(m_ownedScenes, [this](Scene* scene, const std::string& text) { return ReplaceScene(scene, text); });
+		if (CanStepHistory() &&
+			m_history.Redo(m_ownedScenes, [this](Scene* scene, const std::string& text) { return ReplaceScene(scene, text); }))
+			SyncSceneCopies();
 	};
 
 	bool Editor::CanStepHistory() const
@@ -865,8 +884,57 @@ namespace Loom
 	{
 		m_historyDirty = false;
 
-		if (!m_playing)
-			m_history.Record(m_ownedScenes);
+		if (m_playing)
+			return;
+
+		SyncSceneCopies();
+		m_history.Record(m_ownedScenes);
+	};
+
+	void Editor::SyncSceneCopies()
+	{
+		// AddChild and Destroy defer; the text has to show where they land.
+		Engine::DoTasks();
+
+		std::unordered_map<Guid, std::vector<Scene*>> copies{ };
+
+		for (Scene* scene : m_ownedScenes)
+			copies[scene->GetGuid()].push_back(scene);
+
+		std::erase_if(m_copyTexts,
+			[&](const auto& entry)
+			{
+				const auto open = copies.find(entry.first);
+
+				return open == copies.end() || open->second.size() < 2;
+			});
+
+		for (const auto& [guid, scenes] : copies)
+		{
+			if (scenes.size() < 2)
+				continue;
+
+			std::vector<std::string> texts{ };
+
+			for (Scene* scene : scenes)
+				texts.push_back(SceneSerializer::Serialize(*scene));
+
+			// A scene seen open twice for the first time has nothing to have
+			// changed from, so the copy opened first is the scene as it stands.
+			std::string& agreed = m_copyTexts[guid];
+
+			const auto edited = std::find_if(texts.begin(), texts.end(),
+				[&](const std::string& text) { return text != agreed; });
+
+			if (edited == texts.end())
+				continue;
+
+			agreed = *edited;
+
+			for (size_t i = 0; i < scenes.size(); i++)
+				if (texts[i] != agreed)
+					ReplaceScene(scenes[i], agreed);
+		};
 	};
 
 	Scene* Editor::ReplaceScene(Scene* scene, const std::string& text)
@@ -1023,6 +1091,13 @@ namespace Loom
 			if (node == nullptr || node->IsEmpty())
 				m_rebuildLayout = true;
 
+			// A layout saved before a view existed has nowhere for it, so it
+			// joins the others in the middle.
+			else if (const ImGuiDockNode* centre = ImGui::DockBuilderGetCentralNode(dockspace_id))
+				for (const char* window : view_windows)
+					if (ImGui::FindWindowSettingsByID(ImHashStr(window)) == nullptr)
+						ImGui::DockBuilderDockWindow(window, centre->m_ID);
+
 			// Nothing remembered from a previous run: ask where the scenes live.
 			if (m_projectPath.empty())
 			{
@@ -1048,6 +1123,8 @@ namespace Loom
 		if (m_showHierarchy)	DrawHierarchy();
 		if (m_showInspector)	DrawInspector();
 		if (m_showScene)		DrawScene();
+		if (m_showGame)			DrawGame();
+		if (m_showDebug)		DrawDebug();
 		if (m_showSceneData)	DrawSceneData();
 		if (m_showConsole)		DrawConsole();
 		if (m_showStats)		DrawStats();
@@ -1114,8 +1191,9 @@ namespace Loom
 		ImGui::DockBuilderDockWindow("Scene Data", bottom);
 		ImGui::DockBuilderDockWindow("Stats", bottom);
 
-		// Whatever is left in the middle is the selected scene.
-		ImGui::DockBuilderDockWindow("Scene", centre);
+		// Whatever is left in the middle is the views.
+		for (const char* window : view_windows)
+			ImGui::DockBuilderDockWindow(window, centre);
 
 		ImGui::DockBuilderFinish(dockspace_id);
 	};
@@ -1138,11 +1216,13 @@ namespace Loom
 				m_askForNewProject = true;
 			};
 
+			if (ImGui::MenuItem("Open Project..."))
+				ShowOpenProjectDialog();
+
+			ImGui::Separator();
+
 			if (ImGui::MenuItem("New Scene"))
 				CreateScene("Scene " + std::to_string(++m_sceneCounter));
-
-			if (ImGui::MenuItem("Open Scene..."))
-				ShowOpenSceneDialog();
 
 			if (ImGui::MenuItem("Save Scene As...", nullptr, false, m_activeScene != nullptr))
 			{
@@ -1159,13 +1239,7 @@ namespace Loom
 				m_dialogs->saveScene.Open();
 			};
 
-			if (ImGui::MenuItem("Close Scene", nullptr, false, IsOwned(m_activeScene)))
-				CloseScene(m_activeScene);
-
 			ImGui::Separator();
-
-			if (ImGui::MenuItem("Open Scene Folder..."))
-				m_dialogs->folder.Open();
 
 			if (ImGui::BeginMenu("Open Demo"))
 			{
@@ -1237,6 +1311,8 @@ namespace Loom
 			ImGui::MenuItem("Project", nullptr, &m_showProject);
 			ImGui::MenuItem("Inspector", nullptr, &m_showInspector);
 			ImGui::MenuItem("Scene", nullptr, &m_showScene);
+			ImGui::MenuItem(game_window, nullptr, &m_showGame);
+			ImGui::MenuItem(debug_window, nullptr, &m_showDebug);
 			ImGui::MenuItem("Scene Data", nullptr, &m_showSceneData);
 			ImGui::MenuItem("Console", nullptr, &m_showConsole);
 			ImGui::MenuItem("Stats", nullptr, &m_showStats);
@@ -1254,7 +1330,7 @@ namespace Loom
 			ImGui::EndMenu();
 		};
 
-		// Play control, mirrored in the Scene window's toolbar.
+		// Play control, mirrored in the Game window's toolbar.
 		ImGui::Separator();
 
 		if (ImGui::MenuItem(Engine::updateScenes ? "Pause" : "Play"))
@@ -1338,18 +1414,20 @@ namespace Loom
 		return false;
 	};
 
-	void Editor::ShowOpenSceneDialog()
+	void Editor::ShowOpenProjectDialog()
 	{
-		const std::filesystem::path last(m_lastOpenedScene);
+		// Projects tend to sit side by side, so the one open is a sibling of
+		// whatever is opened next.
+		const std::filesystem::path start = m_projectPath.empty()
+			? std::filesystem::path(DesktopPath())
+			: std::filesystem::path(m_projectPath).parent_path();
+
 		std::error_code code;
 
-		if (!m_lastOpenedScene.empty() &&
-			std::filesystem::is_directory(last.parent_path(), code))
-			m_dialogs->openScene.SetCurrentDirectory(last.parent_path());
-		else if (!m_projectPath.empty())
-			m_dialogs->openScene.SetCurrentDirectory(m_projectPath);
+		if (std::filesystem::is_directory(start, code))
+			m_dialogs->openProject.SetCurrentDirectory(start);
 
-		m_dialogs->openScene.Open();
+		m_dialogs->openProject.Open();
 	};
 
 	void Editor::DrawFileDialogs()
@@ -1363,19 +1441,14 @@ namespace Loom
 			m_askForFolder = false;
 		};
 
-		m_dialogs->openScene.Display();
+		m_dialogs->openProject.Display();
 
-		if (m_dialogs->openScene.HasSelected())
+		if (m_dialogs->openProject.HasSelected())
 		{
-			const std::string path = m_dialogs->openScene.GetSelected().string();
+			if (OpenProject(m_dialogs->openProject.GetSelected().string()))
+				m_askForFolder = false;
 
-			if (OpenScene(path))
-			{
-				m_lastOpenedScene = path;
-				SaveSettings();
-			};
-
-			m_dialogs->openScene.ClearSelected();
+			m_dialogs->openProject.ClearSelected();
 		};
 
 		m_dialogs->saveScene.Display();
@@ -2127,10 +2200,26 @@ namespace Loom
 
 	void Editor::DrawScene()
 	{
-		if (ImGui::Begin(
-			"Scene",
-			&m_showScene,
-			ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
+		const std::string title =
+			(m_activeScene ? m_activeScene->GetName() : std::string("Scene")) + scene_window_id;
+
+		if (ImGui::Begin(title.c_str(), &m_showScene, view_flags))
+		{
+			if (m_activeScene == nullptr)
+				ImGui::TextDisabled("No scene open. Pick one in the Project panel.");
+			else
+			{
+				DrawView(m_sceneView, { m_activeScene }, &m_sceneCamera);
+				TakeImportTarget(&m_activeScene->GetRoot());
+			};
+		};
+
+		ImGui::End();
+	};
+
+	void Editor::DrawGame()
+	{
+		if (ImGui::Begin(game_window, &m_showGame, view_flags))
 		{
 			constexpr const char* play_label = "Play";
 			constexpr const char* pause_label = "Pause";
@@ -2181,24 +2270,6 @@ namespace Loom
 			ImGui::EndDisabled();
 
 			ImGui::SameLine();
-			ImGui::SetNextItemWidth(220.0f);
-
-			if (ImGui::BeginCombo(
-				"##scene",
-				m_activeScene
-					? m_activeScene->NameAndID().c_str()
-					: "No scene"))
-			{
-				for (Scene* scene : Scene::GetScenes())
-					if (ImGui::Selectable(
-						scene->NameAndID().c_str(),
-						scene == m_activeScene))
-						SetActiveScene(scene);
-
-				ImGui::EndCombo();
-			};
-
-			ImGui::SameLine();
 			ImGui::ColorEdit4(
 				"Background",
 				Engine::clearColor,
@@ -2206,24 +2277,11 @@ namespace Loom
 
 			ImGui::Separator();
 
-			const ImVec2 available = ImGui::GetContentRegionAvail();
-
 			if (Scene::GetScenes().empty())
 				ImGui::TextDisabled("No scene open. Pick one in the Project panel.");
-			else if (available.x >= 1.0f && available.y >= 1.0f)
+			else
 			{
-				// Rendering here is fine mid-frame: ImGui only records the
-				// texture id now and draws with it once the frame is submitted.
-				m_viewport.Render((int)available.x, (int)available.y);
-
-				if (m_viewport.GetTexture())
-					ImGui::Image(
-						m_viewport.GetTextureID(),
-						ImVec2(
-							(float)m_viewport.GetWidth(),
-							(float)m_viewport.GetHeight()),
-						ImVec2(0.0f, 1.0f),	// The framebuffer is bottom-up,
-						ImVec2(1.0f, 0.0f));// so the V axis is flipped
+				DrawView(m_gameView, Scene::GetScenes(), nullptr);
 
 				if (m_activeScene)
 					TakeImportTarget(&m_activeScene->GetRoot());
@@ -2231,6 +2289,62 @@ namespace Loom
 		};
 
 		ImGui::End();
+	};
+
+	void Editor::DrawDebug()
+	{
+		if (ImGui::Begin(debug_window, &m_showDebug, view_flags))
+		{
+			if (Scene::GetScenes().empty())
+				ImGui::TextDisabled("Nothing loaded.");
+			else
+			{
+				DrawView(m_debugView, Scene::GetScenes(), &m_debugCamera);
+
+				if (m_activeScene)
+					TakeImportTarget(&m_activeScene->GetRoot());
+			};
+		};
+
+		ImGui::End();
+	};
+
+	void Editor::DrawView(EditorViewport& view, const std::vector<Scene*>& scenes, EditorCamera* camera)
+	{
+		const ImVec2 available = ImGui::GetContentRegionAvail();
+
+		if (available.x < 1.0f || available.y < 1.0f)
+			return;
+
+		// The camera is steered before the scenes are drawn, so the image keeps
+		// up with the mouse rather than trailing it by a frame.
+		if (camera)
+		{
+			const ImVec2 corner = ImGui::GetCursorScreenPos();
+
+			ImGui::InvisibleButton(
+				"##fly",
+				available,
+				ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
+
+			camera->Drive(ImGui::IsItemHovered(), ImGui::IsItemActive());
+
+			if (!ImGui::IsItemActive())
+				ImGui::SetItemTooltip("%s", camera_controls);
+
+			ImGui::SetCursorScreenPos(corner);
+		};
+
+		// Rendering here is fine mid-frame: ImGui only records the texture id
+		// now and draws with it once the frame is submitted.
+		view.Render((int)available.x, (int)available.y, scenes, camera ? camera->Get() : nullptr);
+
+		if (view.GetTexture())
+			ImGui::Image(
+				view.GetTextureID(),
+				ImVec2((float)view.GetWidth(), (float)view.GetHeight()),
+				ImVec2(0.0f, 1.0f),	// The framebuffer is bottom-up,
+				ImVec2(1.0f, 0.0f));// so the V axis is flipped
 	};
 
 	void Editor::QueueImport(const std::string& path)
@@ -2423,7 +2537,7 @@ namespace Loom
 					: "paused";
 
 			ImGui::Text("Updating: %s", IsPlaying() ? updating : "stopped");
-			ImGui::Text("Viewport: %d x %d", m_viewport.GetWidth(), m_viewport.GetHeight());
+			ImGui::Text("Game view: %d x %d", m_gameView.GetWidth(), m_gameView.GetHeight());
 
 			if (m_activeScene)
 			{

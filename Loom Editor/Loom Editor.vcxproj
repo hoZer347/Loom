@@ -102,6 +102,7 @@
     <ClCompile Include="EditorSettingsWindow.cpp" />
     <ClCompile Include="EditorTheme.cpp" />
     <ClCompile Include="EditorViewport.cpp" />
+    <ClCompile Include="EditorCamera.cpp" />
     <ClCompile Include="ModelImporter.cpp" />
     <ClCompile Include="ModelPreview.cpp" />
     <ClCompile Include="SceneHistory.cpp" />
@@ -120,6 +121,7 @@
     <ClInclude Include="EditorSettings.h" />
     <ClInclude Include="EditorTheme.h" />
     <ClInclude Include="EditorViewport.h" />
+    <ClInclude Include="EditorCamera.h" />
     <ClInclude Include="ModelImporter.h" />
     <ClInclude Include="ModelPreview.h" />
     <ClInclude Include="SceneHistory.h" />
