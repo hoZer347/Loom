@@ -2132,7 +2132,11 @@ namespace Loom
 			&m_showScene,
 			ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
 		{
-			constexpr const char* play_labels[] = { "Play", "Pause", "Stop", "Step" };
+			constexpr const char* play_label = "Play";
+			constexpr const char* pause_label = "Pause";
+			constexpr const char* stop_label = "Stop";
+			constexpr const char* step_label = "Step";
+			constexpr const char* play_labels[] = { play_label, pause_label, stop_label, step_label };
 			constexpr float frame_sides = 2.0f;
 
 			float label_width = 0.0f;
@@ -2142,33 +2146,33 @@ namespace Loom
 
 			const ImVec2 play_button_size(label_width + ImGui::GetStyle().FramePadding.x * frame_sides, 0.0f);
 
-			ImGui::BeginDisabled(Engine::updateScenes);
+			ImGui::BeginDisabled(Engine::updateScenes || m_playAfterCompile);
 
-			if (ImGui::Button("Play", play_button_size))
+			if (ImGui::Button(play_label, play_button_size))
 				TogglePlay();
 
 			ImGui::EndDisabled();
 			ImGui::SameLine();
 			ImGui::BeginDisabled(!Engine::updateScenes);
 
-			if (ImGui::Button("Pause", play_button_size))
+			if (ImGui::Button(pause_label, play_button_size))
 				TogglePlay();
 
 			ImGui::EndDisabled();
 			ImGui::SameLine();
 			ImGui::BeginDisabled(!IsPlaying());
 
-			if (ImGui::Button("Stop", play_button_size))
+			if (ImGui::Button(stop_label, play_button_size))
 				Stop();
 
 			ImGui::EndDisabled();
 			ImGui::SameLine();
 
-			// A build has the scenes down, so there is nothing to step; a
-			// running scene is already past the next frame.
+			// A build has the scenes down, so there is nothing to step, and a
+			// running scene has no single frame to step to.
 			ImGui::BeginDisabled(m_scripts.IsBuilding() || Engine::updateScenes);
 
-			if (ImGui::Button("Step", play_button_size))
+			if (ImGui::Button(step_label, play_button_size))
 			{
 				BeginPlay();
 				m_steppedLastFrame = true;
