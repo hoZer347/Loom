@@ -51,7 +51,6 @@ namespace Loom
 		constexpr ImVec4 AccentHovered = Rgb(0x6AA1F8);
 		constexpr ImVec4 AccentActive = Rgb(0x3A73D6);
 		constexpr ImVec4 AccentLight = Rgb(0x9DC1FF);
-		constexpr ImVec4 Warning = Rgb(0xE5A445);
 		constexpr ImVec4 Error = Rgb(0xF0625D);
 
 		constexpr float SelectionAlpha = 0.35f;
@@ -77,7 +76,6 @@ namespace Loom
 	};
 
 	const ImVec4 EditorTheme::AccentText = AccentLight;
-	const ImVec4 EditorTheme::WarningText = Warning;
 	const ImVec4 EditorTheme::ErrorText = Error;
 
 	std::vector<std::string> EditorTheme::Fonts()

@@ -1,7 +1,6 @@
 #include "Editor.h"
 
 #include "EditorFileDialogs.h"
-#include "EditorTheme.h"
 #include "ProjectTemplate.h"
 
 #include "Engine.h"
@@ -42,26 +41,80 @@ namespace Loom
 				: (std::filesystem::path(folder) / relative).lexically_normal().string();
 		};
 
-		// Opens a solution in the given devenv, or in whatever .sln is associated
-		// with when no devenv is named.
-		void OpenSolution(const std::string& solution, const std::string& devenv)
+		void Launch(const std::string& file, const std::string& parameters)
 		{
-			const bool named = !devenv.empty();
-
 			const HINSTANCE result = ShellExecuteA(
 				nullptr,
 				"open",
-				named ? devenv.c_str() : solution.c_str(),
-				named ? ('"' + solution + '"').c_str() : nullptr,
+				file.c_str(),
+				parameters.empty() ? nullptr : parameters.c_str(),
 				nullptr,
 				SW_SHOWNORMAL);
 
 			// The one error code ShellExecute has: anything at or below 32.
 			if ((INT_PTR)result <= 32)
 				std::cerr
-					<< "Could not open " << solution
+					<< "Could not open " << file << ' ' << parameters
 					<< " (error " << (INT_PTR)result << ')' << std::endl;
 		};
+
+		// Visual Studio titles its window "<solution> - Microsoft Visual Studio",
+		// with a state such as "(Running)" between the two while debugging.
+		bool SolutionIsOpen(const std::string& solution)
+		{
+			struct Search
+			{
+				std::string prefix;
+				bool found;
+			};
+
+			Search search{ std::filesystem::path(solution).stem().string() + ' ', false };
+
+			EnumWindows(
+				[](HWND window, LPARAM parameter) -> BOOL
+				{
+					Search& search = *reinterpret_cast<Search*>(parameter);
+
+					char title[MAX_PATH]{ };
+					GetWindowTextA(window, title, MAX_PATH);
+
+					const std::string text = title;
+
+					search.found =
+						text.rfind(search.prefix, 0) == 0 &&
+						text.find(" - Microsoft Visual Studio") != std::string::npos;
+
+					return !search.found;
+				},
+				reinterpret_cast<LPARAM>(&search));
+
+			return search.found;
+		};
+	};
+
+	void Editor::OpenScript(const std::string& path)
+	{
+		const std::string& devenv = ScriptLibrary::FindVisualStudio();
+
+		// A hand-written project need not have a solution beside it, even though
+		// every project the editor writes does.
+		const std::string solution =
+			std::filesystem::path(m_scripts.GetProject()).replace_extension(".sln").string();
+
+		std::error_code code;
+
+		if (devenv.empty())
+		{
+			Launch(std::filesystem::exists(solution, code) ? solution : path, "");
+			return;
+		};
+
+		// /Edit hands the file to the Visual Studio already up rather than
+		// starting another, which would open the solution a second time.
+		if (!std::filesystem::exists(solution, code) || SolutionIsOpen(solution))
+			Launch(devenv, "/Edit \"" + path + '"');
+		else
+			Launch(devenv, '"' + solution + "\" /Command \"File.OpenFile \\\"" + path + "\\\"\"");
 	};
 
 	void Editor::LoadProjectFile()
@@ -300,10 +353,9 @@ namespace Loom
 			return;
 		};
 
-		// Pressing Play on scripts that have been edited since the library was
-		// built compiles them first, the way it would in an editor you have used
-		// before.
-		if (m_scripts.HasProject() && !m_scripts.IsBuilding() && m_scripts.IsStale())
+		// A run starts from freshly compiled scripts. A paused one carries on
+		// with the library it started with.
+		if (!m_playing && m_scripts.HasProject() && !m_scripts.IsBuilding())
 		{
 			m_playAfterCompile = true;
 			CompileScripts();
@@ -407,78 +459,6 @@ namespace Loom
 		out.close();
 
 		m_webPlayer.Launch(m_projectPath, scene.string());
-	};
-
-	void Editor::DrawScriptsSection()
-	{
-		ImGui::Separator();
-
-		if (!m_scripts.HasProject())
-		{
-			ImGui::TextDisabled("No scripts project.");
-			ImGui::TextDisabled(m_projectFile.empty()
-				? "File > New Project makes one."
-				: "Opening its .loomproject with File > Open Project makes one.");
-
-			return;
-		};
-
-		ImGui::TextUnformatted("Scripts");
-
-		const bool building = m_scripts.IsBuilding();
-
-		ImGui::BeginDisabled(building);
-
-		if (ImGui::Button(building ? "Compiling..." : "Compile"))
-			CompileScripts();
-
-		ImGui::EndDisabled();
-
-		ImGui::SameLine();
-
-		// A hand-written project need not have a solution beside it, even though
-		// every project the editor writes does.
-		const std::string solution =
-			std::filesystem::path(m_scripts.GetProject()).replace_extension(".sln").string();
-
-		std::error_code code;
-		const bool has_solution = std::filesystem::exists(solution, code);
-
-		ImGui::BeginDisabled(!has_solution);
-
-		if (ImGui::Button("Visual Studio"))
-			OpenSolution(solution, "");
-
-		ImGui::EndDisabled();
-
-		if (!has_solution && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-			ImGui::SetTooltip("No solution beside %s.", m_scripts.GetProject().c_str());
-
-		// The button above goes wherever .sln is associated, which on a machine
-		// with both installed is usually the older one. Its own row: three
-		// buttons do not fit across the Project panel once it is narrowed.
-		const std::string& devenv = ScriptLibrary::FindVisualStudio2026();
-
-		ImGui::BeginDisabled(!has_solution || devenv.empty());
-
-		if (ImGui::Button("Visual Studio 2026"))
-			OpenSolution(solution, devenv);
-
-		ImGui::EndDisabled();
-
-		if (has_solution && devenv.empty() &&
-			ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-			ImGui::SetTooltip("No Visual Studio 2026 on this machine.");
-
-		if (m_scripts.IsStale() && !building)
-			ImGui::TextColored(
-				EditorTheme::WarningText,
-				"Edited since the last build.");
-
-		ImGui::TextWrapped("%s", m_scripts.GetStatus().c_str());
-
-		for (const std::string& type : m_scripts.GetTypes())
-			ImGui::BulletText("%s", type.c_str());
 	};
 
 	void Editor::DrawNewProjectPrompt()

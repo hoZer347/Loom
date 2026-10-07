@@ -458,8 +458,8 @@ int main(int argc, char** argv)
 	if (compile)
 		editor.CompileScripts();
 
-	// The same path the Play button takes, so a script library that has
-	// fallen behind its sources is rebuilt here too.
+	// The same path the Play button takes, so the scripts are compiled first
+	// here too.
 	if (play)
 		editor.TogglePlay();
 

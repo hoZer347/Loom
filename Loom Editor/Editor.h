@@ -191,7 +191,6 @@ namespace Loom
 		void DrawAssetContextMenu(const AssetNode& node);
 		void DrawCreateMenu(const std::string& folder);
 		void DrawCreateAssetPrompt();
-		void DrawScriptsSection();
 		void DrawHierarchy();
 		void DrawSceneNode(Scene* scene);
 		void DrawGameObjectNode(GameObject* gameObject);
@@ -273,10 +272,14 @@ namespace Loom
 		// and the scenes in it.
 		void RefreshProjectAssets();
 
-		// Scenes open in the editor; anything else goes to whatever Windows
-		// opens that kind of file with, and to the text editor when nothing
-		// claims it.
+		// Scenes open in the editor and scripts in Visual Studio; anything else
+		// goes to whatever Windows opens that kind of file with, and to the
+		// text editor when nothing claims it.
 		void OpenAsset(const std::string& path);
+
+		// A source file of the scripts project, which opens in its solution.
+		bool IsScriptFile(const std::string& path) const;
+		void OpenScript(const std::string& path);
 
 		// ImGui's way of opening a link, which for a file in the project is
 		// OpenAsset's.
@@ -395,9 +398,6 @@ namespace Loom
 		std::string m_assetWatchPath{ };
 		std::string m_selectedAsset{ };
 		bool m_revealSelectedAsset = false;
-
-		// How tall the scripts section under the tree came out last frame.
-		float m_scriptsSectionHeight = 0.0f;
 
 		// The scene a session opens with: what the settings file said last time,
 		// and then whichever one this session last made active.

@@ -67,12 +67,9 @@ namespace Loom
 		const std::string& GetLibrary() const { return m_library; };
 		const std::string& GetStatus() const { return m_status; };
 
-		// The component types this library added, in registration order.
-		const std::vector<std::string>& GetTypes() const { return m_types; };
-
-		// devenv.exe from the Visual Studio 2026 on this machine, or empty when
-		// there is none. Looked up once and held.
-		static const std::string& FindVisualStudio2026();
+		// devenv.exe from the newest Visual Studio on this machine, or empty
+		// when there is none. Looked up once and held.
+		static const std::string& FindVisualStudio();
 
 
 	private:
