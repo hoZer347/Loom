@@ -14,10 +14,6 @@
 #include <iostream>
 #include <utility>
 
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <shellapi.h>
-
 
 namespace Loom
 {
@@ -40,81 +36,6 @@ namespace Loom
 				? relative.lexically_normal().string()
 				: (std::filesystem::path(folder) / relative).lexically_normal().string();
 		};
-
-		void Launch(const std::string& file, const std::string& parameters)
-		{
-			const HINSTANCE result = ShellExecuteA(
-				nullptr,
-				"open",
-				file.c_str(),
-				parameters.empty() ? nullptr : parameters.c_str(),
-				nullptr,
-				SW_SHOWNORMAL);
-
-			// The one error code ShellExecute has: anything at or below 32.
-			if ((INT_PTR)result <= 32)
-				std::cerr
-					<< "Could not open " << file << ' ' << parameters
-					<< " (error " << (INT_PTR)result << ')' << std::endl;
-		};
-
-		// Visual Studio titles its window "<solution> - Microsoft Visual Studio",
-		// with a state such as "(Running)" between the two while debugging.
-		bool SolutionIsOpen(const std::string& solution)
-		{
-			struct Search
-			{
-				std::string prefix;
-				bool found;
-			};
-
-			Search search{ std::filesystem::path(solution).stem().string() + ' ', false };
-
-			EnumWindows(
-				[](HWND window, LPARAM parameter) -> BOOL
-				{
-					Search& search = *reinterpret_cast<Search*>(parameter);
-
-					char title[MAX_PATH]{ };
-					GetWindowTextA(window, title, MAX_PATH);
-
-					const std::string text = title;
-
-					search.found =
-						text.rfind(search.prefix, 0) == 0 &&
-						text.find(" - Microsoft Visual Studio") != std::string::npos;
-
-					return !search.found;
-				},
-				reinterpret_cast<LPARAM>(&search));
-
-			return search.found;
-		};
-	};
-
-	void Editor::OpenScript(const std::string& path)
-	{
-		const std::string& devenv = ScriptLibrary::FindVisualStudio();
-
-		// A hand-written project need not have a solution beside it, even though
-		// every project the editor writes does.
-		const std::string solution =
-			std::filesystem::path(m_scripts.GetProject()).replace_extension(".sln").string();
-
-		std::error_code code;
-
-		if (devenv.empty())
-		{
-			Launch(std::filesystem::exists(solution, code) ? solution : path, "");
-			return;
-		};
-
-		// /Edit hands the file to the Visual Studio already up rather than
-		// starting another, which would open the solution a second time.
-		if (!std::filesystem::exists(solution, code) || SolutionIsOpen(solution))
-			Launch(devenv, "/Edit \"" + path + '"');
-		else
-			Launch(devenv, '"' + solution + "\" /Command \"File.OpenFile \\\"" + path + "\\\"\"");
 	};
 
 	void Editor::LoadProjectFile()
@@ -226,16 +147,23 @@ namespace Loom
 		// The components in the open scenes are about to have the code behind
 		// them unloaded, so the scenes go out as text and come back the same way.
 		m_snapshots = TakeSnapshots();
+		m_selectedBeforeBuild = m_selected ? m_selected->GetGuid() : Guid();
 
 		CloseAllScenes();
 
 		m_scripts.Unload();
 
 		if (!m_scripts.Build())
-		{
-			RestoreSnapshots(m_snapshots);
-			m_snapshots.clear();
-		};
+			RestoreAfterBuild();
+	};
+
+	void Editor::RestoreAfterBuild()
+	{
+		RestoreSnapshots(m_snapshots);
+		m_snapshots.clear();
+
+		if (GameObject* selected = LoomObject::GetByGuid<GameObject>(m_selectedBeforeBuild))
+			Select(selected);
 	};
 
 	void Editor::CloseAllScenes()
@@ -265,8 +193,7 @@ namespace Loom
 		if (m_scripts.LastBuildSucceeded())
 			m_scripts.Load();
 
-		RestoreSnapshots(m_snapshots);
-		m_snapshots.clear();
+		RestoreAfterBuild();
 
 		RefreshProjectAssets();
 

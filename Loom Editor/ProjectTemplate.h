@@ -11,7 +11,7 @@ namespace Loom
 	*   Visual Studio C++ project for the scripts that go with it
 	* - The scripts project builds a DLL against the editor's import library, so
 	*   opening it in Visual Studio and pressing build is the same build the
-	*   editor's Compile button runs
+	*   editor's Play runs first
 	*/
 	struct ProjectTemplate final
 	{
