@@ -98,7 +98,8 @@ namespace Loom
 		FieldType type,
 		void* data,
 		LoomObject* (*get_reference)(void*),
-		void (*set_reference)(void*, LoomObject*))
+		void (*set_reference)(void*, LoomObject*),
+		bool (*accepts_reference)(LoomObject*))
 	{
 		LoomObject* owner = constructing;
 
@@ -121,6 +122,7 @@ namespace Loom
 		field.data = data;
 		field.get_reference = get_reference;
 		field.set_reference = set_reference;
+		field.accepts_reference = accepts_reference;
 
 		// Listed once, however many reference fields the object goes on to declare.
 		if (type == FieldType::Reference && !owner->m_references)

@@ -40,6 +40,14 @@ namespace
 		Loom::Serial<Loom::GameObject*> target;
 	};
 
+	// One reference of each kind the editor fills by dragging.
+	struct Slots final : Loom::Component<Slots>
+	{
+		Loom::Serial<Loom::Scene*> scene;
+		Loom::Serial<Loom::GameObject*> gameObject;
+		Loom::Serial<Loom::Material*> material;
+	};
+
 	// A field belongs to the object being built around it, whichever class in
 	// the hierarchy declared it.
 	struct Base : Loom::LoomObject
@@ -338,5 +346,37 @@ TEST_SUITE("SerializedField")
 		// declines rather than handing back something of the wrong type.
 		CHECK_FALSE(Field(*pointer, 0).Read(scene.GetGuid().ToString()));
 		CHECK(pointer->target == nullptr);
+	};
+	// What the editor's inspector does with a dragged scene or GameObject.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a reference takes a dropped object, or the component of it that fits")
+	{
+		Loom::Scene scene("drops");
+		Pump();
+
+		Slots* slots = scene.GetRoot().Attach<Slots>();
+		Loom::GameObject* plain = scene.AddChild("Plain");
+		Loom::GameObject* textured = scene.AddChild("Textured");
+		Loom::Material* material = textured->Attach<Loom::Material>();
+		Pump();
+
+		const Loom::SerializedField& sceneField = Field(*slots, 0);
+		const Loom::SerializedField& gameObjectField = Field(*slots, 1);
+		const Loom::SerializedField& materialField = Field(*slots, 2);
+
+		CHECK(sceneField.ReferenceFor(&scene) == &scene);
+		CHECK(sceneField.ReferenceFor(plain) == nullptr);
+
+		CHECK(gameObjectField.ReferenceFor(plain) == plain);
+		CHECK(gameObjectField.ReferenceFor(&scene) == nullptr);
+
+		CHECK(materialField.ReferenceFor(textured) == material);
+		CHECK(materialField.ReferenceFor(plain) == nullptr);
+
+		CHECK(gameObjectField.ReferenceFor(nullptr) == nullptr);
+
+		EveryField values;
+		Pump();
+
+		CHECK(Field(values, Count).ReferenceFor(plain) == nullptr);
 	};
 };

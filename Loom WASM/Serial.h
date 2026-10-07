@@ -24,7 +24,8 @@ namespace Loom
 		FieldType type,
 		void* data,
 		LoomObject* (*get_reference)(void*),
-		void (*set_reference)(void*, LoomObject*));
+		void (*set_reference)(void*, LoomObject*),
+		bool (*accepts_reference)(LoomObject*));
 
 	// Every type the scene format can write, named by the member's own type.
 	// Anything else is a compile error rather than a field that quietly writes
@@ -151,9 +152,13 @@ namespace Loom
 					[](void* data, LoomObject* object)
 					{
 						*(T*)data = dynamic_cast<T>(object);
+					},
+					[](LoomObject* object)
+					{
+						return dynamic_cast<T>(object) != nullptr;
 					});
 			}
-			else RegisterSerialField(FieldTypeOf<T>(), Data(), nullptr, nullptr);
+			else RegisterSerialField(FieldTypeOf<T>(), Data(), nullptr, nullptr, nullptr);
 		};
 
 		// The vector types are written out of their components, so the field

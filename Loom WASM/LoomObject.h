@@ -87,7 +87,8 @@ namespace Loom
 			FieldType type,
 			void* data,
 			LoomObject* (*get_reference)(void*),
-			void (*set_reference)(void*, LoomObject*));
+			void (*set_reference)(void*, LoomObject*),
+			bool (*accepts_reference)(LoomObject*));
 
 		std::vector<SerializedField> m_fields{ };
 
