@@ -958,9 +958,6 @@ namespace Loom
 
 		ValidateSelection();
 
-		for (Scene* scene : Scene::GetScenes())
-			scene->EditorUpdate();
-
 		if (m_historyDirty && !ImGui::IsAnyItemActive() && !ImGui::IsAnyMouseDown())
 			RecordHistory();
 
