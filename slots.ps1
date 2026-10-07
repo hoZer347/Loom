@@ -51,7 +51,7 @@ $SharedLibraries = @(
 function Invoke-Git
 {
     & git -C @args
-    if ($LASTEXITCODE -ne 0) { throw "git $($args[1..$args.Count]) failed in $($args[0])" }
+    if ($LASTEXITCODE -ne 0) { throw "git $($args[1..($args.Count - 1)]) failed in $($args[0])" }
 }
 
 # For git calls that are allowed to fail. Hosts that turn a native command's
@@ -177,7 +177,10 @@ switch ($Command)
                 continue
             }
 
-            $state = if ($null -ne $record.Locked) { "claimed  $($record.Locked)" } else { 'free' }
+            $state = if ($null -ne $record.Locked) { "claimed  $($record.Locked)" }
+                elseif (Test-Git $userRoot show-ref --verify --quiet "$ClaimPrefix$number")
+                    { "stuck: $ClaimPrefix$number exists without a lock, delete it to free the slot" }
+                else { 'free' }
             $dirty = @(& git -C $slot status --porcelain).Count
             $note = if ($dirty) { "  ($dirty uncommitted)" } else { '' }
             Write-Output "Loom $number  $state$note"
