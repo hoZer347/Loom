@@ -181,10 +181,8 @@ vec3 LoomLight(vec3 normal, vec4 lightSpace)
 
 		// A zero vector has no direction to normalise; straight down is the
 		// least surprising stand-in.
-		glm::vec3 Normalised(const glm::vec3& v)
+		glm::vec3 Normalised(const glm::vec3& direction)
 		{
-			const glm::vec3 direction = *v;
-
 			return glm::length(direction) > 0.0f
 				? glm::normalize(direction)
 				: glm::vec3(0.0f, -1.0f, 0.0f);

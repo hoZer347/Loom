@@ -233,6 +233,11 @@ namespace Loom
 
 		void BuildDefaultLayout(unsigned int dockspace_id);
 
+		// Records the item just drawn as where a queued import goes, if the
+		// mouse is over it.
+		void TakeImportTarget(GameObject* gameObject);
+		void ImportQueued();
+
 		// Rescans the project folder: the asset tree the Project panel draws,
 		// and the scenes in it.
 		void RefreshProjectAssets();
