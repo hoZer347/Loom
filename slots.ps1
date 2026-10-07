@@ -297,8 +297,6 @@ switch ($Command)
         {
             # The user's Loom has the trunk checked out, so its files move with it.
             # A fast-forward keeps their uncommitted work and refuses if it would overwrite any.
-            if ((& git -C $userRoot rev-parse $Trunk) -ne $base) { throw "$Trunk moved while the tests ran. Run merge again." }
-
             $previous = $ErrorActionPreference
             $ErrorActionPreference = 'Continue'
             $output = & git -C $userRoot merge --ff-only --quiet $head 2>&1
