@@ -46,7 +46,6 @@ namespace Loom
 			Move(position);
 		};
 
-	private:
 		/// Shortens the vector to at most max_length, leaving a shorter one alone, which is
 		/// what an analogue stick's read wants.
 		static glm::vec3 ClampMagnitude(const glm::vec3& value, float max_length)
@@ -73,6 +72,7 @@ namespace Loom
 			return current + difference / distance * max_delta;
 		};
 
+	private:
 		void Move(glm::vec3& position)
 		{
 			position += _velocity * Time::DeltaTime();

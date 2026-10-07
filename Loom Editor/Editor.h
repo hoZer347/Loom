@@ -185,6 +185,7 @@ namespace Loom
 		GameObject* m_selected = nullptr;
 		bool m_nodePressOpened = false;
 		std::string m_pendingSelection{ };
+		int m_selectionFramesLeft = 0;
 		std::vector<Scene*> m_ownedScenes{ };
 
 		// Where each open scene came from, so a scene can be put back after the

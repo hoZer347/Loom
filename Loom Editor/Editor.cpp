@@ -47,6 +47,8 @@ namespace Loom
 		// The thread ID that takes a GameObject out of the update loop entirely.
 		constexpr int UNPROCESSED_THREAD = -1;
 
+		constexpr int SELECTION_FRAMES = 60;
+
 		constexpr ImGuiTreeNodeFlags HEADER_FLAGS =
 			ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap;
 
@@ -83,10 +85,6 @@ namespace Loom
 			return true;
 		};
 
-		// Sits beside the executable and holds the one thing worth remembering
-		// between runs: which folder the project is in. Beside the executable
-		// rather than in the working directory, because opening a project moves
-		// the working directory to it.
 		GameObject* FindByName(GameObject& root, const std::string& name)
 		{
 			if (root.GetName() == name)
@@ -99,6 +97,10 @@ namespace Loom
 			return nullptr;
 		};
 
+		// Sits beside the executable and holds the one thing worth remembering
+		// between runs: which folder the project is in. Beside the executable
+		// rather than in the working directory, because opening a project moves
+		// the working directory to it.
 		std::filesystem::path BesideExecutable(const char* file)
 		{
 			char buffer[MAX_PATH]{ };
@@ -565,20 +567,35 @@ namespace Loom
 	void Editor::RequestSelection(const std::string& name)
 	{
 		m_pendingSelection = name;
+		m_selectionFramesLeft = SELECTION_FRAMES;
 	};
 
 	void Editor::ValidateSelection()
 	{
 		const std::vector<Scene*>& scenes = Scene::GetScenes();
 
-		if (!m_pendingSelection.empty())
+		// The scenes load once the scripts have built, and add their children
+		// through the task queue, so the name is looked for over a few frames
+		// after the build before it is given up on.
+		if (!m_pendingSelection.empty() && !m_scripts.IsBuilding())
+		{
+			GameObject* named = nullptr;
+
 			for (Scene* scene : scenes)
-				if (GameObject* named = FindByName(scene->GetRoot(), m_pendingSelection))
-				{
-					Select(named);
-					m_pendingSelection.clear();
+				if ((named = FindByName(scene->GetRoot(), m_pendingSelection)))
 					break;
-				};
+
+			if (named)
+			{
+				Select(named);
+				m_pendingSelection.clear();
+			}
+			else if (--m_selectionFramesLeft <= 0)
+			{
+				std::cerr << "No GameObject named '" << m_pendingSelection << "'" << std::endl;
+				m_pendingSelection.clear();
+			};
+		};
 
 		if (m_activeScene &&
 			std::find(scenes.begin(), scenes.end(), m_activeScene) == scenes.end())

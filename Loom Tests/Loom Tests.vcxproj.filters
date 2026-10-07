@@ -52,6 +52,9 @@
     <ClCompile Include="Input Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="SpeedManager Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Test Support.h" />

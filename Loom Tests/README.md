@@ -56,6 +56,7 @@ window or a GL context, so the module runs headless; no canvas, no browser.
 | `Texture` | The type exists; it has no state yet |
 | `Collider` | Type-level only — see the note in the file |
 | `Input` | Button stubs, cursor and screen fields |
+| `SpeedManager` | `ClampMagnitude` and `MoveTowards`: clamping, no overshoot, zero-length input |
 | `DataPackage` | Wire tag, virtual `Handle`, `Serialize` aliasing, `Deserialize` round-tripping |
 
 ## How it is wired up

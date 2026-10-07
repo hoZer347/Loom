@@ -8,7 +8,11 @@
 #include "Scene.h"
 #include "SceneSerializer.h"
 
+#include "glm/glm.hpp"
+
+#include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 
 using LoomTests::Pump;
@@ -291,6 +295,59 @@ TEST_SUITE("SceneSerializer")
 
 		REQUIRE(marker != nullptr);
 		CHECK(*marker->label == "kept");
+	};
+
+	// Scenes written before GameObject had a transform stop at the thread
+	// fields; they load with the default transform and nothing to complain about.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene without transform fields loads the identity transform")
+	{
+		const std::string text =
+			"Old(" + Loom::Guid::New().ToString() + "):\n"
+			"\tGameObject Root(" + Loom::Guid::New().ToString() + ")\n"
+			"\t\t0 = 0\n"
+			"\t\t1 = false\n";
+
+		std::ostringstream captured;
+		std::streambuf* previous = std::cerr.rdbuf(captured.rdbuf());
+
+		const Loaded loaded(text);
+
+		std::cerr.rdbuf(previous);
+
+		REQUIRE(loaded.scene != nullptr);
+		CHECK(captured.str().empty());
+
+		const Loom::Transform& transform = loaded.scene->GetRoot().transform;
+
+		CHECK(*transform.position == glm::vec3(0.0f));
+		CHECK(*transform.rotation == glm::vec3(0.0f));
+		CHECK(*transform.scale == glm::vec3(1.0f));
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a transform survives being written and read back")
+	{
+		const glm::vec3 position(1.5f, -2.0f, 0.25f);
+		const glm::vec3 rotation(0.0f, 90.0f, 45.0f);
+		const glm::vec3 scale(2.0f, 0.5f, 3.0f);
+
+		Loom::Scene scene("Moved");
+		Loom::GameObject* child = scene.AddChild("Child");
+		Pump();
+
+		child->transform.position = position;
+		child->transform.rotation = rotation;
+		child->transform.scale = scale;
+
+		const Loaded loaded(Written(scene));
+
+		REQUIRE(loaded.scene != nullptr);
+		REQUIRE(loaded.scene->GetRoot().GetChildren().size() == 1);
+
+		const Loom::Transform& read = loaded.scene->GetRoot().GetChildren().front()->transform;
+
+		CHECK(*read.position == position);
+		CHECK(*read.rotation == rotation);
+		CHECK(*read.scale == scale);
 	};
 
 	// Fields used to be keyed by member name. A file from then still opens: the
