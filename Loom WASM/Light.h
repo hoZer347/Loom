@@ -65,18 +65,18 @@ namespace Loom
 		// Scene::Render is drawing it.
 		static inline Light* current = nullptr;
 
-		LOOM_SERIAL(glm::vec3, direction, glm::vec3(-0.4f, -1.0f, -0.3f));
-		LOOM_SERIAL(glm::vec3, color, glm::vec3(1.0f, 1.0f, 1.0f));
-		LOOM_SERIAL(float, intensity, 1.0f);
-		LOOM_SERIAL(float, ambient, 0.25f);
+		Serial<glm::vec3> direction = glm::vec3(-0.4f, -1.0f, -0.3f);
+		Serial<glm::vec3> color = glm::vec3(1.0f, 1.0f, 1.0f);
+		Serial<float> intensity = 1.0f;
+		Serial<float> ambient = 0.25f;
 
 		// Off still allocates the map, cleared to nothing in shadow: a shader
 		// that declares the sampler has to have a depth texture behind it.
-		LOOM_SERIAL(bool, castShadows, true);
+		Serial<bool> castShadows = true;
 		// Clamped to what the driver can allocate.
-		LOOM_SERIAL(int, shadowResolution, 2048);
-		LOOM_SERIAL(glm::vec3, shadowCenter);
-		LOOM_SERIAL(float, shadowExtent, 8.0f);
+		Serial<int> shadowResolution = 2048;
+		Serial<glm::vec3> shadowCenter;
+		Serial<float> shadowExtent = 8.0f;
 
 	private:
 		// Whether there is a shadow map of the current resolution to draw into.

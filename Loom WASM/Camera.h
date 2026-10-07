@@ -40,14 +40,14 @@ namespace Loom
 		// Scene::Render is drawing it.
 		static inline Camera* current = nullptr;
 
-		LOOM_SERIAL(bool, lookAtTarget);
+		Serial<bool> lookAtTarget;
 		// World space.
-		LOOM_SERIAL(glm::vec3, target);
+		Serial<glm::vec3> target;
 
 		// Vertical, in degrees.
-		LOOM_SERIAL(float, fieldOfView, 45.0f);
-		LOOM_SERIAL(float, nearPlane, 0.1f);
-		LOOM_SERIAL(float, farPlane, 100.0f);
+		Serial<float> fieldOfView = 45.0f;
+		Serial<float> nearPlane = 0.1f;
+		Serial<float> farPlane = 100.0f;
 
 	private:
 		struct Aim

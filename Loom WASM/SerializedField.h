@@ -36,14 +36,13 @@ namespace Loom
 	* - One member of a LoomObject that the scene format knows about
 	* - Holds what type it is and where it lives; the pointer is into the object
 	*   that registered the field, so a field never outlives its owner
-	* - Its name is for people (the inspector); the scene format still
-	*   identifies a field by where it sits in the list, which is the order the
-	*   Serial members were declared in
+	* - It has no name of its own: a field is identified by where it sits in the
+	*   list, which is the order the Serial members were declared in. The
+	*   editor labels it after the member that holds it
 	*/
 	struct LOOM_API SerializedField final
 	{
 		FieldType type = FieldType::Int;
-		const char* name = "";
 		void* data = nullptr;
 
 		// Reference fields only. A member declared as some derived type cannot

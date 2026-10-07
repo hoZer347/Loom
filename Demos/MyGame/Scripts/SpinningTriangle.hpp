@@ -68,11 +68,11 @@ namespace MyGameScripts
 			};
 		};
 
-		LOOM_SERIAL(float, m_speed, 0.02f);
-		LOOM_SERIAL(float, m_radius, 0.6f);
-		LOOM_SERIAL(float, m_angle);
-		LOOM_SERIAL(bool, m_spinning, true);
-		LOOM_SERIAL(std::string, m_shader, "Assets/Shader.shader");
+		Loom::Serial<float> m_speed = 0.02f;
+		Loom::Serial<float> m_radius = 0.6f;
+		Loom::Serial<float> m_angle;
+		Loom::Serial<bool> m_spinning = true;
+		Loom::Serial<std::string> m_shader = "Assets/Shader.shader";
 
 		Loom::Mesh* m_mesh = nullptr;
 	};

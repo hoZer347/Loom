@@ -19,9 +19,9 @@ namespace Loom
 	*/
 	struct Transform final
 	{
-		LOOM_SERIAL(glm::vec3, position);
-		LOOM_SERIAL(glm::vec3, rotation);
-		LOOM_SERIAL(glm::vec3, scale, glm::vec3(1.0f));
+		Serial<glm::vec3> position;
+		Serial<glm::vec3> rotation;
+		Serial<glm::vec3> scale = glm::vec3(1.0f);
 
 		// Scale, then rotate, then translate.
 		glm::mat4 Matrix() const

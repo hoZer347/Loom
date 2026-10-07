@@ -7,6 +7,7 @@
 #include <shlobj.h>
 
 #include "Editor.h"
+#include "ProjectAssets.h"
 #include "ProjectTemplate.h"
 #include "SceneSerializer.h"
 
@@ -110,6 +111,9 @@ namespace
 		std::cout
 			<< "Loom Editor [project folder, .loomproject or .loomscene]\n"
 			<< "  --new-project <folder> <name>  create a project and open it\n"
+			<< "  --new-script <scripts project> <folder> <name>\n"
+			<< "                                 write a script into that folder and exit,\n"
+			<< "                                 printing its path\n"
 			<< "  --compile                      build the project's scripts on startup\n"
 			<< "  --play                         start with the scene running\n"
 			<< "  --play-web                     build the scene for the web and open it\n"
@@ -183,6 +187,30 @@ namespace
 // answer to that either.
 int main(int argc, char** argv)
 {
+	// Visual Studio's Add > Loom Script runs this, so it is over before there is
+	// an engine or a window.
+	for (int i = 1; i < argc; i++)
+		if (std::string(argv[i]) == "--new-script")
+		{
+			if (i + 3 >= argc)
+			{
+				std::cerr << "--new-script needs the scripts project, a folder and a name" << std::endl;
+				return 1;
+			};
+
+			std::string error;
+			const std::string path = ProjectAssets::CreateScript(argv[i + 1], argv[i + 2], argv[i + 3], &error);
+
+			if (path.empty())
+			{
+				std::cerr << error << std::endl;
+				return 1;
+			};
+
+			std::cout << path << std::endl;
+			return 0;
+		};
+
 	// A screenshot run is automated by definition: it renders, writes its
 	// bitmap and exits, so it does that without putting a window on screen.
 	// Read before the Engine, which is what opens the window.

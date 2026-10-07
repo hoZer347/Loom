@@ -23,7 +23,6 @@ namespace Loom
 	// constructor has finished, which is what makes that object the right one.
 	LOOM_API void RegisterSerialField(
 		FieldType type,
-		const char* name,
 		void* data,
 		LoomObject* (*get_reference)(void*),
 		void (*set_reference)(void*, LoomObject*),
@@ -58,9 +57,8 @@ namespace Loom
 	* - Declaring one is the whole declaration: it registers itself with the
 	*   object under construction on this thread and behaves as a T from then on,
 	*   through an implicit conversion for the value and -> for its members
-	* - Every one has a name, which is what the inspector labels it with:
-	*   LOOM_SERIAL takes it from the member's identifier, and one declared
-	*   by hand is given it first, Serial<float> m_speed{ "Speed", 0.02f }
+	* - The editor labels it after the member: Serial<float> m_speed reads
+	*   "Speed" in the inspector
 	* - A field is identified by where it was declared, so the scene format keys
 	*   it by position: reordering the Serial members of a type reassigns the
 	*   values in scenes already saved, and inserting one in the middle shifts
@@ -75,16 +73,17 @@ namespace Loom
 	template <typename T>
 	struct Serial final
 	{
-		// There is no nameless field: LOOM_SERIAL names one after its member,
-		// and a Serial declared by hand says what it is called. The field keeps
-		// the pointer, so the name has to outlive the object, as a literal does.
-		explicit Serial(const char* name) : m_value() { Register(name); };
+		// Declared bare, or with the default the member would have had anyway:
+		// Serial<float> m_speed = 0.02f.
+		Serial() : m_value() { Register(); };
 
 		// Anything T itself would take, so a string field can be given a literal
 		// the way the plain member it replaces was.
 		template <typename U>
-			requires std::is_constructible_v<T, U&&>
-		explicit Serial(const char* name, U&& value) : m_value(std::forward<U>(value)) { Register(name); };
+			requires (
+				!std::is_same_v<std::remove_cvref_t<U>, Serial> &&
+				std::is_constructible_v<T, U&&>)
+		Serial(U&& value) : m_value(std::forward<U>(value)) { Register(); };
 
 		// A field points into the object that declared it, and objects are
 		// identities rather than values.
@@ -135,7 +134,7 @@ namespace Loom
 		};
 
 	private:
-		void Register(const char* name)
+		void Register()
 		{
 			if constexpr (std::is_pointer_v<T>)
 			{
@@ -148,7 +147,6 @@ namespace Loom
 				// do these casts through a LoomObject** of its own.
 				RegisterSerialField(
 					FieldType::Reference,
-					name,
 					&m_value,
 					[](void* data) -> LoomObject*
 					{
@@ -163,7 +161,7 @@ namespace Loom
 						return dynamic_cast<T>(object) != nullptr;
 					});
 			}
-			else RegisterSerialField(FieldTypeOf<T>(), name, Data(), nullptr, nullptr, nullptr);
+			else RegisterSerialField(FieldTypeOf<T>(), Data(), nullptr, nullptr, nullptr);
 		};
 
 		// The vector types are written out of their components, so the field
@@ -183,14 +181,3 @@ namespace Loom
 		T m_value;
 	};
 };
-
-// Declares a Serial member named after its identifier, with an optional
-// default: LOOM_SERIAL(float, m_speed, 0.02f) shows in the inspector as "Speed".
-// The name is worked out once per declaration rather than once per object.
-#define LOOM_SERIAL(Type, Name, ...) ::Loom::Serial<Type> Name{ \
-	[]() -> const char* \
-	{ \
-		static const std::string name = ::Loom::NameFromIdentifier(#Name); \
-		return name.c_str(); \
-	}(), \
-	__VA_ARGS__ }

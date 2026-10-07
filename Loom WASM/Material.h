@@ -36,10 +36,10 @@ namespace Loom
 
 	private:
 		// Relative to the project folder, which is where the editor works from.
-		LOOM_SERIAL(std::string, m_shader_path);
+		Serial<std::string> m_shader_path;
 
 	public:
 		// Declared after the path, which fixes its position in scene files.
-		LOOM_SERIAL(glm::vec3, color, glm::vec3(1.0f, 1.0f, 1.0f));
+		Serial<glm::vec3> color = glm::vec3(1.0f, 1.0f, 1.0f);
 	};
 };

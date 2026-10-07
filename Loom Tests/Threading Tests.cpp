@@ -29,8 +29,8 @@ namespace
 
 	struct Threaded final : Loom::LoomObject
 	{
-		LOOM_SERIAL(int, count);
-		LOOM_SERIAL(std::string, label);
+		Loom::Serial<int> count;
+		Loom::Serial<std::string> label;
 	};
 };
 
