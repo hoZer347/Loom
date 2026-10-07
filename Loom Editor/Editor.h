@@ -98,6 +98,7 @@ namespace Loom
 		void DrawHierarchy();
 		void DrawSceneNode(Scene* scene);
 		void DrawGameObjectNode(GameObject* gameObject);
+		void DrawRenameField(GameObject* gameObject);
 		void DrawInspector();
 		void DrawComponent(GameObject* gameObject, ComponentBase* component);
 		void DrawFields(LoomObject& object);
@@ -227,6 +228,11 @@ namespace Loom
 
 		char m_nameBuffer[128]{ };
 		const GameObject* m_nameBufferOwner = nullptr;
+
+		// Double-clicking the selection in the hierarchy edits its name in place,
+		// in the same buffer as the inspector's name box.
+		bool m_renaming = false;
+		bool m_focusRename = false;
 
 		std::string m_screenshotPath{ };
 		int m_screenshotFrame = 0;
