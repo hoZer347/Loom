@@ -3,7 +3,8 @@
     Hands out Loom 1 to Loom 8, the git worktrees agents build features in.
 
 .DESCRIPTION
-    Loom itself belongs to the user and is never a slot. Each slot is a
+    Loom itself belongs to the user and is never a slot. It stays on master,
+    which merge fast-forwards there. Each slot is a
     worktree of this repository beside it. A claim is a create-only ref,
     refs/claims/loom-<n>, so two agents never hold the same slot; the slot's
     worktree lock carries the feature branch for people and for lookups. Any
@@ -13,6 +14,7 @@
     .\slots.ps1 setup
     .\slots.ps1 status
     .\slots.ps1 claim inspector-layout
+    .\slots.ps1 sync inspector-layout
     .\slots.ps1 merge inspector-layout
     .\slots.ps1 release inspector-layout
     .\slots.ps1 release inspector-layout -Abandon
@@ -20,7 +22,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('setup', 'status', 'claim', 'merge', 'release')]
+    [ValidateSet('setup', 'status', 'claim', 'sync', 'merge', 'release')]
     [string] $Command,
 
     [Parameter(Position = 1)]
@@ -127,6 +129,28 @@ function Assert-Clean
     }
 }
 
+# Rebases the claimed branch onto the trunk and returns the trunk commit it now sits on.
+function Update-Branch
+{
+    param($Claim)
+
+    Assert-Clean $Claim.Path
+
+    if ((& git -C $Claim.Path branch --show-current) -ne $Claim.Branch)
+    {
+        throw "$($Claim.Path) is not on $($Claim.Branch)."
+    }
+
+    $base = (& git -C $userRoot rev-parse $Trunk)
+    if (-not (Test-Git $Claim.Path rebase --quiet $base))
+    {
+        throw "Rebasing onto $Trunk hit conflicts in $($Claim.Path). Resolve them and git rebase --continue " +
+            "(or git rebase --abort), then run $Command again."
+    }
+
+    return $base
+}
+
 function Remove-Claim
 {
     param([int] $Number)
@@ -227,31 +251,32 @@ switch ($Command)
         throw 'Every slot is claimed. Check .\slots.ps1 status.'
     }
 
+    'sync'
+    {
+        $claim = Find-Claim
+        Update-Branch $claim | Out-Null
+        Write-Output "$($claim.Branch) is up to date with $Trunk."
+    }
+
     'merge'
     {
         $claim = Find-Claim
         $slot = $claim.Path
-        Assert-Clean $slot
+        $userTree = $false
 
-        if ((& git -C $slot branch --show-current) -ne $claim.Branch)
+        foreach ($entry in (Get-Worktrees).GetEnumerator())
         {
-            throw "$slot is not on $($claim.Branch)."
-        }
+            if ($entry.Value.Branch -ne $Trunk) { continue }
 
-        foreach ($record in (Get-Worktrees).Values)
-        {
-            if ($record.Branch -eq $Trunk)
+            if ($entry.Key -ne [IO.Path]::GetFullPath($userRoot))
             {
-                throw "$Trunk is checked out in a worktree, so it cannot be moved without touching that tree."
+                throw "$Trunk is checked out in $($entry.Key). Only the user's Loom may hold it."
             }
+
+            $userTree = $true
         }
 
-        $base = (& git -C $userRoot rev-parse $Trunk)
-        if (-not (Test-Git $slot rebase --quiet $base))
-        {
-            throw "Rebasing onto $Trunk hit conflicts in $slot. Resolve them and git rebase --continue " +
-                "(or git rebase --abort), then run merge again."
-        }
+        $base = Update-Branch $claim
 
         foreach ($suite in 'run-tests.ps1', 'run-web-tests.ps1')
         {
@@ -266,9 +291,21 @@ switch ($Command)
             if ($failed) { throw "$suite failed. Nothing was merged." }
         }
 
-        # Compare-and-swap: refused if another slot merged since the rebase.
         $head = (& git -C $slot rev-parse HEAD)
-        if (-not (Test-Git $userRoot update-ref -m "merge $($claim.Branch)" "refs/heads/$Trunk" $head $base))
+
+        if ($userTree)
+        {
+            # The user's Loom has the trunk checked out, so its files move with it.
+            # A fast-forward keeps their uncommitted work and refuses if it would overwrite any.
+            if ((& git -C $userRoot rev-parse $Trunk) -ne $base) { throw "$Trunk moved while the tests ran. Run merge again." }
+
+            if (-not (Test-Git $userRoot merge --ff-only --quiet $head))
+            {
+                throw "Uncommitted changes in $userRoot conflict with $($claim.Branch). Nothing was merged."
+            }
+        }
+        # Compare-and-swap: refused if another slot merged since the rebase.
+        elseif (-not (Test-Git $userRoot update-ref -m "merge $($claim.Branch)" "refs/heads/$Trunk" $head $base))
         {
             throw "$Trunk moved while the tests ran. Run merge again."
         }

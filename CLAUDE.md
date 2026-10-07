@@ -3,8 +3,9 @@
 ## Slots
 
 `C:\Users\3hoze\Desktop\Loom` belongs to the user. Agents never edit, build,
-run or read from it, and never run git commands that write to it. It holds
-the user's unfinished work on its own branch, `dev`.
+run or read from it, and never run git commands that write to it. It stays
+on `master` with the user's uncommitted work in it, and only `slots.ps1 merge`
+moves it.
 
 Agents work in a slot: `Loom 1` to `Loom 8` beside it, each a git worktree of
 the same repository. `slots.ps1` hands them out. Any slot's copy works on any
@@ -16,15 +17,19 @@ claimed with. If PowerShell refuses to run it, call it through
 $slots = 'C:\Users\3hoze\Desktop\Loom 1\slots.ps1'
 & $slots status
 & $slots claim <feature-name>
+& $slots sync <feature-name>
 & $slots merge <feature-name>
 & $slots release <feature-name>
 ```
 
 A feature or bug fix, start to finish:
 
-1. `claim <feature-name>` takes a free slot, brings it up to the latest
-   `master` and creates `feature/<feature-name>` there. It prints the slot's
-   path. Work only in that slot, by absolute path.
+1. Start from the latest `master`. For a new feature, `claim <feature-name>`
+   takes a free slot, brings it up to `master` and creates
+   `feature/<feature-name>` there. It prints the slot's path. Work only in
+   that slot, by absolute path. When you come back to a feature you already
+   hold, including after a `deny`, commit what is there and run
+   `sync <feature-name>` first, which rebases the branch onto `master`.
 2. Commit to the branch as you go. This policy is the user's permission to
    commit on feature branches and to merge them as below.
 3. Build, run, test and exercise the change, then get the `code-reviewer`
@@ -48,11 +53,13 @@ A feature or bug fix, start to finish:
    ```
 
    Given the demo's process id, it closes the demo once the user approves or
-   denies. On `deny`, rework the change from the feedback and go back to
-   step 3.
+   denies. On `deny`, go back to step 1 and rework the change from the
+   feedback.
 6. On `approve`, `merge <feature-name>` rebases onto `master`, runs
-   `run-tests.ps1` and `run-web-tests.ps1`, then fast-forwards `master`. If
-   anything fails, nothing is merged. On rebase conflicts, resolve them and
+   `run-tests.ps1` and `run-web-tests.ps1`, then fast-forwards `master` and
+   the user's Loom with it. If anything fails, nothing is merged. If the
+   user's uncommitted work conflicts with the change, tell them; don't touch
+   their tree. On rebase conflicts, resolve them and
    `git rebase --continue` (or `git rebase --abort`) in the slot, then run
    `merge` again. If `master` moved while the tests ran, run it again.
 7. `release <feature-name>` frees the slot. To drop unmerged work, use
@@ -66,5 +73,5 @@ Rules:
   `External Libraries` (Vulkan, boost\stage, openssl\bin and openssl\lib) are
   junctions into the user's Loom.
 - Never push to `origin` unless the user asks.
-- `master` is never checked out anywhere, so `merge` can move it without
-  touching a working tree. Don't check it out.
+- `master` is checked out only in the user's Loom. Never check it out in a
+  slot.
