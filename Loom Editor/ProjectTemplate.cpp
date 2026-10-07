@@ -10,11 +10,9 @@
 
 #include <algorithm>
 #include <cctype>
-#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <iterator>
 #include <vector>
 
 #define WIN32_LEAN_AND_MEAN
@@ -55,10 +53,6 @@ namespace Loom
 
 			return '{' + text + '}';
 		};
-
-		constexpr const char* name_key = "name=";
-		constexpr const char* scripts_key = "scripts=";
-		constexpr const char* library_key = "library=";
 
 		const char* const loomproject = R"(name={NAME}
 )";
@@ -364,27 +358,31 @@ SpinningTriangle is there as a worked example.
 				Write(folder / (name + "Scripts.sln"), fill(solution), error);
 		};
 
-		std::string ReadAll(const std::filesystem::path& path)
+		// Relative to root when it can be, which keeps a project file working
+		// wherever the project is moved, and whole when it cannot.
+		std::string PathIn(const std::filesystem::path& root, const std::filesystem::path& path)
 		{
-			std::ifstream in(path, std::ios::binary);
+			const std::filesystem::path relative = path.lexically_normal().lexically_relative(root);
 
-			return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+			return relative.empty()
+				? path.lexically_normal().generic_string()
+				: relative.generic_string();
 		};
 
-		// What the first <tag> in an MSBuild project holds, or an empty string.
-		std::string Element(const std::string& xml, const std::string& tag)
+		// Where the build of a scripts project puts its library: its OutDir,
+		// which MSBuild reads against the project's own folder, unless that is
+		// made of macros there is no working out here.
+		std::filesystem::path LibraryOf(const std::filesystem::path& root, const std::filesystem::path& scripts)
 		{
-			const std::string open = '<' + tag + '>';
-			const size_t start = xml.find(open);
+			const std::string text = ProjectAssets::ReadText(scripts.string());
+			const std::string target = ProjectAssets::Element(text, "TargetName");
+			const std::string out = ProjectAssets::Element(text, "OutDir");
 
-			if (start == std::string::npos)
-				return "";
+			const std::filesystem::path folder = out.empty() || out.find("$(") != std::string::npos
+				? root / ProjectTemplate::build_folder
+				: scripts.parent_path() / out;
 
-			const size_t end = xml.find("</" + tag + '>', start);
-
-			return end == std::string::npos
-				? ""
-				: xml.substr(start + open.size(), end - start - open.size());
+			return folder / ((target.empty() ? scripts.stem().string() : target) + ".dll");
 		};
 
 		// Sorted first, so the same one is found every time.
@@ -398,7 +396,7 @@ SpinningTriangle is there as a worked example.
 				entry != std::filesystem::recursive_directory_iterator();
 				entry.increment(code))
 				if (entry->path().extension() == ".vcxproj" &&
-					ReadAll(entry->path()).find(script_module_define) != std::string::npos)
+					ProjectAssets::ReadText(entry->path().string()).find(script_module_define) != std::string::npos)
 					found.push_back(entry->path());
 
 			std::sort(found.begin(), found.end());
@@ -500,6 +498,15 @@ SpinningTriangle is there as a worked example.
 		return (root / (name + extension)).string();
 	};
 
+	std::string ProjectTemplate::ValueOf(const std::string& line, const char* key)
+	{
+		const std::string prefix = std::string(key) + '=';
+
+		return line.rfind(prefix, 0) == 0
+			? line.substr(prefix.size())
+			: "";
+	};
+
 	std::string ProjectTemplate::EnsureScripts(const std::string& project_file, std::string* error)
 	{
 		std::error_code code;
@@ -525,13 +532,13 @@ SpinningTriangle is there as a worked example.
 			while (!line.empty() && line.back() == '\r')
 				line.pop_back();
 
-			if (line.rfind(scripts_key, 0) == 0)
-				named = line.substr(strlen(scripts_key));
-			else if (line.rfind(library_key, 0) != 0)
+			if (const std::string value = ValueOf(line, scripts_key); !value.empty())
+				named = value;
+			else if (ValueOf(line, library_key).empty())
 				kept += line + '\n';
 
-			if (line.rfind(name_key, 0) == 0)
-				name = line.substr(strlen(name_key));
+			if (const std::string value = ValueOf(line, name_key); !value.empty())
+				name = value;
 		};
 
 		in.close();
@@ -548,13 +555,8 @@ SpinningTriangle is there as a worked example.
 
 		if (!scripts.empty())
 		{
-			const std::string target = Element(ReadAll(scripts), "TargetName");
-
-			const std::filesystem::path library =
-				root / build_folder / ((target.empty() ? scripts.stem().string() : target) + ".dll");
-
-			kept += scripts_key + scripts.lexically_relative(root).generic_string() + '\n';
-			kept += library_key + library.lexically_relative(root).generic_string() + '\n';
+			kept += std::string(scripts_key) + '=' + PathIn(root, scripts) + '\n';
+			kept += std::string(library_key) + '=' + PathIn(root, LibraryOf(root, scripts)) + '\n';
 
 			std::cout << "Found the scripts project " << scripts.string() << std::endl;
 		}

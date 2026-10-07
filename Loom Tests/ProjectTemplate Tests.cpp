@@ -157,6 +157,30 @@ TEST_SUITE("ProjectTemplate")
 		CHECK(text.find("library=Build/Found.dll\n") != std::string::npos);
 	};
 
+	TEST_CASE("a found scripts project's library is where its OutDir builds it")
+	{
+		const ProjectFolder project("loom template out dir", "name=Game\n");
+		project.Add("Source/Found.vcxproj",
+			"<Project><PreprocessorDefinitions>LOOM_SCRIPT_MODULE</PreprocessorDefinitions>"
+			"<OutDir>..\\Bin\\</OutDir><TargetName>Found</TargetName></Project>");
+
+		REQUIRE_FALSE(project.Ensure().empty());
+
+		CHECK(project.Text().find("library=Bin/Found.dll\n") != std::string::npos);
+	};
+
+	TEST_CASE("an OutDir made of macros leaves the library in the build folder")
+	{
+		const ProjectFolder project("loom template out dir macro", "name=Game\n");
+		project.Add("Source/Found.vcxproj",
+			"<Project><PreprocessorDefinitions>LOOM_SCRIPT_MODULE</PreprocessorDefinitions>"
+			"<OutDir>$(SolutionDir)Out\\</OutDir><TargetName>Found</TargetName></Project>");
+
+		REQUIRE_FALSE(project.Ensure().empty());
+
+		CHECK(project.Text().find("library=Build/Found.dll\n") != std::string::npos);
+	};
+
 	TEST_CASE("a scripts project that is named but gone is looked for again")
 	{
 		const ProjectFolder project("loom template gone", "name=Game\nscripts=Old/Gone.vcxproj\nlibrary=Old/Gone.dll\n");

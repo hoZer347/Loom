@@ -29,15 +29,6 @@ namespace Loom
 		const char* const web_folder = "Web";
 		const char* const web_scene = "Scene";
 
-		std::string ValueOf(const std::string& line, const char* key)
-		{
-			const std::string prefix = std::string(key) + '=';
-
-			return line.rfind(prefix, 0) == 0
-				? line.substr(prefix.size())
-				: "";
-		};
-
 		// A path from a .loomproject is relative to the project folder.
 		std::string Resolve(const std::string& folder, const std::string& path)
 		{
@@ -105,13 +96,13 @@ namespace Loom
 			while (!line.empty() && (line.back() == '\r' || line.back() == '\n'))
 				line.pop_back();
 
-			if (const std::string value = ValueOf(line, "name"); !value.empty())
+			if (const std::string value = ProjectTemplate::ValueOf(line, ProjectTemplate::name_key); !value.empty())
 				m_projectName = value;
 
-			if (const std::string value = ValueOf(line, "scripts"); !value.empty())
+			if (const std::string value = ProjectTemplate::ValueOf(line, ProjectTemplate::scripts_key); !value.empty())
 				project = Resolve(m_projectPath, value);
 
-			if (const std::string value = ValueOf(line, "library"); !value.empty())
+			if (const std::string value = ProjectTemplate::ValueOf(line, ProjectTemplate::library_key); !value.empty())
 				library = Resolve(m_projectPath, value);
 		};
 

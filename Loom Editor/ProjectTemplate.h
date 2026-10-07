@@ -25,6 +25,15 @@ namespace Loom
 
 		static constexpr const char* scripts_folder = "Scripts";
 
+		// What a project file's lines are, each key=value.
+		static constexpr const char* name_key = "name";
+		static constexpr const char* scripts_key = "scripts";
+		static constexpr const char* library_key = "library";
+
+		// The value of a project file line holding key, or an empty string for
+		// a line holding another.
+		static std::string ValueOf(const std::string& line, const char* key);
+
 		// Creates the project under folder/name. Returns the path of the
 		// .loomproject file, or an empty string with the reason in error.
 		static std::string Create(
