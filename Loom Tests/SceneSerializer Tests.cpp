@@ -24,9 +24,9 @@ namespace
 	// tests can put in a scene file.
 	struct Marker final : Loom::Component<Marker>
 	{
-		LOOM_SERIAL(float, weight, 1.0f);
-		LOOM_SERIAL(std::string, label, "unset");
-		LOOM_SERIAL(Loom::GameObject*, partner);
+		Loom::Serial<float> weight = 1.0f;
+		Loom::Serial<std::string> label = "unset";
+		Loom::Serial<Loom::GameObject*> partner;
 	};
 
 	// Registered once for the whole suite: the registry is process-wide, and the

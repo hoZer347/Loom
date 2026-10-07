@@ -96,7 +96,6 @@ namespace Loom
 
 	void RegisterSerialField(
 		FieldType type,
-		const char* name,
 		void* data,
 		LoomObject* (*get_reference)(void*),
 		void (*set_reference)(void*, LoomObject*),
@@ -120,7 +119,6 @@ namespace Loom
 		SerializedField field;
 
 		field.type = type;
-		field.name = name;
 		field.data = data;
 		field.get_reference = get_reference;
 		field.set_reference = set_reference;

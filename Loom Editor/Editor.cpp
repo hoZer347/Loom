@@ -16,6 +16,7 @@
 
 #include "EditCommands.h"
 #include "EditorFileDialogs.h"
+#include "FieldNames.h"
 #include "ModelImporter.h"
 #include "ProjectTemplate.h"
 
@@ -254,10 +255,10 @@ namespace Loom
 		// Labels sit left of their widgets, Unity-style, in a column as wide as
 		// the longest one and no wider. longest seeds it with any label drawn
 		// beside the fields.
-		float LabelColumn(const std::vector<SerializedField>& fields, float longest)
+		float LabelColumn(const LoomObject& object, float longest)
 		{
-			for (const SerializedField& field : fields)
-				longest = (std::max)(longest, ImGui::CalcTextSize(Shortened(field.name, FLT_MAX).c_str()).x);
+			for (size_t i = 0; i < object.GetFields().size(); i++)
+				longest = (std::max)(longest, ImGui::CalcTextSize(Shortened(FieldNames::Of(object, i), FLT_MAX).c_str()).x);
 
 			return (std::min)(longest, ImGui::GetContentRegionAvail().x * max_label_share);
 		};
@@ -1733,7 +1734,7 @@ namespace Loom
 				constexpr const char* name_label = "Name";
 
 				const float column = LabelColumn(
-					gameObject->GetFields(),
+					*gameObject,
 					ImGui::CalcTextSize(name_label).x);
 
 				Label(name_label, column);
@@ -1916,7 +1917,7 @@ namespace Loom
 
 		// The Serial members the component declared, then whatever
 		// else it wants to draw for itself.
-		DrawFields(*component, LabelColumn(component->GetFields(), 0.0f));
+		DrawFields(*component, LabelColumn(*component, 0.0f));
 
 		component->OnGui();
 
@@ -1927,11 +1928,13 @@ namespace Loom
 	{
 		ImGui::PushItemWidth(-FLT_MIN);
 
-		for (const SerializedField& field : object.GetFields())
+		for (size_t i = 0; i < object.GetFields().size(); i++)
 		{
+			const SerializedField& field = object.GetFields()[i];
+
 			ImGui::PushID(&field);
 
-			Label(field.name, column);
+			Label(FieldNames::Of(object, i), column);
 
 			const char* label = "##value";
 			bool changed = false;

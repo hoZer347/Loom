@@ -42,12 +42,12 @@ namespace Loom
 		void DrawShadow(const glm::mat4& lightViewProjection);
 
 		// Relative to the project folder, which is where the editor works from.
-		LOOM_SERIAL(std::string, texturePath);
-		LOOM_SERIAL(glm::vec4, color, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
-		LOOM_SERIAL(float, pixelsPerUnit, 100.0f);
-		LOOM_SERIAL(glm::vec2, pivot, glm::vec2(0.5f, 0.0f));
-		LOOM_SERIAL(float, alphaCutoff, 0.5f);
-		LOOM_SERIAL(bool, castShadows, true);
+		Serial<std::string> texturePath;
+		Serial<glm::vec4> color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+		Serial<float> pixelsPerUnit = 100.0f;
+		Serial<glm::vec2> pivot = glm::vec2(0.5f, 0.0f);
+		Serial<float> alphaCutoff = 0.5f;
+		Serial<bool> castShadows = true;
 
 	private:
 		// Draws the quad with program, the texture and cutoff already handed to it.

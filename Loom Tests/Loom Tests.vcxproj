@@ -141,6 +141,7 @@
          not need a window. The rest of the editor stays out. -->
     <ClCompile Include="..\Loom Editor\SceneHistory.cpp" />
     <ClCompile Include="..\Loom Editor\EditCommands.cpp" />
+    <ClCompile Include="..\Loom Editor\FieldNames.cpp" />
     <ClCompile Include="..\Loom Editor\EditorSettings.cpp" />
     <ClCompile Include="..\Loom Editor\ProjectAssets.cpp" />
   </ItemGroup>

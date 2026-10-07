@@ -106,6 +106,7 @@
     <ClCompile Include="ModelPreview.cpp" />
     <ClCompile Include="SceneHistory.cpp" />
     <ClCompile Include="EditCommands.cpp" />
+    <ClCompile Include="FieldNames.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -123,6 +124,7 @@
     <ClInclude Include="ModelPreview.h" />
     <ClInclude Include="SceneHistory.h" />
     <ClInclude Include="EditCommands.h" />
+    <ClInclude Include="FieldNames.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Loom ImGui\Loom ImGui.vcxproj">

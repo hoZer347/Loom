@@ -89,7 +89,6 @@ namespace Loom
 		// Declaring a Serial member is what fills these in.
 		friend LOOM_API void RegisterSerialField(
 			FieldType type,
-			const char* name,
 			void* data,
 			LoomObject* (*get_reference)(void*),
 			void (*set_reference)(void*, LoomObject*),

@@ -168,8 +168,8 @@ namespace Loom
 		static inline std::atomic<size_t> num_objects = 0;
 		static inline std::atomic<size_t> id_counter = 0;
 
-		LOOM_SERIAL(int, m_threadID);
-		LOOM_SERIAL(bool, m_inherit_thread_id);
+		Serial<int> m_threadID;
+		Serial<bool> m_inherit_thread_id;
 
 	public:
 		// After the thread fields, since a field is its position in the scene

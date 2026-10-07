@@ -33,10 +33,10 @@ namespace Loom
 
 		void OnGui() override;
 
-		LOOM_SERIAL(Material*, material);
-		LOOM_SERIAL(uint32_t, primitive_id);
-		LOOM_SERIAL(uint32_t, m_draw_type, 0x88E4);	// GL_STATIC_DRAW
-		LOOM_SERIAL(std::vector<float>, m_vertices);
+		Serial<Material*> material;
+		Serial<uint32_t> primitive_id;
+		Serial<uint32_t> m_draw_type = 0x88E4;	// GL_STATIC_DRAW
+		Serial<std::vector<float>> m_vertices;
 		std::vector<uint32_t> m_indices;
 	};
 };

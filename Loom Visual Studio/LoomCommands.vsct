@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <Extern href="stdidcmd.h" />
+  <Extern href="vsshlids.h" />
+
+  <Commands package="guidLoomPackage">
+    <Buttons>
+      <!-- Beside New Item... in the Add menu of a project or folder. Hidden
+           until the package sees the selection is in a Loom scripts project. -->
+      <Button guid="guidLoomCommandSet" id="cmdidAddScript" priority="0x0050" type="Button">
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_CTXT_PROJECT_ADD_ITEMS" />
+        <CommandFlag>DynamicVisibility</CommandFlag>
+        <CommandFlag>DefaultInvisible</CommandFlag>
+        <Strings>
+          <ButtonText>Loom Script...</ButtonText>
+          <CanonicalName>.Project.LoomScript</CanonicalName>
+          <LocCanonicalName>.Project.LoomScript</LocCanonicalName>
+        </Strings>
+      </Button>
+    </Buttons>
+  </Commands>
+
+  <Symbols>
+    <GuidSymbol name="guidLoomPackage" value="{69f330bb-26c0-41bf-a703-9df61f61d634}" />
+    <GuidSymbol name="guidLoomCommandSet" value="{76837ee1-2516-42e3-b0fa-d0c4a6c01015}">
+      <IDSymbol name="cmdidAddScript" value="0x0100" />
+    </GuidSymbol>
+  </Symbols>
+</CommandTable>

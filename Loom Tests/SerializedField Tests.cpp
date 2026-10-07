@@ -2,6 +2,7 @@
 
 #include "Test Support.h"
 
+#include "FieldNames.h"
 #include "GameObject.h"
 #include "LoomObject.h"
 #include "Material.h"
@@ -11,7 +12,6 @@
 #include "SerializedField.h"
 
 #include <string>
-#include <type_traits>
 #include <vector>
 
 using LoomTests::Pump;
@@ -22,50 +22,50 @@ namespace
 	// stand in for all of them.
 	struct EveryField final : Loom::Component<EveryField>
 	{
-		LOOM_SERIAL(bool, flag);
-		LOOM_SERIAL(int, count);
-		LOOM_SERIAL(unsigned int, unsigned_count);
-		LOOM_SERIAL(long long, big);
-		LOOM_SERIAL(unsigned long long, unsigned_big);
-		LOOM_SERIAL(float, ratio);
-		LOOM_SERIAL(double, precise);
-		LOOM_SERIAL(std::string, label);
-		LOOM_SERIAL(glm::vec2, pair);
-		LOOM_SERIAL(glm::vec3, triple);
-		LOOM_SERIAL(glm::vec4, quad);
-		LOOM_SERIAL(std::vector<float>, numbers);
+		Loom::Serial<bool> flag;
+		Loom::Serial<int> count;
+		Loom::Serial<unsigned int> unsigned_count;
+		Loom::Serial<long long> big;
+		Loom::Serial<unsigned long long> unsigned_big;
+		Loom::Serial<float> ratio;
+		Loom::Serial<double> precise;
+		Loom::Serial<std::string> label;
+		Loom::Serial<glm::vec2> pair;
+		Loom::Serial<glm::vec3> triple;
+		Loom::Serial<glm::vec4> quad;
+		Loom::Serial<std::vector<float>> numbers;
 	};
 
 	struct Pointer final : Loom::Component<Pointer>
 	{
-		LOOM_SERIAL(Loom::GameObject*, target);
+		Loom::Serial<Loom::GameObject*> target;
 	};
 
 	// One reference of each kind the editor fills by dragging.
 	struct Slots final : Loom::Component<Slots>
 	{
-		LOOM_SERIAL(Loom::Scene*, scene);
-		LOOM_SERIAL(Loom::GameObject*, gameObject);
-		LOOM_SERIAL(Loom::Material*, material);
+		Loom::Serial<Loom::Scene*> scene;
+		Loom::Serial<Loom::GameObject*> gameObject;
+		Loom::Serial<Loom::Material*> material;
 	};
 
 	// A field belongs to the object being built around it, whichever class in
 	// the hierarchy declared it.
 	struct Base : Loom::LoomObject
 	{
-		LOOM_SERIAL(int, first, 1);
+		Loom::Serial<int> first = 1;
 	};
 
 	struct Derived final : Base
 	{
-		LOOM_SERIAL(int, second, 2);
+		Loom::Serial<int> second = 2;
 	};
 
 	// The shape Scene has: a LoomObject of its own, declared after the fields of
 	// the object that owns it.
 	struct Host final : Loom::LoomObject
 	{
-		LOOM_SERIAL(int, mine, 3);
+		Loom::Serial<int> mine = 3;
 
 		Derived owned;
 	};
@@ -76,19 +76,8 @@ namespace
 	{
 		Derived owned;
 
-		LOOM_SERIAL(int, late);
+		Loom::Serial<int> late;
 	};
-
-	struct HandNamed final : Loom::LoomObject
-	{
-		static constexpr float TOP_SPEED = 2.0f;
-
-		Loom::Serial<float> speed{ "top speed", TOP_SPEED };
-	};
-
-	// Without a name a Serial does not compile, and a value alone is not one.
-	static_assert(!std::is_default_constructible_v<Loom::Serial<int>>);
-	static_assert(!std::is_convertible_v<const char*, Loom::Serial<std::string>>);
 
 	// Fields are numbered by declaration order; these are EveryField's.
 	enum Every { Flag, Count, UnsignedCount, Big, UnsignedBig, Ratio, Precise, Label, Pair, Triple, Quad, Numbers };
@@ -112,22 +101,25 @@ TEST_SUITE("SerializedField")
 		CHECK(Loom::NameFromIdentifier("m_threadID") == "Thread ID");
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "LOOM_SERIAL names a field after its member")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the editor labels a field after its member")
 	{
 		EveryField object;
 		Pump();
 
-		CHECK(std::string(Field(object, Flag).name) == "Flag");
-		CHECK(std::string(Field(object, UnsignedCount).name) == "Unsigned Count");
+		CHECK(Loom::FieldNames::Of(object, Flag) == "Flag");
+		CHECK(Loom::FieldNames::Of(object, UnsignedCount) == "Unsigned Count");
+		CHECK(Loom::FieldNames::Of(object, Numbers) == "Numbers");
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a Serial declared by hand keeps the name it was given")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a field declared in a base class is labelled after its member")
 	{
-		HandNamed object;
+		Derived object;
 		Pump();
 
-		CHECK(std::string(Field(object, 0).name) == "top speed");
-		CHECK(object.speed == HandNamed::TOP_SPEED);
+		REQUIRE(object.GetFields().size() == 2);
+
+		CHECK(Loom::FieldNames::Of(object, 0) == "First");
+		CHECK(Loom::FieldNames::Of(object, 1) == "Second");
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "fields are declared in the order they are registered")

@@ -20,8 +20,8 @@ namespace
 	// links between objects back as well as the objects themselves.
 	struct HistoryMarker final : Loom::Component<HistoryMarker>
 	{
-		LOOM_SERIAL(std::string, label, "unset");
-		LOOM_SERIAL(Loom::GameObject*, partner);
+		Loom::Serial<std::string> label = "unset";
+		Loom::Serial<Loom::GameObject*> partner;
 	};
 
 	struct HistoryMarkerRegistered
