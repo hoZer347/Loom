@@ -143,10 +143,6 @@ $form.Add_FormClosing({ $script:written = $feedback.Text })
 $form.Add_Shown({ $summary.SelectionLength = 0; if (-not $Offscreen) { $form.Flash() } })
 & $layout
 
-# Run rather than ShowDialog, which would take the focus.
-$decision = 'deny'
-$written = ''
-
 # Holding the handle for the whole review stops Windows reusing the id if the
 # user closes the demo first.
 $demo = $null
@@ -158,6 +154,9 @@ if ($DemoProcessId)
     if ($demo) { $null = $demo.Handle }
 }
 
+# Run rather than ShowDialog, which would take the focus.
+$decision = 'deny'
+$written = ''
 [System.Windows.Forms.Application]::Run($form)
 
 if ($demo -and -not $demo.HasExited -and -not ($demo.CloseMainWindow() -and $demo.WaitForExit($DemoCloseTimeoutMs)))
