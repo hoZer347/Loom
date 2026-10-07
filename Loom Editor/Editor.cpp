@@ -9,10 +9,13 @@
 #include "LoomObject.h"
 #include "Scene.h"
 #include "SceneSerializer.h"
+#include "Transform.h"
 
 #include "EditorFileDialogs.h"
 
 #include "OpenGL.h"
+
+#include "glm/gtc/type_ptr.hpp"
 
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -24,6 +27,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <thread>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -33,6 +37,19 @@ namespace Loom
 {
 	namespace
 	{
+		// A negative item width leaves that many pixels for the label ImGui draws
+		// after the widget; -FLT_MIN would leave none at all.
+		constexpr float FIELD_LABEL_WIDTH = 160.0f;
+
+		constexpr float DRAG_SPEED = 0.01f;
+		constexpr float ROTATION_DRAG_SPEED = 0.5f;
+
+		// The thread ID that takes a GameObject out of the update loop entirely.
+		constexpr int UNPROCESSED_THREAD = -1;
+
+		constexpr ImGuiTreeNodeFlags HEADER_FLAGS =
+			ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap;
+
 		// Writes a 24 bit bottom-up bitmap, which is the row order GL hands back
 		// and the one format worth writing without an image library.
 		bool WriteBitmap(const std::string& path, int width, int height, const std::vector<uint8_t>& bgr)
@@ -70,6 +87,18 @@ namespace Loom
 		// between runs: which folder the project is in. Beside the executable
 		// rather than in the working directory, because opening a project moves
 		// the working directory to it.
+		GameObject* FindByName(GameObject& root, const std::string& name)
+		{
+			if (root.GetName() == name)
+				return &root;
+
+			for (GameObject* child : root.GetChildren())
+				if (GameObject* found = FindByName(*child, name))
+					return found;
+
+			return nullptr;
+		};
+
 		std::filesystem::path BesideExecutable(const char* file)
 		{
 			char buffer[MAX_PATH]{ };
@@ -533,9 +562,23 @@ namespace Loom
 		return false;
 	};
 
+	void Editor::RequestSelection(const std::string& name)
+	{
+		m_pendingSelection = name;
+	};
+
 	void Editor::ValidateSelection()
 	{
 		const std::vector<Scene*>& scenes = Scene::GetScenes();
+
+		if (!m_pendingSelection.empty())
+			for (Scene* scene : scenes)
+				if (GameObject* named = FindByName(scene->GetRoot(), m_pendingSelection))
+				{
+					Select(named);
+					m_pendingSelection.clear();
+					break;
+				};
 
 		if (m_activeScene &&
 			std::find(scenes.begin(), scenes.end(), m_activeScene) == scenes.end())
@@ -1187,7 +1230,8 @@ namespace Loom
 
 				ImGui::PopItemWidth();
 
-				DrawFields(*gameObject);
+				DrawTransform(gameObject);
+				DrawThread(gameObject);
 
 				ImGui::Separator();
 
@@ -1221,15 +1265,62 @@ namespace Loom
 		ImGui::End();
 	};
 
+	void Editor::DrawTransform(GameObject* gameObject)
+	{
+		if (!ImGui::CollapsingHeader("Transform", HEADER_FLAGS))
+			return;
+
+		Transform& transform = gameObject->transform;
+
+		ImGui::PushItemWidth(-FIELD_LABEL_WIDTH);
+
+		ImGui::DragFloat3("Position", glm::value_ptr(*transform.position), DRAG_SPEED);
+		ImGui::DragFloat3("Rotation", glm::value_ptr(*transform.rotation), ROTATION_DRAG_SPEED);
+		ImGui::DragFloat3("Scale", glm::value_ptr(*transform.scale), DRAG_SPEED);
+
+		ImGui::PopItemWidth();
+	};
+
+	void Editor::DrawThread(GameObject* gameObject)
+	{
+		if (!ImGui::CollapsingHeader("Thread", HEADER_FLAGS))
+			return;
+
+		ImGui::PushItemWidth(-FIELD_LABEL_WIDTH);
+
+		bool inherit = gameObject->InheritsThreadID();
+
+		if (ImGui::Checkbox("Inherit Parent", &inherit))
+			gameObject->SetInheritThreadID(inherit);
+
+		// An inheriting object follows its parent, so its own ID is not the
+		// inspector's to set.
+		ImGui::BeginDisabled(inherit);
+
+		int thread = gameObject->GetThreadID();
+
+		if (ImGui::SliderInt(
+			"Thread ID",
+			&thread,
+			UNPROCESSED_THREAD,
+			(int)std::thread::hardware_concurrency()))
+			gameObject->SetThreadID(thread);
+
+		ImGui::EndDisabled();
+
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+			ImGui::SetTooltip("%d is not processed", UNPROCESSED_THREAD);
+
+		ImGui::PopItemWidth();
+	};
+
 	void Editor::DrawComponent(GameObject* gameObject, ComponentBase* component)
 	{
 		ImGui::PushID(component);
 
 		const std::string name = ComponentRegistry::NameOf(*component);
 
-		const bool open = ImGui::CollapsingHeader(
-			name.c_str(),
-			ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap);
+		const bool open = ImGui::CollapsingHeader(name.c_str(), HEADER_FLAGS);
 
 		if (ImGui::IsItemHovered())
 			ImGui::SetTooltip("%s", component->GetGuid().ToString().c_str());
@@ -1256,9 +1347,7 @@ namespace Loom
 
 	void Editor::DrawFields(LoomObject& object)
 	{
-		// A negative width leaves that many pixels for the label ImGui draws
-		// after the widget; -FLT_MIN would leave none at all.
-		ImGui::PushItemWidth(-160.0f);
+		ImGui::PushItemWidth(-FIELD_LABEL_WIDTH);
 
 		const std::vector<SerializedField>& fields = object.GetFields();
 
@@ -1295,11 +1384,11 @@ namespace Loom
 				break;
 
 			case FieldType::Float:
-				ImGui::DragFloat(label, (float*)field.data, 0.01f);
+				ImGui::DragFloat(label, (float*)field.data, DRAG_SPEED);
 				break;
 
 			case FieldType::Double:
-				ImGui::DragScalar(label, ImGuiDataType_Double, field.data, 0.01f);
+				ImGui::DragScalar(label, ImGuiDataType_Double, field.data, DRAG_SPEED);
 				break;
 
 			case FieldType::String:
@@ -1307,15 +1396,15 @@ namespace Loom
 				break;
 
 			case FieldType::Vec2:
-				ImGui::DragFloat2(label, (float*)field.data, 0.01f);
+				ImGui::DragFloat2(label, (float*)field.data, DRAG_SPEED);
 				break;
 
 			case FieldType::Vec3:
-				ImGui::DragFloat3(label, (float*)field.data, 0.01f);
+				ImGui::DragFloat3(label, (float*)field.data, DRAG_SPEED);
 				break;
 
 			case FieldType::Vec4:
-				ImGui::DragFloat4(label, (float*)field.data, 0.01f);
+				ImGui::DragFloat4(label, (float*)field.data, DRAG_SPEED);
 				break;
 
 			case FieldType::FloatArray:

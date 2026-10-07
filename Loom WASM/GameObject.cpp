@@ -98,6 +98,14 @@ namespace Loom
 				child->SetThreadID(thread_id);
 	};
 
+	void GameObject::SetInheritThreadID(bool inherit)
+	{
+		m_inherit_thread_id = inherit;
+
+		if (inherit && parent)
+			SetThreadID(parent->m_threadID);
+	};
+
 	void GameObject::Destroy()
 	{
 		if (parent == nullptr)
@@ -187,8 +195,7 @@ namespace Loom
 			ImGui::SameLine();
 
 			if (ImGui::Checkbox("Inherit Host Thread", &*m_inherit_thread_id))
-				if (m_inherit_thread_id)
-					SetThreadID(m_threadID);
+				SetInheritThreadID(m_inherit_thread_id);
 
 			ImGui::Text("Name: ");
 			ImGui::SameLine();

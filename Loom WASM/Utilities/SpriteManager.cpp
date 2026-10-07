@@ -9,6 +9,8 @@
 
 #include "imgui.h"
 
+#include "glm/gtc/type_ptr.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -184,7 +186,7 @@ namespace Loom
 		const float sheetHeight = float(std::max(1, sheetSize.y));
 
 		glUniformMatrix4fv(glGetUniformLocation(m_program, "mvp"), 1, GL_FALSE, viewProjection);
-		glUniform3f(glGetUniformLocation(m_program, "_Position"), position.x(), position.y(), position.z());
+		glUniform3f(glGetUniformLocation(m_program, "_Position"), position.x, position.y, position.z);
 		glUniform4f(glGetUniformLocation(m_program, "_Quad"), quad[0], quad[1], quad[2], quad[3]);
 		glUniform4f(glGetUniformLocation(m_program, "_SheetSize"), sheetWidth, sheetHeight, 0.0f, 0.0f);
 		glUniform4f(glGetUniformLocation(m_program, "_CellSize"), float(spriteSize.x), float(spriteSize.y), 0.0f, 0.0f);
@@ -234,7 +236,7 @@ namespace Loom
 		ImGui::DragFloat("Spin", &spin, 1.0f);
 		ImGui::DragFloat("Scale", &scale, 0.05f, 0.0001f, 100.0f);
 		ImGui::DragFloat2("Pivot", &pivot.x, 0.01f);
-		ImGui::DragFloat3("Position", position.data, 0.05f);
+		ImGui::DragFloat3("Position", glm::value_ptr(position), 0.05f);
 
 		ImGui::ColorEdit4("Color", color);
 		ImGui::ColorEdit4("Outline", outline);

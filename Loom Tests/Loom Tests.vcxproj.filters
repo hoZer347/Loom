@@ -13,9 +13,6 @@
     <ClCompile Include="Platform Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
-    <ClCompile Include="Math Tests.cpp">
-      <Filter>Tests</Filter>
-    </ClCompile>
     <ClCompile Include="Macro Helpers Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

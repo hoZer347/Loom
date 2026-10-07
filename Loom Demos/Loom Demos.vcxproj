@@ -41,7 +41,6 @@
     <Import Project="..\Property Files\Boost.props" />
     <Import Project="..\Property Files\Loom Networking.props" />
     <Import Project="..\Property Files\Loom WASM.props" />
-    <Import Project="..\Property Files\Loom Math.props" />
     <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenSSL.props" />
     <Import Project="..\Property Files\OpenGL.props" />
@@ -52,7 +51,6 @@
     <Import Project="..\Property Files\Boost.props" />
     <Import Project="..\Property Files\Loom Networking.props" />
     <Import Project="..\Property Files\Loom WASM.props" />
-    <Import Project="..\Property Files\Loom Math.props" />
     <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenSSL.props" />
     <Import Project="..\Property Files\OpenGL.props" />

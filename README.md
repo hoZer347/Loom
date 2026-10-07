@@ -16,7 +16,7 @@
 - Where I plan to put tests and demos for my projects
 
 *Loom Tests:*
-- doctest-based unit test suite covering Loom WASM, Loom Math and Loom Networking
+- doctest-based unit test suite covering Loom WASM and Loom Networking
 - One suite, built twice: `./run-tests.ps1` for the desktop build, `./run-web-tests.ps1` to compile it with emcc and run it under node
 - See `Loom Tests/README.md`
 
@@ -32,9 +32,6 @@
 
 *Loom ImGui:*
 - Imported ImGui implementation using an OpenGL backend
-
-*Loom Math*
-- glm substitute for WASM projects
 
 *Loom Networking:*
 - Backend server code using boost::asio sockets

@@ -29,9 +29,9 @@ namespace
 		Loom::Serial<float> ratio;
 		Loom::Serial<double> precise;
 		Loom::Serial<std::string> label;
-		Loom::Serial<Loom::Math::vec2<float>> pair;
-		Loom::Serial<Loom::Math::vec3<float>> triple;
-		Loom::Serial<Loom::Math::vec4<float>> quad;
+		Loom::Serial<glm::vec2> pair;
+		Loom::Serial<glm::vec3> triple;
+		Loom::Serial<glm::vec4> quad;
 		Loom::Serial<std::vector<float>> numbers;
 	};
 
@@ -188,9 +188,9 @@ TEST_SUITE("SerializedField")
 		CHECK(read.ratio == doctest::Approx(written.ratio));
 		CHECK(read.precise == doctest::Approx(written.precise));
 		CHECK(*read.label == *written.label);
-		CHECK(read.pair->data[1] == doctest::Approx(-2.5f));
-		CHECK(read.triple->data[2] == doctest::Approx(3.0f));
-		CHECK(read.quad->data[3] == doctest::Approx(4.0f));
+		CHECK(read.pair->y == doctest::Approx(-2.5f));
+		CHECK(read.triple->z == doctest::Approx(3.0f));
+		CHECK(read.quad->w == doctest::Approx(4.0f));
 		CHECK(*read.numbers == *written.numbers);
 	};
 
