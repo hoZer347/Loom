@@ -68,5 +68,11 @@ namespace Loom
 		// to devenv when there is one, since a header has no association;
 		// anything else goes to whatever its association is.
 		static OpenCommand OpenWith(const std::string& path, const std::string& scripts_folder, const std::string& devenv);
+
+		// The whole file, or an empty string when it cannot be read.
+		static std::string ReadText(const std::string& path);
+
+		// What the first <tag> in an MSBuild project holds, or an empty string.
+		static std::string Element(const std::string& xml, const std::string& tag);
 	};
 };

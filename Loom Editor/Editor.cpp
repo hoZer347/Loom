@@ -72,6 +72,18 @@ namespace Loom
 			return nullptr;
 		};
 
+		GameObject* FindByGuid(GameObject& root, const Guid& guid)
+		{
+			if (root.GetGuid() == guid)
+				return &root;
+
+			for (GameObject* child : root.GetChildren())
+				if (GameObject* found = FindByGuid(*child, guid))
+					return found;
+
+			return nullptr;
+		};
+
 		// Sits beside the executable and holds what the editor remembers between
 		// runs. Beside the executable rather than in the working directory,
 		// because opening a project moves the working directory to it.
@@ -940,7 +952,12 @@ namespace Loom
 	Scene* Editor::ReplaceScene(Scene* scene, const std::string& text)
 	{
 		const auto slot = std::find(m_ownedScenes.begin(), m_ownedScenes.end(), scene);
-		const Guid selected = m_selected ? m_selected->GetGuid() : Guid();
+
+		// Looked for again under the replacement alone: another copy of this
+		// scene holds objects with the same guids, and a selection in one of
+		// those stays where it is.
+		const bool selected_here = m_selected && IsInHierarchy(scene->GetRoot(), m_selected);
+		const Guid selected = selected_here ? m_selected->GetGuid() : Guid();
 		const bool active = scene == m_activeScene;
 		const std::string path = m_scenePaths[scene];
 
@@ -949,7 +966,8 @@ namespace Loom
 		if (active)
 			m_activeScene = nullptr;
 
-		Select(nullptr);
+		if (selected_here)
+			Select(nullptr);
 
 		std::string error;
 
@@ -969,7 +987,8 @@ namespace Loom
 		if (active)
 			m_activeScene = replacement;
 
-		Select(LoomObject::GetByGuid<GameObject>(selected));
+		if (selected_here)
+			Select(FindByGuid(replacement->GetRoot(), selected));
 
 		return replacement;
 	};
@@ -2311,6 +2330,12 @@ namespace Loom
 
 	void Editor::DrawView(EditorViewport& view, const std::vector<Scene*>& scenes, EditorCamera* camera)
 	{
+		if (camera)
+		{
+			ImGui::TextDisabled("(?)");
+			ImGui::SetItemTooltip("%s", camera_controls);
+		};
+
 		const ImVec2 available = ImGui::GetContentRegionAvail();
 
 		if (available.x < 1.0f || available.y < 1.0f)
@@ -2328,9 +2353,6 @@ namespace Loom
 				ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
 
 			camera->Drive(ImGui::IsItemHovered(), ImGui::IsItemActive());
-
-			if (!ImGui::IsItemActive())
-				ImGui::SetItemTooltip("%s", camera_controls);
 
 			ImGui::SetCursorScreenPos(corner);
 		};

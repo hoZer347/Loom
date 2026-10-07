@@ -74,18 +74,11 @@ namespace Loom
 		// own name when it does not say.
 		std::string RootNamespace(const std::filesystem::path& project)
 		{
-			constexpr const char* open = "<RootNamespace>";
-			constexpr const char* close = "</RootNamespace>";
+			const std::string name = ProjectAssets::Element(ProjectAssets::ReadText(project.string()), "RootNamespace");
 
-			std::ifstream in(project, std::ios::binary);
-			const std::string text{ std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>() };
-
-			const size_t begin = text.find(open);
-			const size_t end = begin == std::string::npos ? begin : text.find(close, begin);
-
-			return end == std::string::npos
+			return name.empty()
 				? project.stem().string()
-				: text.substr(begin + strlen(open), end - begin - strlen(open));
+				: name;
 		};
 
 		// A whole script in one header, which the scripts project picks up by
@@ -307,6 +300,28 @@ void main()
 			text.replace(at, token.size(), value);
 
 		return text;
+	};
+
+	std::string ProjectAssets::ReadText(const std::string& path)
+	{
+		std::ifstream in(path, std::ios::binary);
+
+		return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+	};
+
+	std::string ProjectAssets::Element(const std::string& xml, const std::string& tag)
+	{
+		const std::string open = '<' + tag + '>';
+		const size_t begin = xml.find(open);
+
+		if (begin == std::string::npos)
+			return "";
+
+		const size_t end = xml.find("</" + tag + '>', begin);
+
+		return end == std::string::npos
+			? ""
+			: xml.substr(begin + open.size(), end - begin - open.size());
 	};
 
 	bool ProjectAssets::IsValidName(const std::string& name)

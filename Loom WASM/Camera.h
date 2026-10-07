@@ -32,6 +32,7 @@ namespace Loom
 		// Where a camera on no GameObject sits, as a world matrix: the editor's
 		// own cameras, which belong to no scene.
 		void SetPose(const glm::mat4& world) { m_pose = world; };
+		const glm::mat4& GetPose() const { return m_pose; };
 
 		// Switches what the camera aims by, re-aiming the one it switches to so
 		// the view does not turn: the target goes ahead of the camera at the
