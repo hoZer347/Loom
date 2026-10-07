@@ -52,8 +52,7 @@ namespace Loom
 		constexpr ImGuiTreeNodeFlags HEADER_FLAGS =
 			ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap;
 
-		// Writes a 24 bit bottom-up bitmap, which is the row order GL hands back
-		// and the one format worth writing without an image library.
+		// Writes a 24 bit bottom-up bitmap, which is the row order GL hands back.
 		bool WriteBitmap(const std::string& path, int width, int height, const std::vector<uint8_t>& bgr)
 		{
 			std::ofstream out(path, std::ios::binary);
@@ -259,6 +258,9 @@ namespace Loom
 		m_ownedScenes.clear();
 
 		EditorLog::Get().Uninstall();
+
+		if (m_assetWatch != nullptr)
+			FindCloseChangeNotification(m_assetWatch);
 	};
 
 	void Editor::LoadSettings()
@@ -349,7 +351,7 @@ namespace Loom
 		// library they are made of alone.
 		if (resolved == m_projectPath)
 		{
-			RefreshProjectScenes();
+			RefreshProjectAssets();
 
 			// A project file that was not there when this folder was opened -
 			// New Project writes one into the folder the editor is already
@@ -382,7 +384,7 @@ namespace Loom
 
 		LoadProjectFile();
 
-		RefreshProjectScenes();
+		RefreshProjectAssets();
 		SaveSettings();
 
 		std::cout
@@ -397,28 +399,6 @@ namespace Loom
 				OpenScene(scene);
 
 		return true;
-	};
-
-	void Editor::RefreshProjectScenes()
-	{
-		m_projectScenes.clear();
-
-		if (m_projectPath.empty())
-			return;
-
-		std::error_code code;
-
-		for (const auto& entry :
-			std::filesystem::recursive_directory_iterator(m_projectPath, code))
-		{
-			if (!entry.is_regular_file(code))
-				continue;
-
-			if (entry.path().extension() == SceneSerializer::extension)
-				m_projectScenes.push_back(entry.path().lexically_normal().string());
-		};
-
-		std::sort(m_projectScenes.begin(), m_projectScenes.end());
 	};
 
 	Scene* Editor::CreateScene(const std::string& name)
@@ -684,6 +664,7 @@ namespace Loom
 
 		DrawFolderPrompt();
 		DrawNewProjectPrompt();
+		DrawCreateAssetPrompt();
 		DrawFileDialogs();
 	};
 
@@ -884,7 +865,7 @@ namespace Loom
 			ImGuiWindowFlags_NoSavedSettings))
 		{
 			ImGui::TextUnformatted("The editor works out of a folder of scene files.");
-			ImGui::TextDisabled("Every %s under it shows up in the Project panel.", SceneSerializer::extension);
+			ImGui::TextDisabled("Everything under it shows up in the Project panel.");
 
 			ImGui::Separator();
 
@@ -947,55 +928,8 @@ namespace Loom
 
 			m_dialogs->saveScene.ClearSelected();
 
-			RefreshProjectScenes();
+			RefreshProjectAssets();
 		};
-	};
-
-	void Editor::DrawProject()
-	{
-		if (ImGui::Begin("Project", &m_showProject))
-		{
-			if (m_projectPath.empty())
-			{
-				ImGui::TextDisabled("No scene folder chosen.");
-
-				if (ImGui::Button("Choose Folder..."))
-					m_dialogs->folder.Open();
-			}
-			else
-			{
-				ImGui::TextWrapped("%s", m_projectPath.c_str());
-
-				if (ImGui::Button("Change..."))
-					m_dialogs->folder.Open();
-
-				ImGui::SameLine();
-
-				if (ImGui::Button("Refresh"))
-					RefreshProjectScenes();
-
-				ImGui::Separator();
-
-				if (m_projectScenes.empty())
-					ImGui::TextDisabled("No %s files here.", SceneSerializer::extension);
-
-				for (const std::string& path : m_projectScenes)
-				{
-					const std::string name =
-						std::filesystem::path(path).filename().string();
-
-					if (ImGui::Selectable(name.c_str()))
-						OpenScene(path);
-
-					if (ImGui::IsItemHovered())
-						ImGui::SetTooltip("%s", path.c_str());
-				};
-			};
-
-			DrawScriptsSection();
-		};
-
-		ImGui::End();
 	};
 
 	void Editor::DrawHierarchy()

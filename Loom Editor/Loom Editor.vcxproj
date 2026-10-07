@@ -89,6 +89,8 @@
     <ClCompile Include="ScriptLibrary.cpp" />
     <ClCompile Include="ProjectTemplate.cpp" />
     <ClCompile Include="EditorScripts.cpp" />
+    <ClCompile Include="EditorProject.cpp" />
+    <ClCompile Include="ProjectAssets.cpp" />
     <ClCompile Include="EditorLog.cpp" />
     <ClCompile Include="EditorViewport.cpp" />
     <ClCompile Include="main.cpp" />
@@ -97,6 +99,7 @@
     <ClInclude Include="Editor.h" />
     <ClInclude Include="ScriptLibrary.h" />
     <ClInclude Include="ProjectTemplate.h" />
+    <ClInclude Include="ProjectAssets.h" />
     <ClInclude Include="EditorFileDialogs.h" />
     <ClInclude Include="EditorLog.h" />
     <ClInclude Include="EditorViewport.h" />
