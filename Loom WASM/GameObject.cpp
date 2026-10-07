@@ -61,7 +61,7 @@ namespace Loom
 					return;
 
 				for (std::vector<ComponentBase*>* list :
-					{ &m_components, &m_updateables, &m_renderables, &m_physicsables })
+					{ &m_components, &m_updateables, &m_renderables, &m_physicsables, &m_editables })
 					list->erase(
 						std::remove(
 							list->begin(),
@@ -196,6 +196,14 @@ namespace Loom
 				renderable->OnPhysics();
 		for (auto& child : m_children)
 			child->Physics();
+	};
+
+	void GameObject::EditorUpdate()
+	{
+		for (ComponentBase* editable : m_editables)
+			editable->OnEditor();
+		for (GameObject* child : m_children)
+			child->EditorUpdate();
 	};
 
 	void GameObject::Gui()
