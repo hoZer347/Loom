@@ -88,6 +88,13 @@ TEST_SUITE("ProjectAssets")
 		CHECK(Loom::ProjectAssets::ScriptNameProblem(scripts.project.string(), "Mover_2").empty());
 	};
 
+	TEST_CASE("a script cannot take a registered component's name")
+	{
+		const ScriptsProject scripts("loom project assets registered");
+
+		CHECK_FALSE(Loom::ProjectAssets::ScriptNameProblem(scripts.project.string(), "Camera").empty());
+	};
+
 	TEST_CASE("a project without a RootNamespace uses its own name")
 	{
 		const ScriptsProject scripts("loom project assets namespace");

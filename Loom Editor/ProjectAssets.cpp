@@ -1,5 +1,7 @@
 #include "ProjectAssets.h"
 
+#include "ComponentRegistry.h"
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -288,6 +290,11 @@ void main()
 		for (const char* keyword : keywords)
 			if (name == keyword)
 				return "'" + name + "' is a C++ keyword.";
+
+		// Components register by type name without their namespace, and the
+		// registry turns away a second one by a name it already has.
+		if (ComponentRegistry::All().contains(name))
+			return "A component called " + name + " already exists.";
 
 		const std::filesystem::path root = std::filesystem::path(scripts_project).parent_path();
 		const std::string header = name + ".hpp";
