@@ -8,8 +8,6 @@
 #include "OpenGL.h"
 #endif
 
-#include "Globals.h"
-
 #include <iostream>
 
 

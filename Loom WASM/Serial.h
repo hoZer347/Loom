@@ -4,7 +4,8 @@
 
 #include "SerializedField.h"
 
-#include "Vector.h"
+#include "glm/glm.hpp"
+#include "glm/gtc/type_ptr.hpp"
 
 #include <initializer_list>
 #include <string>
@@ -41,9 +42,9 @@ namespace Loom
 		else if constexpr (std::is_same_v<T, float>)				return FieldType::Float;
 		else if constexpr (std::is_same_v<T, double>)				return FieldType::Double;
 		else if constexpr (std::is_same_v<T, std::string>)			return FieldType::String;
-		else if constexpr (std::is_same_v<T, Math::vec2<float>>)	return FieldType::Vec2;
-		else if constexpr (std::is_same_v<T, Math::vec3<float>>)	return FieldType::Vec3;
-		else if constexpr (std::is_same_v<T, Math::vec4<float>>)	return FieldType::Vec4;
+		else if constexpr (std::is_same_v<T, glm::vec2>)			return FieldType::Vec2;
+		else if constexpr (std::is_same_v<T, glm::vec3>)			return FieldType::Vec3;
+		else if constexpr (std::is_same_v<T, glm::vec4>)			return FieldType::Vec4;
 		else if constexpr (std::is_same_v<T, std::vector<float>>)	return FieldType::FloatArray;
 		else if constexpr (std::is_pointer_v<T>)					return FieldType::Reference;
 		else static_assert(sizeof(T) == 0, "Serial<T> has no scene-format type for this member");
@@ -171,7 +172,7 @@ namespace Loom
 				type == FieldType::Vec2 ||
 				type == FieldType::Vec3 ||
 				type == FieldType::Vec4)
-				return m_value.data;
+				return glm::value_ptr(m_value);
 			else return &m_value;
 		};
 

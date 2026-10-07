@@ -34,7 +34,6 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\property files\JSON.props" />
     <Import Project="..\Property Files\Loom WASM.props" />
-    <Import Project="..\Property Files\Loom Math.props" />
     <Import Project="..\property files\Boost.props" />
     <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenSSL.props" />
@@ -44,7 +43,6 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\property files\JSON.props" />
     <Import Project="..\Property Files\Loom WASM.props" />
-    <Import Project="..\Property Files\Loom Math.props" />
     <Import Project="..\property files\Boost.props" />
     <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenSSL.props" />

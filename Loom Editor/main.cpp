@@ -21,6 +21,7 @@ namespace
 			<< "  --new-project <folder> <name>  create a project and open it\n"
 			<< "  --compile                      build the project's scripts on startup\n"
 			<< "  --play                         start with the scene running\n"
+			<< "  --select <name>                select the GameObject with this name\n"
 			<< "  --screenshot <file> [frames]   write the editor to a bitmap and exit,\n"
 			<< "                                 without showing a window"
 			<< std::endl;
@@ -51,6 +52,7 @@ int main(int argc, char** argv)
 	bool compile = false;
 	bool play = false;
 	std::string screenshot;
+	std::string selection;
 	int frames = 240;
 
 	for (int i = 1; i < argc; i++)
@@ -89,6 +91,16 @@ int main(int argc, char** argv)
 			if (i + 1 < argc && isdigit((unsigned char)argv[i + 1][0]))
 				frames = atoi(argv[++i]);
 		}
+		else if (argument == "--select")
+		{
+			if (i + 1 >= argc)
+			{
+				std::cerr << "--select needs a GameObject name" << std::endl;
+				return 1;
+			};
+
+			selection = argv[++i];
+		}
 		else if (argument == "--compile")
 			compile = true;
 		else if (argument == "--play")
@@ -109,6 +121,9 @@ int main(int argc, char** argv)
 	// fallen behind its sources is rebuilt here too.
 	if (play)
 		editor.TogglePlay();
+
+	if (!selection.empty())
+		editor.RequestSelection(selection);
 
 	if (!screenshot.empty())
 		editor.RequestScreenshot(screenshot, frames, true);

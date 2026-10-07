@@ -134,7 +134,7 @@ if (-not $NoBuild)
         (Join-Path $root 'External Libraries\doctest')
         (Join-Path $root 'Loom Tests')
         (Join-Path $root 'Loom WASM')
-        (Join-Path $root 'Loom Math')
+        (Join-Path $root 'External Libraries\glm')
         (Join-Path $root 'Loom Networking')
         $imgui
     ) | ForEach-Object { "-I$_" }

@@ -44,12 +44,11 @@ window or a GL context, so the module runs headless; no canvas, no browser.
 | Suite | Covers |
 | --- | --- |
 | `Platform` | What the two builds are allowed to differ on: pointer width, ID width, endianness, threading, how shaders load |
-| `Loom Math` | `vec2`/`vec3`/`vec4`/`mat4` size and alignment, the global `transform` |
 | `Macro Helpers` | `HAS_FUNCTION_*`, `HAS_VARIABLE_*`, `Str`, `VARIABLE_NAME` |
 | `Engine` | Unique IDs (including across threads), the task queue and `DoTasks`, frame-loop defaults |
 | `LoomObject` | ID allocation, naming, `NameAndID`, the `GetByID` registry, deregistration on destruction |
 | `Component` | Base callbacks as no-ops, virtual dispatch and destruction, type identity |
-| `GameObject` | Deferred `Attach`, `GetComponent` by type, selective update/render registration, children, `Destroy`, `DetachComponent` |
+| `GameObject` | Deferred `Attach`, `GetComponent` by type, selective update/render registration, children, `Destroy`, `DetachComponent`, thread inheritance, the transform's fields and matrix |
 | `Scene` | Registration in `GetScenes`, root delegation, `Update`/`Render`/`Physics` walking the hierarchy |
 | `Mesh` | Geometry and draw-type defaults, and that rendering without a material or shader stops before it touches GL |
 | `Material` | Defaults, and being found by a `Mesh` on the same GameObject |

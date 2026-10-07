@@ -4,7 +4,7 @@
 
 #include "Component.h"
 
-#include "Vector.h"
+#include "glm/glm.hpp"
 
 #include <string>
 #include <vector>
@@ -22,8 +22,8 @@ namespace Loom
 	/// a change to the .png and nothing else.
 	///
 	/// Everything the frame needs is a uniform on a shared unit quad, so switching clip
-	/// costs a uniform rather than a rebuild. The sprite carries its own position, since
-	/// GameObject has no transform, and the sheet is a GL texture handle the game
+	/// costs a uniform rather than a rebuild. The sprite carries its own position instead of
+	/// following its GameObject's transform, and the sheet is a GL texture handle the game
 	/// supplies. sortingOrder is honoured by drawing order.
 	struct SpriteManager : Component<SpriteManager>
 	{
@@ -113,9 +113,8 @@ namespace Loom
 
 		#pragma region Draw
 
-		/// Where the sprite is. Loom's GameObject has no transform, so the sprite carries
-		/// its own.
-		Math::vec3<float> position{ };
+		/// Where the sprite is, independent of its GameObject's transform.
+		glm::vec3 position{ };
 
 		/// Mirrors horizontally about the pivot.
 		bool flipX = false;

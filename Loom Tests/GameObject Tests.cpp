@@ -5,6 +5,8 @@
 #include "Scene.h"
 #include "GameObject.h"
 
+#include "glm/glm.hpp"
+
 #include <algorithm>
 #include <string>
 #include <vector>
@@ -384,21 +386,98 @@ TEST_SUITE("GameObject")
 		CHECK(detachCount == 0);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "SetThreadID is callable on a live hierarchy")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "SetThreadID carries down to the children that inherit it")
 	{
-		// GameObject does not expose its thread ID, so this covers the call
-		// path. Note that m_inherit_thread_id, which decides whether children
-		// follow the parent, has no initialiser -- propagation is not
-		// deterministic yet and is deliberately not asserted on here.
+		constexpr int ROOT_THREAD = 2;
+		constexpr int OWN_THREAD = 3;
+
 		Loom::Scene scene("thread ids");
 		Pump();
 
-		scene.GetRoot().AddChild("Child");
+		Loom::GameObject* inheriting = scene.GetRoot().AddChild("Inheriting");
+		Loom::GameObject* independent = scene.GetRoot().AddChild("Independent");
 		Pump();
 
-		scene.GetRoot().SetThreadID(2);
+		inheriting->SetInheritThreadID(true);
+		independent->SetThreadID(OWN_THREAD);
 
-		CHECK(true);
+		scene.GetRoot().SetThreadID(ROOT_THREAD);
+
+		CHECK(inheriting->GetThreadID() == ROOT_THREAD);
+		CHECK(independent->GetThreadID() == OWN_THREAD);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "turning inheritance on takes the parent's thread at once")
+	{
+		constexpr int ROOT_THREAD = 2;
+		constexpr int OWN_THREAD = 3;
+
+		Loom::Scene scene("inherit");
+		Pump();
+
+		Loom::GameObject* child = scene.GetRoot().AddChild("Child");
+		Pump();
+
+		scene.GetRoot().SetThreadID(ROOT_THREAD);
+		child->SetThreadID(OWN_THREAD);
+
+		child->SetInheritThreadID(true);
+
+		CHECK(child->InheritsThreadID());
+		CHECK(child->GetThreadID() == ROOT_THREAD);
+	};
+
+	// Scenes saved before the transform existed number the thread fields 0 and
+	// 1, so the transform has to come after them.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the transform is serialized after the thread fields")
+	{
+		constexpr size_t THREAD_FIELDS = 2;
+		constexpr size_t TRANSFORM_FIELDS = 3;
+
+		Loom::Scene scene("transform fields");
+		Pump();
+
+		Loom::GameObject& root = scene.GetRoot();
+		const std::vector<Loom::SerializedField>& fields = root.GetFields();
+
+		REQUIRE(fields.size() == THREAD_FIELDS + TRANSFORM_FIELDS);
+
+		CHECK(fields[0].type == Loom::FieldType::Int);
+		CHECK(fields[1].type == Loom::FieldType::Bool);
+
+		for (size_t i = THREAD_FIELDS; i < fields.size(); i++)
+			CHECK(fields[i].type == Loom::FieldType::Vec3);
+
+		CHECK(fields[THREAD_FIELDS].data == &root.transform.position->x);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a new transform is the identity")
+	{
+		Loom::Scene scene("identity transform");
+		Pump();
+
+		CHECK(scene.GetRoot().transform.Matrix() == glm::mat4(1.0f));
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a transform scales, then rotates, then translates")
+	{
+		constexpr float QUARTER_TURN = 90.0f;
+
+		Loom::Scene scene("composed transform");
+		Pump();
+
+		Loom::Transform& transform = scene.GetRoot().transform;
+
+		transform.position = glm::vec3(10.0f, 0.0f, 0.0f);
+		transform.rotation = glm::vec3(0.0f, 0.0f, QUARTER_TURN);
+		transform.scale = glm::vec3(2.0f);
+
+		// x scaled to 2, turned onto y, then moved along x.
+		const glm::vec4 moved = transform.Matrix() * glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+
+		CHECK(moved.x == doctest::Approx(10.0f));
+		CHECK(moved.y == doctest::Approx(2.0f));
+		CHECK(moved.z == doctest::Approx(0.0f));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a GameObject is a LoomObject with its own ID and name")

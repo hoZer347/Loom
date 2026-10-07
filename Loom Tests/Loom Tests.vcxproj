@@ -37,7 +37,6 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Property Files\doctest.props" />
-    <Import Project="..\Property Files\Loom Math.props" />
     <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenGL.props" />
     <Import Project="..\Property Files\UserMacros.props" />
@@ -45,7 +44,6 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Property Files\doctest.props" />
-    <Import Project="..\Property Files\Loom Math.props" />
     <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenGL.props" />
     <Import Project="..\Property Files\UserMacros.props" />
@@ -89,7 +87,6 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Platform Tests.cpp" />
-    <ClCompile Include="Math Tests.cpp" />
     <ClCompile Include="Macro Helpers Tests.cpp" />
     <ClCompile Include="DataPackage Tests.cpp" />
     <ClCompile Include="Engine Tests.cpp" />

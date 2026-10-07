@@ -5,6 +5,7 @@
 #include "Engine.h"
 #include "Component.h"
 #include "LoomObject.h"
+#include "Transform.h"
 
 #include <cstring>
 #include <string>
@@ -116,7 +117,11 @@ namespace Loom
 
 		void RemoveChild(GameObject* gameObject);
 
+		int GetThreadID() const { return m_threadID; };
 		void SetThreadID(int thread_id);
+
+		bool InheritsThreadID() const { return m_inherit_thread_id; };
+		void SetInheritThreadID(bool inherit);
 
 		void Destroy();
 
@@ -137,6 +142,13 @@ namespace Loom
 
 		Serial<int> m_threadID;
 		Serial<bool> m_inherit_thread_id;
+
+	public:
+		// After the thread fields, since a field is its position in the scene
+		// file and scenes saved before it existed number those first.
+		Transform transform;
+
+	protected:
 
 		std::vector<GameObject*>	m_children{ };
 		std::vector<ComponentBase*> m_components{ };

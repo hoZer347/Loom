@@ -89,6 +89,10 @@ namespace Loom
 
 		void Select(GameObject* gameObject);
 
+		// Selects the GameObject with this name once its scene has loaded, so a
+		// screenshot can show it in the inspector.
+		void RequestSelection(const std::string& name);
+
 	private:
 		void DrawGui();
 
@@ -105,6 +109,8 @@ namespace Loom
 		// on the object that holds the field. A press on the arrow only opens it.
 		bool NodeReleased();
 		void DrawInspector();
+		void DrawTransform(GameObject* gameObject);
+		void DrawThread(GameObject* gameObject);
 		void DrawComponent(GameObject* gameObject, ComponentBase* component);
 		void DrawFields(LoomObject& object);
 		void DrawScene();
@@ -178,6 +184,7 @@ namespace Loom
 		Scene* m_activeScene = nullptr;
 		GameObject* m_selected = nullptr;
 		bool m_nodePressOpened = false;
+		std::string m_pendingSelection{ };
 		std::vector<Scene*> m_ownedScenes{ };
 
 		// Where each open scene came from, so a scene can be put back after the
