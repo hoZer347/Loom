@@ -255,8 +255,15 @@ switch ($Command)
 
         foreach ($suite in 'run-tests.ps1', 'run-web-tests.ps1')
         {
-            & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $slot $suite)
-            if ($LASTEXITCODE -ne 0) { throw "$suite failed. Nothing was merged." }
+            # The suites write to stderr on purpose (tests of error reporting),
+            # so only the exit code decides.
+            $previous = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $slot $suite) 2>&1 | Out-Host
+            $failed = $LASTEXITCODE -ne 0
+            $ErrorActionPreference = $previous
+
+            if ($failed) { throw "$suite failed. Nothing was merged." }
         }
 
         # Compare-and-swap: refused if another slot merged since the rebase.
