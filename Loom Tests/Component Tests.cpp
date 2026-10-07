@@ -33,9 +33,8 @@ TEST_SUITE("Component")
 		inert.OnRender();
 		inert.OnPhysics();
 		inert.OnGui();
-		inert.OnEditor();
 
-		CHECK(true); // Calling all seven with no GameObject and no GL context is the assertion.
+		CHECK(true); // Calling all six with no GameObject and no GL context is the assertion.
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an overriding component receives its callbacks through the base interface")
@@ -50,14 +49,12 @@ TEST_SUITE("Component")
 		asBase.OnUpdate();
 		asBase.OnRender();
 		asBase.OnPhysics();
-		asBase.OnEditor();
 		asBase.OnDetach();
 
 		CHECK(probe.Count("attach")  == 1);
 		CHECK(probe.Count("update")  == 2);
 		CHECK(probe.Count("render")  == 1);
 		CHECK(probe.Count("physics") == 1);
-		CHECK(probe.Count("editor")  == 1);
 		CHECK(probe.Count("detach")  == 1);
 	};
 

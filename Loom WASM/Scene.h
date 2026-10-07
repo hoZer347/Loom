@@ -39,9 +39,6 @@ namespace Loom
 		void Render();
 		void Physics();
 
-		// OnEditor across the hierarchy. Only the editor calls this, once a frame.
-		void EditorUpdate();
-
 		static const std::vector<Scene*>& GetScenes() { return allScenes; };
 
 		// Puts a scene at index in GetScenes, or last if index is past the end.

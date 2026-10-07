@@ -67,11 +67,6 @@ namespace Loom
 		root.Physics();
 	};
 
-	void Scene::EditorUpdate()
-	{
-		root.EditorUpdate();
-	};
-
 	Scene::~Scene()
 	{
 		Engine::QueueTask(

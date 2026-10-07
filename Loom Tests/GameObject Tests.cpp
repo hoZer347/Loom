@@ -156,29 +156,6 @@ TEST_SUITE("GameObject")
 		CHECK(updater->updates == 2);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "OnEditor runs from the scene's editor tick and nowhere else")
-	{
-		Loom::Scene scene("editor tick");
-		Pump();
-
-		LoomTests::Probe<'E'>* probe =
-			scene.GetRoot().AddChild()->Attach<LoomTests::Probe<'E'>>();
-		Pump();
-
-		scene.Update();
-		scene.Physics();
-		CHECK(probe->Count("editor") == 0);
-
-		scene.EditorUpdate();
-		scene.EditorUpdate();
-		CHECK(probe->Count("editor") == 2);
-
-		scene.GetRoot().GetChildren().front()->DetachComponent(probe);
-		Pump();
-
-		scene.EditorUpdate(); // Detach took it off the list, so this must not reach the freed probe.
-	};
-
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a component that overrides nothing is owned but never called")
 	{
 		Loom::Scene scene("inert component");

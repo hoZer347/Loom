@@ -31,9 +31,6 @@ namespace Loom
 		constexpr virtual void OnRender()	{ };
 		constexpr virtual void OnPhysics()	{ };
 
-		// Every frame the editor draws, playing or not. Never in a built game.
-		constexpr virtual void OnEditor()	{ };
-
 		virtual ~ComponentBase() { };
 
 		const std::string& GetClassName() const { return m_name; };
