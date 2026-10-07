@@ -299,9 +299,16 @@ switch ($Command)
             # A fast-forward keeps their uncommitted work and refuses if it would overwrite any.
             if ((& git -C $userRoot rev-parse $Trunk) -ne $base) { throw "$Trunk moved while the tests ran. Run merge again." }
 
-            if (-not (Test-Git $userRoot merge --ff-only --quiet $head))
+            $previous = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            $output = & git -C $userRoot merge --ff-only --quiet $head 2>&1
+            $failed = $LASTEXITCODE -ne 0
+            $ErrorActionPreference = $previous
+
+            if ($failed)
             {
-                throw "Uncommitted changes in $userRoot conflict with $($claim.Branch). Nothing was merged."
+                if ((& git -C $userRoot rev-parse $Trunk) -ne $base) { throw "$Trunk moved while the tests ran. Run merge again." }
+                throw "The user's work in $userRoot blocks $($claim.Branch). Nothing was merged.`n$($output -join "`n")"
             }
         }
         # Compare-and-swap: refused if another slot merged since the rebase.
