@@ -439,6 +439,7 @@ namespace Loom
 	{
 		m_selected = gameObject;
 		m_nameBufferOwner = nullptr;
+		m_renaming = false;
 	};
 
 	bool Editor::IsInHierarchy(const GameObject& root, const GameObject* target)
@@ -956,17 +957,34 @@ namespace Loom
 		if (m_selected == gameObject)
 			flags |= ImGuiTreeNodeFlags_Selected;
 
+		const bool renaming = m_renaming && m_selected == gameObject;
+
 		const bool open = ImGui::TreeNodeEx(
 			(void*)gameObject,
 			flags,
 			"%s",
-			gameObject->GetName().c_str());
+			renaming ? "" : gameObject->GetName().c_str());
 
-		if (ImGui::IsItemHovered())
+		if (ImGui::IsItemHovered() && !renaming)
 			ImGui::SetTooltip("%s", gameObject->GetGuid().ToString().c_str());
 
 		if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
 			Select(gameObject);
+
+		if (ImGui::IsItemHovered() &&
+			ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
+			!ImGui::IsItemToggledOpen())
+		{
+			snprintf(
+				m_nameBuffer,
+				sizeof(m_nameBuffer),
+				"%s",
+				gameObject->GetName().c_str());
+
+			m_nameBufferOwner = gameObject;
+			m_renaming = true;
+			m_focusRename = true;
+		};
 
 		if (ImGui::BeginPopupContextItem())
 		{
@@ -985,6 +1003,9 @@ namespace Loom
 			ImGui::EndPopup();
 		};
 
+		if (renaming)
+			DrawRenameField(gameObject);
+
 		if (!open)
 			return;
 
@@ -994,6 +1015,35 @@ namespace Loom
 			DrawGameObjectNode(child);
 
 		ImGui::TreePop();
+	};
+
+	void Editor::DrawRenameField(GameObject* gameObject)
+	{
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(-FLT_MIN);
+
+		if (m_focusRename)
+		{
+			ImGui::SetKeyboardFocusHere();
+			m_focusRename = false;
+		};
+
+		ImGui::InputText(
+			"##rename",
+			m_nameBuffer,
+			sizeof(m_nameBuffer),
+			ImGuiInputTextFlags_AutoSelectAll);
+
+		// Enter and clicking away both keep the new name; Escape has already put
+		// the old one back in the buffer by the time the field lets go.
+		if (!ImGui::IsItemDeactivated())
+			return;
+
+		if (m_nameBuffer[0] != '\0')
+			gameObject->SetName(m_nameBuffer);
+
+		m_nameBufferOwner = nullptr;
+		m_renaming = false;
 	};
 
 	void Editor::DrawInspector()
@@ -1006,8 +1056,9 @@ namespace Loom
 			{
 				GameObject* gameObject = m_selected;
 
-				// The name box is only refilled when the selection changes, so
-				// typing into it is not fighting the object's current name.
+				// The name box is only refilled when the selection changes or a
+				// rename ends, so typing into it is not fighting the object's
+				// current name.
 				if (m_nameBufferOwner != gameObject)
 				{
 					snprintf(
