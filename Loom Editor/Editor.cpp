@@ -138,11 +138,21 @@ namespace Loom
 			return field.ReferenceFor(LoomObject::GetByGuid(*(const Guid*)payload->Data));
 		};
 
+		// Components carry no name of their own, so one is shown as its type on
+		// the GameObject that holds it.
+		std::string Describe(const LoomObject& object)
+		{
+			if (const ComponentBase* component = dynamic_cast<const ComponentBase*>(&object))
+				return ComponentRegistry::NameOf(*component) + " on " + component->GetGameObject()->NameAndID();
+
+			return object.NameAndID();
+		};
+
 		void DrawReferenceField(const char* label, const SerializedField& field)
 		{
 			LoomObject* target = field.GetReference();
 
-			const std::string shown = (target ? target->NameAndID() : "none") + "###target";
+			const std::string shown = (target ? Describe(*target) : "none") + "###target";
 
 			// A button for its frame: something the width of the other fields to
 			// drop onto.
