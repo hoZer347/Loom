@@ -36,7 +36,14 @@ using System.Windows.Forms;
 public class ReviewForm : Form
 {
     [StructLayout(LayoutKind.Sequential)]
-    struct FLASHWINFO { public uint cbSize; public IntPtr hwnd; public uint dwFlags; public uint uCount; public uint dwTimeout; }
+    struct FLASHWINFO
+    {
+        public uint cbSize;
+        public IntPtr hwnd;
+        public uint dwFlags;
+        public uint uCount;
+        public uint dwTimeout;
+    }
 
     [DllImport("user32.dll")]
     static extern bool FlashWindowEx(ref FLASHWINFO info);
@@ -65,6 +72,7 @@ $FeedbackHeight = 140
 $ButtonWidth = 110
 $ButtonHeight = 34
 $FontSize = 10
+$OffscreenCoordinate = -32000
 
 $font = New-Object System.Drawing.Font('Segoe UI', $FontSize)
 
@@ -76,9 +84,10 @@ $form.StartPosition = 'CenterScreen'
 if ($Offscreen)
 {
     $form.StartPosition = 'Manual'
-    $form.Location = New-Object System.Drawing.Point(-32000, -32000)
+    $form.Location = New-Object System.Drawing.Point($OffscreenCoordinate, $OffscreenCoordinate)
     $form.ShowInTaskbar = $false
 }
+
 $form.Font = $font
 
 $summary = New-Object System.Windows.Forms.TextBox

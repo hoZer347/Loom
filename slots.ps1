@@ -4,18 +4,18 @@
 
 .DESCRIPTION
     Loom itself belongs to the user and is never a slot. Each slot is a
-    worktree of this repository beside it, and a claimed slot is locked with
-    `git worktree lock`, so two agents never hold the same one. Any slot's copy
-    of this script works on every slot; merge and release act on the slot the
-    script is run from.
+    worktree of this repository beside it. A claim is a create-only ref,
+    refs/claims/loom-<n>, so two agents never hold the same slot; the slot's
+    worktree lock carries the feature branch for people and for lookups. Any
+    slot's copy of this script works on every slot.
 
 .EXAMPLE
     .\slots.ps1 setup
     .\slots.ps1 status
     .\slots.ps1 claim inspector-layout
-    .\slots.ps1 merge
-    .\slots.ps1 release
-    .\slots.ps1 release -Abandon
+    .\slots.ps1 merge inspector-layout
+    .\slots.ps1 release inspector-layout
+    .\slots.ps1 release inspector-layout -Abandon
 #>
 [CmdletBinding()]
 param(
@@ -33,7 +33,9 @@ $ErrorActionPreference = 'Stop'
 
 $SlotCount = 8
 $BranchPrefix = 'feature/'
+$ClaimPrefix = 'refs/claims/loom-'
 $Trunk = 'master'
+$NoObject = '0' * 40
 
 # Ignored, prebuilt libraries a fresh checkout lacks. Slots link to the user's
 # copies rather than holding several gigabytes each.
@@ -44,21 +46,41 @@ $SharedLibraries = @(
     'External Libraries\openssl\lib'
 )
 
+# Both helpers take the directory first and pass the rest to git untouched.
+# A named parameter would swallow git's own flags, such as -d for -Directory.
 function Invoke-Git
 {
-    param([string] $Directory)
+    & git -C @args
+    if ($LASTEXITCODE -ne 0) { throw "git $($args[1..$args.Count]) failed in $($args[0])" }
+}
 
-    & git -C $Directory @args
-    if ($LASTEXITCODE -ne 0) { throw "git $args failed in $Directory" }
+# For git calls that are allowed to fail. Hosts that turn a native command's
+# stderr into error records would otherwise stop the script on the first one.
+function Test-Git
+{
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+
+    try
+    {
+        & git -C @args 2>$null | Out-Null
+        return $LASTEXITCODE -eq 0
+    }
+    finally
+    {
+        $ErrorActionPreference = $previous
+    }
 }
 
 $commonDir = (& git -C $PSScriptRoot rev-parse --path-format=absolute --git-common-dir)
 $userRoot = Split-Path $commonDir -Parent
 $slotParent = Split-Path $userRoot -Parent
 
-function Get-SlotPath([int] $Number)
+function Get-SlotPath
 {
-    Join-Path $slotParent "$(Split-Path $userRoot -Leaf) $Number"
+    param([int] $Number)
+
+    [IO.Path]::GetFullPath((Join-Path $slotParent "$(Split-Path $userRoot -Leaf) $Number"))
 }
 
 # git worktree list --porcelain, one record per worktree, keyed by full path.
@@ -81,21 +103,36 @@ function Get-Worktrees
     return $records
 }
 
-function Get-ThisSlot
+# The one slot claimed for this feature, as @{ Number; Path; Branch }.
+function Find-Claim
 {
-    $root = [IO.Path]::GetFullPath($PSScriptRoot)
+    if (-not $Feature) { throw "$Command needs the feature name it was claimed with." }
 
-    foreach ($number in 1..$SlotCount)
-    {
-        if ([IO.Path]::GetFullPath((Get-SlotPath $number)) -eq $root) { return $root }
-    }
+    $branch = "$BranchPrefix$Feature"
+    $worktrees = Get-Worktrees
+    $found = @(1..$SlotCount | Where-Object { $worktrees[(Get-SlotPath $_)].Locked -eq $branch })
 
-    throw "$root is not a slot. Run merge and release with the slot's own copy of this script."
+    if ($found.Count -ne 1) { throw "Expected one slot claimed for $branch, found $($found.Count)." }
+
+    return @{ Number = $found[0]; Path = (Get-SlotPath $found[0]); Branch = $branch }
 }
 
-function Assert-Clean([string] $Slot)
+function Assert-Clean
 {
-    if (& git -C $Slot status --porcelain) { throw "$Slot has uncommitted changes. Commit them to the branch first." }
+    param([string] $Slot)
+
+    if (& git -C $Slot status --porcelain)
+    {
+        throw "$Slot has uncommitted changes. Commit them to the branch first."
+    }
+}
+
+function Remove-Claim
+{
+    param([int] $Number)
+
+    Test-Git $userRoot worktree unlock (Get-SlotPath $Number) | Out-Null
+    Test-Git $userRoot update-ref -d "$ClaimPrefix$Number" | Out-Null
 }
 
 switch ($Command)
@@ -131,7 +168,7 @@ switch ($Command)
 
         foreach ($number in 1..$SlotCount)
         {
-            $slot = [IO.Path]::GetFullPath((Get-SlotPath $number))
+            $slot = Get-SlotPath $number
             $record = $worktrees[$slot]
 
             if (-not $record)
@@ -140,9 +177,10 @@ switch ($Command)
                 continue
             }
 
-            $state = if ($null -ne $record.Locked) { "claimed  $($record.Branch)" } else { 'free' }
+            $state = if ($null -ne $record.Locked) { "claimed  $($record.Locked)" } else { 'free' }
             $dirty = @(& git -C $slot status --porcelain).Count
-            Write-Output ("Loom {0}  {1}{2}" -f $number, $state, $(if ($dirty) { "  ($dirty uncommitted)" } else { '' }))
+            $note = if ($dirty) { "  ($dirty uncommitted)" } else { '' }
+            Write-Output "Loom $number  $state$note"
         }
     }
 
@@ -151,29 +189,34 @@ switch ($Command)
         if (-not $Feature) { throw 'claim needs a feature name, e.g. .\slots.ps1 claim inspector-layout' }
 
         $branch = "$BranchPrefix$Feature"
-        & git -C $userRoot show-ref --verify --quiet "refs/heads/$branch"
-        if ($LASTEXITCODE -eq 0) { throw "$branch already exists." }
+        if (Test-Git $userRoot show-ref --verify --quiet "refs/heads/$branch") { throw "$branch already exists." }
 
         $worktrees = Get-Worktrees
+        $trunkHead = (& git -C $userRoot rev-parse $Trunk)
 
         foreach ($number in 1..$SlotCount)
         {
-            $slot = [IO.Path]::GetFullPath((Get-SlotPath $number))
+            $slot = Get-SlotPath $number
             $record = $worktrees[$slot]
 
             if (-not $record -or $null -ne $record.Locked -or $record.Branch) { continue }
+            if (& git -C $slot status --porcelain) { continue }
 
-            # The lock is the claim. Losing a race to another agent fails here.
-            & git -C $userRoot worktree lock --reason $branch $slot
-            if ($LASTEXITCODE -ne 0) { continue }
+            # Create-only, so of several agents racing for this slot exactly one gets it.
+            if (-not (Test-Git $userRoot update-ref "$ClaimPrefix$number" $trunkHead $NoObject)) { continue }
 
-            if (& git -C $slot status --porcelain)
+            try
             {
-                Invoke-Git $userRoot worktree unlock $slot
-                continue
+                Invoke-Git $userRoot worktree lock --reason $branch $slot
+                Assert-Clean $slot
+                Invoke-Git $slot switch --quiet --create $branch $Trunk
+            }
+            catch
+            {
+                Remove-Claim $number
+                throw
             }
 
-            Invoke-Git $slot switch --quiet --create $branch $Trunk
             Write-Output $slot
             return
         }
@@ -183,18 +226,29 @@ switch ($Command)
 
     'merge'
     {
-        $slot = Get-ThisSlot
-        $branch = (& git -C $slot branch --show-current)
-        if (-not $branch -or -not $branch.StartsWith($BranchPrefix)) { throw "$slot is not on a $BranchPrefix branch." }
+        $claim = Find-Claim
+        $slot = $claim.Path
         Assert-Clean $slot
+
+        if ((& git -C $slot branch --show-current) -ne $claim.Branch)
+        {
+            throw "$slot is not on $($claim.Branch)."
+        }
 
         foreach ($record in (Get-Worktrees).Values)
         {
-            if ($record.Branch -eq $Trunk) { throw "$Trunk is checked out in a worktree, so it cannot be moved without touching that tree." }
+            if ($record.Branch -eq $Trunk)
+            {
+                throw "$Trunk is checked out in a worktree, so it cannot be moved without touching that tree."
+            }
         }
 
         $base = (& git -C $userRoot rev-parse $Trunk)
-        Invoke-Git $slot rebase --quiet $base
+        if (-not (Test-Git $slot rebase --quiet $base))
+        {
+            throw "Rebasing onto $Trunk hit conflicts in $slot. Resolve them and git rebase --continue " +
+                "(or git rebase --abort), then run merge again."
+        }
 
         foreach ($suite in 'run-tests.ps1', 'run-web-tests.ps1')
         {
@@ -203,29 +257,35 @@ switch ($Command)
         }
 
         # Compare-and-swap: refused if another slot merged since the rebase.
-        & git -C $userRoot update-ref -m "merge $branch" "refs/heads/$Trunk" (& git -C $slot rev-parse HEAD) $base
-        if ($LASTEXITCODE -ne 0) { throw "$Trunk moved while the tests ran. Run merge again." }
+        $head = (& git -C $slot rev-parse HEAD)
+        if (-not (Test-Git $userRoot update-ref -m "merge $($claim.Branch)" "refs/heads/$Trunk" $head $base))
+        {
+            throw "$Trunk moved while the tests ran. Run merge again."
+        }
 
-        Write-Output "$branch is on $Trunk."
+        Write-Output "$($claim.Branch) is on $Trunk."
     }
 
     'release'
     {
-        $slot = Get-ThisSlot
-        $branch = (& git -C $slot branch --show-current)
+        $claim = Find-Claim
+        $slot = $claim.Path
         Assert-Clean $slot
 
-        if ($branch)
+        if (& git -C $slot branch --list $claim.Branch)
         {
-            & git -C $slot merge-base --is-ancestor HEAD $Trunk
-            $merged = $LASTEXITCODE -eq 0
-            if (-not $merged -and -not $Abandon) { throw "$branch is not on $Trunk. Merge it, or release -Abandon to drop it." }
+            $merged = Test-Git $slot merge-base --is-ancestor $claim.Branch $Trunk
+
+            if (-not $merged -and -not $Abandon)
+            {
+                throw "$($claim.Branch) is not on $Trunk. Merge it, or release -Abandon to drop it."
+            }
 
             Invoke-Git $slot switch --quiet --detach $Trunk
-            Invoke-Git $slot branch --quiet $(if ($merged) { '-d' } else { '-D' }) $branch
+            Invoke-Git $slot branch --quiet $(if ($merged) { '-d' } else { '-D' }) $claim.Branch
         }
 
-        Invoke-Git $userRoot worktree unlock $slot
+        Remove-Claim $claim.Number
         Write-Output "$slot is free."
     }
 }
