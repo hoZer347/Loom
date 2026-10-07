@@ -58,17 +58,6 @@ namespace Loom
 		// Whether path is folder or somewhere inside it.
 		static bool IsUnder(const std::string& path, const std::string& folder);
 
-		struct OpenCommand
-		{
-			std::string file;
-			std::string parameters;
-		};
-
-		// What ShellExecute runs to open path. Under the scripts folder it goes
-		// to devenv when there is one, since a header has no association;
-		// anything else goes to whatever its association is.
-		static OpenCommand OpenWith(const std::string& path, const std::string& scripts_folder, const std::string& devenv);
-
 		// The whole file, or an empty string when it cannot be read.
 		static std::string ReadText(const std::string& path);
 
