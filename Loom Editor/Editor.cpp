@@ -10,6 +10,7 @@
 #include "LoomObject.h"
 #include "Scene.h"
 #include "SceneSerializer.h"
+#include "Transform.h"
 
 #include "Utilities/AxisGui.h"
 
@@ -20,15 +21,19 @@
 
 #include "OpenGL.h"
 
+#include "glm/gtc/type_ptr.hpp"
+
 #include "imgui.h"
 #include "imgui_internal.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <thread>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -39,6 +44,29 @@ namespace Loom
 {
 	namespace
 	{
+		constexpr float ROTATION_DRAG_SPEED = 0.5f;
+
+		// The thread ID that takes a GameObject out of the update loop entirely.
+		constexpr int UNPROCESSED_THREAD = -1;
+
+		constexpr int SELECTION_FRAMES = 60;
+
+		constexpr ImGuiTreeNodeFlags HEADER_FLAGS =
+			ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap;
+
+		GameObject* FindByName(GameObject& root, const std::string& name)
+		{
+			if (root.GetName() == name)
+				return &root;
+
+			for (GameObject* child : root.GetChildren())
+				if (GameObject* found = FindByName(*child, name))
+					return found;
+
+			return nullptr;
+		};
+
+
 		// Sits beside the executable and holds what the editor remembers between
 		// runs. Beside the executable rather than in the working directory,
 		// because opening a project moves the working directory to it.
@@ -118,8 +146,6 @@ namespace Loom
 
 			return demos;
 		};
-
-		constexpr const char* gameobject_payload = "LOOM_GAMEOBJECT";
 
 		// How much of a Hierarchy row, top and bottom, drops beside it rather
 		// than into it.
@@ -251,6 +277,92 @@ namespace Loom
 
 			ImGui::SameLine(left + column + ImGui::GetStyle().ItemInnerSpacing.x);
 		};
+
+		// Hierarchy nodes hand over their object's guid rather than its address,
+		// so a drop resolves against what still exists when the mouse comes up.
+		constexpr const char* objectPayload = "LoomObject";
+
+		void DragSource(const LoomObject& object)
+		{
+			if (!ImGui::BeginDragDropSource())
+				return;
+
+			ImGui::SetDragDropPayload(objectPayload, &object.GetGuid(), sizeof(Guid));
+			ImGui::TextUnformatted(object.NameAndID().c_str());
+
+			ImGui::EndDragDropSource();
+		};
+
+		// The object being dragged, as the field would hold it. Null when nothing
+		// is being dragged or the field has no place for it, which also keeps the
+		// field from lighting up under a drag it would refuse.
+		LoomObject* DraggedInto(const SerializedField& field)
+		{
+			const ImGuiPayload* payload = ImGui::GetDragDropPayload();
+
+			if (payload == nullptr || !payload->IsDataType(objectPayload))
+				return nullptr;
+
+			return field.ReferenceFor(LoomObject::GetByGuid(*(const Guid*)payload->Data));
+		};
+
+		// Components carry no name of their own, so one is shown as its type on
+		// the GameObject that holds it.
+		std::string Describe(const LoomObject& object)
+		{
+			if (const ComponentBase* component = dynamic_cast<const ComponentBase*>(&object))
+				return ComponentRegistry::NameOf(*component) + " on " + component->GetGameObject()->NameAndID();
+
+			return object.NameAndID();
+		};
+
+		// Whether the field was cleared or given something dropped on it.
+		bool DrawReferenceField(const SerializedField& field)
+		{
+			LoomObject* target = field.GetReference();
+
+			const std::string shown = (target ? Describe(*target) : "none") + "###target";
+
+			const float spacing = ImGui::GetStyle().ItemInnerSpacing.x;
+			const float clear_width = ImGui::GetFrameHeight();
+
+			bool changed = false;
+
+			// A button for its frame: something the width of the other fields to
+			// drop onto, sharing that width with the clear button when there is
+			// something to clear.
+			ImGui::Button(
+				shown.c_str(),
+				ImVec2(ImGui::CalcItemWidth() - (target ? clear_width + spacing : 0.0f), 0.0f));
+
+			if (target && ImGui::IsItemHovered())
+				ImGui::SetTooltip("%s", target->GetGuid().ToString().c_str());
+
+			if (LoomObject* dropped = DraggedInto(field))
+				if (ImGui::BeginDragDropTarget())
+				{
+					if (ImGui::AcceptDragDropPayload(objectPayload))
+					{
+						field.SetReference(dropped);
+						changed = true;
+					};
+
+					ImGui::EndDragDropTarget();
+				};
+
+			if (target)
+			{
+				ImGui::SameLine(0.0f, spacing);
+
+				if (ImGui::Button("x", ImVec2(clear_width, 0.0f)))
+				{
+					field.SetReference(nullptr);
+					changed = true;
+				};
+			};
+
+			return changed;
+		};
 	};
 
 	Editor::Editor() :
@@ -302,6 +414,9 @@ namespace Loom
 		m_ownedScenes.clear();
 
 		EditorLog::Get().Uninstall();
+
+		if (m_assetWatch != nullptr)
+			FindCloseChangeNotification(m_assetWatch);
 	};
 
 	Backend Editor::SavedBackend()
@@ -451,7 +566,7 @@ namespace Loom
 		// library they are made of alone.
 		if (resolved == m_projectPath)
 		{
-			RefreshProjectFiles();
+			RefreshProjectAssets();
 
 			// A project file that was not there when this folder was opened -
 			// New Project writes one into the folder the editor is already
@@ -484,7 +599,7 @@ namespace Loom
 
 		LoadProjectFile();
 
-		RefreshProjectFiles();
+		RefreshProjectAssets();
 		SaveSettings();
 
 		std::cout
@@ -499,47 +614,6 @@ namespace Loom
 				OpenScene(scene);
 
 		return true;
-	};
-
-	void Editor::RefreshProjectFiles()
-	{
-		m_projectScenes.clear();
-		m_projectModels.clear();
-
-		if (m_projectPath.empty())
-			return;
-
-		std::error_code code;
-
-		for (auto entry = std::filesystem::recursive_directory_iterator(m_projectPath, code);
-			entry != std::filesystem::recursive_directory_iterator();
-			entry.increment(code))
-		{
-			// The compiler's intermediates are .obj files, which Assimp would
-			// take for Wavefront models.
-			if (entry->is_directory(code))
-			{
-				const std::string name = entry->path().filename().string();
-
-				if (name == ProjectTemplate::build_folder || name.starts_with('.'))
-					entry.disable_recursion_pending();
-
-				continue;
-			};
-
-			if (!entry->is_regular_file(code))
-				continue;
-
-			const std::string path = entry->path().lexically_normal().string();
-
-			if (entry->path().extension() == SceneSerializer::extension)
-				m_projectScenes.push_back(path);
-			else if (IsModelFile(path))
-				m_projectModels.push_back(path);
-		};
-
-		std::sort(m_projectScenes.begin(), m_projectScenes.end());
-		std::sort(m_projectModels.begin(), m_projectModels.end());
 	};
 
 	Scene* Editor::CreateScene(const std::string& name)
@@ -677,6 +751,7 @@ namespace Loom
 		m_selected = gameObject;
 		m_nameBufferOwner = nullptr;
 		m_selectedModel.clear();
+		m_renaming = false;
 	};
 
 	void Editor::SelectModel(const std::string& path)
@@ -821,9 +896,38 @@ namespace Loom
 		return false;
 	};
 
+	void Editor::RequestSelection(const std::string& name)
+	{
+		m_pendingSelection = name;
+		m_selectionFramesLeft = SELECTION_FRAMES;
+	};
+
 	void Editor::ValidateSelection()
 	{
 		const std::vector<Scene*>& scenes = Scene::GetScenes();
+
+		// The scenes load once the scripts have built, and add their children
+		// through the task queue, so the name is looked for over a few frames
+		// after the build before it is given up on.
+		if (!m_pendingSelection.empty() && !m_scripts.IsBuilding())
+		{
+			GameObject* named = nullptr;
+
+			for (Scene* scene : scenes)
+				if ((named = FindByName(scene->GetRoot(), m_pendingSelection)))
+					break;
+
+			if (named)
+			{
+				Select(named);
+				m_pendingSelection.clear();
+			}
+			else if (--m_selectionFramesLeft <= 0)
+			{
+				std::cerr << "No GameObject named '" << m_pendingSelection << "'" << std::endl;
+				m_pendingSelection.clear();
+			};
+		};
 
 		if (m_activeScene &&
 			std::find(scenes.begin(), scenes.end(), m_activeScene) == scenes.end())
@@ -925,6 +1029,7 @@ namespace Loom
 
 		DrawFolderPrompt();
 		DrawNewProjectPrompt();
+		DrawCreateAssetPrompt();
 		DrawFileDialogs();
 
 		if (ImGui::IsAnyItemActive())
@@ -1147,7 +1252,7 @@ namespace Loom
 			ImGuiWindowFlags_NoSavedSettings))
 		{
 			ImGui::TextUnformatted("The editor works out of a folder of scene files.");
-			ImGui::TextDisabled("Every %s under it shows up in the Project panel.", SceneSerializer::extension);
+			ImGui::TextDisabled("Everything under it shows up in the Project panel.");
 
 			ImGui::Separator();
 
@@ -1250,72 +1355,8 @@ namespace Loom
 
 			m_dialogs->saveScene.ClearSelected();
 
-			RefreshProjectFiles();
+			RefreshProjectAssets();
 		};
-	};
-
-	void Editor::DrawProject()
-	{
-		if (ImGui::Begin("Project", &m_showProject))
-		{
-			if (m_projectPath.empty())
-			{
-				ImGui::TextDisabled("No scene folder chosen.");
-
-				if (ImGui::Button("Choose Folder..."))
-					m_dialogs->folder.Open();
-			}
-			else
-			{
-				ImGui::TextWrapped("%s", m_projectPath.c_str());
-
-				if (ImGui::Button("Change..."))
-					m_dialogs->folder.Open();
-
-				ImGui::SameLine();
-
-				if (ImGui::Button("Refresh"))
-					RefreshProjectFiles();
-
-				ImGui::Separator();
-
-				if (m_projectScenes.empty())
-					ImGui::TextDisabled("No %s files here.", SceneSerializer::extension);
-
-				for (const std::string& path : m_projectScenes)
-				{
-					const std::string name =
-						std::filesystem::path(path).filename().string();
-
-					if (ImGui::Selectable(name.c_str()))
-						OpenScene(path);
-
-					if (ImGui::IsItemHovered())
-						ImGui::SetTooltip("%s", path.c_str());
-				};
-
-				if (!m_projectModels.empty())
-				{
-					ImGui::SeparatorText("Models");
-
-					for (const std::string& path : m_projectModels)
-					{
-						const std::string name =
-							std::filesystem::path(path).filename().string();
-
-						if (ImGui::Selectable(name.c_str(), path == m_selectedModel))
-							SelectModel(path);
-
-						if (ImGui::IsItemHovered())
-							ImGui::SetTooltip("%s", path.c_str());
-					};
-				};
-			};
-
-			DrawScriptsSection();
-		};
-
-		ImGui::End();
 	};
 
 	void Editor::DrawHierarchy()
@@ -1388,10 +1429,11 @@ namespace Loom
 		if (ImGui::IsItemHovered())
 			ImGui::SetTooltip("%s", scene->GetGuid().ToString().c_str());
 
+		DragSource(*scene);
 		TakeImportTarget(&root);
 		DragAndDropNode(&root, open);
 
-		if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
+		if (NodeReleased())
 		{
 			SetActiveScene(scene);
 			Select(&root);
@@ -1439,17 +1481,41 @@ namespace Loom
 		if (m_expand.contains(gameObject->GetGuid()))
 			ImGui::SetNextItemOpen(true);
 
+		const bool renaming = m_renaming && m_selected == gameObject;
+
 		const bool open = ImGui::TreeNodeEx(
 			gameObject->GetGuid().ToString().c_str(),
 			flags,
 			"%s",
-			gameObject->GetName().c_str());
+			renaming ? "" : gameObject->GetName().c_str());
+
+		if (ImGui::IsItemHovered() && !renaming)
+			ImGui::SetTooltip("%s", gameObject->GetGuid().ToString().c_str());
 
 		TakeImportTarget(gameObject);
 		DragAndDropNode(gameObject, open);
 
-		if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
+		DragSource(*gameObject);
+
+		// Not again when already selected: the release that ends a double-click
+		// would cancel the rename its press just started.
+		if (NodeReleased() && m_selected != gameObject)
 			Select(gameObject);
+
+		if (ImGui::IsItemHovered() &&
+			ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
+			!ImGui::IsItemToggledOpen())
+		{
+			snprintf(
+				m_nameBuffer,
+				sizeof(m_nameBuffer),
+				"%s",
+				gameObject->GetName().c_str());
+
+			m_nameBufferOwner = gameObject;
+			m_renaming = true;
+			m_focusRename = true;
+		};
 
 		if (ImGui::BeginPopupContextItem())
 		{
@@ -1464,6 +1530,9 @@ namespace Loom
 
 			ImGui::EndPopup();
 		};
+
+		if (renaming)
+			DrawRenameField(gameObject);
 
 		if (!open)
 			return;
@@ -1512,20 +1581,11 @@ namespace Loom
 
 	void Editor::DragAndDropNode(GameObject* gameObject, bool open)
 	{
-		if (gameObject->GetParent() != nullptr && ImGui::BeginDragDropSource())
-		{
-			const Guid guid = gameObject->GetGuid();
-
-			ImGui::SetDragDropPayload(gameobject_payload, &guid, sizeof(guid));
-			ImGui::TextUnformatted(gameObject->GetName().c_str());
-			ImGui::EndDragDropSource();
-		};
-
 		if (!ImGui::BeginDragDropTarget())
 			return;
 
 		const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(
-			gameobject_payload,
+			objectPayload,
 			ImGuiDragDropFlags_AcceptBeforeDelivery |
 			ImGuiDragDropFlags_AcceptNoDrawDefaultRect);
 
@@ -1595,6 +1655,47 @@ namespace Loom
 		ImGui::EndDragDropTarget();
 	};
 
+	void Editor::DrawRenameField(GameObject* gameObject)
+	{
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(-FLT_MIN);
+
+		if (m_focusRename)
+		{
+			ImGui::SetKeyboardFocusHere();
+			m_focusRename = false;
+		};
+
+		ImGui::InputText(
+			"##rename",
+			m_nameBuffer,
+			sizeof(m_nameBuffer),
+			ImGuiInputTextFlags_AutoSelectAll);
+
+		// Enter and clicking away both keep the new name; Escape has already put
+		// the old one back in the buffer by the time the field lets go.
+		if (!ImGui::IsItemDeactivated())
+			return;
+
+		if (m_nameBuffer[0] != '\0')
+			gameObject->SetName(m_nameBuffer);
+
+		m_nameBufferOwner = nullptr;
+		m_renaming = false;
+	};
+
+	bool Editor::NodeReleased()
+	{
+		if (ImGui::IsItemActivated())
+			m_nodePressOpened = ImGui::IsItemToggledOpen();
+
+		return
+			ImGui::IsItemDeactivated() &&
+			ImGui::IsItemHovered() &&
+			!ImGui::IsMouseDragPastThreshold(ImGuiMouseButton_Left) &&
+			!m_nodePressOpened;
+	};
+
 	void Editor::DrawInspector()
 	{
 		if (ImGui::Begin("Inspector", &m_showInspector))
@@ -1607,8 +1708,9 @@ namespace Loom
 			{
 				GameObject* gameObject = m_selected;
 
-				// The name box is only refilled when the selection changes, so
-				// typing into it is not fighting the object's current name.
+				// The name box is only refilled when the selection changes or a
+				// rename ends, so typing into it is not fighting the object's
+				// current name.
 				if (m_nameBufferOwner != gameObject)
 				{
 					snprintf(
@@ -1646,7 +1748,8 @@ namespace Loom
 
 				ImGui::PopItemWidth();
 
-				DrawFields(*gameObject, column);
+				DrawTransform(gameObject, column);
+				DrawThread(gameObject, column);
 
 				ImGui::Separator();
 
@@ -1727,15 +1830,75 @@ namespace Loom
 			ImGui::SetTooltip("Into the active scene");
 	};
 
+	void Editor::DrawTransform(GameObject* gameObject, float column)
+	{
+		if (!ImGui::CollapsingHeader("Transform", HEADER_FLAGS))
+			return;
+
+		Transform& transform = gameObject->transform;
+
+		const auto row =
+			[column](const char* name, glm::vec3& value, float speed)
+			{
+				ImGui::PushID(name);
+				Label(name, column);
+				AxisGui::DragFloatN("##value", glm::value_ptr(value), 3, speed, float_format);
+				ImGui::PopID();
+			};
+
+		ImGui::PushItemWidth(-FLT_MIN);
+
+		row("Position", *transform.position, drag_speed);
+		row("Rotation", *transform.rotation, ROTATION_DRAG_SPEED);
+		row("Scale", *transform.scale, drag_speed);
+
+		ImGui::PopItemWidth();
+	};
+
+	void Editor::DrawThread(GameObject* gameObject, float column)
+	{
+		if (!ImGui::CollapsingHeader("Thread", HEADER_FLAGS))
+			return;
+
+		ImGui::PushItemWidth(-FLT_MIN);
+
+		bool inherit = gameObject->InheritsThreadID();
+
+		Label("Inherit Parent", column);
+
+		if (ImGui::Checkbox("##inherit", &inherit))
+			gameObject->SetInheritThreadID(inherit);
+
+		// An inheriting object follows its parent, so its own ID is not the
+		// inspector's to set.
+		ImGui::BeginDisabled(inherit);
+
+		int thread = gameObject->GetThreadID();
+
+		Label("Thread ID", column);
+
+		if (ImGui::SliderInt(
+			"##thread",
+			&thread,
+			UNPROCESSED_THREAD,
+			(int)std::thread::hardware_concurrency()))
+			gameObject->SetThreadID(thread);
+
+		ImGui::EndDisabled();
+
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+			ImGui::SetTooltip("%d is not processed", UNPROCESSED_THREAD);
+
+		ImGui::PopItemWidth();
+	};
+
 	void Editor::DrawComponent(GameObject* gameObject, ComponentBase* component)
 	{
 		ImGui::PushID(component);
 
 		const std::string name = ComponentRegistry::NameOf(*component);
 
-		const bool open = ImGui::CollapsingHeader(
-			name.c_str(),
-			ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap);
+		const bool open = ImGui::CollapsingHeader(name.c_str(), HEADER_FLAGS);
 
 		if (ImGui::IsItemHovered())
 			ImGui::SetTooltip("%s", component->GetGuid().ToString().c_str());
@@ -1829,29 +1992,8 @@ namespace Loom
 			break;
 
 			case FieldType::Reference:
-			{
-				LoomObject* target = field.GetReference();
-
-				ImGui::TextUnformatted(
-					target
-						? target->NameAndID().c_str()
-						: "none");
-
-				if (target && ImGui::IsItemHovered())
-					ImGui::SetTooltip("%s", target->GetGuid().ToString().c_str());
-
-				if (target)
-				{
-					ImGui::SameLine();
-
-					if (ImGui::SmallButton("clear"))
-					{
-						field.SetReference(nullptr);
-						changed = true;
-					};
-				};
-			}
-			break;
+				changed = DrawReferenceField(field);
+				break;
 			};
 
 			if (changed)
@@ -2118,8 +2260,15 @@ namespace Loom
 		{
 			const ImGuiIO& io = ImGui::GetIO();
 
-			ImGui::Text("%.1f FPS (%.3f ms/frame)", io.Framerate, 1000.0f / io.Framerate);
+			constexpr float MillisecondsPerSecond = 1000.0f;
+
+			// ImGui already averages Framerate over its last 60 frames.
+			ImGui::Text(
+				"%d FPS (%d ms/frame)",
+				(int)std::ceil(io.Framerate),
+				(int)std::ceil(MillisecondsPerSecond / io.Framerate));
 			ImGui::Text("Graphics API: %s", EditorSettings::BackendLabel(Engine::backend));
+
 			ImGui::Text("Scenes: %d", (int)Scene::GetScenes().size());
 			ImGui::Text("GameObjects: %d", (int)GameObject::GetObjectCount());
 			ImGui::Text("Registered components: %d", (int)ComponentRegistry::All().size());

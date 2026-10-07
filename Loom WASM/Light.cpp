@@ -181,9 +181,9 @@ vec3 LoomLight(vec3 normal, vec4 lightSpace)
 
 		// A zero vector has no direction to normalise; straight down is the
 		// least surprising stand-in.
-		glm::vec3 Normalised(const Math::vec3<float>& v)
+		glm::vec3 Normalised(const glm::vec3& v)
 		{
-			const glm::vec3 direction = ToGlm(v);
+			const glm::vec3 direction = *v;
 
 			return glm::length(direction) > 0.0f
 				? glm::normalize(direction)
@@ -209,7 +209,7 @@ vec3 LoomLight(vec3 normal, vec4 lightSpace)
 	glm::mat4 Light::ViewProjection() const
 	{
 		const glm::vec3 forward = Normalised(direction);
-		const glm::vec3 center = ToGlm(shadowCenter);
+		const glm::vec3 center = *shadowCenter;
 		const float extent = shadowExtent;
 
 		const glm::mat4 view = glm::lookAt(center - forward * extent, center, UpFor(forward));
@@ -256,7 +256,7 @@ vec3 LoomLight(vec3 normal, vec4 lightSpace)
 		renderer->SetTexture(program, "u_shadowMap", m_depth_texture ? m_depth_texture : NothingInShadow(*renderer));
 
 		renderer->SetUniform(program, "u_lightDirection", Normalised(direction));
-		renderer->SetUniform(program, "u_lightColor", ToGlm(color) * (float)intensity);
+		renderer->SetUniform(program, "u_lightColor", *color * (float)intensity);
 		renderer->SetUniform(program, "u_ambient", (float)ambient);
 		renderer->SetUniform(program, "u_lightViewProjection", m_view_projection);
 	};

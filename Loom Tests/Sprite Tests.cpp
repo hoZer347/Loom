@@ -94,7 +94,7 @@ TEST_SUITE("Sprite")
 
 		sprite->texturePath = WriteOpaque("loom sprite pivot.tga");
 		sprite->pixelsPerUnit = 1.0f;
-		sprite->pivot = Loom::Math::vec2<float>{ { 1.0f, 1.0f } };
+		sprite->pivot = glm::vec2(1.0f, 1.0f);
 
 		CHECK(Near(Corner(sprite->QuadMatrix(), 1.0f, 1.0f), glm::vec3(0.0f)));
 	};

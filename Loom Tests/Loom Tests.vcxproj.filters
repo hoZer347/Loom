@@ -13,9 +13,6 @@
     <ClCompile Include="Platform Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
-    <ClCompile Include="Math Tests.cpp">
-      <Filter>Tests</Filter>
-    </ClCompile>
     <ClCompile Include="Macro Helpers Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
@@ -71,6 +68,9 @@
       <Filter>Tests</Filter>
     </ClCompile>
     <ClCompile Include="WebPlayer Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="SpeedManager Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
   </ItemGroup>

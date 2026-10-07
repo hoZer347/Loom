@@ -74,8 +74,8 @@ TEST_SUITE("Light")
 		Loom::Light light;
 		Pump();
 
-		light.direction = Loom::Math::vec3<float>(0.0f, -1.0f, 0.0f);
-		light.shadowCenter = Loom::Math::vec3<float>(1.0f, 2.0f, 3.0f);
+		light.direction = glm::vec3(0.0f, -1.0f, 0.0f);
+		light.shadowCenter = glm::vec3(1.0f, 2.0f, 3.0f);
 		light.shadowExtent = 4.0f;
 
 		const glm::mat4 transform = light.ViewProjection();
@@ -99,7 +99,7 @@ TEST_SUITE("Light")
 		Loom::Light light;
 		Pump();
 
-		light.direction = Loom::Math::vec3<float>();
+		light.direction = glm::vec3();
 
 		const glm::mat4 transform = light.ViewProjection();
 

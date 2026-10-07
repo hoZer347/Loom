@@ -1,6 +1,8 @@
 #include "SerializedField.h"
 
+#include "GameObject.h"
 #include "LoomObject.h"
+#include "Scene.h"
 
 #include <cstdio>
 #include <cctype>
@@ -112,6 +114,32 @@ namespace Loom
 	{
 		if (set_reference)
 			set_reference(data, object);
+	};
+
+	LoomObject* SerializedField::ReferenceFor(LoomObject* object) const
+	{
+		if (accepts_reference == nullptr || object == nullptr)
+			return nullptr;
+
+		if (accepts_reference(object))
+			return object;
+
+		GameObject* gameObject = dynamic_cast<GameObject*>(object);
+
+		if (Scene* scene = dynamic_cast<Scene*>(object))
+			gameObject = &scene->GetRoot();
+
+		if (gameObject == nullptr)
+			return nullptr;
+
+		if (accepts_reference(gameObject))
+			return gameObject;
+
+		for (ComponentBase* component : gameObject->GetComponents())
+			if (accepts_reference(component))
+				return component;
+
+		return nullptr;
 	};
 
 	std::string SerializedField::Write() const

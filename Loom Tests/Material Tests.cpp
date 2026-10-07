@@ -86,12 +86,12 @@ TEST_SUITE("Material")
 		Loom::Material material;
 		Pump();
 
-		const Loom::Math::vec3<float>& color = material.color;
-		CHECK(color.x() == 1.0f);
-		CHECK(color.y() == 1.0f);
-		CHECK(color.z() == 1.0f);
+		const glm::vec3& color = material.color;
+		CHECK(color.x == 1.0f);
+		CHECK(color.y == 1.0f);
+		CHECK(color.z == 1.0f);
 
-		material.color = Loom::Math::vec3<float>(0.25f, 0.5f, 0.75f);
+		material.color = glm::vec3(0.25f, 0.5f, 0.75f);
 
 		REQUIRE(material.GetFields().size() == 2);
 		CHECK(material.GetFields()[1].Write() == "(0.25, 0.5, 0.75)");

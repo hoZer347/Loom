@@ -64,6 +64,7 @@ namespace Loom
 		void Unload();
 
 		const std::string& GetProject() const { return m_project; };
+		const std::string& GetLibrary() const { return m_library; };
 		const std::string& GetStatus() const { return m_status; };
 
 		// The component types this library added, in registration order.

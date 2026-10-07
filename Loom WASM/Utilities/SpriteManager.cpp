@@ -191,7 +191,7 @@ namespace Loom
 		const float sheetHeight = float(std::max(1, sheetSize.y));
 
 		renderer->SetUniform(m_program, "mvp", glm::make_mat4(viewProjection));
-		renderer->SetUniform(m_program, "_Position", glm::vec3(position.x(), position.y(), position.z()));
+		renderer->SetUniform(m_program, "_Position", position);
 		renderer->SetUniform(m_program, "_Quad", glm::make_vec4(quad));
 		renderer->SetUniform(m_program, "_SheetSize", glm::vec4(sheetWidth, sheetHeight, 0.0f, 0.0f));
 		renderer->SetUniform(m_program, "_CellSize", glm::vec4(float(spriteSize.x), float(spriteSize.y), 0.0f, 0.0f));
@@ -230,7 +230,7 @@ namespace Loom
 		ImGui::DragFloat("Spin", &spin, 1.0f);
 		ImGui::DragFloat("Scale", &scale, 0.05f, 0.0001f, 100.0f);
 		AxisGui::DragFloatN("Pivot", &pivot.x, 2, 0.01f);
-		AxisGui::DragFloatN("Position", position.data, 3, 0.05f);
+		AxisGui::DragFloatN("Position", glm::value_ptr(position), 3, 0.05f);
 
 		ImGui::ColorEdit4("Color", color);
 		ImGui::ColorEdit4("Outline", outline);

@@ -12,7 +12,6 @@
 #include <cmath>
 
 using LoomTests::Pump;
-using Loom::ToGlm;
 
 // How far a projected coordinate may drift from where the math puts it.
 static constexpr float EPSILON = 1e-4f;
@@ -66,7 +65,7 @@ TEST_SUITE("Camera")
 		Loom::Camera* camera = object->Attach<Loom::Camera>();
 		Pump();
 
-		object->position = Loom::Math::vec3<float>(0.0f, 0.0f, 5.0f);
+		object->transform.position = glm::vec3(0.0f, 0.0f, 5.0f);
 
 		const glm::mat4 transform = camera->ViewProjection(SQUARE);
 
@@ -87,10 +86,10 @@ TEST_SUITE("Camera")
 		Loom::Camera* camera = object->Attach<Loom::Camera>();
 		Pump();
 
-		object->position = Loom::Math::vec3<float>(3.0f, 1.0f, 4.0f);
-		object->rotation = Loom::Math::vec3<float>(0.0f, 180.0f, 0.0f);
+		object->transform.position = glm::vec3(3.0f, 1.0f, 4.0f);
+		object->transform.rotation = glm::vec3(0.0f, 180.0f, 0.0f);
 		camera->lookAtTarget = true;
-		camera->target = Loom::Math::vec3<float>(-1.0f, 2.0f, 0.0f);
+		camera->target = glm::vec3(-1.0f, 2.0f, 0.0f);
 
 		const glm::vec4 target = camera->ViewProjection(SQUARE) * glm::vec4(-1.0f, 2.0f, 0.0f, 1.0f);
 		CHECK(std::abs(target.x / target.w) < EPSILON);
@@ -121,9 +120,9 @@ TEST_SUITE("Camera")
 		Loom::Camera* camera = object->Attach<Loom::Camera>();
 		Pump();
 
-		object->position = Loom::Math::vec3<float>(0.0f, 10.0f, 0.0f);
+		object->transform.position = glm::vec3(0.0f, 10.0f, 0.0f);
 		camera->lookAtTarget = true;
-		camera->target = Loom::Math::vec3<float>(0.0f, 0.0f, 0.0f);
+		camera->target = glm::vec3(0.0f, 0.0f, 0.0f);
 
 		const glm::mat4 transform = camera->ViewProjection(SQUARE);
 
@@ -148,11 +147,11 @@ TEST_SUITE("Camera")
 		Loom::Camera* camera = object->Attach<Loom::Camera>();
 		Pump();
 
-		parent->rotation = Loom::Math::vec3<float>(10.0f, -40.0f, 5.0f);
-		parent->scale = Loom::Math::vec3<float>(2.0f, 1.0f, 3.0f);
-		object->position = Loom::Math::vec3<float>(1.0f, 2.0f, 3.0f);
-		object->rotation = Loom::Math::vec3<float>(20.0f, 30.0f, 15.0f);
-		camera->target = Loom::Math::vec3<float>(4.0f, -2.0f, 1.0f);
+		parent->transform.rotation = glm::vec3(10.0f, -40.0f, 5.0f);
+		parent->transform.scale = glm::vec3(2.0f, 1.0f, 3.0f);
+		object->transform.position = glm::vec3(1.0f, 2.0f, 3.0f);
+		object->transform.rotation = glm::vec3(20.0f, 30.0f, 15.0f);
+		camera->target = glm::vec3(4.0f, -2.0f, 1.0f);
 
 		const glm::vec3 eye = glm::vec3(object->WorldMatrix()[3]);
 		const float distance = glm::length(glm::vec3(4.0f, -2.0f, 1.0f) - eye);
@@ -162,7 +161,7 @@ TEST_SUITE("Camera")
 
 		CHECK(camera->lookAtTarget);
 		CheckSame(camera->ViewProjection(SQUARE), before);
-		CHECK(glm::length(ToGlm(camera->target) - eye) == doctest::Approx(distance).epsilon(EPSILON));
+		CHECK(glm::length(*camera->target - eye) == doctest::Approx(distance).epsilon(EPSILON));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "turning the target off turns the transform to face it, under a turned parent")
@@ -177,14 +176,14 @@ TEST_SUITE("Camera")
 		Loom::Camera* camera = object->Attach<Loom::Camera>();
 		Pump();
 
-		parent->position = Loom::Math::vec3<float>(-2.0f, 0.0f, 1.0f);
-		parent->rotation = Loom::Math::vec3<float>(-25.0f, 70.0f, 0.0f);
-		parent->scale = Loom::Math::vec3<float>(1.0f, 1.0f, 2.0f);
-		object->position = Loom::Math::vec3<float>(0.0f, 3.0f, 6.0f);
-		object->rotation = Loom::Math::vec3<float>(0.0f, 0.0f, 30.0f);
-		object->scale = Loom::Math::vec3<float>(1.0f, 4.0f, 0.5f);
+		parent->transform.position = glm::vec3(-2.0f, 0.0f, 1.0f);
+		parent->transform.rotation = glm::vec3(-25.0f, 70.0f, 0.0f);
+		parent->transform.scale = glm::vec3(1.0f, 1.0f, 2.0f);
+		object->transform.position = glm::vec3(0.0f, 3.0f, 6.0f);
+		object->transform.rotation = glm::vec3(0.0f, 0.0f, 30.0f);
+		object->transform.scale = glm::vec3(1.0f, 4.0f, 0.5f);
 		camera->lookAtTarget = true;
-		camera->target = Loom::Math::vec3<float>(5.0f, -1.0f, 2.0f);
+		camera->target = glm::vec3(5.0f, -1.0f, 2.0f);
 
 		const glm::mat4 before = camera->ViewProjection(SQUARE);
 
@@ -192,7 +191,7 @@ TEST_SUITE("Camera")
 
 		CHECK_FALSE(camera->lookAtTarget);
 		CheckSame(camera->ViewProjection(SQUARE), before);
-		CHECK(ToGlm(camera->target) == glm::vec3(5.0f, -1.0f, 2.0f));
+		CHECK(*camera->target == glm::vec3(5.0f, -1.0f, 2.0f));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "turning the target on and off again leaves the rotation as it was")
@@ -205,12 +204,12 @@ TEST_SUITE("Camera")
 		Pump();
 
 		const glm::vec3 rotation(20.0f, 30.0f, 15.0f);
-		object->rotation = Loom::Math::vec3<float>(rotation.x, rotation.y, rotation.z);
+		object->transform.rotation = rotation;
 
 		camera->SetLookAtTarget(true);
 		camera->SetLookAtTarget(false);
 
-		const glm::vec3 after = ToGlm(object->rotation);
+		const glm::vec3 after = *object->transform.rotation;
 
 		for (int axis = 0; axis < 3; axis++)
 			CHECK(after[axis] == doctest::Approx(rotation[axis]).epsilon(EPSILON));
@@ -226,7 +225,7 @@ TEST_SUITE("Camera")
 		Loom::Camera* camera = object->Attach<Loom::Camera>();
 		Pump();
 
-		object->rotation = Loom::Math::vec3<float>(-30.0f, 45.0f, 0.0f);
+		object->transform.rotation = glm::vec3(-30.0f, 45.0f, 0.0f);
 
 		const glm::mat4 before = camera->ViewProjection(SQUARE);
 
