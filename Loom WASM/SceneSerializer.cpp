@@ -213,7 +213,10 @@ namespace Loom
 		return Deserialize(buffer.str(), error);
 	};
 
-	Scene* SceneSerializer::Deserialize(const std::string& text, std::string* error)
+	Scene* SceneSerializer::Deserialize(
+		const std::string& text,
+		std::string* error,
+		PendingReferences* pending_out)
 	{
 		std::stringstream lines(text);
 		std::string line;
@@ -224,7 +227,7 @@ namespace Loom
 
 		// References are written as guids, and the object a guid names may not
 		// have been built yet when the line mentioning it is read.
-		std::vector<std::pair<const SerializedField*, Guid>> pending{ };
+		PendingReferences pending{ };
 
 		int line_number = 0;
 
@@ -417,6 +420,15 @@ namespace Loom
 		if (scene == nullptr)
 			return fail("the file is empty");
 
+		if (pending_out)
+			pending_out->insert(pending_out->end(), pending.begin(), pending.end());
+		else ResolveReferences(pending);
+
+		return scene;
+	};
+
+	void SceneSerializer::ResolveReferences(const PendingReferences& pending)
+	{
 		for (const auto& [field, guid] : pending)
 		{
 			LoomObject* target = LoomObject::GetByGuid(guid);
@@ -425,7 +437,7 @@ namespace Loom
 			{
 				std::cerr
 					<< "Scene load: a reference points at " << guid.ToString()
-					<< ", which is not in the file" << std::endl;
+					<< ", which is not loaded" << std::endl;
 
 				continue;
 			};
@@ -437,7 +449,5 @@ namespace Loom
 					<< "Scene load: a reference cannot point at " << guid.ToString()
 					<< ", which is not the type it holds" << std::endl;
 		};
-
-		return scene;
 	};
 };

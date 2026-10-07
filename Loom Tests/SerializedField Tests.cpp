@@ -347,6 +347,7 @@ TEST_SUITE("SerializedField")
 		CHECK_FALSE(Field(*pointer, 0).Read(scene.GetGuid().ToString()));
 		CHECK(pointer->target == nullptr);
 	};
+
 	// What the editor's inspector does with a dragged scene or GameObject.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a reference takes a dropped object, or the component of it that fits")
 	{
@@ -357,6 +358,7 @@ TEST_SUITE("SerializedField")
 		Loom::GameObject* plain = scene.AddChild("Plain");
 		Loom::GameObject* textured = scene.AddChild("Textured");
 		Loom::Material* material = textured->Attach<Loom::Material>();
+		Loom::Material* rootMaterial = scene.GetRoot().Attach<Loom::Material>();
 		Pump();
 
 		const Loom::SerializedField& sceneField = Field(*slots, 0);
@@ -367,7 +369,11 @@ TEST_SUITE("SerializedField")
 		CHECK(sceneField.ReferenceFor(plain) == nullptr);
 
 		CHECK(gameObjectField.ReferenceFor(plain) == plain);
-		CHECK(gameObjectField.ReferenceFor(&scene) == nullptr);
+
+		// The hierarchy draws the root as the scene, so the scene is how the
+		// root and its components get dragged.
+		CHECK(gameObjectField.ReferenceFor(&scene) == &scene.GetRoot());
+		CHECK(materialField.ReferenceFor(&scene) == rootMaterial);
 
 		CHECK(materialField.ReferenceFor(textured) == material);
 		CHECK(materialField.ReferenceFor(plain) == nullptr);

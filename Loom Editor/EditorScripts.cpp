@@ -261,11 +261,15 @@ namespace Loom
 
 	void Editor::RestoreSnapshots(const std::vector<SceneSnapshot>& snapshots)
 	{
+		// Resolved once every scene is back, since a reference can point into a
+		// scene restored after the one holding it.
+		SceneSerializer::PendingReferences pending;
+
 		for (const SceneSnapshot& snapshot : snapshots)
 		{
 			std::string error;
 
-			Scene* scene = SceneSerializer::Deserialize(snapshot.text, &error);
+			Scene* scene = SceneSerializer::Deserialize(snapshot.text, &error, &pending);
 
 			if (scene == nullptr)
 			{
@@ -282,6 +286,8 @@ namespace Loom
 				Select(&scene->GetRoot());
 			};
 		};
+
+		SceneSerializer::ResolveReferences(pending);
 	};
 
 	void Editor::TogglePlay()
