@@ -31,7 +31,8 @@ A feature or bug fix, start to finish:
    agent's acceptance.
 4. If the change shows on screen, open a demo that shows it, using the slot's
    own build: the editor with a demo project, `Loom Demos`, or
-   `Space Explorers`. Leave it open on the user's desktop. The demo and the
+   `Space Explorers`. Start it with `Start-Process -PassThru` and keep its
+   `Id` for `review.ps1`. Leave it open on the user's desktop. The demo and the
    review window below are the only windows agents put on the user's screen.
 5. Run `review.ps1` from the slot in the background with the longest timeout
    the tool allows, since it blocks until the user answers. It shows what was

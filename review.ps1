@@ -146,16 +146,23 @@ $form.Add_Shown({ $summary.SelectionLength = 0; if (-not $Offscreen) { $form.Fla
 # Run rather than ShowDialog, which would take the focus.
 $decision = 'deny'
 $written = ''
-[System.Windows.Forms.Application]::Run($form)
+
+# Holding the handle for the whole review stops Windows reusing the id if the
+# user closes the demo first.
+$demo = $null
 
 if ($DemoProcessId)
 {
     $demo = Get-Process -Id $DemoProcessId -ErrorAction SilentlyContinue
 
-    if ($demo -and -not ($demo.CloseMainWindow() -and $demo.WaitForExit($DemoCloseTimeoutMs)))
-    {
-        $demo.Kill()
-    }
+    if ($demo) { $null = $demo.Handle }
+}
+
+[System.Windows.Forms.Application]::Run($form)
+
+if ($demo -and -not $demo.HasExited -and -not ($demo.CloseMainWindow() -and $demo.WaitForExit($DemoCloseTimeoutMs)))
+{
+    try { $demo.Kill() } catch [System.InvalidOperationException] { }
 }
 
 [pscustomobject]@{ decision = $decision; feedback = $written } | ConvertTo-Json -Compress
