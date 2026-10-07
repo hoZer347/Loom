@@ -1,5 +1,8 @@
 #include "ProjectTemplate.h"
 
+// The editor only runs on Windows, but the web test build compiles this too.
+#ifndef __EMSCRIPTEN__
+
 #include "ProjectAssets.h"
 
 #include "Guid.h"
@@ -443,12 +446,13 @@ SpinningTriangle is there as a worked example.
 		const std::string usable = UsableName(name);
 		const std::filesystem::path project = ScriptsProject(root.string(), usable);
 		const std::string project_guid = ProjectGuid();
+		const std::string engine = EngineRoot();
 
 		const auto fill =
 			[&](const char* text)
 			{
 				std::string filled = ProjectAssets::Replace(text, "{NAME}", usable);
-				filled = ProjectAssets::Replace(filled, "{ENGINE}", EngineRoot());
+				filled = ProjectAssets::Replace(filled, "{ENGINE}", engine);
 				filled = ProjectAssets::Replace(filled, "{PROJECT}", root.string());
 				filled = ProjectAssets::Replace(filled, "{PROJECT_GUID}", project_guid);
 
@@ -491,6 +495,15 @@ SpinningTriangle is there as a worked example.
 		else
 		{
 			std::ifstream in(project_file, std::ios::binary);
+
+			if (!in)
+			{
+				if (error)
+					*error = "Could not read " + project_file.string();
+
+				return "";
+			};
+
 			text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
 
 			if (!text.empty() && text.back() != '\n')
@@ -507,3 +520,5 @@ SpinningTriangle is there as a worked example.
 		return project.string();
 	};
 };
+
+#endif
