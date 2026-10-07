@@ -99,6 +99,11 @@ namespace Loom
 		void DrawSceneNode(Scene* scene);
 		void DrawGameObjectNode(GameObject* gameObject);
 		void DrawRenameField(GameObject* gameObject);
+
+		// For the hierarchy node just drawn: whether it was clicked, judged on
+		// release so dragging a node into an inspector field leaves the inspector
+		// on the object that holds the field. A press on the arrow only opens it.
+		bool NodeReleased();
 		void DrawInspector();
 		void DrawComponent(GameObject* gameObject, ComponentBase* component);
 		void DrawFields(LoomObject& object);
@@ -172,6 +177,7 @@ namespace Loom
 
 		Scene* m_activeScene = nullptr;
 		GameObject* m_selected = nullptr;
+		bool m_nodePressOpened = false;
 		std::vector<Scene*> m_ownedScenes{ };
 
 		// Where each open scene came from, so a scene can be put back after the

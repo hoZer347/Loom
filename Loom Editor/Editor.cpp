@@ -109,6 +109,68 @@ namespace Loom
 				resize,
 				&value);
 		};
+
+		// Hierarchy nodes hand over their object's guid rather than its address,
+		// so a drop resolves against what still exists when the mouse comes up.
+		constexpr const char* objectPayload = "LoomObject";
+
+		void DragSource(const LoomObject& object)
+		{
+			if (!ImGui::BeginDragDropSource())
+				return;
+
+			ImGui::SetDragDropPayload(objectPayload, &object.GetGuid(), sizeof(Guid));
+			ImGui::TextUnformatted(object.NameAndID().c_str());
+
+			ImGui::EndDragDropSource();
+		};
+
+		// The object being dragged, as the field would hold it. Null when nothing
+		// is being dragged or the field has no place for it, which also keeps the
+		// field from lighting up under a drag it would refuse.
+		LoomObject* DraggedInto(const SerializedField& field)
+		{
+			const ImGuiPayload* payload = ImGui::GetDragDropPayload();
+
+			if (payload == nullptr || !payload->IsDataType(objectPayload))
+				return nullptr;
+
+			return field.ReferenceFor(LoomObject::GetByGuid(*(const Guid*)payload->Data));
+		};
+
+		void DrawReferenceField(const char* label, const SerializedField& field)
+		{
+			LoomObject* target = field.GetReference();
+
+			const std::string shown = (target ? target->NameAndID() : "none") + "###target";
+
+			// A button for its frame: something the width of the other fields to
+			// drop onto.
+			ImGui::Button(shown.c_str(), ImVec2(ImGui::CalcItemWidth(), 0.0f));
+
+			if (target && ImGui::IsItemHovered())
+				ImGui::SetTooltip("%s", target->GetGuid().ToString().c_str());
+
+			if (LoomObject* dropped = DraggedInto(field))
+				if (ImGui::BeginDragDropTarget())
+				{
+					if (ImGui::AcceptDragDropPayload(objectPayload))
+						field.SetReference(dropped);
+
+					ImGui::EndDragDropTarget();
+				};
+
+			if (target)
+			{
+				ImGui::SameLine();
+
+				if (ImGui::SmallButton("x"))
+					field.SetReference(nullptr);
+			};
+
+			ImGui::SameLine();
+			ImGui::TextUnformatted(label);
+		};
 	};
 
 	Editor::Editor() :
@@ -913,7 +975,9 @@ namespace Loom
 		if (ImGui::IsItemHovered())
 			ImGui::SetTooltip("%s", scene->GetGuid().ToString().c_str());
 
-		if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
+		DragSource(*scene);
+
+		if (NodeReleased())
 		{
 			SetActiveScene(scene);
 			Select(&root);
@@ -969,7 +1033,9 @@ namespace Loom
 		if (ImGui::IsItemHovered() && !renaming)
 			ImGui::SetTooltip("%s", gameObject->GetGuid().ToString().c_str());
 
-		if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
+		DragSource(*gameObject);
+
+		if (NodeReleased())
 			Select(gameObject);
 
 		if (ImGui::IsItemHovered() &&
@@ -1045,6 +1111,18 @@ namespace Loom
 
 		m_nameBufferOwner = nullptr;
 		m_renaming = false;
+	};
+
+	bool Editor::NodeReleased()
+	{
+		if (ImGui::IsItemActivated())
+			m_nodePressOpened = ImGui::IsItemToggledOpen();
+
+		return
+			ImGui::IsItemDeactivated() &&
+			ImGui::IsItemHovered() &&
+			!ImGui::IsMouseDragPastThreshold(ImGuiMouseButton_Left) &&
+			!m_nodePressOpened;
 	};
 
 	void Editor::DrawInspector()
@@ -1232,28 +1310,8 @@ namespace Loom
 			break;
 
 			case FieldType::Reference:
-			{
-				LoomObject* target = field.GetReference();
-
-				ImGui::Text(
-					"%s: %s",
-					label,
-					target
-						? target->NameAndID().c_str()
-						: "none");
-
-				if (target && ImGui::IsItemHovered())
-					ImGui::SetTooltip("%s", target->GetGuid().ToString().c_str());
-
-				if (target)
-				{
-					ImGui::SameLine();
-
-					if (ImGui::SmallButton("clear"))
-						field.SetReference(nullptr);
-				};
-			}
-			break;
+				DrawReferenceField(label, field);
+				break;
 			};
 
 			ImGui::PopID();

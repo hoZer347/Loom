@@ -50,6 +50,7 @@ namespace Loom
 		// type is still known.
 		LoomObject* (*get_reference)(void*) = nullptr;
 		void (*set_reference)(void*, LoomObject*) = nullptr;
+		bool (*accepts_reference)(LoomObject*) = nullptr;
 
 		// The scene-file text for the current value, and the reverse. Reading a
 		// reference resolves the guid against the objects that exist right now
@@ -60,5 +61,11 @@ namespace Loom
 
 		LoomObject* GetReference() const;
 		void SetReference(LoomObject* object) const;
+
+		// What handing this field an object would put in it: the object itself
+		// when the field holds its type, otherwise the first of a GameObject's
+		// components that fits, so a GameObject fills a field declared as one of
+		// its components. Null when nothing fits.
+		LoomObject* ReferenceFor(LoomObject* object) const;
 	};
 };
