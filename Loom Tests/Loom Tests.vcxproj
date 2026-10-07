@@ -104,6 +104,7 @@
     <ClCompile Include="Textures Tests.cpp" />
     <ClCompile Include="Collider Tests.cpp" />
     <ClCompile Include="Input Tests.cpp" />
+    <ClCompile Include="SpeedManager Tests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Test Support.h" />
