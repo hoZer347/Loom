@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <regex>
 #include <vector>
 
 
@@ -299,11 +300,26 @@ void main()
 		const std::filesystem::path root = std::filesystem::path(scripts_project).parent_path();
 		const std::string header = name + ".hpp";
 
+		// A header can hold several components, and the registry only knows the
+		// ones in a library that is built and loaded, so the headers are read too.
+		const std::regex declared("\\b(struct|class)\\s+" + name + "\\s*(final\\s*)?[:{]");
+
 		std::error_code code;
 
 		for (const auto& entry : std::filesystem::recursive_directory_iterator(root, code))
+		{
 			if (entry.path().filename() == header)
 				return "There is already a " + header + " in " + entry.path().parent_path().string() + '.';
+
+			if (entry.path().extension() != ".hpp")
+				continue;
+
+			std::ifstream in(entry.path(), std::ios::binary);
+			const std::string text{ std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>() };
+
+			if (std::regex_search(text, declared))
+				return "A component called " + name + " is already in " + entry.path().filename().string() + '.';
+		};
 
 		return "";
 	};

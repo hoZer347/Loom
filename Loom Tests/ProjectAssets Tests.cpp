@@ -95,6 +95,20 @@ TEST_SUITE("ProjectAssets")
 		CHECK_FALSE(Loom::ProjectAssets::ScriptNameProblem(scripts.project.string(), "Camera").empty());
 	};
 
+	TEST_CASE("a script cannot take the name of a component another header declares")
+	{
+		const ScriptsProject scripts("loom project assets declared");
+
+		std::ofstream(scripts.root / "Effects.hpp")
+			<< "struct Glow : Loom::Component<Glow> { };\n"
+			<< "struct Shimmer final : Loom::Component<Shimmer> { };\n"
+			<< "struct GlowSettings { };\n";
+
+		CHECK_FALSE(Loom::ProjectAssets::ScriptNameProblem(scripts.project.string(), "Glow").empty());
+		CHECK_FALSE(Loom::ProjectAssets::ScriptNameProblem(scripts.project.string(), "Shimmer").empty());
+		CHECK(Loom::ProjectAssets::ScriptNameProblem(scripts.project.string(), "Glo").empty());
+	};
+
 	TEST_CASE("a project without a RootNamespace uses its own name")
 	{
 		const ScriptsProject scripts("loom project assets namespace");

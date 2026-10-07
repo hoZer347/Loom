@@ -197,7 +197,7 @@ namespace Loom
 		void DrawTransform(GameObject* gameObject, float column);
 		void DrawThread(GameObject* gameObject, float column);
 		void DrawComponent(GameObject* gameObject, ComponentBase* component);
-		void DrawFields(LoomObject& object, float column);
+		void DrawFields(LoomObject& object, const std::vector<std::string>& labels, float column);
 		void DrawModelPreview();
 		void DrawScene();
 		void DrawSceneData();
