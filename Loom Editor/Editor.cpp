@@ -1051,7 +1051,9 @@ namespace Loom
 
 		DragSource(*gameObject);
 
-		if (NodeReleased())
+		// Not again when already selected: the release that ends a double-click
+		// would cancel the rename its press just started.
+		if (NodeReleased() && m_selected != gameObject)
 			Select(gameObject);
 
 		if (ImGui::IsItemHovered() &&
