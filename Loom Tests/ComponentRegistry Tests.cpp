@@ -8,7 +8,9 @@
 #include "Mesh.h"
 #include "Scene.h"
 
+#include <cstring>
 #include <string>
+#include <vector>
 
 using LoomTests::Pump;
 
@@ -23,6 +25,28 @@ namespace
 		{ };
 
 		int value = 0;
+	};
+
+	// Neither of these is registered by anything in this file.
+	struct SelfRegistered final : Loom::Component<SelfRegistered>
+	{ };
+
+	struct NeedsArguments final : Loom::Component<NeedsArguments>
+	{
+		explicit NeedsArguments(int) { };
+	};
+
+	// Both are called "Clash" once the namespaces are dropped.
+	namespace First
+	{
+		struct Clash final : Loom::Component<Clash>
+		{ };
+	};
+
+	namespace Second
+	{
+		struct Clash final : Loom::Component<Clash>
+		{ };
 	};
 };
 
@@ -132,18 +156,85 @@ TEST_SUITE("ComponentRegistry")
 		CHECK(Loom::PrettyTypeName(nullptr) == "<unknown>");
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "deriving from Component is enough to be registered")
+	{
+		REQUIRE(Loom::ComponentRegistry::All().count("SelfRegistered") == 1);
+
+		Loom::Scene scene("self registered");
+		Pump();
+
+		Loom::ComponentBase* component =
+			Loom::ComponentRegistry::Create("SelfRegistered", scene.GetRoot());
+
+		REQUIRE(component != nullptr);
+		Pump();
+
+		CHECK(scene.GetRoot().GetComponent<SelfRegistered>() == component);
+		CHECK(Loom::ComponentRegistry::NameOf(*component) == "SelfRegistered");
+	};
+
+	// Nothing could fill in the arguments from a menu or a scene file.
+	TEST_CASE("a component that needs arguments is not registered")
+	{
+		CHECK(Loom::ComponentRegistry::All().count("NeedsArguments") == 0);
+	};
+
+	// Which of the two got there first is up to static initialisation; what
+	// matters is that neither a second module registering the same type nor a
+	// different type with the same name changes what the name builds.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a name stays with the type that took it first")
+	{
+		Loom::Scene scene("clash");
+		Pump();
+
+		Loom::ComponentBase* before = Loom::ComponentRegistry::Create("Clash", scene.GetRoot());
+
+		REQUIRE(before != nullptr);
+
+		Loom::ComponentRegistry::RegisterType<First::Clash>();
+		Loom::ComponentRegistry::RegisterType<Second::Clash>();
+
+		Loom::ComponentBase* after = Loom::ComponentRegistry::Create("Clash", scene.GetRoot());
+
+		REQUIRE(after != nullptr);
+		Pump();
+
+		CHECK(strcmp(before->GetTypeName(), after->GetTypeName()) == 0);
+	};
+
 	TEST_CASE("the engine's own components are registered")
 	{
-		Loom::ComponentRegistry::RegisterBuiltins();
-
 		CHECK(Loom::ComponentRegistry::All().count("Mesh") == 1);
 		CHECK(Loom::ComponentRegistry::All().count("Material") == 1);
 	};
 
+	// Each is one click away under Add Component, on whatever object is selected.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "every registered component attaches to a bare GameObject")
+	{
+		std::vector<std::string> names{ };
+
+		for (const auto& [name, factory] : Loom::ComponentRegistry::All())
+			names.push_back(name);
+
+		for (const std::string& name : names)
+		{
+			CAPTURE(name);
+
+			Loom::Scene scene(name);
+			Pump();
+
+			Loom::ComponentBase* component =
+				Loom::ComponentRegistry::Create(name, scene.GetRoot());
+
+			REQUIRE(component != nullptr);
+			Pump();
+
+			CHECK(Loom::ComponentRegistry::NameOf(*component) == name);
+		};
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a built-in comes out as the type it says it is")
 	{
-		Loom::ComponentRegistry::RegisterBuiltins();
-
 		Loom::Scene scene("builtins");
 		Pump();
 

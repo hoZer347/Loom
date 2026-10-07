@@ -1,7 +1,10 @@
 #include "Material.h"
 
+#include "RenderMath.h"
+#include "Renderer.h"
 #include "Shaders.h"
 
+#include <filesystem>
 #include <iostream>
 #include <string>
 #include <unordered_map>
@@ -44,5 +47,25 @@ namespace Loom
 	{
 		if (shader == nullptr && !m_shader_path->empty())
 			shader = Shared(m_shader_path);
+	};
+
+	void Material::OnGui()
+	{
+		const std::string& relative = m_shader_path;
+
+		if (relative.empty())
+			return;
+
+		// Absolute, so the link's tooltip says which file it opens.
+		std::error_code code;
+		const std::string path = std::filesystem::absolute(relative, code).string();
+
+		ImGui::TextLinkOpenURL(("Edit " + relative).c_str(), path.c_str());
+	};
+
+	void Material::Apply(uint32_t program) const
+	{
+		if (Renderer* renderer = Renderer::Get())
+			renderer->SetUniform(program, "u_color", ToGlm(color));
 	};
 };

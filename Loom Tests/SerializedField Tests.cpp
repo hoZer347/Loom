@@ -11,6 +11,7 @@
 #include "SerializedField.h"
 
 #include <string>
+#include <type_traits>
 #include <vector>
 
 using LoomTests::Pump;
@@ -21,42 +22,42 @@ namespace
 	// stand in for all of them.
 	struct EveryField final : Loom::Component<EveryField>
 	{
-		Loom::Serial<bool> flag;
-		Loom::Serial<int> count;
-		Loom::Serial<unsigned int> unsigned_count;
-		Loom::Serial<long long> big;
-		Loom::Serial<unsigned long long> unsigned_big;
-		Loom::Serial<float> ratio;
-		Loom::Serial<double> precise;
-		Loom::Serial<std::string> label;
-		Loom::Serial<Loom::Math::vec2<float>> pair;
-		Loom::Serial<Loom::Math::vec3<float>> triple;
-		Loom::Serial<Loom::Math::vec4<float>> quad;
-		Loom::Serial<std::vector<float>> numbers;
+		LOOM_SERIAL(bool, flag);
+		LOOM_SERIAL(int, count);
+		LOOM_SERIAL(unsigned int, unsigned_count);
+		LOOM_SERIAL(long long, big);
+		LOOM_SERIAL(unsigned long long, unsigned_big);
+		LOOM_SERIAL(float, ratio);
+		LOOM_SERIAL(double, precise);
+		LOOM_SERIAL(std::string, label);
+		LOOM_SERIAL(Loom::Math::vec2<float>, pair);
+		LOOM_SERIAL(Loom::Math::vec3<float>, triple);
+		LOOM_SERIAL(Loom::Math::vec4<float>, quad);
+		LOOM_SERIAL(std::vector<float>, numbers);
 	};
 
 	struct Pointer final : Loom::Component<Pointer>
 	{
-		Loom::Serial<Loom::GameObject*> target;
+		LOOM_SERIAL(Loom::GameObject*, target);
 	};
 
 	// A field belongs to the object being built around it, whichever class in
 	// the hierarchy declared it.
 	struct Base : Loom::LoomObject
 	{
-		Loom::Serial<int> first = 1;
+		LOOM_SERIAL(int, first, 1);
 	};
 
 	struct Derived final : Base
 	{
-		Loom::Serial<int> second = 2;
+		LOOM_SERIAL(int, second, 2);
 	};
 
 	// The shape Scene has: a LoomObject of its own, declared after the fields of
 	// the object that owns it.
 	struct Host final : Loom::LoomObject
 	{
-		Loom::Serial<int> mine = 3;
+		LOOM_SERIAL(int, mine, 3);
 
 		Derived owned;
 	};
@@ -67,8 +68,19 @@ namespace
 	{
 		Derived owned;
 
-		Loom::Serial<int> late;
+		LOOM_SERIAL(int, late);
 	};
+
+	struct HandNamed final : Loom::LoomObject
+	{
+		static constexpr float TOP_SPEED = 2.0f;
+
+		Loom::Serial<float> speed{ "top speed", TOP_SPEED };
+	};
+
+	// Without a name a Serial does not compile, and a value alone is not one.
+	static_assert(!std::is_default_constructible_v<Loom::Serial<int>>);
+	static_assert(!std::is_convertible_v<const char*, Loom::Serial<std::string>>);
 
 	// Fields are numbered by declaration order; these are EveryField's.
 	enum Every { Flag, Count, UnsignedCount, Big, UnsignedBig, Ratio, Precise, Label, Pair, Triple, Quad, Numbers };
@@ -84,6 +96,32 @@ namespace
 
 TEST_SUITE("SerializedField")
 {
+	TEST_CASE("an identifier reads as words")
+	{
+		CHECK(Loom::NameFromIdentifier("position") == "Position");
+		CHECK(Loom::NameFromIdentifier("m_fieldOfView") == "Field Of View");
+		CHECK(Loom::NameFromIdentifier("m_inherit_thread_id") == "Inherit Thread Id");
+		CHECK(Loom::NameFromIdentifier("m_threadID") == "Thread ID");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "LOOM_SERIAL names a field after its member")
+	{
+		EveryField object;
+		Pump();
+
+		CHECK(std::string(Field(object, Flag).name) == "Flag");
+		CHECK(std::string(Field(object, UnsignedCount).name) == "Unsigned Count");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a Serial declared by hand keeps the name it was given")
+	{
+		HandNamed object;
+		Pump();
+
+		CHECK(std::string(Field(object, 0).name) == "top speed");
+		CHECK(object.speed == HandNamed::TOP_SPEED);
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "fields are declared in the order they are registered")
 	{
 		EveryField object;

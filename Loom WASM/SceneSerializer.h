@@ -8,6 +8,7 @@
 namespace Loom
 {
 	struct Scene;
+	struct GameObject;
 
 	/**
 	* Loom::SceneSerializer
@@ -43,5 +44,14 @@ namespace Loom
 		// out-of-date file still loads as far as it can.
 		static Scene* Deserialize(const std::string& text, std::string* error = nullptr);
 		static Scene* LoadFromFile(const std::string& path, std::string* error = nullptr);
+
+		// One GameObject and everything under it, as a scene writes it. Nothing
+		// above it is written, so the text is what a clipboard holds.
+		static std::string Serialize(GameObject& gameObject);
+
+		// Builds the GameObjects in that text under parent and returns the first.
+		// Each gets a new guid, so the same text can go in any number of times,
+		// and references between them follow them to their new guids.
+		static GameObject* Deserialize(const std::string& text, GameObject& parent, std::string* error = nullptr);
 	};
 };

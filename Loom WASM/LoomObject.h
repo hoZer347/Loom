@@ -69,6 +69,10 @@ namespace Loom
 		// writes them by position, and the editor's inspector draws them.
 		const std::vector<SerializedField>& GetFields() const { return m_fields; };
 
+		// After the editor writes one of those fields, for an object whose other
+		// state has to follow it.
+		virtual void OnFieldChanged(const SerializedField& field) { };
+
 	protected:
 		std::string m_name;
 		static inline std::recursive_mutex mutex;
@@ -85,6 +89,7 @@ namespace Loom
 		// Declaring a Serial member is what fills these in.
 		friend LOOM_API void RegisterSerialField(
 			FieldType type,
+			const char* name,
 			void* data,
 			LoomObject* (*get_reference)(void*),
 			void (*set_reference)(void*, LoomObject*));

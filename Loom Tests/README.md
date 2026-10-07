@@ -17,9 +17,11 @@ the other shows up as a failure rather than as a surprise in the browser.
 
 .\run-web-tests.ps1                      # web build: emcc -> wasm, run under node
 .\run-web-tests.ps1 -Configuration Release
+
+.\run-browser-tests.ps1                  # the cases that need a real page, in headless Chrome
 ```
 
-Both scripts take `-NoBuild` to run the last binary as-is, and pass anything
+The first two scripts take `-NoBuild` to run the last binary as-is, and pass anything
 after `--` straight through to doctest:
 
 ```powershell
@@ -27,7 +29,7 @@ after `--` straight through to doctest:
 .\run-web-tests.ps1 -- -tc="*hierarchy*" # only cases matching a pattern
 ```
 
-Both exit with the test runner's exit code, so CI can gate on either.
+All three exit with the test runner's exit code, so CI can gate on any of them.
 
 In Visual Studio, set **Loom Tests** as the startup project and hit Ctrl+F5 for
 the local build.
@@ -39,6 +41,17 @@ vendored at `External Libraries/emsdk` after `emsdk install latest &&
 emsdk activate latest` — plus `node` on PATH. Nothing in the suite opens a
 window or a GL context, so the module runs headless; no canvas, no browser.
 
+### The browser suite
+
+`run-browser-tests.ps1` builds `Browser/` together with the `Input` and
+`Threading` suites, against the engine library Play Web uses. `Browser/run.mjs`
+then runs it in headless Chrome (or Edge). When a case needs input it sets
+`Module.loomRequest`, and run.mjs sends that move, click or key through Chrome's
+own input pipeline, so it takes the same path a person's does. The page is
+served cross-origin isolated, so the threads are the browser's own. Chrome runs
+with a profile of its own and never shows a window. Beyond emsdk and node, it
+needs Chrome or Edge installed.
+
 ## Suites
 
 | Suite | Covers |
@@ -47,17 +60,23 @@ window or a GL context, so the module runs headless; no canvas, no browser.
 | `Loom Math` | `vec2`/`vec3`/`vec4`/`mat4` size and alignment, the global `transform` |
 | `Macro Helpers` | `HAS_FUNCTION_*`, `HAS_VARIABLE_*`, `Str`, `VARIABLE_NAME` |
 | `Engine` | Unique IDs (including across threads), the task queue and `DoTasks`, frame-loop defaults |
+| `Threading` | Threads running at the same time, work queued from other threads running in order on the draining thread, objects built on other threads keeping their own fields |
 | `LoomObject` | ID allocation, naming, `NameAndID`, the `GetByID` registry, deregistration on destruction |
 | `Component` | Base callbacks as no-ops, virtual dispatch and destruction, type identity |
-| `GameObject` | Deferred `Attach`, `GetComponent` by type, selective update/render registration, children, `Destroy`, `DetachComponent` |
+| `GameObject` | Deferred `Attach`, `GetComponent` by type, selective update/render registration, children, `Destroy`, `DetachComponent`, local/world transform |
 | `Scene` | Registration in `GetScenes`, root delegation, `Update`/`Render`/`Physics` walking the hierarchy |
+| `Light` | Registration, `FindComponent` reaching it through the hierarchy, the shadow map's light-space transform |
+| `Camera` | Registration, aiming down the transform or at a target, depth order and aspect, a camera looking straight down, toggling the target without turning the view |
 | `Mesh` | Geometry and draw-type defaults, and that rendering without a material or shader stops before it touches GL |
 | `Material` | Defaults, and being found by a `Mesh` on the same GameObject |
 | `Shader` | Source loading failures on the local build (the web build fetches over HTTP instead, so those cases are skipped there) |
 | `Texture` | The type exists; it has no state yet |
 | `Collider` | Type-level only — see the note in the file |
-| `Input` | Button stubs, cursor and screen fields |
-| `DataPackage` | Wire tag, virtual `Handle`, `Serialize` aliasing, `Deserialize` round-tripping |
+| `Input` | Button edges: down for one frame, held, up for one frame, a click inside one frame, buttons GLFW does not have; cursor and screen fields |
+| `Browser` | Run by `run-browser-tests.ps1` only: real mouse moves, buttons and the spacebar reaching `Input`, GLFW and `DialogueInput`; the page being cross-origin isolated |
+| `SceneHistory` | The editor's undo and redo: exact text both ways, redo cleared by a new edit, unrecorded edits, several scenes, closed scenes, the step cap, guids and references coming back, scene order |
+| `EditCommands` | The editor's Ctrl+Z/Y/X/C/V and Delete read from real ImGui key events, a text box keeping them, held keys not repeating, which object can be taken and where a paste lands, cut/copy/paste through undo |
+| `AxisGui` | One axis-coloured stripe over each of the first three drag boxes, nothing else added beside ImGui's own `DragScalarN`, nothing drawn in a collapsed window |
 
 ## How it is wired up
 
@@ -105,7 +124,14 @@ and letting that fire after the object has gone runs it against freed memory.
 ## Not covered
 
 - Anything needing a live GL context: `Engine`'s constructor, `Start`,
-  `renderFrame`, shader compilation, `Mesh::OnRender` past its null guards.
+  `renderFrame`, shader compilation, `Mesh::OnRender` past its null guards,
+  `Mesh::Draw`, `Light::RenderShadowMap`, `Apply` and `ApplyNone`,
+  `Camera::Apply`, `Material::Apply`, `Engine::CaptureFrame`, `Scene::Render`
+  setting and clearing `Light::current` (a light renders its shadow map).
+  `Loom Editor.exe Demos/Shadows --screenshot <file>` is the check for those,
+  with the OpenGL debug output on stderr. A clean run prints one GL line,
+  "Pixel transfer is synchronized with 3D rendering", which is the screenshot's
+  own readback; anything else is a regression.
 - Anything needing an ImGui frame: every `OnGui` and `GameObject::Gui`.
 - `Loom WASM/Utilities` (the hoZer state machines, dialogue, attribute and
   sprite layer). It is compiled and linked in, so it has to build, but nothing
@@ -115,8 +141,6 @@ and letting that fire after the object has gone runs it against freed memory.
 - `Physics::Collider`'s behaviour. Its constructor reads `m_gameObject` before
   `Attach` has assigned it, so constructing one is undefined; only type-level
   checks are possible until that changes.
-- `Loom Networking` past `DataPackage`. `TCPServer` binds its acceptor and
-  `TCPClient` opens its socket in member initialisers, so constructing either
-  takes a real port, and their headers need Boost, which is gitignored rather
-  than vendored.
-- `Loom SQL`, `Loom Editor`, `Loom Demos`, `Space Explorers`.
+- `Loom SQL`, `Loom Demos`, `Space Explorers`, and `Loom Editor` beyond
+  `SceneHistory.cpp` and `EditCommands.cpp`, the two of its sources that need
+  no window and are compiled into the suite beside the engine's.

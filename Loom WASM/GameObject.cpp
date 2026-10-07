@@ -2,7 +2,10 @@
 
 #include "ComponentRegistry.h"
 #include "Engine.h"
+#include "RenderMath.h"
 #include "Scene.h"
+
+#include "glm/gtc/matrix_transform.hpp"
 
 #include "imgui.h"
 
@@ -124,6 +127,50 @@ namespace Loom
 			});
 
 		return gameObject;
+	};
+
+	void GameObject::SetParent(GameObject* new_parent, const GameObject* before)
+	{
+		Engine::QueueTask(
+			[this, new_parent, before]()
+			{
+				if (parent == nullptr || new_parent == nullptr || before == this)
+					return;
+
+				for (const GameObject* above = new_parent; above != nullptr; above = above->parent)
+					if (above == this)
+						return;
+
+				std::erase(parent->m_children, this);
+
+				parent = new_parent;
+
+				parent->m_children.insert(
+					std::find(
+						parent->m_children.begin(),
+						parent->m_children.end(),
+						before),
+					this);
+			});
+	};
+
+	glm::mat4 GameObject::LocalMatrix() const
+	{
+		const glm::vec3 degrees = ToGlm(rotation);
+
+		glm::mat4 matrix = glm::translate(glm::mat4(1.0f), ToGlm(position));
+		matrix = glm::rotate(matrix, glm::radians(degrees.y), Y_AXIS);
+		matrix = glm::rotate(matrix, glm::radians(degrees.x), X_AXIS);
+		matrix = glm::rotate(matrix, glm::radians(degrees.z), Z_AXIS);
+
+		return glm::scale(matrix, ToGlm(scale));
+	};
+
+	glm::mat4 GameObject::WorldMatrix() const
+	{
+		return parent
+			? parent->WorldMatrix() * LocalMatrix()
+			: LocalMatrix();
 	};
 
 	void GameObject::Update(const int& thread)

@@ -14,7 +14,7 @@ using LoomTests::Pump;
 
 TEST_SUITE("Engine")
 {
-	// Engine's constructor opens a window and a GL context, so these cover the
+	// Engine's constructor opens a window and a renderer, so these cover the
 	// static half of Engine that a host can reach without one.
 	TEST_CASE("an unstarted engine reports itself as not running")
 	{
@@ -30,10 +30,8 @@ TEST_SUITE("Engine")
 			CHECK(seen.insert(Loom::Engine::GetUniqueID()).second);
 	};
 
-	// A default emscripten build has no pthreads, and std::thread's constructor
-	// throws there rather than running anything. The engine only ever hands IDs
-	// out from one thread on the web today, so the threaded case is compiled out
-	// instead of the build being asked for pthreads it does not otherwise need.
+	// Without -pthread, emscripten's std::thread throws rather than running
+	// anything. run-web-tests.ps1 builds with it.
 #if !defined(__EMSCRIPTEN__) || defined(__EMSCRIPTEN_PTHREADS__)
 	TEST_CASE("GetUniqueID stays unique across threads")
 	{
@@ -160,11 +158,11 @@ TEST_SUITE("Engine")
 			Loom::Engine::clearColor[i] = original[i];
 	};
 
-	TEST_CASE("the GL object handles start unbound")
+	TEST_CASE("there is no renderer before an engine opens a window")
 	{
-		// Engine's constructor is what generates these; before it runs they are
-		// all 0, which is GL's "no object" handle.
-		CHECK(Loom::Engine::shaderProgram == 0);
+		// Engine's constructor is what creates one, on the backend asked for.
+		CHECK(Loom::Renderer::Get() == nullptr);
+		CHECK(Loom::Engine::backend == Loom::Backend::OpenGL);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "SetUpdateFunction registers a per-frame callback")

@@ -16,10 +16,6 @@ namespace Loom
 {
 	namespace
 	{
-		// What a script library has to export for its component types to reach
-		// the registry in the executable.
-		const char* const entry_point = "LoomRegisterScripts";
-
 #ifdef _DEBUG
 		const char* const configuration = "Debug";
 #else
@@ -289,18 +285,40 @@ namespace Loom
 		if (BuiltAgainstOlderEditor())
 			return true;
 
-		for (const auto& entry : std::filesystem::recursive_directory_iterator(
-			std::filesystem::path(m_project).parent_path(), code))
+		const std::filesystem::path scripts = std::filesystem::path(m_project).parent_path();
+
+		// The project compiles whatever headers are there, so adding, removing or
+		// renaming one is a change even when no file in it is newer: a copied or
+		// renamed file keeps its time, and a deleted one leaves nothing behind.
+		// Each of those does touch the folder it was in.
+		if (std::filesystem::last_write_time(scripts, code) > built)
+			return true;
+
+		for (auto entry = std::filesystem::recursive_directory_iterator(scripts, code);
+			entry != std::filesystem::recursive_directory_iterator();
+			entry.increment(code))
 		{
-			if (!entry.is_regular_file(code))
+			if (entry->is_directory(code))
+			{
+				// Visual Studio's own state, written to all the time the solution
+				// is open.
+				if (entry->path().filename().string().front() == '.')
+					entry.disable_recursion_pending();
+				else if (entry->last_write_time(code) > built)
+					return true;
+
+				continue;
+			};
+
+			if (!entry->is_regular_file(code))
 				continue;
 
-			const std::filesystem::path extension = entry.path().extension();
+			const std::filesystem::path extension = entry->path().extension();
 
-			if (extension != ".cpp" && extension != ".h" && extension != ".vcxproj")
+			if (extension != ".hpp" && extension != ".cpp" && extension != ".h" && extension != ".vcxproj")
 				continue;
 
-			if (entry.last_write_time(code) > built)
+			if (entry->last_write_time(code) > built)
 				return true;
 		};
 
@@ -450,35 +468,15 @@ namespace Loom
 				code);
 		};
 
-		HMODULE module = LoadLibraryA(copy.string().c_str());
-
-		if (module == nullptr)
-		{
-			m_status = "Could not load the library (error " + std::to_string(GetLastError()) + ").";
-			std::cerr << m_status << std::endl;
-			return false;
-		};
-
-		const auto entry = (void(*)())GetProcAddress(module, entry_point);
-
-		if (entry == nullptr)
-		{
-			FreeLibrary(module);
-
-			m_status = std::string("The library does not export ") + entry_point + ".";
-			std::cerr << m_status << std::endl;
-
-			return false;
-		};
-
-		// Whatever turns up in the registry while the entry point runs belongs to
-		// this library and goes again when it is unloaded. The registry as it
+		// Whatever turns up in the registry while the library loads belongs to
+		// it and goes again when it is unloaded: each component type registers
+		// itself as the library's statics are initialised. The registry as it
 		// stands now is kept alongside: a script may register over a name that
 		// already exists, and that factory has to come back rather than stay
 		// behind pointing into a library that is no longer mapped.
 		const std::map<std::string, ComponentRegistry::Factory> before = ComponentRegistry::All();
 
-		entry();
+		HMODULE module = LoadLibraryA(copy.string().c_str());
 
 		m_types.clear();
 		m_before.clear();
@@ -490,6 +488,19 @@ namespace Loom
 			if (previous == before.end())
 				m_types.push_back(name);
 			else m_before.emplace(*previous);
+		};
+
+		// A library whose initialisation threw is unmapped again, possibly after
+		// some of its types got as far as registering.
+		if (module == nullptr)
+		{
+			const DWORD error = GetLastError();
+
+			RestoreRegistry();
+
+			m_status = "Could not load the library (error " + std::to_string(error) + ").";
+			std::cerr << m_status << std::endl;
+			return false;
 		};
 
 		m_module = module;
@@ -506,11 +517,8 @@ namespace Loom
 		return true;
 	};
 
-	void ScriptLibrary::Unload()
+	void ScriptLibrary::RestoreRegistry()
 	{
-		if (m_module == nullptr)
-			return;
-
 		for (const std::string& type : m_types)
 			ComponentRegistry::Unregister(type);
 
@@ -521,6 +529,14 @@ namespace Loom
 
 		m_types.clear();
 		m_before.clear();
+	};
+
+	void ScriptLibrary::Unload()
+	{
+		if (m_module == nullptr)
+			return;
+
+		RestoreRegistry();
 
 		FreeLibrary((HMODULE)m_module);
 		m_module = nullptr;

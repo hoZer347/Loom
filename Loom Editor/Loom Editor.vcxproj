@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -43,6 +43,8 @@
     <Import Project="..\Property Files\Loom Math.props" />
     <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenGL.props" />
+    <Import Project="..\Property Files\Vulkan.props" />
+    <Import Project="..\Property Files\Assimp.props" />
     <Import Project="..\Property Files\UserMacros.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -51,6 +53,8 @@
     <Import Project="..\Property Files\Loom Math.props" />
     <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenGL.props" />
+    <Import Project="..\Property Files\Vulkan.props" />
+    <Import Project="..\Property Files\Assimp.props" />
     <Import Project="..\Property Files\UserMacros.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
@@ -66,6 +70,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalOptions>/WHOLEARCHIVE:"Loom WASM.lib" %(AdditionalOptions)</AdditionalOptions>
+      <IgnoreSpecificDefaultLibraries>msvcrt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -89,19 +94,34 @@
   <ItemGroup>
     <ClCompile Include="Editor.cpp" />
     <ClCompile Include="ScriptLibrary.cpp" />
+    <ClCompile Include="WebPlayer.cpp" />
     <ClCompile Include="ProjectTemplate.cpp" />
     <ClCompile Include="EditorScripts.cpp" />
     <ClCompile Include="EditorLog.cpp" />
+    <ClCompile Include="EditorSettings.cpp" />
+    <ClCompile Include="EditorSettingsWindow.cpp" />
+    <ClCompile Include="EditorTheme.cpp" />
     <ClCompile Include="EditorViewport.cpp" />
+    <ClCompile Include="ModelImporter.cpp" />
+    <ClCompile Include="ModelPreview.cpp" />
+    <ClCompile Include="SceneHistory.cpp" />
+    <ClCompile Include="EditCommands.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Editor.h" />
     <ClInclude Include="ScriptLibrary.h" />
+    <ClInclude Include="WebPlayer.h" />
     <ClInclude Include="ProjectTemplate.h" />
     <ClInclude Include="EditorFileDialogs.h" />
     <ClInclude Include="EditorLog.h" />
+    <ClInclude Include="EditorSettings.h" />
+    <ClInclude Include="EditorTheme.h" />
     <ClInclude Include="EditorViewport.h" />
+    <ClInclude Include="ModelImporter.h" />
+    <ClInclude Include="ModelPreview.h" />
+    <ClInclude Include="SceneHistory.h" />
+    <ClInclude Include="EditCommands.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Loom ImGui\Loom ImGui.vcxproj">
@@ -112,6 +132,11 @@
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="CopyAssimp" AfterTargets="Build">
+    <Copy SourceFiles="$(DevDirectory)\assimp\bin\x64\assimp-vc143-mt.dll"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>

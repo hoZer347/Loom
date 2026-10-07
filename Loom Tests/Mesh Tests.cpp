@@ -52,7 +52,7 @@ TEST_SUITE("Mesh")
 
 		CHECK(mesh.m_vertices->size() == 9);
 
-		// m_vertices holds three floats per vertex, which is what OnRender
+		// m_vertices holds three floats per vertex, which is what Draw
 		// divides by before handing a vertex count to glDrawArrays.
 		CHECK(mesh.m_vertices->size() % 3 == 0);
 		CHECK(mesh.m_vertices->size() / 3 == 3);

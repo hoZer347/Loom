@@ -2,10 +2,12 @@
 
 #include "Loom API.h"
 
+#include "ComponentRegistry.h"
 #include "imgui.h"
 #include "LoomObject.h"
 
 #include <typeinfo>
+#include <type_traits>
 #include <iostream>
 
 
@@ -40,7 +42,7 @@ namespace Loom
 
 	protected:
 		friend struct GameObject;
-		GameObject* m_gameObject;
+		GameObject* m_gameObject = nullptr;
 
 		virtual void Gui() { };
 
@@ -69,5 +71,17 @@ namespace Loom
 		{
 			DrawDefaultGui();
 		};
+
+	private:
+		static inline const bool s_registered = ComponentRegistry::RegisterType<T>();
+
+		// A static member is only defined once something uses it, and nothing in
+		// T would. Naming it in a typedef does: the typedef is instantiated with
+		// this class, which is the moment T derives from it.
+		typedef std::integral_constant<const bool*, &s_registered> Registration;
 	};
 };
+
+// The factory Component<T> registers attaches a T to a GameObject, so a file
+// that defines a component needs the whole of it by the time it ends.
+#include "GameObject.h"

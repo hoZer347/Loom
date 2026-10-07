@@ -75,8 +75,26 @@ TEST_SUITE("Material")
 		CHECK(material->GetShaderPath() == "Assets/Shader.shader");
 
 		// It is a serialized field, so the scene file carries it too.
-		REQUIRE(material->GetFields().size() == 1);
+		REQUIRE(material->GetFields().size() == 2);
 		CHECK(material->GetFields().front().Write() == "\"Assets/Shader.shader\"");
+	};
+
+	// The path comes first: it was the only field before colour was added, and
+	// scene files already saved key it by position.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a material is white until given a colour, and saves it after the path")
+	{
+		Loom::Material material;
+		Pump();
+
+		const Loom::Math::vec3<float>& color = material.color;
+		CHECK(color.x() == 1.0f);
+		CHECK(color.y() == 1.0f);
+		CHECK(color.z() == 1.0f);
+
+		material.color = Loom::Math::vec3<float>(0.25f, 0.5f, 0.75f);
+
+		REQUIRE(material.GetFields().size() == 2);
+		CHECK(material.GetFields()[1].Write() == "(0.25, 0.5, 0.75)");
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a material with no shader named compiles nothing")

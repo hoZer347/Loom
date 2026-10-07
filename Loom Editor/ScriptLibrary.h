@@ -39,6 +39,9 @@ namespace Loom
 		bool HasProject() const { return !m_project.empty(); };
 		bool IsBuilding() const { return m_current && !m_current->done; };
 
+		// No build running, and none finished and waiting on Poll to hand over.
+		bool IsIdle() const { return !m_current; };
+
 		// Whether any script source is newer than the library built from it.
 		// Answered from a short-lived cache: the panel asks every frame, and
 		// scanning a directory tree at frame rate is pure waste.
@@ -84,6 +87,9 @@ namespace Loom
 		// Clears out the copies of a library that earlier editors loaded. The
 		// one a running editor still holds cannot be removed, and is left.
 		static void SweepLoadedCopies(const std::string& library);
+
+		// Takes the library's component types back out of the registry.
+		void RestoreRegistry();
 
 		// Whether the library predates the editor running it. MSBuild has no idea
 		// the engine moved, so this is also what decides a full rebuild.

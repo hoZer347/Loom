@@ -10,6 +10,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 using LoomTests::Pump;
 
@@ -19,9 +20,9 @@ namespace
 	// tests can put in a scene file.
 	struct Marker final : Loom::Component<Marker>
 	{
-		Loom::Serial<float> weight = 1.0f;
-		Loom::Serial<std::string> label = "unset";
-		Loom::Serial<Loom::GameObject*> partner;
+		LOOM_SERIAL(float, weight, 1.0f);
+		LOOM_SERIAL(std::string, label, "unset");
+		LOOM_SERIAL(Loom::GameObject*, partner);
 	};
 
 	// Registered once for the whole suite: the registry is process-wide, and the
@@ -154,6 +155,38 @@ TEST_SUITE("SceneSerializer")
 
 		// And writing it out again produces the same text.
 		CHECK(Loom::SceneSerializer::Serialize(*loaded.scene) == text);
+	};
+
+	// Undo puts a scene back from its text, so an object brought back by it
+	// lands where it was rather than last.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "siblings read back in the order they were written")
+	{
+		std::string text;
+
+		{
+			Loom::Scene scene("Order");
+			Loom::GameObject* first = scene.AddChild("First");
+			scene.AddChild("Second");
+			Pump();
+
+			scene.AddChild("Third")->SetParent(&scene.GetRoot(), first);
+			Pump();
+
+			text = Written(scene);
+		};
+
+		Pump();
+
+		const Loaded loaded(text);
+
+		REQUIRE(loaded.scene != nullptr);
+
+		std::vector<std::string> names;
+
+		for (Loom::GameObject* child : loaded.scene->GetRoot().GetChildren())
+			names.push_back(child->GetName());
+
+		CHECK(names == std::vector<std::string>{ "Third", "First", "Second" });
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a reference to something further down the file still lands")
@@ -354,5 +387,109 @@ TEST_SUITE("SceneSerializer")
 		REQUIRE(read != nullptr);
 		CHECK(*read->m_vertices == *mesh->m_vertices);
 		CHECK(read->primitive_id == 4);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a pasted subtree is a copy with guids of its own")
+	{
+		MarkerRegistered registered;
+
+		Loom::Scene scene("Clipboard");
+		Loom::GameObject* original = scene.AddChild("Original");
+		Pump();
+
+		Loom::GameObject* grandchild = original->AddChild("Grandchild");
+		Marker* marker = original->Attach<Marker>();
+		Pump();
+
+		marker->label = "copied";
+		marker->partner = grandchild;
+
+		const std::string text = Loom::SceneSerializer::Serialize(*original);
+
+		std::string error;
+
+		// Twice, as a second Ctrl+V would: the same text has to make a second copy.
+		Loom::GameObject* first = Loom::SceneSerializer::Deserialize(text, scene.GetRoot(), &error);
+		Loom::GameObject* second = Loom::SceneSerializer::Deserialize(text, scene.GetRoot(), &error);
+		Pump();
+
+		REQUIRE(first != nullptr);
+		REQUIRE(second != nullptr);
+		CHECK(scene.GetRoot().GetChildren().size() == 3);
+
+		for (Loom::GameObject* pasted : { first, second })
+		{
+			CHECK(pasted->GetName() == "Original");
+			CHECK(pasted->GetGuid() != original->GetGuid());
+
+			REQUIRE(pasted->GetChildren().size() == 1);
+
+			Marker* copy = pasted->GetComponent<Marker>();
+
+			REQUIRE(copy != nullptr);
+			CHECK(copy->GetGuid() != marker->GetGuid());
+			CHECK(*copy->label == "copied");
+
+			// The reference followed its target into the copy.
+			CHECK(copy->partner == pasted->GetChildren().front());
+		};
+
+		CHECK(first->GetGuid() != second->GetGuid());
+
+		// And the original still answers to its own guid.
+		CHECK(Loom::LoomObject::GetByGuid<Loom::GameObject>(original->GetGuid()) == original);
+		CHECK(marker->partner == grandchild);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a reference out of a pasted subtree still points out of it")
+	{
+		MarkerRegistered registered;
+
+		Loom::Scene scene("Clipboard");
+		Loom::GameObject* original = scene.AddChild("Original");
+		Loom::GameObject* outside = scene.AddChild("Outside");
+		Pump();
+
+		Marker* marker = original->Attach<Marker>();
+		Pump();
+
+		marker->partner = outside;
+
+		Loom::GameObject* pasted = Loom::SceneSerializer::Deserialize(
+			Loom::SceneSerializer::Serialize(*original),
+			scene.GetRoot());
+		Pump();
+
+		REQUIRE(pasted != nullptr);
+
+		Marker* copy = pasted->GetComponent<Marker>();
+
+		REQUIRE(copy != nullptr);
+		CHECK(copy->partner == outside);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "text that is not a GameObject pastes nothing")
+	{
+		Loom::Scene scene("Clipboard");
+		Pump();
+
+		for (const std::string text : { std::string("just some words"), std::string("0 = 1\n") })
+		{
+			std::string error;
+
+			CHECK(Loom::SceneSerializer::Deserialize(text, scene.GetRoot(), &error) == nullptr);
+			CHECK(!error.empty());
+		};
+
+		// A GameObject line followed by one the parser refuses takes the half
+		// built copy back out.
+		const std::string broken =
+			"GameObject Half(" + Loom::Guid::New().ToString() + ")\n"
+			"\tGameObject Bad\n";
+
+		CHECK(Loom::SceneSerializer::Deserialize(broken, scene.GetRoot()) == nullptr);
+		Pump();
+
+		CHECK(scene.GetRoot().GetChildren().empty());
 	};
 };

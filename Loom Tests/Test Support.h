@@ -9,6 +9,9 @@
 #include "Engine.h"
 #include "Component.h"
 
+#include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -86,5 +89,46 @@ namespace LoomTests
 
 		int number;
 		std::string text;
+	};
+
+
+	// Writes width x height RGBA pixels, top row first, as an uncompressed
+	// 32 bit TGA in the temp folder and answers its path. TGA because it is
+	// short enough to write by hand and carries alpha.
+	inline std::string WriteTga(const std::string& name, int width, int height, const std::vector<uint8_t>& rgba)
+	{
+		// Byte offsets in the header.
+		enum { IMAGE_TYPE = 2, WIDTH = 12, HEIGHT = 14, DEPTH = 16, DESCRIPTOR = 17, HEADER_SIZE = 18 };
+
+		constexpr uint8_t UNCOMPRESSED_TRUE_COLOR = 2;
+		constexpr uint8_t BITS_PER_PIXEL = 32;
+		constexpr uint8_t ALPHA_BITS = 8;
+		constexpr uint8_t TOP_LEFT_ORIGIN = 0x20;
+		constexpr int BYTE = 8;
+		constexpr int RGBA = 4;
+
+		uint8_t header[HEADER_SIZE]{ };
+		header[IMAGE_TYPE] = UNCOMPRESSED_TRUE_COLOR;
+		header[WIDTH] = (uint8_t)width;
+		header[WIDTH + 1] = (uint8_t)(width >> BYTE);
+		header[HEIGHT] = (uint8_t)height;
+		header[HEIGHT + 1] = (uint8_t)(height >> BYTE);
+		header[DEPTH] = BITS_PER_PIXEL;
+		header[DESCRIPTOR] = ALPHA_BITS | TOP_LEFT_ORIGIN;
+
+		const std::string path = (std::filesystem::temp_directory_path() / name).string();
+
+		std::ofstream file(path, std::ios::binary);
+		file.write((const char*)header, HEADER_SIZE);
+
+		// TGA stores BGRA.
+		for (size_t i = 0; i < rgba.size(); i += RGBA)
+		{
+			enum { R, G, B, A };
+			const uint8_t bgra[RGBA] = { rgba[i + B], rgba[i + G], rgba[i + R], rgba[i + A] };
+			file.write((const char*)bgra, RGBA);
+		};
+
+		return path;
 	};
 };

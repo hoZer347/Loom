@@ -2,7 +2,7 @@
 
 - This is where I store any C++ projects I'm working on
 
-- You'll find the most interesting code in Loom Engine, Networking, and WASM
+- You'll find the most interesting code in Loom Engine and WASM
 
 - [Link to the documentation]("https://hozer347.github.io/Loom-Website/Loom%20Documentation/html/index.html") (mostly a skeleton outline for now)
 
@@ -16,8 +16,8 @@
 - Where I plan to put tests and demos for my projects
 
 *Loom Tests:*
-- doctest-based unit test suite covering Loom WASM, Loom Math and Loom Networking
-- One suite, built twice: `./run-tests.ps1` for the desktop build, `./run-web-tests.ps1` to compile it with emcc and run it under node
+- doctest-based unit test suite covering Loom WASM and Loom Math
+- One suite, built for the desktop and the web: `./run-tests.ps1` for the desktop build, `./run-web-tests.ps1` to compile it with emcc and run it under node. `./run-browser-tests.ps1` runs the cases that need a real page in headless Chrome
 - See `Loom Tests/README.md`
 
 *Loom WASM*
@@ -35,9 +35,6 @@
 
 *Loom Math*
 - glm substitute for WASM projects
-
-*Loom Networking:*
-- Backend server code using boost::asio sockets
 
 *Loom SQL:*
 - Basic SQL Server set up
@@ -58,11 +55,6 @@
 - Shader conversion (GLSL core 330 and es 300)
 - Shader file combination (Unifying vertex / fragment etc, into a single file)
 - Shader file template generation / automatic uniform updating (Generating a template shader file based on the uniforms connected to the shader)
-
-#### Networking
-- Implement SSL into Server struct
-- Implement UDPServer
-- Implement multi-threading on the browser
 
 #### Miscellaneous
 - Implement SQL

@@ -12,8 +12,7 @@ namespace Loom
 
 	/// Carries a velocity and pushes a position around with it.
 	///
-	/// Moves a position vector directly in world space, GameObject having no transform
-	/// component to push around.
+	/// Moves a position vector directly in world space.
 	struct SpeedManager final
 	{
 		const Vec3& Velocity() const { return _velocity; };

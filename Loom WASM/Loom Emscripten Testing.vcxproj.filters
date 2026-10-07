@@ -37,6 +37,27 @@
     <ClCompile Include="Mesh.cpp">
       <Filter>Mesh</Filter>
     </ClCompile>
+    <ClCompile Include="Renderer.cpp">
+      <Filter>Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="OpenGLRenderer.cpp">
+      <Filter>Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanRenderer.cpp">
+      <Filter>Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="$(VulkanSdk)\Source\SPIRV-Reflect\spirv_reflect.c">
+      <Filter>Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="Light.cpp">
+      <Filter>Light</Filter>
+    </ClCompile>
+    <ClCompile Include="Sprite.cpp">
+      <Filter>Sprite</Filter>
+    </ClCompile>
+    <ClCompile Include="Camera.cpp">
+      <Filter>Camera</Filter>
+    </ClCompile>
     <ClCompile Include="Material.cpp">
       <Filter>Material</Filter>
     </ClCompile>
@@ -82,6 +103,9 @@
     <ClCompile Include="Utilities\SpriteSheetScanner.cpp">
       <Filter>Utilities\Sprite Manager</Filter>
     </ClCompile>
+    <ClCompile Include="Utilities\AxisGui.cpp">
+      <Filter>Utilities\General</Filter>
+    </ClCompile>
     <ClCompile Include="Utilities\Clock.cpp">
       <Filter>Utilities\General</Filter>
     </ClCompile>
@@ -92,6 +116,9 @@
     </Filter>
     <Filter Include="Shaders">
       <UniqueIdentifier>{7426a2f4-d5ee-4af2-9f47-9b00f910a0d8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Sprite">
+      <UniqueIdentifier>{6f1c2a4e-5b7d-4e8f-9a3c-2d1e0f4b7a95}</UniqueIdentifier>
     </Filter>
     <Filter Include="Textures">
       <UniqueIdentifier>{ebdbd59a-850e-4312-a29a-cadf8029f34c}</UniqueIdentifier>
@@ -110,6 +137,15 @@
     </Filter>
     <Filter Include="LoomObject">
       <UniqueIdentifier>{da5e6d83-c126-402d-9369-f5608d3305a6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Camera">
+      <UniqueIdentifier>{5c1e8a3d-7b42-4f19-9d6e-2a0b3c4d5e61}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Light">
+      <UniqueIdentifier>{a752ee90-2fd7-414d-a687-c8263b629f37}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Renderer">
+      <UniqueIdentifier>{5d0a3c7e-8f21-4b69-a4d2-1c7e9b3f6a85}</UniqueIdentifier>
     </Filter>
     <Filter Include="Mesh">
       <UniqueIdentifier>{8b6dc36d-46e9-4067-99f0-6d491f5b01cf}</UniqueIdentifier>
@@ -174,6 +210,9 @@
       <Filter>Shaders</Filter>
     </ClInclude>
     <ClInclude Include="OpenGL.h" />
+    <ClInclude Include="Sprite.h">
+      <Filter>Sprite</Filter>
+    </ClInclude>
     <ClInclude Include="Textures.h">
       <Filter>Textures</Filter>
     </ClInclude>
@@ -191,6 +230,18 @@
     </ClInclude>
     <ClInclude Include="Mesh.h">
       <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer.h">
+      <Filter>Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Light.h">
+      <Filter>Light</Filter>
+    </ClInclude>
+    <ClInclude Include="Camera.h">
+      <Filter>Camera</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderMath.h">
+      <Filter>Engine</Filter>
     </ClInclude>
     <ClInclude Include="Material.h">
       <Filter>Material</Filter>
@@ -267,6 +318,9 @@
       <Filter>Utilities\General</Filter>
     </ClInclude>
     <ClInclude Include="Utilities\SpeedManager.h">
+      <Filter>Utilities\General</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\AxisGui.h">
       <Filter>Utilities\General</Filter>
     </ClInclude>
     <ClInclude Include="Utilities\Clock.h">

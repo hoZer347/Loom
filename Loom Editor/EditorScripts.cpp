@@ -1,6 +1,7 @@
 #include "Editor.h"
 
 #include "EditorFileDialogs.h"
+#include "EditorTheme.h"
 #include "ProjectTemplate.h"
 
 #include "Engine.h"
@@ -23,6 +24,11 @@ namespace Loom
 {
 	namespace
 	{
+		// Under the project's build folder: the scene Play Web hands over, and
+		// the page and module built beside it.
+		const char* const web_folder = "Web";
+		const char* const web_scene = "Scene";
+
 		std::string ValueOf(const std::string& line, const char* key)
 		{
 			const std::string prefix = std::string(key) + '=';
@@ -219,7 +225,7 @@ namespace Loom
 		RestoreSnapshots(m_snapshots);
 		m_snapshots.clear();
 
-		RefreshProjectScenes();
+		RefreshProjectFiles();
 
 		// Nothing open yet: the scene this project starts on was waiting for the
 		// scripts it mentions.
@@ -279,7 +285,9 @@ namespace Loom
 			if (snapshot.active || m_activeScene == nullptr)
 			{
 				SetActiveScene(scene);
-				Select(&scene->GetRoot());
+
+				if (m_selectedModel.empty())
+					Select(&scene->GetRoot());
 			};
 		};
 	};
@@ -369,6 +377,42 @@ namespace Loom
 		return m_playing || m_playAfterCompile;
 	};
 
+	void Editor::PlayWeb()
+	{
+		if (m_activeScene == nullptr || m_projectPath.empty())
+		{
+			std::cerr << "Play Web needs a project folder and a scene open in it" << std::endl;
+			return;
+		};
+
+		std::string text = SceneSerializer::Serialize(*m_activeScene);
+
+		for (const SceneSnapshot& snapshot : m_playSnapshots)
+			if (snapshot.active)
+				text = snapshot.text;
+
+		const std::filesystem::path scene =
+			std::filesystem::path(m_projectPath) /
+			ProjectTemplate::build_folder /
+			web_folder /
+			(std::string(web_scene) + SceneSerializer::extension);
+
+		std::error_code code;
+		std::filesystem::create_directories(scene.parent_path(), code);
+
+		std::ofstream out(scene, std::ios::binary);
+
+		if (!(out << text))
+		{
+			std::cerr << "Could not write " << scene.string() << std::endl;
+			return;
+		};
+
+		out.close();
+
+		m_webPlayer.Launch(m_projectPath, scene.string());
+	};
+
 	void Editor::DrawScriptsSection()
 	{
 		ImGui::Separator();
@@ -430,7 +474,7 @@ namespace Loom
 
 		if (m_scripts.IsStale() && !building)
 			ImGui::TextColored(
-				ImVec4(0.85f, 0.65f, 0.2f, 1.0f),
+				EditorTheme::WarningText,
 				"Edited since the last build.");
 
 		ImGui::TextWrapped("%s", m_scripts.GetStatus().c_str());

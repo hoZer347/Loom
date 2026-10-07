@@ -37,17 +37,21 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Property Files\doctest.props" />
+    <Import Project="..\Property Files\stb.props" />
     <Import Project="..\Property Files\Loom Math.props" />
     <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenGL.props" />
+    <Import Project="..\Property Files\Vulkan.props" />
     <Import Project="..\Property Files\UserMacros.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Property Files\doctest.props" />
+    <Import Project="..\Property Files\stb.props" />
     <Import Project="..\Property Files\Loom Math.props" />
     <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenGL.props" />
+    <Import Project="..\Property Files\Vulkan.props" />
     <Import Project="..\Property Files\UserMacros.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
@@ -61,7 +65,7 @@
       <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalIncludeDirectories>$(SolutionDir)Loom Networking;$(SolutionDir)Loom WASM;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Loom WASM;$(SolutionDir)Loom Editor;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -77,7 +81,7 @@
       <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalIncludeDirectories>$(SolutionDir)Loom Networking;$(SolutionDir)Loom WASM;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Loom WASM;$(SolutionDir)Loom Editor;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -91,22 +95,30 @@
     <ClCompile Include="Platform Tests.cpp" />
     <ClCompile Include="Math Tests.cpp" />
     <ClCompile Include="Macro Helpers Tests.cpp" />
-    <ClCompile Include="DataPackage Tests.cpp" />
     <ClCompile Include="Engine Tests.cpp" />
     <ClCompile Include="LoomObject Tests.cpp" />
     <ClCompile Include="ComponentRegistry Tests.cpp" />
     <ClCompile Include="SceneSerializer Tests.cpp" />
+    <ClCompile Include="SceneHistory Tests.cpp" />
+    <ClCompile Include="EditorSettings Tests.cpp" />
+    <ClCompile Include="EditCommands Tests.cpp" />
+    <ClCompile Include="WebPlayer Tests.cpp" />
     <ClCompile Include="SerializedField Tests.cpp" />
     <ClCompile Include="Guid Tests.cpp" />
     <ClCompile Include="Component Tests.cpp" />
     <ClCompile Include="GameObject Tests.cpp" />
     <ClCompile Include="Scene Tests.cpp" />
+    <ClCompile Include="Camera Tests.cpp" />
+    <ClCompile Include="Light Tests.cpp" />
+    <ClCompile Include="Sprite Tests.cpp" />
     <ClCompile Include="Mesh Tests.cpp" />
     <ClCompile Include="Material Tests.cpp" />
     <ClCompile Include="Shaders Tests.cpp" />
     <ClCompile Include="Textures Tests.cpp" />
     <ClCompile Include="Collider Tests.cpp" />
     <ClCompile Include="Input Tests.cpp" />
+    <ClCompile Include="Threading Tests.cpp" />
+    <ClCompile Include="AxisGui Tests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Test Support.h" />
@@ -122,7 +134,15 @@
          Nothing here constructs an Engine, so no window and no GL context is
          ever created; the tests drive the parts that do not need one. -->
     <ClCompile Include="..\Loom WASM\*.cpp" />
+    <ClCompile Include="$(VulkanSdk)\Source\SPIRV-Reflect\spirv_reflect.c" />
     <ClCompile Include="..\Loom WASM\Utilities\*.cpp" Exclude="..\Loom WASM\Utilities\_*.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The editor's undo history and edit shortcuts, the parts of it that do
+         not need a window. The rest of the editor stays out. -->
+    <ClCompile Include="..\Loom Editor\SceneHistory.cpp" />
+    <ClCompile Include="..\Loom Editor\EditCommands.cpp" />
+    <ClCompile Include="..\Loom Editor\EditorSettings.cpp" />
   </ItemGroup>
   <ItemGroup>
     <!-- ImGui is linked rather than recompiled: Component<T>::Gui and

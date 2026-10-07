@@ -1,0 +1,3 @@
+name=MyGame
+scripts=Scripts/MyGameScripts.vcxproj
+library=Build/MyGameScripts.dll

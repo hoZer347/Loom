@@ -67,10 +67,12 @@ library=Build/{NAME}Scripts.dll
 
 layout(location = 0) in vec3 aPos;
 
+uniform mat4 u_model;
+
 void main()
 {
-    gl_Position = vec4(aPos, 1.0);
-};
+    gl_Position = u_model * vec4(aPos, 1.0);
+}
 
 
 // ===FRAGMENT===
@@ -80,115 +82,87 @@ out vec4 FragColor;
 void main()
 {
     FragColor = vec4(0.35, 0.8, 0.45, 1.0);
-};
+}
 )";
 
-		const char* const script_header = R"(#pragma once
+		const char* const script = R"(#pragma once
 
 #include "Component.h"
+#include "Material.h"
 #include "Mesh.h"
 
+#include <cmath>
+#include <numbers>
 #include <string>
 
 
 namespace {NAME}Scripts
 {
-	// A script is an ordinary Loom component. Serial members show up in the
-	// inspector and are written to the scene file, with no editor code to write
-	// for them.
+	// A script is an ordinary Loom component, written whole in one header.
+	// Deriving from Loom::Component is all it takes to appear under Add
+	// Component. Serial members show up in the inspector and are written to the
+	// scene file, with no editor code to write for them.
 	struct SpinningTriangle : Loom::Component<SpinningTriangle>
 	{
-		void OnAttach() override;
-		void OnUpdate() override;
+		void OnAttach() override
+		{
+			Loom::Material* material = m_gameObject->GetComponent<Loom::Material>();
+
+			if (material == nullptr)
+				material = m_gameObject->Attach<Loom::Material>();
+
+			// Named, not built here: the engine compiles one shader per path and
+			// shares it, so a script hands over the name and lets it do that.
+			material->SetShaderPath(m_shader);
+
+			m_mesh = m_gameObject->GetComponent<Loom::Mesh>();
+
+			if (m_mesh == nullptr)
+				m_mesh = m_gameObject->Attach<Loom::Mesh>();
+
+			m_mesh->material = material;
+
+			Rebuild();
+		};
+
+		void OnUpdate() override
+		{
+			if (!m_spinning)
+				return;
+
+			m_angle += m_speed;
+
+			Rebuild();
+		};
 
 	private:
-		void Rebuild();
+		static constexpr int corners = 3;
 
-		Loom::Serial<float> m_speed = 0.02f;
-		Loom::Serial<float> m_radius = 0.6f;
-		Loom::Serial<float> m_angle;
-		Loom::Serial<bool> m_spinning = true;
-		Loom::Serial<std::string> m_shader = "Assets/Shader.shader";
+		void Rebuild()
+		{
+			if (m_mesh == nullptr)
+				return;
+
+			m_mesh->m_vertices->clear();
+
+			for (int corner = 0; corner < corners; corner++)
+			{
+				const float turn = m_angle + (float)corner * 2.0f * std::numbers::pi_v<float> / corners;
+
+				m_mesh->m_vertices->push_back(std::cos(turn) * m_radius);
+				m_mesh->m_vertices->push_back(std::sin(turn) * m_radius);
+				m_mesh->m_vertices->push_back(0.0f);
+			};
+		};
+
+		LOOM_SERIAL(float, m_speed, 0.02f);
+		LOOM_SERIAL(float, m_radius, 0.6f);
+		LOOM_SERIAL(float, m_angle);
+		LOOM_SERIAL(bool, m_spinning, true);
+		LOOM_SERIAL(std::string, m_shader, "Assets/Shader.shader");
 
 		Loom::Mesh* m_mesh = nullptr;
 	};
-};
-)";
-
-		const char* const script_source = R"(#include "SpinningTriangle.h"
-
-#include "GameObject.h"
-#include "Material.h"
-#include "Mesh.h"
-
-#include <cmath>
-
-
-namespace {NAME}Scripts
-{
-	// GL_TRIANGLES, without dragging a GL header into a script.
-	static const uint32_t triangles = 0x0004;
-
-	void SpinningTriangle::OnAttach()
-	{
-		Loom::Material* material = m_gameObject->GetComponent<Loom::Material>();
-
-		if (material == nullptr)
-			material = m_gameObject->Attach<Loom::Material>();
-
-		// Named, not built here: the engine compiles one shader per path and
-		// shares it, so a script hands over the name and lets it do that.
-		material->SetShaderPath(m_shader);
-
-		m_mesh = m_gameObject->GetComponent<Loom::Mesh>();
-
-		if (m_mesh == nullptr)
-			m_mesh = m_gameObject->Attach<Loom::Mesh>(triangles);
-
-		m_mesh->material = material;
-
-		Rebuild();
-	};
-
-	void SpinningTriangle::OnUpdate()
-	{
-		if (!m_spinning)
-			return;
-
-		m_angle += m_speed;
-
-		Rebuild();
-	};
-
-	void SpinningTriangle::Rebuild()
-	{
-		if (m_mesh == nullptr)
-			return;
-
-		m_mesh->m_vertices->clear();
-
-		for (int corner = 0; corner < 3; corner++)
-		{
-			const float turn = m_angle + (float)corner * 2.0944f;
-
-			m_mesh->m_vertices->push_back(std::cos(turn) * m_radius);
-			m_mesh->m_vertices->push_back(std::sin(turn) * m_radius);
-			m_mesh->m_vertices->push_back(0.0f);
-		};
-	};
-};
-)";
-
-		const char* const script_module = R"(#include "SpinningTriangle.h"
-
-#include "ComponentRegistry.h"
-
-
-// The editor calls this once, right after it loads the library. Everything the
-// project wants to see in Add Component (and in scene files) is named here.
-extern "C" __declspec(dllexport) void LoomRegisterScripts()
-{
-	Loom::ComponentRegistry::Register<{NAME}Scripts::SpinningTriangle>("SpinningTriangle");
 };
 )";
 
@@ -268,12 +242,12 @@ extern "C" __declspec(dllexport) void LoomRegisterScripts()
       <IntrinsicFunctions>true</IntrinsicFunctions>
     </ClCompile>
   </ItemDefinitionGroup>
+  <!-- Each component is a header, compiled on its own so that a new one is
+       built (and registers itself) without being listed here. -->
   <ItemGroup>
-    <ClCompile Include="SpinningTriangle.cpp" />
-    <ClCompile Include="ScriptModule.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="SpinningTriangle.h" />
+    <ClCompile Include="**\*.hpp">
+      <CompileAs>CompileAsCpp</CompileAs>
+    </ClCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
@@ -282,11 +256,7 @@ extern "C" __declspec(dllexport) void LoomRegisterScripts()
 		const char* const filters = R"(<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="SpinningTriangle.cpp" />
-    <ClCompile Include="ScriptModule.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="SpinningTriangle.h" />
+    <ClCompile Include="**\*.hpp" />
   </ItemGroup>
 </Project>
 )";
@@ -341,17 +311,25 @@ scripts are an ordinary C++ project in Scripts/.
     Assets/Shader.shader         what the starter scene draws with
     Build/                       where the compiled script library lands
 
-Scripts are Loom components. Compile them from the editor (the Compile button in
-the Project panel, or just press Play) or build the solution in Visual Studio -
-they are the same build. The library links the editor's import library, so there
-is one engine in the process rather than one per module.
+Scripts are Loom components, one header each: add a .hpp to Scripts/ with
+
+    struct Name : Loom::Component<Name> { ... };
+
+in it and it is compiled and offered under Add Component, with nothing to
+register. Each header is compiled on its own and they may include one another,
+so anything defined outside a struct has to be inline. Compile them from the
+editor (the Compile button in the Project panel,
+or just press Play) or build the solution in Visual Studio - they are the same
+build. The library links the editor's import library, so there is one engine in
+the process rather than one per module.
 
 Start Debugging (F5) builds the scripts and then starts the editor on this
 project with the scene running, so breakpoints in them are hit.
 
-Members declared as Serial<T> appear in the inspector and are written into the
-scene file, in the order they were declared - which is also how the file names
-them, so inserting one in the middle shifts the values already saved.
+Members declared with LOOM_SERIAL(type, name, default) appear in the inspector
+under their own name (m_speed shows as "Speed") and are written into the scene
+file, in the order they were declared - which is also how the file names them,
+so inserting one in the middle shifts the values already saved.
 SpinningTriangle is there as a worked example.
 )";
 	};
@@ -414,7 +392,7 @@ SpinningTriangle is there as a worked example.
 		std::filesystem::create_directories(root / "Scenes", code);
 		std::filesystem::create_directories(root / "Scripts", code);
 		std::filesystem::create_directories(root / "Assets", code);
-		std::filesystem::create_directories(root / "Build", code);
+		std::filesystem::create_directories(root / build_folder, code);
 
 		if (code)
 		{
@@ -447,12 +425,10 @@ SpinningTriangle is there as a worked example.
 
 		const bool written =
 			Write(root / (name + extension), fill(loomproject), error) &&
-			Write(root / "Assets" / "Shader.shader", fill(shader), error) &&
+			Write(root / shader_path, fill(shader), error) &&
 			Write(root / "Scenes" / (std::string("Main") + SceneSerializer::extension), fill(starter_scene), error) &&
 			Write(root / "README.txt", fill(readme), error) &&
-			Write(root / "Scripts" / "SpinningTriangle.h", fill(script_header), error) &&
-			Write(root / "Scripts" / "SpinningTriangle.cpp", fill(script_source), error) &&
-			Write(root / "Scripts" / "ScriptModule.cpp", fill(script_module), error) &&
+			Write(root / "Scripts" / "SpinningTriangle.hpp", fill(script), error) &&
 			Write(root / "Scripts" / (name + "Scripts.vcxproj"), fill(vcxproj), error) &&
 			Write(root / "Scripts" / (name + "Scripts.vcxproj.filters"), fill(filters), error) &&
 			Write(root / "Scripts" / (name + "Scripts.sln"), fill(solution), error);

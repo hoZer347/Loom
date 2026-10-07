@@ -9,19 +9,6 @@
 
 TEST_SUITE("Collider")
 {
-	// Collider is not constructed anywhere in these tests, and that is
-	// deliberate. Its constructor reads m_gameObject:
-	//
-	//     Collider::Collider() : m_mesh(m_gameObject->GetComponent<Mesh>())
-	//
-	// but m_gameObject is only assigned by GameObject::Attach, on the task
-	// queue, well after the component has been built. So the pointer is
-	// uninitialised at that point and the constructor dereferences it.
-	// Attach<Collider>() would take the process down before any assertion here
-	// could run. Once the constructor stops looking the mesh up eagerly (or
-	// Attach starts wiring the parent before construction), the behaviour tests
-	// below the type checks can be filled in.
-
 	TEST_CASE("Collider is a component the physics pass can drive")
 	{
 		CHECK(std::is_base_of_v<Loom::Component<Loom::Physics::Collider>, Loom::Physics::Collider>);

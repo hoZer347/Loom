@@ -2,22 +2,30 @@
 
 #include "Loom API.h"
 
-#include "GameObject.h"
-
 #include <functional>
 #include <map>
 #include <string>
+#include <type_traits>
 #include <typeinfo>
 
 
 namespace Loom
 {
+	struct ComponentBase;
+	struct GameObject;
+
+	// typeid().name() gives "struct Loom::Mesh" on MSVC, which is not what you
+	// want filling an inspector header; this trims it down to "Mesh".
+	LOOM_API std::string PrettyTypeName(const char* type_name);
+
 	/**
 	* Loom::ComponentRegistry
 	* - The component types that can be named
 	* - A scene file says "Component Mesh(...)", and something has to turn that
 	*   back into an actual Mesh on an actual GameObject; the same list is what
 	*   the editor offers under "Add Component"
+	* - Every default-constructible Component<T> puts itself in here, under its
+	*   own type name, as the statics of each module that includes it start up
 	*/
 	struct LOOM_API ComponentRegistry final
 	{
@@ -34,13 +42,32 @@ namespace Loom
 		template <typename T, typename... Args>
 		static void Register(const std::string& name, Args... args)
 		{
+			// Generic so the call is only resolved once T is: GameObject includes
+			// this header by way of Component, so it is not complete yet here.
 			Register(
 				name,
 				typeid(T).name(),
-				[args...](GameObject& gameObject) -> ComponentBase*
+				[args...](auto& gameObject) -> ComponentBase*
 				{
-					return gameObject.Attach<T>(args...);
+					return gameObject.template Attach<T>(args...);
 				});
+		};
+
+		// What Component<T> runs for every type derived from it. One that cannot
+		// be built from nothing has no place in a menu, and is left to register
+		// itself with the arguments it needs.
+		template <typename T>
+		static bool RegisterType()
+		{
+			if constexpr (std::is_default_constructible_v<T>)
+			{
+				const std::string name = PrettyTypeName(typeid(T).name());
+
+				if (IsFree(name, typeid(T).name()))
+					Register<T>(name);
+			};
+
+			return true;
 		};
 
 		// Attaches one by registered name. Null when nothing is registered under
@@ -59,15 +86,14 @@ namespace Loom
 		// when it has one, otherwise its type name tidied up.
 		static std::string NameOf(const ComponentBase& component);
 
-		// The component types that ship with the engine. Called by Engine.
-		static void RegisterBuiltins();
-
 	private:
+		// Whether a type registering itself may take the name. Not when it
+		// already has it, which is a second module including the same type, and
+		// not when another type does: the names drop namespaces, and whichever
+		// came first keeps it.
+		static bool IsFree(const std::string& name, const char* type_name);
+
 		static std::map<std::string, Factory>& Factories();
 		static std::map<std::string, std::string>& DisplayNames();
 	};
-
-	// typeid().name() gives "struct Loom::Mesh" on MSVC, which is not what you
-	// want filling an inspector header; this trims it down to "Mesh".
-	std::string PrettyTypeName(const char* type_name);
 };

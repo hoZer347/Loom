@@ -26,10 +26,20 @@ namespace Loom
 		void OnRender() override
 		{ };
 
+		// A link that opens the shader file in whatever edits that kind of file.
+		void OnGui() override;
+
+		// Hands the material's own values to its program, as u_color.
+		void Apply(uint32_t program) const;
+
 		Shader* shader = nullptr;
 
 	private:
 		// Relative to the project folder, which is where the editor works from.
-		Serial<std::string> m_shader_path;
+		LOOM_SERIAL(std::string, m_shader_path);
+
+	public:
+		// Declared after the path, which fixes its position in scene files.
+		LOOM_SERIAL(Math::vec3<float>, color, Math::vec3<float>(1.0f, 1.0f, 1.0f));
 	};
 };

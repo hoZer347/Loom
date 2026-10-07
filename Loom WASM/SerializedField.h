@@ -36,12 +36,14 @@ namespace Loom
 	* - One member of a LoomObject that the scene format knows about
 	* - Holds what type it is and where it lives; the pointer is into the object
 	*   that registered the field, so a field never outlives its owner
-	* - It has no name of its own: a field is identified by where it sits in the
-	*   list, which is the order the Serial members were declared in
+	* - Its name is for people (the inspector); the scene format still
+	*   identifies a field by where it sits in the list, which is the order the
+	*   Serial members were declared in
 	*/
 	struct LOOM_API SerializedField final
 	{
 		FieldType type = FieldType::Int;
+		const char* name = "";
 		void* data = nullptr;
 
 		// Reference fields only. A member declared as some derived type cannot
@@ -61,4 +63,7 @@ namespace Loom
 		LoomObject* GetReference() const;
 		void SetReference(LoomObject* object) const;
 	};
+
+	// A member's identifier as a label: "m_fieldOfView" reads "Field Of View".
+	LOOM_API std::string NameFromIdentifier(const char* identifier);
 };

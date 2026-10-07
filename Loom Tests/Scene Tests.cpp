@@ -92,6 +92,27 @@ TEST_SUITE("Scene")
 		CHECK(Registered(&second));
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "MoveScene puts a scene at a position in the registry")
+	{
+		const std::vector<Loom::Scene*>& scenes = Loom::Scene::GetScenes();
+		const size_t before = scenes.size();
+
+		Loom::Scene first("First");
+		Loom::Scene second("Second");
+		Pump();
+
+		Loom::Scene::MoveScene(&second, before);
+		Pump();
+
+		CHECK(scenes[before] == &second);
+		CHECK(scenes[before + 1] == &first);
+
+		Loom::Scene::MoveScene(&second, scenes.size() + 1);
+		Pump();
+
+		CHECK(scenes.back() == &second);
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "GetRoot hands out the same object every time")
 	{
 		Loom::Scene scene("Root identity");

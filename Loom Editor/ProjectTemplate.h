@@ -17,6 +17,12 @@ namespace Loom
 	{
 		static constexpr const char* extension = ".loomproject";
 
+		// What the starter scene draws with, relative to the project folder.
+		static constexpr const char* shader_path = "Assets/Shader.shader";
+
+		// Where the scripts build to, intermediates and all.
+		static constexpr const char* build_folder = "Build";
+
 		// Creates the project under folder/name. Returns the path of the
 		// .loomproject file, or an empty string with the reason in error.
 		static std::string Create(

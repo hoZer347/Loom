@@ -5,6 +5,8 @@
 #include "Scene.h"
 #include "GameObject.h"
 
+#include "glm/glm.hpp"
+
 #include <algorithm>
 #include <string>
 #include <vector>
@@ -293,6 +295,59 @@ TEST_SUITE("GameObject")
 		CHECK(scene.GetRoot().GetChildren().empty());
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "SetParent reorders siblings and moves between parents")
+	{
+		Loom::Scene scene("set parent");
+		Pump();
+
+		Loom::GameObject& root = scene.GetRoot();
+		Loom::GameObject* a = root.AddChild("A");
+		Loom::GameObject* b = root.AddChild("B");
+		Loom::GameObject* c = root.AddChild("C");
+		Pump();
+
+		c->SetParent(&root, a);
+		Pump();
+
+		CHECK(root.GetChildren() == std::vector<Loom::GameObject*>{ c, a, b });
+
+		c->SetParent(&root);
+		Pump();
+
+		CHECK(root.GetChildren() == std::vector<Loom::GameObject*>{ a, b, c });
+
+		b->SetParent(a);
+		Pump();
+
+		CHECK(root.GetChildren() == std::vector<Loom::GameObject*>{ a, c });
+		CHECK(a->GetChildren() == std::vector<Loom::GameObject*>{ b });
+		CHECK(b->GetParent() == a);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "SetParent refuses a root, a cycle, and placing an object before itself")
+	{
+		Loom::Scene scene("set parent refusals");
+		Pump();
+
+		Loom::GameObject& root = scene.GetRoot();
+		Loom::GameObject* a = root.AddChild("A");
+		Loom::GameObject* b = root.AddChild("B");
+		Pump();
+
+		Loom::GameObject* grandchild = a->AddChild("Grandchild");
+		Pump();
+
+		root.SetParent(a);
+		a->SetParent(grandchild);
+		a->SetParent(a);
+		a->SetParent(&root, a);
+		Pump();
+
+		CHECK(root.GetParent() == nullptr);
+		CHECK(root.GetChildren() == std::vector<Loom::GameObject*>{ a, b });
+		CHECK(a->GetChildren() == std::vector<Loom::GameObject*>{ grandchild });
+	};
+
 	// A scene's root has no parent to be removed from, so destroying it would
 	// leave the scene without a hierarchy. The engine refuses instead.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Destroy refuses to delete a scene root")
@@ -413,5 +468,67 @@ TEST_SUITE("GameObject")
 		CHECK(first->m_ID != second->m_ID);
 		CHECK(first->NameAndID() == "First (ID: " + std::to_string(first->m_ID) + ')');
 		CHECK(scene.GetRoot().GetName() == "Root");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a fresh GameObject's transform is the identity")
+	{
+		Loom::Scene scene("identity");
+		Loom::GameObject* object = scene.AddChild("Object");
+		Pump();
+
+		CHECK(object->WorldMatrix() == glm::mat4(1.0f));
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a transform scales, then rotates, then translates")
+	{
+		constexpr float EPSILON = 1e-5f;
+
+		Loom::Scene scene("local");
+		Loom::GameObject* object = scene.AddChild("Object");
+		Pump();
+
+		object->position = Loom::Math::vec3<float>(1.0f, 2.0f, 3.0f);
+		object->rotation = Loom::Math::vec3<float>(0.0f, 90.0f, 0.0f);
+		object->scale = Loom::Math::vec3<float>(2.0f, 2.0f, 2.0f);
+
+		// +X, doubled, turned a quarter about Y to -Z, then moved.
+		const glm::vec4 moved = object->WorldMatrix() * glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+
+		CHECK(moved.x == doctest::Approx(1.0f).epsilon(EPSILON));
+		CHECK(moved.y == doctest::Approx(2.0f).epsilon(EPSILON));
+		CHECK(moved.z == doctest::Approx(1.0f).epsilon(EPSILON));
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "rotation applies X before Y")
+	{
+		constexpr float EPSILON = 1e-5f;
+
+		Loom::Scene scene("rotation order");
+		Loom::GameObject* object = scene.AddChild("Object");
+		Pump();
+
+		object->rotation = Loom::Math::vec3<float>(90.0f, 90.0f, 0.0f);
+
+		// X turns +Z to -Y, which Y leaves alone. Y first would give +X.
+		const glm::vec4 turned = object->WorldMatrix() * glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
+
+		CHECK(turned.x == doctest::Approx(0.0f).epsilon(EPSILON));
+		CHECK(turned.y == doctest::Approx(-1.0f).epsilon(EPSILON));
+		CHECK(turned.z == doctest::Approx(0.0f).epsilon(EPSILON));
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a child's transform is relative to its parent")
+	{
+		Loom::Scene scene("hierarchy transform");
+		Loom::GameObject* parent = scene.AddChild("Parent");
+		Loom::GameObject* child = parent->AddChild("Child");
+		Pump();
+
+		parent->position = Loom::Math::vec3<float>(5.0f, 0.0f, 0.0f);
+		child->position = Loom::Math::vec3<float>(0.0f, 1.0f, 0.0f);
+
+		const glm::vec4 origin = child->WorldMatrix() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+
+		CHECK(origin == glm::vec4(5.0f, 1.0f, 0.0f, 1.0f));
 	};
 };

@@ -22,9 +22,9 @@ namespace Loom
 	/// a change to the .png and nothing else.
 	///
 	/// Everything the frame needs is a uniform on a shared unit quad, so switching clip
-	/// costs a uniform rather than a rebuild. The sprite carries its own position, since
-	/// GameObject has no transform, and the sheet is a GL texture handle the game
-	/// supplies. sortingOrder is honoured by drawing order.
+	/// costs a uniform rather than a rebuild. The sprite carries its own position, and
+	/// the sheet is a Renderer texture handle the game supplies. sortingOrder is honoured by
+	/// drawing order.
 	struct SpriteManager : Component<SpriteManager>
 	{
 		SpriteManager();
@@ -32,7 +32,7 @@ namespace Loom
 
 		#pragma region Sheet
 
-		/// The sheet, as an OpenGL texture handle. Whatever loaded the .png owns it.
+		/// The sheet, as a Renderer texture handle (a GL name under OpenGL). Whatever loaded the .png owns it.
 		unsigned int texture = 0;
 
 		/// The size of that texture, in pixels. The shader needs it to find a cell, and it
@@ -113,8 +113,7 @@ namespace Loom
 
 		#pragma region Draw
 
-		/// Where the sprite is. Loom's GameObject has no transform, so the sprite carries
-		/// its own.
+		/// Where the sprite is, drawn without the GameObject's transform.
 		Math::vec3<float> position{ };
 
 		/// Mirrors horizontally about the pivot.

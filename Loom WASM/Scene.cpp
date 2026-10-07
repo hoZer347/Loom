@@ -1,7 +1,10 @@
 #include "Scene.h"
 
+#include "Camera.h"
 #include "Engine.h"
+#include "Light.h"
 
+#include <algorithm>
 #include <vector>
 #include <string>
 
@@ -30,7 +33,33 @@ namespace Loom
 
 	void Scene::Render()
 	{
+		// The shadow map has to be finished before the first mesh samples it.
+		Light* light = root.FindComponent<Light>();
+
+		if (light)
+			light->RenderShadowMap(root);
+
+		Light::current = light;
+		Camera::current = root.FindComponent<Camera>();
+
 		root.Render();
+
+		Light::current = nullptr;
+		Camera::current = nullptr;
+	};
+
+	void Scene::MoveScene(Scene* scene, size_t index)
+	{
+		Engine::QueueTask(
+			[scene, index]()
+			{
+				if (std::erase(allScenes, scene) == 0)
+					return;
+
+				allScenes.insert(
+					allScenes.begin() + std::min(index, allScenes.size()),
+					scene);
+			});
 	};
 
 	void Scene::Physics()

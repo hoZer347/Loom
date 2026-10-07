@@ -1,24 +1,17 @@
 #include "Engine.h"
 
 #include "imgui.h"
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_opengl3.h"
 
-#include <stdio.h>
-#define GL_SILENCE_DEPRECATION
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-#include <GLES2/gl2.h>
-#endif
-
-#include "ComponentRegistry.h"
 #include "OpenGL.h"
+#include "Renderer.h"
 #include "Scene.h"
 #include "Input.h"
-#include "Shaders.h"
 #include "Utilities/Clock.h"
 
 #include <iostream>
 #include <atomic>
+#include <fstream>
+#include <vector>
 
 
 namespace Loom
@@ -27,9 +20,70 @@ namespace Loom
 	const unsigned int SCR_WIDTH = 800;
 	const unsigned int SCR_HEIGHT = 600;
 
-	const char* glsl_version;
-
 	ImGuiIO* io;
+
+	namespace
+	{
+		// GL hands pixels back red first; a bitmap stores them blue first.
+		enum Channel { RED, GREEN, BLUE, BYTES_PER_PIXEL };
+		enum BitmapChannel { BITMAP_BLUE, BITMAP_GREEN, BITMAP_RED };
+
+		std::unique_ptr<Renderer> renderer;
+
+		// Writes a 24 bit bottom-up bitmap, which is the row order GL hands back
+		// and the one format worth writing without an image library.
+		bool WriteBitmap(const std::string& path, int width, int height, const std::vector<uint8_t>& rgb)
+		{
+			constexpr uint32_t FILE_HEADER = 14;
+			constexpr uint32_t INFO_HEADER = 40;
+			constexpr uint16_t PLANES = 1;
+			constexpr uint16_t BITS_PER_PIXEL = 24;
+			constexpr uint32_t PIXELS_PER_METRE = 2835;	// 72 dpi
+			constexpr uint32_t ROW_ALIGNMENT = 4;
+			constexpr char SIGNATURE[] = { 'B', 'M' };
+
+			std::ofstream out(path, std::ios::binary);
+
+			if (!out)
+				return false;
+
+			const uint32_t packed = (uint32_t)width * BYTES_PER_PIXEL;
+			const uint32_t row = (packed + ROW_ALIGNMENT - 1) & ~(ROW_ALIGNMENT - 1);
+			const uint32_t image = row * (uint32_t)height;
+			const uint32_t offset = FILE_HEADER + INFO_HEADER;
+
+			const auto put16 = [&out](uint16_t v) { out.write((const char*)&v, sizeof(v)); };
+			const auto put32 = [&out](uint32_t v) { out.write((const char*)&v, sizeof(v)); };
+
+			out.write(SIGNATURE, sizeof(SIGNATURE));
+			put32(offset + image); put32(0); put32(offset);
+			put32(INFO_HEADER); put32((uint32_t)width); put32((uint32_t)height);
+			put16(PLANES); put16(BITS_PER_PIXEL); put32(0); put32(image);
+			put32(PIXELS_PER_METRE); put32(PIXELS_PER_METRE); put32(0); put32(0);
+
+			// Read as RGB and swizzled here, because GLES has no BGR.
+			std::vector<char> line(row, 0);
+
+			for (int y = 0; y < height; y++)
+			{
+				const uint8_t* source = rgb.data() + (size_t)y * packed;
+
+				for (int x = 0; x < width; x++)
+				{
+					char* to = line.data() + x * BYTES_PER_PIXEL;
+					const uint8_t* from = source + x * BYTES_PER_PIXEL;
+
+					to[BITMAP_BLUE] = (char)from[BLUE];
+					to[BITMAP_GREEN] = (char)from[GREEN];
+					to[BITMAP_RED] = (char)from[RED];
+				};
+
+				out.write(line.data(), (std::streamsize)row);
+			};
+
+			return (bool)out;
+		};
+	};
 
 	void Engine::InitImGui()
 	{
@@ -65,38 +119,13 @@ namespace Loom
 			style.Colors[ImGuiCol_WindowBg].w = 1.0f;
 		};
 
-		// Setup Platform/Renderer backends
-#ifdef __EMSCRIPTEN__
-	// Emscripten: avoid double-callback wiring
-		ImGui_ImplGlfw_InitForOpenGL(Engine::window, false);
-		ImGui_ImplGlfw_InstallEmscriptenCallbacks(Engine::window, "#canvas");
-
-		// Make canvas focusable + stop browser stealing input
-		emscripten_run_script(R"JS(
-		(function(){
-			var c = Module['canvas'];
-			if (!c) return;
-			c.tabIndex = 0;
-			c.style.outline = 'none';
-			c.style.touchAction = 'none';
-			c.focus();
-			c.addEventListener('click', () => c.focus());
-			c.addEventListener('contextmenu', e => e.preventDefault());
-			c.addEventListener('wheel', e => e.preventDefault(), { passive: false });
-		})();
-	)JS");
-#else
-		ImGui_ImplGlfw_InitForOpenGL(Engine::window, true);
-#endif
-
-		ImGui_ImplOpenGL3_Init(glsl_version);
+		renderer->InitImGui(Engine::window);
 	};
 
 	void Engine::RenderImGui()
 	{
 		// Start the Dear ImGui frame
-		ImGui_ImplOpenGL3_NewFrame();
-		ImGui_ImplGlfw_NewFrame();
+		renderer->NewImGuiFrame();
 		ImGui::NewFrame();
 
 		// GUI
@@ -112,44 +141,10 @@ namespace Loom
 
 		// Rendering
 		ImGui::Render();
-		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		renderer->RenderImGui(ImGui::GetDrawData());
 
-#ifndef __EMSCRIPTEN__
-		// Multi-viewport rendering (native only)
 		if (io->ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-		{
-			GLFWwindow* backup_current_context = glfwGetCurrentContext();
-			ImGui::UpdatePlatformWindows();
-			ImGui::RenderPlatformWindowsDefault();
-			glfwMakeContextCurrent(backup_current_context);
-		};
-#endif
-	};
-
-	void resizeCanvas()
-	{
-		int width, height;
-
-#if __EMSCRIPTEN__
-		// Get the current size of the canvas
-		emscripten_get_canvas_element_size("#canvas", &width, &height);
-
-		// Update GLFW's window size
-		glfwSetWindowSize(
-			Engine::window,
-			width,
-			height);
-#else
-		glfwGetWindowSize(
-			Engine::window,
-			&width,
-			&height);
-#endif
-		Input::screen_width = width;
-		Input::screen_height = height;
-
-		// Explicitly update the OpenGL viewport
-		glViewport(0, 0, width, height);
+			renderer->RenderImGuiWindows();
 	};
 
 	void Engine::Start()
@@ -160,11 +155,6 @@ namespace Loom
 		while (!glfwWindowShouldClose(window))
 			renderFrame();
 #endif
-
-		glDeleteBuffers(1, &VBO);
-		glDeleteBuffers(1, &EBO);
-
-		glfwTerminate();
 
 		isRunning = false;
 	};
@@ -179,13 +169,15 @@ namespace Loom
 	{
 		glfwPollEvents();
 
+		Input::Tick();
+
 		// The frame clock, the edge-detected dialogue input and the StaticStateMachine.
 		// First thing in the frame, so everything ticked below reads the same delta and
 		// the same key presses.
 		Utilities::Tick();
 
-		glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		renderer->BeginFrame();
+		renderer->Clear(clearColor, true);
 
 		DoTasks();
 
@@ -205,9 +197,20 @@ namespace Loom
 			for (auto& scene : Scene::allScenes)
 				scene->Render();
 
-		glFlush();
+		renderer->EndFrame();
+	};
 
-		glfwSwapBuffers(window);
+	void Engine::CaptureFrame(const std::string& path)
+	{
+		renderer->Capture(
+			[path](int width, int height, const std::vector<uint8_t>& rgb)
+			{
+				if (width <= 0 || height <= 0)
+					std::cerr << "Nothing to capture: the window has no size" << std::endl;
+				else if (!WriteBitmap(path, width, height, rgb))
+					std::cerr << "Could not write " << path << std::endl;
+				else std::cout << "Wrote " << path << " (" << width << 'x' << height << ')' << std::endl;
+			});
 	};
 
 	void Engine::SetUpdateFunction(const Task& task)
@@ -272,130 +275,67 @@ namespace Loom
 		if (!glfwInit())
 			std::cerr << "GLFW failed to init" << std::endl;
 
-		// Decide GL+GLSL versions
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-	// GL ES 2.0 + GLSL 100
-		glsl_version = "#version 100";
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-		glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
-#elif defined(__APPLE__)
-	// GL 3.2 + GLSL 150
-		glsl_version = "#version 150";
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
-		glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // Required on Mac
-#else
-	// GL 3.0 + GLSL 130
-		glsl_version = "#version 130";
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-		//glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
-		//glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
-#endif
+		window = OpenWindow(backend);
+
+		// Vulkan needs a driver and features an OpenGL machine may not have, and
+		// a window made for one API cannot be handed to the other.
+		if (!window && backend == Backend::Vulkan)
+		{
+			std::cerr << "Falling back to OpenGL" << std::endl;
+			backend = Backend::OpenGL;
+			window = OpenWindow(backend);
+		};
+
+		if (!window)
+		{
+			std::cerr << "Failed to create a window" << std::endl;
+			return;
+		};
+
+		Renderer::current = renderer.get();
+
+		Input::Init();
+
+		InitImGui();
+	};
+
+	GLFWwindow* Engine::OpenWindow(Backend api)
+	{
+		glfwDefaultWindowHints();
+		renderer = Renderer::Create(api);
 
 		if (!showWindow)
 			glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
-		window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "", NULL, NULL);
-		if (window == NULL)
-		{
-			std::cout << "Failed to create GLFW window" << std::endl;
-			glfwTerminate();
-		};
+		GLFWwindow* opened = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "", NULL, NULL);
 
-		glfwMakeContextCurrent(window);
-		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+		if (opened && renderer->Attach(opened))
+			return opened;
 
-#ifndef __EMSCRIPTEN__
-		glewExperimental = true;
+		renderer.reset();
 
-		if (glewInit())
-			std::cerr << "Glew failed to init" << std::endl;
-#endif
+		if (opened)
+			glfwDestroyWindow(opened);
 
-		Input::Init();
-
-		// Setting the Resize Callback
-#if __EMSCRIPTEN__
-		emscripten_set_resize_callback(
-			EMSCRIPTEN_EVENT_TARGET_WINDOW,
-			nullptr,
-			EM_TRUE,
-			[](int, const EmscriptenUiEvent*, void*) -> EM_BOOL
-			{
-				std::cout << "Resize Callback" << std::endl;
-				resizeCanvas();
-				return EM_TRUE;
-			});
-#else
-		glfwSetFramebufferSizeCallback(
-			window,
-			[](GLFWwindow*, int w, int h)
-			{
-				glViewport(0, 0, w, h);
-			});
-#endif
-		//
-
-		glEnable(GL_DEPTH_TEST);
-		//glEnable(GL_MULTISAMPLE);
-		glfwWindowHint(GLFW_SAMPLES, 4);
-
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-
-#ifndef __EMSCRIPTEN__
-#ifndef NDEBUG
-		glEnable(GL_DEBUG_OUTPUT);
-		glDebugMessageCallback(
-			[](GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
-			{
-				// Notifications are per-buffer-upload chatter from the driver;
-				// they drown out anything worth reading (the editor console in
-				// particular) without ever saying anything actionable.
-				if (severity == GL_DEBUG_SEVERITY_NOTIFICATION)
-					return;
-
-				std::cerr << "OpenGL Debug: " << message << std::endl;
-			},
-			nullptr);
-#endif
-#endif
-
-		if (!glfwGetCurrentContext())
-		{
-			std::cerr << "No OpenGL context is currently active!" << std::endl;
-			return;
-		};
-
-		GLenum err = glGetError();
-		if (err != GL_NO_ERROR)
-		{
-			std::cerr << "OpenGL error: " << err << std::endl;
-			return;
-		};
-
-		std::cout << "OpenGL Version: " << glGetString(GL_VERSION) << std::endl;
-		std::cout << "GLSL Version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
-
-		glGenBuffers(1, &VBO);
-		glGenBuffers(1, &EBO);
-
-#ifndef __EMSCRIPTEN__
-		glGenVertexArrays(1, &VAO);
-		glBindVertexArray(Engine::VAO);
-#endif
-
-		ComponentRegistry::RegisterBuiltins();
-
-		InitImGui();
+		return nullptr;
 	};
 
 	Engine::~Engine()
 	{
 		Stop();
+
+		// After whatever the application built on the Engine is gone, since
+		// that is what holds the textures and programs being released here.
+		if (renderer)
+		{
+			renderer->ShutdownImGui();
+			ImGui::DestroyContext();
+
+			Renderer::current = nullptr;
+			renderer.reset();
+		};
+
+		glfwTerminate();
+		window = nullptr;
 	};
 };

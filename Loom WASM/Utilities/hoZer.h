@@ -23,17 +23,19 @@
 ///
 ///	  Sprites              SpriteSheetScanner reads a raw RGBA buffer. SpriteManager is a
 ///	                       Component drawing the shared unit quad through Flipbook.shader
-///	                       and carrying its own position, GameObject having no transform.
+///	                       and carrying its own position.
 ///
 ///	  Timing               Duration, Gait and SpeedManager, measured against Clock.
 ///
 ///	  Tooling              ImGui windows over the running game: StateMachineMonitor for
-///	                       machines and their inspector, AttributeGui for attributes.
+///	                       machines and their inspector, AttributeGui for attributes,
+///	                       AxisGui for vectors edged in their axis colours.
 
 #include "Attributes.h"
 #include "AttributeFields.h"
 #include "AttributeGui.h"
 #include "AttributeTriggers.h"
+#include "AxisGui.h"
 #include "CustomState.h"
 #include "DialogueArgs.h"
 #include "DialogueInput.h"

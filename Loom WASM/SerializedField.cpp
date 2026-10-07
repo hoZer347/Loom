@@ -3,8 +3,10 @@
 #include "LoomObject.h"
 
 #include <cstdio>
+#include <cctype>
 #include <cstdlib>
 #include <string>
+#include <string_view>
 #include <vector>
 
 
@@ -223,5 +225,43 @@ namespace Loom
 		};
 
 		return false;
+	};
+
+	std::string NameFromIdentifier(const char* identifier)
+	{
+		constexpr std::string_view MEMBER_PREFIX = "m_";
+
+		std::string_view rest = identifier;
+
+		if (rest.starts_with(MEMBER_PREFIX))
+			rest.remove_prefix(MEMBER_PREFIX.size());
+
+		std::string name;
+		bool word_start = true;
+		char previous = '\0';
+
+		for (const char c : rest)
+		{
+			if (c == '_')
+			{
+				word_start = true;
+				continue;
+			};
+
+			// camelCase breaks before an upper case letter, but an acronym like ID
+			// stays one word.
+			if (isupper((unsigned char)c) && islower((unsigned char)previous))
+				word_start = true;
+
+			if (word_start && !name.empty())
+				name += ' ';
+
+			name += word_start ? (char)toupper((unsigned char)c) : c;
+
+			word_start = false;
+			previous = c;
+		};
+
+		return name;
 	};
 };

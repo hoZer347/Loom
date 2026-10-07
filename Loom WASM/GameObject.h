@@ -6,6 +6,8 @@
 #include "Component.h"
 #include "LoomObject.h"
 
+#include "glm/glm.hpp"
+
 #include <cstring>
 #include <string>
 #include <atomic>
@@ -105,6 +107,20 @@ namespace Loom
 			return nullptr;
 		};
 
+		// Depth first, the first T on this object or anywhere under it.
+		template <typename T>
+		[[nodiscard]] T* FindComponent()
+		{
+			if (T* found = GetComponent<T>())
+				return found;
+
+			for (GameObject* child : m_children)
+				if (T* found = child->FindComponent<T>())
+					return found;
+
+			return nullptr;
+		};
+
 		// Read-only views of the hierarchy, for tooling that draws it (the editor).
 		const std::vector<GameObject*>& GetChildren() const { return m_children; };
 		const std::vector<ComponentBase*>& GetComponents() const { return m_components; };
@@ -122,7 +138,19 @@ namespace Loom
 
 		GameObject* AddChild(const std::string& name = "New GameObject");
 
+		// Moves this object under parent, in front of before, or last when before
+		// is null or not one of parent's children. Deferred like AddChild, and
+		// ignored for a root, a move that would put an object under itself, or
+		// placing it before itself.
+		void SetParent(GameObject* parent, const GameObject* before = nullptr);
+
 		static size_t GetObjectCount() { return num_objects.load(); };
+
+		// Scale, then rotation, then translation, relative to the parent.
+		[[nodiscard]] glm::mat4 LocalMatrix() const;
+
+		// Every ancestor's local matrix applied over this one's.
+		[[nodiscard]] glm::mat4 WorldMatrix() const;
 
 	protected:
 		friend struct Scene;
@@ -135,9 +163,17 @@ namespace Loom
 		static inline std::atomic<size_t> num_objects = 0;
 		static inline std::atomic<size_t> id_counter = 0;
 
-		Serial<int> m_threadID;
-		Serial<bool> m_inherit_thread_id;
+		LOOM_SERIAL(int, m_threadID);
+		LOOM_SERIAL(bool, m_inherit_thread_id);
 
+	public:
+		// Declared after the fields above so scenes saved before them keep
+		// their indices. Rotation is Euler degrees, applied Z, then X, then Y.
+		LOOM_SERIAL(Math::vec3<float>, position);
+		LOOM_SERIAL(Math::vec3<float>, rotation);
+		LOOM_SERIAL(Math::vec3<float>, scale, Math::vec3<float>(1.0f, 1.0f, 1.0f));
+
+	protected:
 		std::vector<GameObject*>	m_children{ };
 		std::vector<ComponentBase*> m_components{ };
 		std::vector<ComponentBase*> m_updateables{ };

@@ -22,6 +22,9 @@
     <ClCompile Include="ScriptLibrary.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
+    <ClCompile Include="WebPlayer.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
     <ClCompile Include="Editor.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
@@ -31,9 +34,33 @@
     <ClCompile Include="EditorLog.cpp">
       <Filter>Panels</Filter>
     </ClCompile>
+    <ClCompile Include="EditorSettings.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorSettingsWindow.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorTheme.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="ModelImporter.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="ModelPreview.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="SceneHistory.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="EditCommands.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ScriptLibrary.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="WebPlayer.h">
       <Filter>Scripts</Filter>
     </ClInclude>
     <ClInclude Include="ProjectTemplate.h">
@@ -50,6 +77,24 @@
     </ClInclude>
     <ClInclude Include="EditorLog.h">
       <Filter>Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorSettings.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorTheme.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="ModelImporter.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="ModelPreview.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneHistory.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="EditCommands.h">
+      <Filter>Editor</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -1,35 +1,85 @@
 #include "doctest.h"
 
+#include "Test Support.h"
+
 #include "Textures.h"
 
-#include <type_traits>
+#include <stdexcept>
+#include <vector>
+
+
+namespace
+{
+	constexpr int RGBA = 4;
+	constexpr uint8_t OPAQUE = 255;
+	constexpr uint8_t CLEAR = 0;
+	constexpr uint8_t FULL = 255;
+
+	// Two by two, top row red then clear, bottom row green then blue.
+	constexpr int SIZE = 2;
+	const std::vector<uint8_t> TOP_FIRST =
+	{
+		FULL, 0, 0, OPAQUE,		0, 0, 0, CLEAR,
+		0, FULL, 0, OPAQUE,		0, 0, FULL, OPAQUE,
+	};
+};
 
 
 TEST_SUITE("Texture")
 {
-	// Texture has no members and no behaviour yet -- Material holds a Shader and
-	// nothing samples anything. These cases pin the type down so that giving it
-	// a GL handle, a loader or a lifetime has a place to be tested from, and so
-	// that "textures are not implemented" is a stated fact rather than a gap.
+	// No test constructs an Engine, so there is no renderer: a texture decodes
+	// its pixels but has no handle.
 
-	TEST_CASE("Texture exists and is default constructible")
+	TEST_CASE("a texture decodes its file to RGBA, bottom row first")
 	{
-		Loom::Texture texture;
-		(void)texture;
+		const Loom::Texture texture(LoomTests::WriteTga("loom texture rows.tga", SIZE, SIZE, TOP_FIRST));
 
-		CHECK(std::is_default_constructible_v<Loom::Texture>);
+		CHECK(texture.width == SIZE);
+		CHECK(texture.height == SIZE);
+		REQUIRE(texture.pixels.size() == (size_t)SIZE * SIZE * RGBA);
+
+		const std::vector<uint8_t> bottom_first =
+		{
+			0, FULL, 0, OPAQUE,		0, 0, FULL, OPAQUE,
+			FULL, 0, 0, OPAQUE,		0, 0, 0, CLEAR,
+		};
+
+		CHECK(texture.pixels == bottom_first);
 	};
 
-	TEST_CASE("Texture carries no state yet")
+	TEST_CASE("a texture keeps a transparent pixel transparent")
 	{
-		CHECK(std::is_empty_v<Loom::Texture>);
-		CHECK(std::is_final_v<Loom::Texture>);
+		const Loom::Texture texture(LoomTests::WriteTga("loom texture alpha.tga", SIZE, SIZE, TOP_FIRST));
+
+		constexpr size_t TOP_RIGHT_ALPHA = (SIZE + 1) * RGBA + 3;
+
+		CHECK(texture.pixels[TOP_RIGHT_ALPHA] == CLEAR);
 	};
 
-	TEST_CASE("Texture is not a component")
+	TEST_CASE("without a renderer a texture has no handle")
 	{
-		// Like Shader, a texture is a resource a Material points at rather than
-		// something attached to a GameObject.
-		CHECK(std::is_trivially_copyable_v<Loom::Texture>);
+		const Loom::Texture texture(LoomTests::WriteTga("loom texture handle.tga", SIZE, SIZE, TOP_FIRST));
+
+		CHECK(texture.handle == 0);
+	};
+
+	TEST_CASE("a missing file throws")
+	{
+		CHECK_THROWS_AS(Loom::Texture("no such texture.png"), std::runtime_error);
+	};
+
+	TEST_CASE("Shared hands out one texture per path")
+	{
+		const std::string path = LoomTests::WriteTga("loom texture shared.tga", SIZE, SIZE, TOP_FIRST);
+
+		Loom::Texture* first = Loom::Texture::Shared(path);
+
+		REQUIRE(first != nullptr);
+		CHECK(Loom::Texture::Shared(path) == first);
+	};
+
+	TEST_CASE("Shared answers null for a file that will not load")
+	{
+		CHECK(Loom::Texture::Shared("no such shared texture.png") == nullptr);
 	};
 };

@@ -1,15 +1,14 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 
 
 namespace Loom
 {
-	struct Scene;
-
 	/**
 	* Loom::EditorViewport
-	* - An off-screen colour + depth target a scene is rendered into
+	* - An off-screen colour + depth target the open scenes are rendered into
 	* - Lets the editor show a live scene as an image in the middle of its dock
 	*   space instead of drawing it over the whole window
 	*/
@@ -21,11 +20,16 @@ namespace Loom
 		EditorViewport(const EditorViewport&) = delete;
 		EditorViewport& operator=(const EditorViewport&) = delete;
 
-		// Renders the scene at the requested size, reallocating the target if the
-		// size changed. Safe to call while an ImGui frame is being built: the two
-		// pieces of GL state it touches (framebuffer binding, viewport) are saved
-		// and restored, and ImGui only records the texture id until it draws.
-		void Render(Scene* scene, int width, int height);
+		// Renders every open scene, in the order the runtime draws them, at the
+		// requested size, reallocating the target if the size changed. Safe to
+		// call while an ImGui frame is being built: the target is pushed and
+		// popped around the scenes, and ImGui only records the texture id until
+		// it draws.
+		void Render(int width, int height);
+
+		// The same, for anything that draws itself: draw runs with the target
+		// bound and cleared to clear_colour (RGBA).
+		void Render(int width, int height, const float* clear_colour, const std::function<void()>& draw);
 
 		// The colour attachment, as an ImTextureID.
 		void* GetTextureID() const;
@@ -38,9 +42,7 @@ namespace Loom
 		void Resize(int width, int height);
 		void Destroy();
 
-		uint32_t m_fbo = 0;
 		uint32_t m_texture = 0;
-		uint32_t m_depth = 0;
 
 		int m_width = 0;
 		int m_height = 0;

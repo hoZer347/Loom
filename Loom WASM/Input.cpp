@@ -2,19 +2,79 @@
 
 #include "Engine.h"
 
-#if __EMSCRIPTEN__
-#include <emscripten/html5.h>
-#else
 #include "OpenGL.h"
-#endif
 
 #include "Globals.h"
 
+#include <array>
 #include <iostream>
 
 
 namespace Loom
 {
+	namespace
+	{
+		static_assert(Input::mouse_buttons == GLFW_MOUSE_BUTTON_LAST + 1);
+
+		using Buttons = std::array<bool, Input::mouse_buttons>;
+
+		// Held, as the callbacks last said.
+		Buttons held{ };
+
+		// Edges heard since the last Tick, and the ones this frame answers with.
+		Buttons went_down{ };
+		Buttons went_up{ };
+		Buttons down_this_frame{ };
+		Buttons up_this_frame{ };
+
+		bool IsButton(int button)
+		{
+			return button >= 0 && button < Input::mouse_buttons;
+		};
+
+		void mouse_button_callback(GLFWwindow*, int button, int action, int)
+		{
+			Input::OnMouseButton(button, action == GLFW_PRESS);
+		};
+	};
+
+	bool Input::GetMouseButtonDown(int button)
+	{
+		return IsButton(button) && down_this_frame[button];
+	};
+
+	bool Input::GetMouseButton(int button)
+	{
+		return IsButton(button) && (held[button] || down_this_frame[button]);
+	};
+
+	bool Input::GetMouseButtonUp(int button)
+	{
+		return IsButton(button) && up_this_frame[button];
+	};
+
+	void Input::OnMouseButton(int button, bool pressed)
+	{
+		if (!IsButton(button))
+			return;
+
+		held[button] = pressed;
+
+		if (pressed)
+			went_down[button] = true;
+		else
+			went_up[button] = true;
+	};
+
+	void Input::Tick()
+	{
+		down_this_frame = went_down;
+		up_this_frame = went_up;
+
+		went_down.fill(false);
+		went_up.fill(false);
+	};
+
 #if __EMSCRIPTEN__
 	EM_BOOL mouse_move_callback(int eventType, const EmscriptenMouseEvent* e, void* userData)
 	{
@@ -76,5 +136,11 @@ namespace Loom
 			Engine::window,
 			mouse_move_callback);
 #endif
+
+		// The engine's own GLFW port on the web: ImGui is told to leave GLFW's
+		// callbacks alone there, and on the desktop it chains to this one.
+		glfwSetMouseButtonCallback(
+			Engine::window,
+			mouse_button_callback);
 	};
 };

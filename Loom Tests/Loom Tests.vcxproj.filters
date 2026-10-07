@@ -19,9 +19,6 @@
     <ClCompile Include="Macro Helpers Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
-    <ClCompile Include="DataPackage Tests.cpp">
-      <Filter>Tests</Filter>
-    </ClCompile>
     <ClCompile Include="Engine Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
@@ -35,6 +32,18 @@
       <Filter>Tests</Filter>
     </ClCompile>
     <ClCompile Include="Scene Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="Camera Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="Light Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorSettings Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="Sprite Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
     <ClCompile Include="Mesh Tests.cpp">
@@ -53,6 +62,15 @@
       <Filter>Tests</Filter>
     </ClCompile>
     <ClCompile Include="Input Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="Threading Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="AxisGui Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="WebPlayer Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
   </ItemGroup>

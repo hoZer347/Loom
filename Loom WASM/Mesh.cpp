@@ -1,10 +1,13 @@
 #include "Mesh.h"
 
+#include "Camera.h"
 #include "Engine.h"
 #include "OpenGL.h"
+#include "Renderer.h"
 #include "Shaders.h"
 #include "Material.h"
 #include "GameObject.h"
+#include "Light.h"
 
 #include <iostream>
 
@@ -49,24 +52,40 @@ namespace Loom
 	Mesh::~Mesh()
 	{ };
 
-	void Mesh::OnRender()
+	bool Mesh::IsDrawable()
 	{
 		if (material == nullptr)
 			material = m_gameObject->GetComponent<Material>();
 
 		// A mesh attached without a material (or before one is set up, which is
 		// the normal state for a mesh just added in the editor) has nothing to
-		// draw with; skip it instead of dereferencing null.
-		if (material == nullptr || material->shader == nullptr)
+		// draw with.
+		return material != nullptr && material->shader != nullptr;
+	};
+
+	void Mesh::OnRender()
+	{
+		if (!IsDrawable())
 			return;
 
-		glUseProgram(material->shader->id);
+		material->Apply(material->shader->id);
 
-		glBindBuffer(GL_ARRAY_BUFFER, Engine::VBO);
-		glBufferData(GL_ARRAY_BUFFER, m_vertices->size() * sizeof(float), m_vertices->data(), m_draw_type);
+		if (Camera::current)
+			Camera::current->Apply(material->shader->id);
 
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-		glEnableVertexAttribArray(0);
+		if (Light::current)
+			Light::current->Apply(material->shader->id);
+		else Light::ApplyNone(material->shader->id);
+
+		Draw(material->shader->id);
+	};
+
+	void Mesh::Draw(uint32_t program)
+	{
+		Renderer* renderer = Renderer::Get();
+
+		if (!renderer)
+			return;
 
 		if (m_indices.size())
 		{
@@ -80,18 +99,13 @@ namespace Loom
 				std::cerr << "Mesh: indexed drawing is not supported yet" << std::endl;
 			};
 
-			glDisableVertexAttribArray(0);
-			glBindBuffer(GL_ARRAY_BUFFER, 0);
-
 			return;
-		}
-		// m_vertices holds floats, three per vertex, but glDrawArrays counts
-		// vertices. Passing the float count asks GL to read past the end of the
-		// buffer, which WebGL rejects outright (INVALID_OPERATION, nothing drawn).
-		else glDrawArrays(primitive_id, 0, (GLsizei)(m_vertices->size() / 3));
+		};
 
-		glDisableVertexAttribArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		constexpr size_t COMPONENTS = 3;
+
+		renderer->SetUniform(program, "u_model", m_gameObject->WorldMatrix());
+		renderer->Draw(program, primitive_id, m_vertices->data(), m_vertices->size() / COMPONENTS, m_draw_type);
 	};
 
 	void Mesh::OnGui()

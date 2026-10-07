@@ -1,11 +1,15 @@
 #include "SpriteManager.h"
 
+#include "AxisGui.h"
 #include "Clock.h"
 
 #include "Engine.h"
 #include "Shaders.h"
 
 #include "OpenGL.h"
+#include "Renderer.h"
+
+#include "glm/gtc/type_ptr.hpp"
 
 #include "imgui.h"
 
@@ -175,7 +179,10 @@ namespace Loom
 		if (m_program == ~0u || texture == 0)
 			return;
 
-		glUseProgram(m_program);
+		Renderer* renderer = Renderer::Get();
+
+		if (!renderer)
+			return;
 
 		float quad[4];
 		QuadVector(quad);
@@ -183,34 +190,23 @@ namespace Loom
 		const float sheetWidth = float(std::max(1, sheetSize.x));
 		const float sheetHeight = float(std::max(1, sheetSize.y));
 
-		glUniformMatrix4fv(glGetUniformLocation(m_program, "mvp"), 1, GL_FALSE, viewProjection);
-		glUniform3f(glGetUniformLocation(m_program, "_Position"), position.x(), position.y(), position.z());
-		glUniform4f(glGetUniformLocation(m_program, "_Quad"), quad[0], quad[1], quad[2], quad[3]);
-		glUniform4f(glGetUniformLocation(m_program, "_SheetSize"), sheetWidth, sheetHeight, 0.0f, 0.0f);
-		glUniform4f(glGetUniformLocation(m_program, "_CellSize"), float(spriteSize.x), float(spriteSize.y), 0.0f, 0.0f);
-		glUniform4f(glGetUniformLocation(m_program, "_Anim"), float(clip), float(std::max(1, animationLength)), animationSpeed, 0.0f);
-		glUniform4f(glGetUniformLocation(m_program, "_Play"), loop ? 1.0f : 0.0f, startTime, 0.0f, 0.0f);
-		glUniform4f(glGetUniformLocation(m_program, "_Flip"), flipX ? 1.0f : 0.0f, flipY ? 1.0f : 0.0f, 0.0f, 0.0f);
-		glUniform1f(glGetUniformLocation(m_program, "_Spin"), spin * 0.01745329252f);
-		glUniform4fv(glGetUniformLocation(m_program, "_Color"), 1, color);
-		glUniform4fv(glGetUniformLocation(m_program, "_Outline"), 1, outline);
-		glUniform1f(glGetUniformLocation(m_program, "_OutlineWidth"), std::max(0.0f, outlineWidth));
-		glUniform1f(glGetUniformLocation(m_program, "_Time"), Time::SinceStart());
+		renderer->SetUniform(m_program, "mvp", glm::make_mat4(viewProjection));
+		renderer->SetUniform(m_program, "_Position", glm::vec3(position.x(), position.y(), position.z()));
+		renderer->SetUniform(m_program, "_Quad", glm::make_vec4(quad));
+		renderer->SetUniform(m_program, "_SheetSize", glm::vec4(sheetWidth, sheetHeight, 0.0f, 0.0f));
+		renderer->SetUniform(m_program, "_CellSize", glm::vec4(float(spriteSize.x), float(spriteSize.y), 0.0f, 0.0f));
+		renderer->SetUniform(m_program, "_Anim", glm::vec4(float(clip), float(std::max(1, animationLength)), animationSpeed, 0.0f));
+		renderer->SetUniform(m_program, "_Play", glm::vec4(loop ? 1.0f : 0.0f, startTime, 0.0f, 0.0f));
+		renderer->SetUniform(m_program, "_Flip", glm::vec4(flipX ? 1.0f : 0.0f, flipY ? 1.0f : 0.0f, 0.0f, 0.0f));
+		renderer->SetUniform(m_program, "_Spin", glm::radians(spin));
+		renderer->SetUniform(m_program, "_Color", glm::make_vec4(color));
+		renderer->SetUniform(m_program, "_Outline", glm::make_vec4(outline));
+		renderer->SetUniform(m_program, "_OutlineWidth", std::max(0.0f, outlineWidth));
+		renderer->SetUniform(m_program, "_Time", Time::SinceStart());
+		renderer->SetTexture(m_program, "_MainTex", texture);
 
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, texture);
-		glUniform1i(glGetUniformLocation(m_program, "_MainTex"), 0);
-
-		glBindBuffer(GL_ARRAY_BUFFER, Engine::VBO);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(s_quad), s_quad, GL_DYNAMIC_DRAW);
-
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-		glEnableVertexAttribArray(0);
-
-		glDrawArrays(GL_TRIANGLES, 0, 6);
-
-		glDisableVertexAttribArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		constexpr size_t QUAD_VERTICES = 6;
+		renderer->Draw(m_program, GL_TRIANGLES, s_quad, QUAD_VERTICES, GL_DYNAMIC_DRAW);
 	};
 
 	void SpriteManager::OnGui()
@@ -233,8 +229,8 @@ namespace Loom
 
 		ImGui::DragFloat("Spin", &spin, 1.0f);
 		ImGui::DragFloat("Scale", &scale, 0.05f, 0.0001f, 100.0f);
-		ImGui::DragFloat2("Pivot", &pivot.x, 0.01f);
-		ImGui::DragFloat3("Position", position.data, 0.05f);
+		AxisGui::DragFloatN("Pivot", &pivot.x, 2, 0.01f);
+		AxisGui::DragFloatN("Position", position.data, 3, 0.05f);
 
 		ImGui::ColorEdit4("Color", color);
 		ImGui::ColorEdit4("Outline", outline);

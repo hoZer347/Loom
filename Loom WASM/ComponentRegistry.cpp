@@ -1,10 +1,10 @@
 #include "ComponentRegistry.h"
 
-#include "Material.h"
-#include "Mesh.h"
+#include "Component.h"
 
 #include <cctype>
 #include <cstring>
+#include <iostream>
 #include <iterator>
 
 
@@ -31,6 +31,21 @@ namespace Loom
 
 		if (type_name)
 			DisplayNames()[type_name] = name;
+	};
+
+	bool ComponentRegistry::IsFree(const std::string& name, const char* type_name)
+	{
+		if (Factories().count(name) == 0)
+			return true;
+
+		const auto found = DisplayNames().find(type_name);
+
+		if (found == DisplayNames().end() || found->second != name)
+			std::cerr
+				<< "Two component types are called " << name
+				<< "; " << type_name << " is not registered." << std::endl;
+
+		return false;
 	};
 
 	ComponentBase* ComponentRegistry::Create(const std::string& name, GameObject& gameObject)
@@ -69,13 +84,6 @@ namespace Loom
 		return found == DisplayNames().end()
 			? PrettyTypeName(type_name)
 			: found->second;
-	};
-
-	void ComponentRegistry::RegisterBuiltins()
-	{
-		// GL_TRIANGLES, spelled out so this file does not have to pull in GL
-		Register<Mesh>("Mesh", (uint32_t)0x0004);
-		Register<Material>("Material");
 	};
 
 	std::string PrettyTypeName(const char* type_name)

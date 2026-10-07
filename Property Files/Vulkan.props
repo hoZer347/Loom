@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros">
+    <VulkanSdk>$(MSBuildThisFileDirectory)..\External Libraries\Vulkan</VulkanSdk>
+    <VulkanLibSuffix Condition="'$(Configuration)'=='Debug'">d</VulkanLibSuffix>
+  </PropertyGroup>
+  <PropertyGroup>
+    <_PropertySheetDisplayName>Vulkan</_PropertySheetDisplayName>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(VulkanSdk)\Include;$(VulkanSdk)\Source\SPIRV-Reflect;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(VulkanSdk)\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;glslang$(VulkanLibSuffix).lib;glslang-default-resource-limits$(VulkanLibSuffix).lib;SPIRV-Tools-opt$(VulkanLibSuffix).lib;SPIRV-Tools$(VulkanLibSuffix).lib;delayimp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <!-- Loaded on first use, so a machine without a Vulkan driver still runs on OpenGL. -->
+      <DelayLoadDLLs>vulkan-1.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
+      <!-- The SDK's debug shader compiler libraries ship without their PDBs. -->
+      <AdditionalOptions>/ignore:4099 %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup />
+</Project>

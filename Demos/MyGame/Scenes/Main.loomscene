@@ -1,0 +1,13 @@
+Main(37798b23-8ae7-4ab7-a029-99636dc7c69e):
+	GameObject Root(cf0d2fd9-2d72-4f95-98ed-92d97f886a7b)
+		0 = 0
+		1 = false
+		GameObject Triangle(6d2dc6c2-f22e-4e5d-94df-c8842f221435)
+			0 = 0
+			1 = false
+			Component SpinningTriangle(62f93048-4497-46a7-ab27-047ffad7bf1f)
+				0 = 0.02
+				1 = 0.6
+				2 = 0
+				3 = true
+				4 = "Assets/Shader.shader"

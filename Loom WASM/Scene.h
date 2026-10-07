@@ -41,6 +41,10 @@ namespace Loom
 
 		static const std::vector<Scene*>& GetScenes() { return allScenes; };
 
+		// Puts a scene at index in GetScenes, or last if index is past the end.
+		// Deferred, so it lands after a new scene has registered itself.
+		static void MoveScene(Scene* scene, size_t index);
+
 		static inline std::atomic<bool> is_engine_running = false;
 		
 

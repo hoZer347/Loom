@@ -35,32 +35,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 
-function Find-Emcc
-{
-    $candidates = @()
-
-    if ($env:EMSDK) { $candidates += (Join-Path $env:EMSDK 'upstream\emscripten\emcc.bat') }
-
-    $candidates += 'C:\emsdk\upstream\emscripten\emcc.bat'
-    $candidates += (Join-Path $root 'External Libraries\emsdk\upstream\emscripten\emcc.bat')
-
-    foreach ($candidate in $candidates)
-    {
-        if (Test-Path $candidate) { return $candidate }
-    }
-
-    $onPath = Get-Command emcc.bat -ErrorAction SilentlyContinue
-    if ($onPath) { return $onPath.Source }
-
-    throw @"
-Could not find emcc. Install the emscripten SDK and either set EMSDK, put it at
-C:\emsdk, or install the copy vendored at "External Libraries\emsdk":
-
-    cd "External Libraries\emsdk"
-    .\emsdk install latest
-    .\emsdk activate latest
-"@
-}
+. (Join-Path $root 'WebBuild.ps1')
 
 # The desktop project is the single source of truth for what gets compiled.
 # Reading it here means adding a test file, or the engine gaining a source file,
@@ -119,7 +94,7 @@ if (-not $NoBuild)
 
     # ImGui is compiled in rather than linked: the desktop build links a .lib,
     # and there is no equivalent prebuilt artefact for wasm. The GLFW and
-    # OpenGL3 backends come along because Engine.cpp calls into them.
+    # OpenGL3 backends come along because the engine's OpenGL renderer calls into them.
     $imgui = Join-Path $root 'Loom ImGui'
     $sources += @(
         (Join-Path $imgui 'imgui.cpp')
@@ -134,8 +109,10 @@ if (-not $NoBuild)
         (Join-Path $root 'External Libraries\doctest')
         (Join-Path $root 'Loom Tests')
         (Join-Path $root 'Loom WASM')
+        (Join-Path $root 'Loom Editor')
         (Join-Path $root 'Loom Math')
-        (Join-Path $root 'Loom Networking')
+        (Join-Path $root 'External Libraries\glm')
+        (Join-Path $root 'External Libraries\stb')
         $imgui
     ) | ForEach-Object { "-I$_" }
 
@@ -150,6 +127,9 @@ if (-not $NoBuild)
         '-sFETCH'                       # Shader::Request fetches shader sources over HTTP.
         '-sASYNCIFY'                    # ...and waits on the fetch with emscripten_sleep.
         '-sALLOW_MEMORY_GROWTH=1'
+        '-pthread'                      # Same threading the site build ships with.
+        '-sPTHREAD_POOL_SIZE=8'         # Pre-spawned: a later thread cannot start while main blocks in join.
+        '-Wno-pthreads-mem-growth'
         '-sEXIT_RUNTIME=1'              # So the process exit code is the test result.
         '-sENVIRONMENT=node'
         '-sNODERAWFS=1'                 # Gives the suite the real filesystem under node.

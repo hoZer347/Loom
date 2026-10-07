@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Loom API.h"
+#include "Renderer.h"
 
 #include <functional>
 #include <mutex>
@@ -20,8 +21,7 @@ namespace Loom
 	* Loom::Engine
 	* - Manages the runtime of the application
 	* - Updates all GameObjects
-	* - Manages the backend OpenGL and ImGui loops
-	* - Should decouple OpenGL and ImGui, but currently does not
+	* - Opens the window on the Renderer for Engine::backend, and runs ImGui on it
 	*/
 	struct LOOM_API Engine final
 	{
@@ -37,7 +37,7 @@ namespace Loom
 		static void SetUpdateFunction(const Task& task);
 
 		// Replaces the built-in per-scene ImGui windows with a custom one. Called
-		// from inside the ImGui frame, so it is safe to issue ImGui (and raw GL)
+		// from inside the ImGui frame, so it is safe to issue ImGui (and Renderer)
 		// calls from it. Pass an empty Task to fall back to the default windows.
 		static void SetGuiFunction(const Task& task);
 
@@ -46,7 +46,7 @@ namespace Loom
 		// Runs everything QueueTask has collected so far, on the calling
 		// thread. renderFrame calls this once a frame; it is public so a host
 		// that drives the engine itself (a test, a tool) can flush deferred
-		// work without a window or a GL context.
+		// work without a window or a renderer.
 		static void DoTasks() noexcept;
 
 		static inline bool doGUI = true;
@@ -63,10 +63,10 @@ namespace Loom
 		static inline bool updateScenes = true;
 		static inline bool renderScenes = true;
 
-		static inline unsigned int shaderProgram = 0;
-		static inline unsigned int VAO = 0;
-		static inline unsigned int VBO = 0;
-		static inline unsigned int EBO = 0;
+		// The graphics API the window is opened on. Set before the Engine is
+		// constructed; if Vulkan cannot run here it falls back to OpenGL, and
+		// this says which one it ended up on.
+		static inline Backend backend = Backend::OpenGL;
 
 		static const size_t GetUniqueID();
 
@@ -78,11 +78,20 @@ namespace Loom
 
 		static void renderFrame();
 
+		// Writes this frame, once it is finished, to a 24 bit bitmap. Works on a
+		// hidden window, which is what lets an automated run look at a frame
+		// without putting it on screen. Says on the console what it wrote, or
+		// why it did not.
+		static void CaptureFrame(const std::string& path);
+
 		static inline bool isRunning;
 
 	private:
 		static void InitImGui();
 		static void RenderImGui();
+
+		// A window with a renderer attached, or null if the API cannot run.
+		static GLFWwindow* OpenWindow(Backend api);
 
 		static inline const char* projectDirectory;
 
