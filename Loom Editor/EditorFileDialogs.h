@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ProjectTemplate.h"
-#include "SceneSerializer.h"
 
 #include "imgui.h"
 #include "imfilebrowser.h"
@@ -20,11 +19,6 @@ namespace Loom
 	{
 		ImGui::FileBrowser openProject{ ImGuiFileBrowserFlags_CloseOnEsc };
 
-		ImGui::FileBrowser saveScene{
-			ImGuiFileBrowserFlags_EnterNewFilename |
-			ImGuiFileBrowserFlags_CreateNewDir |
-			ImGuiFileBrowserFlags_CloseOnEsc };
-
 		ImGui::FileBrowser folder{
 			ImGuiFileBrowserFlags_SelectDirectory |
 			ImGuiFileBrowserFlags_CreateNewDir |
@@ -39,9 +33,6 @@ namespace Loom
 		{
 			openProject.SetTitle("Open Project");
 			openProject.SetTypeFilters({ ProjectTemplate::extension });
-
-			saveScene.SetTitle("Save Scene As");
-			saveScene.SetTypeFilters({ SceneSerializer::extension });
 
 			folder.SetTitle("Choose a Scene Folder");
 

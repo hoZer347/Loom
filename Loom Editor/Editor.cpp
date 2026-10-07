@@ -748,16 +748,6 @@ namespace Loom
 		return true;
 	};
 
-	std::string Editor::DefaultPathFor(Scene* scene) const
-	{
-		const std::string name =
-			(scene ? scene->GetName() : std::string("Untitled")) + SceneSerializer::extension;
-
-		return m_projectPath.empty()
-			? "Scenes/" + name
-			: (std::filesystem::path(m_projectPath) / name).string();
-	};
-
 	bool Editor::IsOwned(Scene* scene) const
 	{
 		return std::find(
@@ -1243,21 +1233,6 @@ namespace Loom
 			if (ImGui::MenuItem("New Scene"))
 				CreateScene("Scene " + std::to_string(++m_sceneCounter));
 
-			if (ImGui::MenuItem("Save Scene As...", nullptr, false, m_activeScene != nullptr))
-			{
-				const std::filesystem::path path(DefaultPathFor(m_activeScene));
-
-				if (path.has_parent_path())
-				{
-					std::error_code code;
-					std::filesystem::create_directories(path.parent_path(), code);
-					m_dialogs->saveScene.SetCurrentDirectory(path.parent_path());
-				};
-
-				m_dialogs->saveScene.SetInputName(path.filename().string());
-				m_dialogs->saveScene.Open();
-			};
-
 			ImGui::Separator();
 
 			if (ImGui::BeginMenu("Open Demo"))
@@ -1468,23 +1443,6 @@ namespace Loom
 				m_askForFolder = false;
 
 			m_dialogs->openProject.ClearSelected();
-		};
-
-		m_dialogs->saveScene.Display();
-
-		if (m_dialogs->saveScene.HasSelected())
-		{
-			std::filesystem::path path = m_dialogs->saveScene.GetSelected();
-
-			// Typing a name without the extension is the common case.
-			if (path.extension() != SceneSerializer::extension)
-				path += SceneSerializer::extension;
-
-			SaveScene(m_activeScene, path.string());
-
-			m_dialogs->saveScene.ClearSelected();
-
-			RefreshProjectAssets();
 		};
 	};
 
