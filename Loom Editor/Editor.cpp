@@ -44,14 +44,14 @@ namespace Loom
 {
 	namespace
 	{
-		constexpr float ROTATION_DRAG_SPEED = 0.5f;
+		constexpr float rotation_drag_speed = 0.5f;
 
 		// The thread ID that takes a GameObject out of the update loop entirely.
-		constexpr int UNPROCESSED_THREAD = -1;
+		constexpr int unprocessed_thread = -1;
 
-		constexpr int SELECTION_FRAMES = 60;
+		constexpr int selection_frames = 60;
 
-		constexpr ImGuiTreeNodeFlags HEADER_FLAGS =
+		constexpr ImGuiTreeNodeFlags header_flags =
 			ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap;
 
 		GameObject* FindByName(GameObject& root, const std::string& name)
@@ -65,7 +65,6 @@ namespace Loom
 
 			return nullptr;
 		};
-
 
 		// Sits beside the executable and holds what the editor remembers between
 		// runs. Beside the executable rather than in the working directory,
@@ -280,14 +279,14 @@ namespace Loom
 
 		// Hierarchy nodes hand over their object's guid rather than its address,
 		// so a drop resolves against what still exists when the mouse comes up.
-		constexpr const char* objectPayload = "LoomObject";
+		constexpr const char* object_payload = "LoomObject";
 
 		void DragSource(const LoomObject& object)
 		{
 			if (!ImGui::BeginDragDropSource())
 				return;
 
-			ImGui::SetDragDropPayload(objectPayload, &object.GetGuid(), sizeof(Guid));
+			ImGui::SetDragDropPayload(object_payload, &object.GetGuid(), sizeof(Guid));
 			ImGui::TextUnformatted(object.NameAndID().c_str());
 
 			ImGui::EndDragDropSource();
@@ -300,7 +299,7 @@ namespace Loom
 		{
 			const ImGuiPayload* payload = ImGui::GetDragDropPayload();
 
-			if (payload == nullptr || !payload->IsDataType(objectPayload))
+			if (payload == nullptr || !payload->IsDataType(object_payload))
 				return nullptr;
 
 			return field.ReferenceFor(LoomObject::GetByGuid(*(const Guid*)payload->Data));
@@ -341,7 +340,7 @@ namespace Loom
 			if (LoomObject* dropped = DraggedInto(field))
 				if (ImGui::BeginDragDropTarget())
 				{
-					if (ImGui::AcceptDragDropPayload(objectPayload))
+					if (ImGui::AcceptDragDropPayload(object_payload))
 					{
 						field.SetReference(dropped);
 						changed = true;
@@ -758,6 +757,7 @@ namespace Loom
 	{
 		Select(nullptr);
 		m_selectedModel = path;
+		m_selectedAsset = std::filesystem::path(path).lexically_normal().string();
 	};
 
 	void Editor::DeleteSelected()
@@ -899,7 +899,7 @@ namespace Loom
 	void Editor::RequestSelection(const std::string& name)
 	{
 		m_pendingSelection = name;
-		m_selectionFramesLeft = SELECTION_FRAMES;
+		m_selectionFramesLeft = selection_frames;
 	};
 
 	void Editor::ValidateSelection()
@@ -1585,7 +1585,7 @@ namespace Loom
 			return;
 
 		const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(
-			objectPayload,
+			object_payload,
 			ImGuiDragDropFlags_AcceptBeforeDelivery |
 			ImGuiDragDropFlags_AcceptNoDrawDefaultRect);
 
@@ -1832,7 +1832,7 @@ namespace Loom
 
 	void Editor::DrawTransform(GameObject* gameObject, float column)
 	{
-		if (!ImGui::CollapsingHeader("Transform", HEADER_FLAGS))
+		if (!ImGui::CollapsingHeader("Transform", header_flags))
 			return;
 
 		Transform& transform = gameObject->transform;
@@ -1849,7 +1849,7 @@ namespace Loom
 		ImGui::PushItemWidth(-FLT_MIN);
 
 		row("Position", *transform.position, drag_speed);
-		row("Rotation", *transform.rotation, ROTATION_DRAG_SPEED);
+		row("Rotation", *transform.rotation, rotation_drag_speed);
 		row("Scale", *transform.scale, drag_speed);
 
 		ImGui::PopItemWidth();
@@ -1857,7 +1857,7 @@ namespace Loom
 
 	void Editor::DrawThread(GameObject* gameObject, float column)
 	{
-		if (!ImGui::CollapsingHeader("Thread", HEADER_FLAGS))
+		if (!ImGui::CollapsingHeader("Thread", header_flags))
 			return;
 
 		ImGui::PushItemWidth(-FLT_MIN);
@@ -1880,14 +1880,14 @@ namespace Loom
 		if (ImGui::SliderInt(
 			"##thread",
 			&thread,
-			UNPROCESSED_THREAD,
+			unprocessed_thread,
 			(int)std::thread::hardware_concurrency()))
 			gameObject->SetThreadID(thread);
 
 		ImGui::EndDisabled();
 
 		if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-			ImGui::SetTooltip("%d is not processed", UNPROCESSED_THREAD);
+			ImGui::SetTooltip("%d is not processed", unprocessed_thread);
 
 		ImGui::PopItemWidth();
 	};
@@ -1898,7 +1898,7 @@ namespace Loom
 
 		const std::string name = ComponentRegistry::NameOf(*component);
 
-		const bool open = ImGui::CollapsingHeader(name.c_str(), HEADER_FLAGS);
+		const bool open = ImGui::CollapsingHeader(name.c_str(), header_flags);
 
 		if (ImGui::IsItemHovered())
 			ImGui::SetTooltip("%s", component->GetGuid().ToString().c_str());
@@ -2260,13 +2260,13 @@ namespace Loom
 		{
 			const ImGuiIO& io = ImGui::GetIO();
 
-			constexpr float MillisecondsPerSecond = 1000.0f;
+			constexpr float milliseconds_per_second = 1000.0f;
 
 			// ImGui already averages Framerate over its last 60 frames.
 			ImGui::Text(
 				"%d FPS (%d ms/frame)",
 				(int)std::ceil(io.Framerate),
-				(int)std::ceil(MillisecondsPerSecond / io.Framerate));
+				(int)std::ceil(milliseconds_per_second / io.Framerate));
 			ImGui::Text("Graphics API: %s", EditorSettings::BackendLabel(Engine::backend));
 
 			ImGui::Text("Scenes: %d", (int)Scene::GetScenes().size());
