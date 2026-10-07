@@ -165,6 +165,9 @@ namespace Loom
 		// screenshot can show it in the inspector.
 		void RequestSelection(const std::string& name);
 
+		// Create > Script in the project folder, named and confirmed.
+		void CreateScriptAsset(const std::string& name);
+
 	private:
 		void DrawGui();
 
@@ -270,6 +273,10 @@ namespace Loom
 		// when asked for somewhere else.
 		std::string NewAssetPath() const;
 		std::string NewAssetFolder() const;
+
+		// The project's scripts project, or the one Create > Script would add
+		// to a project that has none.
+		std::string ScriptsProject() const;
 
 		// Why the Create prompt's name cannot be used, or an empty string.
 		std::string NewAssetProblem() const;

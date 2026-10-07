@@ -4,6 +4,7 @@
 #include "EditorGui.h"
 #include "ModelImporter.h"
 #include "ProjectAssets.h"
+#include "ProjectTemplate.h"
 
 #include "SceneSerializer.h"
 
@@ -363,9 +364,7 @@ namespace Loom
 
 		for (const AssetKindInfo& info : assetKinds)
 		{
-			const bool usable = info.kind != AssetKind::Script || m_scripts.HasProject();
-
-			if (ImGui::MenuItem(info.label, nullptr, false, usable))
+			if (ImGui::MenuItem(info.label))
 			{
 				m_newAssetKind = info.kind;
 				m_newAssetFolder = folder;
@@ -383,9 +382,6 @@ namespace Loom
 					m_newAssetProblem = NewAssetProblem();
 				};
 			};
-
-			if (!usable && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-				ImGui::SetTooltip("This project has no scripts project.");
 		};
 
 		ImGui::EndMenu();
@@ -397,11 +393,18 @@ namespace Loom
 			return m_newAssetFolder;
 
 		const std::string scripts =
-			std::filesystem::path(m_scripts.GetProject()).parent_path().string();
+			std::filesystem::path(ScriptsProject()).parent_path().string();
 
 		return IsUnder(m_newAssetFolder, scripts) || m_newAssetFolder == scripts
 			? m_newAssetFolder
 			: scripts;
+	};
+
+	std::string Editor::ScriptsProject() const
+	{
+		return m_scripts.HasProject()
+			? m_scripts.GetProject()
+			: ProjectTemplate::ScriptsProject(m_projectPath, m_projectName);
 	};
 
 	std::string Editor::NewAssetPath() const
@@ -422,7 +425,7 @@ namespace Loom
 	std::string Editor::NewAssetProblem() const
 	{
 		if (m_newAssetKind == AssetKind::Script)
-			return ProjectAssets::ScriptNameProblem(m_scripts.GetProject(), m_newAssetName);
+			return ProjectAssets::ScriptNameProblem(ScriptsProject(), m_newAssetName);
 
 		if (!ProjectAssets::IsValidName(m_newAssetName))
 			return "Not a usable file name.";
@@ -434,6 +437,15 @@ namespace Loom
 		return std::filesystem::exists(path, code)
 			? path + " already exists."
 			: "";
+	};
+
+	void Editor::CreateScriptAsset(const std::string& name)
+	{
+		m_newAssetKind = AssetKind::Script;
+		m_newAssetFolder = m_projectPath;
+		snprintf(m_newAssetName, sizeof(m_newAssetName), "%s", name.c_str());
+
+		CreateAsset();
 	};
 
 	void Editor::CreateAsset()
@@ -461,7 +473,8 @@ namespace Loom
 			break;
 
 		case AssetKind::Script:
-			path = ProjectAssets::CreateScript(m_scripts.GetProject(), folder, name, &error);
+			if (m_scripts.HasProject() || !ProjectTemplate::AddScripts(m_projectPath, m_projectName, &error).empty())
+				path = ProjectAssets::CreateScript(ScriptsProject(), folder, name, &error);
 			break;
 
 		case AssetKind::Shader:
@@ -481,8 +494,15 @@ namespace Loom
 
 		std::cout << "Created " << path << std::endl;
 
+		// A scripts project added just now is picked up and built, so the
+		// script is in Add Component without a trip to Compile.
 		if (m_newAssetKind == AssetKind::Script)
-			std::cout << name << " shows up in Add Component after the next compile." << std::endl;
+		{
+			if (m_scripts.HasProject())
+				std::cout << name << " shows up in Add Component after the next compile." << std::endl;
+			else
+				LoadProjectFile();
+		};
 
 		m_askForAsset = false;
 		m_selectedAsset = std::filesystem::path(path).lexically_normal().string();
