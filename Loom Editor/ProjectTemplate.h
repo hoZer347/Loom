@@ -34,7 +34,23 @@ namespace Loom
 		// (<engine>/x64/<configuration>/Loom Editor.exe).
 		static std::string EngineRoot();
 
+		// Creates a scripts project in the project in folder, named after it,
+		// and points its .loomproject at it, writing one if there is none.
+		// Returns the .vcxproj, or an empty string with the reason in error.
+		static std::string AddScripts(
+			const std::string& folder,
+			const std::string& name,
+			std::string* error = nullptr);
+
+		// The .vcxproj AddScripts writes for the project in folder.
+		static std::string ScriptsProject(const std::string& folder, const std::string& name);
+
+		static constexpr size_t maxNameLength = 64;
+
 		// A name a file system and MSBuild will both accept.
 		static bool IsValidName(const std::string& name);
+
+		// The name with what IsValidName refuses taken out.
+		static std::string UsableName(const std::string& name);
 	};
 };

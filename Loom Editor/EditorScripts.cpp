@@ -77,7 +77,9 @@ namespace Loom
 	{
 		m_scripts.Clear();
 		m_projectFile.clear();
-		m_projectName.clear();
+
+		// Unless the project file names it otherwise.
+		m_projectName = std::filesystem::path(m_projectPath).filename().string();
 
 		std::error_code code;
 
@@ -112,9 +114,6 @@ namespace Loom
 			if (const std::string value = ValueOf(line, "library"); !value.empty())
 				library = Resolve(m_projectPath, value);
 		};
-
-		if (m_projectName.empty())
-			m_projectName = std::filesystem::path(m_projectPath).filename().string();
 
 		if (project.empty())
 			return;

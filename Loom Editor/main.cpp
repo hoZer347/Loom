@@ -114,6 +114,8 @@ namespace
 			<< "  --new-script <scripts project> <folder> <name>\n"
 			<< "                                 write a script into that folder and exit,\n"
 			<< "                                 printing its path\n"
+			<< "  --create-script <name>         Create > Script in the project, adding a\n"
+			<< "                                 scripts project if it has none\n"
 			<< "  --compile                      build the project's scripts on startup\n"
 			<< "  --play                         start with the scene running\n"
 			<< "  --play-web                     build the scene for the web and open it\n"
@@ -263,6 +265,7 @@ int main(int argc, char** argv)
 	std::string screenshot;
 	std::string preview;
 	std::string selection;
+	std::string new_script;
 	int frames = 240;
 
 	for (int i = 1; i < argc; i++)
@@ -330,6 +333,16 @@ int main(int argc, char** argv)
 
 			preview = argv[++i];
 		}
+		else if (argument == "--create-script")
+		{
+			if (i + 1 >= argc)
+			{
+				std::cerr << "--create-script needs a name" << std::endl;
+				return 1;
+			};
+
+			new_script = argv[++i];
+		}
 		else if (argument == "--select")
 		{
 			if (i + 1 >= argc)
@@ -382,6 +395,9 @@ int main(int argc, char** argv)
 		}
 		else editor.OpenProject(argument);
 	};
+
+	if (!new_script.empty())
+		editor.CreateScriptAsset(new_script);
 
 	if (compile)
 		editor.CompileScripts();

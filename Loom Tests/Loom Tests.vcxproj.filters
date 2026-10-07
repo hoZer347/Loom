@@ -43,6 +43,9 @@
     <ClCompile Include="ProjectAssets Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="ProjectTemplate Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="Sprite Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

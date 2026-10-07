@@ -6,9 +6,11 @@
 #include "SceneSerializer.h"
 
 #include <cctype>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -49,8 +51,11 @@ namespace Loom
 			return '{' + text + '}';
 		};
 
-		const char* const loomproject = R"(name={NAME}
-scripts=Scripts/{NAME}Scripts.vcxproj
+		const char* const loomproject = "name={NAME}\n";
+
+		// Appended to a .loomproject, whether New Project just wrote it or it
+		// predates the project having any scripts.
+		const char* const scripts_entries = R"(scripts=Scripts/{NAME}Scripts.vcxproj
 library=Build/{NAME}Scripts.dll
 )";
 
@@ -328,7 +333,7 @@ SpinningTriangle is there as a worked example.
 
 	bool ProjectTemplate::IsValidName(const std::string& name)
 	{
-		if (name.empty() || name.size() > 64)
+		if (name.empty() || name.size() > maxNameLength)
 			return false;
 
 		for (const char c : name)
@@ -364,7 +369,6 @@ SpinningTriangle is there as a worked example.
 		};
 
 		std::filesystem::create_directories(root / "Scenes", code);
-		std::filesystem::create_directories(root / "Scripts", code);
 		std::filesystem::create_directories(root / "Assets", code);
 		std::filesystem::create_directories(root / build_folder, code);
 
@@ -376,17 +380,10 @@ SpinningTriangle is there as a worked example.
 			return "";
 		};
 
-		const std::string engine = EngineRoot();
-		const std::string project_guid = ProjectGuid();
-		const std::string project = root.lexically_normal().string();
-
 		const auto fill =
 			[&](const char* text)
 			{
 				std::string filled = ProjectAssets::Replace(text, "{NAME}", name);
-				filled = ProjectAssets::Replace(filled, "{ENGINE}", engine);
-				filled = ProjectAssets::Replace(filled, "{PROJECT}", project);
-				filled = ProjectAssets::Replace(filled, "{PROJECT_GUID}", project_guid);
 				filled = ProjectAssets::Replace(filled, "{SCENE_EXTENSION}", SceneSerializer::extension);
 				filled = ProjectAssets::Replace(filled, "{UNDERLINE}", std::string(name.size(), '='));
 				filled = ProjectAssets::Replace(filled, "{SCENE_GUID}", Guid::New().ToString());
@@ -403,15 +400,110 @@ SpinningTriangle is there as a worked example.
 			Write(root / "Scenes" / (std::string("Main") + SceneSerializer::extension), fill(starter_scene), error) &&
 			Write(root / "README.txt", fill(readme), error) &&
 			Write(root / "Scripts" / "SpinningTriangle.hpp", fill(script), error) &&
-			Write(root / "Scripts" / (name + "Scripts.vcxproj"), fill(vcxproj), error) &&
-			Write(root / "Scripts" / (name + "Scripts.vcxproj.filters"), fill(filters), error) &&
-			Write(root / "Scripts" / (name + "Scripts.sln"), fill(solution), error);
+			!AddScripts(root.string(), name, error).empty();
 
 		if (!written)
 			return "";
 
-		std::cout << "Created project " << project << std::endl;
+		std::cout << "Created project " << root.lexically_normal().string() << std::endl;
 
 		return (root / (name + extension)).string();
+	};
+
+	std::string ProjectTemplate::UsableName(const std::string& name)
+	{
+		constexpr const char* fallback = "Project";
+
+		std::string usable;
+
+		for (const char c : name)
+			if (isalnum((unsigned char)c) || c == '_' || c == '-')
+				usable += c;
+
+		usable = usable.substr(0, maxNameLength);
+
+		return IsValidName(usable)
+			? usable
+			: fallback + usable.substr(0, maxNameLength - strlen(fallback));
+	};
+
+	std::string ProjectTemplate::ScriptsProject(const std::string& folder, const std::string& name)
+	{
+		const std::string usable = UsableName(name);
+
+		return (std::filesystem::path(folder) / "Scripts" / (usable + "Scripts.vcxproj")).lexically_normal().string();
+	};
+
+	std::string ProjectTemplate::AddScripts(
+		const std::string& folder,
+		const std::string& name,
+		std::string* error)
+	{
+		const std::filesystem::path root = std::filesystem::absolute(folder).lexically_normal();
+		const std::string usable = UsableName(name);
+		const std::filesystem::path project = ScriptsProject(root.string(), usable);
+		const std::string project_guid = ProjectGuid();
+
+		const auto fill =
+			[&](const char* text)
+			{
+				std::string filled = ProjectAssets::Replace(text, "{NAME}", usable);
+				filled = ProjectAssets::Replace(filled, "{ENGINE}", EngineRoot());
+				filled = ProjectAssets::Replace(filled, "{PROJECT}", root.string());
+				filled = ProjectAssets::Replace(filled, "{PROJECT_GUID}", project_guid);
+
+				return filled;
+			};
+
+		std::error_code code;
+
+		// One left behind by a .loomproject that lost its entries is taken up
+		// again rather than written over.
+		if (!std::filesystem::exists(project, code))
+		{
+			const std::filesystem::path scripts = project.parent_path();
+
+			const bool written =
+				Write(project, fill(vcxproj), error) &&
+				Write(scripts / (usable + "Scripts.vcxproj.filters"), fill(filters), error) &&
+				Write(scripts / (usable + "Scripts.sln"), fill(solution), error);
+
+			if (!written)
+				return "";
+		};
+
+		std::filesystem::path project_file;
+
+		for (const auto& entry : std::filesystem::directory_iterator(root, code))
+			if (entry.is_regular_file(code) && entry.path().extension() == extension)
+			{
+				project_file = entry.path();
+				break;
+			};
+
+		std::string text;
+
+		if (project_file.empty())
+		{
+			project_file = root / (usable + extension);
+			text = ProjectAssets::Replace(loomproject, "{NAME}", usable);
+		}
+		else
+		{
+			std::ifstream in(project_file, std::ios::binary);
+			text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+
+			if (!text.empty() && text.back() != '\n')
+				text += '\n';
+		};
+
+		// Already pointed here by an earlier call whose script was never made.
+		if (text.find(fill(scripts_entries)) != std::string::npos)
+			return project.string();
+
+		if (!Write(project_file, text + fill(scripts_entries), error))
+			return "";
+
+		return project.string();
 	};
 };
