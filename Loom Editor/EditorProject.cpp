@@ -213,9 +213,16 @@ namespace Loom
 			return result;
 		};
 
+		// What a Visual Studio in the middle of a build or a modal dialog answers.
+		bool IsBusy(HRESULT result)
+		{
+			return result == RPC_E_CALL_REJECTED || result == RPC_E_SERVERCALL_RETRYLATER;
+		};
+
 		// Each running Visual Studio registers its automation object as
-		// "!VisualStudio.DTE.<version>:<process id>".
-		ComPtr<IDispatch> FindVisualStudioWith(const std::string& solution, DWORD& process)
+		// "!VisualStudio.DTE.<version>:<process id>". Sets busy when one would
+		// not say which solution it has.
+		ComPtr<IDispatch> FindVisualStudioWith(const std::string& solution, DWORD& process, bool& busy)
 		{
 			ComPtr<IRunningObjectTable> table;
 			ComPtr<IEnumMoniker> monikers;
@@ -248,21 +255,28 @@ namespace Loom
 					FAILED(object.As(&dte)))
 					continue;
 
-				const ComPtr<IDispatch> open = Property(dte.Get(), L"Solution");
-
+				VARIANT open;
 				VARIANT path;
+				VariantInit(&open);
 				VariantInit(&path);
+
+				HRESULT result = Call(dte.Get(), L"Solution", DISPATCH_PROPERTYGET, &open);
+
+				if (SUCCEEDED(result) && open.vt == VT_DISPATCH)
+					result = Call(open.pdispVal, L"FullName", DISPATCH_PROPERTYGET, &path);
+
+				busy = busy || IsBusy(result);
 
 				std::error_code code;
 
 				const bool match =
-					open &&
-					SUCCEEDED(Call(open.Get(), L"FullName", DISPATCH_PROPERTYGET, &path)) &&
+					SUCCEEDED(result) &&
 					path.vt == VT_BSTR &&
 					SysStringLen(path.bstrVal) > 0 &&
 					std::filesystem::equivalent(std::filesystem::path(path.bstrVal), solution, code);
 
 				VariantClear(&path);
+				VariantClear(&open);
 
 				if (match)
 				{
@@ -274,15 +288,20 @@ namespace Loom
 			return nullptr;
 		};
 
-		// False when no Visual Studio has the solution open.
-		bool OpenInRunningVisualStudio(const std::string& solution, const std::string& file)
+		bool OpenThroughAutomation(const std::string& solution, const std::string& file)
 		{
 			DWORD process = 0;
+			bool busy = false;
 
-			const ComPtr<IDispatch> dte = FindVisualStudioWith(solution, process);
+			const ComPtr<IDispatch> dte = FindVisualStudioWith(solution, process, busy);
+
+			// A busy one may be the one with the solution, and starting another
+			// would open it twice.
+			if (!dte && busy)
+				std::cerr << "Visual Studio is busy; try again once it has finished." << std::endl;
 
 			if (!dte)
-				return false;
+				return busy;
 
 			const ComPtr<IDispatch> operations = Property(dte.Get(), L"ItemOperations");
 			const ComPtr<IDispatch> window = Property(dte.Get(), L"MainWindow");
@@ -319,6 +338,20 @@ namespace Loom
 				Call(window.Get(), L"Activate", DISPATCH_METHOD, nullptr);
 
 			return true;
+		};
+
+		// False when no Visual Studio has the solution open. The editor's thread
+		// does not keep COM up, so this brings it up for the length of the call.
+		bool OpenInRunningVisualStudio(const std::string& solution, const std::string& file)
+		{
+			const HRESULT com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+
+			const bool handled = OpenThroughAutomation(solution, file);
+
+			if (SUCCEEDED(com))
+				CoUninitialize();
+
+			return handled;
 		};
 	};
 
