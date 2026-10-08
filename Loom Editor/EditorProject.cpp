@@ -11,10 +11,12 @@
 #include "imgui.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <iostream>
+#include <thread>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -288,20 +290,27 @@ namespace Loom
 			return nullptr;
 		};
 
-		bool OpenThroughAutomation(const std::string& solution, const std::string& file)
+		enum struct Handover
+		{
+			Opened,
+			NotRunning,
+
+			// A Visual Studio would not answer, and may be the one with the
+			// solution.
+			Busy,
+
+			Failed,
+		};
+
+		Handover OpenThroughAutomation(const std::string& solution, const std::string& file)
 		{
 			DWORD process = 0;
 			bool busy = false;
 
 			const ComPtr<IDispatch> dte = FindVisualStudioWith(solution, process, busy);
 
-			// A busy one may be the one with the solution, and starting another
-			// would open it twice.
-			if (!dte && busy)
-				std::cerr << "Visual Studio is busy; try again once it has finished." << std::endl;
-
 			if (!dte)
-				return busy;
+				return busy ? Handover::Busy : Handover::NotRunning;
 
 			const ComPtr<IDispatch> operations = Property(dte.Get(), L"ItemOperations");
 			const ComPtr<IDispatch> window = Property(dte.Get(), L"MainWindow");
@@ -321,13 +330,16 @@ namespace Loom
 			VariantClear(&opened);
 			VariantClear(&path);
 
+			if (IsBusy(result))
+				return Handover::Busy;
+
 			if (FAILED(result))
 			{
 				std::cerr
 					<< "Visual Studio has " << solution << " open but would not open "
 					<< file << " (error 0x" << std::hex << result << std::dec << ')' << std::endl;
 
-				return true;
+				return Handover::Failed;
 			};
 
 			// The editor has the foreground, having just been clicked, and Windows
@@ -337,7 +349,7 @@ namespace Loom
 			if (window)
 				Call(window.Get(), L"Activate", DISPATCH_METHOD, nullptr);
 
-			return true;
+			return Handover::Opened;
 		};
 
 		// False when no Visual Studio has the solution open. The editor's thread
@@ -346,12 +358,54 @@ namespace Loom
 		{
 			const HRESULT com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
-			const bool handled = OpenThroughAutomation(solution, file);
+			const Handover handover = OpenThroughAutomation(solution, file);
+
+			// A busy one may be the one with the solution, and starting another
+			// would open it twice.
+			if (handover == Handover::Busy)
+				std::cerr << "Visual Studio is busy; try again once it has finished." << std::endl;
 
 			if (SUCCEEDED(com))
 				CoUninitialize();
 
-			return handled;
+			return handover != Handover::NotRunning;
+		};
+
+		// Long enough for a cold start of Visual Studio on a large solution.
+		constexpr std::chrono::seconds visualStudioStartTimeout{ 180 };
+		constexpr std::chrono::milliseconds visualStudioPollInterval{ 500 };
+
+		// A Visual Studio just started answers nothing until it has loaded the
+		// solution, so the file is handed to it from a thread of its own once it
+		// says it has. Its command line could open the file too, but File.OpenFile
+		// through /Command fails with dialogs of its own.
+		void OpenOnceLoaded(const std::string& solution, const std::string& file)
+		{
+			std::thread(
+				[solution, file]()
+				{
+					const HRESULT com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+
+					const auto deadline = std::chrono::steady_clock::now() + visualStudioStartTimeout;
+
+					Handover handover = Handover::NotRunning;
+
+					while (std::chrono::steady_clock::now() < deadline)
+					{
+						handover = OpenThroughAutomation(solution, file);
+
+						if (handover == Handover::Opened || handover == Handover::Failed)
+							break;
+
+						std::this_thread::sleep_for(visualStudioPollInterval);
+					};
+
+					if (handover == Handover::NotRunning || handover == Handover::Busy)
+						std::cerr << "Visual Studio did not load " << solution << " in time to open " << file << std::endl;
+
+					if (SUCCEEDED(com))
+						CoUninitialize();
+				}).detach();
 		};
 	};
 
@@ -748,7 +802,10 @@ namespace Loom
 		if (devenv.empty())
 			Shell((has_solution ? solution : path).c_str(), "");
 		else if (has_solution)
-			Shell(devenv.c_str(), '"' + solution + "\" /Command \"File.OpenFile \\\"" + path + "\\\"\"");
+		{
+			Shell(devenv.c_str(), '"' + solution + '"');
+			OpenOnceLoaded(solution, path);
+		}
 		else
 			Shell(devenv.c_str(), "/Edit \"" + path + '"');
 	};
