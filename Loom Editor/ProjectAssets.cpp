@@ -118,13 +118,13 @@ namespace {NAMESPACE}
 
 namespace {NAMESPACE}
 {
-	// One step of a state machine's behaviour. Registered by name, so a
-	// StateMachine's Start and Current can be set to it in the inspector.
+	// One step of a state machine's behaviour. Deriving from Loom::State is
+	// all it takes for a StateMachine's Start and Current to offer it.
 	// gameObject is the object the machine is on. Proceed() moves the machine
 	// on to the next queued state, SetState<Other>() straight to another.
-	struct {NAME} : Loom::State
+	struct {NAME} : Loom::State<{NAME}>
 	{
-		void OnEnter(Loom::State* lastState) override
+		void OnEnter(Loom::StateBase* lastState) override
 		{
 		};
 
@@ -132,12 +132,10 @@ namespace {NAMESPACE}
 		{
 		};
 
-		void OnExit(Loom::State* nextState) override
+		void OnExit(Loom::StateBase* nextState) override
 		{
 		};
 	};
-
-	HOZER_REGISTER_STATE({NAME});
 };
 )";
 
@@ -178,7 +176,7 @@ namespace {NAMESPACE}
 	};
 
 	// Stands still for the machine's Pause, then turns round.
-	struct {NAME}Waiting : Loom::StateOf<{NAME}>
+	struct {NAME}Waiting : Loom::State<{NAME}Waiting, {NAME}>
 	{
 		void OnUpdate() override;
 
@@ -187,13 +185,10 @@ namespace {NAMESPACE}
 	};
 
 	// Walks to the end it is heading for at the machine's Speed.
-	struct {NAME}Walking : Loom::StateOf<{NAME}>
+	struct {NAME}Walking : Loom::State<{NAME}Walking, {NAME}>
 	{
 		void OnUpdate() override;
 	};
-
-	HOZER_REGISTER_STATE({NAME}Waiting);
-	HOZER_REGISTER_STATE({NAME}Walking);
 
 	// Defined below both states, since each hands over to the other.
 	inline {NAME}::{NAME}()

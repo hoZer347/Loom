@@ -73,15 +73,14 @@ TEST_SUITE("ProjectAssets")
 		CHECK(ReadAll(scripts.project.string()).find("Spinner") == std::string::npos);
 	};
 
-	TEST_CASE("a state is one header, registered under its own name")
+	TEST_CASE("a state is one header, a self-typed State")
 	{
 		const ScriptsProject scripts("loom project assets state");
 
 		const std::string text = ReadAll(scripts.Create("Jumping", nullptr, Loom::ProjectAssets::ScriptKind::State));
 
 		CHECK(text.find("namespace GameScripts") != std::string::npos);
-		CHECK(text.find("struct Jumping : Loom::State") != std::string::npos);
-		CHECK(text.find("HOZER_REGISTER_STATE(Jumping);") != std::string::npos);
+		CHECK(text.find("struct Jumping : Loom::State<Jumping>") != std::string::npos);
 		CHECK(text.find("{NAME}") == std::string::npos);
 	};
 
@@ -92,8 +91,8 @@ TEST_SUITE("ProjectAssets")
 		const std::string text = ReadAll(scripts.Create("Guard", nullptr, Loom::ProjectAssets::ScriptKind::StateMachine));
 
 		CHECK(text.find("struct Guard : Loom::StateMachineOf<Guard>") != std::string::npos);
-		CHECK(text.find("HOZER_REGISTER_STATE(GuardWaiting);") != std::string::npos);
-		CHECK(text.find("HOZER_REGISTER_STATE(GuardWalking);") != std::string::npos);
+		CHECK(text.find("struct GuardWaiting : Loom::State<GuardWaiting, Guard>") != std::string::npos);
+		CHECK(text.find("struct GuardWalking : Loom::State<GuardWalking, Guard>") != std::string::npos);
 		CHECK(text.find("m_start = Loom::StateReference::Of<GuardWaiting>();") != std::string::npos);
 		CHECK(text.find("{NAME}") == std::string::npos);
 	};
@@ -102,7 +101,7 @@ TEST_SUITE("ProjectAssets")
 	{
 		const ScriptsProject scripts("loom project assets machine states");
 
-		std::ofstream(scripts.root / "GuardWalking.hpp") << "struct GuardWalking : Loom::State { };\n";
+		std::ofstream(scripts.root / "GuardWalking.hpp") << "struct GuardWalking : Loom::State<GuardWalking> { };\n";
 
 		CHECK(Loom::ProjectAssets::ScriptNameProblem(scripts.project.string(), "Guard").empty());
 		CHECK_FALSE(Loom::ProjectAssets::ScriptNameProblem(

@@ -17,19 +17,21 @@ using LoomTests::Pump;
 
 namespace
 {
-	struct StateTestIdle final : Loom::State
+	struct StateTestIdle final : Loom::State<StateTestIdle>
 	{
 	};
 
-	struct StateTestWalk final : Loom::State
+	struct StateTestWalk final : Loom::State<StateTestWalk, Loom::StateMachine>
 	{
-		void OnExit(Loom::State* nextState) override { exits++; };
+		void OnExit(Loom::StateBase* nextState) override { exits++; };
 
 		static inline int exits = 0;
 	};
 
-	HOZER_REGISTER_STATE(StateTestIdle);
-	HOZER_REGISTER_STATE(StateTestWalk);
+	// Built by the machine that runs it, so not one to offer.
+	struct StateTestInternal final : Loom::StateOf<Loom::StateMachine>
+	{
+	};
 
 	// A machine on an object in a scene of its own.
 	struct Machine
@@ -63,6 +65,15 @@ TEST_SUITE("StateMachine")
 	TEST_CASE("StateMachine is offered under Add Component")
 	{
 		CHECK(Loom::ComponentRegistry::All().contains("StateMachine"));
+	};
+
+	TEST_CASE("a State registers itself under its type name, and a StateOf does not")
+	{
+		CHECK(Loom::StateRegistry::Contains("StateTestIdle"));
+		CHECK(Loom::StateRegistry::Contains("StateTestWalk"));
+		CHECK_FALSE(Loom::StateRegistry::Contains("StateTestInternal"));
+
+		CHECK(dynamic_cast<StateTestIdle*>(Loom::StateRegistry::Create("StateTestIdle").get()) != nullptr);
 	};
 
 	TEST_CASE("a reference built from a type is named the way its registration is")

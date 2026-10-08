@@ -12,14 +12,14 @@ namespace Loom
 	///
 	/// Every hook is optional and checked before it is called, so an unset one is
 	/// skipped rather than throwing.
-	struct CustomState final : State
+	struct CustomState final : StateBase
 	{
-		std::function<void(State* lastState, CustomState& self)> onEnter{ };
+		std::function<void(StateBase* lastState, CustomState& self)> onEnter{ };
 		std::function<void(CustomState& self)> onUpdate{ };
 		std::function<void(CustomState& self)> onPhysics{ };
 		std::function<void(CustomState& self)> onLateUpdate{ };
 		std::function<void(CustomState& self)> onGui{ };
-		std::function<void(State* nextState, CustomState& self)> onExit{ };
+		std::function<void(StateBase* nextState, CustomState& self)> onExit{ };
 
 		std::string Name() const override { return name.empty() ? "CustomState" : name; };
 
@@ -27,14 +27,14 @@ namespace Loom
 		/// in play, or they are indistinguishable in the log.
 		std::string name{ };
 
-		void OnEnter(State* lastState) override { if (onEnter) onEnter(lastState, *this); };
+		void OnEnter(StateBase* lastState) override { if (onEnter) onEnter(lastState, *this); };
 		void OnUpdate() override { if (onUpdate) onUpdate(*this); };
 		void OnPhysics() override { if (onPhysics) onPhysics(*this); };
 		void OnLateUpdate() override { if (onLateUpdate) onLateUpdate(*this); };
 		void OnGui() override { if (onGui) onGui(*this); };
-		void OnExit(State* nextState) override { if (onExit) onExit(nextState, *this); };
+		void OnExit(StateBase* nextState) override { if (onExit) onExit(nextState, *this); };
 
-		/// Proceed, from inside a callback -- State::Proceed is protected, and a lambda is
+		/// Proceed, from inside a callback -- StateBase::Proceed is protected, and a lambda is
 		/// not a member.
 		void Continue() { Proceed(); };
 	};

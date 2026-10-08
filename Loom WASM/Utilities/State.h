@@ -1,6 +1,10 @@
 #pragma once
 
+#include "ComponentRegistry.h"
+#include "Loom API.h"
+
 #include <concepts>
+#include <functional>
 #include <memory>
 #include <string>
 #include <typeinfo>
@@ -11,7 +15,7 @@
 namespace Loom
 {
 	struct GameObject;
-	struct State;
+	struct StateBase;
 	struct StateMachineBase;
 
 	/// Anything a machine will run.
@@ -20,7 +24,7 @@ namespace Loom
 	/// with: the constraint is part of the signature now, so a wrong type is rejected at
 	/// the call rather than inside the body, and it is written once instead of nine times.
 	template <typename _Type>
-	concept AState = std::derived_from<_Type, State>;
+	concept AState = std::derived_from<_Type, StateBase>;
 
 	namespace detail
 	{
@@ -32,7 +36,7 @@ namespace Loom
 		///
 		/// Whoever mixes it in says which pump the commands land on, through Machine().
 		/// Everything here is a template, so the machine only has to be a complete type
-		/// where a command is actually called -- which is what lets State carry this
+		/// where a command is actually called -- which is what lets StateBase carry this
 		/// without knowing yet what a StateMachineBase is.
 		template <typename _Self>
 		struct StateCommands
@@ -81,19 +85,19 @@ namespace Loom
 			};
 
 			/// Queues a number of states that then all run at once, and proceeds to them.
-			auto SetParallel(std::vector<std::shared_ptr<State>> states)
+			auto SetParallel(std::vector<std::shared_ptr<StateBase>> states)
 			{
 				return Pump().EnterParallel(std::move(states));
 			};
 
 			/// The same, without proceeding.
-			auto PushParallel(std::vector<std::shared_ptr<State>> states)
+			auto PushParallel(std::vector<std::shared_ptr<StateBase>> states)
 			{
 				return Pump().QueueParallel(std::move(states));
 			};
 
 			/// The same again, at the front of the queue.
-			auto PushParallelFirst(std::vector<std::shared_ptr<State>> states)
+			auto PushParallelFirst(std::vector<std::shared_ptr<StateBase>> states)
 			{
 				return Pump().QueueParallelFirst(std::move(states));
 			};
@@ -111,10 +115,10 @@ namespace Loom
 	///
 	/// States are held by shared_ptr: the history keeps entered states alive well after
 	/// the machine has moved on, so ownership is shared between it and the queue.
-	struct State :
-		protected detail::StateCommands<State>
+	struct StateBase :
+		protected detail::StateCommands<StateBase>
 	{
-		virtual ~State() = default;
+		virtual ~StateBase() = default;
 
 		/// The object the owning machine is attached to. Null on a machine that is not on
 		/// one -- the StaticStateMachine, or a machine driven by hand.
@@ -128,7 +132,7 @@ namespace Loom
 		#pragma region Overrideables
 
 		/// Called when Proceed brings this state in -- the equivalent of a start function.
-		virtual void OnEnter(State* lastState) { };
+		virtual void OnEnter(StateBase* lastState) { };
 
 		/// Called every frame the state is current.
 		virtual void OnUpdate() { };
@@ -145,12 +149,12 @@ namespace Loom
 		virtual void OnGui() { };
 
 		/// Called when Proceed takes this state out.
-		virtual void OnExit(State* nextState) { };
+		virtual void OnExit(StateBase* nextState) { };
 
 		#pragma endregion
 
 		/// What the monitor and the history call this state. typeid gives the concrete
-		/// type even through a State*.
+		/// type even through a StateBase*.
 		virtual std::string Name() const { return typeid(*this).name(); };
 
 		/// Anything extra worth writing into the flushed history. A state that wants its
@@ -158,7 +162,7 @@ namespace Loom
 		virtual std::string Describe() const { return ""; };
 
 	protected:
-		friend struct detail::StateCommands<State>;
+		friend struct detail::StateCommands<StateBase>;
 
 		// The two commands that are not about queueing a state, and so cannot be
 		// templates. Defined in StateMachine.h, where the machine is a complete type.
@@ -167,20 +171,72 @@ namespace Loom
 	};
 
 	/// A state that knows what kind of machine it is running on, and reaches it through
-	/// Focus(). Spelled StateOf rather than State, a class and a class template not
-	/// being able to share a name.
+	/// Focus(). Not registered: for states a machine builds itself, as the dialogue's
+	/// are, which have no business in a Start or Current dropdown.
 	template <typename _Focus>
-	struct StateOf : State
+	struct StateOf : StateBase
 	{
 	protected:
 		_Focus* Focus() const { return static_cast<_Focus*>(stateMachine); };
 	};
 
+	/// Names that can be built by string. A state registers itself once, and anything
+	/// data-driven (a monitor's "set state" box, a config file, a script) can then
+	/// reach it.
+	struct LOOM_API StateRegistry final
+	{
+		static void Register(const std::string& name, std::function<std::shared_ptr<StateBase>()> create);
+
+		/// Takes a name back out: a script library is unloaded before it is rebuilt,
+		/// and a factory pointing into code that is no longer mapped is a crash.
+		static void Unregister(const std::string& name);
+
+		static std::shared_ptr<StateBase> Create(const std::string& name);
+
+		static bool Contains(const std::string& name);
+
+		/// Every registered name, sorted, for a dropdown to list.
+		static std::vector<std::string> Names();
+
+		StateRegistry() = delete;
+	};
+
+	/// A state that registers itself under its own type name, so a machine's Start and
+	/// Current can name it, and that reaches its machine through Focus(). The state
+	/// equivalent of Component&lt;T&gt;: self-typed, and nothing else to write.
+	///
+	///		struct St_Idle : Loom::State&lt;St_Idle&gt; { };
+	///		struct St_Walk : Loom::State&lt;St_Walk, Camp&gt; { };
+	template <typename _Self, typename _Focus = StateMachineBase>
+	struct State : StateOf<_Focus>
+	{
+	private:
+		// Generic over the type rather than naming _Self in the class, for the same
+		// reason as Component&lt;T&gt;'s: _Self is not complete until it has derived from
+		// this.
+		template <typename _Type>
+		static bool Register()
+		{
+			if constexpr (std::is_default_constructible_v<_Type>)
+				StateRegistry::Register(
+					PrettyTypeName(typeid(_Type).name()),
+					[]() -> std::shared_ptr<StateBase> { return std::make_shared<_Type>(); });
+
+			return true;
+		};
+
+		static inline const bool s_registered = Register<_Self>();
+
+		// A static member is only defined once something uses it, and nothing in
+		// _Self would. Naming it in a typedef does.
+		typedef std::integral_constant<const bool*, &s_registered> Registration;
+	};
+
 	/// Builds a vector of states for the parallel commands, without the caller spelling
 	/// out make_shared each time: PushParallel(States<St_Walk, St_Talk>()).
 	template <AState... _States>
-	std::vector<std::shared_ptr<State>> States()
+	std::vector<std::shared_ptr<StateBase>> States()
 	{
-		return { std::static_pointer_cast<State>(std::make_shared<_States>())... };
+		return { std::static_pointer_cast<StateBase>(std::make_shared<_States>())... };
 	};
 };

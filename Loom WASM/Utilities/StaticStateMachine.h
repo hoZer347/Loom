@@ -41,7 +41,7 @@ namespace Loom
 		StateReference startState{ };
 
 	protected:
-		std::shared_ptr<State> FirstState() const override { return startState.Create(); };
+		std::shared_ptr<StateBase> FirstState() const override { return startState.Create(); };
 
 	private:
 		friend struct Utilities;
