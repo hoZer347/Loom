@@ -141,6 +141,11 @@ namespace Loom
 
 		void Destroy();
 
+		// A hidden object and everything under it is left out of rendering and
+		// the shadow map. It still updates.
+		bool IsHidden() const { return m_hidden; };
+		void SetHidden(bool hidden) { m_hidden = hidden; };
+
 		GameObject* AddChild(const std::string& name = "New GameObject");
 
 		// Moves this object under parent, in front of before, or last when before
@@ -177,6 +182,9 @@ namespace Loom
 		Transform transform;
 
 	protected:
+		// Last for the same reason.
+		Serial<bool> m_hidden;
+
 		std::vector<GameObject*>	m_children{ };
 		std::vector<ComponentBase*> m_components{ };
 		std::vector<ComponentBase*> m_updateables{ };

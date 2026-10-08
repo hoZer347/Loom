@@ -240,6 +240,41 @@ TEST_SUITE("GameObject")
 		CHECK(probe->Count("render") == 1);
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "hiding an object leaves it and everything under it out of Render")
+	{
+		Loom::Scene scene("hidden render");
+		Pump();
+
+		Loom::GameObject* hidden = scene.GetRoot().AddChild("Hidden");
+		Loom::GameObject* shown = scene.GetRoot().AddChild("Shown");
+		Pump();
+
+		Loom::GameObject* under = hidden->AddChild("Under");
+		Pump();
+
+		Probe<>* onHidden = hidden->Attach<Probe<>>();
+		Probe<>* onUnder  = under->Attach<Probe<>>();
+		Probe<>* onShown  = shown->Attach<Probe<>>();
+		Pump();
+
+		hidden->SetHidden(true);
+		scene.Render();
+
+		CHECK(onHidden->Count("render") == 0);
+		CHECK(onUnder->Count("render")  == 0);
+		CHECK(onShown->Count("render")  == 1);
+
+		// Hiding stops the drawing, not the object.
+		scene.Update();
+
+		CHECK(onUnder->Count("update") == 1);
+
+		hidden->SetHidden(false);
+		scene.Render();
+
+		CHECK(onUnder->Count("render") == 1);
+	};
+
 	// Attach fills m_components, m_updateables and m_renderables, but never
 	// m_physicsables -- so GameObject::Physics walks an always-empty list and no
 	// component's OnPhysics is ever called, on any object, anywhere. Collider,
@@ -481,11 +516,12 @@ TEST_SUITE("GameObject")
 	};
 
 	// Scenes saved before the transform existed number the thread fields 0 and
-	// 1, so the transform has to come after them.
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the transform is serialized after the thread fields")
+	// 1, so the transform has to come after them, and hiding after that.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the transform is serialized after the thread fields, and hiding last")
 	{
 		constexpr size_t THREAD_FIELDS = 2;
 		constexpr size_t TRANSFORM_FIELDS = 3;
+		constexpr size_t HIDDEN_FIELD = THREAD_FIELDS + TRANSFORM_FIELDS;
 
 		Loom::Scene scene("transform fields");
 		Pump();
@@ -493,15 +529,16 @@ TEST_SUITE("GameObject")
 		Loom::GameObject& root = scene.GetRoot();
 		const std::vector<Loom::SerializedField>& fields = root.GetFields();
 
-		REQUIRE(fields.size() == THREAD_FIELDS + TRANSFORM_FIELDS);
+		REQUIRE(fields.size() == HIDDEN_FIELD + 1);
 
 		CHECK(fields[0].type == Loom::FieldType::Int);
 		CHECK(fields[1].type == Loom::FieldType::Bool);
 
-		for (size_t i = THREAD_FIELDS; i < fields.size(); i++)
+		for (size_t i = THREAD_FIELDS; i < HIDDEN_FIELD; i++)
 			CHECK(fields[i].type == Loom::FieldType::Vec3);
 
 		CHECK(fields[THREAD_FIELDS].data == &root.transform.position->x);
+		CHECK(fields[HIDDEN_FIELD].type == Loom::FieldType::Bool);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a GameObject is a LoomObject with its own ID and name")

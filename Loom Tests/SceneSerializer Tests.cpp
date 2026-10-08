@@ -383,6 +383,27 @@ TEST_SUITE("SceneSerializer")
 		CHECK(*read.scale == scale);
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "hiding survives being written and read back")
+	{
+		Loom::Scene scene("Hidden");
+		Loom::GameObject* hidden = scene.AddChild("Hidden");
+		scene.AddChild("Shown");
+		Pump();
+
+		hidden->SetHidden(true);
+
+		const Loaded loaded(Written(scene));
+
+		REQUIRE(loaded.scene != nullptr);
+
+		const std::vector<Loom::GameObject*>& children = loaded.scene->GetRoot().GetChildren();
+
+		REQUIRE(children.size() == 2);
+		CHECK(children[0]->IsHidden());
+		CHECK_FALSE(children[1]->IsHidden());
+		CHECK_FALSE(loaded.scene->GetRoot().IsHidden());
+	};
+
 	// Fields used to be keyed by member name. A file from then still opens: the
 	// lines nothing can be done with are dropped, and the rest still lands.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a field key that is not an index is skipped")

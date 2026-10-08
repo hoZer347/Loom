@@ -271,6 +271,9 @@ vec3 LoomLight(vec3 normal)
 
 	void Light::DrawCasters(GameObject& gameObject) const
 	{
+		if (gameObject.IsHidden())
+			return;
+
 		Renderer& renderer = *Renderer::Get();
 
 		// By type name, the way GetComponent matches: a script library's Mesh

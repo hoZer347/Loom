@@ -177,6 +177,65 @@ namespace Loom
 		// How often the editor checks whether a shader file was edited outside it.
 		constexpr double shader_poll_seconds = 0.5;
 
+		// The Hierarchy's eye, against the font size: its half-width, how far
+		// its lids bow from the middle, its pupil, and its lashes when closed.
+		constexpr float eye_half_width = 0.42f;
+		constexpr float eye_lid_bow = 0.5f;
+		constexpr float eye_pupil = 0.16f;
+		constexpr float eye_lash = 0.14f;
+		constexpr float eye_stroke = 1.5f;
+		constexpr float eye_hidden_by_parent_alpha = 0.4f;
+
+		// Where each lash leaves the lower lid, as a fraction of its width.
+		constexpr float eye_lash_positions[] = { -0.5f, 0.0f, 0.5f };
+
+		void DrawEye(ImDrawList* draw, ImVec2 centre, float size, bool open, ImU32 colour)
+		{
+			const float half = size * eye_half_width;
+			const float bow = half * eye_lid_bow;
+			const ImVec2 left(centre.x - half, centre.y);
+			const ImVec2 right(centre.x + half, centre.y);
+
+			// A cubic's control points sit 4/3 out from where its middle passes.
+			constexpr float control = 4.0f / 3.0f;
+			constexpr float control_x = 0.5f;
+
+			const auto lid =
+				[&](float side)
+				{
+					draw->PathLineTo(left);
+					draw->PathBezierCubicCurveTo(
+						ImVec2(centre.x - half * control_x, centre.y + side * bow * control),
+						ImVec2(centre.x + half * control_x, centre.y + side * bow * control),
+						right);
+					draw->PathStroke(colour, ImDrawFlags_None, eye_stroke);
+				};
+
+			lid(1.0f);
+
+			if (open)
+			{
+				lid(-1.0f);
+				draw->AddCircleFilled(centre, size * eye_pupil, colour);
+				return;
+			};
+
+			// The closed lid is the lower one, so its lashes hang below it.
+			for (float position : eye_lash_positions)
+			{
+				const float t = (position + 1.0f) * 0.5f;
+				const ImVec2 root(
+					left.x + (right.x - left.x) * t,
+					centre.y + bow * (1.0f - position * position));
+
+				draw->AddLine(
+					root,
+					ImVec2(root.x + position * size * eye_lash, root.y + size * eye_lash),
+					colour,
+					eye_stroke);
+			};
+		};
+
 		const GameObject* RootOf(const GameObject* gameObject)
 		{
 			while (gameObject->GetParent() != nullptr)
@@ -1740,6 +1799,7 @@ namespace Loom
 		ImGuiTreeNodeFlags flags =
 			ImGuiTreeNodeFlags_OpenOnArrow |
 			ImGuiTreeNodeFlags_SpanAvailWidth |
+			ImGuiTreeNodeFlags_AllowOverlap |
 			ImGuiTreeNodeFlags_DefaultOpen;
 
 		if (m_selected == &root)
@@ -1789,22 +1849,25 @@ namespace Loom
 			ImGui::EndPopup();
 		};
 
+		DrawHideToggle(&root, false);
+
 		if (!open)
 			return;
 
 		const std::vector<GameObject*> children = root.GetChildren();
 
 		for (GameObject* child : children)
-			DrawGameObjectNode(child);
+			DrawGameObjectNode(child, root.IsHidden());
 
 		ImGui::TreePop();
 	};
 
-	void Editor::DrawGameObjectNode(GameObject* gameObject)
+	void Editor::DrawGameObjectNode(GameObject* gameObject, bool parent_hidden)
 	{
 		ImGuiTreeNodeFlags flags =
 			ImGuiTreeNodeFlags_OpenOnArrow |
-			ImGuiTreeNodeFlags_SpanAvailWidth;
+			ImGuiTreeNodeFlags_SpanAvailWidth |
+			ImGuiTreeNodeFlags_AllowOverlap;
 
 		if (gameObject->GetChildren().empty())
 			flags |= ImGuiTreeNodeFlags_Leaf;
@@ -1816,12 +1879,19 @@ namespace Loom
 			ImGui::SetNextItemOpen(true);
 
 		const bool renaming = m_renaming && m_selected == gameObject;
+		const bool hidden = parent_hidden || gameObject->IsHidden();
+
+		if (hidden)
+			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 
 		const bool open = ImGui::TreeNodeEx(
 			gameObject->GetGuid().ToString().c_str(),
 			flags,
 			"%s",
 			renaming ? "" : gameObject->GetName().c_str());
+
+		if (hidden)
+			ImGui::PopStyleColor();
 
 		TakeImportTarget(gameObject);
 		DragAndDropNode(gameObject, open);
@@ -1865,15 +1935,56 @@ namespace Loom
 		if (renaming)
 			DrawRenameField(gameObject);
 
+		DrawHideToggle(gameObject, parent_hidden);
+
 		if (!open)
 			return;
 
 		const std::vector<GameObject*> children = gameObject->GetChildren();
 
 		for (GameObject* child : children)
-			DrawGameObjectNode(child);
+			DrawGameObjectNode(child, hidden);
 
 		ImGui::TreePop();
+	};
+
+	void Editor::DrawHideToggle(GameObject* gameObject, bool parent_hidden)
+	{
+		const float size = ImGui::GetFontSize();
+
+		// Measured from the line below, which still spans the whole row.
+		const float right = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
+
+		ImGui::SameLine();
+		ImGui::SetCursorScreenPos(ImVec2(right - size, ImGui::GetCursorScreenPos().y));
+
+		ImGui::PushID(gameObject);
+
+		if (ImGui::InvisibleButton("##hide", ImVec2(size, size)))
+		{
+			gameObject->SetHidden(!gameObject->IsHidden());
+			m_historyDirty = true;
+		};
+
+		ImGui::PopID();
+
+		const bool shown = !gameObject->IsHidden();
+
+		ImGui::SetItemTooltip(shown ? "Hide" : "Show");
+
+		const ImGuiCol colour = shown && !ImGui::IsItemHovered()
+			? ImGuiCol_TextDisabled
+			: ImGuiCol_Text;
+
+		const ImVec2 min = ImGui::GetItemRectMin();
+		const ImVec2 max = ImGui::GetItemRectMax();
+
+		DrawEye(
+			ImGui::GetWindowDrawList(),
+			ImVec2((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f),
+			size,
+			shown,
+			ImGui::GetColorU32(colour, parent_hidden ? eye_hidden_by_parent_alpha : 1.0f));
 	};
 
 	void Editor::ExpandGrownNodes(const std::vector<Scene*>& scenes)
@@ -1995,7 +2106,9 @@ namespace Loom
 	void Editor::DrawRenameField(GameObject* gameObject)
 	{
 		ImGui::SameLine();
-		ImGui::SetNextItemWidth(-FLT_MIN);
+
+		// Short of the eye at the end of the row.
+		ImGui::SetNextItemWidth(-(ImGui::GetFontSize() + ImGui::GetStyle().ItemSpacing.x));
 
 		if (m_focusRename)
 		{

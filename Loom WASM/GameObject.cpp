@@ -182,6 +182,9 @@ namespace Loom
 
 	void GameObject::Render()
 	{
+		if (m_hidden)
+			return;
+
 		for (auto& renderable : m_renderables)
 			//if (m_threadID != -1)
 				renderable->OnRender();
