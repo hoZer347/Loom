@@ -148,15 +148,16 @@ TEST_SUITE("ProjectAssets")
 		CHECK(Loom::ProjectAssets::ScriptNameProblem(scripts.project.string(), "Glo").empty());
 	};
 
-	TEST_CASE("a script's declared types are the ones it defines, in order")
+	TEST_CASE("a script's declared types are the ones it defines, in order, commented out or not")
 	{
 		const std::string text =
 			"struct Forward;\n"
+			"// struct Glow : Loom::Component<Glow> { };\n"
 			"struct Glow : Loom::Component<Glow> { };\n"
 			"class Shimmer final : public Loom::Component<Shimmer> { };\n"
 			"struct GlowSettings { };\n";
 
-		CHECK(Loom::ProjectAssets::DeclaredTypes(text) == std::vector<std::string>{ "Glow", "Shimmer", "GlowSettings" });
+		CHECK(Loom::ProjectAssets::DeclaredTypes(text) == std::vector<std::string>{ "Glow", "Glow", "Shimmer", "GlowSettings" });
 	};
 
 	TEST_CASE("scenes and shaders open in the editor, the scripts project's sources in Visual Studio")

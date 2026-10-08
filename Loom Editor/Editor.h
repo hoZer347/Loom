@@ -327,7 +327,8 @@ namespace Loom
 		// Gives the GameObject the shader, on its Material or a new one.
 		void DropShader(GameObject* gameObject, const std::string& path);
 
-		// Attaches the components the script defines that are compiled in.
+		// Attaches the script library's components that the script defines, once
+		// each.
 		void DropScript(GameObject* gameObject, const std::string& path);
 
 		// Recompiles the shaders whose files something else has written, every

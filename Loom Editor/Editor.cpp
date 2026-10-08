@@ -2042,14 +2042,21 @@ namespace Loom
 	{
 		const std::string text = ProjectAssets::ReadText((std::filesystem::path(m_projectPath) / path).string());
 
+		const std::vector<std::string>& types = m_scripts.GetTypes();
+		const std::vector<std::string> declared = ProjectAssets::DeclaredTypes(text);
+
 		bool attached = false;
 
-		for (const std::string& name : ProjectAssets::DeclaredTypes(text))
-			attached |= ComponentRegistry::Create(name, *gameObject) != nullptr;
+		// A name can be declared twice, in a comment or an #if branch, and a
+		// helper type can share an engine component's name.
+		for (auto name = declared.begin(); name != declared.end(); name++)
+			if (std::find(declared.begin(), name, *name) == name &&
+				std::find(types.begin(), types.end(), *name) != types.end())
+				attached |= ComponentRegistry::Create(*name, *gameObject) != nullptr;
 
 		if (!attached)
 		{
-			std::cerr << path << " has no compiled component to attach. Compile the scripts first if it should." << std::endl;
+			std::cerr << path << " has no script component to attach. One written since the last compile attaches after the next." << std::endl;
 			return;
 		};
 
