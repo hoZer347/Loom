@@ -155,7 +155,7 @@ namespace {NAMESPACE}
 	// patrols: it waits, walks its GameObject out along X, waits, walks back.
 	// It starts in {NAME}Waiting; set Current in the inspector while it runs
 	// to send it straight to either state.
-	struct {NAME} : Loom::StateMachineOf<{NAME}>
+	struct {NAME} : Loom::StateMachine<{NAME}>
 	{
 		{NAME}();
 

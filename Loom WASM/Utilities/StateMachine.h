@@ -194,10 +194,10 @@ namespace Loom
 	/// Component&lt;T&gt; is CRTP and GameObject::Attach refuses anything that is not a
 	/// component of its own type, so a machine subclass has to name itself here regardless.
 	///
-	///		struct Camp : Loom::StateMachineOf&lt;Camp&gt; { };
+	///		struct Camp : Loom::StateMachine&lt;Camp&gt; { };
 	///		gameObject->Attach&lt;Camp&gt;();
 	template <typename _Self>
-	struct StateMachineOf :
+	struct StateMachine :
 		public Component<_Self>,
 		public StateMachineBase
 	{
@@ -286,10 +286,5 @@ namespace Loom
 
 	private:
 		bool _physics_dispatched = false;
-	};
-
-	/// A machine with no behaviour of its own, for when the states are the whole of it.
-	struct StateMachine final : StateMachineOf<StateMachine>
-	{
 	};
 };
