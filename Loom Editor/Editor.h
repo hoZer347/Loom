@@ -2,6 +2,7 @@
 
 #include "EditorCamera.h"
 #include "EditorConsole.h"
+#include "EditorLayouts.h"
 #include "EditorViewport.h"
 #include "Guid.h"
 #include "EditorSettings.h"
@@ -17,6 +18,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 struct ImGuiContext;
@@ -270,6 +272,16 @@ namespace Loom
 
 		void BuildDefaultLayout(unsigned int dockspace_id);
 
+		// The panels the Window menu toggles, by the name ImGui knows each by.
+		std::vector<std::pair<const char*, bool*>> Panels();
+
+		// Puts which panels are open into ImGui's settings, so the layout file
+		// and every saved layout carry it along with the docking.
+		void AddPanelSettings();
+
+		// The Layout menu's Save prompt.
+		void DrawSaveLayoutPrompt();
+
 		// Records the item just drawn as where a queued import goes, if the
 		// mouse is over it.
 		void TakeImportTarget(GameObject* gameObject);
@@ -451,6 +463,20 @@ namespace Loom
 
 		bool m_firstFrame = true;
 		bool m_rebuildLayout = false;
+
+		// Set when a layout has been put in place, so the next frame checks it
+		// has every panel; the first frame's is the one the last run left.
+		bool m_checkLayout = false;
+
+		// Loaded at the top of the next frame, before the dockspace it replaces
+		// is submitted.
+		std::string m_pendingLayout{ };
+
+		// What the Layout menu lists, read again each time it opens.
+		std::vector<std::string> m_layouts{ };
+
+		bool m_askForLayoutName = false;
+		char m_layoutName[EditorLayouts::MaxNameLength + 1]{ };
 
 		// Set by "Step": updating is switched on for exactly one frame and
 		// switched back off at the top of the next one.

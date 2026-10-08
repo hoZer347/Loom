@@ -99,6 +99,7 @@
     <ClCompile Include="ProjectAssets.cpp" />
     <ClCompile Include="EditorLog.cpp" />
     <ClCompile Include="EditorConsole.cpp" />
+    <ClCompile Include="EditorLayouts.cpp" />
     <ClCompile Include="ShaderEditor.cpp" />
     <ClCompile Include="EditorSettings.cpp" />
     <ClCompile Include="EditorSettingsWindow.cpp" />
@@ -121,6 +122,7 @@
     <ClInclude Include="EditorFileDialogs.h" />
     <ClInclude Include="EditorLog.h" />
     <ClInclude Include="EditorConsole.h" />
+    <ClInclude Include="EditorLayouts.h" />
     <ClInclude Include="ShaderEditor.h" />
     <ClInclude Include="EditorSettings.h" />
     <ClInclude Include="EditorTheme.h" />

@@ -19,6 +19,7 @@
 #include "Utilities/StateMachineMonitor.h"
 
 #include "EditCommands.h"
+#include "EditorLayouts.h"
 #include "EditorFileDialogs.h"
 #include "FieldNames.h"
 #include "ModelImporter.h"
@@ -35,6 +36,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -94,6 +96,11 @@ namespace Loom
 			GetModuleFileNameA(nullptr, buffer, MAX_PATH);
 
 			return std::filesystem::path(buffer).parent_path() / file;
+		};
+
+		std::filesystem::path LayoutsFolder()
+		{
+			return BesideExecutable("Layouts");
 		};
 
 		std::string SettingsPath()
@@ -440,6 +447,7 @@ namespace Loom
 		// Set before the first frame, which is when ImGui reads it.
 		static const std::string layout = BesideExecutable("LoomEditor.layout.ini").string();
 		ImGui::GetIO().IniFilename = layout.c_str();
+		AddPanelSettings();
 
 		// The engine keeps every floating window in an OS window of its own,
 		// which for an editor means dialogs that sit behind the main window and
@@ -1085,14 +1093,27 @@ namespace Loom
 		// exist this frame.
 		SetDropCallback(OnDrop);
 
+		if (!m_pendingLayout.empty())
+		{
+			if (EditorLayouts::Load(LayoutsFolder(), m_pendingLayout))
+				m_checkLayout = true;
+			else
+				std::cerr << "Could not read the layout '" << m_pendingLayout << "'" << std::endl;
+
+			m_pendingLayout.clear();
+		};
+
 		DrawMainMenuBar();
 
 		const ImGuiID dockspace_id =
 			ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
 
+		if (m_firstFrame)
+			m_checkLayout = true;
+
 		// Only lay the panels out when there is nothing to restore: from the
 		// second run on, imgui.ini holds wherever the user dragged them.
-		if (m_firstFrame)
+		if (m_checkLayout)
 		{
 			const ImGuiDockNode* node = ImGui::DockBuilderGetNode(dockspace_id);
 
@@ -1106,6 +1127,11 @@ namespace Loom
 					if (ImGui::FindWindowSettingsByID(ImHashStr(window)) == nullptr)
 						ImGui::DockBuilderDockWindow(window, centre->ID);
 
+			m_checkLayout = false;
+		};
+
+		if (m_firstFrame)
+		{
 			// Nothing remembered from a previous run: ask where the scenes live.
 			if (m_projectPath.empty())
 			{
@@ -1152,6 +1178,7 @@ namespace Loom
 
 		DrawFolderPrompt();
 		DrawNewProjectPrompt();
+		DrawSaveLayoutPrompt();
 		DrawCreateAssetPrompt();
 		DrawFileDialogs();
 
@@ -1204,6 +1231,130 @@ namespace Loom
 			ImGui::DockBuilderDockWindow(window, centre);
 
 		ImGui::DockBuilderFinish(dockspace_id);
+	};
+
+	std::vector<std::pair<const char*, bool*>> Editor::Panels()
+	{
+		return {
+			{ "Hierarchy", &m_showHierarchy },
+			{ "Project", &m_showProject },
+			{ "Inspector", &m_showInspector },
+			{ "Scene", &m_showScene },
+			{ game_window, &m_showGame },
+			{ debug_window, &m_showDebug },
+			{ "Scene Data", &m_showSceneData },
+			{ "Console", &m_showConsole },
+			{ ShaderEditor::window, &m_showShaders },
+			{ "Stats", &m_showStats } };
+	};
+
+	void Editor::AddPanelSettings()
+	{
+		static constexpr const char* entry = "Panels";
+
+		ImGuiSettingsHandler handler;
+		handler.TypeName = "LoomEditor";
+		handler.TypeHash = ImHashStr(handler.TypeName);
+		handler.UserData = this;
+
+		handler.ReadOpenFn = [](ImGuiContext*, ImGuiSettingsHandler* handler, const char* name) -> void*
+		{
+			return strcmp(name, entry) == 0 ? handler->UserData : nullptr;
+		};
+
+		// One "name=0" or "name=1" line per panel.
+		handler.ReadLineFn = [](ImGuiContext*, ImGuiSettingsHandler*, void* editor, const char* line)
+		{
+			const char* equals = strrchr(line, '=');
+
+			if (equals == nullptr)
+				return;
+
+			const std::string name(line, equals);
+
+			for (const auto& [panel, shown] : ((Editor*)editor)->Panels())
+				if (name == panel)
+					*shown = equals[1] == '1';
+		};
+
+		handler.WriteAllFn = [](ImGuiContext*, ImGuiSettingsHandler* handler, ImGuiTextBuffer* buffer)
+		{
+			buffer->appendf("[%s][%s]\n", handler->TypeName, entry);
+
+			for (const auto& [panel, shown] : ((Editor*)handler->UserData)->Panels())
+				buffer->appendf("%s=%d\n", panel, *shown ? 1 : 0);
+
+			buffer->append("\n");
+		};
+
+		ImGui::AddSettingsHandler(&handler);
+	};
+
+	void Editor::DrawSaveLayoutPrompt()
+	{
+		if (!m_askForLayoutName)
+			return;
+
+		constexpr float name_width = 320.0f;
+		constexpr float button_width = 160.0f;
+
+		const ImGuiViewport* viewport = ImGui::GetMainViewport();
+
+		ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+		if (ImGui::Begin(
+			"Save Layout",
+			nullptr,
+			ImGuiWindowFlags_AlwaysAutoResize |
+			ImGuiWindowFlags_NoDocking |
+			ImGuiWindowFlags_NoCollapse |
+			ImGuiWindowFlags_NoSavedSettings))
+		{
+			ImGui::TextUnformatted("Where every panel sits, and which are open.");
+			ImGui::TextDisabled("Letters, digits, spaces, _ and - in the name.");
+
+			ImGui::Separator();
+
+			if (ImGui::IsWindowAppearing())
+				ImGui::SetKeyboardFocusHere();
+
+			ImGui::SetNextItemWidth(name_width);
+
+			const bool entered = ImGui::InputText(
+				"Name",
+				m_layoutName,
+				sizeof(m_layoutName),
+				ImGuiInputTextFlags_EnterReturnsTrue);
+
+			const bool usable = EditorLayouts::IsValidName(m_layoutName);
+
+			ImGui::TextDisabled(
+				"%s",
+				!usable
+					? "Pick a usable name."
+					: std::find(m_layouts.begin(), m_layouts.end(), m_layoutName) != m_layouts.end()
+						? "Replaces the saved layout of that name."
+						: "Listed in the Layout menu once saved.");
+
+			ImGui::BeginDisabled(!usable);
+
+			if (ImGui::Button("Save", ImVec2(button_width, 0.0f)) || (entered && usable))
+			{
+				if (EditorLayouts::Save(LayoutsFolder(), m_layoutName))
+					m_askForLayoutName = false;
+				else
+					std::cerr << "Could not write the layout '" << m_layoutName << "'" << std::endl;
+			};
+
+			ImGui::EndDisabled();
+
+			ImGui::SameLine();
+
+			if (ImGui::Button("Cancel", ImVec2(button_width, 0.0f)) || (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_Escape)))
+				m_askForLayoutName = false;
+		};
+
+		ImGui::End();
 	};
 
 	void Editor::DrawMainMenuBar()
@@ -1300,26 +1451,51 @@ namespace Loom
 
 		if (ImGui::BeginMenu("Window"))
 		{
-			ImGui::MenuItem("Hierarchy", nullptr, &m_showHierarchy);
-			ImGui::MenuItem("Project", nullptr, &m_showProject);
-			ImGui::MenuItem("Inspector", nullptr, &m_showInspector);
-			ImGui::MenuItem("Scene", nullptr, &m_showScene);
-			ImGui::MenuItem(game_window, nullptr, &m_showGame);
-			ImGui::MenuItem(debug_window, nullptr, &m_showDebug);
-			ImGui::MenuItem("Scene Data", nullptr, &m_showSceneData);
-			ImGui::MenuItem("Console", nullptr, &m_showConsole);
-			ImGui::MenuItem(ShaderEditor::window, nullptr, &m_showShaders);
-			ImGui::MenuItem("Stats", nullptr, &m_showStats);
+			for (const auto& [name, shown] : Panels())
+				ImGui::MenuItem(name, nullptr, shown);
+
+			ImGui::Separator();
+			ImGui::MenuItem("ImGui Demo", nullptr, &m_showImGuiDemo);
+
+			ImGui::Separator();
+			ImGui::MenuItem("Settings", nullptr, &m_showSettings);
+
+			ImGui::EndMenu();
+		};
+
+		if (ImGui::BeginMenu("Layout"))
+		{
+			if (ImGui::IsWindowAppearing())
+				m_layouts = EditorLayouts::Names(LayoutsFolder());
+
+			if (m_layouts.empty())
+				ImGui::TextDisabled("No saved layouts.");
+
+			for (const std::string& layout : m_layouts)
+				if (ImGui::MenuItem(layout.c_str()))
+					m_pendingLayout = layout;
+
+			ImGui::Separator();
+
+			if (ImGui::MenuItem("Save Layout..."))
+			{
+				m_layoutName[0] = 0;
+				m_askForLayoutName = true;
+			};
+
+			if (ImGui::BeginMenu("Delete Layout", !m_layouts.empty()))
+			{
+				for (const std::string& layout : m_layouts)
+					if (ImGui::MenuItem(layout.c_str()) && !EditorLayouts::Delete(LayoutsFolder(), layout))
+						std::cerr << "Could not delete the layout '" << layout << "'" << std::endl;
+
+				ImGui::EndMenu();
+			};
 
 			ImGui::Separator();
 
 			if (ImGui::MenuItem("Reset Layout"))
 				m_rebuildLayout = true;
-
-			ImGui::MenuItem("ImGui Demo", nullptr, &m_showImGuiDemo);
-
-			ImGui::Separator();
-			ImGui::MenuItem("Settings", nullptr, &m_showSettings);
 
 			ImGui::EndMenu();
 		};
