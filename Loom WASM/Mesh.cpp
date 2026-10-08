@@ -106,7 +106,7 @@ namespace Loom
 		renderer->Draw(program, primitive_id, m_vertices->data(), m_vertices->size() / COMPONENTS, m_draw_type);
 	};
 
-	void Mesh::DrawTransparent(std::vector<Mesh*>& meshes)
+	void Mesh::DrawTransparent(const std::vector<Mesh*>& meshes)
 	{
 		Renderer* renderer = Renderer::Get();
 

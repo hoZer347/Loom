@@ -50,7 +50,7 @@ namespace Loom
 
 		// Draws the meshes farthest from Camera::current first, writing no
 		// depth, so each blends over everything behind it.
-		static void DrawTransparent(std::vector<Mesh*>& meshes);
+		static void DrawTransparent(const std::vector<Mesh*>& meshes);
 
 		// While Scene::Render points this at a list, a mesh whose shader has
 		// transparency on goes onto it rather than being drawn, so it can be
