@@ -450,6 +450,7 @@ namespace Loom
 		ImGui::GetIO().ConfigDragClickToInputText = true;
 
 		ImGui::GetIO().PlatformOpenInShellFn = OpenInShell;
+		ImGui::GetIO().PlatformOpenInShellUserData = this;
 
 		drop_receiver = this;
 

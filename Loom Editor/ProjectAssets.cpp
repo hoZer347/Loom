@@ -503,6 +503,21 @@ void main()
 			: "";
 	};
 
+	ProjectAssets::Opener ProjectAssets::OpenerOf(const std::string& path, const std::string& scripts_folder)
+	{
+		const std::filesystem::path extension = std::filesystem::path(path).extension();
+
+		if (extension == SceneSerializer::extension)
+			return Opener::Editor;
+
+		if (extension == shaderExtension)
+			return Opener::VisualStudio;
+
+		return IsScriptFile(path) && !scripts_folder.empty() && IsUnder(path, scripts_folder)
+			? Opener::VisualStudio
+			: Opener::Shell;
+	};
+
 	bool ProjectAssets::IsUnder(const std::string& path, const std::string& folder)
 	{
 		const std::filesystem::path relative =

@@ -275,13 +275,10 @@ namespace Loom
 		// and the scenes in it.
 		void RefreshProjectAssets();
 
-		// Scenes open in the editor, scripts and shaders in Visual Studio;
-		// anything else goes to whatever Windows opens that kind of file with,
-		// and to the text editor when nothing claims it.
+		// Where ProjectAssets::OpenerOf says; the shell's opener is whatever
+		// Windows opens that kind of file with, and the text editor when
+		// nothing claims it.
 		void OpenAsset(const std::string& path);
-
-		// A source file of the scripts project.
-		bool IsScriptFile(const std::string& path) const;
 
 		// In the scripts project's solution when it has one.
 		void OpenInVisualStudio(const std::string& path);

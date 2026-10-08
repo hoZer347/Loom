@@ -29,6 +29,18 @@ namespace Loom
 		static constexpr const char* textureExtension = ".png";
 		static constexpr std::string_view scriptExtensions[] = { ".hpp", ".h", ".cpp" };
 
+		enum struct Opener
+		{
+			Editor,
+			VisualStudio,
+			Shell,
+		};
+
+		// Scenes open in the editor, the scripts project's sources and shaders
+		// in Visual Studio, and anything else through the shell.
+		// scripts_folder is empty when there is no scripts project.
+		static Opener OpenerOf(const std::string& path, const std::string& scripts_folder);
+
 		// The shader every new one starts from: a flat colour.
 		static const char* const defaultShader;
 

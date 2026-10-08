@@ -147,6 +147,27 @@ TEST_SUITE("ProjectAssets")
 		CHECK(Loom::ProjectAssets::ScriptNameProblem(scripts.project.string(), "Glo").empty());
 	};
 
+	TEST_CASE("scenes open in the editor, shaders and the scripts project's sources in Visual Studio")
+	{
+		using Loom::ProjectAssets;
+
+		const std::string project = (std::filesystem::temp_directory_path() / "loom opener").string();
+		const std::string scripts = (std::filesystem::path(project) / "Scripts").string();
+
+		const auto opener = [&](const std::string& relative, const std::string& scripts_folder)
+		{
+			return ProjectAssets::OpenerOf((std::filesystem::path(project) / relative).string(), scripts_folder);
+		};
+
+		CHECK(opener("Scenes/Main.loomscene", scripts) == ProjectAssets::Opener::Editor);
+		CHECK(opener("Assets/Lit.shader", scripts) == ProjectAssets::Opener::VisualStudio);
+		CHECK(opener("Assets/Lit.shader", "") == ProjectAssets::Opener::VisualStudio);
+		CHECK(opener("Scripts/Spinner.hpp", scripts) == ProjectAssets::Opener::VisualStudio);
+		CHECK(opener("Scripts/Spinner.hpp", "") == ProjectAssets::Opener::Shell);
+		CHECK(opener("Tools/Bake.cpp", scripts) == ProjectAssets::Opener::Shell);
+		CHECK(opener("Assets/Brick.png", scripts) == ProjectAssets::Opener::Shell);
+	};
+
 	TEST_CASE("a project without a RootNamespace uses its own name")
 	{
 		const ScriptsProject scripts("loom project assets namespace");

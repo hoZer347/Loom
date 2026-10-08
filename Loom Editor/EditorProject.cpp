@@ -776,16 +776,6 @@ namespace Loom
 		return path;
 	};
 
-	bool Editor::IsScriptFile(const std::string& path) const
-	{
-		if (!m_scripts.HasProject())
-			return false;
-
-		return
-			ProjectAssets::IsScriptFile(path) &&
-			ProjectAssets::IsUnder(path, std::filesystem::path(m_scripts.GetProject()).parent_path().string());
-	};
-
 	void Editor::OpenInVisualStudio(const std::string& path)
 	{
 		// A hand-written project need not have a solution beside it, even though
@@ -815,12 +805,24 @@ namespace Loom
 
 	void Editor::OpenAsset(const std::string& path)
 	{
-		if (std::filesystem::path(path).extension() == SceneSerializer::extension)
+		const std::string scripts_folder = m_scripts.HasProject()
+			? std::filesystem::path(m_scripts.GetProject()).parent_path().string()
+			: "";
+
+		switch (ProjectAssets::OpenerOf(path, scripts_folder))
+		{
+		case ProjectAssets::Opener::Editor:
 			OpenScene(path);
-		else if (IsScriptFile(path) || std::filesystem::path(path).extension() == Shader::extension)
+			break;
+
+		case ProjectAssets::Opener::VisualStudio:
 			OpenInVisualStudio(path);
-		else
+			break;
+
+		case ProjectAssets::Opener::Shell:
 			OpenFile(path);
+			break;
+		};
 	};
 
 	bool Editor::OpenInShell(ImGuiContext*, const char* path)
@@ -828,7 +830,7 @@ namespace Loom
 		std::error_code code;
 
 		if (std::filesystem::is_regular_file(path, code))
-			OpenFile(path);
+			static_cast<Editor*>(ImGui::GetIO().PlatformOpenInShellUserData)->OpenAsset(path);
 		else
 			Shell(path, "");
 
