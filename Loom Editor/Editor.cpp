@@ -184,7 +184,7 @@ namespace Loom
 		constexpr float eye_pupil = 0.16f;
 		constexpr float eye_lash = 0.14f;
 		constexpr float eye_stroke = 1.5f;
-		constexpr float eye_hidden_by_parent_alpha = 0.4f;
+		constexpr float eye_disabled_by_parent_alpha = 0.4f;
 
 		// Where each lash leaves the lower lid, as a fraction of its width.
 		constexpr float eye_lash_positions[] = { -0.5f, 0.0f, 0.5f };
@@ -1805,12 +1805,12 @@ namespace Loom
 			flags |= ImGuiTreeNodeFlags_Selected;
 
 		const bool is_active = scene == m_activeScene;
-		const bool styled = is_active || root.IsHidden();
+		const bool styled = is_active || root.IsDisabled();
 
 		if (styled)
 			ImGui::PushStyleColor(
 				ImGuiCol_Text,
-				root.IsHidden() ? ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled) : EditorTheme::AccentText);
+				root.IsDisabled() ? ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled) : EditorTheme::AccentText);
 
 		if (m_expand.contains(root.GetGuid()))
 			ImGui::SetNextItemOpen(true);
@@ -1851,7 +1851,7 @@ namespace Loom
 			ImGui::EndPopup();
 		};
 
-		DrawHideToggle(&root, false);
+		DrawEnableToggle(&root, false);
 
 		if (!open)
 			return;
@@ -1859,12 +1859,12 @@ namespace Loom
 		const std::vector<GameObject*> children = root.GetChildren();
 
 		for (GameObject* child : children)
-			DrawGameObjectNode(child, root.IsHidden());
+			DrawGameObjectNode(child, root.IsDisabled());
 
 		ImGui::TreePop();
 	};
 
-	void Editor::DrawGameObjectNode(GameObject* gameObject, bool parent_hidden)
+	void Editor::DrawGameObjectNode(GameObject* gameObject, bool parent_disabled)
 	{
 		ImGuiTreeNodeFlags flags =
 			ImGuiTreeNodeFlags_OpenOnArrow |
@@ -1881,9 +1881,9 @@ namespace Loom
 			ImGui::SetNextItemOpen(true);
 
 		const bool renaming = m_renaming && m_selected == gameObject;
-		const bool hidden = parent_hidden || gameObject->IsHidden();
+		const bool disabled = parent_disabled || gameObject->IsDisabled();
 
-		if (hidden)
+		if (disabled)
 			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 
 		const bool open = ImGui::TreeNodeEx(
@@ -1892,7 +1892,7 @@ namespace Loom
 			"%s",
 			renaming ? "" : gameObject->GetName().c_str());
 
-		if (hidden)
+		if (disabled)
 			ImGui::PopStyleColor();
 
 		TakeImportTarget(gameObject);
@@ -1937,7 +1937,7 @@ namespace Loom
 		if (renaming)
 			DrawRenameField(gameObject);
 
-		DrawHideToggle(gameObject, parent_hidden);
+		DrawEnableToggle(gameObject, parent_disabled);
 
 		if (!open)
 			return;
@@ -1945,12 +1945,12 @@ namespace Loom
 		const std::vector<GameObject*> children = gameObject->GetChildren();
 
 		for (GameObject* child : children)
-			DrawGameObjectNode(child, hidden);
+			DrawGameObjectNode(child, disabled);
 
 		ImGui::TreePop();
 	};
 
-	void Editor::DrawHideToggle(GameObject* gameObject, bool parent_hidden)
+	void Editor::DrawEnableToggle(GameObject* gameObject, bool parent_disabled)
 	{
 		const float size = ImGui::GetFontSize();
 
@@ -1962,19 +1962,19 @@ namespace Loom
 
 		ImGui::PushID(gameObject);
 
-		if (ImGui::InvisibleButton("##hide", ImVec2(size, size)))
+		if (ImGui::InvisibleButton("##enabled", ImVec2(size, size)))
 		{
-			gameObject->SetHidden(!gameObject->IsHidden());
+			gameObject->SetDisabled(!gameObject->IsDisabled());
 			m_historyDirty = true;
 		};
 
 		ImGui::PopID();
 
-		const bool shown = !gameObject->IsHidden();
+		const bool enabled = !gameObject->IsDisabled();
 
-		ImGui::SetItemTooltip(shown ? "Hide" : "Show");
+		ImGui::SetItemTooltip(enabled ? "Disable" : "Enable");
 
-		const ImGuiCol colour = shown && !ImGui::IsItemHovered()
+		const ImGuiCol colour = enabled && !ImGui::IsItemHovered()
 			? ImGuiCol_TextDisabled
 			: ImGuiCol_Text;
 
@@ -1982,8 +1982,8 @@ namespace Loom
 			ImGui::GetWindowDrawList(),
 			ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()).GetCenter(),
 			size,
-			shown,
-			ImGui::GetColorU32(colour, parent_hidden ? eye_hidden_by_parent_alpha : 1.0f));
+			enabled,
+			ImGui::GetColorU32(colour, parent_disabled ? eye_disabled_by_parent_alpha : 1.0f));
 	};
 
 	void Editor::ExpandGrownNodes(const std::vector<Scene*>& scenes)

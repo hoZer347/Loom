@@ -240,38 +240,41 @@ TEST_SUITE("GameObject")
 		CHECK(probe->Count("render") == 1);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "hiding an object leaves it and everything under it out of Render")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "disabling an object leaves it and everything under it out of the frame")
 	{
-		Loom::Scene scene("hidden render");
+		Loom::Scene scene("disabled");
 		Pump();
 
-		Loom::GameObject* hidden = scene.GetRoot().AddChild("Hidden");
-		Loom::GameObject* shown = scene.GetRoot().AddChild("Shown");
+		Loom::GameObject* disabled = scene.GetRoot().AddChild("Disabled");
+		Loom::GameObject* enabled = scene.GetRoot().AddChild("Enabled");
 		Pump();
 
-		Loom::GameObject* under = hidden->AddChild("Under");
+		Loom::GameObject* under = disabled->AddChild("Under");
 		Pump();
 
-		Probe<>* onHidden = hidden->Attach<Probe<>>();
-		Probe<>* onUnder  = under->Attach<Probe<>>();
-		Probe<>* onShown  = shown->Attach<Probe<>>();
+		Probe<>* onDisabled = disabled->Attach<Probe<>>();
+		Probe<>* onUnder    = under->Attach<Probe<>>();
+		Probe<>* onEnabled  = enabled->Attach<Probe<>>();
 		Pump();
 
-		hidden->SetHidden(true);
+		disabled->SetDisabled(true);
+		scene.Update();
 		scene.Render();
 
-		CHECK(onHidden->Count("render") == 0);
-		CHECK(onUnder->Count("render")  == 0);
-		CHECK(onShown->Count("render")  == 1);
+		CHECK(onDisabled->Count("update") == 0);
+		CHECK(onUnder->Count("update")    == 0);
+		CHECK(onUnder->Count("render")    == 0);
+		CHECK(onEnabled->Count("update")  == 1);
+		CHECK(onEnabled->Count("render")  == 1);
 
-		// Hiding stops the drawing, not the object.
+		CHECK(scene.GetRoot().FindComponent<Probe<>>() == onEnabled);
+		CHECK(scene.GetRoot().FindComponent<Probe<>>(true) == onDisabled);
+
+		disabled->SetDisabled(false);
 		scene.Update();
+		scene.Render();
 
 		CHECK(onUnder->Count("update") == 1);
-
-		hidden->SetHidden(false);
-		scene.Render();
-
 		CHECK(onUnder->Count("render") == 1);
 	};
 
@@ -516,12 +519,12 @@ TEST_SUITE("GameObject")
 	};
 
 	// Scenes saved before the transform existed number the thread fields 0 and
-	// 1, so the transform has to come after them, and hiding after that.
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the transform is serialized after the thread fields, and hiding last")
+	// 1, so the transform has to come after them, and disabling after that.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the transform is serialized after the thread fields, and disabling last")
 	{
 		constexpr size_t THREAD_FIELDS = 2;
 		constexpr size_t TRANSFORM_FIELDS = 3;
-		constexpr size_t HIDDEN_FIELD = THREAD_FIELDS + TRANSFORM_FIELDS;
+		constexpr size_t DISABLED_FIELD = THREAD_FIELDS + TRANSFORM_FIELDS;
 
 		Loom::Scene scene("transform fields");
 		Pump();
@@ -529,16 +532,16 @@ TEST_SUITE("GameObject")
 		Loom::GameObject& root = scene.GetRoot();
 		const std::vector<Loom::SerializedField>& fields = root.GetFields();
 
-		REQUIRE(fields.size() == HIDDEN_FIELD + 1);
+		REQUIRE(fields.size() == DISABLED_FIELD + 1);
 
 		CHECK(fields[0].type == Loom::FieldType::Int);
 		CHECK(fields[1].type == Loom::FieldType::Bool);
 
-		for (size_t i = THREAD_FIELDS; i < HIDDEN_FIELD; i++)
+		for (size_t i = THREAD_FIELDS; i < DISABLED_FIELD; i++)
 			CHECK(fields[i].type == Loom::FieldType::Vec3);
 
 		CHECK(fields[THREAD_FIELDS].data == &root.transform.position->x);
-		CHECK(fields[HIDDEN_FIELD].type == Loom::FieldType::Bool);
+		CHECK(fields[DISABLED_FIELD].type == Loom::FieldType::Bool);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a GameObject is a LoomObject with its own ID and name")

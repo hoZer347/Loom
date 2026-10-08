@@ -271,7 +271,7 @@ vec3 LoomLight(vec3 normal)
 
 	void Light::DrawCasters(GameObject& gameObject) const
 	{
-		if (gameObject.IsHidden())
+		if (gameObject.IsDisabled())
 			return;
 
 		Renderer& renderer = *Renderer::Get();

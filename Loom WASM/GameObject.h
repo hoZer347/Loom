@@ -108,15 +108,19 @@ namespace Loom
 			return nullptr;
 		};
 
-		// Depth first, the first T on this object or anywhere under it.
+		// Depth first, the first T on this object or anywhere under it, passing
+		// over disabled objects unless asked not to.
 		template <typename T>
-		[[nodiscard]] T* FindComponent()
+		[[nodiscard]] T* FindComponent(bool include_disabled = false)
 		{
+			if (m_disabled && !include_disabled)
+				return nullptr;
+
 			if (T* found = GetComponent<T>())
 				return found;
 
 			for (GameObject* child : m_children)
-				if (T* found = child->FindComponent<T>())
+				if (T* found = child->FindComponent<T>(include_disabled))
 					return found;
 
 			return nullptr;
@@ -141,10 +145,11 @@ namespace Loom
 
 		void Destroy();
 
-		// A hidden object and everything under it is left out of rendering and
-		// the shadow map. It still updates.
-		bool IsHidden() const { return m_hidden; };
-		void SetHidden(bool hidden) { m_hidden = hidden; };
+		// A disabled object and everything under it is left out of updates,
+		// rendering, physics and FindComponent, so its cameras and lights go
+		// dark with it.
+		bool IsDisabled() const { return m_disabled; };
+		void SetDisabled(bool disabled) { m_disabled = disabled; };
 
 		GameObject* AddChild(const std::string& name = "New GameObject");
 
@@ -183,7 +188,7 @@ namespace Loom
 
 	protected:
 		// Last for the same reason.
-		Serial<bool> m_hidden;
+		Serial<bool> m_disabled;
 
 		std::vector<GameObject*>	m_children{ };
 		std::vector<ComponentBase*> m_components{ };

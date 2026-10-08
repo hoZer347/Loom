@@ -173,6 +173,9 @@ namespace Loom
 
 	void GameObject::Update(const int& thread)
 	{
+		if (m_disabled)
+			return;
+
 		for (ComponentBase* updateable : m_updateables)
 			//if (thread == m_threadID)
 				updateable->OnUpdate();
@@ -182,7 +185,7 @@ namespace Loom
 
 	void GameObject::Render()
 	{
-		if (m_hidden)
+		if (m_disabled)
 			return;
 
 		for (auto& renderable : m_renderables)
@@ -194,6 +197,9 @@ namespace Loom
 
 	void GameObject::Physics()
 	{
+		if (m_disabled)
+			return;
+
 		for (auto& renderable : m_physicsables)
 			if (m_threadID != -1)
 				renderable->OnPhysics();

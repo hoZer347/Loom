@@ -34,6 +34,13 @@ namespace Loom
 
 	void Scene::Render(Camera* camera)
 	{
+		Camera* seen = camera ? camera : root.FindComponent<Camera>();
+
+		// A scene with no camera is drawn in world space, but one whose cameras
+		// are all disabled shows nothing.
+		if (seen == nullptr && root.FindComponent<Camera>(true) != nullptr)
+			return;
+
 		// The shadow map has to be finished before the first mesh samples it.
 		Light* light = root.FindComponent<Light>();
 
@@ -41,7 +48,7 @@ namespace Loom
 			light->RenderShadowMap(root);
 
 		Light::current = light;
-		Camera::current = camera ? camera : root.FindComponent<Camera>();
+		Camera::current = seen;
 
 		std::vector<Mesh*> transparent;
 		Mesh::transparent = &transparent;

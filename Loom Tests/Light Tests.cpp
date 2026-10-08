@@ -54,6 +54,11 @@ TEST_SUITE("Light")
 		Pump();
 
 		CHECK(scene.GetRoot().FindComponent<Loom::Light>() == light);
+
+		// What the scene lights with, so a disabled ancestor turns it off.
+		parent->SetDisabled(true);
+
+		CHECK(scene.GetRoot().FindComponent<Loom::Light>() == nullptr);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the root's own light comes before a child's")

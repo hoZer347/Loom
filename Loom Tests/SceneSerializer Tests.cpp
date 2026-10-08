@@ -383,14 +383,14 @@ TEST_SUITE("SceneSerializer")
 		CHECK(*read.scale == scale);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "hiding survives being written and read back")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "disabling survives being written and read back")
 	{
-		Loom::Scene scene("Hidden");
-		Loom::GameObject* hidden = scene.AddChild("Hidden");
-		scene.AddChild("Shown");
+		Loom::Scene scene("Disabled");
+		Loom::GameObject* disabled = scene.AddChild("Disabled");
+		scene.AddChild("Enabled");
 		Pump();
 
-		hidden->SetHidden(true);
+		disabled->SetDisabled(true);
 
 		const Loaded loaded(Written(scene));
 
@@ -399,9 +399,9 @@ TEST_SUITE("SceneSerializer")
 		const std::vector<Loom::GameObject*>& children = loaded.scene->GetRoot().GetChildren();
 
 		REQUIRE(children.size() == 2);
-		CHECK(children[0]->IsHidden());
-		CHECK_FALSE(children[1]->IsHidden());
-		CHECK_FALSE(loaded.scene->GetRoot().IsHidden());
+		CHECK(children[0]->IsDisabled());
+		CHECK_FALSE(children[1]->IsDisabled());
+		CHECK_FALSE(loaded.scene->GetRoot().IsDisabled());
 	};
 
 	// Fields used to be keyed by member name. A file from then still opens: the

@@ -12,6 +12,7 @@
 #include <cmath>
 
 using LoomTests::Pump;
+using LoomTests::Probe;
 
 // How far a projected coordinate may drift from where the math puts it.
 static constexpr float EPSILON = 1e-4f;
@@ -83,6 +84,32 @@ TEST_SUITE("Camera")
 
 		CHECK(witness->seen == &outside);
 		CHECK(Loom::Camera::current == nullptr);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene whose only camera is disabled draws nothing")
+	{
+		Loom::Scene scene("camera off");
+		Pump();
+
+		Loom::GameObject* holder = scene.AddChild("Camera");
+		Pump();
+
+		holder->Attach<Loom::Camera>();
+		Probe<>* probe = scene.Attach<Probe<>>();
+		Pump();
+
+		holder->SetDisabled(true);
+		scene.Render();
+
+		CHECK(probe->Count("render") == 0);
+
+		// One handed in from outside still sees it.
+		Loom::Camera outside;
+		Pump();
+
+		scene.Render(&outside);
+
+		CHECK(probe->Count("render") == 1);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a camera on no GameObject sees from the pose it was given")
