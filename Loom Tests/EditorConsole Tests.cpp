@@ -6,9 +6,12 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
+#include <algorithm>
+#include <cfloat>
 #include <cstring>
 #include <iostream>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace
@@ -67,24 +70,88 @@ namespace
 			ImGui::EndFrame();
 		};
 
-		// The middle of the boundary before column on the given line.
-		ImVec2 At(int line, int column)
+		// The scrolling child that holds the console's lines.
+		static const ImGuiWindow& Lines()
 		{
-			constexpr float half = 0.5f;
-
-			const ImGuiWindow* text = nullptr;
+			const ImGuiWindow* found = nullptr;
 
 			for (const ImGuiWindow* window : ImGui::GetCurrentContext()->Windows)
 				if (window->ParentWindow && std::strcmp(window->ParentWindow->Name, "Console") == 0)
-					text = window;
+					found = window;
 
-			REQUIRE(text);
+			REQUIRE(found);
+
+			return *found;
+		};
+
+		// The middle of the boundary before column on the given line.
+		static ImVec2 At(int line, int column)
+		{
+			const ImGuiWindow& text = Lines();
 
 			return ImVec2(
-				text->ContentRegionRect.Min.x + column * ImGui::CalcTextSize("x").x,
-				text->ContentRegionRect.Min.y
+				text.ContentRegionRect.Min.x + column * ImGui::CalcTextSize("x").x,
+				text.ContentRegionRect.Min.y
 					+ line * ImGui::GetTextLineHeightWithSpacing()
 					+ ImGui::GetTextLineHeight() * half);
+		};
+
+		// The middle of the given row of the open right-click menu.
+		static ImVec2 MenuRow(int row)
+		{
+			constexpr float indent = 10.0f;
+
+			const ImVector<ImGuiPopupData>& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+
+			REQUIRE(!popups.empty());
+
+			const ImGuiWindow* menu = popups.back().Window;
+
+			REQUIRE(menu);
+
+			return ImVec2(
+				menu->ContentRegionRect.Min.x + indent,
+				menu->ContentRegionRect.Min.y
+					+ row * ImGui::GetTextLineHeightWithSpacing()
+					+ ImGui::GetTextLineHeight() * half);
+		};
+
+		// The filter box fills the toolbar from the checkbox to the right edge.
+		static ImVec2 Filter()
+		{
+			constexpr float inset = 20.0f;
+
+			const ImGuiWindow* panel = ImGui::FindWindowByName("Console");
+
+			REQUIRE(panel);
+
+			return ImVec2(
+				panel->ContentRegionRect.Max.x - inset,
+				panel->ContentRegionRect.Min.y + ImGui::GetFrameHeight() * half);
+		};
+
+		static ImVec2 TitleBar()
+		{
+			return ImVec2(width * half, ImGui::GetFrameHeight() * half);
+		};
+
+		// Left and right of everything drawn in the selection colour.
+		static std::pair<float, float> Highlighted()
+		{
+			const ImDrawList& list = *Lines().DrawList;
+			const ImU32 colour = ImGui::GetColorU32(ImGuiCol_TextSelectedBg);
+
+			float left = FLT_MAX;
+			float right = -FLT_MAX;
+
+			for (const ImDrawVert& vertex : list.VtxBuffer)
+				if (vertex.col == colour)
+				{
+					left = std::min(left, vertex.pos.x);
+					right = std::max(right, vertex.pos.x);
+				};
+
+			return { left, right };
 		};
 
 		void Press(ImVec2 at)
@@ -108,6 +175,29 @@ namespace
 			Release(to);
 		};
 
+		void Click(ImVec2 at)
+		{
+			Drag(at, at);
+		};
+
+		void RightClick(ImVec2 at)
+		{
+			ImGui::GetIO().AddMousePosEvent(at.x, at.y);
+			ImGui::GetIO().AddMouseButtonEvent(ImGuiMouseButton_Right, true);
+			Frame();
+			ImGui::GetIO().AddMouseButtonEvent(ImGuiMouseButton_Right, false);
+			Frame();
+
+			// A new menu spends its first frame hidden, measuring itself.
+			Frame();
+		};
+
+		void Type(const char* text)
+		{
+			ImGui::GetIO().AddInputCharactersUTF8(text);
+			Frame();
+		};
+
 		void Chord(ImGuiKey key)
 		{
 			ImGui::GetIO().AddKeyEvent(ImGuiMod_Ctrl, true);
@@ -118,6 +208,7 @@ namespace
 			Frame();
 		};
 
+		static constexpr float half = 0.5f;
 		static constexpr float width = 800.0f;
 		static constexpr float height = 600.0f;
 
@@ -196,5 +287,63 @@ TEST_SUITE("EditorConsole")
 		Chord(ImGuiKey_C);
 
 		CHECK(clipboard.empty());
+	};
+
+	TEST_CASE_FIXTURE(Driven, "the selected columns are drawn highlighted")
+	{
+		Drag(At(1, 2), At(1, 6));
+
+		const auto [left, right] = Highlighted();
+
+		CHECK(left == doctest::Approx(At(1, 2).x));
+		CHECK(right == doctest::Approx(At(1, 6).x));
+	};
+
+	TEST_CASE_FIXTURE(Driven, "a shift-click extends the selection")
+	{
+		Click(At(0, 2));
+
+		ImGui::GetIO().AddKeyEvent(ImGuiMod_Shift, true);
+		Click(At(1, 6));
+		ImGui::GetIO().AddKeyEvent(ImGuiMod_Shift, false);
+
+		Chord(ImGuiKey_C);
+
+		CHECK(clipboard == "rst line\nsecond");
+	};
+
+	TEST_CASE_FIXTURE(Driven, "the right-click menu selects all and copies")
+	{
+		constexpr int copy_row = 0;
+		constexpr int select_all_row = 1;
+
+		RightClick(At(1, 0));
+		Click(MenuRow(select_all_row));
+		RightClick(At(1, 0));
+		Click(MenuRow(copy_row));
+
+		// The menu only asks for the copy, which happens on the next frame.
+		Frame();
+
+		CHECK(clipboard == "first line\nsecond line\nthird line");
+	};
+
+	TEST_CASE_FIXTURE(Driven, "copying skips lines the filter hides")
+	{
+		Click(Filter());
+		Type("ir");
+		Drag(At(0, 0), At(1, 5));
+		Chord(ImGuiKey_C);
+
+		CHECK(clipboard == "first line\nthird");
+	};
+
+	TEST_CASE_FIXTURE(Driven, "Ctrl+C still copies after the panel itself takes focus")
+	{
+		Drag(At(0, 0), At(0, 5));
+		Click(TitleBar());
+		Chord(ImGuiKey_C);
+
+		CHECK(clipboard == "first");
 	};
 };
