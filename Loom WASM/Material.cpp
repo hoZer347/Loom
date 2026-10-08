@@ -28,28 +28,44 @@ namespace Loom
 			return shaders;
 		};
 
-		Shader* Shared(const std::string& path)
+		// When each path that failed to compile was last written, so the
+		// editor's poll compiles it again once the file changes.
+		std::unordered_map<std::string, std::filesystem::file_time_type>& FailedShaders()
 		{
-			std::unordered_map<std::string, Shader*>& shaders = SharedShaders();
+			static std::unordered_map<std::string, std::filesystem::file_time_type> failed{ };
 
-			const auto found = shaders.find(path);
+			return failed;
+		};
 
-			if (found != shaders.end())
-				return found->second;
-
+		Shader* Compile(const std::string& path)
+		{
 			try
 			{
-				return shaders[path] = new Shader(path);
+				Shader* shader = SharedShaders()[path] = new Shader(path);
+				FailedShaders().erase(path);
+
+				return shader;
 			}
 			catch (const std::exception& e)
 			{
-				std::cerr << "Material: " << e.what() << std::endl;
+				SharedShaders().erase(path);
 
-				// Deliberately not remembered: fixing the shader file and
-				// reloading the scene should be enough, without restarting the
-				// editor. Shader's own registry does the same.
+				std::error_code code;
+				FailedShaders()[path] = std::filesystem::last_write_time(path, code);
+
+				std::cerr << "Material: " << path << ": " << e.what() << std::endl;
+
 				return nullptr;
 			};
+		};
+
+		// A path that failed is compiled again here too, so reloading the
+		// scene retries it wherever the file cannot be watched (the web).
+		Shader* Shared(const std::string& path)
+		{
+			const auto found = SharedShaders().find(path);
+
+			return found != SharedShaders().end() ? found->second : Compile(path);
 		};
 
 		bool TypeCombo(UniformType& type)
@@ -95,6 +111,17 @@ namespace Loom
 	{
 		if (shader == nullptr && !m_shader_path->empty())
 			shader = Shared(m_shader_path);
+	};
+
+	void Material::PickUpShader()
+	{
+		if (shader != nullptr || m_shader_path->empty())
+			return;
+
+		const auto found = SharedShaders().find(m_shader_path);
+
+		if (found != SharedShaders().end())
+			shader = found->second;
 	};
 
 	void Material::ChangeShader(const std::string& path)
@@ -286,5 +313,16 @@ namespace Loom
 	{
 		for (const auto& [path, shader] : SharedShaders())
 			shader->ReloadIfChanged();
+
+		// A copy, since compiling takes the path out of the map.
+		const auto failed = FailedShaders();
+
+		for (const auto& [path, written] : failed)
+		{
+			std::error_code code;
+
+			if (std::filesystem::last_write_time(path, code) != written)
+				Compile(path);
+		};
 	};
 };

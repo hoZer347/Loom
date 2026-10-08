@@ -43,7 +43,12 @@ namespace Loom
 		// A mesh attached without a material (or before one is set up, which is
 		// the normal state for a mesh just added in the editor) has nothing to
 		// draw with.
-		return material != nullptr && material->shader != nullptr;
+		if (material == nullptr)
+			return false;
+
+		material->PickUpShader();
+
+		return material->shader != nullptr;
 	};
 
 	void Mesh::OnRender()

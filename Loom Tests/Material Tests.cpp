@@ -6,6 +6,8 @@
 #include "Scene.h"
 #include "SerializedField.h"
 
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -141,9 +143,9 @@ TEST_SUITE("Material")
 	};
 
 #ifndef __EMSCRIPTEN__
-	// A shader that would not compile is not remembered as broken: fixing the
-	// file and reloading the scene has to be enough, or live iteration means
-	// restarting the editor.
+	// Attaching a material retries a shader that would not compile, whatever
+	// the poll remembers: reloading the scene has to be enough wherever the
+	// file cannot be watched, or live iteration means restarting the editor.
 	//
 	// Native only, for the reason the Shader suite gives: a missing path fails
 	// in the ifstream here, while the web build fetches over HTTP and needs a
@@ -175,12 +177,58 @@ TEST_SUITE("Material")
 		// failure handed back to it.
 		size_t attempts = 0;
 
-		for (size_t at = captured.str().find("no such shader.shader");
+		for (size_t at = captured.str().find("Material: no such shader.shader:");
 			at != std::string::npos;
-			at = captured.str().find("no such shader.shader", at + 1))
+			at = captured.str().find("Material: no such shader.shader:", at + 1))
 			attempts++;
 
 		CHECK(attempts == 2);
+	};
+
+	// Fixing the file then needs no reload: the editor's poll compiles it
+	// again once it has been written, and not before.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader that failed to compile is compiled again by the poll once its file changes")
+	{
+		const std::filesystem::path path = std::filesystem::temp_directory_path() / "loom polled shader.shader";
+		std::filesystem::remove(path);
+
+		const std::string failure = "Material: " + path.string() + ":";
+
+		std::ostringstream captured;
+		std::streambuf* previous = std::cerr.rdbuf(captured.rdbuf());
+
+		const auto attempts = [&]()
+		{
+			size_t count = 0;
+
+			for (size_t at = captured.str().find(failure); at != std::string::npos; at = captured.str().find(failure, at + 1))
+				count++;
+
+			return count;
+		};
+
+		Loom::Scene scene("polled");
+		Pump();
+
+		scene.Attach<Loom::Material>()->SetShaderPath(path.string());
+		Pump();
+		const size_t attached = attempts();
+
+		Loom::Material::ReloadChangedShaders();
+		const size_t unchanged = attempts();
+
+		// Written, and still not a shader that compiles here.
+		std::ofstream(path) << "// ===FRAGMENT===\n";
+
+		Loom::Material::ReloadChangedShaders();
+		const size_t changed = attempts();
+
+		std::cerr.rdbuf(previous);
+		std::filesystem::remove(path);
+
+		CHECK(attached == 1);
+		CHECK(unchanged == 1);
+		CHECK(changed == 2);
 	};
 #endif
 };

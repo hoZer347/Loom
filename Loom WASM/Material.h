@@ -15,8 +15,10 @@ namespace Loom
 	struct LOOM_API Material : Component<Material>
 	{
 		// Names the shader to compile. Read by OnAttach, so a script sets it on
-		// the material it just attached; changing it after that takes effect the
-		// next time the material is attached, which for a scene means reloading.
+		// the material it just attached. Changed after that, it takes effect the
+		// next time the material is attached, which for a scene means reloading,
+		// or, for a material with no shader, once the path has been compiled for
+		// another material or by ReloadChangedShaders.
 		void SetShaderPath(const std::string& path) { m_shader_path = path; };
 		const std::string& GetShaderPath() const { return m_shader_path; };
 
@@ -27,6 +29,11 @@ namespace Loom
 		// Compiles the shader named above, unless whoever built this material has
 		// already put one here.
 		void OnAttach() override;
+
+		// Takes up the shader named above if this material has none and it has
+		// since compiled, as a fixed file does under ReloadChangedShaders. Reads
+		// nothing from disk, so it is cheap enough for every draw.
+		void PickUpShader();
 
 		void OnRender() override
 		{ };
@@ -44,7 +51,8 @@ namespace Loom
 		void Apply(uint32_t program, const UniformValues* instance = nullptr) const;
 
 		// Recompiles every material's shader whose file has been written since,
-		// for after something outside the editor edits one.
+		// for after something outside the editor edits one, and compiles again
+		// any that failed to once its file has been written.
 		static void ReloadChangedShaders();
 
 		Shader* shader = nullptr;

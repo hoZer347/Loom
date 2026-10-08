@@ -189,6 +189,29 @@ TEST_SUITE("Shader")
 			CHECK(message.line == 5);
 	};
 
+	// Renaming a main written over two lines keeps both, or every line after
+	// it would be numbered one short.
+	TEST_CASE("Check numbers the lines after a main split over two as the file does")
+	{
+		const std::string text =
+			"// ===SETTINGS===\n"
+			"shading = on\n"
+			"// ===FRAGMENT===\n"
+			"out vec4 FragColor;\n"
+			"void\n"
+			"main()\n"
+			"{\n"
+			"\tFragColor = vec4(missingTint);\n"
+			"}\n";
+
+		const std::vector<Loom::ShaderMessage> messages = Loom::Shader::Check(text);
+
+		REQUIRE_FALSE(messages.empty());
+
+		for (const Loom::ShaderMessage& message : messages)
+			CHECK(message.line == 8);
+	};
+
 	TEST_CASE("Check reports a setting it does not know against no line")
 	{
 		const std::vector<Loom::ShaderMessage> messages = Loom::Shader::Check("// ===SETTINGS===\nglow = on\n" + FRAGMENT);

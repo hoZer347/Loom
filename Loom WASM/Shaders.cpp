@@ -83,7 +83,9 @@ void main()
 
 		const std::regex& MainPattern()
 		{
-			static const std::regex pattern(R"(\bvoid\s+main\s*\(\s*(?:void\s*)?\))");
+			// The whitespace is kept, so a main split over lines keeps the
+			// lines after it where #line numbered them.
+			static const std::regex pattern(R"(\b(void\s+)main(\s*\(\s*(?:void\s*)?\)))");
 
 			return pattern;
 		};
@@ -110,7 +112,7 @@ void main()
 			if (!std::regex_search(stage, MainPattern()))
 				throw std::runtime_error("Shading needs the " + which + " stage to have a main()");
 
-			return std::regex_replace(stage, MainPattern(), "void loom_main()");
+			return std::regex_replace(stage, MainPattern(), "$1loom_main$2");
 		};
 
 		std::string ShadedVertex(const std::string& stage, bool shadows)
@@ -307,7 +309,7 @@ void main()
 		}
 		catch (const std::exception& e)
 		{
-			std::cerr << "Shader: " << e.what() << std::endl;
+			std::cerr << "Shader: " << file_path << ": " << e.what() << std::endl;
 			return false;
 		};
 
