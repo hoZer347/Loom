@@ -29,6 +29,10 @@ namespace Loom
 		// A pointer to another LoomObject. Written as that object's guid, which
 		// is the whole reason objects carry one.
 		Reference,
+
+		// Values for a shader's variables. The inspector leaves them to the
+		// component, which knows the shader that declares them.
+		Uniforms,
 	};
 
 	/**

@@ -5,9 +5,11 @@
 
 #include "Component.h"
 #include "ComponentRegistry.h"
+#include "EditorGui.h"
 #include "Engine.h"
 #include "GameObject.h"
 #include "LoomObject.h"
+#include "Material.h"
 #include "Scene.h"
 #include "SceneSerializer.h"
 #include "Transform.h"
@@ -18,6 +20,7 @@
 #include "EditorFileDialogs.h"
 #include "FieldNames.h"
 #include "ModelImporter.h"
+#include "ProjectAssets.h"
 #include "ProjectTemplate.h"
 
 #include "OpenGL.h"
@@ -151,6 +154,9 @@ namespace Loom
 		// than into it.
 		constexpr float sibling_edge = 0.25f;
 
+		// How often the editor checks whether a shader file was edited outside it.
+		constexpr double shader_poll_seconds = 0.5;
+
 		const GameObject* RootOf(const GameObject* gameObject)
 		{
 			while (gameObject->GetParent() != nullptr)
@@ -192,32 +198,6 @@ namespace Loom
 			for (ImGuiViewport* viewport : ImGui::GetPlatformIO().Viewports)
 				if (viewport->PlatformHandle)
 					glfwSetDropCallback((GLFWwindow*)viewport->PlatformHandle, callback);
-		};
-
-		// ImGui has no std::string overload without the stdlib helper, so this
-		// is the same resize callback that one uses.
-		bool InputTextString(const char* label, std::string& value)
-		{
-			const auto resize =
-				[](ImGuiInputTextCallbackData* data) -> int
-				{
-					if (data->EventFlag != ImGuiInputTextFlags_CallbackResize)
-						return 0;
-
-					std::string* text = (std::string*)data->UserData;
-					text->resize(data->BufTextLen);
-					data->Buf = text->data();
-
-					return 0;
-				};
-
-			return ImGui::InputText(
-				label,
-				value.data(),
-				value.capacity() + 1,
-				ImGuiInputTextFlags_CallbackResize,
-				resize,
-				&value);
 		};
 
 		constexpr const char* ellipsis = "...";
@@ -442,6 +422,8 @@ namespace Loom
 
 		// Clicking a number field types into it, Unity-style; dragging still scrubs.
 		ImGui::GetIO().ConfigDragClickToInputText = true;
+
+		ImGui::GetIO().PlatformOpenInShellFn = OpenInShell;
 
 		drop_receiver = this;
 
@@ -1019,6 +1001,7 @@ namespace Loom
 		};
 
 		HandleShortcuts();
+		PollShaders();
 
 		// Panels come and go as OS windows, so the callback is put on whichever
 		// exist this frame.
@@ -1636,6 +1619,12 @@ namespace Loom
 		if (!ImGui::BeginDragDropTarget())
 			return;
 
+		if (DropShader(gameObject))
+		{
+			ImGui::EndDragDropTarget();
+			return;
+		};
+
 		const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(
 			object_payload,
 			ImGuiDragDropFlags_AcceptBeforeDelivery |
@@ -1746,6 +1735,45 @@ namespace Loom
 			ImGui::IsItemHovered() &&
 			!ImGui::IsMouseDragPastThreshold(ImGuiMouseButton_Left) &&
 			!m_nodePressOpened;
+	};
+
+	bool Editor::DropShader(GameObject* gameObject)
+	{
+		const ImGuiPayload* dragged = ImGui::GetDragDropPayload();
+
+		if (dragged == nullptr || !dragged->IsDataType(ASSET_PAYLOAD))
+			return false;
+
+		const std::string path = (const char*)dragged->Data;
+
+		// Anything else dragged out of the Project panel has no place here.
+		if (std::filesystem::path(path).extension() != ProjectAssets::shaderExtension)
+			return true;
+
+		if (!ImGui::AcceptDragDropPayload(ASSET_PAYLOAD))
+			return true;
+
+		Material* material = gameObject->GetComponent<Material>();
+
+		if (material == nullptr)
+			material = gameObject->Attach<Material>();
+
+		material->ChangeShader(path);
+
+		Select(gameObject);
+		m_historyDirty = true;
+
+		return true;
+	};
+
+	void Editor::PollShaders()
+	{
+		if (ImGui::GetTime() - m_shadersPolled < shader_poll_seconds)
+			return;
+
+		m_shadersPolled = ImGui::GetTime();
+
+		Material::ReloadChangedShaders();
 	};
 
 	void Editor::DrawInspector()
@@ -1987,6 +2015,9 @@ namespace Loom
 		{
 			const SerializedField& field = object.GetFields()[i];
 
+			if (field.type == FieldType::Uniforms)
+				continue;
+
 			ImGui::PushID(&field);
 
 			Label(labels[i], column);
@@ -2028,6 +2059,7 @@ namespace Loom
 
 			case FieldType::String:
 				changed = InputTextString(label, *(std::string*)field.data);
+				changed |= AcceptAssetDrop(*(std::string*)field.data);
 				break;
 
 			case FieldType::Vec2:
@@ -2053,6 +2085,9 @@ namespace Loom
 
 			case FieldType::Reference:
 				changed = DrawReferenceField(field);
+				break;
+
+			case FieldType::Uniforms:
 				break;
 			};
 

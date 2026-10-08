@@ -1,6 +1,7 @@
 #include "Light.h"
 
 #include "GameObject.h"
+#include "Material.h"
 #include "Mesh.h"
 #include "RenderMath.h"
 #include "Renderer.h"
@@ -69,6 +70,10 @@ uniform vec3 u_lightColor;
 uniform float u_ambient;
 uniform highp sampler2DShadow u_shadowMap;
 
+// Set by a material whose shadows are off. Zero, which is what a program
+// nothing has set it in reads, is shadowed.
+uniform float u_shadowsOff;
+
 // Taps either side of the centre texel, on top of the 2x2 the hardware
 // comparison already filters.
 const int LOOM_PCF_RADIUS = 1;
@@ -79,6 +84,9 @@ const float LOOM_CLIP_TO_TEXTURE = 0.5;
 
 float LoomShadow(vec4 lightSpace)
 {
+	if (u_shadowsOff != 0.0)
+		return 1.0;
+
 	vec3 coords = lightSpace.xyz / lightSpace.w * LOOM_CLIP_TO_TEXTURE + LOOM_CLIP_TO_TEXTURE;
 
 	// Outside the shadow map is outside what the light can say anything about.
@@ -307,7 +315,7 @@ vec3 LoomLight(vec3 normal, vec4 lightSpace)
 			{
 				Mesh* mesh = (Mesh*)component;
 
-				if (mesh->IsDrawable())
+				if (mesh->IsDrawable() && mesh->material->shadows)
 					mesh->Draw(program);
 			}
 			else if (strcmp(component->GetTypeName(), typeid(Sprite).name()) == 0)

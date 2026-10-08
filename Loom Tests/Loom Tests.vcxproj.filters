@@ -52,6 +52,9 @@
     <ClCompile Include="Material Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="Shader Variables Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="Shaders Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

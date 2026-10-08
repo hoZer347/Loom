@@ -600,6 +600,35 @@ namespace Loom
 			Write(program, name, glm::value_ptr(value), sizeof(value));
 		};
 
+		void SetUniform(uint32_t handle, const char* name, UniformType type, const void* components) override
+		{
+			const auto found = m_programs.find(handle);
+
+			if (found == m_programs.end())
+				return;
+
+			Program& program = found->second;
+			const auto member = program.members.find(std::string_view(name));
+
+			if (member == program.members.end())
+				return;
+
+			const UniformTypeInfo& info = InfoOf(type);
+			const uint32_t column = info.rows * sizeof(uint32_t);
+			const uint32_t stride = IsMatrix(info) ? member->second.matrixStride : column;
+			const uint32_t end = member->second.offset + member->second.size;
+
+			for (int i = 0; i < info.columns; i++)
+			{
+				const uint32_t offset = member->second.offset + i * stride;
+
+				if (offset + column > end)
+					break;
+
+				memcpy(program.block.data() + offset, (const uint8_t*)components + i * column, column);
+			};
+		};
+
 		void SetTexture(uint32_t program, const char* name, uint32_t texture) override
 		{
 			const auto found = m_programs.find(program);
@@ -941,6 +970,9 @@ namespace Loom
 			{
 				uint32_t offset;
 				uint32_t size;
+
+				// Between a matrix's columns, which std140 pads to a vec4 each.
+				uint32_t matrixStride;
 			};
 
 			struct Sampler
@@ -1691,7 +1723,7 @@ namespace Loom
 					for (uint32_t i = 0; i < binding->block.member_count; i++)
 					{
 						const SpvReflectBlockVariable& member = binding->block.members[i];
-						program.members[member.name] = { member.offset, member.size };
+						program.members[member.name] = { member.offset, member.size, member.numeric.matrix.stride };
 					};
 				}
 				else if (binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)

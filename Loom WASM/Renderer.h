@@ -2,6 +2,8 @@
 
 #include "Loom API.h"
 
+#include "UniformType.h"
+
 #include "glm/glm.hpp"
 
 #include <cstdint>
@@ -82,6 +84,11 @@ namespace Loom
 		virtual void SetUniform(uint32_t program, const char* name, const glm::vec3& value) = 0;
 		virtual void SetUniform(uint32_t program, const char* name, const glm::vec4& value) = 0;
 		virtual void SetUniform(uint32_t program, const char* name, const glm::mat4& value) = 0;
+
+		// Any type but a sampler, which is SetTexture's. components holds the
+		// type's columns one after another, four bytes a component: floats, ints
+		// or unsigned ints, and a bool as an int.
+		virtual void SetUniform(uint32_t program, const char* name, UniformType type, const void* components) = 0;
 		virtual void SetTexture(uint32_t program, const char* name, uint32_t texture) = 0;
 
 		// Draws positions, three floats a vertex, as the GL primitive given

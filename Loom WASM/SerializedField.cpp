@@ -3,6 +3,7 @@
 #include "GameObject.h"
 #include "LoomObject.h"
 #include "Scene.h"
+#include "ShaderVariables.h"
 
 #include <cstdio>
 #include <cctype>
@@ -173,6 +174,8 @@ namespace Loom
 			return text + ']';
 		};
 
+		case FieldType::Uniforms:	return Quote(((UniformValues*)data)->Write());
+
 		case FieldType::Reference:
 		{
 			const LoomObject* target = GetReference();
@@ -227,6 +230,8 @@ namespace Loom
 
 			return true;
 		};
+
+		case FieldType::Uniforms:	((UniformValues*)data)->Read(Unquote(text));	return true;
 
 		case FieldType::Reference:
 		{

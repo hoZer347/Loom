@@ -2,10 +2,14 @@
 
 #include "Loom API.h"
 
+#include "ShaderVariables.h"
+
+#include <filesystem>
 #include <istream>
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 
 namespace Loom
@@ -22,8 +26,25 @@ namespace Loom
 
 		~Shader();
 
+		// Compiles the file again, for after it has been edited, and swaps the
+		// new program in. A file that no longer compiles keeps the old program
+		// and says why.
+		bool Reload();
+
+		// Reloads when the file has been written since it was last compiled.
+		void ReloadIfChanged();
+
 		const std::string file_path;
-		const uint32_t id; // TODO: Make this const
+
+		// The uniforms the source declares for its users to fill in. Declared
+		// before id, which is what fills them in.
+		std::vector<ShaderVariable> variables;
+
+	private:
+		std::filesystem::file_time_type m_written;
+
+	public:
+		uint32_t id;
 
 	private:
 		uint32_t CompileSource(const std::string& file_path);
@@ -32,6 +53,9 @@ namespace Loom
 		// Splits the source into its stages and links them. The caller holds
 		// the mutex.
 		uint32_t Build(const std::string& name, std::istream& source);
+
+		// Throws std::runtime_error when there is nothing to read.
+		std::string ReadSource(const std::string& file_path);
 
 #ifdef __EMSCRIPTEN__
 		void Request(

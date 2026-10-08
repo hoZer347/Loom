@@ -12,6 +12,7 @@
 #include <iostream>
 #include <fstream>
 #include <filesystem>
+#include <iterator>
 
 #define SHADER_PATH ""
 
@@ -55,17 +56,59 @@ namespace Loom
 		if (shaders.contains(file_path))
 			return shaders[file_path];
 
+		std::istringstream file(ReadSource(file_path));
+
+		return Build(file_path, file);
+	};
+
+	std::string Shader::ReadSource(const std::string& file_path)
+	{
 #if __EMSCRIPTEN__
-		std::string shader_raw;
-		Request(file_path, shader_raw);
-		std::istringstream file(shader_raw);
+		std::string source;
+		Request(file_path, source);
+		return source;
 #else
 		std::ifstream file(file_path);
 		if (!file)
 			throw std::runtime_error("Could not open shader file: " + file_path);
-#endif
 
-		return Build(file_path, file);
+		std::error_code code;
+		m_written = std::filesystem::last_write_time(file_path, code);
+
+		return std::string(std::istreambuf_iterator<char>(file), { });
+#endif
+	};
+
+	bool Shader::Reload()
+	{
+		std::scoped_lock lock{ mutex };
+
+		const uint32_t previous = id;
+
+		try
+		{
+			std::istringstream source(ReadSource(file_path));
+			id = Build(file_path, source);
+		}
+		catch (const std::exception& e)
+		{
+			std::cerr << "Shader: " << e.what() << std::endl;
+			return false;
+		};
+
+		if (Renderer* renderer = Renderer::Get())
+			renderer->DeleteProgram(previous);
+
+		return true;
+	};
+
+	void Shader::ReloadIfChanged()
+	{
+		std::error_code code;
+		const std::filesystem::file_time_type written = std::filesystem::last_write_time(file_path, code);
+
+		if (!code && written != m_written)
+			Reload();
 	};
 
 	uint32_t Shader::CompileStream(const std::string& name, std::istream& source)
@@ -80,16 +123,19 @@ namespace Loom
 
 	uint32_t Shader::Build(const std::string& name, std::istream& source)
 	{
+		const std::string text(std::istreambuf_iterator<char>(source), { });
+		std::istringstream lines(text);
+
 		std::unordered_map<ShaderType, std::stringstream> sources;
 		ShaderType current = ShaderType::NONE;
 
 		std::string line;
-		while (std::getline(source, line))
-			if (line.find("===VERTEX===") != std::string::npos)
+		while (std::getline(lines, line))
+			if (line.find(VERTEX_SECTION) != std::string::npos)
 				current = ShaderType::VERTEX;
-			else if (line.find("===FRAGMENT===") != std::string::npos)
+			else if (line.find(FRAGMENT_SECTION) != std::string::npos)
 				current = ShaderType::FRAGMENT;
-			else if (line.find("===COMMON===") != std::string::npos)
+			else if (line.find(COMMON_SECTION) != std::string::npos)
 				current = ShaderType::COMMON;
 			else if (current != ShaderType::NONE)
 				sources[current] << line << '\n';
@@ -110,7 +156,10 @@ namespace Loom
 			Light::VertexLibrary(vertex) + vertex,
 			Light::FragmentLibrary(fragment) + fragment);
 
-		shaders.emplace(name, program);
+		// After the program, so a reload that fails leaves them describing the
+		// program still in use.
+		variables = ParseShaderVariables(text);
+		shaders[name] = program;
 
 		return program;
 	};

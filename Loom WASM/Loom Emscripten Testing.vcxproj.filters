@@ -19,6 +19,12 @@
     <ClCompile Include="Shaders.cpp">
       <Filter>Shaders</Filter>
     </ClCompile>
+    <ClCompile Include="ShaderVariables.cpp">
+      <Filter>Shaders</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorGui.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
     <ClCompile Include="Textures.cpp">
       <Filter>Textures</Filter>
     </ClCompile>
@@ -208,6 +214,15 @@
     </ClInclude>
     <ClInclude Include="Shaders.h">
       <Filter>Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="ShaderVariables.h">
+      <Filter>Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="UniformType.h">
+      <Filter>Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorGui.h">
+      <Filter>Engine</Filter>
     </ClInclude>
     <ClInclude Include="OpenGL.h" />
     <ClInclude Include="Sprite.h">

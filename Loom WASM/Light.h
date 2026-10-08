@@ -31,7 +31,10 @@ namespace Loom
 	*               vec3 LoomLight(vec3 normal, vec4 lightSpace)
 	*                 ambient plus the shadowed diffuse, to multiply a colour by
 	* - That GLSL declares u_lightViewProjection, u_lightDirection, u_lightColor,
-	*   u_ambient and u_shadowMap, so a stage that uses it must not declare them
+	*   u_ambient, u_shadowMap and u_shadowsOff, so a stage that uses it must
+	*   not declare them
+	* - A Material with shadows off is left out of the shadow map, and
+	*   LoomShadow answers fully lit for it
 	*/
 	struct LOOM_API Light : Component<Light>
 	{

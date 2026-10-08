@@ -9,6 +9,7 @@
 #include "GameObject.h"
 #include "Light.h"
 
+#include <algorithm>
 #include <iostream>
 
 
@@ -50,7 +51,7 @@ namespace Loom
 		if (!IsDrawable())
 			return;
 
-		material->Apply(material->shader->id);
+		material->Apply(material->shader->id, &*variables);
 
 		if (Camera::current)
 			Camera::current->Apply(material->shader->id);
@@ -94,5 +95,21 @@ namespace Loom
 	{
 		ImGui::Text("Vertices: %zu", m_vertices->size());
 		ImGui::Text("Indices:  %zu", m_indices.size());
+
+		if (!IsDrawable())
+			return;
+
+		const std::vector<ShaderVariable>& declared = material->shader->variables;
+
+		const bool any = std::any_of(
+			declared.begin(),
+			declared.end(),
+			[](const ShaderVariable& variable) { return variable.scope == UniformScope::Instance; });
+
+		if (!any)
+			return;
+
+		ImGui::SeparatorText("Instance Variables");
+		DrawShaderVariables(declared, UniformScope::Instance, variables);
 	};
 };
