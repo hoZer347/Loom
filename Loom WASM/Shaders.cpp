@@ -180,10 +180,7 @@ void main()
 		std::scoped_lock lock{ mutex };
 
 		if (shaders.contains(file_path))
-		{
-			shadow_id = shaders[file_path].shadow;
-			return shaders[file_path].id;
-		};
+			return Cached(shaders[file_path]);
 
 		std::istringstream file(ReadSource(file_path));
 
@@ -246,15 +243,20 @@ void main()
 			Reload();
 	};
 
+	uint32_t Shader::Cached(const Programs& programs)
+	{
+		settings = programs.settings;
+		shadow_id = programs.shadow;
+
+		return programs.id;
+	};
+
 	uint32_t Shader::CompileStream(const std::string& name, std::istream& source)
 	{
 		std::scoped_lock lock{ mutex };
 
 		if (shaders.contains(name))
-		{
-			shadow_id = shaders[name].shadow;
-			return shaders[name].id;
-		};
+			return Cached(shaders[name]);
 
 		return Build(name, source);
 	};
@@ -325,6 +327,7 @@ void main()
 		const Stages stages = Assemble(text);
 
 		Programs programs;
+		programs.settings = stages.settings;
 		programs.id = renderer->CreateProgram(name, stages.vertex, stages.fragment);
 
 		if (stages.settings.shadows)
@@ -341,11 +344,9 @@ void main()
 		// After the programs, so a reload that fails leaves these describing
 		// the ones still in use.
 		variables = ParseShaderVariables(text);
-		settings = stages.settings;
-		shadow_id = programs.shadow;
 		shaders[name] = programs;
 
-		return programs.id;
+		return Cached(programs);
 	};
 
 #ifdef __EMSCRIPTEN__

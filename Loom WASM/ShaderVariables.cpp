@@ -106,9 +106,16 @@ namespace Loom
 		constexpr size_t SETTING_VALUE_MATCH = 2;
 
 		// Each setting by the name the file gives it.
-		std::array<std::pair<const char*, bool ShaderSettings::*>, 2> SettingNames()
+		struct SettingName
 		{
-			return { { { "shading", &ShaderSettings::shading }, { "shadows", &ShaderSettings::shadows } } };
+			const char* name;
+			bool ShaderSettings::* member;
+		};
+
+		constexpr SettingName SETTING_NAMES[] =
+		{
+			{ "shading", &ShaderSettings::shading },
+			{ "shadows", &ShaderSettings::shadows },
 		};
 
 		// A shader file as lines, and the line ending to write it back with.
@@ -170,7 +177,7 @@ namespace Loom
 			};
 
 			// After the declarations and precision statements already at the top
-			// of COMMON, adding the section in front of the first stage when
+			// of COMMON, adding the section in front of the first section when
 			// there is none.
 			size_t InsertionPoint()
 			{
@@ -604,7 +611,7 @@ namespace Loom
 			bool* setting = nullptr;
 
 			if (std::regex_match(line, match, SettingPattern()))
-				for (const auto& [name, member] : SettingNames())
+				for (const auto& [name, member] : SETTING_NAMES)
 					if (match[SETTING_NAME_MATCH] == name)
 						setting = &(settings.*member);
 
@@ -651,7 +658,7 @@ namespace Loom
 			if (std::regex_match(file.lines[i], match, SettingPattern()))
 				append = i + 1;
 
-		for (const auto& [name, member] : SettingNames())
+		for (const auto& [name, member] : SETTING_NAMES)
 		{
 			const std::string written = std::string(name) + " = " + (settings.*member ? SETTING_ON : SETTING_OFF);
 
@@ -672,7 +679,7 @@ namespace Loom
 		return file.Write(path, error);
 	};
 
-	void ApplyShaderVariables(uint32_t program,const std::vector<ShaderVariable>& variables, const UniformValues& material, const UniformValues* instance)
+	void ApplyShaderVariables(uint32_t program, const std::vector<ShaderVariable>& variables, const UniformValues& material, const UniformValues* instance)
 	{
 		Renderer* renderer = Renderer::Get();
 

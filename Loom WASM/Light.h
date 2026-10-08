@@ -49,7 +49,8 @@ namespace Loom
 		// the light's clip space.
 		glm::mat4 ViewProjection() const;
 
-		// Renders every mesh under root into the shadow map. Leaves the
+		// Renders every mesh under root whose shader has shadows on, and whose
+		// material has not turned them off, into the shadow map. Leaves the
 		// framebuffer and viewport the way it found them, so it can run inside
 		// whatever target the scene is being drawn into.
 		void RenderShadowMap(GameObject& root);

@@ -74,7 +74,7 @@ namespace
 		void SetUniform(uint32_t, const char* name, float value) override { floats[name] = value; };
 		void SetUniform(uint32_t, const char*, const glm::vec3&) override { };
 		void SetUniform(uint32_t, const char*, const glm::vec4&) override { };
-		void SetUniform(uint32_t, const char*, const glm::mat4&) override { };
+		void SetUniform(uint32_t, const char* name, const glm::mat4& value) override { matrices[name] = value; };
 
 		void SetUniform(uint32_t, const char* name, Loom::UniformType type, const void* components) override
 		{
@@ -104,6 +104,7 @@ namespace
 		void* ImGuiTexture(uint32_t) override { return nullptr; };
 
 		std::map<std::string, float> floats;
+		std::map<std::string, glm::mat4> matrices;
 		std::map<std::string, Uniform> uniforms;
 		std::map<std::string, uint32_t> textures;
 		std::vector<uint32_t> deleted;
@@ -439,6 +440,32 @@ TEST_SUITE("Shader variables")
 		CHECK(shader.variables.size() == 2);
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "turning a shader's shadows on and off in its file builds and drops its shadow program")
+	{
+		RecordingRenderer renderer;
+
+		const ShaderFile file("toggle shadows.shader", STAGES);
+		Loom::Shader shader(file.path.string());
+
+		CHECK(shader.shadow_id == 0);
+
+		std::string error;
+		REQUIRE(Loom::WriteShaderSettings(file.path.string(), { .shadows = true }, error));
+		REQUIRE(shader.Reload());
+
+		const uint32_t shadow = shader.shadow_id;
+
+		CHECK(shader.settings.shadows);
+		CHECK(shadow != 0);
+
+		REQUIRE(Loom::WriteShaderSettings(file.path.string(), { }, error));
+		REQUIRE(shader.Reload());
+
+		CHECK_FALSE(shader.settings.shadows);
+		CHECK(shader.shadow_id == 0);
+		CHECK(std::find(renderer.deleted.begin(), renderer.deleted.end(), shadow) != renderer.deleted.end());
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader path being typed keeps the material's shader until it names a shader file")
 	{
 		RecordingRenderer renderer;
@@ -546,12 +573,31 @@ TEST_SUITE("Shader variables")
 		CHECK(Loom::Shader("no shadow program", unshadowed).shadow_id == 0);
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a second shader of the same name takes the compiled one's settings and shadow program")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream source("// ===SETTINGS===\nshading = on\nshadows = on\n// ===FRAGMENT===\nout vec4 c;\nvoid main() { c = vec4(1.0); }\n");
+		Loom::Shader first("cached settings", source);
+
+		std::istringstream ignored("");
+		Loom::Shader second("cached settings", ignored);
+
+		CHECK(second.id == first.id);
+		CHECK(second.shadow_id == first.shadow_id);
+		CHECK(second.settings.shading);
+		CHECK(second.settings.shadows);
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a material with shadows off is left out of the shadow map and drawn fully lit")
 	{
 		RecordingRenderer renderer;
 
 		std::istringstream source("// ===SETTINGS===\nshadows = on\n" + STAGES);
 		Loom::Shader shader("shadow casters", source);
+
+		std::istringstream unshadowed_source(STAGES);
+		Loom::Shader unshadowed("shadow casters without shadows", unshadowed_source);
 
 		Loom::Scene scene("shadow casters");
 		Pump();
@@ -560,12 +606,12 @@ TEST_SUITE("Shader variables")
 
 		std::vector<Loom::Material*> materials;
 
-		for (const char* name : { "Shadowed", "Unshadowed" })
+		for (const char* name : { "Shadowed", "Unshadowed", "Shader without shadows" })
 		{
 			Loom::GameObject* object = scene.AddChild(name);
 
 			Loom::Material* material = object->Attach<Loom::Material>();
-			material->shader = &shader;
+			material->shader = materials.size() < 2 ? &shader : &unshadowed;
 			materials.push_back(material);
 
 			object->Attach<Loom::Mesh>()->m_vertices = std::vector<float>{ 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
@@ -577,8 +623,9 @@ TEST_SUITE("Shader variables")
 
 		light->RenderShadowMap(scene.GetRoot());
 
-		// With the shader's own shadow program.
+		// With the shader's own shadow program, seeing the scene from the light.
 		CHECK(renderer.drawn == std::vector<uint32_t>{ shader.shadow_id });
+		CHECK(renderer.matrices["u_viewProjection"] == light->ViewProjection());
 
 		materials[0]->Apply(shader.id);
 		CHECK(renderer.floats["u_shadowsOff"] == 0.0f);

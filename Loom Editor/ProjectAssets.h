@@ -41,8 +41,8 @@ namespace Loom
 		// scripts_folder is empty when there is no scripts project.
 		static Opener OpenerOf(const std::string& path, const std::string& scripts_folder);
 
-		// The shader every new one starts from: a fragment stage writing the
-		// material's colour, with every engine section off.
+		// The shader every new one starts from: the mesh through the camera,
+		// in the material's colour, with every engine section off.
 		static const char* const defaultShader;
 
 		// Each returns the path written, or an empty string with the reason in

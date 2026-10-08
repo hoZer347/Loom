@@ -70,8 +70,19 @@ namespace Loom
 		uint32_t id;
 
 	private:
+		struct Programs
+		{
+			uint32_t id = 0;
+			uint32_t shadow = 0;
+			ShaderSettings settings;
+		};
+
 		uint32_t CompileSource(const std::string& file_path);
 		uint32_t CompileStream(const std::string& name, std::istream& source);
+
+		// Takes on the settings and shadow program of programs, and answers
+		// its id.
+		uint32_t Cached(const Programs& programs);
 
 		// Assembles the source and links its programs. The caller holds the
 		// mutex.
@@ -91,12 +102,6 @@ namespace Loom
 	protected:
 	public:
 		friend struct Engine;
-
-		struct Programs
-		{
-			uint32_t id = 0;
-			uint32_t shadow = 0;
-		};
 
 		static inline std::unordered_map<std::string, Programs> shaders;
 	};
