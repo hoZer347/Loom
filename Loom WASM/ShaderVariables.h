@@ -68,7 +68,7 @@ namespace Loom
 		{ "LoomLightSpace", "vec4 LoomLightSpace(vec4 world)", "Vertex stage: where a world position falls in the Light's shadow map. Hand it on to the fragment stage for LoomLight or LoomShadow." },
 		{ "LoomShadow", "float LoomShadow(vec4 lightSpace)", "Fragment stage: 1 where the Light reaches, 0 in shadow, softened at the edges." },
 		{ "LoomDiffuse", "float LoomDiffuse(vec3 normal)", "Fragment stage: how squarely the Light falls on a world space normal, from 0 to 1." },
-		{ "LoomLight", "vec3 LoomLight(vec3 normal, vec4 lightSpace)\nvec3 LoomLight(vec3 normal)","Fragment stage: the ambient light plus the Light's colour on a world space normal, shadowed when given where it falls in the shadow map." },
+		{ "LoomLight", "vec3 LoomLight(vec3 normal, vec4 lightSpace)\nvec3 LoomLight(vec3 normal)", "Fragment stage: the ambient light plus the Light's colour on a world space normal, shadowed when given where it falls in the shadow map." },
 	};
 
 	// Whether a variable is filled in once on the Material, or on each Mesh

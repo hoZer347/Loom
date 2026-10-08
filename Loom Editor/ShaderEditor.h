@@ -47,7 +47,6 @@ namespace Loom
 
 			// Brings the tab forward on the next frame.
 			bool select = true;
-
 		};
 
 		static void Check(Document& document);

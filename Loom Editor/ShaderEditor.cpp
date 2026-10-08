@@ -114,7 +114,9 @@ namespace Loom
 
 	void ShaderEditor::Open(const std::string& path)
 	{
-		const std::string normal = std::filesystem::path(path).lexically_normal().string();
+		// Absolute, since opening a project moves the working directory.
+		std::error_code code;
+		const std::string normal = std::filesystem::absolute(path, code).lexically_normal().string();
 
 		m_focusFrames = focus_frames;
 
