@@ -7,16 +7,16 @@
 #include "imgui.h"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstdio>
-#include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <limits>
 #include <regex>
 #include <sstream>
 #include <string_view>
 #include <unordered_map>
-#include <unordered_set>
 
 
 namespace Loom
@@ -135,15 +135,17 @@ namespace Loom
 				return (bool)file;
 			};
 
-			size_t Declaring(const std::string& name) const
+			// Every line, since each stage can declare the same uniform.
+			std::vector<size_t> Declaring(const std::string& name) const
 			{
+				std::vector<size_t> found;
 				std::smatch match;
 
 				for (size_t i = 0; i < lines.size(); i++)
 					if (std::regex_match(lines[i], match, DeclarationPattern()) && match[NAME_MATCH] == name)
-						return i;
+						found.push_back(i);
 
-				return std::string::npos;
+				return found;
 			};
 
 			// After the declarations and precision statements already at the top
@@ -220,16 +222,25 @@ namespace Loom
 			return blank;
 		};
 
-		// An image that will not load is reported once, not every frame, and
-		// tried again when the path changes.
+		// An image that will not load is tried again once its file changes,
+		// rather than every frame, which would say why every frame. A path with
+		// no file behind it, one still being typed among them, says nothing.
 		uint32_t TextureFor(Renderer& renderer, const UniformValue* value)
 		{
 			if (value == nullptr || value->texture.empty())
 				return BlankTexture(renderer);
 
-			static std::unordered_set<std::string> failed;
+			static std::unordered_map<std::string, std::filesystem::file_time_type> failed;
 
-			if (failed.contains(value->texture))
+			std::error_code code;
+			const std::filesystem::file_time_type written = std::filesystem::last_write_time(value->texture, code);
+
+			if (code)
+				return BlankTexture(renderer);
+
+			const auto tried = failed.find(value->texture);
+
+			if (tried != failed.end() && tried->second == written)
 				return BlankTexture(renderer);
 
 			const Texture* texture = Texture::Shared(value->texture);
@@ -237,7 +248,7 @@ namespace Loom
 			if (texture && texture->handle)
 				return texture->handle;
 
-			failed.insert(value->texture);
+			failed[value->texture] = written;
 
 			return BlankTexture(renderer);
 		};
@@ -422,9 +433,7 @@ namespace Loom
 			const UniformTypeInfo& info = InfoOf(type);
 
 			if (info.kind == UniformKind::Texture)
-			{
 				std::getline(words >> std::ws, value.texture);
-			}
 			else
 				for (int i = 0; i < info.columns * info.rows; i++)
 					words >> value.components[i];
@@ -491,24 +500,23 @@ namespace Loom
 		if (!file.Read(path, error))
 			return false;
 
-		const size_t existing = file.Declaring(variable.name);
-
-		if (existing != std::string::npos && variable.name != replacing)
+		if (!file.Declaring(variable.name).empty() && variable.name != replacing)
 		{
 			error = path + " already declares " + variable.name;
 			return false;
 		};
 
-		const size_t replaced = replacing.empty() ? std::string::npos : file.Declaring(replacing);
+		const std::vector<size_t> replaced = replacing.empty() ? std::vector<size_t>{ } : file.Declaring(replacing);
 
-		if (replaced != std::string::npos)
+		for (const size_t line : replaced)
 		{
 			std::smatch match;
-			std::regex_match(file.lines[replaced], match, DeclarationPattern());
+			std::regex_match(file.lines[line], match, DeclarationPattern());
 
-			file.lines[replaced] = match[1].str() + Declaration(variable);
-		}
-		else
+			file.lines[line] = match[1].str() + Declaration(variable);
+		};
+
+		if (replaced.empty())
 		{
 			// Apart, since finding the point can add lines.
 			const size_t at = file.InsertionPoint();
@@ -525,15 +533,17 @@ namespace Loom
 		if (!file.Read(path, error))
 			return false;
 
-		const size_t line = file.Declaring(name);
+		const std::vector<size_t> declaring = file.Declaring(name);
 
-		if (line == std::string::npos)
+		if (declaring.empty())
 		{
 			error = path + " does not declare " + name;
 			return false;
 		};
 
-		file.lines.erase(file.lines.begin() + line);
+		// From the last, so the lines still to go keep their places.
+		for (auto line = declaring.rbegin(); line != declaring.rend(); line++)
+			file.lines.erase(file.lines.begin() + *line);
 
 		return file.Write(path, error);
 	};
@@ -563,13 +573,7 @@ namespace Loom
 			for (int i = 0; i < info.columns * info.rows; i++)
 				switch (info.kind)
 				{
-				case UniformKind::Float:
-				{
-					const float component = (float)components[i];
-					memcpy(&packed[i], &component, sizeof(component));
-				}
-				break;
-
+				case UniformKind::Float:	packed[i] = std::bit_cast<uint32_t>((float)components[i]);	break;
 				case UniformKind::Int:	packed[i] = (uint32_t)(int32_t)components[i];	break;
 				case UniformKind::UInt:	packed[i] = (uint32_t)components[i];			break;
 				case UniformKind::Bool:	packed[i] = components[i] != 0.0;				break;

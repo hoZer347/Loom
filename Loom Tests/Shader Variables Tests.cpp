@@ -1,15 +1,119 @@
 #include "doctest.h"
 
+#include "Test Support.h"
+
+#include "GameObject.h"
+#include "Light.h"
+#include "Material.h"
+#include "Mesh.h"
+#include "Renderer.h"
+#include "Scene.h"
+#include "Shaders.h"
 #include "ShaderVariables.h"
 
+#include <array>
+#include <bit>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <iterator>
+#include <map>
+#include <sstream>
+#include <stdexcept>
 #include <string>
+#include <vector>
+
+using LoomTests::Pump;
 
 
 namespace
 {
+	// Stands in for the Engine's renderer while it lives, which a test has no
+	// window to open. It hands out handles, records what it is given, and
+	// compiles anything but a fragment stage that says BROKEN.
+	struct RecordingRenderer final : Loom::Renderer
+	{
+		static constexpr const char* BROKEN = "BROKEN";
+		static constexpr int MAX_TEXTURE_SIZE = 4096;
+
+		struct Uniform
+		{
+			Loom::UniformType type;
+			std::array<uint32_t, Loom::MAX_UNIFORM_COMPONENTS> components{ };
+
+			float Float(int i) const { return std::bit_cast<float>(components[i]); };
+			int32_t Int(int i) const { return (int32_t)components[i]; };
+		};
+
+		RecordingRenderer() : m_previous(current) { current = this; };
+		~RecordingRenderer() { current = m_previous; };
+
+		Loom::Backend GetBackend() const override { return Loom::Backend::OpenGL; };
+		bool Attach(GLFWwindow*) override { return true; };
+
+		void InitImGui(GLFWwindow*) override { };
+		void ShutdownImGui() override { };
+		void NewImGuiFrame() override { };
+		void RenderImGui(ImDrawData*) override { };
+		void RenderImGuiWindows() override { };
+		void ReleaseImGuiFonts() override { };
+		void BeginFrame() override { };
+		void EndFrame() override { };
+		void Capture(const CaptureHandler&) override { };
+
+		uint32_t CreateProgram(const std::string& name, const std::string&, const std::string& fragment) override
+		{
+			if (fragment.find(BROKEN) != std::string::npos)
+				throw std::runtime_error("Shader compile error in " + name);
+
+			return ++m_handles;
+		};
+
+		void DeleteProgram(uint32_t program) override { deleted.push_back(program); };
+
+		void SetUniform(uint32_t, const char* name, float value) override { floats[name] = value; };
+		void SetUniform(uint32_t, const char*, const glm::vec3&) override { };
+		void SetUniform(uint32_t, const char*, const glm::vec4&) override { };
+		void SetUniform(uint32_t, const char*, const glm::mat4&) override { };
+
+		void SetUniform(uint32_t, const char* name, Loom::UniformType type, const void* components) override
+		{
+			const Loom::UniformTypeInfo& info = Loom::InfoOf(type);
+
+			Uniform& uniform = uniforms[name];
+			uniform.type = type;
+			std::copy_n((const uint32_t*)components, info.columns * info.rows, uniform.components.begin());
+		};
+
+		void SetTexture(uint32_t, const char* name, uint32_t texture) override { textures[name] = texture; };
+
+		void Draw(uint32_t, uint32_t, const float*, size_t, uint32_t) override { draws++; };
+
+		uint32_t CreateTexture(int, int, const uint8_t*) override { return ++m_handles; };
+		uint32_t CreateDepthTarget(int) override { return ++m_handles; };
+		uint32_t CreateColorTarget(int, int) override { return ++m_handles; };
+		void DestroyTexture(uint32_t) override { };
+
+		void PushTarget(uint32_t) override { };
+		void PopTarget() override { };
+		void Clear(const float*, bool) override { };
+		void SetDepthBias(float, float) override { };
+
+		glm::ivec2 TargetSize() const override { return glm::ivec2(1); };
+		int MaxTextureSize() const override { return MAX_TEXTURE_SIZE; };
+		void* ImGuiTexture(uint32_t) override { return nullptr; };
+
+		std::map<std::string, float> floats;
+		std::map<std::string, Uniform> uniforms;
+		std::map<std::string, uint32_t> textures;
+		std::vector<uint32_t> deleted;
+		size_t draws = 0;
+
+	private:
+		Renderer* m_previous;
+		uint32_t m_handles = 0;
+	};
+
 	// A shader file in the temp folder, gone again when the test is.
 	struct ShaderFile
 	{
@@ -17,6 +121,11 @@ namespace
 
 		ShaderFile(const std::string& name, const std::string& source) :
 			path(std::filesystem::temp_directory_path() / name)
+		{
+			Write(source);
+		};
+
+		void Write(const std::string& source) const
 		{
 			std::ofstream(path, std::ios::binary) << source;
 		};
@@ -221,5 +330,190 @@ TEST_SUITE("Shader variables")
 		CHECK(file.Text() == "// ===COMMON===\nuniform vec3 u_tint;\n" + STAGES);
 
 		CHECK_FALSE(Loom::RemoveShaderVariable(file.path.string(), "u_speed", error));
+	};
+
+	// One variable to the table, so every line declaring it goes with it:
+	// stages that disagree on a type do not link.
+	TEST_CASE("a uniform both stages declare is retyped and removed in both")
+	{
+		const ShaderFile file(
+			"both stages.shader",
+			"// ===VERTEX===\nuniform float u_wave;\nvoid main() { }\n"
+			"// ===FRAGMENT===\nuniform float u_wave;\nvoid main() { }\n");
+
+		std::string error;
+		REQUIRE(Loom::DeclareShaderVariable(file.path.string(), "u_wave", { "u_wave", Loom::UniformType::Vec2 }, error));
+
+		CHECK(file.Text() ==
+			"// ===VERTEX===\nuniform vec2 u_wave; // material\nvoid main() { }\n"
+			"// ===FRAGMENT===\nuniform vec2 u_wave; // material\nvoid main() { }\n");
+
+		REQUIRE(Loom::RemoveShaderVariable(file.path.string(), "u_wave", error));
+
+		CHECK(file.Text() == "// ===VERTEX===\nvoid main() { }\n// ===FRAGMENT===\nvoid main() { }\n");
+		CHECK(Loom::ParseShaderVariables(file.Text()).empty());
+	};
+
+#ifndef __EMSCRIPTEN__
+	// Native only, for the reason the Shader suite gives: the web build fetches
+	// shader files over HTTP, which needs a browser.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader reloads its file, and keeps its program when the file stops compiling")
+	{
+		RecordingRenderer renderer;
+
+		const ShaderFile file("reload.shader", "// ===COMMON===\nuniform float u_speed;\n" + STAGES);
+		Loom::Shader shader(file.path.string());
+
+		REQUIRE(shader.variables.size() == 1);
+
+		const uint32_t first = shader.id;
+
+		// Nothing written since it compiled.
+		shader.ReloadIfChanged();
+		CHECK(shader.id == first);
+
+		file.Write("// ===COMMON===\nuniform float u_speed;\nuniform vec3 u_tint; // instance\n" + STAGES);
+
+		CHECK(shader.Reload());
+		CHECK(shader.id != first);
+		CHECK(renderer.deleted == std::vector<uint32_t>{ first });
+		REQUIRE(shader.variables.size() == 2);
+		CHECK(shader.variables[1].scope == Loom::UniformScope::Instance);
+
+		const uint32_t second = shader.id;
+
+		file.Write("// ===COMMON===\nuniform float u_gone;\n// ===FRAGMENT===\nBROKEN\n");
+
+		std::ostringstream captured;
+		std::streambuf* previous = std::cerr.rdbuf(captured.rdbuf());
+		const bool reloaded = shader.Reload();
+		std::cerr.rdbuf(previous);
+
+		CHECK_FALSE(reloaded);
+		CHECK(captured.str().find("compile error") != std::string::npos);
+		CHECK(shader.id == second);
+		CHECK(shader.variables.size() == 2);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader path being typed keeps the material's shader until it names a shader file")
+	{
+		RecordingRenderer renderer;
+
+		const ShaderFile file("typed path.shader", STAGES);
+
+		Loom::Scene scene("typed path");
+		Pump();
+
+		Loom::Material* material = scene.Attach<Loom::Material>();
+		Pump();
+
+		material->ChangeShader(file.path.string());
+
+		Loom::Shader* const named = material->shader;
+		REQUIRE(named != nullptr);
+
+		const Loom::SerializedField& path = material->GetFields().front();
+
+		*(std::string*)path.data = file.path.parent_path().string();
+		material->OnFieldChanged(path);
+		CHECK(material->shader == named);
+
+		*(std::string*)path.data = "";
+		material->OnFieldChanged(path);
+		CHECK(material->shader == nullptr);
+
+		*(std::string*)path.data = file.path.string();
+		material->OnFieldChanged(path);
+		CHECK(material->shader == named);
+	};
+#endif
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "each variable gets its own scope's value, or the default")
+	{
+		RecordingRenderer renderer;
+
+		const std::vector<Loom::ShaderVariable> variables =
+		{
+			{ "u_speed", Loom::UniformType::Float, Loom::UniformScope::Material },
+			{ "u_tint", Loom::UniformType::Vec3, Loom::UniformScope::Instance },
+			{ "u_basis", Loom::UniformType::Mat2, Loom::UniformScope::Material },
+			{ "u_count", Loom::UniformType::Int, Loom::UniformScope::Instance },
+			{ "u_albedo", Loom::UniformType::Sampler2D, Loom::UniformScope::Material },
+		};
+
+		Loom::UniformValues material;
+		material.Set("u_speed", Loom::UniformType::Float, { 2.0 });
+
+		// Neither is the variable's: the tint is per instance, and the basis
+		// is a mat2.
+		material.Set("u_tint", Loom::UniformType::Vec3, { 9.0, 9.0, 9.0 });
+		material.Set("u_basis", Loom::UniformType::Vec4, { 5.0, 5.0, 5.0, 5.0 });
+
+		Loom::UniformValues instance;
+		instance.Set("u_tint", Loom::UniformType::Vec3, { 0.5, 0.25, 1.0 });
+
+		Loom::ApplyShaderVariables(1, variables, material, &instance);
+
+		CHECK(renderer.uniforms["u_speed"].Float(0) == 2.0f);
+
+		CHECK(renderer.uniforms["u_tint"].Float(0) == 0.5f);
+		CHECK(renderer.uniforms["u_tint"].Float(1) == 0.25f);
+		CHECK(renderer.uniforms["u_tint"].Float(2) == 1.0f);
+
+		CHECK(renderer.uniforms["u_basis"].type == Loom::UniformType::Mat2);
+		CHECK(renderer.uniforms["u_basis"].Float(0) == 1.0f);
+		CHECK(renderer.uniforms["u_basis"].Float(1) == 0.0f);
+		CHECK(renderer.uniforms["u_basis"].Float(3) == 1.0f);
+
+		CHECK(renderer.uniforms["u_count"].Int(0) == 0);
+
+		// No image named still puts something behind the sampler.
+		CHECK(renderer.textures["u_albedo"] != 0);
+
+		// Drawn with no instance values, a per-instance variable is put back to
+		// its default rather than keeping the last object's.
+		Loom::ApplyShaderVariables(1, variables, material, nullptr);
+
+		CHECK(renderer.uniforms["u_tint"].Float(0) == 0.0f);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a material with shadows off is left out of the shadow map and drawn fully lit")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream source(STAGES);
+		Loom::Shader shader("shadow casters", source);
+
+		Loom::Scene scene("shadow casters");
+		Pump();
+
+		Loom::Light* light = scene.Attach<Loom::Light>();
+
+		std::vector<Loom::Material*> materials;
+
+		for (const char* name : { "Shadowed", "Unshadowed" })
+		{
+			Loom::GameObject* object = scene.AddChild(name);
+
+			Loom::Material* material = object->Attach<Loom::Material>();
+			material->shader = &shader;
+			materials.push_back(material);
+
+			object->Attach<Loom::Mesh>()->m_vertices = std::vector<float>{ 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
+		};
+
+		Pump();
+
+		materials[1]->shadows = false;
+
+		light->RenderShadowMap(scene.GetRoot());
+
+		CHECK(renderer.draws == 1);
+
+		materials[0]->Apply(shader.id);
+		CHECK(renderer.floats["u_shadowsOff"] == 0.0f);
+
+		materials[1]->Apply(shader.id);
+		CHECK(renderer.floats["u_shadowsOff"] == 1.0f);
 	};
 };

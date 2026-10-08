@@ -126,9 +126,12 @@ namespace Loom
 		// A texture as ImGui::Image takes it.
 		virtual void* ImGuiTexture(uint32_t texture) = 0;
 
+	protected:
+		// Protected as well as the Engine's, so a renderer a test builds with no
+		// window can put itself in.
+		static inline Renderer* current = nullptr;
+
 	private:
 		friend struct Engine;
-
-		static inline Renderer* current = nullptr;
 	};
 };

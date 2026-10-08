@@ -26,9 +26,9 @@ namespace Loom
 	{ };
 
 	Shader::Shader(const std::string& file_path) :
-		file_path(file_path.ends_with(".shader") ?
+		file_path(file_path.ends_with(extension) ?
 			file_path :
-			file_path + ".shader"),
+			file_path + extension),
 		id(CompileSource(file_path))
 	{ };
 
