@@ -189,8 +189,8 @@ TEST_SUITE("EditorLayouts")
 		frame(Dock::Keep);
 
 		CHECK(apart());
-		CHECK(ImGui::FindWindowByName(window)->DockIsActive);
-		CHECK(ImGui::FindWindowByName(other)->DockIsActive);
+		CHECK(static_cast<bool>(ImGui::FindWindowByName(window)->DockIsActive));
+		CHECK(static_cast<bool>(ImGui::FindWindowByName(other)->DockIsActive));
 	};
 
 	TEST_CASE("a missing layout does not load, and a deleted one is no longer listed")
