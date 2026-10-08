@@ -84,35 +84,15 @@ TEST_SUITE("ProjectAssets")
 		CHECK(text.find("{NAME}") == std::string::npos);
 	};
 
-	TEST_CASE("a state machine comes with states of its own, and starts in one")
+	TEST_CASE("a state machine is one header, a self-typed StateMachine")
 	{
 		const ScriptsProject scripts("loom project assets state machine");
 
 		const std::string text = ReadAll(scripts.Create("Guard", nullptr, Loom::ProjectAssets::ScriptKind::StateMachine));
 
+		CHECK(text.find("namespace GameScripts") != std::string::npos);
 		CHECK(text.find("struct Guard : Loom::StateMachine<Guard>") != std::string::npos);
-		CHECK(text.find("struct GuardWaiting : Loom::State<GuardWaiting, Guard>") != std::string::npos);
-		CHECK(text.find("struct GuardWalking : Loom::State<GuardWalking, Guard>") != std::string::npos);
-		CHECK(text.find("m_start = Loom::StateReference::Of<GuardWaiting>();") != std::string::npos);
 		CHECK(text.find("{NAME}") == std::string::npos);
-	};
-
-	TEST_CASE("a state machine cannot be named so that one of its states is taken")
-	{
-		const ScriptsProject scripts("loom project assets machine states");
-
-		std::ofstream(scripts.root / "GuardWalking.hpp") << "struct GuardWalking : Loom::State<GuardWalking> { };\n";
-
-		CHECK(Loom::ProjectAssets::ScriptNameProblem(scripts.project.string(), "Guard").empty());
-		CHECK_FALSE(Loom::ProjectAssets::ScriptNameProblem(
-			scripts.project.string(),
-			"Guard",
-			Loom::ProjectAssets::ScriptKind::StateMachine).empty());
-
-		std::string error;
-
-		CHECK(scripts.Create("Guard", &error, Loom::ProjectAssets::ScriptKind::StateMachine).empty());
-		CHECK(error.find("GuardWalking") != std::string::npos);
 	};
 
 	TEST_CASE("a script cannot take a registered state's name")

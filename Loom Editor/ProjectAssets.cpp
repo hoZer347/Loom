@@ -139,93 +139,26 @@ namespace {NAMESPACE}
 };
 )";
 
-		// The states state_machine declares, each named after the machine.
-		constexpr const char* const stateMachineStates[] = { "Waiting", "Walking" };
-
 		const char* const state_machine = R"(#pragma once
 
 #include "Utilities/StateMachine.h"
 
-#include <cmath>
-
 
 namespace {NAMESPACE}
 {
-	// A state machine is a component whose behaviour is its states. This one
-	// patrols: it waits, walks its GameObject out along X, waits, walks back.
-	// It starts in {NAME}Waiting; set Current in the inspector while it runs
-	// to send it straight to either state.
+	// A component whose behaviour is its states. Deriving from
+	// Loom::StateMachine is all it takes to appear under Add Component, with
+	// Start and Current to pick its states from.
 	struct {NAME} : Loom::StateMachine<{NAME}>
 	{
-		{NAME}();
-
-		Loom::Serial<float> m_distance = 2.0f;
-		Loom::Serial<float> m_speed = 1.0f;
-		Loom::Serial<float> m_pause = 1.0f;
-
-		// Where the patrol starts from, and whether the next walk is away
-		// from it.
-		float m_home = 0.0f;
-		bool m_outward = false;
-
 	protected:
 		void OnMachineStart() override
 		{
-			m_home = m_gameObject->transform.position->x;
 		};
-	};
 
-	// Stands still for the machine's Pause, then turns round.
-	struct {NAME}Waiting : Loom::State<{NAME}Waiting, {NAME}>
-	{
-		void OnUpdate() override;
-
-	private:
-		float m_waited = 0.0f;
-	};
-
-	// Walks to the end it is heading for at the machine's Speed.
-	struct {NAME}Walking : Loom::State<{NAME}Walking, {NAME}>
-	{
-		void OnUpdate() override;
-	};
-
-	// Defined below both states, since each hands over to the other.
-	inline {NAME}::{NAME}()
-	{
-		m_start = Loom::StateReference::Of<{NAME}Waiting>();
-	};
-
-	inline void {NAME}Waiting::OnUpdate()
-	{
-		m_waited += Loom::Time::DeltaTime();
-
-		if (m_waited < Focus()->m_pause)
-			return;
-
-		Focus()->m_outward = !Focus()->m_outward;
-
-		SetState<{NAME}Walking>();
-	};
-
-	inline void {NAME}Walking::OnUpdate()
-	{
-		const {NAME}& patrol = *Focus();
-
-		glm::vec3& position = *gameObject->transform.position;
-
-		const float target = patrol.m_home + (patrol.m_outward ? *patrol.m_distance : 0.0f);
-		const float step = patrol.m_speed * Loom::Time::DeltaTime();
-
-		if (std::abs(target - position.x) > step)
+		void OnMachineUpdate() override
 		{
-			position.x += std::copysign(step, target - position.x);
-			return;
 		};
-
-		position.x = target;
-
-		SetState<{NAME}Waiting>();
 	};
 };
 )";
@@ -391,79 +324,59 @@ void main()
 		return true;
 	};
 
-	namespace
+	std::string ProjectAssets::ScriptNameProblem(const std::string& scripts_project, const std::string& name)
 	{
-		// ScriptNameProblem for one type name.
-		std::string TypeNameProblem(const std::string& scripts_project, const std::string& name)
-		{
-			const auto identifier =
-				[&name]()
-				{
-					if (name.empty() || name.size() > maxNameLength || isdigit((unsigned char)name.front()))
+		const auto identifier =
+			[&name]()
+			{
+				if (name.empty() || name.size() > maxNameLength || isdigit((unsigned char)name.front()))
+					return false;
+
+				for (const char c : name)
+					if (!isalnum((unsigned char)c) && c != '_')
 						return false;
 
-					for (const char c : name)
-						if (!isalnum((unsigned char)c) && c != '_')
-							return false;
-
-					return true;
-				};
-
-			if (!identifier())
-				return "Letters, digits and _; it becomes a C++ type.";
-
-			for (const char* keyword : keywords)
-				if (name == keyword)
-					return "'" + name + "' is a C++ keyword.";
-
-			// Components register by type name without their namespace, and the
-			// registry turns away a second one by a name it already has.
-			if (ComponentRegistry::All().contains(name))
-				return "A component called " + name + " already exists.";
-
-			if (StateRegistry::Contains(name))
-				return "A state called " + name + " already exists.";
-
-			const std::filesystem::path root = std::filesystem::path(scripts_project).parent_path();
-			const std::string header = name + ".hpp";
-
-			// A header can hold several components, and the registry only knows the
-			// ones in a library that is built and loaded, so the headers are read too.
-			const std::regex declared("\\b(struct|class)\\s+" + name + "\\s*(final\\s*)?[:{]");
-
-			std::error_code code;
-
-			for (const auto& entry : std::filesystem::recursive_directory_iterator(root, code))
-			{
-				if (entry.path().filename() == header)
-					return "There is already a " + header + " in " + entry.path().parent_path().string() + '.';
-
-				if (entry.path().extension() != ".hpp")
-					continue;
-
-				std::ifstream in(entry.path(), std::ios::binary);
-				const std::string text{ std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>() };
-
-				if (std::regex_search(text, declared))
-					return "A type called " + name + " is already in " + entry.path().filename().string() + '.';
+				return true;
 			};
 
-			return "";
+		if (!identifier())
+			return "Letters, digits and _; it becomes a C++ type.";
+
+		for (const char* keyword : keywords)
+			if (name == keyword)
+				return "'" + name + "' is a C++ keyword.";
+
+		// Components register by type name without their namespace, and the
+		// registry turns away a second one by a name it already has.
+		if (ComponentRegistry::All().contains(name))
+			return "A component called " + name + " already exists.";
+
+		if (StateRegistry::Contains(name))
+			return "A state called " + name + " already exists.";
+
+		const std::filesystem::path root = std::filesystem::path(scripts_project).parent_path();
+		const std::string header = name + ".hpp";
+
+		// A header can hold several components, and the registry only knows the
+		// ones in a library that is built and loaded, so the headers are read too.
+		const std::regex declared("\\b(struct|class)\\s+" + name + "\\s*(final\\s*)?[:{]");
+
+		std::error_code code;
+
+		for (const auto& entry : std::filesystem::recursive_directory_iterator(root, code))
+		{
+			if (entry.path().filename() == header)
+				return "There is already a " + header + " in " + entry.path().parent_path().string() + '.';
+
+			if (entry.path().extension() != ".hpp")
+				continue;
+
+			std::ifstream in(entry.path(), std::ios::binary);
+			const std::string text{ std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>() };
+
+			if (std::regex_search(text, declared))
+				return "A type called " + name + " is already in " + entry.path().filename().string() + '.';
 		};
-	};
-
-	std::string ProjectAssets::ScriptNameProblem(
-		const std::string& scripts_project,
-		const std::string& name,
-		ScriptKind kind)
-	{
-		if (const std::string problem = TypeNameProblem(scripts_project, name); !problem.empty())
-			return problem;
-
-		if (kind == ScriptKind::StateMachine)
-			for (const char* state : stateMachineStates)
-				if (const std::string problem = TypeNameProblem(scripts_project, name + state); !problem.empty())
-					return problem;
 
 		return "";
 	};
@@ -515,7 +428,7 @@ void main()
 		ScriptKind kind,
 		std::string* error)
 	{
-		if (const std::string problem = ScriptNameProblem(scripts_project, name, kind); !problem.empty())
+		if (const std::string problem = ScriptNameProblem(scripts_project, name); !problem.empty())
 		{
 			Fail(error, problem);
 			return "";
