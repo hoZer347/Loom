@@ -11,16 +11,16 @@ namespace Loom
 {
 	#pragma region StateRegistry
 
-	static std::map<std::string, std::function<std::shared_ptr<State>()>>& Registry()
+	static std::map<std::string, std::function<std::shared_ptr<StateBase>()>>& Registry()
 	{
 		// Function-local, so a state registering itself from a static initialiser in
 		// another translation unit cannot beat the map into existence.
-		static std::map<std::string, std::function<std::shared_ptr<State>()>> registry;
+		static std::map<std::string, std::function<std::shared_ptr<StateBase>()>> registry;
 
 		return registry;
 	};
 
-	void StateRegistry::Register(const std::string& name, std::function<std::shared_ptr<State>()> create)
+	void StateRegistry::Register(const std::string& name, std::function<std::shared_ptr<StateBase>()> create)
 	{
 		Registry()[name] = std::move(create);
 	};
@@ -30,7 +30,7 @@ namespace Loom
 		Registry().erase(name);
 	};
 
-	std::shared_ptr<State> StateRegistry::Create(const std::string& name)
+	std::shared_ptr<StateBase> StateRegistry::Create(const std::string& name)
 	{
 		const auto found = Registry().find(name);
 
@@ -63,7 +63,7 @@ namespace Loom
 		return _create || StateRegistry::Contains(_type_name);
 	};
 
-	std::shared_ptr<State> StateReference::Create() const
+	std::shared_ptr<StateBase> StateReference::Create() const
 	{
 		return _create
 			? _create()
@@ -77,13 +77,13 @@ namespace Loom
 	/// Handler for many sub-states running at the same time: does not proceed until every
 	/// sub-state inside it has triggered Proceed. (Sub-states still run their own OnExit
 	/// as they proceed, rather than all at once at the end.)
-	struct StateMachineBase::St_Parallel final : State
+	struct StateMachineBase::St_Parallel final : StateBase
 	{
 		/// Sub-states that all run at once.
-		std::vector<std::shared_ptr<State>> SubStates{ };
+		std::vector<std::shared_ptr<StateBase>> SubStates{ };
 
 		/// Currently active sub-state, so a Proceed from inside one is attributed to it.
-		State* _active = nullptr;
+		StateBase* _active = nullptr;
 
 		std::string Name() const override { return "St_Parallel"; };
 
@@ -97,7 +97,7 @@ namespace Loom
 			if (_active == nullptr || found == SubStates.end())
 				return false;
 
-			const std::shared_ptr<State> finished = *found;
+			const std::shared_ptr<StateBase> finished = *found;
 
 			SubStates.erase(found);
 
@@ -113,7 +113,7 @@ namespace Loom
 		/// allowed to proceed from inside the very step being walked.
 		void Each(auto&& step)
 		{
-			for (const auto& state : std::vector<std::shared_ptr<State>>(SubStates))
+			for (const auto& state : std::vector<std::shared_ptr<StateBase>>(SubStates))
 			{
 				_active = state.get();
 
@@ -124,15 +124,15 @@ namespace Loom
 			};
 		};
 
-		void OnEnter(State* lastState) override { Each([&](State& s) { s.OnEnter(lastState); }); };
-		void OnUpdate() override { Each([](State& s) { s.OnUpdate(); }); };
-		void OnPhysics() override { Each([](State& s) { s.OnPhysics(); }); };
-		void OnLateUpdate() override { Each([](State& s) { s.OnLateUpdate(); }); };
-		void OnGui() override { Each([](State& s) { s.OnGui(); }); };
+		void OnEnter(StateBase* lastState) override { Each([&](StateBase& s) { s.OnEnter(lastState); }); };
+		void OnUpdate() override { Each([](StateBase& s) { s.OnUpdate(); }); };
+		void OnPhysics() override { Each([](StateBase& s) { s.OnPhysics(); }); };
+		void OnLateUpdate() override { Each([](StateBase& s) { s.OnLateUpdate(); }); };
+		void OnGui() override { Each([](StateBase& s) { s.OnGui(); }); };
 
 		// The one step that is not attributed to a sub-state: nothing is going to proceed
 		// out of a parallel that is already on its way out.
-		void OnExit(State* nextState) override
+		void OnExit(StateBase* nextState) override
 		{
 			for (const auto& state : SubStates)
 				if (state)
@@ -140,7 +140,7 @@ namespace Loom
 		};
 	};
 
-	const std::vector<std::shared_ptr<State>>* StateMachineBase::SubStatesOf(const State* state)
+	const std::vector<std::shared_ptr<StateBase>>* StateMachineBase::SubStatesOf(const StateBase* state)
 	{
 		const St_Parallel* parallel = dynamic_cast<const St_Parallel*>(state);
 
@@ -203,7 +203,7 @@ namespace Loom
 
 		OnMachineStart();
 
-		if (std::shared_ptr<State> first = FirstState())
+		if (std::shared_ptr<StateBase> first = FirstState())
 			Enter(std::move(first));
 	};
 
@@ -250,7 +250,7 @@ namespace Loom
 
 	#pragma region State Management
 
-	void StateMachineBase::Adopt(const std::shared_ptr<State>& state)
+	void StateMachineBase::Adopt(const std::shared_ptr<StateBase>& state)
 	{
 		if (!state)
 			return;
@@ -259,40 +259,40 @@ namespace Loom
 		state->stateMachine = this;
 	};
 
-	State* StateMachineBase::Enter(std::shared_ptr<State> state)
+	StateBase* StateMachineBase::Enter(std::shared_ptr<StateBase> state)
 	{
-		State* raw = QueueFirst(std::move(state));
+		StateBase* raw = QueueFirst(std::move(state));
 
 		Proceed();
 
 		return raw;
 	};
 
-	State* StateMachineBase::Queue(std::shared_ptr<State> state)
+	StateBase* StateMachineBase::Queue(std::shared_ptr<StateBase> state)
 	{
-		State* raw = state.get();
+		StateBase* raw = state.get();
 
 		_stateQueue.emplace_back(std::move(state));
 
 		return raw;
 	};
 
-	State* StateMachineBase::QueueFirst(std::shared_ptr<State> state)
+	StateBase* StateMachineBase::QueueFirst(std::shared_ptr<StateBase> state)
 	{
-		State* raw = state.get();
+		StateBase* raw = state.get();
 
 		_stateQueue.insert(_stateQueue.begin(), std::move(state));
 
 		return raw;
 	};
 
-	std::vector<State*> StateMachineBase::Parallelize(
-		std::vector<std::shared_ptr<State>> states,
-		std::shared_ptr<State>& out)
+	std::vector<StateBase*> StateMachineBase::Parallelize(
+		std::vector<std::shared_ptr<StateBase>> states,
+		std::shared_ptr<StateBase>& out)
 	{
 		auto parallel = std::make_shared<St_Parallel>();
 
-		std::vector<State*> raw;
+		std::vector<StateBase*> raw;
 		raw.reserve(states.size());
 
 		for (const auto& state : states)
@@ -305,38 +305,38 @@ namespace Loom
 		return raw;
 	};
 
-	std::vector<State*> StateMachineBase::QueueParallel(std::vector<std::shared_ptr<State>> states)
+	std::vector<StateBase*> StateMachineBase::QueueParallel(std::vector<std::shared_ptr<StateBase>> states)
 	{
-		std::shared_ptr<State> parallel;
+		std::shared_ptr<StateBase> parallel;
 
-		std::vector<State*> raw = Parallelize(std::move(states), parallel);
+		std::vector<StateBase*> raw = Parallelize(std::move(states), parallel);
 
 		_stateQueue.emplace_back(std::move(parallel));
 
 		return raw;
 	};
 
-	std::vector<State*> StateMachineBase::QueueParallelFirst(std::vector<std::shared_ptr<State>> states)
+	std::vector<StateBase*> StateMachineBase::QueueParallelFirst(std::vector<std::shared_ptr<StateBase>> states)
 	{
-		std::shared_ptr<State> parallel;
+		std::shared_ptr<StateBase> parallel;
 
-		std::vector<State*> raw = Parallelize(std::move(states), parallel);
+		std::vector<StateBase*> raw = Parallelize(std::move(states), parallel);
 
 		_stateQueue.insert(_stateQueue.begin(), std::move(parallel));
 
 		return raw;
 	};
 
-	std::vector<State*> StateMachineBase::EnterParallel(std::vector<std::shared_ptr<State>> states)
+	std::vector<StateBase*> StateMachineBase::EnterParallel(std::vector<std::shared_ptr<StateBase>> states)
 	{
-		std::vector<State*> raw = QueueParallel(std::move(states));
+		std::vector<StateBase*> raw = QueueParallel(std::move(states));
 
 		Proceed();
 
 		return raw;
 	};
 
-	State* StateMachineBase::Proceed()
+	StateBase* StateMachineBase::Proceed()
 	{
 		// St_Parallel overrides normal Proceed: one sub-state finishing is not the whole
 		// parallel state finishing.
@@ -344,11 +344,11 @@ namespace Loom
 			if (parallel->OnChildProceed())
 				return _stateQueue.empty() ? nullptr : _stateQueue.front().get();
 
-		State* nextState = _stateQueue.empty() ? nullptr : _stateQueue.front().get();
+		StateBase* nextState = _stateQueue.empty() ? nullptr : _stateQueue.front().get();
 
 		// Held, so the outgoing state survives its own OnExit and the incoming state's
 		// OnEnter -- which is handed a pointer to it.
-		const std::shared_ptr<State> previousState = current;
+		const std::shared_ptr<StateBase> previousState = current;
 
 		if (current)
 			current->OnExit(nextState);

@@ -25,7 +25,7 @@ namespace Loom
 	{
 		std::string Name() const override { return "St_Dg_DialogueEnd"; };
 
-		void OnEnter(State* lastState) override;
+		void OnEnter(StateBase* lastState) override;
 	};
 
 	/// Runs one [Binding] token and moves on.
@@ -55,7 +55,7 @@ namespace Loom
 
 		std::string Describe() const override { return text; };
 
-		void OnEnter(State* lastState) override;
+		void OnEnter(StateBase* lastState) override;
 
 		void OnUpdate() override;
 

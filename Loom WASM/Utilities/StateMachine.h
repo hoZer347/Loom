@@ -31,7 +31,7 @@ namespace Loom
 		/// Where this machine's commands land. It is its own pump.
 		StateMachineBase& Machine() { return *this; };
 
-		State* Current() const { return current.get(); };
+		StateBase* Current() const { return current.get(); };
 
 		#pragma region Primitives
 
@@ -40,28 +40,28 @@ namespace Loom
 		// a state that already exists, the commands build one.
 
 		/// Queues at the front, then proceeds -- SetState.
-		State* Enter(std::shared_ptr<State> state);
+		StateBase* Enter(std::shared_ptr<StateBase> state);
 
 		/// Queues at the back -- Push.
-		State* Queue(std::shared_ptr<State> state);
+		StateBase* Queue(std::shared_ptr<StateBase> state);
 
 		/// Queues at the front -- PushFirst.
-		State* QueueFirst(std::shared_ptr<State> state);
+		StateBase* QueueFirst(std::shared_ptr<StateBase> state);
 
 		/// Queues a set that runs at once, then proceeds -- SetParallel.
-		std::vector<State*> EnterParallel(std::vector<std::shared_ptr<State>> states);
+		std::vector<StateBase*> EnterParallel(std::vector<std::shared_ptr<StateBase>> states);
 
 		/// Queues a set that runs at once -- PushParallel.
-		std::vector<State*> QueueParallel(std::vector<std::shared_ptr<State>> states);
+		std::vector<StateBase*> QueueParallel(std::vector<std::shared_ptr<StateBase>> states);
 
 		/// The same, at the front -- PushParallelFirst.
-		std::vector<State*> QueueParallelFirst(std::vector<std::shared_ptr<State>> states);
+		std::vector<StateBase*> QueueParallelFirst(std::vector<std::shared_ptr<StateBase>> states);
 
 		#pragma endregion
 
 		/// Takes the current state out and brings the head of the queue in. Returns what
 		/// is left at the head.
-		State* Proceed();
+		StateBase* Proceed();
 
 		/// Empties the queue. The current state keeps running.
 		void Clear();
@@ -94,11 +94,11 @@ namespace Loom
 		#pragma region Inspection
 
 		/// States waiting to run, next first. The current state is not among them.
-		const std::vector<std::shared_ptr<State>>& Queued() const { return _stateQueue; };
+		const std::vector<std::shared_ptr<StateBase>>& Queued() const { return _stateQueue; };
 
 		/// Entered states with the time they were entered, oldest first. Empty unless
 		/// maxSavedStates is above zero.
-		const std::deque<std::pair<float, std::shared_ptr<State>>>& History() const { return _stateStack; };
+		const std::deque<std::pair<float, std::shared_ptr<StateBase>>>& History() const { return _stateStack; };
 
 		/// True between Disable and Enable -- a state is held aside and nothing is running.
 		bool IsDisabled() const { return disabledState != nullptr && current == nullptr; };
@@ -107,7 +107,7 @@ namespace Loom
 		float ElapsedTime() const { return elapsedTime; };
 
 		/// What a parallel state is running at once, or null for an ordinary state.
-		static const std::vector<std::shared_ptr<State>>* SubStatesOf(const State* state);
+		static const std::vector<std::shared_ptr<StateBase>>* SubStatesOf(const StateBase* state);
 
 		/// Writes every recorded past state (oldest first) out as text, and clears it.
 		std::string FlushStateHistory();
@@ -151,7 +151,7 @@ namespace Loom
 		#pragma endregion
 
 		/// The state the machine enters when it starts, or null to start on nothing.
-		virtual std::shared_ptr<State> FirstState() const { return nullptr; };
+		virtual std::shared_ptr<StateBase> FirstState() const { return nullptr; };
 
 		/// Ends the state Disable put aside, for when another is entered in its place
 		/// rather than it being enabled again.
@@ -162,29 +162,29 @@ namespace Loom
 
 		/// Wraps a set of states in one parallel state, and hands back the raw pointers.
 		/// Both parallel queues differ only in which end the result goes on.
-		static std::vector<State*> Parallelize(
-			std::vector<std::shared_ptr<State>> states,
-			std::shared_ptr<State>& out);
+		static std::vector<StateBase*> Parallelize(
+			std::vector<std::shared_ptr<StateBase>> states,
+			std::shared_ptr<StateBase>& out);
 
-		void Adopt(const std::shared_ptr<State>& state);
+		void Adopt(const std::shared_ptr<StateBase>& state);
 
-		std::shared_ptr<State> current{ };
-		std::shared_ptr<State> disabledState{ };
+		std::shared_ptr<StateBase> current{ };
+		std::shared_ptr<StateBase> disabledState{ };
 
 		float elapsedTime = 0.0f;
 		bool started = false;
 
 		/// Queue of states. On Proceed, pulls the first element.
-		std::vector<std::shared_ptr<State>> _stateQueue{ };
+		std::vector<std::shared_ptr<StateBase>> _stateQueue{ };
 
 		/// Previously entered states, for debugging.
-		std::deque<std::pair<float, std::shared_ptr<State>>> _stateStack{ };
+		std::deque<std::pair<float, std::shared_ptr<StateBase>>> _stateStack{ };
 	};
 
-	// Now that the machine is a complete type, the two commands State could not carry
+	// Now that the machine is a complete type, the two commands StateBase could not carry
 	// inline.
-	inline void State::Proceed() { stateMachine->Proceed(); };
-	inline void State::Clear() { stateMachine->Clear(); };
+	inline void StateBase::Proceed() { stateMachine->Proceed(); };
+	inline void StateBase::Clear() { stateMachine->Clear(); };
 
 	/// A state machine living on a GameObject, with its Start and Current states in
 	/// the inspector and the scene file.
@@ -253,7 +253,7 @@ namespace Loom
 			if (field.data != &*m_current || !IsStarted())
 				return;
 
-			if (std::shared_ptr<State> state = m_current->Create())
+			if (std::shared_ptr<StateBase> state = m_current->Create())
 			{
 				ExitDisabled();
 				Enter(std::move(state));
@@ -263,9 +263,9 @@ namespace Loom
 		};
 
 	protected:
-		std::shared_ptr<State> FirstState() const override
+		std::shared_ptr<StateBase> FirstState() const override
 		{
-			std::shared_ptr<State> first = m_current->Create();
+			std::shared_ptr<StateBase> first = m_current->Create();
 
 			return first ? first : m_start->Create();
 		};
@@ -277,7 +277,7 @@ namespace Loom
 			if (!IsStarted())
 				return;
 
-			const State* state = Current();
+			const StateBase* state = Current();
 
 			m_current = state
 				? StateReference::Named(PrettyTypeName(typeid(*state).name()))

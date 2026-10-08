@@ -3,12 +3,12 @@
 
 namespace Loom
 {
-	void St_Dg_DialogueEnd::OnEnter(State* lastState)
+	void St_Dg_DialogueEnd::OnEnter(StateBase* lastState)
 	{
 		Focus()->ClearText();
 	};
 
-	void St_Dg_StreamPlainText::OnEnter(State* lastState)
+	void St_Dg_StreamPlainText::OnEnter(StateBase* lastState)
 	{
 		duration.Reset(Focus()->TextSpeed());
 	};

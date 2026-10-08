@@ -36,15 +36,15 @@ namespace Loom
 		template <typename _State, typename _Configure = std::nullptr_t>
 		static StateReference Of(_Configure configure = nullptr)
 		{
-			static_assert(std::is_base_of_v<State, _State>, "State must derive from State");
+			static_assert(std::is_base_of_v<StateBase, _State>, "State must derive from StateBase");
 
 			StateReference reference;
 
-			// Unqualified, the way HOZER_REGISTER_STATE names it, so a reference
-			// written to a file is read back as the same state.
+			// Unqualified, the way State<T> registers it, so a reference written
+			// to a file is read back as the same state.
 			reference._type_name = PrettyTypeName(typeid(_State).name());
 			reference._create =
-				[configure]() -> std::shared_ptr<State>
+				[configure]() -> std::shared_ptr<StateBase>
 				{
 					auto state = std::make_shared<_State>();
 
@@ -74,51 +74,10 @@ namespace Loom
 
 		/// A fresh state, or null when nothing is set. A copy every time, so the same
 		/// reference can start a machine more than once.
-		std::shared_ptr<State> Create() const;
+		std::shared_ptr<StateBase> Create() const;
 
 	private:
 		std::string _type_name{ };
-		std::function<std::shared_ptr<State>()> _create{ };
-	};
-
-	/// Names that can be built by string. A state registers itself once, and anything
-	/// data-driven (a monitor's "set state" box, a config file, a script) can then
-	/// reach it.
-	struct LOOM_API StateRegistry final
-	{
-		static void Register(const std::string& name, std::function<std::shared_ptr<State>()> create);
-
-		/// Takes a name back out: a script library is unloaded before it is rebuilt,
-		/// and a factory pointing into code that is no longer mapped is a crash.
-		static void Unregister(const std::string& name);
-
-		static std::shared_ptr<State> Create(const std::string& name);
-
-		static bool Contains(const std::string& name);
-
-		/// Every registered name, sorted, for a dropdown to list.
-		static std::vector<std::string> Names();
-
-		StateRegistry() = delete;
-	};
-
-	namespace detail
-	{
-		struct StateRegistrar final
-		{
-			StateRegistrar(const std::string& name, std::function<std::shared_ptr<State>()> create)
-			{
-				StateRegistry::Register(name, std::move(create));
-			};
-		};
+		std::function<std::shared_ptr<StateBase>()> _create{ };
 	};
 };
-
-
-/// Makes a state buildable by name. Written once, at file scope, beneath the state:
-///
-///		HOZER_REGISTER_STATE(St_Idle);
-#define HOZER_REGISTER_STATE(_State)														\
-	static const Loom::detail::StateRegistrar _hozer_registrar_##_State(				\
-		#_State,																			\
-		[]() -> std::shared_ptr<Loom::State> { return std::make_shared<_State>(); })

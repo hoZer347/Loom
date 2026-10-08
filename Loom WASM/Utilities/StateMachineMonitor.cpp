@@ -13,7 +13,7 @@ namespace Loom
 {
 	void StateMachineMonitor::DrawInline(StateMachineBase& machine)
 	{
-		const State* current = machine.Current();
+		const StateBase* current = machine.Current();
 
 		ImGui::Text("Elapsed:  %.3f", machine.ElapsedTime());
 
@@ -140,7 +140,7 @@ namespace Loom
 
 			if (ImGui::TreeNode(machine, "%s", machine->MachineName().c_str()))
 			{
-				const State* current = machine->Current();
+				const StateBase* current = machine->Current();
 
 				ImGui::Text("Current:  %s", current ? current->Name().c_str() : "<none>");
 
