@@ -403,15 +403,20 @@ void main()
 			: "";
 	};
 
+	bool ProjectAssets::IsUnder(const std::string& path, const std::string& folder)
+	{
+		const std::filesystem::path relative =
+			std::filesystem::path(path).lexically_relative(folder);
+
+		return !relative.empty() && *relative.begin() != "..";
+	};
+
 	ProjectAssets::OpenCommand ProjectAssets::OpenWith(
 		const std::string& path,
 		const std::string& scripts_folder,
 		const std::string& devenv)
 	{
-		const std::filesystem::path relative =
-			std::filesystem::path(path).lexically_relative(scripts_folder);
-
-		if (devenv.empty() || relative.empty() || *relative.begin() == "..")
+		if (devenv.empty() || !IsUnder(path, scripts_folder))
 			return { path, "" };
 
 		const std::filesystem::path extension = std::filesystem::path(path).extension();

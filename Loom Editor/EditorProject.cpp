@@ -109,14 +109,6 @@ namespace Loom
 				});
 		};
 
-		bool IsUnder(const std::string& path, const std::string& folder)
-		{
-			const std::filesystem::path relative =
-				std::filesystem::path(path).lexically_relative(folder);
-
-			return !relative.empty() && *relative.begin() != "..";
-		};
-
 		void Shell(const char* file, const std::string& parameters)
 		{
 			const HINSTANCE result = ShellExecuteA(
@@ -296,7 +288,7 @@ namespace Loom
 			if (depth == 0)
 				flags |= ImGuiTreeNodeFlags_DefaultOpen;
 
-			if (m_revealSelectedAsset && IsUnder(m_selectedAsset, node.path))
+			if (m_revealSelectedAsset && ProjectAssets::IsUnder(m_selectedAsset, node.path))
 				ImGui::SetNextItemOpen(true);
 		}
 		else
@@ -395,7 +387,7 @@ namespace Loom
 		const std::string scripts =
 			std::filesystem::path(ScriptsProject()).parent_path().string();
 
-		return IsUnder(m_newAssetFolder, scripts) || m_newAssetFolder == scripts
+		return ProjectAssets::IsUnder(m_newAssetFolder, scripts) || m_newAssetFolder == scripts
 			? m_newAssetFolder
 			: scripts;
 	};
