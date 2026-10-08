@@ -31,8 +31,9 @@ namespace Loom
 		// One label per entry of object.GetFields(), in the same order.
 		static std::vector<std::string> Of(const LoomObject& object);
 
-		// One list per entry of object.GetFields(), empty for a field that is
-		// not an enum or that the symbols say nothing about.
-		static std::vector<std::vector<Enumerator>> EnumeratorsOf(const LoomObject& object);
+		// One list per entry of object.GetFields(), null for a field that is not
+		// an enum or that the symbols say nothing about. The lists live as long
+		// as the process.
+		static std::vector<const std::vector<Enumerator>*> EnumeratorsOf(const LoomObject& object);
 	};
 };

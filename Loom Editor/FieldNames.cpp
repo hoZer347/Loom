@@ -231,8 +231,8 @@ namespace Loom
 			return name;
 		};
 
-		// What the symbols of the module that made this object say its Serial
-		// members are called. Empty when they cannot say.
+		// What the symbols of the module that made this object say about its
+		// Serial members. Empty when they cannot say.
 		Members Read(const std::type_info& type, HMODULE module, const IMAGE_NT_HEADERS& headers)
 		{
 			if (Session() == nullptr)
@@ -334,12 +334,12 @@ namespace Loom
 		return names;
 	};
 
-	std::vector<std::vector<FieldNames::Enumerator>> FieldNames::EnumeratorsOf(const LoomObject& object)
+	std::vector<const std::vector<FieldNames::Enumerator>*> FieldNames::EnumeratorsOf(const LoomObject& object)
 	{
-		std::vector<std::vector<Enumerator>> enumerators;
+		std::vector<const std::vector<Enumerator>*> enumerators;
 
 		for (const Member* member : Lookup(object))
-			enumerators.push_back(member ? member->enumerators : std::vector<Enumerator>{ });
+			enumerators.push_back(member && !member->enumerators.empty() ? &member->enumerators : nullptr);
 
 		return enumerators;
 	};
