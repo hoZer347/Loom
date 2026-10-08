@@ -20,10 +20,7 @@ namespace Loom
 		enum struct ScriptKind
 		{
 			Component,
-
-			// A state, registered so a state machine's fields can name it.
 			State,
-
 			StateMachine,
 		};
 
