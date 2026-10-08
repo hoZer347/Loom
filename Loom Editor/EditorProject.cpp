@@ -786,15 +786,16 @@ namespace Loom
 			ProjectAssets::IsUnder(path, std::filesystem::path(m_scripts.GetProject()).parent_path().string());
 	};
 
-	void Editor::OpenScript(const std::string& path)
+	void Editor::OpenInVisualStudio(const std::string& path)
 	{
 		// A hand-written project need not have a solution beside it, even though
 		// every project the editor writes does.
-		const std::string solution =
-			std::filesystem::path(m_scripts.GetProject()).replace_extension(".sln").string();
+		const std::string solution = m_scripts.HasProject()
+			? std::filesystem::path(m_scripts.GetProject()).replace_extension(".sln").string()
+			: "";
 
 		std::error_code code;
-		const bool has_solution = std::filesystem::exists(solution, code);
+		const bool has_solution = !solution.empty() && std::filesystem::exists(solution, code);
 
 		if (has_solution && OpenInRunningVisualStudio(solution, path))
 			return;
@@ -816,8 +817,8 @@ namespace Loom
 	{
 		if (std::filesystem::path(path).extension() == SceneSerializer::extension)
 			OpenScene(path);
-		else if (IsScriptFile(path))
-			OpenScript(path);
+		else if (IsScriptFile(path) || std::filesystem::path(path).extension() == Shader::extension)
+			OpenInVisualStudio(path);
 		else
 			OpenFile(path);
 	};
