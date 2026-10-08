@@ -473,8 +473,12 @@ namespace Loom
 	{
 		// The handler reads this editor's panels, and ImGui would otherwise
 		// call it when the engine destroys the context, after this is gone.
+		// Saving before ImGui has read the file would leave only the panels in it.
 		ImGuiIO& io = ImGui::GetIO();
-		ImGui::SaveIniSettingsToDisk(io.IniFilename);
+
+		if (ImGui::GetCurrentContext()->SettingsLoaded)
+			ImGui::SaveIniSettingsToDisk(io.IniFilename);
+
 		io.IniFilename = nullptr;
 		ImGui::RemoveSettingsHandler(panel_settings);
 
@@ -1197,8 +1201,7 @@ namespace Loom
 		if (!m_screenshotPath.empty() && ++m_frame >= m_screenshotFrame)
 			CaptureFrame();
 
-		DrawFolderPrompt();
-		if (!m_layoutToSave.empty() && !m_firstFrame)
+		if (!m_layoutToSave.empty())
 		{
 			if (!EditorLayouts::Save(LayoutsFolder(), m_layoutToSave))
 				std::cerr << "Could not write the layout '" << m_layoutToSave << "'" << std::endl;
@@ -1206,6 +1209,7 @@ namespace Loom
 			m_layoutToSave.clear();
 		};
 
+		DrawFolderPrompt();
 		DrawNewProjectPrompt();
 		DrawSaveLayoutPrompt();
 		DrawCreateAssetPrompt();

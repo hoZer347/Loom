@@ -118,6 +118,21 @@ TEST_SUITE("EditorLayouts")
 		CHECK(std::find(windows.begin(), windows.end(), ImHashStr("Never Drawn")) == windows.end());
 	};
 
+	TEST_CASE("a layout with Windows line endings still names its windows")
+	{
+		Driven driven;
+		driven.Frame();
+
+		std::filesystem::create_directories(driven.folder);
+		std::ofstream(driven.folder / "Crlf.ini", std::ios::binary)
+			<< "[Window][" << window << "]\r\nPos=10,10\r\n\r\n[Window][Second]\r\nPos=20,20\r\n";
+
+		std::vector<ImGuiID> windows;
+		REQUIRE(Loom::EditorLayouts::Load(driven.folder, "Crlf", &windows));
+
+		CHECK(windows == std::vector<ImGuiID>{ ImHashStr(window), ImHashStr("Second") });
+	};
+
 	TEST_CASE("a saved layout is listed by name, sorted, and other files are not")
 	{
 		Driven driven;

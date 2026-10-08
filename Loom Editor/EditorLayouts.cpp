@@ -112,12 +112,12 @@ namespace Loom
 			{
 				at += strlen(window_entry);
 
-				const size_t end = settings.find("]\n", at);
+				const size_t end = std::min(settings.find_first_of("\r\n", at), settings.size());
 
-				if (end == std::string::npos)
+				if (end == at || settings[end - 1] != ']')
 					break;
 
-				windows->push_back(ImHashStr(settings.c_str() + at, end - at));
+				windows->push_back(ImHashStr(settings.c_str() + at, end - 1 - at));
 			};
 		};
 
