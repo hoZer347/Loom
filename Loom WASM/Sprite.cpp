@@ -249,13 +249,13 @@ void main()
 		DrawQuad(program);
 	};
 
-	void Sprite::DrawQuad(uint32_t program)
+	bool Sprite::DrawQuad(uint32_t program)
 	{
 		Renderer* renderer = Renderer::Get();
 		const Texture* texture = GetTexture();
 
 		if (!renderer || !texture || !texture->handle)
-			return;
+			return false;
 
 		renderer->SetTexture(program, "u_texture", texture->handle);
 		renderer->SetUniform(program, "u_color", *color);
@@ -263,5 +263,7 @@ void main()
 		renderer->SetUniform(program, "u_model", QuadMatrix());
 
 		renderer->Draw(program, Mesh::Triangles, QUAD, QUAD_VERTICES, STATIC_DRAW);
+
+		return true;
 	};
 };

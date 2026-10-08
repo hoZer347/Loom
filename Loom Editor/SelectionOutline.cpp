@@ -5,13 +5,12 @@
 #include "Mesh.h"
 #include "OpenGL.h"
 #include "Renderer.h"
-#include "Shaders.h"
 #include "Sprite.h"
 
 #include <cstring>
 #include <iostream>
 #include <iterator>
-#include <sstream>
+#include <stdexcept>
 #include <typeinfo>
 
 
@@ -36,9 +35,7 @@ namespace Loom
 		constexpr size_t floats_per_vertex = 3;
 		constexpr size_t screen_vertices = std::size(screen) / floats_per_vertex;
 
-		const char* const mesh_mask_shader = R"(
-// ===VERTEX===
-
+		const char* const mesh_mask_vertex = R"(
 layout(location = 0) in vec3 aPos;
 
 uniform mat4 u_model;
@@ -48,9 +45,9 @@ void main()
 {
 	gl_Position = u_viewProjection * u_model * vec4(aPos, 1.0);
 }
+)";
 
-// ===FRAGMENT===
-
+		const char* const mesh_mask_fragment = R"(
 out vec4 FragColor;
 
 void main()
@@ -59,10 +56,7 @@ void main()
 }
 )";
 
-		// Cut out the way Sprite cuts its quad, so the ring follows the image.
-		const char* const sprite_mask_shader = R"(
-// ===VERTEX===
-
+		const char* const sprite_mask_vertex = R"(
 layout(location = 0) in vec3 aPos;
 
 uniform mat4 u_model;
@@ -75,9 +69,10 @@ void main()
 	v_uv = aPos.xy;
 	gl_Position = u_viewProjection * u_model * vec4(aPos, 1.0);
 }
+)";
 
-// ===FRAGMENT===
-
+		// Cut out the way Sprite cuts its quad, so the ring follows the image.
+		const char* const sprite_mask_fragment = R"(
 in vec2 v_uv;
 
 uniform sampler2D u_texture;
@@ -95,20 +90,18 @@ void main()
 }
 )";
 
-		// The mask is the size of the target, so a fragment's own pixel is the
-		// mask's.
-		const char* const edge_shader = R"(
-// ===VERTEX===
-
+		const char* const edge_vertex = R"(
 layout(location = 0) in vec3 aPos;
 
 void main()
 {
 	gl_Position = vec4(aPos, 1.0);
 }
+)";
 
-// ===FRAGMENT===
-
+		// The mask is the size of the target, so a fragment's own pixel is the
+		// mask's.
+		const char* const edge_fragment = R"(
 uniform sampler2D u_mask;
 uniform vec4 u_color;
 
@@ -136,69 +129,85 @@ void main()
 	discard;
 }
 )";
+	};
 
-		// Like the materials' shaders, they live until the process ends. 0 when
-		// one will not compile, which is reported once.
-		uint32_t Compile(const char* name, const char* source)
+	SelectionOutline::~SelectionOutline()
+	{
+		Destroy();
+	};
+
+	bool SelectionOutline::Compile()
+	{
+		if (m_compileTried)
+			return m_edge != 0;
+
+		m_compileTried = true;
+
+		Renderer& renderer = *Renderer::Get();
+
+		try
 		{
-			try
+			m_meshMask = renderer.CreateProgram("Loom Editor Mesh Mask", mesh_mask_vertex, mesh_mask_fragment);
+			m_spriteMask = renderer.CreateProgram("Loom Editor Sprite Mask", sprite_mask_vertex, sprite_mask_fragment);
+			m_edge = renderer.CreateProgram("Loom Editor Selection Outline", edge_vertex, edge_fragment);
+		}
+		catch (const std::exception& e)
+		{
+			std::cerr << "Selection outline: " << e.what() << std::endl;
+			Destroy();
+		};
+
+		return m_edge != 0;
+	};
+
+	void SelectionOutline::Destroy()
+	{
+		Renderer* renderer = Renderer::Get();
+
+		for (uint32_t* program : { &m_meshMask, &m_spriteMask, &m_edge })
+		{
+			if (renderer && *program)
+				renderer->DeleteProgram(*program);
+
+			*program = 0;
+		};
+	};
+
+	bool SelectionOutline::DrawSilhouettes(GameObject& gameObject)
+	{
+		bool drew = false;
+
+		// By type name, the way GetComponent matches: a script library's Mesh
+		// carries its own copy of the type info.
+		for (ComponentBase* component : gameObject.GetComponents())
+			if (strcmp(component->GetTypeName(), typeid(Mesh).name()) == 0)
 			{
-				std::istringstream stream(source);
-				return (new Shader(name, stream))->id;
+				Mesh* mesh = (Mesh*)component;
+
+				if (!mesh->IsDrawable())
+					continue;
+
+				mesh->Draw(m_meshMask);
+				drew = true;
 			}
-			catch (const std::exception& e)
-			{
-				std::cerr << "Selection outline: " << e.what() << std::endl;
-				return 0;
-			};
-		};
+			else if (strcmp(component->GetTypeName(), typeid(Sprite).name()) == 0)
+				drew |= ((Sprite*)component)->DrawQuad(m_spriteMask);
 
-		uint32_t MeshMaskProgram()
-		{
-			static const uint32_t program = Compile("Loom Editor Mesh Mask", mesh_mask_shader);
-			return program;
-		};
+		for (GameObject* child : gameObject.GetChildren())
+			drew |= DrawSilhouettes(*child);
 
-		uint32_t SpriteMaskProgram()
-		{
-			static const uint32_t program = Compile("Loom Editor Sprite Mask", sprite_mask_shader);
-			return program;
-		};
-
-		uint32_t EdgeProgram()
-		{
-			static const uint32_t program = Compile("Loom Editor Selection Outline", edge_shader);
-			return program;
-		};
-
-		void DrawSilhouettes(GameObject& gameObject)
-		{
-			// By type name, the way GetComponent matches: a script library's Mesh
-			// carries its own copy of the type info.
-			for (ComponentBase* component : gameObject.GetComponents())
-				if (strcmp(component->GetTypeName(), typeid(Mesh).name()) == 0)
-				{
-					Mesh* mesh = (Mesh*)component;
-
-					if (mesh->IsDrawable())
-						mesh->Draw(MeshMaskProgram());
-				}
-				else if (strcmp(component->GetTypeName(), typeid(Sprite).name()) == 0)
-					((Sprite*)component)->DrawQuad(SpriteMaskProgram());
-
-			for (GameObject* child : gameObject.GetChildren())
-				DrawSilhouettes(*child);
-		};
+		return drew;
 	};
 
 	void SelectionOutline::Draw(GameObject& selected, const Camera& camera)
 	{
 		Renderer* renderer = Renderer::Get();
 
-		if (!renderer || !MeshMaskProgram() || !SpriteMaskProgram() || !EdgeProgram())
+		if (!renderer || !Compile())
 			return;
 
 		const glm::ivec2 size = renderer->TargetSize();
+		bool drew = false;
 
 		m_mask.Render(
 			size.x,
@@ -206,21 +215,24 @@ void main()
 			uncovered,
 			[&]()
 			{
-				camera.Apply(MeshMaskProgram());
-				camera.Apply(SpriteMaskProgram());
+				// The mesh program last, so that when nothing draws it is the one
+				// left bound: GL calls the sprite program's sampler undefined
+				// behaviour while it would read the shadow map left on its unit.
+				camera.Apply(m_spriteMask);
+				camera.Apply(m_meshMask);
 
-				DrawSilhouettes(selected);
+				drew = DrawSilhouettes(selected);
 			});
 
-		if (!m_mask.GetTexture())
+		if (!drew)
 			return;
 
 		// Otherwise the scene's depth would hide the ring wherever it overlaps
 		// something nearer than the screen quad.
 		renderer->Clear(nullptr, true);
 
-		renderer->SetTexture(EdgeProgram(), "u_mask", m_mask.GetTexture());
-		renderer->SetUniform(EdgeProgram(), "u_color", outline_colour);
-		renderer->Draw(EdgeProgram(), GL_TRIANGLES, screen, screen_vertices, GL_STATIC_DRAW);
+		renderer->SetTexture(m_edge, "u_mask", m_mask.GetTexture());
+		renderer->SetUniform(m_edge, "u_color", outline_colour);
+		renderer->Draw(m_edge, GL_TRIANGLES, screen, screen_vertices, GL_STATIC_DRAW);
 	};
 };

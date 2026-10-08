@@ -11,112 +11,21 @@
 #include "Shaders.h"
 #include "ShaderVariables.h"
 
-#include <array>
-#include <bit>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <iterator>
-#include <map>
 #include <sstream>
-#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <vector>
 
 using LoomTests::Pump;
+using LoomTests::RecordingRenderer;
 
 
 namespace
 {
-	// Stands in for the Engine's renderer while it lives, which a test has no
-	// window to open. It hands out handles, records what it is given, and
-	// compiles anything but a fragment stage that says BROKEN.
-	struct RecordingRenderer final : Loom::Renderer
-	{
-		static constexpr const char* BROKEN = "BROKEN";
-		static constexpr int MAX_TEXTURE_SIZE = 4096;
-
-		struct Uniform
-		{
-			Loom::UniformType type;
-			std::array<uint32_t, Loom::MAX_UNIFORM_COMPONENTS> components{ };
-
-			float Float(int i) const { return std::bit_cast<float>(components[i]); };
-			int32_t Int(int i) const { return (int32_t)components[i]; };
-		};
-
-		RecordingRenderer() : m_previous(current) { current = this; };
-		~RecordingRenderer() { current = m_previous; };
-
-		Loom::Backend GetBackend() const override { return Loom::Backend::OpenGL; };
-		bool Attach(GLFWwindow*) override { return true; };
-
-		void InitImGui(GLFWwindow*) override { };
-		void ShutdownImGui() override { };
-		void NewImGuiFrame() override { };
-		void RenderImGui(ImDrawData*) override { };
-		void RenderImGuiWindows() override { };
-		void BeginFrame() override { };
-		void EndFrame() override { };
-		void Capture(const CaptureHandler&) override { };
-
-		uint32_t CreateProgram(const std::string& name, const std::string&, const std::string& fragment) override
-		{
-			if (fragment.find(BROKEN) != std::string::npos)
-				throw std::runtime_error("Shader compile error in " + name);
-
-			return ++m_handles;
-		};
-
-		void DeleteProgram(uint32_t program) override { deleted.push_back(program); };
-
-		void SetUniform(uint32_t, const char* name, float value) override { floats[name] = value; };
-		void SetUniform(uint32_t, const char*, const glm::vec3&) override { };
-		void SetUniform(uint32_t, const char*, const glm::vec4&) override { };
-		void SetUniform(uint32_t, const char* name, const glm::mat4& value) override { matrices[name] = value; };
-
-		void SetUniform(uint32_t, const char* name, Loom::UniformType type, const void* components) override
-		{
-			const Loom::UniformTypeInfo& info = Loom::InfoOf(type);
-
-			Uniform& uniform = uniforms[name];
-			uniform.type = type;
-			std::copy_n((const uint32_t*)components, info.columns * info.rows, uniform.components.begin());
-		};
-
-		void SetTexture(uint32_t, const char* name, uint32_t texture) override { textures[name] = texture; };
-
-		void Draw(uint32_t program, uint32_t, const float*, size_t, uint32_t) override { drawn.push_back(program); };
-
-		uint32_t CreateTexture(int, int, const uint8_t*) override { return ++m_handles; };
-		uint32_t CreateDepthTarget(int) override { return ++m_handles; };
-		uint32_t CreateColorTarget(int, int) override { return ++m_handles; };
-		void DestroyTexture(uint32_t) override { };
-
-		void PushTarget(uint32_t) override { };
-		void PopTarget() override { };
-		void Clear(const float*, bool) override { };
-		void SetDepthBias(float, float) override { };
-		void SetDepthWrite(bool write) override { depthWrites.push_back(write); };
-
-		glm::ivec2 TargetSize() const override { return glm::ivec2(1); };
-		int MaxTextureSize() const override { return MAX_TEXTURE_SIZE; };
-		void* ImGuiTexture(uint32_t) override { return nullptr; };
-
-		std::map<std::string, float> floats;
-		std::map<std::string, glm::mat4> matrices;
-		std::map<std::string, Uniform> uniforms;
-		std::map<std::string, uint32_t> textures;
-		std::vector<uint32_t> deleted;
-		std::vector<uint32_t> drawn;
-		std::vector<bool> depthWrites;
-
-	private:
-		Renderer* m_previous;
-		uint32_t m_handles = 0;
-	};
-
 	// A shader file in the temp folder, gone again when the test is.
 	struct ShaderFile
 	{

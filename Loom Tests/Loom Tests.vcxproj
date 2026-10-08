@@ -117,6 +117,7 @@
     <ClCompile Include="Camera Tests.cpp" />
     <ClCompile Include="Light Tests.cpp" />
     <ClCompile Include="Sprite Tests.cpp" />
+    <ClCompile Include="SelectionOutline Tests.cpp" />
     <ClCompile Include="Mesh Tests.cpp" />
     <ClCompile Include="Material Tests.cpp" />
     <ClCompile Include="Shader Variables Tests.cpp" />
@@ -162,6 +163,8 @@
     <ClCompile Include="..\Loom Editor\ShaderEditor.cpp" />
     <ClCompile Include="..\Loom Editor\EditorLog.cpp" />
     <ClCompile Include="..\Loom Editor\EditorTheme.cpp" />
+    <ClCompile Include="..\Loom Editor\EditorViewport.cpp" />
+    <ClCompile Include="..\Loom Editor\SelectionOutline.cpp" />
   </ItemGroup>
   <ItemGroup>
     <!-- ImGui is linked rather than recompiled: Component<T>::Gui and

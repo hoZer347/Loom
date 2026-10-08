@@ -2718,8 +2718,6 @@ namespace Loom
 			ImGui::SetCursorScreenPos(corner);
 		};
 
-		// Rendering here is fine mid-frame: ImGui only records the texture id
-		// now and draws with it once the frame is submitted.
 		Camera* seen_through = camera ? camera->Get() : nullptr;
 
 		const bool ringed = outline && seen_through && m_selected && std::any_of(
@@ -2727,6 +2725,8 @@ namespace Loom
 			scenes.end(),
 			[this](const Scene* scene) { return IsInHierarchy(scene->GetRoot(), m_selected); });
 
+		// Rendering here is fine mid-frame: ImGui only records the texture id
+		// now and draws with it once the frame is submitted.
 		view.Render(
 			(int)available.x,
 			(int)available.y,
