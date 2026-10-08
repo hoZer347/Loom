@@ -120,6 +120,8 @@
     <ClCompile Include="Shaders.cpp" />
     <ClCompile Include="Sprite.cpp" />
     <ClCompile Include="Textures.cpp" />
+    <ClCompile Include="ShaderVariables.cpp" />
+    <ClCompile Include="EditorGui.cpp" />
     <ClCompile Include="VulkanRenderer.cpp" />
     <ClCompile Include="$(VulkanSdk)\Source\SPIRV-Reflect\spirv_reflect.c" />
     <ClCompile Include="Utilities\AttributeFields.cpp" />
@@ -164,6 +166,9 @@
     <ClInclude Include="Shaders.h" />
     <ClInclude Include="Sprite.h" />
     <ClInclude Include="Textures.h" />
+    <ClInclude Include="ShaderVariables.h" />
+    <ClInclude Include="EditorGui.h" />
+    <ClInclude Include="UniformType.h" />
     <ClInclude Include="Transform.h" />
     <ClInclude Include="Utilities\AttributeFields.h" />
     <ClInclude Include="Utilities\AttributeGui.h" />

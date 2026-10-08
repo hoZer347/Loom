@@ -336,6 +336,15 @@ namespace Loom
 
 		void DeleteProgram(uint32_t program) override
 		{
+			// A program still bound outlives glDeleteProgram until it is
+			// unbound, and anything that puts the binding back afterwards (Clear
+			// does) names a program that is gone.
+			GLint current = 0;
+			glGetIntegerv(GL_CURRENT_PROGRAM, &current);
+
+			if ((GLuint)current == program)
+				glUseProgram(0);
+
 			m_units.erase(program);
 			glDeleteProgram(program);
 		};
@@ -362,6 +371,46 @@ namespace Loom
 		{
 			glUseProgram(program);
 			glUniformMatrix4fv(glGetUniformLocation(program, name), 1, GL_FALSE, glm::value_ptr(value));
+		};
+
+		void SetUniform(uint32_t program, const char* name, UniformType type, const void* components) override
+		{
+			glUseProgram(program);
+
+			const GLint location = glGetUniformLocation(program, name);
+			const GLfloat* floats = (const GLfloat*)components;
+			const GLint* ints = (const GLint*)components;
+			const GLuint* uints = (const GLuint*)components;
+
+			switch (type)
+			{
+			case UniformType::Float:	glUniform1fv(location, 1, floats);	break;
+			case UniformType::Vec2:		glUniform2fv(location, 1, floats);	break;
+			case UniformType::Vec3:		glUniform3fv(location, 1, floats);	break;
+			case UniformType::Vec4:		glUniform4fv(location, 1, floats);	break;
+			case UniformType::Int:
+			case UniformType::Bool:		glUniform1iv(location, 1, ints);	break;
+			case UniformType::IVec2:
+			case UniformType::BVec2:	glUniform2iv(location, 1, ints);	break;
+			case UniformType::IVec3:
+			case UniformType::BVec3:	glUniform3iv(location, 1, ints);	break;
+			case UniformType::IVec4:
+			case UniformType::BVec4:	glUniform4iv(location, 1, ints);	break;
+			case UniformType::UInt:		glUniform1uiv(location, 1, uints);	break;
+			case UniformType::UVec2:	glUniform2uiv(location, 1, uints);	break;
+			case UniformType::UVec3:	glUniform3uiv(location, 1, uints);	break;
+			case UniformType::UVec4:	glUniform4uiv(location, 1, uints);	break;
+			case UniformType::Mat2:		glUniformMatrix2fv(location, 1, GL_FALSE, floats);		break;
+			case UniformType::Mat2x3:	glUniformMatrix2x3fv(location, 1, GL_FALSE, floats);	break;
+			case UniformType::Mat2x4:	glUniformMatrix2x4fv(location, 1, GL_FALSE, floats);	break;
+			case UniformType::Mat3x2:	glUniformMatrix3x2fv(location, 1, GL_FALSE, floats);	break;
+			case UniformType::Mat3:		glUniformMatrix3fv(location, 1, GL_FALSE, floats);		break;
+			case UniformType::Mat3x4:	glUniformMatrix3x4fv(location, 1, GL_FALSE, floats);	break;
+			case UniformType::Mat4x2:	glUniformMatrix4x2fv(location, 1, GL_FALSE, floats);	break;
+			case UniformType::Mat4x3:	glUniformMatrix4x3fv(location, 1, GL_FALSE, floats);	break;
+			case UniformType::Mat4:		glUniformMatrix4fv(location, 1, GL_FALSE, floats);		break;
+			case UniformType::Sampler2D:	break;
+			};
 		};
 
 		void SetTexture(uint32_t program, const char* name, uint32_t texture) override

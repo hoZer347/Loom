@@ -3,6 +3,7 @@
 #include "Loom API.h"
 
 #include "Component.h"
+#include "ShaderVariables.h"
 
 #include <vector>
 
@@ -53,6 +54,9 @@ namespace Loom
 		Serial<Primitive> primitive_id;
 		Serial<DrawType> m_draw_type = Static;
 		Serial<std::vector<float>> m_vertices;
+
+		// This mesh's values for its material's per-instance shader variables.
+		Serial<UniformValues> variables;
 		std::vector<uint32_t> m_indices;
 	};
 };

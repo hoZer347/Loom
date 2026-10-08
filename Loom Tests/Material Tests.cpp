@@ -13,6 +13,14 @@
 
 using LoomTests::Pump;
 
+namespace
+{
+	// Path, colour, shadows, variables.
+	constexpr size_t FIELDS = 4;
+
+	enum { PATH, COLOR, SHADOWS, VARIABLES };
+};
+
 
 TEST_SUITE("Material")
 {
@@ -75,7 +83,7 @@ TEST_SUITE("Material")
 		CHECK(material->GetShaderPath() == "Assets/Shader.shader");
 
 		// It is a serialized field, so the scene file carries it too.
-		REQUIRE(material->GetFields().size() == 2);
+		REQUIRE(material->GetFields().size() == FIELDS);
 		CHECK(material->GetFields().front().Write() == "\"Assets/Shader.shader\"");
 	};
 
@@ -93,8 +101,32 @@ TEST_SUITE("Material")
 
 		material.color = glm::vec3(0.25f, 0.5f, 0.75f);
 
-		REQUIRE(material.GetFields().size() == 2);
-		CHECK(material.GetFields()[1].Write() == "(0.25, 0.5, 0.75)");
+		REQUIRE(material.GetFields().size() == FIELDS);
+		CHECK(material.GetFields()[COLOR].Write() == "(0.25, 0.5, 0.75)");
+	};
+
+	// After colour, for the same reason colour is after the path.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a material is shadowed until told otherwise, and saves its variables last")
+	{
+		Loom::Material material;
+		Pump();
+
+		CHECK(material.shadows);
+		CHECK(material.GetFields()[SHADOWS].Write() == "true");
+
+		material.variables->Set("u_speed", Loom::UniformType::Float, { 2.0 });
+		material.variables->Set("u_tint", Loom::UniformType::Vec3, { 1.0, 0.5, 0.25 });
+
+		const Loom::SerializedField& field = material.GetFields()[VARIABLES];
+
+		CHECK(field.type == Loom::FieldType::Uniforms);
+		CHECK(field.Write() == "\"u_speed float 2\\nu_tint vec3 1 0.5 0.25\\n\"");
+
+		Loom::Material read;
+		Pump();
+
+		REQUIRE(read.GetFields()[VARIABLES].Read(field.Write()));
+		CHECK(read.variables->Write() == material.variables->Write());
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a material with no shader named compiles nothing")

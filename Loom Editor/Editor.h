@@ -16,6 +16,8 @@
 #include <unordered_set>
 #include <vector>
 
+struct ImGuiContext;
+
 
 namespace Loom
 {
@@ -243,8 +245,25 @@ namespace Loom
 		void RefreshProjectAssets();
 
 		// Scenes open in the editor; anything else goes to whatever Windows
-		// opens that kind of file with.
+		// opens that kind of file with, and to the text editor when nothing
+		// claims it.
 		void OpenAsset(const std::string& path);
+
+		// ImGui's way of opening a link, which for a file in the project is
+		// OpenAsset's.
+		static bool OpenInShell(ImGuiContext* context, const char* path);
+
+		// Lets a file be dragged out of the Project panel, onto a field that
+		// names a file or a GameObject in the hierarchy.
+		void DragAsset(const AssetNode& node) const;
+
+		// Gives the GameObject the shader, on its Material or a new one. Whether
+		// the drop was taken.
+		bool DropShader(GameObject* gameObject);
+
+		// Recompiles the shaders whose files something else has written, every
+		// so often.
+		void PollShaders();
 
 		// Where the Create prompt's asset would be written: the file for most,
 		// the source for a script, which goes under the scripts project even
@@ -321,6 +340,9 @@ namespace Loom
 
 		std::string m_projectPath{ };
 		std::string m_projectFile{ };
+
+		// When PollShaders last looked, in ImGui's seconds.
+		double m_shadersPolled = 0.0;
 		std::string m_projectName{ };
 		std::vector<std::string> m_projectScenes{ };
 

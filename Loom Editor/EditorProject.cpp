@@ -1,6 +1,7 @@
 #include "Editor.h"
 
 #include "EditorFileDialogs.h"
+#include "EditorGui.h"
 #include "ModelImporter.h"
 #include "ProjectAssets.h"
 
@@ -17,6 +18,9 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <shellapi.h>
+#include <shlwapi.h>
+
+#pragma comment(lib, "shlwapi.lib")
 
 
 namespace Loom
@@ -132,6 +136,37 @@ namespace Loom
 		void ShowInExplorer(const std::string& path)
 		{
 			Shell("explorer.exe", "/select,\"" + path + '"');
+		};
+
+		bool HasOpener(const std::string& extension)
+		{
+			char executable[MAX_PATH]{ };
+			DWORD length = MAX_PATH;
+
+			return SUCCEEDED(AssocQueryStringA(ASSOCF_NONE, ASSOCSTR_EXECUTABLE, extension.c_str(), "open", executable, &length));
+		};
+
+		// With whatever opens text files, for a kind of file nothing claims (a
+		// .shader among them).
+		void OpenAsText(const std::string& path)
+		{
+			SHELLEXECUTEINFOA info{ sizeof(info) };
+			info.fMask = SEE_MASK_CLASSNAME;
+			info.lpClass = ".txt";
+			info.lpVerb = "open";
+			info.lpFile = path.c_str();
+			info.nShow = SW_SHOWNORMAL;
+
+			if (!ShellExecuteExA(&info))
+				std::cerr << "Could not open " << path << " (error " << GetLastError() << ')' << std::endl;
+		};
+
+		void OpenFile(const std::string& path)
+		{
+			if (HasOpener(std::filesystem::path(path).extension().string()))
+				Shell(path.c_str(), "");
+			else
+				OpenAsText(path);
 		};
 	};
 
@@ -282,6 +317,8 @@ namespace Loom
 			ImGui::IsItemHovered() &&
 			ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 			OpenAsset(node.path);
+
+		DragAsset(node);
 
 		ImGui::SetItemTooltip("%s", node.path.c_str());
 
@@ -459,7 +496,33 @@ namespace Loom
 		if (std::filesystem::path(path).extension() == SceneSerializer::extension)
 			OpenScene(path);
 		else
-			Shell(path.c_str(), "");
+			OpenFile(path);
+	};
+
+	bool Editor::OpenInShell(ImGuiContext*, const char* path)
+	{
+		std::error_code code;
+
+		if (std::filesystem::is_regular_file(path, code))
+			OpenFile(path);
+		else
+			Shell(path, "");
+
+		return true;
+	};
+
+	void Editor::DragAsset(const AssetNode& node) const
+	{
+		if (node.folder || !ImGui::BeginDragDropSource())
+			return;
+
+		// Relative, the way components name the files they use.
+		const std::string relative = std::filesystem::path(node.path).lexically_relative(m_projectPath).generic_string();
+
+		ImGui::SetDragDropPayload(ASSET_PAYLOAD, relative.c_str(), relative.size() + 1);
+		ImGui::TextUnformatted(relative.c_str());
+
+		ImGui::EndDragDropSource();
 	};
 
 	void Editor::DrawCreateAssetPrompt()
