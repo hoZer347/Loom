@@ -10,7 +10,6 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
 
-
 #include "spirv_reflect.h"
 
 #include "glm/gtc/type_ptr.hpp"
@@ -194,7 +193,6 @@ namespace Loom
 			if (m_surface)		vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
 			if (m_messenger)	DestroyMessenger();
 			if (m_instance)		vkDestroyInstance(m_instance, nullptr);
-
 		};
 
 		Backend GetBackend() const override

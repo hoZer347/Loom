@@ -165,6 +165,38 @@ TEST_SUITE("Shader")
 		CHECK(messages[0].error);
 		CHECK(messages[0].line == 0);
 	};
+
+	TEST_CASE("Check compiles a shaded shader with its shadow pass as the engine would, settings left out")
+	{
+		CHECK(Loom::Shader::Check("// ===SETTINGS===\nshading = on\nshadows = on\n" + VERTEX + FRAGMENT).empty());
+	};
+
+	TEST_CASE("Check puts a mistake in a shaded stage on the file's line, past the code shading adds")
+	{
+		const std::string text =
+			"// ===SETTINGS===\n"
+			"shading = on\n"
+			"// ===FRAGMENT===\n"
+			"out vec4 FragColor;\n"
+			"void main() { FragColor = vec4(missingTint); }\n";
+
+		const std::vector<Loom::ShaderMessage> messages = Loom::Shader::Check(text);
+
+		REQUIRE_FALSE(messages.empty());
+		CHECK(messages[0].text.find("missingTint") != std::string::npos);
+
+		for (const Loom::ShaderMessage& message : messages)
+			CHECK(message.line == 5);
+	};
+
+	TEST_CASE("Check reports a setting it does not know against no line")
+	{
+		const std::vector<Loom::ShaderMessage> messages = Loom::Shader::Check("// ===SETTINGS===\nglow = on\n" + FRAGMENT);
+
+		REQUIRE(messages.size() == 1);
+		CHECK(messages[0].error);
+		CHECK(messages[0].line == 0);
+	};
 #endif
 
 	TEST_CASE("Shader is a plain resource handle, not a component")
@@ -186,7 +218,7 @@ TEST_SUITE("Shader")
 		const Loom::Shader::Stages stages = Loom::Shader::Assemble(FRAGMENT);
 
 		CHECK(stages.vertex.find("gl_Position = u_viewProjection * u_model * vec4(aPos, 1.0);") != std::string::npos);
-		CHECK(stages.fragment == "out vec4 FragColor;\nvoid main() { FragColor = vec4(1.0); }\n");
+		CHECK(stages.fragment == "#line 2 0\nout vec4 FragColor;\nvoid main() { FragColor = vec4(1.0); }\n");
 		CHECK(stages.shadowVertex.empty());
 		CHECK(stages.shadowFragment.empty());
 		CHECK_FALSE(stages.settings.shading);
@@ -202,8 +234,8 @@ TEST_SUITE("Shader")
 			"\n" +
 			VERTEX + FRAGMENT);
 
-		CHECK(stages.vertex == "layout(location = 0) in vec3 aPos;\nuniform mat4 u_model;\nvoid main() { gl_Position = u_model * vec4(aPos, 1.0); }\n");
-		CHECK(stages.fragment == "out vec4 FragColor;\nvoid main() { FragColor = vec4(1.0); }\n");
+		CHECK(stages.vertex == "#line 6 0\nlayout(location = 0) in vec3 aPos;\nuniform mat4 u_model;\nvoid main() { gl_Position = u_model * vec4(aPos, 1.0); }\n");
+		CHECK(stages.fragment == "#line 10 0\nout vec4 FragColor;\nvoid main() { FragColor = vec4(1.0); }\n");
 	};
 
 	TEST_CASE("shading wraps each stage's main and lights the colour the fragment stage writes")
@@ -258,7 +290,7 @@ TEST_SUITE("Shader")
 	{
 		const Loom::Shader::Stages stages = Loom::Shader::Assemble("// ===SETTINGS===\nshadows = on\n" + FRAGMENT);
 
-		CHECK(stages.fragment == "out vec4 FragColor;\nvoid main() { FragColor = vec4(1.0); }\n");
+		CHECK(stages.fragment == "#line 4 0\nout vec4 FragColor;\nvoid main() { FragColor = vec4(1.0); }\n");
 		CHECK_FALSE(stages.shadowVertex.empty());
 	};
 

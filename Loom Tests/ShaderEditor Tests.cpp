@@ -15,6 +15,7 @@
 #include <iterator>
 #include <string>
 #include <thread>
+#include <utility>
 
 namespace
 {
@@ -165,6 +166,23 @@ namespace
 			return nullptr;
 		};
 
+		// Whether the tab shows its document as unsaved, once a frame has drawn
+		// it since the last keystroke.
+		bool Unsaved()
+		{
+			Frame();
+
+			ImGuiContext& g = *ImGui::GetCurrentContext();
+
+			for (int i = 0; i < g.TabBars.GetMapSize(); i++)
+				if (const ImGuiTabBar* bar = g.TabBars.TryGetMapData(i))
+					for (const ImGuiTabItem& tab : bar->Tabs)
+						if (tab.Flags & ImGuiTabItemFlags_UnsavedDocument)
+							return true;
+
+			return false;
+		};
+
 		// Whether glslang's messages are listed under the text this frame.
 		static bool Listed()
 		{
@@ -232,6 +250,39 @@ TEST_SUITE("ShaderEditor")
 				tabs += bar->Tabs.Size;
 
 		CHECK(tabs == 1);
+	};
+
+	TEST_CASE("an edit made after undoing back past a save still counts as unsaved")
+	{
+		Driven driven;
+
+		driven.Type("x");
+		driven.Press(ImGuiKey_S, true);
+		driven.Press(ImGuiKey_Z, true);
+		driven.Type("y");
+
+		CHECK(driven.Unsaved());
+	};
+
+	TEST_CASE("undoing back to what was saved counts as saved")
+	{
+		Driven driven;
+
+		driven.Type("x");
+		CHECK(driven.Unsaved());
+
+		driven.Press(ImGuiKey_Z, true);
+		CHECK_FALSE(driven.Unsaved());
+	};
+
+	TEST_CASE("a message underlines the name it quotes, not the same letters inside another")
+	{
+		using Loom::ShaderEditor;
+
+		CHECK(ShaderEditor::MessageSpan("\tcolor = col;", "'col' : undeclared identifier") == std::pair<size_t, size_t>{ 9, 12 });
+		CHECK(ShaderEditor::MessageSpan("col", "'col' : undeclared identifier") == std::pair<size_t, size_t>{ 0, 3 });
+		CHECK(ShaderEditor::MessageSpan("\tcolor = 1.0;", "'col' : undeclared identifier") == std::pair<size_t, size_t>{ 1, 13 });
+		CHECK(ShaderEditor::MessageSpan("  x = y;", "'' : syntax error") == std::pair<size_t, size_t>{ 2, 8 });
 	};
 
 	TEST_CASE("resting the mouse on an engine name explains it")

@@ -10,6 +10,7 @@
 #include "imgui.h"
 
 #include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -40,12 +41,17 @@ namespace Loom
 		constexpr float marker_alpha = 0.15f;
 
 		// The most messages listed under the text before the list scrolls.
-		constexpr float max_message_rows = 6.0f;
+		constexpr size_t max_message_rows = 6;
 
 		// How wide an explanation runs before it wraps, in font heights.
 		constexpr float explanation_width = 30.0f;
 
 		constexpr char quote = '\'';
+
+		bool IsIdentifier(char c)
+		{
+			return std::isalnum((unsigned char)c) || c == '_';
+		};
 
 		ImU32 Colour(const ShaderMessage& message, float alpha = 1.0f)
 		{
@@ -55,26 +61,14 @@ namespace Loom
 			return ImGui::ColorConvertFloat4ToU32(colour);
 		};
 
-		// glslang quotes what it is complaining about: "'x' : undeclared
-		// identifier". The span of that on the line, or of the whole line when
-		// it is not there.
-		std::pair<size_t, size_t> Span(const std::string& line, const std::string& message)
+		const ShaderSymbol* EngineSymbol(std::string_view name)
 		{
-			const size_t open = message.find(quote);
-			const size_t close = open == std::string::npos ? std::string::npos : message.find(quote, open + 1);
+			const auto found = std::find_if(
+				std::begin(ENGINE_SHADER_SYMBOLS),
+				std::end(ENGINE_SHADER_SYMBOLS),
+				[name](const ShaderSymbol& symbol) { return symbol.name == name; });
 
-			if (close != std::string::npos && close > open + 1)
-			{
-				const std::string token = message.substr(open + 1, close - open - 1);
-				const size_t at = line.find(token);
-
-				if (at != std::string::npos)
-					return { at, at + token.size() };
-			};
-
-			const size_t start = line.find_first_not_of(" \t");
-
-			return start == std::string::npos ? std::pair<size_t, size_t>{ 0, line.size() } : std::pair<size_t, size_t>{ start, line.size() };
+			return found == std::end(ENGINE_SHADER_SYMBOLS) ? nullptr : &*found;
 		};
 
 		// GLSL, with the engine's names coloured as GLSL's own are.
@@ -92,21 +86,30 @@ namespace Loom
 
 			return &language;
 		};
-
-		const ShaderSymbol* EngineSymbol(std::string_view name)
-		{
-			const auto found = std::find_if(
-				std::begin(ENGINE_SHADER_SYMBOLS),
-				std::end(ENGINE_SHADER_SYMBOLS),
-				[name](const ShaderSymbol& symbol) { return symbol.name == name; });
-
-			return found == std::end(ENGINE_SHADER_SYMBOLS) ? nullptr : &*found;
-		};
 	};
 
-	bool ShaderEditor::Document::Unsaved() const
+	std::pair<size_t, size_t> ShaderEditor::MessageSpan(const std::string& line, const std::string& message)
 	{
-		return editor.GetUndoIndex() != savedUndoIndex;
+		const size_t open = message.find(quote);
+		const size_t close = open == std::string::npos ? std::string::npos : message.find(quote, open + 1);
+
+		if (close != std::string::npos && close > open + 1)
+		{
+			const std::string token = message.substr(open + 1, close - open - 1);
+
+			// The token itself, not the same letters inside a longer name.
+			for (size_t at = line.find(token); at != std::string::npos; at = line.find(token, at + 1))
+			{
+				const size_t end = at + token.size();
+
+				if ((at == 0 || !IsIdentifier(line[at - 1])) && (end == line.size() || !IsIdentifier(line[end])))
+					return { at, end };
+			};
+		};
+
+		const size_t start = line.find_first_not_of(" \t");
+
+		return start == std::string::npos ? std::pair<size_t, size_t>{ 0, line.size() } : std::pair<size_t, size_t>{ start, line.size() };
 	};
 
 	void ShaderEditor::Open(const std::string& path)
@@ -139,14 +142,14 @@ namespace Loom
 		editor.SetLanguage(Language());
 		editor.SetTabSize(tab_size);
 		editor.SetShowWhitespacesEnabled(false);
-		editor.SetText(std::string(std::istreambuf_iterator<char>(file), { }));
+		opened->savedText.assign(std::istreambuf_iterator<char>(file), { });
+		editor.SetText(opened->savedText);
 		editor.SetChangeCallback([opened]() { Check(*opened); }, check_delay_milliseconds);
 
 		TextEditor::AutoCompleteConfig autoComplete;
 		autoComplete.callback = [opened](TextEditor::AutoCompleteState& state) { Suggest(*opened, state); };
 		editor.SetAutoCompleteConfig(&autoComplete);
 
-		opened->savedUndoIndex = editor.GetUndoIndex();
 		Check(*opened);
 		editor.SetFocus();
 
@@ -173,7 +176,7 @@ namespace Loom
 				{
 					ImGuiTabItemFlags flags = ImGuiTabItemFlags_None;
 
-					if (document->Unsaved())
+					if (document->unsaved)
 						flags |= ImGuiTabItemFlags_UnsavedDocument;
 
 					if (std::exchange(document->select, false))
@@ -193,7 +196,7 @@ namespace Loom
 
 					if (!keep)
 					{
-						if (document->Unsaved())
+						if (document->unsaved)
 							m_closing = document.get();
 						else
 							closed = document.get();
@@ -215,11 +218,14 @@ namespace Loom
 		if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_S))
 			Save(document);
 
-		const size_t rows = std::min(document.messages.size(), (size_t)max_message_rows);
-		const float messages_height = rows == 0 ? 0.0f : rows * ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y;
+		const size_t rows = std::min(document.messages.size(), max_message_rows);
+		const float messages_height = rows == 0 ? 0.0f : (float)rows * ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y;
 
 		ImGui::PushFont(EditorTheme::CodeFont(), 0.0f);
-		document.editor.Render("##text", ImVec2(0.0f, -messages_height));
+		// Against the text rather than the undo history, which an edit made
+		// after an undo can bring back to where it was saved.
+		if (document.editor.Render("##text", ImVec2(0.0f, -messages_height)))
+			document.unsaved = document.editor.GetText() != document.savedText;
 		ImGui::PopFont();
 
 		Explain(document);
@@ -338,7 +344,7 @@ namespace Loom
 
 			for (const ShaderMessage* message : messages)
 			{
-				const auto [start, end] = Span(text, message->text);
+				const auto [start, end] = MessageSpan(text, message->text);
 
 				editor.AddSquiggle(
 					TextEditor::DocPos(line, start),
@@ -353,14 +359,16 @@ namespace Loom
 	bool ShaderEditor::Save(Document& document)
 	{
 		std::ofstream file(document.path, std::ios::binary);
+		std::string text = document.editor.GetText();
 
-		if (!(file << document.editor.GetText()))
+		if (!(file << text))
 		{
 			std::cerr << "Shaders: could not save " << document.path << std::endl;
 			return false;
 		};
 
-		document.savedUndoIndex = document.editor.GetUndoIndex();
+		document.savedText = std::move(text);
+		document.unsaved = false;
 
 		return true;
 	};

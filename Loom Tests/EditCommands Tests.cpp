@@ -33,6 +33,7 @@ namespace
 			context = ImGui::CreateContext();
 
 			ImGuiIO& io = ImGui::GetIO();
+			io.IniFilename = nullptr;
 			io.DisplaySize = ImVec2(width, height);
 			io.DeltaTime = frame_time;
 

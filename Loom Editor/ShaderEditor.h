@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 
@@ -30,18 +31,23 @@ namespace Loom
 
 		void Draw(bool* open);
 
+		// Where on the line to underline a message about it: what glslang
+		// quotes, as in "'x' : undeclared identifier", when the line has it as
+		// a word of its own, and otherwise the line from its first non-blank.
+		static std::pair<size_t, size_t> MessageSpan(const std::string& line, const std::string& message);
+
 	private:
 		struct Document
 		{
 			std::string path;
 			TextEditor editor;
-			size_t savedUndoIndex = 0;
+			std::string savedText;
+			bool unsaved = false;
 			std::vector<ShaderMessage> messages;
 
 			// Brings the tab forward on the next frame.
 			bool select = true;
 
-			bool Unsaved() const;
 		};
 
 		static void Check(Document& document);
