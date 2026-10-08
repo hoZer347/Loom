@@ -5,6 +5,7 @@
 #include "EditorViewport.h"
 #include "Guid.h"
 #include "EditorSettings.h"
+#include "ShaderEditor.h"
 #include "ModelPreview.h"
 #include "SceneHistory.h"
 #include "ScriptLibrary.h"
@@ -95,6 +96,9 @@ namespace Loom
 
 		// Opens one of the projects in <engine>/Demos, by its folder name.
 		bool OpenDemo(const std::string& name);
+
+		// In a tab of the Shaders panel, which comes forward.
+		void OpenShader(const std::string& path);
 
 		// Writes a new project (scenes, scripts, a Visual Studio solution) into
 		// folder/name and opens it.
@@ -440,6 +444,7 @@ namespace Loom
 		bool m_showDebug = true;
 		bool m_showSceneData = true;
 		bool m_showConsole = true;
+		bool m_showShaders = false;
 		bool m_showStats = true;
 		bool m_showImGuiDemo = false;
 		bool m_showSettings = false;
@@ -469,6 +474,7 @@ namespace Loom
 		std::string m_newAssetProblem{ };
 
 		EditorConsole m_console;
+		ShaderEditor m_shaders;
 
 		char m_nameBuffer[128]{ };
 		const GameObject* m_nameBufferOwner = nullptr;

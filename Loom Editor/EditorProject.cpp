@@ -815,6 +815,10 @@ namespace Loom
 			OpenScene(path);
 			break;
 
+		case ProjectAssets::Opener::Shaders:
+			OpenShader(path);
+			break;
+
 		case ProjectAssets::Opener::VisualStudio:
 			OpenInVisualStudio(path);
 			break;
@@ -823,6 +827,12 @@ namespace Loom
 			OpenFile(path);
 			break;
 		};
+	};
+
+	void Editor::OpenShader(const std::string& path)
+	{
+		m_shaders.Open(path);
+		m_showShaders = true;
 	};
 
 	bool Editor::OpenInShell(ImGuiContext*, const char* path)

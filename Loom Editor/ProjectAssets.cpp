@@ -513,7 +513,7 @@ void main()
 			return Opener::Editor;
 
 		if (extension == shaderExtension)
-			return Opener::VisualStudio;
+			return Opener::Shaders;
 
 		return IsScriptFile(path) && !scripts_folder.empty() && IsUnder(path, scripts_folder)
 			? Opener::VisualStudio

@@ -153,6 +153,7 @@ namespace
 			<< "  --open-demo <name>             open a project from the engine's Demos folder\n"
 			<< "  --open-scene <file>            open a scene beside those already open, even\n"
 			<< "                                 one of them again\n"
+			<< "  --open-shader <file>           open a shader in the Shaders panel\n"
 			<< "  --undo, --redo                 step the history once the imports have landed\n"
 			<< "  --vulkan, --opengl             run on that graphics API this time\n"
 			<< "  --screenshot <file> [frames]   write the editor to a bitmap and exit,\n"
@@ -430,6 +431,16 @@ int main(int argc, char** argv)
 			};
 
 			editor.OpenScene(argv[++i]);
+		}
+		else if (argument == "--open-shader")
+		{
+			if (i + 1 >= argc)
+			{
+				std::cerr << "--open-shader needs a shader file" << std::endl;
+				return 1;
+			};
+
+			editor.OpenShader(argv[++i]);
 		}
 		else if (argument == "--open-demo")
 		{

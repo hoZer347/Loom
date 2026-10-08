@@ -147,7 +147,7 @@ TEST_SUITE("ProjectAssets")
 		CHECK(Loom::ProjectAssets::ScriptNameProblem(scripts.project.string(), "Glo").empty());
 	};
 
-	TEST_CASE("scenes open in the editor, shaders and the scripts project's sources in Visual Studio")
+	TEST_CASE("scenes and shaders open in the editor, the scripts project's sources in Visual Studio")
 	{
 		using Loom::ProjectAssets;
 
@@ -160,8 +160,8 @@ TEST_SUITE("ProjectAssets")
 		};
 
 		CHECK(opener("Scenes/Main.loomscene", scripts) == ProjectAssets::Opener::Editor);
-		CHECK(opener("Assets/Lit.shader", scripts) == ProjectAssets::Opener::VisualStudio);
-		CHECK(opener("Assets/Lit.shader", "") == ProjectAssets::Opener::VisualStudio);
+		CHECK(opener("Assets/Lit.shader", scripts) == ProjectAssets::Opener::Shaders);
+		CHECK(opener("Assets/Lit.shader", "") == ProjectAssets::Opener::Shaders);
 		CHECK(opener("Scripts/Spinner.hpp", scripts) == ProjectAssets::Opener::VisualStudio);
 		CHECK(opener("Scripts/Spinner.hpp", "") == ProjectAssets::Opener::Shell);
 		CHECK(opener("Tools/Bake.cpp", scripts) == ProjectAssets::Opener::Shell);

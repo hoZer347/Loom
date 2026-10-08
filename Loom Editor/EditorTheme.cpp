@@ -52,6 +52,7 @@ namespace Loom
 		constexpr ImVec4 AccentActive = Rgb(0x3A73D6);
 		constexpr ImVec4 AccentLight = Rgb(0x9DC1FF);
 		constexpr ImVec4 Error = Rgb(0xF0625D);
+		constexpr ImVec4 Warning = Rgb(0xE5C07B);
 
 		constexpr float SelectionAlpha = 0.35f;
 		constexpr float SelectionActiveAlpha = 0.5f;
@@ -73,10 +74,32 @@ namespace Loom
 		constexpr ImVec2 ItemSpacing = ImVec2(8.0f, 5.0f);
 		constexpr ImVec2 ItemInnerSpacing = ImVec2(5.0f, 4.0f);
 		constexpr ImVec2 CellPadding = ImVec2(6.0f, 3.0f);
+
+		// Monospaced, for the shader editor.
+		constexpr const char* CodeFontFile = "Cousine-Regular.ttf";
+
+		ImFont* codeFont = nullptr;
+
+		// ImGui's built-in ProggyClean, itself monospaced, stands in for a
+		// missing file.
+		ImFont* AddFont(const std::string& file, float size)
+		{
+			ImFontAtlas& atlas = *ImGui::GetIO().Fonts;
+			const std::filesystem::path path = FontFolder() / file;
+			std::error_code code;
+
+			if (std::filesystem::exists(path, code))
+				return atlas.AddFontFromFileTTF(path.string().c_str(), size);
+
+			std::cerr << "EditorTheme: no font at " << path.string() << std::endl;
+
+			return atlas.AddFontDefault();
+		};
 	};
 
 	const ImVec4 EditorTheme::AccentText = AccentLight;
 	const ImVec4 EditorTheme::ErrorText = Error;
+	const ImVec4 EditorTheme::WarningText = Warning;
 
 	std::vector<std::string> EditorTheme::Fonts()
 	{
@@ -95,16 +118,13 @@ namespace Loom
 		ImFontAtlas& atlas = *ImGui::GetIO().Fonts;
 		atlas.ClearFonts();
 
-		const std::filesystem::path path = FontFolder() / file;
-		std::error_code code;
+		AddFont(file, size);
+		codeFont = AddFont(CodeFontFile, size);
+	};
 
-		if (std::filesystem::exists(path, code))
-			atlas.AddFontFromFileTTF(path.string().c_str(), size);
-		else
-		{
-			std::cerr << "EditorTheme: no font at " << path.string() << std::endl;
-			atlas.AddFontDefault();
-		};
+	ImFont* EditorTheme::CodeFont()
+	{
+		return codeFont;
 	};
 
 	void EditorTheme::ApplyStyle()

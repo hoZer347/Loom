@@ -1,0 +1,252 @@
+#include "doctest.h"
+
+// The shader editor checks with glslang, which the web build does not have.
+#ifndef __EMSCRIPTEN__
+
+#include "ShaderEditor.h"
+
+#include "imgui.h"
+#include "imgui_internal.h"
+
+#include <chrono>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <string>
+#include <thread>
+
+namespace
+{
+	constexpr float width = 900.0f;
+	constexpr float height = 600.0f;
+
+	// Longer than the autocomplete popup and the check each wait after a
+	// keystroke, which they time by the clock rather than by frames.
+	constexpr std::chrono::milliseconds settle{ 500 };
+
+	// Enough for the panel and then the text in it to take focus.
+	constexpr int opening_frames = 4;
+
+	// The second line is empty, for typing on in the vertex stage.
+	const char* const shader =
+		"// ===VERTEX===\n"
+		"\n"
+		"void main() { gl_Position = vec4(0.0); }\n"
+		"// ===FRAGMENT===\n"
+		"out vec4 FragColor;\n"
+		"void main() { FragColor = vec4(1.0); }\n";
+
+	// An ImGui context of the test's own, with no window and no renderer, the
+	// Shaders panel filling the display and a shader that compiles open in it.
+	struct Driven
+	{
+		explicit Driven(const char* text = shader) :
+			path(std::filesystem::temp_directory_path() / "ShaderEditor Tests.shader")
+		{
+			constexpr float frame_time = 1.0f / 60.0f;
+
+			context = ImGui::CreateContext();
+
+			ImGuiIO& io = ImGui::GetIO();
+			io.IniFilename = nullptr;
+			io.DisplaySize = ImVec2(width, height);
+			io.DeltaTime = frame_time;
+
+			// Every event lands in the frame it was sent before.
+			io.ConfigInputTrickleEventQueue = false;
+
+			unsigned char* pixels = nullptr;
+			int atlas_width = 0;
+			int atlas_height = 0;
+			io.Fonts->GetTexDataAsRGBA32(&pixels, &atlas_width, &atlas_height);
+
+			std::ofstream(path, std::ios::binary) << text;
+
+			editor.Open(path.string());
+
+			for (int i = 0; i < opening_frames; i++)
+				Frame();
+
+			Press(ImGuiKey_DownArrow);
+		};
+
+		~Driven()
+		{
+			ImGui::DestroyContext(context);
+
+			std::error_code code;
+			std::filesystem::remove(path, code);
+		};
+
+		void Frame()
+		{
+			ImGui::NewFrame();
+			ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+			ImGui::SetNextWindowSize(ImVec2(width, height));
+			editor.Draw(&open);
+			ImGui::EndFrame();
+		};
+
+		void Type(const char* text)
+		{
+			ImGui::GetIO().AddInputCharactersUTF8(text);
+			Frame();
+		};
+
+		void Press(ImGuiKey key, bool control = false)
+		{
+			ImGuiIO& io = ImGui::GetIO();
+
+			io.AddKeyEvent(ImGuiMod_Ctrl, control);
+			io.AddKeyEvent(key, true);
+			Frame();
+
+			io.AddKeyEvent(key, false);
+			io.AddKeyEvent(ImGuiMod_Ctrl, false);
+			Frame();
+		};
+
+		void Settle()
+		{
+			std::this_thread::sleep_for(settle);
+			Frame();
+			Frame();
+		};
+
+		std::string Saved() const
+		{
+			std::ifstream file(path, std::ios::binary);
+
+			return std::string(std::istreambuf_iterator<char>(file), { });
+		};
+
+		// Rests the mouse at points along the given line, from its start, and
+		// says whether a tooltip came up at any of them.
+		bool TooltipAlong(int line)
+		{
+			constexpr float half = 0.5f;
+			constexpr int stride = 3;
+			constexpr int glyphs = 30;
+
+			// Longer than ImGui waits on a still mouse before a tooltip.
+			constexpr int resting_frames = 30;
+
+			const ImGuiWindow* text = Window("##text");
+
+			REQUIRE(text != nullptr);
+
+			const float glyph = ImGui::CalcTextSize("x").x;
+			const float y = text->InnerRect.Min.y + (line + half) * ImGui::GetFontSize();
+
+			for (int column = 0; column < glyphs; column += stride)
+			{
+				ImGui::GetIO().AddMousePosEvent(text->InnerRect.Min.x + (column + half) * glyph, y);
+
+				for (int i = 0; i < resting_frames; i++)
+				{
+					Frame();
+
+					if (Window("##Tooltip_") != nullptr)
+						return true;
+				};
+			};
+
+			return false;
+		};
+
+		// The first window drawn this frame with that in its name.
+		static const ImGuiWindow* Window(const char* part)
+		{
+			for (const ImGuiWindow* window : ImGui::GetCurrentContext()->Windows)
+				if (window->Active && std::strstr(window->Name, part) != nullptr)
+					return window;
+
+			return nullptr;
+		};
+
+		// Whether glslang's messages are listed under the text this frame.
+		static bool Listed()
+		{
+			for (const ImGuiWindow* window : ImGui::GetCurrentContext()->Windows)
+				if (window->Active && std::strstr(window->Name, "##messages") != nullptr)
+					return true;
+
+			return false;
+		};
+
+		const std::filesystem::path path;
+		ImGuiContext* context = nullptr;
+		Loom::ShaderEditor editor;
+		bool open = true;
+	};
+};
+
+TEST_SUITE("ShaderEditor")
+{
+	TEST_CASE("typing an engine name offers it, and Tab and Ctrl+S put it in the file")
+	{
+		Driven driven;
+
+		driven.Type("LoomLi");
+		driven.Settle();
+		driven.Press(ImGuiKey_Tab);
+		driven.Press(ImGuiKey_S, true);
+
+		CHECK(driven.Saved().starts_with("// ===VERTEX===\nLoomLight\n"));
+	};
+
+	TEST_CASE("a mistake is listed under the text a moment after it is typed")
+	{
+		Driven driven;
+
+		CHECK_FALSE(Driven::Listed());
+
+		driven.Type("x");
+		driven.Settle();
+
+		CHECK(Driven::Listed());
+	};
+
+	TEST_CASE("an edit stays out of the file until Ctrl+S")
+	{
+		Driven driven;
+
+		driven.Type("x");
+		driven.Settle();
+
+		CHECK(driven.Saved() == shader);
+	};
+
+	TEST_CASE("opening a shader that is already open adds no tab")
+	{
+		Driven driven;
+
+		driven.editor.Open(driven.path.string());
+		driven.Frame();
+
+		int tabs = 0;
+
+		for (int i = 0; i < ImGui::GetCurrentContext()->TabBars.GetMapSize(); i++)
+			if (const ImGuiTabBar* bar = ImGui::GetCurrentContext()->TabBars.TryGetMapData(i))
+				tabs += bar->Tabs.Size;
+
+		CHECK(tabs == 1);
+	};
+
+	TEST_CASE("resting the mouse on an engine name explains it")
+	{
+		Driven driven("// ===VERTEX===\nuniform mat4 u_model;\n");
+
+		CHECK(driven.TooltipAlong(1));
+	};
+
+	TEST_CASE("a name of the shader's own gets no explanation")
+	{
+		Driven driven("// ===VERTEX===\nuniform mat4 u_mine;\n");
+
+		CHECK_FALSE(driven.TooltipAlong(1));
+	};
+};
+
+#endif

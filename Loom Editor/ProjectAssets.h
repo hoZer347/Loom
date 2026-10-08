@@ -32,12 +32,14 @@ namespace Loom
 		enum struct Opener
 		{
 			Editor,
+			Shaders,
 			VisualStudio,
 			Shell,
 		};
 
-		// Scenes open in the editor, the scripts project's sources and shaders
-		// in Visual Studio, and anything else through the shell.
+		// Scenes open in the editor, shaders in its Shaders panel, the scripts
+		// project's sources in Visual Studio, and anything else through the
+		// shell.
 		// scripts_folder is empty when there is no scripts project.
 		static Opener OpenerOf(const std::string& path, const std::string& scripts_folder);
 

@@ -220,7 +220,8 @@ namespace Loom
 		constexpr const char* game_window = "Game";
 		constexpr const char* debug_window = "Debug";
 
-		constexpr const char* view_windows[] = { scene_window_id, game_window, debug_window };
+		// What is docked in the middle: the views, and the shader editor.
+		constexpr const char* centre_windows[] = { scene_window_id, game_window, debug_window, ShaderEditor::window };
 
 		constexpr ImGuiWindowFlags view_flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 
@@ -1098,10 +1099,10 @@ namespace Loom
 			if (node == nullptr || node->IsEmpty())
 				m_rebuildLayout = true;
 
-			// A layout saved before a view existed has nowhere for it, so it
+			// A layout saved before a window existed has nowhere for it, so it
 			// joins the others in the middle.
 			else if (const ImGuiDockNode* centre = ImGui::DockBuilderGetCentralNode(dockspace_id))
-				for (const char* window : view_windows)
+				for (const char* window : centre_windows)
 					if (ImGui::FindWindowSettingsByID(ImHashStr(window)) == nullptr)
 						ImGui::DockBuilderDockWindow(window, centre->ID);
 
@@ -1134,6 +1135,7 @@ namespace Loom
 		if (m_showDebug)		DrawDebug();
 		if (m_showSceneData)	DrawSceneData();
 		if (m_showConsole)		m_console.Draw(&m_showConsole);
+		if (m_showShaders)		m_shaders.Draw(&m_showShaders);
 		if (m_showStats)		DrawStats();
 		if (m_showImGuiDemo)	ImGui::ShowDemoWindow(&m_showImGuiDemo);
 
@@ -1198,8 +1200,7 @@ namespace Loom
 		ImGui::DockBuilderDockWindow("Scene Data", bottom);
 		ImGui::DockBuilderDockWindow("Stats", bottom);
 
-		// Whatever is left in the middle is the views.
-		for (const char* window : view_windows)
+		for (const char* window : centre_windows)
 			ImGui::DockBuilderDockWindow(window, centre);
 
 		ImGui::DockBuilderFinish(dockspace_id);
@@ -1307,6 +1308,7 @@ namespace Loom
 			ImGui::MenuItem(debug_window, nullptr, &m_showDebug);
 			ImGui::MenuItem("Scene Data", nullptr, &m_showSceneData);
 			ImGui::MenuItem("Console", nullptr, &m_showConsole);
+			ImGui::MenuItem(ShaderEditor::window, nullptr, &m_showShaders);
 			ImGui::MenuItem("Stats", nullptr, &m_showStats);
 
 			ImGui::Separator();
