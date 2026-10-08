@@ -26,8 +26,9 @@ namespace Loom
 		void Clear();
 
 		// Walks the buffered lines under the lock, so the console can draw them
-		// without copying the whole buffer every frame.
-		void ForEach(const std::function<void(const std::string&, bool is_error)>& visit) const;
+		// without copying the whole buffer every frame. A line keeps its id
+		// while older lines are trimmed or cleared away.
+		void ForEach(const std::function<void(size_t id, const std::string&, bool is_error)>& visit) const;
 
 	private:
 		EditorLog() = default;
@@ -64,6 +65,7 @@ namespace Loom
 
 		mutable std::recursive_mutex mutex;
 		std::vector<Line> lines;
+		size_t dropped = 0;
 
 		Sink out_sink, err_sink;
 		std::streambuf* previous_out = nullptr;

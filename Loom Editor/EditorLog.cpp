@@ -57,15 +57,16 @@ namespace Loom
 	{
 		std::scoped_lock lock(mutex);
 
+		dropped += lines.size();
 		lines.clear();
 	};
 
-	void EditorLog::ForEach(const std::function<void(const std::string&, bool)>& visit) const
+	void EditorLog::ForEach(const std::function<void(size_t, const std::string&, bool)>& visit) const
 	{
 		std::scoped_lock lock(mutex);
 
-		for (const Line& line : lines)
-			visit(line.text, line.is_error);
+		for (size_t i = 0; i < lines.size(); i++)
+			visit(dropped + i, lines[i].text, lines[i].is_error);
 	};
 
 	void EditorLog::Sink::Put(char c)
@@ -78,9 +79,12 @@ namespace Loom
 			log->lines.push_back({ pending, is_error });
 
 			if (log->lines.size() > max_lines)
-				log->lines.erase(
-					log->lines.begin(),
-					log->lines.begin() + (log->lines.size() - max_lines));
+			{
+				const size_t excess = log->lines.size() - max_lines;
+
+				log->lines.erase(log->lines.begin(), log->lines.begin() + excess);
+				log->dropped += excess;
+			};
 
 			pending.clear();
 		}

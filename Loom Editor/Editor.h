@@ -1,6 +1,7 @@
 #pragma once
 
 #include "EditorCamera.h"
+#include "EditorConsole.h"
 #include "EditorViewport.h"
 #include "Guid.h"
 #include "EditorSettings.h"
@@ -226,7 +227,6 @@ namespace Loom
 		// camera takes the mouse and keyboard, to fly it.
 		void DrawView(EditorViewport& view, const std::vector<Scene*>& scenes, EditorCamera* camera);
 		void DrawSceneData();
-		void DrawConsole();
 		void DrawStats();
 
 		// The first-run "where are your scenes?" prompt, the new project dialog,
@@ -469,8 +469,7 @@ namespace Loom
 		char m_newAssetName[128]{ };
 		std::string m_newAssetProblem{ };
 
-		bool m_consoleAutoScroll = true;
-		char m_consoleFilter[128]{ };
+		EditorConsole m_console;
 
 		char m_nameBuffer[128]{ };
 		const GameObject* m_nameBufferOwner = nullptr;
