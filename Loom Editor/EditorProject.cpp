@@ -523,21 +523,17 @@ namespace Loom
 			return;
 		};
 
-		// A header has no association to fall back on, so Windows would ask
-		// what to open it with. /Edit hands a source to a Visual Studio already
-		// running rather than starting another; a solution or project is opened
-		// as one.
-		const std::string& devenv = ScriptLibrary::FindVisualStudio2026();
-		const std::filesystem::path scripts = std::filesystem::path(ScriptsProject()).parent_path();
+		const ProjectAssets::OpenCommand command = ProjectAssets::OpenWith(
+			path,
+			std::filesystem::path(ScriptsProject()).parent_path().string(),
+			ScriptLibrary::FindVisualStudio2026());
 
-		const std::filesystem::path extension = std::filesystem::path(path).extension();
-
-		if (devenv.empty() || !IsUnder(path, scripts.string()))
+		// Anything OpenWith leaves to its association goes the way every other
+		// file does, which falls back to a text editor for one nothing claims.
+		if (command.file == path)
 			OpenFile(path);
-		else if (extension == ".sln" || extension == ".vcxproj")
-			Shell(devenv.c_str(), '"' + path + '"');
 		else
-			Shell(devenv.c_str(), "/Edit \"" + path + '"');
+			Shell(command.file.c_str(), command.parameters);
 	};
 
 	bool Editor::OpenInShell(ImGuiContext*, const char* path)
