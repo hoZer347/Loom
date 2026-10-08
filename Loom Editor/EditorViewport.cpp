@@ -1,8 +1,6 @@
 #include "EditorViewport.h"
 
-#include "Engine.h"
 #include "Renderer.h"
-#include "Scene.h"
 
 
 namespace Loom
@@ -33,19 +31,6 @@ namespace Loom
 		m_width = width;
 		m_height = height;
 		m_texture = Renderer::Get()->CreateColorTarget(m_width, m_height);
-	};
-
-	void EditorViewport::Render(int width, int height, const std::vector<Scene*>& scenes, Camera* camera)
-	{
-		Render(
-			width,
-			height,
-			Engine::clearColor,
-			[&]()
-			{
-				for (Scene* scene : scenes)
-					scene->Render(camera);
-			});
 	};
 
 	void EditorViewport::Render(int width, int height, const float* clear_colour, const std::function<void()>& draw)

@@ -111,6 +111,7 @@
     <ClCompile Include="EditorCamera.cpp" />
     <ClCompile Include="ModelImporter.cpp" />
     <ClCompile Include="ModelPreview.cpp" />
+    <ClCompile Include="SelectionOutline.cpp" />
     <ClCompile Include="SceneHistory.cpp" />
     <ClCompile Include="EditCommands.cpp" />
     <ClCompile Include="FieldNames.cpp" />
@@ -134,6 +135,7 @@
     <ClInclude Include="EditorCamera.h" />
     <ClInclude Include="ModelImporter.h" />
     <ClInclude Include="ModelPreview.h" />
+    <ClInclude Include="SelectionOutline.h" />
     <ClInclude Include="SceneHistory.h" />
     <ClInclude Include="EditCommands.h" />
     <ClInclude Include="FieldNames.h" />

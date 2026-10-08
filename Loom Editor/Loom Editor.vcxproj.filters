@@ -70,6 +70,9 @@
     <ClCompile Include="ModelPreview.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
+    <ClCompile Include="SelectionOutline.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
     <ClCompile Include="SceneHistory.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
@@ -130,6 +133,9 @@
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="ModelPreview.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="SelectionOutline.h">
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="SceneHistory.h">

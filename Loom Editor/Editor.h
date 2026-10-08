@@ -8,6 +8,7 @@
 #include "EditorSettings.h"
 #include "ShaderEditor.h"
 #include "ModelPreview.h"
+#include "SelectionOutline.h"
 #include "SceneHistory.h"
 #include "ScriptLibrary.h"
 #include "WebPlayer.h"
@@ -242,8 +243,9 @@ namespace Loom
 
 		// Fills the rest of the panel with the scenes, seen through camera, or
 		// through each scene's own when there is none. Only a view with a
-		// camera takes the mouse and keyboard, to fly it.
-		void DrawView(EditorViewport& view, const std::vector<Scene*>& scenes, EditorCamera* camera);
+		// camera takes the mouse and keyboard, to fly it, and only one with a
+		// camera rings the selection, when it is given an outline to do it with.
+		void DrawView(EditorViewport& view, const std::vector<Scene*>& scenes, EditorCamera* camera, SelectionOutline* outline = nullptr);
 		void DrawSceneData();
 		void DrawStats();
 
@@ -414,6 +416,9 @@ namespace Loom
 
 		EditorCamera m_sceneCamera;
 		EditorCamera m_debugCamera;
+
+		SelectionOutline m_sceneOutline;
+		SelectionOutline m_debugOutline;
 
 		ScriptLibrary m_scripts;
 		WebPlayer m_webPlayer;

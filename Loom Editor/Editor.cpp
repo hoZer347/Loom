@@ -2589,7 +2589,7 @@ namespace Loom
 				ImGui::TextDisabled("No scene open. Pick one in the Project panel.");
 			else
 			{
-				DrawView(m_sceneView, { m_activeScene }, &m_sceneCamera);
+				DrawView(m_sceneView, { m_activeScene }, &m_sceneCamera, &m_sceneOutline);
 				TakeImportTarget(&m_activeScene->GetRoot());
 			};
 		};
@@ -2679,7 +2679,7 @@ namespace Loom
 				ImGui::TextDisabled("Nothing loaded.");
 			else
 			{
-				DrawView(m_debugView, Scene::GetScenes(), &m_debugCamera);
+				DrawView(m_debugView, Scene::GetScenes(), &m_debugCamera, &m_debugOutline);
 
 				if (m_activeScene)
 					TakeImportTarget(&m_activeScene->GetRoot());
@@ -2689,7 +2689,7 @@ namespace Loom
 		ImGui::End();
 	};
 
-	void Editor::DrawView(EditorViewport& view, const std::vector<Scene*>& scenes, EditorCamera* camera)
+	void Editor::DrawView(EditorViewport& view, const std::vector<Scene*>& scenes, EditorCamera* camera, SelectionOutline* outline)
 	{
 		if (camera)
 		{
@@ -2720,7 +2720,25 @@ namespace Loom
 
 		// Rendering here is fine mid-frame: ImGui only records the texture id
 		// now and draws with it once the frame is submitted.
-		view.Render((int)available.x, (int)available.y, scenes, camera ? camera->Get() : nullptr);
+		Camera* seen_through = camera ? camera->Get() : nullptr;
+
+		const bool ringed = outline && seen_through && m_selected && std::any_of(
+			scenes.begin(),
+			scenes.end(),
+			[this](const Scene* scene) { return IsInHierarchy(scene->GetRoot(), m_selected); });
+
+		view.Render(
+			(int)available.x,
+			(int)available.y,
+			Engine::clearColor,
+			[&]()
+			{
+				for (Scene* scene : scenes)
+					scene->Render(seen_through);
+
+				if (ringed)
+					outline->Draw(*m_selected, *seen_through);
+			});
 
 		if (view.GetTexture())
 			ImGui::Image(

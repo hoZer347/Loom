@@ -41,6 +41,10 @@ namespace Loom
 		// when castShadows is off or there is no texture.
 		void DrawShadow(const glm::mat4& lightViewProjection);
 
+		// Draws the quad with program, handing it u_texture, u_color,
+		// u_alphaCutoff and u_model. Does nothing when there is no texture.
+		void DrawQuad(uint32_t program);
+
 		// Relative to the project folder, which is where the editor works from.
 		Serial<std::string> texturePath;
 		Serial<glm::vec4> color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -50,9 +54,6 @@ namespace Loom
 		Serial<bool> castShadows = true;
 
 	private:
-		// Draws the quad with program, the texture and cutoff already handed to it.
-		void DrawQuad(uint32_t program);
-
 		Texture* m_texture = nullptr;
 
 		// What was last asked for, loaded or not, so a file that will not load
