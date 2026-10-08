@@ -1,4 +1,4 @@
-#include "doctest.h"
+﻿#include "doctest.h"
 
 #include "ProjectAssets.h"
 
@@ -6,6 +6,7 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <utility>
 
 
 namespace
@@ -116,5 +117,49 @@ TEST_SUITE("ProjectAssets")
 		std::ofstream(scripts.project) << "<Project>\n</Project>\n";
 
 		CHECK(ReadAll(scripts.Create("Spinner")).find("namespace GameScripts") != std::string::npos);
+	};
+
+
+	TEST_CASE("a script opens in Visual Studio, reusing one already running")
+	{
+		const std::string devenv = "C:/VS/devenv.exe";
+		const std::string scripts = "C:/My Game/Scripts";
+		const std::string header = scripts + "/Mover.hpp";
+
+		const Loom::ProjectAssets::OpenCommand command = Loom::ProjectAssets::OpenWith(header, scripts, devenv);
+
+		CHECK(command.file == devenv);
+		CHECK(command.parameters == "/Edit \"" + header + '"');
+	};
+
+	TEST_CASE("the scripts solution and project open as themselves in Visual Studio")
+	{
+		const std::string devenv = "C:/VS/devenv.exe";
+		const std::string scripts = "C:/My Game/Scripts";
+
+		for (const std::string& name : { "GameScripts.sln", "GameScripts.vcxproj" })
+		{
+			const std::string path = scripts + '/' + name;
+			const Loom::ProjectAssets::OpenCommand command = Loom::ProjectAssets::OpenWith(path, scripts, devenv);
+
+			CHECK(command.file == devenv);
+			CHECK(command.parameters == '"' + path + '"');
+		};
+	};
+
+	TEST_CASE("anything else, or any file without Visual Studio 2026, goes to its association")
+	{
+		const std::string devenv = "C:/VS/devenv.exe";
+		const std::string scripts = "C:/My Game/Scripts";
+		const std::string shader = "C:/My Game/Assets/Shader.shader";
+		const std::string header = scripts + "/Mover.hpp";
+
+		for (const auto& [path, with] : { std::pair{ shader, devenv }, std::pair{ header, std::string() } })
+		{
+			const Loom::ProjectAssets::OpenCommand command = Loom::ProjectAssets::OpenWith(path, scripts, with);
+
+			CHECK(command.file == path);
+			CHECK(command.parameters.empty());
+		};
 	};
 };

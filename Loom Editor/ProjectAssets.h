@@ -45,5 +45,16 @@ namespace Loom
 		static std::string ScriptNameProblem(const std::string& scripts_project, const std::string& name);
 
 		static std::string Replace(std::string text, const std::string& token, const std::string& value);
+
+		struct OpenCommand
+		{
+			std::string file;
+			std::string parameters;
+		};
+
+		// What ShellExecute runs to open path. Under the scripts folder it goes
+		// to devenv when there is one, since a header has no association;
+		// anything else goes to whatever its association is.
+		static OpenCommand OpenWith(const std::string& path, const std::string& scripts_folder, const std::string& devenv);
 	};
 };
