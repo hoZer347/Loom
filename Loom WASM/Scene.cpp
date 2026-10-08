@@ -3,6 +3,7 @@
 #include "Camera.h"
 #include "Engine.h"
 #include "Light.h"
+#include "Mesh.h"
 
 #include <algorithm>
 #include <vector>
@@ -42,7 +43,13 @@ namespace Loom
 		Light::current = light;
 		Camera::current = camera ? camera : root.FindComponent<Camera>();
 
+		std::vector<Mesh*> transparent;
+		Mesh::transparent = &transparent;
+
 		root.Render();
+
+		Mesh::transparent = nullptr;
+		Mesh::DrawTransparent(transparent);
 
 		Light::current = nullptr;
 		Camera::current = nullptr;

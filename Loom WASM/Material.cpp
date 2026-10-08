@@ -175,6 +175,9 @@ namespace Loom
 		changed |= ImGui::Checkbox("Shadows", &settings.shadows);
 		ImGui::SetItemTooltip("Casts shadows, and is darkened by them when shading is on. Written into the shader file's settings");
 
+		changed |= ImGui::Checkbox("Transparency", &settings.transparency);
+		ImGui::SetItemTooltip("Blends by the alpha its fragment stage writes, drawn after everything opaque. Written into the shader file's settings");
+
 		if (!changed)
 			return;
 

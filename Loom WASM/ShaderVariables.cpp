@@ -105,6 +105,7 @@ namespace Loom
 		{
 			{ "shading", &ShaderSettings::shading },
 			{ "shadows", &ShaderSettings::shadows },
+			{ "transparency", &ShaderSettings::transparency },
 		};
 
 		// A shader file as lines, and the line ending to write it back with.
@@ -607,7 +608,7 @@ namespace Loom
 			const std::string value = match.empty() ? "" : match[SETTING_VALUE_MATCH].str();
 
 			if (!setting || (value != SETTING_ON && value != SETTING_OFF))
-				throw std::runtime_error("'" + trimmed + "' is not a setting: shading or shadows, = on or off");
+				throw std::runtime_error("'" + trimmed + "' is not a setting: shading, shadows or transparency, = on or off");
 
 			*setting = value == SETTING_ON;
 		};

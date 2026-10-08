@@ -585,6 +585,11 @@ namespace Loom
 			glPolygonOffset(slope, constant);
 		};
 
+		void SetDepthWrite(bool write) override
+		{
+			glDepthMask(write ? GL_TRUE : GL_FALSE);
+		};
+
 		glm::ivec2 TargetSize() const override
 		{
 			GLint viewport[VIEWPORT_SIZE]{ };

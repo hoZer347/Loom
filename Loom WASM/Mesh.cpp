@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <utility>
 
 
 namespace Loom
@@ -56,6 +57,12 @@ namespace Loom
 		if (!IsDrawable())
 			return;
 
+		if (transparent && material->shader->settings.transparency)
+		{
+			transparent->push_back(this);
+			return;
+		};
+
 		material->Apply(material->shader->id, &*variables);
 
 		if (Camera::current)
@@ -97,6 +104,36 @@ namespace Loom
 
 		renderer->SetUniform(program, "u_model", m_gameObject->WorldMatrix());
 		renderer->Draw(program, primitive_id, m_vertices->data(), m_vertices->size() / COMPONENTS, m_draw_type);
+	};
+
+	void Mesh::DrawTransparent(std::vector<Mesh*>& meshes)
+	{
+		Renderer* renderer = Renderer::Get();
+
+		if (meshes.empty() || !renderer)
+			return;
+
+		// Clip space depth does not depend on the aspect ratio.
+		constexpr float ANY_ASPECT = 1.0f;
+
+		const glm::mat4 viewProjection = Camera::current
+			? Camera::current->ViewProjection(ANY_ASPECT)
+			: glm::mat4(1.0f);
+
+		std::vector<std::pair<float, Mesh*>> byDepth;
+		byDepth.reserve(meshes.size());
+
+		for (Mesh* mesh : meshes)
+			byDepth.emplace_back((viewProjection * mesh->m_gameObject->WorldMatrix()[3]).z, mesh);
+
+		std::stable_sort(byDepth.begin(), byDepth.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+
+		renderer->SetDepthWrite(false);
+
+		for (const auto& [depth, mesh] : byDepth)
+			mesh->OnRender();
+
+		renderer->SetDepthWrite(true);
 	};
 
 	void Mesh::OnGui()

@@ -21,6 +21,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <vector>
 
 using LoomTests::Pump;
@@ -97,6 +98,7 @@ namespace
 		void PopTarget() override { };
 		void Clear(const float*, bool) override { };
 		void SetDepthBias(float, float) override { };
+		void SetDepthWrite(bool write) override { depthWrites.push_back(write); };
 
 		glm::ivec2 TargetSize() const override { return glm::ivec2(1); };
 		int MaxTextureSize() const override { return MAX_TEXTURE_SIZE; };
@@ -108,6 +110,7 @@ namespace
 		std::map<std::string, uint32_t> textures;
 		std::vector<uint32_t> deleted;
 		std::vector<uint32_t> drawn;
+		std::vector<bool> depthWrites;
 
 	private:
 		Renderer* m_previous;
@@ -300,7 +303,7 @@ TEST_SUITE("Shader variables")
 		std::string error;
 		REQUIRE(Loom::WriteShaderSettings(file.path.string(), { .shading = true }, error));
 
-		CHECK(file.Text() == "// A header comment.\n\n// ===SETTINGS===\nshading = on\nshadows = off\n\n" + STAGES);
+		CHECK(file.Text() == "// A header comment.\n\n// ===SETTINGS===\nshading = on\nshadows = off\ntransparency = off\n\n" + STAGES);
 
 		const Loom::ShaderSettings read = Loom::ParseShaderSettings(file.Text());
 
@@ -320,13 +323,14 @@ TEST_SUITE("Shader variables")
 			"void main() { }\r\n");
 
 		std::string error;
-		REQUIRE(Loom::WriteShaderSettings(file.path.string(), { .shading = false, .shadows = true }, error));
+		REQUIRE(Loom::WriteShaderSettings(file.path.string(), { .shading = false, .shadows = true, .transparency = true }, error));
 
 		CHECK(file.Text() ==
 			"// ===SETTINGS===\r\n"
 			"// Lit, for now.\r\n"
 			"shading = off\r\n"
 			"shadows = on\r\n"
+			"transparency = on\r\n"
 			"\r\n"
 			"// ===FRAGMENT===\r\n"
 			"void main() { }\r\n");
@@ -631,5 +635,46 @@ TEST_SUITE("Shader variables")
 
 		materials[1]->Apply(shader.id);
 		CHECK(renderer.floats["u_shadowsOff"] == 1.0f);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader with transparency on is drawn after everything opaque, farthest first, writing no depth")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream opaque_source(STAGES);
+		Loom::Shader opaque("opaque", opaque_source);
+
+		std::istringstream near_source("// ===SETTINGS===\ntransparency = on\n" + STAGES);
+		Loom::Shader near("transparent near", near_source);
+
+		std::istringstream far_source("// ===SETTINGS===\ntransparency = on\n" + STAGES);
+		Loom::Shader far("transparent far", far_source);
+
+		CHECK(near.settings.transparency);
+
+		Loom::Scene scene("transparency");
+		Pump();
+
+		// In hierarchy order the near one comes first, and the opaque one last.
+		// Without a camera, world space is clip space, where a greater z is farther.
+		constexpr float NEAR_Z = -0.5f;
+		constexpr float FAR_Z = 0.5f;
+
+		const std::tuple<const char*, Loom::Shader*, float> placed[] = { { "Near", &near, NEAR_Z }, { "Far", &far, FAR_Z }, { "Opaque", &opaque, 0.0f } };
+
+		for (const auto& [name, shader, z] : placed)
+		{
+			Loom::GameObject* object = scene.AddChild(name);
+			object->transform.position = glm::vec3(0.0f, 0.0f, z);
+			object->Attach<Loom::Material>()->shader = shader;
+			object->Attach<Loom::Mesh>()->m_vertices = std::vector<float>{ 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
+		};
+
+		Pump();
+
+		scene.Render();
+
+		CHECK(renderer.drawn == std::vector<uint32_t>{ opaque.id, far.id, near.id });
+		CHECK(renderer.depthWrites == std::vector<bool>{ false, true });
 	};
 };

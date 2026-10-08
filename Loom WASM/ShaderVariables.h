@@ -40,6 +40,10 @@ namespace Loom
 		// Drawn into the light's shadow map by a second program built from the
 		// vertex stage, and, when shaded, darkened where the map says so.
 		bool shadows = false;
+
+		// Drawn after everything opaque, farthest first, without writing depth,
+		// so what is behind it shows through wherever its alpha is under 1.
+		bool transparency = false;
 	};
 
 	// A name the engine gives a shader: a uniform Material, Mesh, Camera or

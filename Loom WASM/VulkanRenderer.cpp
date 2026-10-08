@@ -805,6 +805,14 @@ namespace Loom
 				vkCmdSetDepthBias(Command(), m_biasConstant, 0.0f, m_biasSlope);
 		};
 
+		void SetDepthWrite(bool write) override
+		{
+			m_depthWrite = write;
+
+			if (m_rendering)
+				vkCmdSetDepthWriteEnable(Command(), m_depthWrite);
+		};
+
 		glm::ivec2 TargetSize() const override
 		{
 			const uint32_t target = m_stack.back();
@@ -1405,6 +1413,7 @@ namespace Loom
 			vkCmdSetViewport(command, 0, 1, &viewport);
 			vkCmdSetScissor(command, 0, 1, &scissor);
 			vkCmdSetDepthBias(command, m_biasConstant, 0.0f, m_biasSlope);
+			vkCmdSetDepthWriteEnable(command, m_depthWrite);
 		};
 
 		void EndRendering()
@@ -1572,7 +1581,7 @@ namespace Loom
 			blend.attachmentCount = hasColor ? 1 : 0;
 			blend.pAttachments = &blendAttachment;
 
-			const VkDynamicState dynamics[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_DEPTH_BIAS };
+			const VkDynamicState dynamics[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_DEPTH_BIAS, VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE };
 
 			VkPipelineDynamicStateCreateInfo dynamic{ VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
 			dynamic.dynamicStateCount = (uint32_t)std::size(dynamics);
@@ -1625,6 +1634,11 @@ namespace Loom
 
 			for (const SpvReflectDescriptorBinding* binding : bindings)
 			{
+				// One the stage never reads is left without a binding of its own, so
+				// it can share one with what it does read.
+				if (!binding->accessed)
+					continue;
+
 				if (binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER && binding->binding == Glsl::DEFAULT_BLOCK_BINDING)
 				{
 					program.blockSize = std::max(program.blockSize, binding->block.padded_size);
@@ -2037,6 +2051,7 @@ namespace Loom
 
 		float m_biasSlope = 0.0f;
 		float m_biasConstant = 0.0f;
+		bool m_depthWrite = true;
 
 		CaptureHandler m_capture;
 
