@@ -2,9 +2,11 @@
 
 #include "Shaders.h"
 
+#include <algorithm>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <vector>
 
 
 namespace
@@ -77,6 +79,91 @@ TEST_SUITE("Shader")
 	{
 		CHECK_THROWS_AS(Loom::Shader("missing"), std::runtime_error);
 		CHECK_THROWS_AS(Loom::Shader("missing.shader"), std::runtime_error);
+	};
+
+	TEST_CASE("Check has nothing to say about a shader that compiles")
+	{
+		const std::string text =
+			"// ===VERTEX===\n"
+			"layout(location = 0) in vec3 aPos;\n"
+			"uniform mat4 u_viewProjection;\n"
+			"uniform mat4 u_model;\n"
+			"out vec4 v_lightSpace;\n"
+			"void main()\n"
+			"{\n"
+			"\tvec4 world = u_model * vec4(aPos, 1.0);\n"
+			"\tv_lightSpace = LoomLightSpace(world);\n"
+			"\tgl_Position = u_viewProjection * world;\n"
+			"}\n"
+			"// ===FRAGMENT===\n"
+			"in vec4 v_lightSpace;\n"
+			"out vec4 FragColor;\n"
+			"void main()\n"
+			"{\n"
+			"\tFragColor = vec4(LoomLight(vec3(0.0, 1.0, 0.0), v_lightSpace), 1.0);\n"
+			"}\n";
+
+		CHECK(Loom::Shader::Check(text).empty());
+	};
+
+	TEST_CASE("Check puts an error on the line of the file it is on")
+	{
+		const std::string text =
+			"// A comment above the sections.\n"
+			"// ===VERTEX===\n"
+			"layout(location = 0) in vec3 aPos;\n"
+			"void main() { gl_Position = vec4(aPos, 1.0); }\n"
+			"// ===FRAGMENT===\n"
+			"out vec4 FragColor;\n"
+			"void main()\n"
+			"{\n"
+			"\tFragColor = undeclaredColour;\n"
+			"}\n";
+
+		const std::vector<Loom::ShaderMessage> messages = Loom::Shader::Check(text);
+
+		REQUIRE_FALSE(messages.empty());
+		CHECK(messages[0].error);
+		CHECK(messages[0].text.find("undeclaredColour") != std::string::npos);
+
+		for (const Loom::ShaderMessage& message : messages)
+			CHECK(message.line == 9);
+	};
+
+	TEST_CASE("Check reports a mistake in COMMON once, though both stages have it")
+	{
+		const std::string text =
+			"// ===COMMON===\n"
+			"const float scale = undeclaredScale;\n"
+			"// ===VERTEX===\n"
+			"void main() { gl_Position = vec4(scale); }\n"
+			"// ===FRAGMENT===\n"
+			"out vec4 FragColor;\n"
+			"void main() { FragColor = vec4(scale); }\n";
+
+		const std::vector<Loom::ShaderMessage> messages = Loom::Shader::Check(text);
+
+		const auto undeclared = [](const Loom::ShaderMessage& message) { return message.text.find("undeclaredScale") != std::string::npos; };
+
+		CHECK(std::count_if(messages.begin(), messages.end(), undeclared) == 1);
+
+		for (const Loom::ShaderMessage& message : messages)
+			CHECK(message.line == 2);
+	};
+
+	TEST_CASE("Check reports a stage with no main against no line")
+	{
+		const std::string text =
+			"// ===VERTEX===\n"
+			"void main() { gl_Position = vec4(0.0); }\n"
+			"// ===FRAGMENT===\n"
+			"out vec4 FragColor;\n";
+
+		const std::vector<Loom::ShaderMessage> messages = Loom::Shader::Check(text);
+
+		REQUIRE_FALSE(messages.empty());
+		CHECK(messages[0].error);
+		CHECK(messages[0].line == 0);
 	};
 #endif
 

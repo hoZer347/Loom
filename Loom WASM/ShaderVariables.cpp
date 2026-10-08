@@ -23,21 +23,6 @@ namespace Loom
 {
 	namespace
 	{
-		// Set by Material, Mesh, Camera and Light, so never a variable.
-		constexpr std::string_view ENGINE_UNIFORMS[] =
-		{
-			"u_model",
-			"u_color",
-			"u_shadowsOff",
-			"u_viewProjection",
-			"u_cameraPosition",
-			"u_lightViewProjection",
-			"u_lightDirection",
-			"u_lightColor",
-			"u_ambient",
-			"u_shadowMap",
-		};
-
 		constexpr const char* INSTANCE_TAG = "instance";
 		constexpr const char* MATERIAL_TAG = "material";
 
@@ -70,9 +55,13 @@ namespace Loom
 		constexpr size_t NAME_MATCH = 3;
 		constexpr size_t TAG_MATCH = 4;
 
+		// Set by Material, Mesh, Camera and Light, so never a variable.
 		bool IsEngineUniform(std::string_view name)
 		{
-			return std::find(std::begin(ENGINE_UNIFORMS), std::end(ENGINE_UNIFORMS), name) != std::end(ENGINE_UNIFORMS);
+			return std::any_of(
+				std::begin(ENGINE_SHADER_SYMBOLS),
+				std::end(ENGINE_SHADER_SYMBOLS),
+				[name](const ShaderSymbol& symbol) { return symbol.uniform && symbol.name == name; });
 		};
 
 		std::string Trimmed(const std::string& line)

@@ -14,6 +14,16 @@
 
 namespace Loom
 {
+	// Something compiling a shader file had to say about it.
+	struct ShaderMessage
+	{
+		// The file's line, from 1, or 0 for a message about no line of it (the
+		// link, or the engine's own GLSL).
+		size_t line = 0;
+		bool error = true;
+		std::string text;
+	};
+
 	struct LOOM_API Shader final
 	{
 		Shader();
@@ -51,6 +61,12 @@ namespace Loom
 
 		// Reloads when the file has been written since it was last compiled.
 		void ReloadIfChanged();
+
+#ifndef __EMSCRIPTEN__
+		// Compiles the text of a shader file the way the Vulkan renderer would,
+		// whichever renderer is running, without making a program of it.
+		static std::vector<ShaderMessage> Check(const std::string& text);
+#endif
 
 		const std::string file_path;
 

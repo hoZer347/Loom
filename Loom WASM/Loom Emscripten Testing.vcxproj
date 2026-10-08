@@ -118,6 +118,7 @@
     <ClCompile Include="SerializedField.cpp" />
     <ClCompile Include="SceneSerializer.cpp" />
     <ClCompile Include="Shaders.cpp" />
+    <ClCompile Include="GlslCompiler.cpp" />
     <ClCompile Include="Sprite.cpp" />
     <ClCompile Include="Textures.cpp" />
     <ClCompile Include="ShaderVariables.cpp" />
@@ -164,6 +165,7 @@
     <ClInclude Include="SerializedField.h" />
     <ClInclude Include="SceneSerializer.h" />
     <ClInclude Include="Shaders.h" />
+    <ClInclude Include="GlslCompiler.h" />
     <ClInclude Include="Sprite.h" />
     <ClInclude Include="Textures.h" />
     <ClInclude Include="ShaderVariables.h" />

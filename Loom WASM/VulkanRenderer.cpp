@@ -1,5 +1,6 @@
 #ifndef __EMSCRIPTEN__
 
+#include "GlslCompiler.h"
 #include "Renderer.h"
 
 #define GLFW_INCLUDE_VULKAN
@@ -9,9 +10,6 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
 
-#include <glslang/Public/ResourceLimits.h>
-#include <glslang/Public/ShaderLang.h>
-#include <glslang/SPIRV/GlslangToSpv.h>
 
 #include "spirv_reflect.h"
 
@@ -34,9 +32,6 @@ namespace Loom
 		constexpr uint32_t API_VERSION = VK_API_VERSION_1_3;
 		constexpr uint32_t FRAMES_IN_FLIGHT = 2;
 
-		// Vertex and fragment.
-		constexpr size_t STAGES = 2;
-
 		constexpr size_t RGBA = 4;
 
 		// Where each part of a pipeline's key sits: the topology in the low
@@ -53,18 +48,7 @@ namespace Loom
 		// this size, reused once their frame has finished on the GPU.
 		constexpr VkDeviceSize CHUNK_SIZE = 4 * 1024 * 1024;
 
-		// Loose uniforms are gathered into one block, at this binding.
-		constexpr uint32_t DEFAULT_BLOCK_BINDING = 0;
-
-		// The fragment stage's specialisation constant that undoes the window's
-		// flipped viewport for dFdy (see FRAGMENT_PRELUDE).
-		constexpr uint32_t FLIP_CONSTANT_ID = 0;
-
 		constexpr uint32_t IMGUI_DESCRIPTORS = 1024;
-		constexpr int GLSL_VERSION = 460;
-
-		// The Vulkan GLSL semantics glslang compiles to (the VULKAN macro's value).
-		constexpr int VULKAN_INPUT_VERSION = 100;
 
 		constexpr uint32_t POSITION_LOCATION = 0;
 		constexpr uint32_t POSITION_COMPONENTS = 3;
@@ -84,19 +68,6 @@ namespace Loom
 			GL_TRIANGLE_STRIP_ = 0x0005,
 			GL_TRIANGLE_FAN_ = 0x0006,
 		};
-
-		const char* const VERSION_LINE = "#version 460 core\n";
-
-		// The window is drawn with a flipped viewport, so its rows come out top
-		// first while clip space keeps GL's y up. That reverses screen space y,
-		// which dFdy would show; this puts it back. #line keeps the compiler's
-		// line numbers where GL's would be.
-		const char* const FRAGMENT_PRELUDE =
-			"layout(constant_id = 0) const float loom_FlipY = 1.0;\n"
-			"#define dFdy(p) (loom_FlipY * dFdy(p))\n"
-			"#define dFdyFine(p) (loom_FlipY * dFdyFine(p))\n"
-			"#define dFdyCoarse(p) (loom_FlipY * dFdyCoarse(p))\n"
-			"#line 2\n";
 
 		// Looked up by the const char* a caller has, without building a string.
 		struct NameHash
@@ -179,60 +150,6 @@ namespace Loom
 			// GL's -1 to 1 clip space depth, so shaders and projections carry over.
 			VK_EXT_DEPTH_CLIP_CONTROL_EXTENSION_NAME,
 		};
-
-		// Compiles both stages with GL's rules relaxed onto Vulkan's: loose
-		// uniforms are gathered into one block, and bindings and locations are
-		// given out across the two stages together.
-		std::array<std::vector<uint32_t>, STAGES> CompileToSpirv(const std::string& name, const std::string& vertex, const std::string& fragment)
-		{
-			const EShMessages messages = (EShMessages)(EShMsgSpvRules | EShMsgVulkanRules);
-
-			const std::string sources[] =
-			{
-				VERSION_LINE + vertex,
-				VERSION_LINE + std::string(FRAGMENT_PRELUDE) + fragment,
-			};
-
-			const EShLanguage stages[] = { EShLangVertex, EShLangFragment };
-			const char* const stageNames[] = { "VERTEX", "FRAGMENT" };
-
-			glslang::TShader vertexShader(EShLangVertex);
-			glslang::TShader fragmentShader(EShLangFragment);
-			glslang::TShader* shaders[] = { &vertexShader, &fragmentShader };
-
-			glslang::TProgram program;
-
-			for (size_t i = 0; i < std::size(shaders); i++)
-			{
-				glslang::TShader& shader = *shaders[i];
-				const char* text = sources[i].c_str();
-
-				shader.setStrings(&text, 1);
-				shader.setEnvInput(glslang::EShSourceGlsl, stages[i], glslang::EShClientVulkan, VULKAN_INPUT_VERSION);
-				shader.setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_3);
-				shader.setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_6);
-				shader.setEnvInputVulkanRulesRelaxed();
-				shader.setAutoMapBindings(true);
-				shader.setAutoMapLocations(true);
-				shader.setGlobalUniformSet(0);
-				shader.setGlobalUniformBinding(DEFAULT_BLOCK_BINDING);
-
-				if (!shader.parse(GetDefaultResources(), GLSL_VERSION, false, messages))
-					throw std::runtime_error(std::string("Shader compile error in ") + stageNames[i] + ":\n" + shader.getInfoLog());
-
-				program.addShader(&shader);
-			};
-
-			if (!program.link(messages) || !program.mapIO())
-				throw std::runtime_error("Shader link error in " + name + ":\n" + program.getInfoLog());
-
-			std::array<std::vector<uint32_t>, STAGES> spirv;
-
-			for (size_t i = 0; i < std::size(stages); i++)
-				glslang::GlslangToSpv(*program.getIntermediate(stages[i]), spirv[i]);
-
-			return spirv;
-		};
 	};
 
 	struct VulkanRenderer final : Renderer
@@ -278,8 +195,6 @@ namespace Loom
 			if (m_messenger)	DestroyMessenger();
 			if (m_instance)		vkDestroyInstance(m_instance, nullptr);
 
-			if (m_glslang)
-				glslang::FinalizeProcess();
 		};
 
 		Backend GetBackend() const override
@@ -306,8 +221,6 @@ namespace Loom
 				|| !CreateFrames()
 				|| !CreateSwapchain())
 				return false;
-
-			m_glslang = glslang::InitializeProcess();
 
 			glfwSetFramebufferSizeCallback(
 				window,
@@ -519,7 +432,12 @@ namespace Loom
 
 		uint32_t CreateProgram(const std::string& name, const std::string& vertex, const std::string& fragment) override
 		{
-			const std::array<std::vector<uint32_t>, STAGES> spirv = CompileToSpirv(name, vertex, fragment);
+			const Glsl::Program compiled = Glsl::Compile(vertex, fragment);
+
+			if (!compiled.compiled)
+				throw std::runtime_error("Shader compile error in " + name + ":\n" + compiled.log);
+
+			const std::array<std::vector<uint32_t>, Glsl::STAGES>& spirv = compiled.spirv;
 
 			Program program;
 			program.name = name;
@@ -538,7 +456,7 @@ namespace Loom
 			std::vector<VkDescriptorSetLayoutBinding> bindings;
 
 			if (program.blockSize)
-				bindings.push_back({ DEFAULT_BLOCK_BINDING, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL_GRAPHICS, nullptr });
+				bindings.push_back({ Glsl::DEFAULT_BLOCK_BINDING, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL_GRAPHICS, nullptr });
 
 			for (const auto& [samplerName, sampler] : program.samplers)
 				bindings.push_back({ sampler.binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL_GRAPHICS, nullptr });
@@ -698,7 +616,7 @@ namespace Loom
 				block = { uniforms.buffer, uniforms.offset, program.blockSize };
 
 				VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-				write.dstBinding = DEFAULT_BLOCK_BINDING;
+				write.dstBinding = Glsl::DEFAULT_BLOCK_BINDING;
 				write.descriptorCount = 1;
 				write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 				write.pBufferInfo = &block;
@@ -976,7 +894,7 @@ namespace Loom
 			};
 
 			std::string name;
-			std::array<VkShaderModule, STAGES> modules{ };
+			std::array<VkShaderModule, Glsl::STAGES> modules{ };
 			VkDescriptorSetLayout setLayout = VK_NULL_HANDLE;
 			VkPipelineLayout layout = VK_NULL_HANDLE;
 
@@ -1582,7 +1500,7 @@ namespace Loom
 				return found->second;
 
 			const float flip = flipped ? -1.0f : 1.0f;
-			const VkSpecializationMapEntry entry = { FLIP_CONSTANT_ID, 0, sizeof(flip) };
+			const VkSpecializationMapEntry entry = { Glsl::FLIP_CONSTANT_ID, 0, sizeof(flip) };
 
 			VkSpecializationInfo specialization{ };
 			specialization.mapEntryCount = 1;
@@ -1590,7 +1508,7 @@ namespace Loom
 			specialization.dataSize = sizeof(flip);
 			specialization.pData = &flip;
 
-			VkPipelineShaderStageCreateInfo stages[STAGES] = { { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO }, { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO } };
+			VkPipelineShaderStageCreateInfo stages[Glsl::STAGES] = { { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO }, { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO } };
 			stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
 			stages[0].module = program.modules[0];
 			stages[0].pName = "main";
@@ -1709,7 +1627,7 @@ namespace Loom
 
 			for (const SpvReflectDescriptorBinding* binding : bindings)
 			{
-				if (binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER && binding->binding == DEFAULT_BLOCK_BINDING)
+				if (binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER && binding->binding == Glsl::DEFAULT_BLOCK_BINDING)
 				{
 					program.blockSize = std::max(program.blockSize, binding->block.padded_size);
 
@@ -2086,7 +2004,6 @@ namespace Loom
 
 		VkDeviceSize m_uniformAlignment = 1;
 		int m_maxTextureSize = 0;
-		bool m_glslang = false;
 
 		VkSwapchainKHR m_swapchain = VK_NULL_HANDLE;
 		VkFormat m_swapFormat = VK_FORMAT_UNDEFINED;

@@ -1,5 +1,6 @@
 #include "Shaders.h"
 
+#include "GlslCompiler.h"
 #include "Light.h"
 #include "Renderer.h"
 
@@ -8,6 +9,7 @@
 #include <emscripten/fetch.h>
 #endif
 
+#include <algorithm>
 #include <sstream>
 #include <iostream>
 #include <fstream>
@@ -25,6 +27,23 @@ namespace Loom
 
 	namespace
 	{
+		// The file is source string 0 to the compiler and the engine's GLSL is
+		// 1, so nothing said about the engine's is taken for the file's.
+		constexpr int FILE_SOURCE = 0;
+		constexpr int LIBRARY_SOURCE = 1;
+
+		// From GLSL 3.30 and ES 3.00 on, #line numbers the line after it.
+		std::string LineDirective(size_t line, int source)
+		{
+			return "#line " + std::to_string(line) + ' ' + std::to_string(source) + '\n';
+		};
+
+		// Code the engine puts in a stage, numbered apart from the file's.
+		std::string EngineCode(const std::string& code)
+		{
+			return code.empty() ? code : LineDirective(1, LIBRARY_SOURCE) + code;
+		};
+
 		// The vertex stage of a file without one: the mesh's positions, through
 		// its transform and the camera.
 		constexpr const char* DEFAULT_VERTEX = R"(
@@ -96,7 +115,7 @@ void main()
 
 		std::string ShadedVertex(const std::string& stage, bool shadows)
 		{
-			std::string shaded = WithMainRenamed(stage, "vertex") + '\n';
+			std::string shaded = WithMainRenamed(stage, "vertex") + '\n' + LineDirective(1, LIBRARY_SOURCE);
 
 			for (const ShadingInput& input : SHADING_INPUTS)
 				if (!Declares(stage, input.name))
@@ -126,7 +145,7 @@ void main()
 			if (!std::regex_search(stage, color, ColorPattern()))
 				throw std::runtime_error("Shading needs the fragment stage to write an out vec4 colour");
 
-			std::string shaded = WithMainRenamed(stage, "fragment") + "\nin vec3 loom_World;\n";
+			std::string shaded = WithMainRenamed(stage, "fragment") + '\n' + LineDirective(1, LIBRARY_SOURCE) + "in vec3 loom_World;\n";
 
 			if (shadows)
 				shaded += "in vec4 loom_LightSpace;\n";
@@ -140,6 +159,75 @@ void main()
 				"\t" + color[1].str() + ".rgb *= LoomLight(loom_normal" + (shadows ? ", loom_LightSpace" : "") + ");\n"
 				"}\n";
 		};
+
+#ifndef __EMSCRIPTEN__
+		// glslang's "ERROR: 0:12: 'x' : undeclared identifier", and its warnings.
+		const std::regex& MessagePattern()
+		{
+			static const std::regex pattern(R"(^(ERROR|WARNING): (.*)$)");
+			return pattern;
+		};
+
+		const std::regex& PlacePattern()
+		{
+			static const std::regex pattern(R"(^(\d+):(\d+): (.*)$)");
+			return pattern;
+		};
+
+		// What glslang ends a stage that failed with.
+		const std::regex& EndPattern()
+		{
+			static const std::regex pattern(R"(^\d+ compilation errors|: compilation terminated)");
+			return pattern;
+		};
+
+		std::vector<ShaderMessage> ParseMessages(const std::string& log)
+		{
+			std::vector<ShaderMessage> messages;
+			std::istringstream lines(log);
+
+			for (std::string line; std::getline(lines, line);)
+			{
+				std::smatch match;
+
+				if (!std::regex_match(line, match, MessagePattern()))
+					continue;
+
+				ShaderMessage message;
+				message.error = match[1] == "ERROR";
+				message.text = match[2];
+
+				if (std::regex_search(message.text, EndPattern()))
+					continue;
+
+				std::smatch place;
+
+				if (std::regex_match(message.text, place, PlacePattern()))
+				{
+					// A warning about the engine's GLSL is nothing the file can do
+					// anything about.
+					if (std::stoi(place[1]) != FILE_SOURCE && !message.error)
+						continue;
+
+					if (std::stoi(place[1]) == FILE_SOURCE)
+						message.line = std::stoul(place[2]);
+
+					message.text = place[3];
+				};
+
+				// COMMON is in both stages, and so is anything wrong with it.
+				const bool repeated = std::any_of(
+					messages.begin(),
+					messages.end(),
+					[&message](const ShaderMessage& other) { return other.line == message.line && other.text == message.text; });
+
+				if (!repeated)
+					messages.push_back(std::move(message));
+			};
+
+			return messages;
+		};
+#endif
 	};
 
 	Shader::Shader() :
@@ -269,8 +357,14 @@ void main()
 		ShaderType current = ShaderType::NONE;
 		bool has_vertex = false;
 
-		std::string line;
-		while (std::getline(lines, line))
+		size_t number = 0;
+
+		// Each section starts on the file's own line number, so what the
+		// compiler says about a line of a stage is about that line of the file.
+		for (std::string line; std::getline(lines, line);)
+		{
+			number++;
+
 			if (line.find(VERTEX_SECTION) != std::string::npos)
 			{
 				current = ShaderType::VERTEX;
@@ -282,15 +376,23 @@ void main()
 				current = ShaderType::COMMON;
 			else if (line.find(SETTINGS_SECTION) != std::string::npos)
 				current = ShaderType::SETTINGS;
-			else if (current != ShaderType::NONE)
-				sections[current] << line << '\n';
+			else
+			{
+				if (current != ShaderType::NONE)
+					sections[current] << line << '\n';
+
+				continue;
+			};
+
+			sections[current] << LineDirective(number + 1, FILE_SOURCE);
+		};
 
 		Stages stages;
 		stages.settings = ParseShaderSettings(source);
 
 		const ShaderSettings& settings = stages.settings;
 		const std::string common = sections[ShaderType::COMMON].str();
-		const std::string vertex = common + (has_vertex ? sections[ShaderType::VERTEX].str() : DEFAULT_VERTEX);
+		const std::string vertex = common + (has_vertex ? sections[ShaderType::VERTEX].str() : EngineCode(DEFAULT_VERTEX));
 		const std::string fragment = common + sections[ShaderType::FRAGMENT].str();
 
 		stages.vertex = settings.shading ? ShadedVertex(vertex, settings.shadows) : vertex;
@@ -299,18 +401,18 @@ void main()
 		if (settings.shadows)
 		{
 			stages.shadowVertex = vertex;
-			stages.shadowFragment = common + SHADOW_FRAGMENT;
+			stages.shadowFragment = common + EngineCode(SHADOW_FRAGMENT);
 		};
 
 		// The engine's GLSL goes first, so a shader's own COMMON block (its
 		// precision statements included) has the last word.
 		for (std::string* stage : { &stages.vertex, &stages.shadowVertex })
 			if (!stage->empty())
-				*stage = Light::VertexLibrary(*stage) + *stage;
+				*stage = EngineCode(Light::VertexLibrary(*stage)) + *stage;
 
 		for (std::string* stage : { &stages.fragment, &stages.shadowFragment })
 			if (!stage->empty())
-				*stage = Light::FragmentLibrary(*stage) + *stage;
+				*stage = EngineCode(Light::FragmentLibrary(*stage)) + *stage;
 
 		return stages;
 	};
@@ -348,6 +450,29 @@ void main()
 
 		return Cached(programs);
 	};
+
+#ifndef __EMSCRIPTEN__
+	std::vector<ShaderMessage> Shader::Check(const std::string& text)
+	{
+		Stages stages;
+
+		try
+		{
+			stages = Assemble(text);
+		}
+		catch (const std::runtime_error& e)
+		{
+			return { ShaderMessage{ 0, true, e.what() } };
+		};
+
+		std::string log = Glsl::Compile(stages.vertex, stages.fragment).log;
+
+		if (stages.settings.shadows)
+			log += Glsl::Compile(stages.shadowVertex, stages.shadowFragment).log;
+
+		return ParseMessages(log);
+	};
+#endif
 
 #ifdef __EMSCRIPTEN__
 	void Shader::Request(

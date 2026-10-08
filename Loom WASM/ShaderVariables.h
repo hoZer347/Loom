@@ -9,6 +9,7 @@
 #include <initializer_list>
 #include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 
 
@@ -39,6 +40,35 @@ namespace Loom
 		// Drawn into the light's shadow map by a second program built from the
 		// vertex stage, and, when shaded, darkened where the map says so.
 		bool shadows = false;
+	};
+
+	// A name the engine gives a shader: a uniform Material, Mesh, Camera or
+	// Light sets, or a function of the GLSL it puts in front of a stage that
+	// calls one.
+	struct ShaderSymbol
+	{
+		std::string_view name;
+		std::string_view declaration;
+		std::string_view description;
+		bool uniform = false;
+	};
+
+	inline constexpr ShaderSymbol ENGINE_SHADER_SYMBOLS[] =
+	{
+		{ "u_model", "uniform mat4 u_model;", "The GameObject's world matrix, set by Mesh and Sprite.", true },
+		{ "u_color", "uniform vec3 u_color;", "The Material's colour.", true },
+		{ "u_shadowsOff", "uniform float u_shadowsOff;", "Not zero on a Material whose shadows are off.", true },
+		{ "u_viewProjection", "uniform mat4 u_viewProjection;", "The Camera's view and projection together.", true },
+		{ "u_cameraPosition", "uniform vec3 u_cameraPosition;", "The Camera's position in world space.", true },
+		{ "u_lightViewProjection", "uniform mat4 u_lightViewProjection;", "The Light's view and projection, which its shadow map is drawn with.", true },
+		{ "u_lightDirection", "uniform vec3 u_lightDirection;", "The way the Light shines, in world space.", true },
+		{ "u_lightColor", "uniform vec3 u_lightColor;", "The Light's colour.", true },
+		{ "u_ambient", "uniform float u_ambient;", "How much light reaches what the Light does not.", true },
+		{ "u_shadowMap", "uniform highp sampler2DShadow u_shadowMap;", "The Light's shadow map.", true },
+		{ "LoomLightSpace", "vec4 LoomLightSpace(vec4 world)", "Vertex stage: where a world position falls in the Light's shadow map. Hand it on to the fragment stage for LoomLight or LoomShadow." },
+		{ "LoomShadow", "float LoomShadow(vec4 lightSpace)", "Fragment stage: 1 where the Light reaches, 0 in shadow, softened at the edges." },
+		{ "LoomDiffuse", "float LoomDiffuse(vec3 normal)", "Fragment stage: how squarely the Light falls on a world space normal, from 0 to 1." },
+		{ "LoomLight", "vec3 LoomLight(vec3 normal, vec4 lightSpace)\nvec3 LoomLight(vec3 normal)","Fragment stage: the ambient light plus the Light's colour on a world space normal, shadowed when given where it falls in the shadow map." },
 	};
 
 	// Whether a variable is filled in once on the Material, or on each Mesh
