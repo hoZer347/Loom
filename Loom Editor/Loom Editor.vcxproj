@@ -44,6 +44,7 @@
     <Import Project="..\Property Files\OpenGL.props" />
     <Import Project="..\Property Files\Vulkan.props" />
     <Import Project="..\Property Files\Assimp.props" />
+    <Import Project="..\Property Files\stb.props" />
     <Import Project="..\Property Files\UserMacros.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -53,6 +54,7 @@
     <Import Project="..\Property Files\OpenGL.props" />
     <Import Project="..\Property Files\Vulkan.props" />
     <Import Project="..\Property Files\Assimp.props" />
+    <Import Project="..\Property Files\stb.props" />
     <Import Project="..\Property Files\UserMacros.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
@@ -103,6 +105,7 @@
     <ClCompile Include="EditorConsole.cpp" />
     <ClCompile Include="EditorLayouts.cpp" />
     <ClCompile Include="ShaderEditor.cpp" />
+    <ClCompile Include="SpriteEditor.cpp" />
     <ClCompile Include="EditorSettings.cpp" />
     <ClCompile Include="EditorSettingsWindow.cpp" />
     <ClCompile Include="EditorTheme.cpp" />
@@ -128,6 +131,7 @@
     <ClInclude Include="EditorConsole.h" />
     <ClInclude Include="EditorLayouts.h" />
     <ClInclude Include="ShaderEditor.h" />
+    <ClInclude Include="SpriteEditor.h" />
     <ClInclude Include="EditorSettings.h" />
     <ClInclude Include="EditorTheme.h" />
     <ClInclude Include="EditorIcons.h" />

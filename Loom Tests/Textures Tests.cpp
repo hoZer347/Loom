@@ -82,4 +82,36 @@ TEST_SUITE("Texture")
 	{
 		CHECK(Loom::Texture::Shared("no such shared texture.png") == nullptr);
 	};
+
+	TEST_CASE("ReloadShared decodes the file again into the texture already handed out")
+	{
+		const std::string path = LoomTests::WriteTga("loom texture reload.tga", SIZE, SIZE, TOP_FIRST);
+
+		Loom::Texture* texture = Loom::Texture::Shared(path);
+
+		REQUIRE(texture != nullptr);
+
+		const std::vector<uint8_t> white(TOP_FIRST.size(), FULL);
+		LoomTests::WriteTga("loom texture reload.tga", SIZE, SIZE, white);
+
+		Loom::Texture::ReloadShared(path);
+
+		CHECK(Loom::Texture::Shared(path) == texture);
+		CHECK(texture->pixels == white);
+	};
+
+	TEST_CASE("Decode reads the pixels without a texture")
+	{
+		int width = 0;
+		int height = 0;
+
+		const std::vector<uint8_t> pixels = Loom::Texture::Decode(
+			LoomTests::WriteTga("loom texture decode.tga", SIZE, SIZE, TOP_FIRST),
+			width,
+			height);
+
+		CHECK(width == SIZE);
+		CHECK(height == SIZE);
+		CHECK(pixels.size() == (size_t)SIZE * SIZE * RGBA);
+	};
 };

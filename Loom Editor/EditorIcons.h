@@ -43,6 +43,7 @@ namespace Loom
 		constexpr const char* SceneData = "📊 Scene Data###Scene Data";
 		constexpr const char* Console = "💬 Console###Console";
 		constexpr const char* Shaders = "✨ Shaders###Shaders";
+		constexpr const char* Sprites = "🖌 Sprites###Sprites";
 		constexpr const char* Stats = "📈 Stats###Stats";
 		constexpr const char* Settings = "⚙ Settings###Settings";
 

@@ -471,6 +471,34 @@ void main()
 		return path.string();
 	};
 
+	std::string ProjectAssets::CopyInto(const std::string& file, const std::string& folder, std::string* error)
+	{
+		const std::filesystem::path source(file);
+		std::error_code code;
+
+		if (!std::filesystem::is_regular_file(source, code))
+		{
+			Fail(error, file + " is not a file");
+			return "";
+		};
+
+		if (std::filesystem::equivalent(source.parent_path(), folder, code))
+			return source.string();
+
+		std::filesystem::path target = std::filesystem::path(folder) / source.filename();
+
+		for (int suffix = 1; std::filesystem::exists(target, code); suffix++)
+			target = std::filesystem::path(folder) / (source.stem().string() + std::to_string(suffix) + source.extension().string());
+
+		if (!std::filesystem::copy_file(source, target, code))
+		{
+			Fail(error, "Could not copy " + file + " to " + target.string() + ": " + code.message());
+			return "";
+		};
+
+		return target.string();
+	};
+
 	std::string ProjectAssets::CreateScript(
 		const std::string& scripts_project,
 		const std::string& folder,
@@ -525,6 +553,9 @@ void main()
 
 		if (extension == shaderExtension)
 			return Opener::Shaders;
+
+		if (IsTextureFile(path))
+			return Opener::Sprites;
 
 		return IsScriptFile(path) && !scripts_folder.empty() && IsUnder(path, scripts_folder)
 			? Opener::VisualStudio

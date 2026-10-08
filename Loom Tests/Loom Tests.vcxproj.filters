@@ -61,6 +61,9 @@
     <ClCompile Include="ShaderEditor Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="SpriteEditor Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="Sprite Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

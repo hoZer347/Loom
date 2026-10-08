@@ -551,6 +551,9 @@ namespace Loom
 				for (const AssetNode& node : m_assets.children)
 					DrawAssetNode(node, 0);
 
+				// Dropped anywhere else in the list, it goes in the project folder.
+				TakeImportFolder(m_projectPath, ImGui::IsWindowHovered());
+
 				m_revealSelectedAsset = false;
 
 				if (ImGui::BeginPopupContextWindow(
@@ -617,6 +620,22 @@ namespace Loom
 			ImGui::IsItemHovered() &&
 			ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 			OpenAsset(node.path);
+
+		// On the release, so dragging one out to a field leaves the panel shut.
+		const ImGuiIO& io = ImGui::GetIO();
+		const float drag_threshold = io.MouseDragThreshold * io.MouseDragThreshold;
+
+		if (!node.folder &&
+			node.path == m_selectedAsset &&
+			ProjectAssets::IsTextureFile(node.path) &&
+			ImGui::IsItemHovered() &&
+			ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
+			io.MouseDragMaxDistanceSqr[ImGuiMouseButton_Left] < drag_threshold)
+			OpenSprite(node.path);
+
+		TakeImportFolder(
+			node.folder ? node.path : std::filesystem::path(node.path).parent_path().string(),
+			ImGui::IsItemHovered());
 
 		DragAsset(node);
 
@@ -872,6 +891,10 @@ namespace Loom
 			OpenShader(path);
 			break;
 
+		case ProjectAssets::Opener::Sprites:
+			OpenSprite(path);
+			break;
+
 		case ProjectAssets::Opener::VisualStudio:
 			OpenInVisualStudio(path);
 			break;
@@ -886,6 +909,12 @@ namespace Loom
 	{
 		m_shaders.Open(path);
 		m_showShaders = true;
+	};
+
+	void Editor::OpenSprite(const std::string& path)
+	{
+		m_sprites.Open(path);
+		m_showSprites = true;
 	};
 
 	bool Editor::OpenInShell(ImGuiContext*, const char* path)

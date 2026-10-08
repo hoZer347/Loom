@@ -7,6 +7,7 @@
 #include "Guid.h"
 #include "EditorSettings.h"
 #include "ShaderEditor.h"
+#include "SpriteEditor.h"
 #include "ModelPreview.h"
 #include "SelectionOutline.h"
 #include "SceneHistory.h"
@@ -110,6 +111,8 @@ namespace Loom
 		void LoadLayout(const std::string& name) { m_pendingLayout = name; };
 		void SaveLayout(const std::string& name) { m_layoutToSave = name; };
 		void ShowSaveLayoutPrompt();
+		// In a tab of the Sprites panel, which comes forward.
+		void OpenSprite(const std::string& path);
 
 		// Writes a new project (scenes, scripts, a Visual Studio solution) into
 		// folder/name and opens it.
@@ -147,6 +150,8 @@ namespace Loom
 		void QueueImport(const std::string& path);
 
 		// The same, with the mouse moved to x, y first, in ImGui's coordinates.
+		// Over the Project panel, the file is copied into the folder there
+		// instead.
 		void Drop(const std::string& path, float x, float y);
 
 		// File > Open Project..., starting beside the project that is open.
@@ -310,6 +315,12 @@ namespace Loom
 		// Records the item just drawn as where a queued import goes, if the
 		// mouse is over it.
 		void TakeImportTarget(GameObject* gameObject);
+
+		// The same for the Project panel, with the folder a drop there goes in.
+		void TakeImportFolder(const std::string& folder, bool hovered);
+
+		// Into the folder the drop landed in, selecting the copy.
+		void CopyIntoProject(const std::string& file);
 		void ImportQueued();
 
 		// Rescans the project folder: the asset tree the Project panel draws,
@@ -350,6 +361,10 @@ namespace Loom
 		// Recompiles the shaders whose files something else has written, every
 		// so often.
 		void PollShaders();
+
+		// Has the Sprites that show a file the Sprites panel saved draw it as
+		// it now is.
+		void ReloadSavedSprites();
 
 		// Where the Create prompt's asset would be written: the file for most,
 		// the source for a script, which goes under the scripts project even
@@ -499,6 +514,7 @@ namespace Loom
 		bool m_showSceneData = true;
 		bool m_showConsole = true;
 		bool m_showShaders = false;
+		bool m_showSprites = false;
 		bool m_showStats = true;
 		bool m_showImGuiDemo = false;
 		bool m_showSettings = false;
@@ -554,6 +570,7 @@ namespace Loom
 
 		EditorConsole m_console;
 		ShaderEditor m_shaders;
+		SpriteEditor m_sprites;
 
 		char m_nameBuffer[128]{ };
 		const GameObject* m_nameBufferOwner = nullptr;
@@ -570,6 +587,10 @@ namespace Loom
 
 		std::vector<QueuedImport> m_importQueue{ };
 		GameObject* m_importTarget = nullptr;
+
+		// The Project panel folder a drop landed in, which takes copies of the
+		// files rather than importing them into a scene.
+		std::string m_importFolder{ };
 
 		// Whether the mouse has been put where the front drop happened, so the
 		// panels drawn since have hovered what it lands in.

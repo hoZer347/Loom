@@ -12,6 +12,7 @@
 #include "Material.h"
 #include "Scene.h"
 #include "SceneSerializer.h"
+#include "Textures.h"
 #include "Transform.h"
 
 #include "Utilities/AxisGui.h"
@@ -290,8 +291,9 @@ namespace Loom
 					glfwSetDropCallback((GLFWwindow*)viewport->PlatformHandle, callback);
 		};
 
-		// What is docked in the middle: the views, and the shader editor.
-		constexpr const char* centre_windows[] = { EditorPanels::SceneId, EditorPanels::Game, EditorPanels::Debug, EditorPanels::Shaders };
+		// What is docked in the middle: the views, and the shader and sprite
+		// editors.
+		constexpr const char* centre_windows[] = { EditorPanels::SceneId, EditorPanels::Game, EditorPanels::Debug, EditorPanels::Shaders, EditorPanels::Sprites };
 
 		// The ImGui settings entry that holds which panels are open.
 		constexpr const char* panel_settings = "LoomEditor";
@@ -1075,6 +1077,10 @@ namespace Loom
 
 	void Editor::HandleShortcuts()
 	{
+		// The Sprites panel undoes its own strokes.
+		if (m_showSprites && m_sprites.IsFocused())
+			return;
+
 		switch (EditCommands::FromShortcut(m_showHierarchy && m_hierarchyFocused))
 		{
 		case EditCommand::Undo:		Undo();				break;
@@ -1171,6 +1177,7 @@ namespace Loom
 
 		HandleShortcuts();
 		PollShaders();
+		ReloadSavedSprites();
 
 		// Panels come and go as OS windows, so the callback is put on whichever
 		// exist this frame.
@@ -1262,6 +1269,7 @@ namespace Loom
 		if (m_showSceneData)	DrawSceneData();
 		if (m_showConsole)		m_console.Draw(&m_showConsole);
 		if (m_showShaders)		m_shaders.Draw(&m_showShaders);
+		if (m_showSprites)		m_sprites.Draw(&m_showSprites);
 		if (m_showStats)		DrawStats();
 		if (m_showImGuiDemo)	ImGui::ShowDemoWindow(&m_showImGuiDemo);
 
@@ -1355,6 +1363,7 @@ namespace Loom
 			{ EditorPanels::SceneData, &m_showSceneData, true },
 			{ EditorPanels::Console, &m_showConsole, true },
 			{ EditorPanels::Shaders, &m_showShaders, false },
+			{ EditorPanels::Sprites, &m_showSprites, false },
 			{ EditorPanels::Stats, &m_showStats, true } };
 	};
 
@@ -2231,6 +2240,12 @@ namespace Loom
 		Material::ReloadChangedShaders();
 	};
 
+	void Editor::ReloadSavedSprites()
+	{
+		for (const std::string& path : m_sprites.TakeSaved())
+			Texture::ReloadShared(path);
+	};
+
 	void Editor::DrawInspector()
 	{
 		if (ImGui::Begin(EditorPanels::Inspector, &m_showInspector))
@@ -2774,15 +2789,6 @@ namespace Loom
 		if (m_importQueue.empty())
 			return;
 
-		// A build has the scenes down; the files wait for them to come back and
-		// be drawn, so there is something under the mouse to import into.
-		if (!m_scripts.IsIdle())
-		{
-			m_importTarget = nullptr;
-			m_importPlaced = false;
-			return;
-		};
-
 		const QueuedImport& front = m_importQueue.front();
 
 		// The mouse event lands at the start of the next frame, and the panels
@@ -2792,15 +2798,19 @@ namespace Loom
 			ImGui::GetIO().AddMousePosEvent(front.x, front.y);
 			m_importPlaced = true;
 			m_importTarget = nullptr;
+			m_importFolder.clear();
 			return;
 		};
 
-		GameObject* parent = m_importTarget ? m_importTarget : m_selected;
-
-		if (parent == nullptr)
-			parent = m_activeScene
-				? &m_activeScene->GetRoot()
-				: &CreateScene("Scene " + std::to_string(++m_sceneCounter))->GetRoot();
+		// A build has the scenes down; the files wait for them to come back and
+		// be drawn, so there is something under the mouse to import into. A
+		// copy into the Project panel needs no scene.
+		if (m_importFolder.empty() && !m_scripts.IsIdle())
+		{
+			m_importTarget = nullptr;
+			m_importPlaced = false;
+			return;
+		};
 
 		// Files dropped together go in together; a drop somewhere else waits
 		// for the mouse to be put there.
@@ -2812,18 +2822,65 @@ namespace Loom
 
 		const auto end = std::find_if_not(m_importQueue.begin(), m_importQueue.end(), together);
 
-		for (auto queued = m_importQueue.begin(); queued != end; ++queued)
-			if (!IsModelFile(queued->path))
-				std::cerr << "Import: " << queued->path << " is not a model format Assimp reads" << std::endl;
-			else if (GameObject* model = ImportModel(queued->path, *parent))
-			{
-				Select(model);
-				m_historyDirty = true;
-			};
+		if (!m_importFolder.empty())
+		{
+			for (auto queued = m_importQueue.begin(); queued != end; ++queued)
+				CopyIntoProject(queued->path);
+
+			RefreshProjectAssets();
+		}
+		else
+		{
+			GameObject* parent = m_importTarget ? m_importTarget : m_selected;
+
+			if (parent == nullptr)
+				parent = m_activeScene
+					? &m_activeScene->GetRoot()
+					: &CreateScene("Scene " + std::to_string(++m_sceneCounter))->GetRoot();
+
+			for (auto queued = m_importQueue.begin(); queued != end; ++queued)
+				if (!IsModelFile(queued->path))
+					std::cerr << "Import: " << queued->path << " is not a model format Assimp reads" << std::endl;
+				else if (GameObject* model = ImportModel(queued->path, *parent))
+				{
+					Select(model);
+					m_historyDirty = true;
+				};
+		};
 
 		m_importQueue.erase(m_importQueue.begin(), end);
 		m_importTarget = nullptr;
+		m_importFolder.clear();
 		m_importPlaced = false;
+	};
+
+	void Editor::TakeImportFolder(const std::string& folder, bool hovered)
+	{
+		if (hovered && m_importPlaced && m_importFolder.empty())
+			m_importFolder = folder;
+	};
+
+	void Editor::CopyIntoProject(const std::string& file)
+	{
+		if (!ProjectAssets::IsGameFile(file) && !IsModelFile(file))
+		{
+			std::cerr << "Project: " << file << " is not a file the Project panel lists" << std::endl;
+			return;
+		};
+
+		std::string error;
+		const std::string copied = ProjectAssets::CopyInto(file, m_importFolder, &error);
+
+		if (copied.empty())
+		{
+			std::cerr << "Project: " << error << std::endl;
+			return;
+		};
+
+		std::cout << "Copied " << file << " to " << copied << std::endl;
+
+		m_selectedAsset = std::filesystem::path(copied).lexically_normal().string();
+		m_revealSelectedAsset = true;
 	};
 
 	void Editor::DrawSceneData()

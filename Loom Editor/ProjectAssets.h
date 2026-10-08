@@ -34,13 +34,14 @@ namespace Loom
 		{
 			Editor,
 			Shaders,
+			Sprites,
 			VisualStudio,
 			Shell,
 		};
 
-		// Scenes open in the editor, shaders in its Shaders panel, the scripts
-		// project's sources in Visual Studio, and anything else through the
-		// shell.
+		// Scenes open in the editor, shaders in its Shaders panel, textures in
+		// its Sprites panel, the scripts project's sources in Visual Studio,
+		// and anything else through the shell.
 		// scripts_folder is empty when there is no scripts project.
 		static Opener OpenerOf(const std::string& path, const std::string& scripts_folder);
 
@@ -53,6 +54,11 @@ namespace Loom
 		static std::string CreateFolder(const std::string& folder, const std::string& name, std::string* error = nullptr);
 		static std::string CreateShader(const std::string& folder, const std::string& name, std::string* error = nullptr);
 		static std::string CreateTexture(const std::string& folder, const std::string& name, std::string* error = nullptr);
+
+		// Copies file into folder under its own name, or with the first number
+		// after its stem that nothing there is using. A file already in folder
+		// stays as it is, and its own path comes back.
+		static std::string CopyInto(const std::string& file, const std::string& folder, std::string* error = nullptr);
 
 		// Writes <name>.hpp into folder, which has to sit under the scripts
 		// project's own folder.

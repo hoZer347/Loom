@@ -52,6 +52,9 @@
     <ClCompile Include="ShaderEditor.cpp">
       <Filter>Panels</Filter>
     </ClCompile>
+    <ClCompile Include="SpriteEditor.cpp">
+      <Filter>Panels</Filter>
+    </ClCompile>
     <ClCompile Include="EditorSettings.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
@@ -115,6 +118,9 @@
       <Filter>Panels</Filter>
     </ClInclude>
     <ClInclude Include="ShaderEditor.h">
+      <Filter>Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="SpriteEditor.h">
       <Filter>Panels</Filter>
     </ClInclude>
     <ClInclude Include="EditorSettings.h">

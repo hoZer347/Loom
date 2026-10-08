@@ -145,7 +145,8 @@ namespace
 			<< "  --compile                      build the project's scripts on startup\n"
 			<< "  --play                         start with the scene running\n"
 			<< "  --play-web                     build the scene for the web and open it\n"
-			<< "  --import <file> [x y]          import a model, as if dropped on the window\n"
+			<< "  --import <file> [x y]          import a model, as if dropped on the window;\n"
+			<< "                                 over the Project panel, copy the file there\n"
 			<< "  --preview <file>               select a model file, showing it in the Inspector\n"
 			<< "  --select <name>                select the first GameObject called that\n"
 			<< "  --open-project-dialog          start with File > Open Project... open\n"
@@ -157,6 +158,7 @@ namespace
 			<< "  --layout <name>                load a layout saved from the Layout menu\n"
 			<< "  --save-layout <name>           save the layout once the panels are drawn\n"
 			<< "  --save-layout-prompt           start with Layout > Save Layout... open\n"
+			<< "  --open-sprite <file>           open an image in the Sprites panel\n"
 			<< "  --undo, --redo                 step the history once the imports have landed\n"
 			<< "  --vulkan, --opengl             run on that graphics API this time\n"
 			<< "  --screenshot <file> [frames]   write the editor to a bitmap and exit,\n"
@@ -460,6 +462,16 @@ int main(int argc, char** argv)
 		}
 		else if (argument == "--save-layout-prompt")
 			editor.ShowSaveLayoutPrompt();
+		else if (argument == "--open-sprite")
+		{
+			if (i + 1 >= argc)
+			{
+				std::cerr << "--open-sprite needs an image file" << std::endl;
+				return 1;
+			};
+
+			editor.OpenSprite(argv[++i]);
+		}
 		else if (argument == "--open-demo")
 		{
 			if (i + 1 >= argc)

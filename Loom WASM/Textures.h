@@ -31,6 +31,16 @@ namespace Loom
 		// not remembered, so fixing the file is enough to have it load next time.
 		static Texture* Shared(const std::string& file_path);
 
+		// Decodes the file again into every shared Texture of it, so whatever
+		// holds one draws the file as it now is. One that no longer decodes
+		// keeps what it had.
+		static void ReloadShared(const std::string& file_path);
+
+		// The file's pixels, eight bit RGBA, bottom row first, with no renderer
+		// texture made from them. Throws std::runtime_error as the constructor
+		// does.
+		static std::vector<uint8_t> Decode(const std::string& file_path, int& width, int& height);
+
 		const std::string file_path;
 
 		int width = 0;

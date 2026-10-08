@@ -178,7 +178,8 @@ TEST_SUITE("ProjectAssets")
 		CHECK(opener("Scripts/Spinner.hpp", scripts) == ProjectAssets::Opener::VisualStudio);
 		CHECK(opener("Scripts/Spinner.hpp", "") == ProjectAssets::Opener::Shell);
 		CHECK(opener("Tools/Bake.cpp", scripts) == ProjectAssets::Opener::Shell);
-		CHECK(opener("Assets/Brick.png", scripts) == ProjectAssets::Opener::Shell);
+		CHECK(opener("Assets/Brick.png", scripts) == ProjectAssets::Opener::Sprites);
+		CHECK(opener("Assets/Hero.BMP", "") == ProjectAssets::Opener::Sprites);
 	};
 
 	TEST_CASE("a project without a RootNamespace uses its own name")
@@ -205,5 +206,38 @@ TEST_SUITE("ProjectAssets")
 		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("Game.loomproject"));
 		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("README.txt"));
 		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("Spinner"));
+	};
+
+	TEST_CASE("a file copied into a folder keeps its name, or takes the first free number")
+	{
+		const std::filesystem::path root = std::filesystem::temp_directory_path() / "loom project assets copy";
+		const std::filesystem::path outside = root / "Downloads";
+		const std::filesystem::path assets = root / "Assets";
+
+		std::filesystem::remove_all(root);
+		std::filesystem::create_directories(outside);
+		std::filesystem::create_directories(assets);
+
+		const std::string file = (outside / "Hero.png").string();
+		std::ofstream(file, std::ios::binary) << "pixels";
+
+		const std::string first = Loom::ProjectAssets::CopyInto(file, assets.string());
+		const std::string second = Loom::ProjectAssets::CopyInto(file, assets.string());
+
+		CHECK(first == (assets / "Hero.png").string());
+		CHECK(second == (assets / "Hero1.png").string());
+		CHECK(ReadAll(second) == "pixels");
+
+		// Dropped back where it already is, nothing is copied.
+		CHECK(Loom::ProjectAssets::CopyInto(first, assets.string()) == first);
+		CHECK_FALSE(std::filesystem::exists(assets / "Hero2.png"));
+
+		std::string error;
+		CHECK(Loom::ProjectAssets::CopyInto((outside / "Missing.png").string(), assets.string(), &error).empty());
+		CHECK_FALSE(error.empty());
+
+		CHECK(Loom::ProjectAssets::CopyInto(outside.string(), assets.string(), &error).empty());
+
+		std::filesystem::remove_all(root);
 	};
 };
