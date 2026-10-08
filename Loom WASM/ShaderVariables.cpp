@@ -230,7 +230,14 @@ namespace Loom
 			if (value == nullptr || value->texture.empty())
 				return BlankTexture(renderer);
 
+			// The disk is only asked about a path that has not loaded.
+			static std::unordered_map<std::string, uint32_t> loaded;
 			static std::unordered_map<std::string, std::filesystem::file_time_type> failed;
+
+			const auto found = loaded.find(value->texture);
+
+			if (found != loaded.end())
+				return found->second;
 
 			std::error_code code;
 			const std::filesystem::file_time_type written = std::filesystem::last_write_time(value->texture, code);
@@ -246,7 +253,7 @@ namespace Loom
 			const Texture* texture = Texture::Shared(value->texture);
 
 			if (texture && texture->handle)
-				return texture->handle;
+				return loaded[value->texture] = texture->handle;
 
 			failed[value->texture] = written;
 
