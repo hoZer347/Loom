@@ -90,7 +90,7 @@ TEST_SUITE("ProjectAssets")
 
 		const std::string text = ReadAll(scripts.Create("Guard", nullptr, Loom::ProjectAssets::ScriptKind::StateMachine));
 
-		CHECK(text.find("struct Guard : Loom::StateMachineOf<Guard>") != std::string::npos);
+		CHECK(text.find("struct Guard : Loom::StateMachine<Guard>") != std::string::npos);
 		CHECK(text.find("struct GuardWaiting : Loom::State<GuardWaiting, Guard>") != std::string::npos);
 		CHECK(text.find("struct GuardWalking : Loom::State<GuardWalking, Guard>") != std::string::npos);
 		CHECK(text.find("m_start = Loom::StateReference::Of<GuardWaiting>();") != std::string::npos);

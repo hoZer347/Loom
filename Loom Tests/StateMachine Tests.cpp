@@ -21,7 +21,12 @@ namespace
 	{
 	};
 
-	struct StateTestWalk final : Loom::State<StateTestWalk, Loom::StateMachine>
+	// A machine is written the way a component is, and registers the same way.
+	struct StateTestMachine final : Loom::StateMachine<StateTestMachine>
+	{
+	};
+
+	struct StateTestWalk final : Loom::State<StateTestWalk, StateTestMachine>
 	{
 		void OnExit(Loom::StateBase* nextState) override { exits++; };
 
@@ -29,7 +34,7 @@ namespace
 	};
 
 	// Built by the machine that runs it, so not one to offer.
-	struct StateTestInternal final : Loom::StateOf<Loom::StateMachine>
+	struct StateTestInternal final : Loom::StateOf<StateTestMachine>
 	{
 	};
 
@@ -41,7 +46,7 @@ namespace
 			object = scene.AddChild("Patrol");
 			Pump();
 
-			machine = object->Attach<Loom::StateMachine>();
+			machine = object->Attach<StateTestMachine>();
 			Pump();
 		};
 
@@ -52,7 +57,7 @@ namespace
 
 		Loom::Scene scene{ "Machine" };
 		Loom::GameObject* object = nullptr;
-		Loom::StateMachine* machine = nullptr;
+		StateTestMachine* machine = nullptr;
 	};
 
 	constexpr size_t startField = 0;
@@ -62,9 +67,9 @@ namespace
 
 TEST_SUITE("StateMachine")
 {
-	TEST_CASE("StateMachine is offered under Add Component")
+	TEST_CASE("a state machine is offered under Add Component by its own name")
 	{
-		CHECK(Loom::ComponentRegistry::All().contains("StateMachine"));
+		CHECK(Loom::ComponentRegistry::All().contains("StateTestMachine"));
 	};
 
 	TEST_CASE("a State registers itself under its type name, and a StateOf does not")
@@ -133,7 +138,7 @@ TEST_SUITE("StateMachine")
 
 		REQUIRE(loaded != nullptr);
 
-		Loom::StateMachine* machine = loaded->GetRoot().GetChildren().front()->GetComponent<Loom::StateMachine>();
+		StateTestMachine* machine = loaded->GetRoot().GetChildren().front()->GetComponent<StateTestMachine>();
 
 		REQUIRE(machine != nullptr);
 		CHECK(machine->m_start->StateType() == "StateTestIdle");
