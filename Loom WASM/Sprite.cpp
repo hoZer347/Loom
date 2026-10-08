@@ -262,6 +262,6 @@ void main()
 		renderer->SetUniform(program, "u_alphaCutoff", (float)alphaCutoff);
 		renderer->SetUniform(program, "u_model", QuadMatrix());
 
-		renderer->Draw(program, Mesh::triangles, QUAD, QUAD_VERTICES, STATIC_DRAW);
+		renderer->Draw(program, Mesh::Triangles, QUAD, QUAD_VERTICES, STATIC_DRAW);
 	};
 };

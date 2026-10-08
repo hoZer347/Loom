@@ -8,39 +8,31 @@
 
 using LoomTests::Pump;
 
-// GL_STATIC_DRAW / GL_DYNAMIC_DRAW / GL_STREAM_DRAW, spelled out so the test
-// does not need a GL header (and reads the same in both builds).
-static constexpr uint32_t GL_STATIC_DRAW_VALUE  = 0x88E4;
-static constexpr uint32_t GL_DYNAMIC_DRAW_VALUE = 0x88E8;
-
-// GL_TRIANGLES.
-static constexpr uint32_t GL_TRIANGLES_VALUE = 0x0004;
-
 
 TEST_SUITE("Mesh")
 {
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh remembers the primitive it was built for")
 	{
-		Loom::Mesh mesh(GL_TRIANGLES_VALUE);
+		Loom::Mesh mesh(Loom::Mesh::Triangles);
 		Pump();
 
-		CHECK(mesh.primitive_id == GL_TRIANGLES_VALUE);
+		CHECK(mesh.primitive_id == Loom::Mesh::Triangles);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a fresh mesh has no geometry, no material and static draw")
 	{
-		Loom::Mesh mesh(GL_TRIANGLES_VALUE);
+		Loom::Mesh mesh(Loom::Mesh::Triangles);
 		Pump();
 
 		CHECK(mesh.m_vertices->empty());
 		CHECK(mesh.m_indices.empty());
 		CHECK(mesh.material == nullptr);
-		CHECK(mesh.m_draw_type == GL_STATIC_DRAW_VALUE);
+		CHECK(mesh.m_draw_type == Loom::Mesh::Static);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "geometry is owned by the mesh and can be replaced wholesale")
 	{
-		Loom::Mesh mesh(GL_TRIANGLES_VALUE);
+		Loom::Mesh mesh(Loom::Mesh::Triangles);
 		Pump();
 
 		mesh.m_vertices =
@@ -60,12 +52,12 @@ TEST_SUITE("Mesh")
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the draw type is settable to any GL usage hint")
 	{
-		Loom::Mesh mesh(GL_TRIANGLES_VALUE);
+		Loom::Mesh mesh(Loom::Mesh::Triangles);
 		Pump();
 
-		mesh.m_draw_type = GL_DYNAMIC_DRAW_VALUE;
+		mesh.m_draw_type = Loom::Mesh::Dynamic;
 
-		CHECK(mesh.m_draw_type == GL_DYNAMIC_DRAW_VALUE);
+		CHECK(mesh.m_draw_type == Loom::Mesh::Dynamic);
 	};
 
 	TEST_CASE("a mesh is a component and registers itself for rendering")
@@ -82,7 +74,7 @@ TEST_SUITE("Mesh")
 		Loom::Scene scene("mesh without material");
 		Pump();
 
-		Loom::Mesh* mesh = scene.Attach<Loom::Mesh>(GL_TRIANGLES_VALUE);
+		Loom::Mesh* mesh = scene.Attach<Loom::Mesh>(Loom::Mesh::Triangles);
 		Pump();
 
 		REQUIRE(mesh->GetGameObject() == &scene.GetRoot());
@@ -101,7 +93,7 @@ TEST_SUITE("Mesh")
 		Pump();
 
 		Loom::Material* material = scene.Attach<Loom::Material>();
-		Loom::Mesh*     mesh     = scene.Attach<Loom::Mesh>(GL_TRIANGLES_VALUE);
+		Loom::Mesh*     mesh     = scene.Attach<Loom::Mesh>(Loom::Mesh::Triangles);
 		Pump();
 
 		REQUIRE(material->shader == nullptr);

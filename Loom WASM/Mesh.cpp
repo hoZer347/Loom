@@ -14,37 +14,19 @@
 
 namespace Loom
 {
-	namespace
-	{
-		enum DrawType
-		{
-			STATIC = GL_STATIC_DRAW,
-			DYNAMIC = GL_DYNAMIC_DRAW,
-			STREAM = GL_STREAM_DRAW,
-		};
+	static_assert(Mesh::Points == GL_POINTS);
+	static_assert(Mesh::Lines == GL_LINES);
+	static_assert(Mesh::LineLoop == GL_LINE_LOOP);
+	static_assert(Mesh::LineStrip == GL_LINE_STRIP);
+	static_assert(Mesh::Triangles == GL_TRIANGLES);
+	static_assert(Mesh::TriangleStrip == GL_TRIANGLE_STRIP);
+	static_assert(Mesh::TriangleFan == GL_TRIANGLE_FAN);
 
-		const char* DrawTypeName(uint32_t draw_type)
-		{
-			switch (draw_type)
-			{
-			case STATIC:	return "STATIC";
-			case STREAM:	return "STREAM";
-			default:	return "DYNAMIC";
-			};
-		};
+	static_assert(Mesh::Stream == GL_STREAM_DRAW);
+	static_assert(Mesh::Static == GL_STATIC_DRAW);
+	static_assert(Mesh::Dynamic == GL_DYNAMIC_DRAW);
 
-		uint32_t NextDrawType(uint32_t draw_type)
-		{
-			switch (draw_type)
-			{
-			case DYNAMIC:	return STATIC;
-			case STATIC:	return STREAM;
-			default:	return DYNAMIC;
-			};
-		};
-	};
-
-	Mesh::Mesh(uint32_t primitive)
+	Mesh::Mesh(Primitive primitive)
 	{
 		primitive_id = primitive;
 	};
@@ -112,10 +94,5 @@ namespace Loom
 	{
 		ImGui::Text("Vertices: %zu", m_vertices->size());
 		ImGui::Text("Indices:  %zu", m_indices.size());
-
-		// Read off the value: a label remembered beside it would be one string
-		// shared by every mesh in the process.
-		if (ImGui::Button(DrawTypeName(m_draw_type)))
-			m_draw_type = NextDrawType(m_draw_type);
 	};
 };

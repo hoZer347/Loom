@@ -303,6 +303,7 @@ Members declared as Loom::Serial<type> name = default; appear in the inspector
 under their own name (m_speed shows as "Speed") and are written into the scene
 file, in the order they were declared - which is also how the file names them,
 so inserting one in the middle shifts the values already saved.
+A Serial of an enum type is a dropdown of its enumerators.
 SpinningTriangle is there as a worked example.
 )";
 	};

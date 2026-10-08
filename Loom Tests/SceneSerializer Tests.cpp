@@ -472,7 +472,7 @@ TEST_SUITE("SceneSerializer")
 		Loom::Scene scene("Geometry");
 		Pump();
 
-		Loom::Mesh* mesh = scene.GetRoot().Attach<Loom::Mesh>((uint32_t)4);
+		Loom::Mesh* mesh = scene.GetRoot().Attach<Loom::Mesh>(Loom::Mesh::Triangles);
 		Pump();
 
 		mesh->m_vertices = { 0.0f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f };
@@ -487,7 +487,7 @@ TEST_SUITE("SceneSerializer")
 
 		REQUIRE(read != nullptr);
 		CHECK(*read->m_vertices == *mesh->m_vertices);
-		CHECK(read->primitive_id == 4);
+		CHECK(read->primitive_id == Loom::Mesh::Triangles);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a pasted subtree is a copy with guids of its own")

@@ -363,6 +363,57 @@ namespace Loom
 
 			return changed;
 		};
+
+		// An enum is stored as its underlying integer, which is one of these.
+		long long IntegerOf(const SerializedField& field)
+		{
+			switch (field.type)
+			{
+			case FieldType::Int:	return *(int*)field.data;
+			case FieldType::UInt:	return *(unsigned int*)field.data;
+			default:				return *(long long*)field.data;
+			};
+		};
+
+		void SetInteger(const SerializedField& field, long long value)
+		{
+			switch (field.type)
+			{
+			case FieldType::Int:	*(int*)field.data = (int)value;					break;
+			case FieldType::UInt:	*(unsigned int*)field.data = (unsigned int)value;	break;
+			default:				*(long long*)field.data = value;				break;
+			};
+		};
+
+		// Whether another enumerator was picked. A value that is none of them
+		// shows as its number.
+		bool DrawEnumField(const char* label, const SerializedField& field, const std::vector<FieldNames::Enumerator>& enumerators)
+		{
+			const long long value = IntegerOf(field);
+
+			std::string shown = std::to_string(value);
+
+			for (const FieldNames::Enumerator& enumerator : enumerators)
+				if (enumerator.value == value)
+					shown = enumerator.label;
+
+			bool changed = false;
+
+			if (ImGui::BeginCombo(label, shown.c_str()))
+			{
+				for (const FieldNames::Enumerator& enumerator : enumerators)
+					if (ImGui::Selectable(enumerator.label.c_str(), enumerator.value == value) &&
+						enumerator.value != value)
+					{
+						SetInteger(field, enumerator.value);
+						changed = true;
+					};
+
+				ImGui::EndCombo();
+			};
+
+			return changed;
+		};
 	};
 
 	Editor::Editor() :
@@ -1930,6 +1981,8 @@ namespace Loom
 	{
 		ImGui::PushItemWidth(-FLT_MIN);
 
+		const std::vector<std::vector<FieldNames::Enumerator>> enumerators = FieldNames::EnumeratorsOf(object);
+
 		for (size_t i = 0; i < object.GetFields().size(); i++)
 		{
 			const SerializedField& field = object.GetFields()[i];
@@ -1941,7 +1994,9 @@ namespace Loom
 			const char* label = "##value";
 			bool changed = false;
 
-			switch (field.type)
+			if (!enumerators[i].empty())
+				changed = DrawEnumField(label, field, enumerators[i]);
+			else switch (field.type)
 			{
 			case FieldType::Bool:
 				changed = ImGui::Checkbox(label, (bool*)field.data);
