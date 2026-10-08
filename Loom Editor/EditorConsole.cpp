@@ -1,4 +1,6 @@
 #include "EditorConsole.h"
+
+#include "EditorIcons.h"
 #include "EditorLog.h"
 #include "EditorTheme.h"
 
@@ -44,7 +46,7 @@ namespace Loom
 
 	void EditorConsole::Draw(bool* open)
 	{
-		if (ImGui::Begin("Console", open))
+		if (ImGui::Begin(EditorPanels::Console, open))
 		{
 			if (ImGui::Button("Clear"))
 				EditorLog::Get().Clear();

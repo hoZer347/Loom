@@ -5,6 +5,13 @@
 #include <filesystem>
 #include <iostream>
 
+// The editor only runs on Windows, but the web test build compiles this too.
+#ifndef __EMSCRIPTEN__
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <shlobj.h>
+#endif
+
 
 namespace Loom
 {
@@ -95,6 +102,47 @@ namespace Loom
 
 			return atlas.AddFontDefault();
 		};
+
+		// Windows' own, for EditorIcons, or an empty path where there is none.
+		std::filesystem::path EmojiFont()
+		{
+			std::filesystem::path path;
+
+#ifndef __EMSCRIPTEN__
+			constexpr const char* emojiFont = "seguiemj.ttf";
+
+			PWSTR fonts = nullptr;
+
+			if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Fonts, 0, nullptr, &fonts)))
+				path = std::filesystem::path(fonts) / emojiFont;
+
+			CoTaskMemFree(fonts);
+#endif
+
+			return path;
+		};
+
+		// ImGui draws it in the text colour, having no colour glyphs without
+		// FreeType.
+		void AddEmoji(float size)
+		{
+			const std::filesystem::path path = EmojiFont();
+			std::error_code code;
+
+			if (path.empty())
+				return;
+
+			if (!std::filesystem::exists(path, code))
+			{
+				std::cerr << "EditorTheme: no emoji font at " << path.string() << std::endl;
+				return;
+			};
+
+			ImFontConfig config;
+			config.MergeMode = true;
+
+			ImGui::GetIO().Fonts->AddFontFromFileTTF(path.string().c_str(), size, &config);
+		};
 	};
 
 	const ImVec4 EditorTheme::AccentText = AccentLight;
@@ -119,6 +167,7 @@ namespace Loom
 		atlas.ClearFonts();
 
 		AddFont(file, size);
+		AddEmoji(size);
 		codeFont = AddFont(CodeFontFile, size);
 	};
 

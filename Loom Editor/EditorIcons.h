@@ -1,0 +1,57 @@
+#pragma once
+
+#include <string>
+#include <string_view>
+
+
+namespace Loom
+{
+	/*
+	* Every kind of asset, panel and document tab has an emoji, so it can be
+	* told apart at a glance. EditorTheme merges Segoe UI Emoji into the UI
+	* font for them. A texture shows itself where there is room for a picture,
+	* and this only where there is not.
+	*/
+	namespace EditorIcons
+	{
+		constexpr const char* Folder = "📁";
+		constexpr const char* Project = "🧵";
+		constexpr const char* Scene = "🎬";
+		constexpr const char* Shader = "✨";
+		constexpr const char* Texture = "🖼";
+		constexpr const char* Model = "🧊";
+		constexpr const char* Header = "📑";
+		constexpr const char* Source = "📜";
+		constexpr const char* File = "📄";
+
+		// What the Project panel shows beside a file, models aside, which only
+		// ModelImporter can tell.
+		const char* Of(const std::string& path);
+	};
+
+	// The panels' titles. What follows ### is the ID ImGui saves the layout
+	// under, and what DockBuilderDockWindow and FindWindowByName can be given.
+	namespace EditorPanels
+	{
+		constexpr const char* Hierarchy = "🌳 Hierarchy###Hierarchy";
+		constexpr const char* Project = "📁 Project###Project";
+		constexpr const char* Inspector = "🔍 Inspector###Inspector";
+		constexpr const char* Scene = "🎬 Scene###Scene";
+		constexpr const char* SceneId = "###Scene";
+		constexpr const char* Game = "🎮 Game###Game";
+		constexpr const char* Debug = "🐞 Debug###Debug";
+		constexpr const char* SceneData = "📊 Scene Data###Scene Data";
+		constexpr const char* Console = "💬 Console###Console";
+		constexpr const char* Shaders = "✨ Shaders###Shaders";
+		constexpr const char* Stats = "📈 Stats###Stats";
+		constexpr const char* Settings = "⚙ Settings###Settings";
+
+		// The part of a title after ###.
+		constexpr std::string_view IdOf(std::string_view title)
+		{
+			constexpr std::string_view marker = "###";
+
+			return title.substr(title.find(marker) + marker.size());
+		};
+	};
+};

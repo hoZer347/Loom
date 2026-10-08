@@ -1,6 +1,7 @@
 #include "doctest.h"
 
 #include "EditorConsole.h"
+#include "EditorIcons.h"
 #include "EditorLog.h"
 
 #include "imgui.h"
@@ -8,7 +9,6 @@
 
 #include <algorithm>
 #include <cfloat>
-#include <cstring>
 #include <iostream>
 #include <string>
 #include <utility>
@@ -76,7 +76,7 @@ namespace
 			const ImGuiWindow* found = nullptr;
 
 			for (const ImGuiWindow* window : ImGui::GetCurrentContext()->Windows)
-				if (window->ParentWindow && std::strcmp(window->ParentWindow->Name, "Console") == 0)
+				if (window->ParentWindow && window->ParentWindow->ID == ImHashStr(Loom::EditorPanels::Console))
 					found = window;
 
 			REQUIRE(found);
@@ -121,7 +121,7 @@ namespace
 		{
 			constexpr float inset = 20.0f;
 
-			const ImGuiWindow* panel = ImGui::FindWindowByName("Console");
+			const ImGuiWindow* panel = ImGui::FindWindowByName(Loom::EditorPanels::Console);
 
 			REQUIRE(panel);
 

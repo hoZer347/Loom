@@ -20,6 +20,7 @@
 
 #include "EditCommands.h"
 #include "EditorFileDialogs.h"
+#include "EditorIcons.h"
 #include "FieldNames.h"
 #include "ModelImporter.h"
 #include "ProjectAssets.h"
@@ -289,14 +290,8 @@ namespace Loom
 					glfwSetDropCallback((GLFWwindow*)viewport->PlatformHandle, callback);
 		};
 
-		// The Scene window's title is its scene's name; this part of it is what
-		// ImGui knows the window by, so it keeps its place in the layout.
-		constexpr const char* scene_window_id = "###Scene";
-		constexpr const char* game_window = "Game";
-		constexpr const char* debug_window = "Debug";
-
 		// What is docked in the middle: the views, and the shader editor.
-		constexpr const char* centre_windows[] = { scene_window_id, game_window, debug_window, ShaderEditor::window };
+		constexpr const char* centre_windows[] = { EditorPanels::SceneId, EditorPanels::Game, EditorPanels::Debug, EditorPanels::Shaders };
 
 		// The ImGui settings entry that holds which panels are open.
 		constexpr const char* panel_settings = "LoomEditor";
@@ -1335,12 +1330,12 @@ namespace Loom
 		const ImGuiID right = ImGui::DockBuilderSplitNode(centre, ImGuiDir_Right, 0.25f, nullptr, &centre);
 		const ImGuiID left_bottom = ImGui::DockBuilderSplitNode(left, ImGuiDir_Down, 0.40f, nullptr, &left);
 
-		ImGui::DockBuilderDockWindow("Hierarchy", left);
-		ImGui::DockBuilderDockWindow("Project", left_bottom);
-		ImGui::DockBuilderDockWindow("Inspector", right);
-		ImGui::DockBuilderDockWindow("Console", bottom);
-		ImGui::DockBuilderDockWindow("Scene Data", bottom);
-		ImGui::DockBuilderDockWindow("Stats", bottom);
+		ImGui::DockBuilderDockWindow(EditorPanels::Hierarchy, left);
+		ImGui::DockBuilderDockWindow(EditorPanels::Project, left_bottom);
+		ImGui::DockBuilderDockWindow(EditorPanels::Inspector, right);
+		ImGui::DockBuilderDockWindow(EditorPanels::Console, bottom);
+		ImGui::DockBuilderDockWindow(EditorPanels::SceneData, bottom);
+		ImGui::DockBuilderDockWindow(EditorPanels::Stats, bottom);
 
 		for (const char* window : centre_windows)
 			ImGui::DockBuilderDockWindow(window, centre);
@@ -1351,16 +1346,16 @@ namespace Loom
 	std::vector<Editor::Panel> Editor::Panels()
 	{
 		return {
-			{ "Hierarchy", &m_showHierarchy, true },
-			{ "Project", &m_showProject, true },
-			{ "Inspector", &m_showInspector, true },
-			{ "Scene", &m_showScene, true },
-			{ game_window, &m_showGame, true },
-			{ debug_window, &m_showDebug, true },
-			{ "Scene Data", &m_showSceneData, true },
-			{ "Console", &m_showConsole, true },
-			{ ShaderEditor::window, &m_showShaders, false },
-			{ "Stats", &m_showStats, true } };
+			{ EditorPanels::Hierarchy, &m_showHierarchy, true },
+			{ EditorPanels::Project, &m_showProject, true },
+			{ EditorPanels::Inspector, &m_showInspector, true },
+			{ EditorPanels::Scene, &m_showScene, true },
+			{ EditorPanels::Game, &m_showGame, true },
+			{ EditorPanels::Debug, &m_showDebug, true },
+			{ EditorPanels::SceneData, &m_showSceneData, true },
+			{ EditorPanels::Console, &m_showConsole, true },
+			{ EditorPanels::Shaders, &m_showShaders, false },
+			{ EditorPanels::Stats, &m_showStats, true } };
 	};
 
 	void Editor::AddPanelSettings()
@@ -1377,7 +1372,7 @@ namespace Loom
 			return strcmp(name, entry) == 0 ? handler->UserData : nullptr;
 		};
 
-		// One "name=0" or "name=1" line per panel.
+		// One "name=0" or "name=1" line per panel, named by its ID.
 		handler.ReadLineFn = [](ImGuiContext*, ImGuiSettingsHandler*, void* editor, const char* line)
 		{
 			const char* equals = strrchr(line, '=');
@@ -1388,7 +1383,7 @@ namespace Loom
 			const std::string name(line, equals);
 
 			for (const Panel& panel : ((Editor*)editor)->Panels())
-				if (name == panel.name)
+				if (name == EditorPanels::IdOf(panel.title))
 					*panel.shown = equals[1] == '1';
 		};
 
@@ -1397,7 +1392,11 @@ namespace Loom
 			buffer->appendf("[%s][%s]\n", handler->TypeName, entry);
 
 			for (const Panel& panel : ((Editor*)handler->UserData)->Panels())
-				buffer->appendf("%s=%d\n", panel.name, *panel.shown ? 1 : 0);
+			{
+				const std::string_view id = EditorPanels::IdOf(panel.title);
+
+				buffer->appendf("%.*s=%d\n", (int)id.size(), id.data(), *panel.shown ? 1 : 0);
+			};
 
 			buffer->append("\n");
 		};
@@ -1501,7 +1500,7 @@ namespace Loom
 
 		if (ImGui::BeginMenu("File"))
 		{
-			if (ImGui::MenuItem("New Project..."))
+			if (ImGui::MenuItem((std::string(EditorIcons::Project) + " New Project...").c_str()))
 			{
 				snprintf(
 					m_newProjectFolder,
@@ -1512,7 +1511,7 @@ namespace Loom
 				m_askForNewProject = true;
 			};
 
-			if (ImGui::MenuItem("Open Project..."))
+			if (ImGui::MenuItem((std::string(EditorIcons::Project) + " Open Project...").c_str()))
 				ShowOpenProjectDialog();
 
 			ImGui::Separator();
@@ -1589,13 +1588,13 @@ namespace Loom
 		if (ImGui::BeginMenu("Window"))
 		{
 			for (const Panel& panel : Panels())
-				ImGui::MenuItem(panel.name, nullptr, panel.shown);
+				ImGui::MenuItem(panel.title, nullptr, panel.shown);
 
 			ImGui::Separator();
 			ImGui::MenuItem("ImGui Demo", nullptr, &m_showImGuiDemo);
 
 			ImGui::Separator();
-			ImGui::MenuItem("Settings", nullptr, &m_showSettings);
+			ImGui::MenuItem(EditorPanels::Settings, nullptr, &m_showSettings);
 
 			ImGui::EndMenu();
 		};
@@ -1769,7 +1768,7 @@ namespace Loom
 	{
 		m_hierarchyFocused = false;
 
-		if (ImGui::Begin("Hierarchy", &m_showHierarchy))
+		if (ImGui::Begin(EditorPanels::Hierarchy, &m_showHierarchy))
 		{
 			m_hierarchyFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
@@ -1831,7 +1830,8 @@ namespace Loom
 		const bool open = ImGui::TreeNodeEx(
 			scene->GetGuid().ToString().c_str(),
 			flags,
-			"%s%s",
+			"%s %s%s",
+			EditorIcons::Scene,
 			scene->NameAndID().c_str(),
 			is_active ? "  [active]" : "");
 
@@ -2233,7 +2233,7 @@ namespace Loom
 
 	void Editor::DrawInspector()
 	{
-		if (ImGui::Begin("Inspector", &m_showInspector))
+		if (ImGui::Begin(EditorPanels::Inspector, &m_showInspector))
 		{
 			if (!m_selectedModel.empty())
 				DrawModelPreview();
@@ -2580,7 +2580,8 @@ namespace Loom
 	void Editor::DrawScene()
 	{
 		const std::string title =
-			(m_activeScene ? m_activeScene->GetName() : std::string("Scene")) + scene_window_id;
+			std::string(EditorIcons::Scene) + " " +
+			(m_activeScene ? m_activeScene->GetName() : std::string("Scene")) + EditorPanels::SceneId;
 
 		if (ImGui::Begin(title.c_str(), &m_showScene, view_flags))
 		{
@@ -2598,7 +2599,7 @@ namespace Loom
 
 	void Editor::DrawGame()
 	{
-		if (ImGui::Begin(game_window, &m_showGame, view_flags))
+		if (ImGui::Begin(EditorPanels::Game, &m_showGame, view_flags))
 		{
 			constexpr const char* play_label = "Play";
 			constexpr const char* pause_label = "Pause";
@@ -2672,7 +2673,7 @@ namespace Loom
 
 	void Editor::DrawDebug()
 	{
-		if (ImGui::Begin(debug_window, &m_showDebug, view_flags))
+		if (ImGui::Begin(EditorPanels::Debug, &m_showDebug, view_flags))
 		{
 			if (Scene::GetScenes().empty())
 				ImGui::TextDisabled("Nothing loaded.");
@@ -2809,7 +2810,7 @@ namespace Loom
 
 	void Editor::DrawSceneData()
 	{
-		if (ImGui::Begin("Scene Data", &m_showSceneData))
+		if (ImGui::Begin(EditorPanels::SceneData, &m_showSceneData))
 		{
 			if (m_activeScene == nullptr)
 				ImGui::TextDisabled("No scene open.");
@@ -2843,7 +2844,7 @@ namespace Loom
 
 	void Editor::DrawStats()
 	{
-		if (ImGui::Begin("Stats", &m_showStats))
+		if (ImGui::Begin(EditorPanels::Stats, &m_showStats))
 		{
 			const ImGuiIO& io = ImGui::GetIO();
 

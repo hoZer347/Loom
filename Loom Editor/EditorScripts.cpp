@@ -1,6 +1,7 @@
 #include "Editor.h"
 
 #include "EditorFileDialogs.h"
+#include "EditorIcons.h"
 #include "ProjectTemplate.h"
 
 #include "Engine.h"
@@ -398,7 +399,7 @@ namespace Loom
 		ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
 		if (ImGui::Begin(
-			"New Project",
+			(std::string(EditorIcons::Project) + " New Project").c_str(),
 			nullptr,
 			ImGuiWindowFlags_AlwaysAutoResize |
 			ImGuiWindowFlags_NoDocking |

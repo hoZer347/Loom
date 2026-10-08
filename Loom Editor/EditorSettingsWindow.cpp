@@ -1,5 +1,7 @@
 #include "EditorSettings.h"
 
+#include "EditorIcons.h"
+
 #include "Engine.h"
 
 #include "imgui.h"
@@ -67,7 +69,7 @@ namespace Loom
 
 		ImGui::SetNextWindowSize(WINDOW_SIZE, ImGuiCond_FirstUseEver);
 
-		if (ImGui::Begin("Settings", open) && ImGui::BeginTabBar("Settings Tabs"))
+		if (ImGui::Begin(EditorPanels::Settings, open) && ImGui::BeginTabBar("Settings Tabs"))
 		{
 			if (ImGui::BeginTabItem("Graphics"))
 			{

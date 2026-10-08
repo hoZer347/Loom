@@ -23,13 +23,15 @@ namespace Loom
 	{
 		constexpr size_t maxNameLength = 64;
 
-		// Scripts aside. Textures are whatever Textures.cpp has stb_image decode.
+		// Scripts and textures aside.
 		constexpr std::string_view gameFileExtensions[] =
 		{
 			SceneSerializer::extension,
 			ProjectAssets::shaderExtension,
-			ProjectAssets::textureExtension, ".jpg", ".jpeg", ".bmp", ".tga",
 		};
+
+		// Whatever Textures.cpp has stb_image decode.
+		constexpr std::string_view textureExtensions[] = { ProjectAssets::textureExtension, ".jpg", ".jpeg", ".bmp", ".tga" };
 
 		template <size_t count>
 		bool HasExtension(const std::string& name, const std::string_view (&extensions)[count])
@@ -539,11 +541,16 @@ void main()
 
 	bool ProjectAssets::IsGameFile(const std::string& name)
 	{
-		return HasExtension(name, gameFileExtensions) || IsScriptFile(name);
+		return HasExtension(name, gameFileExtensions) || IsTextureFile(name) || IsScriptFile(name);
 	};
 
 	bool ProjectAssets::IsScriptFile(const std::string& name)
 	{
 		return HasExtension(name, scriptExtensions);
+	};
+
+	bool ProjectAssets::IsTextureFile(const std::string& name)
+	{
+		return HasExtension(name, textureExtensions);
 	};
 };

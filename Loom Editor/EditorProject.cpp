@@ -2,16 +2,20 @@
 
 #include "EditorFileDialogs.h"
 #include "EditorGui.h"
+#include "EditorIcons.h"
 #include "ModelImporter.h"
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
 
+#include "Renderer.h"
 #include "SceneSerializer.h"
+#include "Textures.h"
 
 #include "imgui.h"
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
@@ -43,6 +47,7 @@ namespace Loom
 		struct AssetKindInfo
 		{
 			AssetKind kind;
+			const char* icon;
 			const char* label;
 			const char* defaultName;
 
@@ -54,13 +59,13 @@ namespace Loom
 
 		constexpr AssetKindInfo assetKinds[] =
 		{
-			{ AssetKind::Folder, "Folder", "New Folder" },
-			{ AssetKind::Scene, "Scene", "New Scene" },
-			{ AssetKind::Script, "Script", "NewScript", ProjectAssets::ScriptKind::Component, "Add Component" },
-			{ AssetKind::State, "State", "NewState", ProjectAssets::ScriptKind::State, "a state machine's Start and Current" },
-			{ AssetKind::StateMachine, "State Machine", "NewStateMachine", ProjectAssets::ScriptKind::StateMachine, "Add Component" },
-			{ AssetKind::Shader, "Shader", "NewShader" },
-			{ AssetKind::Texture, "Texture", "NewTexture" },
+			{ AssetKind::Folder, EditorIcons::Folder, "Folder", "New Folder" },
+			{ AssetKind::Scene, EditorIcons::Scene, "Scene", "New Scene" },
+			{ AssetKind::Script, EditorIcons::Header, "Script", "NewScript", ProjectAssets::ScriptKind::Component, "Add Component" },
+			{ AssetKind::State, EditorIcons::Header, "State", "NewState", ProjectAssets::ScriptKind::State, "a state machine's Start and Current" },
+			{ AssetKind::StateMachine, EditorIcons::Header, "State Machine", "NewStateMachine", ProjectAssets::ScriptKind::StateMachine, "Add Component" },
+			{ AssetKind::Shader, EditorIcons::Shader, "Shader", "NewShader" },
+			{ AssetKind::Texture, EditorIcons::Texture, "Texture", "NewTexture" },
 		};
 
 		const AssetKindInfo& InfoOf(AssetKind kind)
@@ -75,6 +80,42 @@ namespace Loom
 		bool IsScript(AssetKind kind)
 		{
 			return InfoOf(kind).appearsIn != nullptr;
+		};
+
+		// Textures are uploaded bottom row first, so V is flipped.
+		const ImVec2 thumbnailTop(0.0f, 1.0f);
+		const ImVec2 thumbnailBottom(1.0f, 0.0f);
+
+		const char* IconOf(const std::string& path)
+		{
+			return IsModelFile(path) ? EditorIcons::Model : EditorIcons::Of(path);
+		};
+
+		// As wide as the icon it stands in for, a line high and no wider,
+		// keeping the picture's shape.
+		ImVec2 ThumbnailSize(const Texture& texture)
+		{
+			const float side = (std::min)(ImGui::GetFontSize(), ImGui::CalcTextSize(EditorIcons::Texture).x);
+			const float longest = (float)(std::max)(texture.width, texture.height);
+
+			return ImVec2(side * texture.width / longest, side * texture.height / longest);
+		};
+
+		// Over the icon's place in the tree node just drawn.
+		void DrawThumbnail(const Texture& texture)
+		{
+			const ImVec2 size = ThumbnailSize(texture);
+			const ImVec2 item = ImGui::GetItemRectMin();
+			const ImVec2 corner(
+				item.x + ImGui::GetTreeNodeToLabelSpacing() + (ImGui::CalcTextSize(EditorIcons::Texture).x - size.x) / 2.0f,
+				item.y + (ImGui::GetItemRectSize().y - size.y) / 2.0f);
+
+			ImGui::GetWindowDrawList()->AddImage(
+				Renderer::Get()->ImGuiTexture(texture.handle),
+				corner,
+				ImVec2(corner.x + size.x, corner.y + size.y),
+				thumbnailTop,
+				thumbnailBottom);
 		};
 
 		// Folders first, then files, each alphabetically. Only files the game
@@ -418,6 +459,7 @@ namespace Loom
 		WatchProject();
 
 		m_projectScenes.clear();
+		m_noThumbnail.clear();
 		m_assets = AssetNode{ m_projectPath, "", true };
 
 		if (m_projectPath.empty())
@@ -467,7 +509,7 @@ namespace Loom
 
 	void Editor::DrawProject()
 	{
-		if (ImGui::Begin("Project", &m_showProject))
+		if (ImGui::Begin(EditorPanels::Project, &m_showProject))
 		{
 			if (m_projectPath.empty())
 			{
@@ -548,7 +590,18 @@ namespace Loom
 		else
 			flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 
-		const bool open = ImGui::TreeNodeEx(node.path.c_str(), flags, "%s", node.name.c_str());
+		// A texture that loads is its own icon, drawn over spaces as wide as
+		// the icon it stands in for.
+		const Texture* thumbnail = node.folder ? nullptr : Thumbnail(node.path);
+
+		const std::string icon = thumbnail != nullptr
+			? std::string((size_t)std::ceil(ImGui::CalcTextSize(EditorIcons::Texture).x / ImGui::CalcTextSize(" ").x), ' ')
+			: node.folder ? EditorIcons::Folder : IconOf(node.path);
+
+		const bool open = ImGui::TreeNodeEx(node.path.c_str(), flags, "%s %s", icon.c_str(), node.name.c_str());
+
+		if (thumbnail != nullptr)
+			DrawThumbnail(*thumbnail);
 
 		if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen())
 		{
@@ -609,7 +662,7 @@ namespace Loom
 			return;
 
 		for (const AssetKindInfo& info : assetKinds)
-			if (ImGui::MenuItem(info.label))
+			if (ImGui::MenuItem((std::string(info.icon) + " " + info.label).c_str()))
 				AskForAsset(info.kind, folder);
 
 		ImGui::EndMenu();
@@ -847,7 +900,22 @@ namespace Loom
 		return true;
 	};
 
-	void Editor::DragAsset(const AssetNode& node) const
+	const Texture* Editor::Thumbnail(const std::string& path)
+	{
+		if (!ProjectAssets::IsTextureFile(path) || m_noThumbnail.contains(path))
+			return nullptr;
+
+		const Texture* texture = Texture::Shared(path);
+
+		if (texture != nullptr && texture->handle != 0)
+			return texture;
+
+		m_noThumbnail.insert(path);
+
+		return nullptr;
+	};
+
+	void Editor::DragAsset(const AssetNode& node)
 	{
 		if (node.folder || !ImGui::BeginDragDropSource())
 			return;
@@ -856,7 +924,13 @@ namespace Loom
 		const std::string relative = std::filesystem::path(node.path).lexically_relative(m_projectPath).generic_string();
 
 		ImGui::SetDragDropPayload(ASSET_PAYLOAD, relative.c_str(), relative.size() + 1);
-		ImGui::TextUnformatted(relative.c_str());
+		if (const Texture* thumbnail = Thumbnail(node.path))
+		{
+			ImGui::Image(Renderer::Get()->ImGuiTexture(thumbnail->handle), ThumbnailSize(*thumbnail), thumbnailTop, thumbnailBottom);
+			ImGui::SameLine();
+			ImGui::TextUnformatted(relative.c_str());
+		}
+		else ImGui::Text("%s %s", IconOf(node.path), relative.c_str());
 
 		ImGui::EndDragDropSource();
 	};
@@ -867,7 +941,7 @@ namespace Loom
 			return;
 
 		const AssetKindInfo& info = InfoOf(m_newAssetKind);
-		const std::string title = std::string("Create ") + info.label + "###create_asset";
+		const std::string title = std::string(info.icon) + " Create " + info.label + "###create_asset";
 
 		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 

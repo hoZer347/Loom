@@ -1,5 +1,7 @@
 #include "ShaderEditor.h"
 
+#include "EditorIcons.h"
+
 // The editor only runs on Windows, but the web test build compiles this too,
 // and glslang is desktop only.
 #ifndef __EMSCRIPTEN__
@@ -166,7 +168,7 @@ namespace Loom
 			ImGui::SetNextWindowFocus();
 		};
 
-		if (ImGui::Begin(window, open))
+		if (ImGui::Begin(EditorPanels::Shaders, open))
 		{
 			if (m_documents.empty())
 				ImGui::TextDisabled("Double-click a shader in the Project panel to edit it here.");
@@ -184,7 +186,7 @@ namespace Loom
 					if (std::exchange(document->select, false))
 						flags |= ImGuiTabItemFlags_SetSelected;
 
-					const std::string label = std::filesystem::path(document->path).filename().string() + "###" + document->path;
+					const std::string label = std::string(EditorIcons::Shader) + " " + std::filesystem::path(document->path).filename().string() + "###" + document->path;
 					bool keep = true;
 					const bool shown = ImGui::BeginTabItem(label.c_str(), &keep, flags);
 

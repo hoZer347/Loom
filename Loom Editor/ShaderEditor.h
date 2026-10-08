@@ -23,8 +23,6 @@ namespace Loom
 	*/
 	struct ShaderEditor final
 	{
-		static constexpr const char* window = "Shaders";
-
 		// Opens the file in a tab of its own, or brings its tab forward, and
 		// the panel with it.
 		void Open(const std::string& path);

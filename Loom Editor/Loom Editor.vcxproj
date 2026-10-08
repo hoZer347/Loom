@@ -63,6 +63,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -80,6 +81,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -104,6 +106,7 @@
     <ClCompile Include="EditorSettings.cpp" />
     <ClCompile Include="EditorSettingsWindow.cpp" />
     <ClCompile Include="EditorTheme.cpp" />
+    <ClCompile Include="EditorIcons.cpp" />
     <ClCompile Include="EditorViewport.cpp" />
     <ClCompile Include="EditorCamera.cpp" />
     <ClCompile Include="ModelImporter.cpp" />
@@ -126,6 +129,7 @@
     <ClInclude Include="ShaderEditor.h" />
     <ClInclude Include="EditorSettings.h" />
     <ClInclude Include="EditorTheme.h" />
+    <ClInclude Include="EditorIcons.h" />
     <ClInclude Include="EditorViewport.h" />
     <ClInclude Include="EditorCamera.h" />
     <ClInclude Include="ModelImporter.h" />

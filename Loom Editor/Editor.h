@@ -31,6 +31,7 @@ namespace Loom
 	struct GameObject;
 	struct ComponentBase;
 	struct LoomObject;
+	struct Texture;
 
 	// The file dialogs, kept behind a pointer so Editor.h does not have to drag
 	// the file browser (and <filesystem>) into everything that includes it.
@@ -286,7 +287,8 @@ namespace Loom
 		// The panels the Window menu toggles, by the name ImGui knows each by.
 		struct Panel
 		{
-			const char* name;
+			// One of EditorPanels'.
+			const char* title;
 			bool* shown;
 			bool shownByDefault;
 		};
@@ -326,7 +328,11 @@ namespace Loom
 
 		// Lets a file be dragged out of the Project panel, onto a field that
 		// names a file or a GameObject in the hierarchy.
-		void DragAsset(const AssetNode& node) const;
+		void DragAsset(const AssetNode& node);
+
+		// The texture at path, to show in place of its icon. Null for anything
+		// else, or a texture that will not load.
+		const Texture* Thumbnail(const std::string& path);
 
 		// Takes a file dragged out of the Project panel onto a GameObject in the
 		// hierarchy. Whether the drag was one, taken or turned away.
@@ -443,6 +449,9 @@ namespace Loom
 		void* m_assetWatch = nullptr;
 		std::string m_assetWatchPath{ };
 		std::string m_selectedAsset{ };
+
+		// Textures that would not load, so each is tried once per scan.
+		std::unordered_set<std::string> m_noThumbnail{ };
 		bool m_revealSelectedAsset = false;
 
 		// The scene a session opens with: what the settings file said last time,
