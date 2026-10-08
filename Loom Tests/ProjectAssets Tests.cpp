@@ -1,4 +1,4 @@
-﻿#include "doctest.h"
+#include "doctest.h"
 
 #include "ProjectAssets.h"
 
@@ -118,7 +118,6 @@ TEST_SUITE("ProjectAssets")
 
 		CHECK(ReadAll(scripts.Create("Spinner")).find("namespace GameScripts") != std::string::npos);
 	};
-
 
 	TEST_CASE("a script opens in Visual Studio, reusing one already running")
 	{
