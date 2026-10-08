@@ -669,17 +669,23 @@ namespace Loom
 		case AssetKind::State:
 		case AssetKind::StateMachine:
 		{
-			const bool adding = !m_scripts.HasProject();
+			if (!m_scripts.HasProject())
+			{
+				if (ProjectTemplate::AddScripts(m_projectPath, m_projectName, &error).empty())
+					break;
 
-			if (adding && ProjectTemplate::AddScripts(m_projectPath, m_projectName, &error).empty())
-				break;
-
-			path = ProjectAssets::CreateScript(ScriptsProject(), folder, name, InfoOf(m_newAssetKind).script, &error);
-
-			// The project file names the scripts project now, script or not, so
-			// it is picked up and built.
-			if (adding)
+				// The project file names a scripts project now, which may be one
+				// already under the folder rather than a new one, so it is loaded
+				// before the script's place is worked out from it.
 				LoadProjectFile();
+			};
+
+			path = ProjectAssets::CreateScript(
+				ScriptsProject(),
+				NewAssetFolder(),
+				name,
+				InfoOf(m_newAssetKind).script,
+				&error);
 			break;
 		};
 
