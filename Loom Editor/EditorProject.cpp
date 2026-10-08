@@ -518,9 +518,26 @@ namespace Loom
 	void Editor::OpenAsset(const std::string& path)
 	{
 		if (std::filesystem::path(path).extension() == SceneSerializer::extension)
+		{
 			OpenScene(path);
-		else
+			return;
+		};
+
+		// A header has no association to fall back on, so Windows would ask
+		// what to open it with. /Edit hands a source to a Visual Studio already
+		// running rather than starting another; a solution or project is opened
+		// as one.
+		const std::string& devenv = ScriptLibrary::FindVisualStudio2026();
+		const std::filesystem::path scripts = std::filesystem::path(ScriptsProject()).parent_path();
+
+		const std::filesystem::path extension = std::filesystem::path(path).extension();
+
+		if (devenv.empty() || !IsUnder(path, scripts.string()))
 			OpenFile(path);
+		else if (extension == ".sln" || extension == ".vcxproj")
+			Shell(devenv.c_str(), '"' + path + '"');
+		else
+			Shell(devenv.c_str(), "/Edit \"" + path + '"');
 	};
 
 	bool Editor::OpenInShell(ImGuiContext*, const char* path)
