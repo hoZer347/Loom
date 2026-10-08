@@ -90,6 +90,9 @@ namespace Loom
 		/// The current state's debug GUI, for whatever draws the machine.
 		void PumpGui();
 
+		/// The machine's rows, then its current state's debug GUI.
+		void DrawMachineGui();
+
 		/// The current state's update at a given delta. For driving a machine by hand -- a
 		/// test, or a machine ticking on something other than the frame clock.
 		void Advance(float deltaTime);
@@ -207,6 +210,8 @@ namespace Loom
 		GameObject* GetGameObject() override { return this->m_gameObject; };
 
 		std::string MachineName() const override { return typeid(_Self).name(); };
+
+		void ExtraGui() override { DrawMachineGui(); };
 
 		void OnFieldChanged(const SerializedField& field) override
 		{

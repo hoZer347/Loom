@@ -46,6 +46,10 @@ namespace Loom
 
 		virtual void Gui() { };
 
+		// Drawn under OnGui in the same fold-out, for a component type the
+		// engine builds on, so its own rows leave OnGui to whoever writes one.
+		virtual void ExtraGui() { };
+
 		// The fold-out the built-in GUI wraps a component in. Lives here
 		// rather than in Component<T> so a script module instantiating a
 		// component of its own does not have to link a UI to do it.

@@ -8,6 +8,7 @@
 #include "SceneSerializer.h"
 #include "SerializedField.h"
 
+#include "Utilities/Clock.h"
 #include "Utilities/StateMachine.h"
 
 #include <memory>
@@ -34,6 +35,13 @@ namespace
 
 		int starts = 0;
 		int updates = 0;
+	};
+
+	struct StateTestCounted final : Loom::State<StateTestCounted>
+	{
+		void OnUpdate() override { updates++; };
+
+		static inline int updates = 0;
 	};
 
 	struct StateTestWalk final : Loom::State<StateTestWalk, StateTestMachine>
@@ -182,21 +190,24 @@ TEST_SUITE("StateMachine")
 		StateTestHooked* machine = object->Attach<StateTestHooked>();
 		Pump();
 
-		machine->m_start = Loom::StateReference::Named("StateTestIdle");
+		machine->m_start = Loom::StateReference::Named("StateTestCounted");
 
-		Loom::StateMachineBase::StepAttached();
-		Loom::StateMachineBase::StepAttached();
+		const int stateUpdates = StateTestCounted::updates;
+
+		// One frame of play, the way the engine runs it.
+		scene.Update();
+		Loom::Utilities::Update();
 
 		CHECK(machine->starts == 1);
-		CHECK(dynamic_cast<const StateTestIdle*>(machine->Current()) != nullptr);
-
-		// The engine's component update calls it, not the machine's step.
-		CHECK(machine->updates == 0);
-
-		machine->OnUpdate();
-
 		CHECK(machine->updates == 1);
-		CHECK(dynamic_cast<const StateTestIdle*>(machine->Current()) != nullptr);
+		CHECK(StateTestCounted::updates == stateUpdates + 1);
+
+		scene.Update();
+		Loom::Utilities::Update();
+
+		CHECK(machine->starts == 1);
+		CHECK(machine->updates == 2);
+		CHECK(StateTestCounted::updates == stateUpdates + 2);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Current set before the machine starts is where it starts")

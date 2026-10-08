@@ -2070,10 +2070,7 @@ namespace Loom
 
 			ImGui::EndDisabled();
 
-			// Drawn here rather than by the machine, whose OnGui is its own to write.
-			StateMachineMonitor::DrawInline(*machine);
-
-			machine->PumpGui();
+			machine->DrawMachineGui();
 		};
 
 		component->OnGui();
