@@ -2,7 +2,6 @@
 
 #include "Clock.h"
 #include "State.h"
-#include "StateMachineMonitor.h"
 #include "StateReference.h"
 
 #include "Component.h"
@@ -74,19 +73,25 @@ namespace Loom
 
 		#pragma region Frame
 
-		// Driven by whatever hosts the machine. Named apart from the Component hooks of
-		// the same shape, since a machine on a GameObject is both.
+		// Driven by the engine rather than by the hooks of the component a machine is,
+		// so a machine's own OnUpdate and the rest are free for it to write.
 
-		/// Runs OnMachineStart and enters FirstState. Safe to call twice.
+		/// Runs OnStart and enters FirstState. Safe to call twice.
 		void StartMachine();
 
-		void PumpUpdate();
-		void PumpPhysics();
-		void PumpLate();
+		/// One frame: starts the machine if it has not started, then runs the current
+		/// state's physics, update and late update.
+		void Step();
+
+		/// Steps every machine on a GameObject. What the engine runs each frame the
+		/// scenes update.
+		static void StepAttached();
+
+		/// The current state's debug GUI, for whatever draws the machine.
 		void PumpGui();
 
-		/// One update step at a given delta, without the hook. For driving a machine by
-		/// hand -- a test, or a machine ticking on something other than the frame clock.
+		/// The current state's update at a given delta. For driving a machine by hand -- a
+		/// test, or a machine ticking on something other than the frame clock.
 		void Advance(float deltaTime);
 
 		#pragma endregion
@@ -130,25 +135,13 @@ namespace Loom
 		/// Every machine currently alive, for the monitor.
 		static std::vector<StateMachineBase*> All();
 
+		/// When the machine starts, before it enters its first state. A machine on a
+		/// GameObject starts on the first frame of play.
+		virtual void OnStart() { };
+
 	protected:
-		#pragma region Subclass hooks
-
-		// Deliberately not named OnStart, OnUpdate and so on. A machine on a GameObject
-		// is also a Component, whose OnUpdate and OnPhysics are virtuals of the same
-		// signature; one override in the subclass would silently override both, and the
-		// pump's call to its own hook would land back in the component and recurse until
-		// the stack ran out.
-
-		virtual void OnMachineStart() { };
-		virtual void OnMachineUpdate() { };
-		virtual void OnMachinePhysics() { };
-		virtual void OnMachineLateUpdate() { };
-		virtual void OnMachineGui() { };
-
 		/// After the current state changes, whether by Proceed, Disable or Enable.
 		virtual void OnMachineStateChanged() { };
-
-		#pragma endregion
 
 		/// The state the machine enters when it starts, or null to start on nothing.
 		virtual std::shared_ptr<StateBase> FirstState() const { return nullptr; };
@@ -189,6 +182,9 @@ namespace Loom
 	/// A state machine living on a GameObject, with its Start and Current states in
 	/// the inspector and the scene file.
 	///
+	/// Written like a component: OnAttach, OnUpdate and the rest are its own, and OnStart
+	/// runs when play starts. The engine steps its states each frame of play.
+	///
 	/// Self-typed, so StateOf&lt;_Focus&gt; resolves to the concrete machine. The engine
 	/// requires it in any case:
 	/// Component&lt;T&gt; is CRTP and GameObject::Attach refuses anything that is not a
@@ -211,42 +207,6 @@ namespace Loom
 		GameObject* GetGameObject() override { return this->m_gameObject; };
 
 		std::string MachineName() const override { return typeid(_Self).name(); };
-
-		// Public because Loom's GameObject::Attach asks &T::OnAttach and friends from
-		// outside the class to work out which of them a component overrides.
-
-		void OnUpdate() override
-		{
-			// Started here rather than on attach: attaching happens in the editor
-			// too, before the scene has read Start in, and a machine is only meant
-			// to run while the scene does.
-			StartMachine();
-
-			// GameObject never fills m_physicsables, so the engine does not dispatch
-			// ComponentBase::OnPhysics and a state's OnPhysics would never run. Pump the
-			// physics step from here until it does; the flag below makes the changeover
-			// automatic once the engine starts dispatching.
-			if (!_physics_dispatched)
-				PumpPhysics();
-
-			PumpUpdate();
-			PumpLate();
-		};
-
-		void OnPhysics() override
-		{
-			_physics_dispatched = true;
-
-			PumpPhysics();
-		};
-
-		void OnGui() override
-		{
-			// The queue, the history and the state it is on, over the live machine.
-			StateMachineMonitor::DrawInline(*this);
-
-			PumpGui();
-		};
 
 		void OnFieldChanged(const SerializedField& field) override
 		{
@@ -283,9 +243,6 @@ namespace Loom
 				? StateReference::Named(PrettyTypeName(typeid(*state).name()))
 				: StateReference{ };
 		};
-
-	private:
-		bool _physics_dispatched = false;
 	};
 
 	namespace Basic
