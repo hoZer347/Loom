@@ -387,7 +387,7 @@ namespace Loom
 		const std::string scripts =
 			std::filesystem::path(ScriptsProject()).parent_path().string();
 
-		return ProjectAssets::IsUnder(m_newAssetFolder, scripts) || m_newAssetFolder == scripts
+		return ProjectAssets::IsUnder(m_newAssetFolder, scripts)
 			? m_newAssetFolder
 			: scripts;
 	};
