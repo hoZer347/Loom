@@ -89,7 +89,8 @@ namespace Loom
 		// one a running editor still holds cannot be removed, and is left.
 		static void SweepLoadedCopies(const std::string& library);
 
-		// Takes the library's component types back out of the registry.
+		// Takes the library's component and state types back out of the
+		// registries.
 		void RestoreRegistry();
 
 		// Whether the library predates the editor running it. MSBuild has no idea
@@ -108,6 +109,9 @@ namespace Loom
 
 		void* m_module = nullptr;
 		std::vector<std::string> m_types{ };
+
+		// The state names this library registered.
+		std::vector<std::string> m_states{ };
 
 		// The whole registry as it stood before this library registered anything.
 		// Kept in full rather than just the entries it went on to displace, because

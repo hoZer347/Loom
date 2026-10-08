@@ -36,6 +36,13 @@ namespace Loom
 
 		std::string MachineName() const override { return "StaticStateMachine"; };
 
+		/// Initial state at the start of the machine's lifetime. Set it before the
+		/// machine starts; it is created once, when it does.
+		StateReference startState{ };
+
+	protected:
+		std::shared_ptr<State> FirstState() const override { return startState.Create(); };
+
 	private:
 		friend struct Utilities;
 

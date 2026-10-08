@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Loom API.h"
+
 
 namespace Loom
 {
@@ -8,7 +10,7 @@ namespace Loom
 	/// One clock, ticked once per frame by the Engine, so that Duration, SpeedManager, the
 	/// dialogue stream and the sprite flipbook all advance by the same delta instead of
 	/// each keeping its own and drifting apart.
-	struct Time final
+	struct LOOM_API Time final
 	{
 		/// Seconds the last frame took. Clamped, so a breakpoint or a stalled tab does not
 		/// teleport everything that integrates against it.

@@ -44,13 +44,20 @@ namespace Loom
 			AssetKind kind;
 			const char* label;
 			const char* defaultName;
+
+			// Scripts only: the header's template, and where its type turns up
+			// once it is compiled.
+			ProjectAssets::ScriptKind script = ProjectAssets::ScriptKind::Component;
+			const char* appearsIn = nullptr;
 		};
 
 		constexpr AssetKindInfo assetKinds[] =
 		{
 			{ AssetKind::Folder, "Folder", "New Folder" },
 			{ AssetKind::Scene, "Scene", "New Scene" },
-			{ AssetKind::Script, "Script", "NewScript" },
+			{ AssetKind::Script, "Script", "NewScript", ProjectAssets::ScriptKind::Component, "Add Component" },
+			{ AssetKind::State, "State", "NewState", ProjectAssets::ScriptKind::State, "a state machine's Start and Current" },
+			{ AssetKind::StateMachine, "State Machine", "NewStateMachine", ProjectAssets::ScriptKind::StateMachine, "Add Component" },
 			{ AssetKind::Shader, "Shader", "NewShader" },
 			{ AssetKind::Texture, "Texture", "NewTexture" },
 		};
@@ -62,6 +69,11 @@ namespace Loom
 					return info;
 
 			return assetKinds[0];
+		};
+
+		bool IsScript(AssetKind kind)
+		{
+			return InfoOf(kind).appearsIn != nullptr;
 		};
 
 		// Folders first, then files, each alphabetically. Dot-prefixed entries
@@ -355,33 +367,36 @@ namespace Loom
 			return;
 
 		for (const AssetKindInfo& info : assetKinds)
-		{
 			if (ImGui::MenuItem(info.label))
-			{
-				m_newAssetKind = info.kind;
-				m_newAssetFolder = folder;
-				m_askForAsset = true;
-				m_focusAssetName = true;
-
-				// NewShader, NewShader1, ...: the first name nothing is using.
-				snprintf(m_newAssetName, sizeof(m_newAssetName), "%s", info.defaultName);
-
-				m_newAssetProblem = NewAssetProblem();
-
-				for (int suffix = 1; !m_newAssetProblem.empty() && suffix < maxDefaultNameSuffix; suffix++)
-				{
-					snprintf(m_newAssetName, sizeof(m_newAssetName), "%s%d", info.defaultName, suffix);
-					m_newAssetProblem = NewAssetProblem();
-				};
-			};
-		};
+				AskForAsset(info.kind, folder);
 
 		ImGui::EndMenu();
 	};
 
+	void Editor::AskForAsset(AssetKind kind, const std::string& folder)
+	{
+		const AssetKindInfo& info = InfoOf(kind);
+
+		m_newAssetKind = kind;
+		m_newAssetFolder = folder;
+		m_askForAsset = true;
+		m_focusAssetName = true;
+
+		// NewShader, NewShader1, ...: the first name nothing is using.
+		snprintf(m_newAssetName, sizeof(m_newAssetName), "%s", info.defaultName);
+
+		m_newAssetProblem = NewAssetProblem();
+
+		for (int suffix = 1; !m_newAssetProblem.empty() && suffix < maxDefaultNameSuffix; suffix++)
+		{
+			snprintf(m_newAssetName, sizeof(m_newAssetName), "%s%d", info.defaultName, suffix);
+			m_newAssetProblem = NewAssetProblem();
+		};
+	};
+
 	std::string Editor::NewAssetFolder() const
 	{
-		if (m_newAssetKind != AssetKind::Script)
+		if (!IsScript(m_newAssetKind))
 			return m_newAssetFolder;
 
 		const std::string scripts =
@@ -404,10 +419,12 @@ namespace Loom
 		const std::filesystem::path folder = NewAssetFolder();
 		const std::string name = m_newAssetName;
 
+		if (IsScript(m_newAssetKind))
+			return (folder / (name + ".hpp")).string();
+
 		switch (m_newAssetKind)
 		{
 		case AssetKind::Scene:		return (folder / (name + SceneSerializer::extension)).string();
-		case AssetKind::Script:		return (folder / (name + ".hpp")).string();
 		case AssetKind::Shader:		return (folder / (name + ProjectAssets::shaderExtension)).string();
 		case AssetKind::Texture:	return (folder / (name + ProjectAssets::textureExtension)).string();
 		default:					return (folder / name).string();
@@ -416,7 +433,7 @@ namespace Loom
 
 	std::string Editor::NewAssetProblem() const
 	{
-		if (m_newAssetKind == AssetKind::Script)
+		if (IsScript(m_newAssetKind))
 			return ProjectAssets::ScriptNameProblem(ScriptsProject(), m_newAssetName);
 
 		if (!ProjectAssets::IsValidName(m_newAssetName))
@@ -431,16 +448,16 @@ namespace Loom
 			: "";
 	};
 
-	void Editor::CreateScriptAsset(const std::string& name)
+	void Editor::CreateScriptAsset(AssetKind kind, const std::string& name)
 	{
-		m_newAssetKind = AssetKind::Script;
+		m_newAssetKind = kind;
 		m_newAssetFolder = m_projectPath;
 		snprintf(m_newAssetName, sizeof(m_newAssetName), "%s", name.c_str());
 
 		CreateAsset();
 	};
 
-	void Editor::CreateAsset()
+	std::string Editor::CreateAsset()
 	{
 		const std::string folder = NewAssetFolder();
 		const std::string name = m_newAssetName;
@@ -465,13 +482,15 @@ namespace Loom
 			break;
 
 		case AssetKind::Script:
+		case AssetKind::State:
+		case AssetKind::StateMachine:
 		{
 			const bool adding = !m_scripts.HasProject();
 
 			if (adding && ProjectTemplate::AddScripts(m_projectPath, m_projectName, &error).empty())
 				break;
 
-			path = ProjectAssets::CreateScript(ScriptsProject(), folder, name, &error);
+			path = ProjectAssets::CreateScript(ScriptsProject(), folder, name, InfoOf(m_newAssetKind).script, &error);
 
 			// The project file names the scripts project now, script or not, so
 			// it is picked up and built.
@@ -492,19 +511,21 @@ namespace Loom
 		if (path.empty())
 		{
 			std::cerr << "Could not create " << name << ": " << error << std::endl;
-			return;
+			return "";
 		};
 
 		std::cout << "Created " << path << std::endl;
 
-		if (m_newAssetKind == AssetKind::Script)
-			std::cout << name << " shows up in Add Component after the next compile." << std::endl;
+		if (const char* appearsIn = InfoOf(m_newAssetKind).appearsIn)
+			std::cout << name << " shows up in " << appearsIn << " after the next compile." << std::endl;
 
 		m_askForAsset = false;
 		m_selectedAsset = std::filesystem::path(path).lexically_normal().string();
 		m_revealSelectedAsset = true;
 
 		RefreshProjectAssets();
+
+		return path;
 	};
 
 	void Editor::OpenAsset(const std::string& path)
@@ -597,8 +618,11 @@ namespace Loom
 
 			ImGui::BeginDisabled(!usable);
 
+			// Opened from here rather than in CreateAsset, so --create-script
+			// leaves Visual Studio closed.
 			if (ImGui::Button("Create", ImVec2(promptButtonWidth, 0.0f)) || (entered && usable))
-				CreateAsset();
+				if (const std::string path = CreateAsset(); !path.empty() && IsScript(m_newAssetKind))
+					OpenAsset(path);
 
 			ImGui::EndDisabled();
 

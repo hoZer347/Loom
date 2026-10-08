@@ -6,10 +6,11 @@
 #include "StateReference.h"
 
 #include "Component.h"
+#include "Loom API.h"
+#include "Serial.h"
 
 #include <deque>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <vector>
 
@@ -21,7 +22,7 @@ namespace Loom
 	/// The pump lives in the machine itself rather than in a separate core object every
 	/// call forwards to, so whatever hosts a machine -- a Component, or the always-on
 	/// StaticStateMachine -- simply derives this.
-	struct StateMachineBase :
+	struct LOOM_API StateMachineBase :
 		public detail::StateCommands<StateMachineBase>
 	{
 		StateMachineBase();
@@ -76,7 +77,7 @@ namespace Loom
 		// Driven by whatever hosts the machine. Named apart from the Component hooks of
 		// the same shape, since a machine on a GameObject is both.
 
-		/// Runs OnMachineStart and enters the start state. Safe to call twice.
+		/// Runs OnMachineStart and enters FirstState. Safe to call twice.
 		void StartMachine();
 
 		void PumpUpdate();
@@ -113,9 +114,8 @@ namespace Loom
 
 		#pragma endregion
 
-		/// Initial state at the start of the machine's lifetime. Set it before the machine
-		/// starts; it is created once, when it does.
-		StateReference startState{ };
+		/// True once StartMachine has run.
+		bool IsStarted() const { return started; };
 
 		/// How much state history to keep before discarding the oldest. Keep it low or
 		/// zero unless debugging, to avoid memory over-use.
@@ -145,7 +145,13 @@ namespace Loom
 		virtual void OnMachineLateUpdate() { };
 		virtual void OnMachineGui() { };
 
+		/// After the current state changes, whether by Proceed, Disable or Enable.
+		virtual void OnMachineStateChanged() { };
+
 		#pragma endregion
+
+		/// The state the machine enters when it starts, or null to start on nothing.
+		virtual std::shared_ptr<State> FirstState() const { return nullptr; };
 
 	private:
 		struct St_Parallel;
@@ -169,9 +175,6 @@ namespace Loom
 
 		/// Previously entered states, for debugging.
 		std::deque<std::pair<float, std::shared_ptr<State>>> _stateStack{ };
-
-		static inline std::vector<StateMachineBase*> _all{ };
-		static inline std::recursive_mutex _all_mutex{ };
 	};
 
 	// Now that the machine is a complete type, the two commands State could not carry
@@ -179,20 +182,28 @@ namespace Loom
 	inline void State::Proceed() { stateMachine->Proceed(); };
 	inline void State::Clear() { stateMachine->Clear(); };
 
-	/// A state machine living on a GameObject.
+	/// A state machine living on a GameObject, with its Start and Current states in
+	/// the inspector and the scene file.
 	///
 	/// Self-typed, so StateOf&lt;_Focus&gt; resolves to the concrete machine. The engine
 	/// requires it in any case:
 	/// Component&lt;T&gt; is CRTP and GameObject::Attach refuses anything that is not a
 	/// component of its own type, so a machine subclass has to name itself here regardless.
 	///
-	///		struct Camp : Loom::StateMachine&lt;Camp&gt; { };
+	///		struct Camp : Loom::StateMachineOf&lt;Camp&gt; { };
 	///		gameObject->Attach&lt;Camp&gt;();
 	template <typename _Self>
-	struct StateMachine :
+	struct StateMachineOf :
 		public Component<_Self>,
 		public StateMachineBase
 	{
+		/// What the machine enters when play starts, unless Current names a state.
+		Serial<StateReference> m_start;
+
+		/// The state running now. Setting it enters that state, or, before the machine
+		/// has started, is where it will start.
+		Serial<StateReference> m_current;
+
 		GameObject* GetGameObject() override { return this->m_gameObject; };
 
 		std::string MachineName() const override { return typeid(_Self).name(); };
@@ -200,10 +211,13 @@ namespace Loom
 		// Public because Loom's GameObject::Attach asks &T::OnAttach and friends from
 		// outside the class to work out which of them a component overrides.
 
-		void OnAttach() override { StartMachine(); };
-
 		void OnUpdate() override
 		{
+			// Started here rather than on attach: attaching happens in the editor
+			// too, before the scene has read Start in, and a machine is only meant
+			// to run while the scene does.
+			StartMachine();
+
 			// GameObject never fills m_physicsables, so the engine does not dispatch
 			// ComponentBase::OnPhysics and a state's OnPhysics would never run. Pump the
 			// physics step from here until it does; the flag below makes the changeover
@@ -230,12 +244,39 @@ namespace Loom
 			PumpGui();
 		};
 
+		void OnFieldChanged(const SerializedField& field) override
+		{
+			if (field.data != &*m_current || !IsStarted())
+				return;
+
+			if (std::shared_ptr<State> state = m_current->Create())
+				Enter(std::move(state));
+			else Disable();
+		};
+
+	protected:
+		std::shared_ptr<State> FirstState() const override
+		{
+			std::shared_ptr<State> first = m_current->Create();
+
+			return first ? first : m_start->Create();
+		};
+
+		void OnMachineStateChanged() override
+		{
+			const State* state = Current();
+
+			m_current = state
+				? StateReference::Named(PrettyTypeName(typeid(*state).name()))
+				: StateReference{ };
+		};
+
 	private:
 		bool _physics_dispatched = false;
 	};
 
 	/// A machine with no behaviour of its own, for when the states are the whole of it.
-	struct SimpleStateMachine final : StateMachine<SimpleStateMachine>
+	struct StateMachine final : StateMachineOf<StateMachine>
 	{
 	};
 };

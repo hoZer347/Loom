@@ -2,6 +2,8 @@
 
 #include "ProjectAssets.h"
 
+#include "Utilities/StateReference.h"
+
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -33,9 +35,12 @@ namespace
 			std::filesystem::remove_all(root, code);
 		};
 
-		std::string Create(const std::string& name, std::string* error = nullptr) const
+		std::string Create(
+			const std::string& name,
+			std::string* error = nullptr,
+			Loom::ProjectAssets::ScriptKind kind = Loom::ProjectAssets::ScriptKind::Component) const
 		{
-			return Loom::ProjectAssets::CreateScript(project.string(), root.string(), name, error);
+			return Loom::ProjectAssets::CreateScript(project.string(), root.string(), name, kind, error);
 		};
 	};
 
@@ -66,6 +71,42 @@ TEST_SUITE("ProjectAssets")
 
 		// Nothing else to edit: the project picks headers up by its glob.
 		CHECK(ReadAll(scripts.project.string()).find("Spinner") == std::string::npos);
+	};
+
+	TEST_CASE("a state is one header, registered under its own name")
+	{
+		const ScriptsProject scripts("loom project assets state");
+
+		const std::string text = ReadAll(scripts.Create("Jumping", nullptr, Loom::ProjectAssets::ScriptKind::State));
+
+		CHECK(text.find("namespace GameScripts") != std::string::npos);
+		CHECK(text.find("struct Jumping : Loom::State") != std::string::npos);
+		CHECK(text.find("HOZER_REGISTER_STATE(Jumping);") != std::string::npos);
+		CHECK(text.find("{NAME}") == std::string::npos);
+	};
+
+	TEST_CASE("a state machine comes with states of its own, and starts in one")
+	{
+		const ScriptsProject scripts("loom project assets state machine");
+
+		const std::string text = ReadAll(scripts.Create("Guard", nullptr, Loom::ProjectAssets::ScriptKind::StateMachine));
+
+		CHECK(text.find("struct Guard : Loom::StateMachineOf<Guard>") != std::string::npos);
+		CHECK(text.find("HOZER_REGISTER_STATE(GuardWaiting);") != std::string::npos);
+		CHECK(text.find("HOZER_REGISTER_STATE(GuardWalking);") != std::string::npos);
+		CHECK(text.find("m_start = Loom::StateReference::Of<GuardWaiting>();") != std::string::npos);
+		CHECK(text.find("{NAME}") == std::string::npos);
+	};
+
+	TEST_CASE("a script cannot take a registered state's name")
+	{
+		const ScriptsProject scripts("loom project assets registered state");
+
+		Loom::StateRegistry::Register("ProjectAssetsTestState", nullptr);
+
+		CHECK_FALSE(Loom::ProjectAssets::ScriptNameProblem(scripts.project.string(), "ProjectAssetsTestState").empty());
+
+		Loom::StateRegistry::Unregister("ProjectAssetsTestState");
 	};
 
 	TEST_CASE("a script name already taken is refused")

@@ -44,6 +44,8 @@ namespace Loom
 		Folder,
 		Scene,
 		Script,
+		State,
+		StateMachine,
 		Shader,
 		Texture,
 	};
@@ -165,8 +167,9 @@ namespace Loom
 		// screenshot can show it in the inspector.
 		void RequestSelection(const std::string& name);
 
-		// Create > Script in the project folder, named and confirmed.
-		void CreateScriptAsset(const std::string& name);
+		// Create > Script, State or State Machine in the project folder, named
+		// and confirmed.
+		void CreateScriptAsset(AssetKind kind, const std::string& name);
 
 	private:
 		void DrawGui();
@@ -176,6 +179,10 @@ namespace Loom
 		void DrawAssetNode(const AssetNode& node, int depth);
 		void DrawAssetContextMenu(const AssetNode& node);
 		void DrawCreateMenu(const std::string& folder);
+
+		// Opens the Create prompt for that kind of asset, named the first default
+		// name nothing is using.
+		void AskForAsset(AssetKind kind, const std::string& folder);
 		void DrawCreateAssetPrompt();
 		void DrawScriptsSection();
 		void DrawHierarchy();
@@ -280,7 +287,9 @@ namespace Loom
 
 		// Why the Create prompt's name cannot be used, or an empty string.
 		std::string NewAssetProblem() const;
-		void CreateAsset();
+
+		// The path written, or an empty string when it could not be.
+		std::string CreateAsset();
 
 		// Points a change notification at the project folder, so the tree is
 		// rescanned when something under it is added, removed or renamed

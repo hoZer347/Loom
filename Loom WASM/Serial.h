@@ -17,6 +17,7 @@
 namespace Loom
 {
 	struct LoomObject;
+	struct StateReference;
 	struct UniformValues;
 
 	// Hands a field to the last LoomObject whose constructor started on this
@@ -50,6 +51,7 @@ namespace Loom
 		else if constexpr (std::is_same_v<T, glm::vec4>)			return FieldType::Vec4;
 		else if constexpr (std::is_same_v<T, std::vector<float>>)	return FieldType::FloatArray;
 		else if constexpr (std::is_same_v<T, UniformValues>)		return FieldType::Uniforms;
+		else if constexpr (std::is_same_v<T, StateReference>)		return FieldType::State;
 		else if constexpr (std::is_pointer_v<T>)					return FieldType::Reference;
 		else static_assert(sizeof(T) == 0, "Serial<T> has no scene-format type for this member");
 	};

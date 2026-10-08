@@ -16,6 +16,18 @@ namespace Loom
 	*/
 	struct ProjectAssets final
 	{
+		// What a new script header starts out as.
+		enum struct ScriptKind
+		{
+			Component,
+
+			// A state, registered so a state machine's fields can name it.
+			State,
+
+			// A state machine with two states of its own, as a worked example.
+			StateMachine,
+		};
+
 		static constexpr const char* shaderExtension = Shader::extension;
 		static constexpr const char* textureExtension = ".png";
 
@@ -34,14 +46,15 @@ namespace Loom
 			const std::string& scripts_project,
 			const std::string& folder,
 			const std::string& name,
+			ScriptKind kind,
 			std::string* error = nullptr);
 
 		// A name usable as a file name, and as a path in an MSBuild project.
 		static bool IsValidName(const std::string& name);
 
 		// Why name cannot be a new script in the given project, or an empty
-		// string when it can: it has to be a C++ type name that no script or
-		// registered component is already using.
+		// string when it can: it has to be a C++ type name that no script,
+		// registered component or registered state is already using.
 		static std::string ScriptNameProblem(const std::string& scripts_project, const std::string& name);
 
 		static std::string Replace(std::string text, const std::string& token, const std::string& value);

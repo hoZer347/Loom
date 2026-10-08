@@ -1,5 +1,8 @@
 #pragma once
 
+#include "Loom API.h"
+
+#include "ComponentRegistry.h"
 #include "State.h"
 
 #include <functional>
@@ -22,7 +25,10 @@ namespace Loom
 	///
 	///		machine->startState = StateReference::Of&lt;St_Walk&gt;(
 	///			[](St_Walk& state) { state.speed = 4.0f; });
-	struct StateReference final
+	///
+	/// A Serial&lt;StateReference&gt; is written to a scene by its name alone, so only a
+	/// registered state comes back from a file, and without its setup.
+	struct LOOM_API StateReference final
 	{
 		StateReference() = default;
 
@@ -34,7 +40,9 @@ namespace Loom
 
 			StateReference reference;
 
-			reference._type_name = typeid(_State).name();
+			// Unqualified, the way HOZER_REGISTER_STATE names it, so a reference
+			// written to a file is read back as the same state.
+			reference._type_name = PrettyTypeName(typeid(_State).name());
 			reference._create =
 				[configure]() -> std::shared_ptr<State>
 				{
@@ -50,20 +58,23 @@ namespace Loom
 			return reference;
 		};
 
-		/// Builds whatever was registered under that name, or an empty reference.
+		/// Builds whatever is registered under that name when it is asked to. The name
+		/// is kept even while nothing is registered under it, so a scene read before
+		/// the scripts that register it are loaded does not lose it.
 		static StateReference Named(const std::string& name);
 
-		/// The type the reference builds, for a readout. Empty when nothing is set.
+		/// The state's name, for a readout and for the scene file. Empty when nothing
+		/// is set.
 		const std::string& StateType() const { return _type_name; };
 
 		/// True when this reference will build something.
-		bool IsSet() const { return bool(_create); };
+		bool IsSet() const;
 
 		explicit operator bool() const { return IsSet(); };
 
 		/// A fresh state, or null when nothing is set. A copy every time, so the same
 		/// reference can start a machine more than once.
-		std::shared_ptr<State> Create() const { return _create ? _create() : nullptr; };
+		std::shared_ptr<State> Create() const;
 
 	private:
 		std::string _type_name{ };
@@ -73,9 +84,13 @@ namespace Loom
 	/// Names that can be built by string. A state registers itself once, and anything
 	/// data-driven (a monitor's "set state" box, a config file, a script) can then
 	/// reach it.
-	struct StateRegistry final
+	struct LOOM_API StateRegistry final
 	{
 		static void Register(const std::string& name, std::function<std::shared_ptr<State>()> create);
+
+		/// Takes a name back out: a script library is unloaded before it is rebuilt,
+		/// and a factory pointing into code that is no longer mapped is a crash.
+		static void Unregister(const std::string& name);
 
 		static std::shared_ptr<State> Create(const std::string& name);
 

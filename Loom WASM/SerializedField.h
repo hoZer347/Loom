@@ -33,6 +33,9 @@ namespace Loom
 		// Values for a shader's variables. The inspector leaves them to the
 		// component, which knows the shader that declares them.
 		Uniforms,
+
+		// A state machine's state, written as the name it is registered under.
+		State,
 	};
 
 	/**

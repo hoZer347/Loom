@@ -6,10 +6,10 @@
 ///
 ///	  State machines       StateMachineBase is the pump: a queue, a current state,
 ///	                       parallel sub-states, and a history for debugging. Pick the
-///	                       machine that matches the owner. StateMachine<Self> sits on a
+///	                       machine that matches the owner. StateMachineOf<Self> sits on a
 ///	                       GameObject and is self-typed, since Component is CRTP.
 ///	                       StaticStateMachine is always on and owned by nothing.
-///	                       SimpleStateMachine is the plain case. States are StateOf<Focus>.
+///	                       StateMachine is the plain case. States are StateOf<Focus>.
 ///
 ///	  Attributes           Attribute<T, CacheMode> with its modifiers and triggers. An
 ///	                       owner declares its attributes once with HOZER_ATTRIBUTES,
