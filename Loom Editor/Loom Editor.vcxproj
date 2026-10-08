@@ -144,6 +144,16 @@
           DestinationFolder="$(OutDir)"
           SkipUnchangedFiles="true" />
   </Target>
+  <ItemGroup>
+    <DemoSource Include="$(MSBuildProjectDirectory)\..\Demo Sources\**\*" />
+  </ItemGroup>
+  <!-- Inputs and Outputs pair up, so only demo files whose source is newer than the copy are refreshed -->
+  <Target Name="CopyDemos" AfterTargets="Build"
+          Inputs="@(DemoSource)"
+          Outputs="@(DemoSource->'$(MSBuildProjectDirectory)\..\Demos\%(RecursiveDir)%(Filename)%(Extension)')">
+    <Copy SourceFiles="@(DemoSource)"
+          DestinationFiles="@(DemoSource->'$(MSBuildProjectDirectory)\..\Demos\%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>

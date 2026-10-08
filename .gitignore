@@ -369,6 +369,5 @@ FodyWeavers.xsd
 Loom Tests/x64/
 x64/Web*/
 
-# What the demos build, and per-user editor settings
-Demos/*/Build/
-Demos/*/.vscode/
+# The editor build copies Demo Sources here, so edits made while debugging stay local
+Demos/
