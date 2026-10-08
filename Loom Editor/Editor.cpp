@@ -2052,7 +2052,7 @@ namespace Loom
 
 		DrawFields(*component, labels, LabelColumn(labels, 0.0f));
 
-		if (dynamic_cast<StateMachineBase*>(component))
+		if (StateMachineBase* machine = dynamic_cast<StateMachineBase*>(component))
 		{
 			const float spacing = ImGui::GetStyle().ItemSpacing.x;
 			const float half = (ImGui::GetContentRegionAvail().x - spacing) / 2.0f;
@@ -2069,6 +2069,11 @@ namespace Loom
 				AskForAsset(AssetKind::StateMachine, m_projectPath);
 
 			ImGui::EndDisabled();
+
+			// Drawn here rather than by the machine, whose OnGui is its own to write.
+			StateMachineMonitor::DrawInline(*machine);
+
+			machine->PumpGui();
 		};
 
 		component->OnGui();

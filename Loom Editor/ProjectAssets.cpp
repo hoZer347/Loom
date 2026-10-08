@@ -144,12 +144,11 @@ namespace {NAMESPACE}
 	// Start and Current to pick its states from.
 	struct {NAME} : Loom::StateMachine<{NAME}>
 	{
-	protected:
-		void OnMachineStart() override
+		void OnStart() override
 		{
 		};
 
-		void OnMachineUpdate() override
+		void OnUpdate() override
 		{
 		};
 	};

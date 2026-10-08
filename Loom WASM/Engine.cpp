@@ -190,8 +190,12 @@ namespace Loom
 #endif
 
 		if (updateScenes)
+		{
 			for (auto& scene : Scene::allScenes)
 				scene->Update();
+
+			Utilities::Update();
+		};
 
 		if (renderScenes)
 			for (auto& scene : Scene::allScenes)

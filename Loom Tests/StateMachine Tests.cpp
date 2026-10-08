@@ -26,6 +26,16 @@ namespace
 	{
 	};
 
+	// One with hooks of its own, written the way a component's are.
+	struct StateTestHooked final : Loom::StateMachine<StateTestHooked>
+	{
+		void OnStart() override { starts++; };
+		void OnUpdate() override { updates++; };
+
+		int starts = 0;
+		int updates = 0;
+	};
+
 	struct StateTestWalk final : Loom::State<StateTestWalk, StateTestMachine>
 	{
 		void OnExit(Loom::StateBase* nextState) override { exits++; };
@@ -149,7 +159,7 @@ TEST_SUITE("StateMachine")
 		CHECK(machine->m_start->StateType() == "StateTestIdle");
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the machine starts on its first update, not when it is attached")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the machine starts on its first step, not when it is attached")
 	{
 		Machine patrol;
 		patrol.machine->m_start = Loom::StateReference::Named("StateTestIdle");
@@ -157,10 +167,36 @@ TEST_SUITE("StateMachine")
 		CHECK_FALSE(patrol.machine->IsStarted());
 		CHECK(patrol.machine->Current() == nullptr);
 
-		patrol.machine->OnUpdate();
+		patrol.machine->Step();
 
 		CHECK(dynamic_cast<const StateTestIdle*>(patrol.machine->Current()) != nullptr);
 		CHECK(patrol.machine->m_current->StateType() == "StateTestIdle");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a machine's own OnStart and OnUpdate are its, and its states still run")
+	{
+		Loom::Scene scene{ "Hooked" };
+		Loom::GameObject* object = scene.AddChild("Guard");
+		Pump();
+
+		StateTestHooked* machine = object->Attach<StateTestHooked>();
+		Pump();
+
+		machine->m_start = Loom::StateReference::Named("StateTestIdle");
+
+		Loom::StateMachineBase::StepAttached();
+		Loom::StateMachineBase::StepAttached();
+
+		CHECK(machine->starts == 1);
+		CHECK(dynamic_cast<const StateTestIdle*>(machine->Current()) != nullptr);
+
+		// The engine's component update calls it, not the machine's step.
+		CHECK(machine->updates == 0);
+
+		machine->OnUpdate();
+
+		CHECK(machine->updates == 1);
+		CHECK(dynamic_cast<const StateTestIdle*>(machine->Current()) != nullptr);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Current set before the machine starts is where it starts")
@@ -173,7 +209,7 @@ TEST_SUITE("StateMachine")
 
 		CHECK(patrol.machine->Current() == nullptr);
 
-		patrol.machine->OnUpdate();
+		patrol.machine->Step();
 
 		CHECK(dynamic_cast<const StateTestWalk*>(patrol.machine->Current()) != nullptr);
 	};
@@ -182,7 +218,7 @@ TEST_SUITE("StateMachine")
 	{
 		Machine patrol;
 		patrol.machine->m_start = Loom::StateReference::Named("StateTestIdle");
-		patrol.machine->OnUpdate();
+		patrol.machine->Step();
 
 		patrol.machine->m_current = Loom::StateReference::Named("StateTestWalk");
 		patrol.machine->OnFieldChanged(patrol.Field(currentField));

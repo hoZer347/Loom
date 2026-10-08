@@ -201,10 +201,37 @@ namespace Loom
 
 		started = true;
 
-		OnMachineStart();
+		OnStart();
 
 		if (std::shared_ptr<StateBase> first = FirstState())
 			Enter(std::move(first));
+	};
+
+	void StateMachineBase::Step()
+	{
+		StartMachine();
+
+		if (current)
+			current->OnPhysics();
+
+		Advance(Time::DeltaTime());
+
+		if (current)
+			current->OnLateUpdate();
+	};
+
+	void StateMachineBase::StepAttached()
+	{
+		const std::vector<StateMachineBase*> machines = All();
+
+		for (StateMachineBase* machine : machines)
+		{
+			// A state may destroy a machine, its own or another, mid-frame.
+			const std::vector<StateMachineBase*> alive = All();
+
+			if (std::ranges::find(alive, machine) != alive.end() && machine->GetGameObject())
+				machine->Step();
+		};
 	};
 
 	void StateMachineBase::Advance(float deltaTime)
@@ -215,33 +242,8 @@ namespace Loom
 			current->OnUpdate();
 	};
 
-	void StateMachineBase::PumpUpdate()
-	{
-		OnMachineUpdate();
-
-		Advance(Time::DeltaTime());
-	};
-
-	void StateMachineBase::PumpPhysics()
-	{
-		OnMachinePhysics();
-
-		if (current)
-			current->OnPhysics();
-	};
-
-	void StateMachineBase::PumpLate()
-	{
-		OnMachineLateUpdate();
-
-		if (current)
-			current->OnLateUpdate();
-	};
-
 	void StateMachineBase::PumpGui()
 	{
-		OnMachineGui();
-
 		if (current)
 			current->OnGui();
 	};

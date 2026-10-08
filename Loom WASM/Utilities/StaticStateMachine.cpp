@@ -38,10 +38,6 @@ namespace Loom
 		if (s_instance == nullptr)
 			return;
 
-		s_instance->StartMachine();
-
-		s_instance->PumpPhysics();
-		s_instance->PumpUpdate();
-		s_instance->PumpLate();
+		s_instance->Step();
 	};
 };

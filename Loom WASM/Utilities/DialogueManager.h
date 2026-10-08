@@ -181,7 +181,7 @@ namespace Loom
 		friend struct St_Dg_StreamRichText;
 		friend struct St_Dg_DialogueEnd;
 
-		void OnMachineStart() override;
+		void OnStart() override;
 
 		/// Appends to the box, and tells whoever is drawing it.
 		void Append(const std::string& text);

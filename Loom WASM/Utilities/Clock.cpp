@@ -1,6 +1,7 @@
 #include "Clock.h"
 
 #include "DialogueInput.h"
+#include "StateMachine.h"
 #include "StaticStateMachine.h"
 
 #include "OpenGL.h"
@@ -60,5 +61,10 @@ namespace Loom
 		Time::Tick();
 		DialogueInput::Tick();
 		StaticStateMachine::Pump();
+	};
+
+	void Utilities::Update()
+	{
+		StateMachineBase::StepAttached();
 	};
 };

@@ -36,14 +36,17 @@ namespace Loom
 		static void Tick();
 	};
 
-	/// The per-frame pump for everything in this library that is not attached to a
-	/// GameObject: the clock, the edge-detected input, and the StaticStateMachine.
-	///
-	/// Loom::Engine calls this once per frame from renderFrame. Anything living on a
-	/// GameObject is already driven by the Scene, and is not pumped again here.
+	/// The per-frame pump for this library: the clock, the edge-detected input, and the
+	/// state machines.
 	struct Utilities final
 	{
+		/// The clock, the input and the StaticStateMachine. Loom::Engine calls this first
+		/// thing every frame.
 		static void Tick();
+
+		/// The state machines on GameObjects. Loom::Engine calls this after the scenes,
+		/// on the frames they update.
+		static void Update();
 
 		Utilities() = delete;
 		~Utilities() = delete;

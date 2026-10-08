@@ -130,7 +130,7 @@ namespace Loom
 
 	#pragma region Running
 
-	void DialogueManager::OnMachineStart()
+	void DialogueManager::OnStart()
 	{
 		Build();
 
