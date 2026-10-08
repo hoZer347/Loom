@@ -14,10 +14,11 @@ namespace Loom
 	* - Where the scene is seen from: its GameObject's position, looking down
 	*   the transform's -Z with its +Y up, or at target when lookAtTarget is on.
 	*   Looking at a target still takes its roll from the transform
-	* - Scene::Render uses the first one in the hierarchy, unless it is handed
-	*   one from outside the scene, and hands it to each mesh's program as it
-	*   draws. The aspect ratio is the viewport's, so the same camera fits a
-	*   window or an editor's framebuffer
+	* - Scene::Render uses the first enabled one in the hierarchy, unless it is
+	*   handed one from outside the scene, and hands it to each mesh's program
+	*   as it draws. A scene whose cameras are all disabled draws nothing. The
+	*   aspect ratio is the viewport's, so the same camera fits a window or an
+	*   editor's framebuffer
 	* - What a shader can declare, all optional:
 	*     uniform mat4 u_viewProjection;     world space to clip space
 	*     uniform vec3 u_cameraPosition;
