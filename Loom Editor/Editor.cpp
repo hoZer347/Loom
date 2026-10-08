@@ -548,6 +548,9 @@ namespace Loom
 			if (line.rfind("scene=", 0) == 0)
 				m_startupScene = line.substr(strlen("scene="));
 
+			if (line.rfind("layout=", 0) == 0)
+				m_currentLayout = line.substr(strlen("layout="));
+
 			m_settings.Read(line);
 		};
 
@@ -574,6 +577,9 @@ namespace Loom
 		// leaving the scene behind.
 		if (!m_startupScene.empty())
 			out << "scene=" << m_startupScene << '\n';
+
+		if (!m_currentLayout.empty())
+			out << "layout=" << m_currentLayout << '\n';
 	};
 
 	std::string Editor::StartupScene() const
@@ -1109,7 +1115,10 @@ namespace Loom
 		if (!m_pendingLayout.empty())
 		{
 			if (EditorLayouts::Load(LayoutsFolder(), m_pendingLayout, &m_layoutWindows))
+			{
 				m_checkLayout = true;
+				SetCurrentLayout(m_pendingLayout);
+			}
 			else
 				std::cerr << "Could not read the layout '" << m_pendingLayout << "'" << std::endl;
 
@@ -1176,6 +1185,8 @@ namespace Loom
 
 			for (const Panel& panel : Panels())
 				*panel.shown = panel.shownByDefault;
+
+			SetCurrentLayout("");
 		};
 
 		if (m_showProject)		DrawProject();
@@ -1203,7 +1214,9 @@ namespace Loom
 
 		if (!m_layoutToSave.empty())
 		{
-			if (!EditorLayouts::Save(LayoutsFolder(), m_layoutToSave))
+			if (EditorLayouts::Save(LayoutsFolder(), m_layoutToSave))
+				SetCurrentLayout(m_layoutToSave);
+			else
 				std::cerr << "Could not write the layout '" << m_layoutToSave << "'" << std::endl;
 
 			m_layoutToSave.clear();
@@ -1326,8 +1339,17 @@ namespace Loom
 	void Editor::ShowSaveLayoutPrompt()
 	{
 		m_layouts = EditorLayouts::Names(LayoutsFolder());
-		m_layoutName[0] = 0;
+		snprintf(m_layoutName, sizeof(m_layoutName), "%s", m_currentLayout.c_str());
 		m_askForLayoutName = true;
+	};
+
+	void Editor::SetCurrentLayout(const std::string& name)
+	{
+		if (name == m_currentLayout)
+			return;
+
+		m_currentLayout = name;
+		SaveSettings();
 	};
 
 	void Editor::DrawSaveLayoutPrompt()
@@ -1384,7 +1406,10 @@ namespace Loom
 			if (ImGui::Button("Save", ImVec2(button_width, 0.0f)) || (entered && usable))
 			{
 				if (EditorLayouts::Save(LayoutsFolder(), m_layoutName))
+				{
+					SetCurrentLayout(m_layoutName);
 					m_askForLayoutName = false;
+				}
 				else
 					std::cerr << "Could not write the layout '" << m_layoutName << "'" << std::endl;
 			};
@@ -1506,7 +1531,11 @@ namespace Loom
 			ImGui::EndMenu();
 		};
 
-		if (ImGui::BeginMenu("Layout"))
+		const std::string layout_menu = m_currentLayout.empty()
+			? std::string("Layout###Layout")
+			: "Layout: " + m_currentLayout + "###Layout";
+
+		if (ImGui::BeginMenu(layout_menu.c_str()))
 		{
 			if (ImGui::IsWindowAppearing())
 				m_layouts = EditorLayouts::Names(LayoutsFolder());
@@ -1515,7 +1544,7 @@ namespace Loom
 				ImGui::TextDisabled("No saved layouts.");
 
 			for (const std::string& layout : m_layouts)
-				if (ImGui::MenuItem(layout.c_str()))
+				if (ImGui::MenuItem(layout.c_str(), nullptr, EditorLayouts::SameName(layout, m_currentLayout)))
 					m_pendingLayout = layout;
 
 			ImGui::Separator();
@@ -1526,8 +1555,13 @@ namespace Loom
 			if (ImGui::BeginMenu("Delete Layout", !m_layouts.empty()))
 			{
 				for (const std::string& layout : m_layouts)
-					if (ImGui::MenuItem(layout.c_str()) && !EditorLayouts::Delete(LayoutsFolder(), layout))
-						std::cerr << "Could not delete the layout '" << layout << "'" << std::endl;
+					if (ImGui::MenuItem(layout.c_str()))
+					{
+						if (!EditorLayouts::Delete(LayoutsFolder(), layout))
+							std::cerr << "Could not delete the layout '" << layout << "'" << std::endl;
+						else if (EditorLayouts::SameName(layout, m_currentLayout))
+							SetCurrentLayout("");
+					};
 
 				ImGui::EndMenu();
 			};

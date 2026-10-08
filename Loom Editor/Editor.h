@@ -295,6 +295,9 @@ namespace Loom
 		// The Layout menu's Save prompt.
 		void DrawSaveLayoutPrompt();
 
+		// Remembered in the settings file, so the next session names it too.
+		void SetCurrentLayout(const std::string& name);
+
 		// Records the item just drawn as where a queued import goes, if the
 		// mouse is over it.
 		void TakeImportTarget(GameObject* gameObject);
@@ -501,6 +504,10 @@ namespace Loom
 
 		// What the Layout menu lists, read again each time it opens.
 		std::vector<std::string> m_layouts{ };
+
+		// The saved layout last loaded or saved, shown on the Layout menu and
+		// offered as the Save prompt's name. Empty once the layout is reset.
+		std::string m_currentLayout{ };
 
 		bool m_askForLayoutName = false;
 		char m_layoutName[EditorLayouts::MaxNameLength + 1]{ };
