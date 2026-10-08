@@ -1881,7 +1881,7 @@ namespace Loom
 		if (!ImGui::BeginDragDropTarget())
 			return;
 
-		if (DropShader(gameObject))
+		if (DropAsset(gameObject))
 		{
 			ImGui::EndDragDropTarget();
 			return;
@@ -1999,7 +1999,7 @@ namespace Loom
 			!m_nodePressOpened;
 	};
 
-	bool Editor::DropShader(GameObject* gameObject)
+	bool Editor::DropAsset(GameObject* gameObject)
 	{
 		const ImGuiPayload* dragged = ImGui::GetDragDropPayload();
 
@@ -2008,13 +2008,25 @@ namespace Loom
 
 		const std::string path = (const char*)dragged->Data;
 
+		const bool shader = std::filesystem::path(path).extension() == ProjectAssets::shaderExtension;
+
 		// Anything else dragged out of the Project panel has no place here.
-		if (std::filesystem::path(path).extension() != ProjectAssets::shaderExtension)
+		if (!shader && !ProjectAssets::IsScriptFile(path))
 			return true;
 
 		if (!ImGui::AcceptDragDropPayload(ASSET_PAYLOAD))
 			return true;
 
+		if (shader)
+			DropShader(gameObject, path);
+		else
+			DropScript(gameObject, path);
+
+		return true;
+	};
+
+	void Editor::DropShader(GameObject* gameObject, const std::string& path)
+	{
 		Material* material = gameObject->GetComponent<Material>();
 
 		if (material == nullptr)
@@ -2024,8 +2036,25 @@ namespace Loom
 
 		Select(gameObject);
 		m_historyDirty = true;
+	};
 
-		return true;
+	void Editor::DropScript(GameObject* gameObject, const std::string& path)
+	{
+		const std::string text = ProjectAssets::ReadText((std::filesystem::path(m_projectPath) / path).string());
+
+		bool attached = false;
+
+		for (const std::string& name : ProjectAssets::DeclaredTypes(text))
+			attached |= ComponentRegistry::Create(name, *gameObject) != nullptr;
+
+		if (!attached)
+		{
+			std::cerr << path << " has no compiled component to attach. Compile the scripts first if it should." << std::endl;
+			return;
+		};
+
+		Select(gameObject);
+		m_historyDirty = true;
 	};
 
 	void Editor::PollShaders()

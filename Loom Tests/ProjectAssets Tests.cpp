@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <vector>
 
 
 namespace
@@ -145,6 +146,17 @@ TEST_SUITE("ProjectAssets")
 		CHECK_FALSE(Loom::ProjectAssets::ScriptNameProblem(scripts.project.string(), "Glow").empty());
 		CHECK_FALSE(Loom::ProjectAssets::ScriptNameProblem(scripts.project.string(), "Shimmer").empty());
 		CHECK(Loom::ProjectAssets::ScriptNameProblem(scripts.project.string(), "Glo").empty());
+	};
+
+	TEST_CASE("a script's declared types are the ones it defines, in order")
+	{
+		const std::string text =
+			"struct Forward;\n"
+			"struct Glow : Loom::Component<Glow> { };\n"
+			"class Shimmer final : public Loom::Component<Shimmer> { };\n"
+			"struct GlowSettings { };\n";
+
+		CHECK(Loom::ProjectAssets::DeclaredTypes(text) == std::vector<std::string>{ "Glow", "Shimmer", "GlowSettings" });
 	};
 
 	TEST_CASE("scenes and shaders open in the editor, the scripts project's sources in Visual Studio")

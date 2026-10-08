@@ -398,8 +398,6 @@ void main()
 
 		// A header can hold several components, and the registry only knows the
 		// ones in a library that is built and loaded, so the headers are read too.
-		const std::regex declared("\\b(struct|class)\\s+" + name + "\\s*(final\\s*)?[:{]");
-
 		std::error_code code;
 
 		for (const auto& entry : std::filesystem::recursive_directory_iterator(root, code))
@@ -410,14 +408,25 @@ void main()
 			if (entry.path().extension() != ".hpp")
 				continue;
 
-			std::ifstream in(entry.path(), std::ios::binary);
-			const std::string text{ std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>() };
+			const std::vector<std::string> declared = DeclaredTypes(ReadText(entry.path().string()));
 
-			if (std::regex_search(text, declared))
+			if (std::find(declared.begin(), declared.end(), name) != declared.end())
 				return "A type called " + name + " is already in " + entry.path().filename().string() + '.';
 		};
 
 		return "";
+	};
+
+	std::vector<std::string> ProjectAssets::DeclaredTypes(const std::string& text)
+	{
+		static const std::regex declared("\\b(?:struct|class)\\s+(\\w+)\\s*(?:final\\s*)?[:{]");
+
+		std::vector<std::string> names;
+
+		for (auto match = std::sregex_iterator(text.begin(), text.end(), declared); match != std::sregex_iterator(); match++)
+			names.push_back((*match)[1].str());
+
+		return names;
 	};
 
 	std::string ProjectAssets::CreateFolder(const std::string& folder, const std::string& name, std::string* error)

@@ -320,9 +320,15 @@ namespace Loom
 		// names a file or a GameObject in the hierarchy.
 		void DragAsset(const AssetNode& node) const;
 
-		// Gives the GameObject the shader, on its Material or a new one. Whether
-		// the drop was taken.
-		bool DropShader(GameObject* gameObject);
+		// Takes a file dragged out of the Project panel onto a GameObject in the
+		// hierarchy. Whether the drag was one, taken or turned away.
+		bool DropAsset(GameObject* gameObject);
+
+		// Gives the GameObject the shader, on its Material or a new one.
+		void DropShader(GameObject* gameObject, const std::string& path);
+
+		// Attaches the components the script defines that are compiled in.
+		void DropScript(GameObject* gameObject, const std::string& path);
 
 		// Recompiles the shaders whose files something else has written, every
 		// so often.

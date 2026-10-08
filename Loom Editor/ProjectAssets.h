@@ -4,6 +4,7 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 
 namespace Loom
@@ -69,6 +70,10 @@ namespace Loom
 		// string when it can: it has to be a C++ type name that no script,
 		// registered component or registered state is already using.
 		static std::string ScriptNameProblem(const std::string& scripts_project, const std::string& name);
+
+		// The types a script's text defines, in order. A forward declaration
+		// defines nothing.
+		static std::vector<std::string> DeclaredTypes(const std::string& text);
 
 		static std::string Replace(std::string text, const std::string& token, const std::string& value);
 
