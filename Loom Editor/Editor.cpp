@@ -379,9 +379,9 @@ namespace Loom
 		{
 			switch (field.type)
 			{
-			case FieldType::Int:	*(int*)field.data = (int)value;					break;
+			case FieldType::Int:	*(int*)field.data = (int)value;						break;
 			case FieldType::UInt:	*(unsigned int*)field.data = (unsigned int)value;	break;
-			default:				*(long long*)field.data = value;				break;
+			default:				*(long long*)field.data = value;					break;
 			};
 		};
 
