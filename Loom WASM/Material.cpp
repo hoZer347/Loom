@@ -105,7 +105,15 @@ namespace Loom
 
 	void Material::OnFieldChanged(const SerializedField& field)
 	{
-		if (field.data == &*m_shader_path)
+		if (field.data != &*m_shader_path)
+			return;
+
+		// The field changes a letter at a time. Until it names a shader file,
+		// the material keeps drawing with the one it has.
+		std::error_code code;
+
+		if (m_shader_path->empty() ||
+			(m_shader_path->ends_with(Shader::extension) && std::filesystem::is_regular_file(*m_shader_path, code)))
 			ChangeShader(m_shader_path);
 	};
 

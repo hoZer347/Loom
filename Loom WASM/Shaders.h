@@ -26,6 +26,8 @@ namespace Loom
 
 		~Shader();
 
+		static constexpr const char* extension = ".shader";
+
 		// Compiles the file again, for after it has been edited, and swaps the
 		// new program in. A file that no longer compiles keeps the old program
 		// and says why.

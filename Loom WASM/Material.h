@@ -70,7 +70,7 @@ namespace Loom
 		// in error.
 		void Edited(bool written, const std::string& error);
 
-		// The declaration the "Add" row is building.
+		// The declaration being typed into the table's last row.
 		ShaderVariable m_new_variable;
 
 		// Why the last edit to the shader file failed, shown until the next one.

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Shaders.h"
+
 #include <string>
 
 
@@ -14,7 +16,7 @@ namespace Loom
 	*/
 	struct ProjectAssets final
 	{
-		static constexpr const char* shaderExtension = ".shader";
+		static constexpr const char* shaderExtension = Shader::extension;
 		static constexpr const char* textureExtension = ".png";
 
 		// The shader every new one starts from: a flat colour.
