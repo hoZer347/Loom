@@ -100,33 +100,53 @@ void main()
 )";
 
 		// The mask is the size of the target, so a fragment's own pixel is the
-		// mask's.
+		// mask's. The distance to the silhouette's edge, negative inside it,
+		// places the ring: WIDTH pixels wide, fading in over the edge itself and
+		// out beyond, each over SOFTNESS, so neither side follows the pixels.
 		const char* const edge_fragment = R"(
 uniform sampler2D u_mask;
 uniform vec4 u_color;
 
 out vec4 FragColor;
 
-const int RADIUS = 2;
+const float WIDTH = 2.0;
+const float SOFTNESS = 1.0;
+
+// Halfway between a pixel and its neighbour is where the silhouette's edge lies.
+const float HALF_PIXEL = 0.5;
+
+const int REACH = int(ceil(WIDTH + SOFTNESS + HALF_PIXEL));
 const float COVERED = 0.5;
+
+bool Covered(ivec2 pixel, ivec2 last)
+{
+	return texelFetch(u_mask, clamp(pixel, ivec2(0), last), 0).r > COVERED;
+}
 
 void main()
 {
 	ivec2 pixel = ivec2(gl_FragCoord.xy);
 	ivec2 last = textureSize(u_mask, 0) - 1;
 
-	if (texelFetch(u_mask, pixel, 0).r > COVERED)
+	bool inside = Covered(pixel, last);
+	float nearest = float(REACH);
+
+	for (int x = -REACH; x <= REACH; x++)
+		for (int y = -REACH; y <= REACH; y++)
+			if (Covered(pixel + ivec2(x, y), last) != inside)
+				nearest = min(nearest, length(vec2(x, y)));
+
+	float edge = nearest - HALF_PIXEL;
+	float from_edge = inside ? -edge : edge;
+
+	float alpha =
+		clamp((from_edge + SOFTNESS) / SOFTNESS, 0.0, 1.0) *
+		clamp((WIDTH + SOFTNESS - from_edge) / SOFTNESS, 0.0, 1.0);
+
+	if (alpha <= 0.0)
 		discard;
 
-	for (int x = -RADIUS; x <= RADIUS; x++)
-		for (int y = -RADIUS; y <= RADIUS; y++)
-			if (texelFetch(u_mask, clamp(pixel + ivec2(x, y), ivec2(0), last), 0).r > COVERED)
-			{
-				FragColor = u_color;
-				return;
-			}
-
-	discard;
+	FragColor = vec4(u_color.rgb, u_color.a * alpha);
 }
 )";
 	};
