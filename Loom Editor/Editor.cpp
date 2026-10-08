@@ -344,9 +344,6 @@ namespace Loom
 				shown.c_str(),
 				ImVec2(ImGui::CalcItemWidth() - (target ? clear_width + spacing : 0.0f), 0.0f));
 
-			if (target && ImGui::IsItemHovered())
-				ImGui::SetTooltip("%s", target->GetGuid().ToString().c_str());
-
 			if (LoomObject* dropped = DraggedInto(field))
 				if (ImGui::BeginDragDropTarget())
 				{
@@ -1513,9 +1510,6 @@ namespace Loom
 		if (is_active)
 			ImGui::PopStyleColor();
 
-		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip("%s", scene->GetGuid().ToString().c_str());
-
 		DragSource(*scene);
 		TakeImportTarget(&root);
 		DragAndDropNode(&root, open);
@@ -1575,9 +1569,6 @@ namespace Loom
 			flags,
 			"%s",
 			renaming ? "" : gameObject->GetName().c_str());
-
-		if (ImGui::IsItemHovered() && !renaming)
-			ImGui::SetTooltip("%s", gameObject->GetGuid().ToString().c_str());
 
 		TakeImportTarget(gameObject);
 		DragAndDropNode(gameObject, open);
@@ -2031,9 +2022,6 @@ namespace Loom
 		const std::string name = ComponentRegistry::NameOf(*component);
 
 		const bool open = ImGui::CollapsingHeader(name.c_str(), header_flags);
-
-		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip("%s", component->GetGuid().ToString().c_str());
 
 		// The remove button rides on the header's own line, Unity-style.
 		ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::GetFrameHeight());
