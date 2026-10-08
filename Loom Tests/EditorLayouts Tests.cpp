@@ -5,6 +5,7 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -82,6 +83,39 @@ TEST_SUITE("EditorLayouts")
 		CHECK_FALSE(Loom::EditorLayouts::IsValidName("..\\up"));
 		CHECK_FALSE(Loom::EditorLayouts::IsValidName("what?"));
 		CHECK_FALSE(Loom::EditorLayouts::IsValidName(std::string(Loom::EditorLayouts::MaxNameLength + 1, 'a')));
+	};
+
+	TEST_CASE("Windows' device names are not names, in any case")
+	{
+		CHECK_FALSE(Loom::EditorLayouts::IsValidName("NUL"));
+		CHECK_FALSE(Loom::EditorLayouts::IsValidName("con"));
+		CHECK_FALSE(Loom::EditorLayouts::IsValidName("Aux"));
+		CHECK_FALSE(Loom::EditorLayouts::IsValidName("com1"));
+		CHECK_FALSE(Loom::EditorLayouts::IsValidName("LPT9"));
+
+		CHECK(Loom::EditorLayouts::IsValidName("Console"));
+		CHECK(Loom::EditorLayouts::IsValidName("COM"));
+		CHECK(Loom::EditorLayouts::IsValidName("COMX"));
+	};
+
+	TEST_CASE("names that differ only in case are the same file")
+	{
+		CHECK(Loom::EditorLayouts::SameName("Alpha", "aLPHA"));
+		CHECK_FALSE(Loom::EditorLayouts::SameName("Alpha", "Alphas"));
+	};
+
+	TEST_CASE("loading names the windows the layout has a place for")
+	{
+		Driven driven;
+		driven.Frame();
+
+		REQUIRE(Loom::EditorLayouts::Save(driven.folder, "Named"));
+
+		std::vector<ImGuiID> windows;
+		REQUIRE(Loom::EditorLayouts::Load(driven.folder, "Named", &windows));
+
+		CHECK(std::find(windows.begin(), windows.end(), ImHashStr(window)) != windows.end());
+		CHECK(std::find(windows.begin(), windows.end(), ImHashStr("Never Drawn")) == windows.end());
 	};
 
 	TEST_CASE("a saved layout is listed by name, sorted, and other files are not")

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "imgui.h"
+
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -20,16 +22,20 @@ namespace Loom
 		constexpr const char* Extension = ".ini";
 		constexpr size_t MaxNameLength = 64;
 
-		// Letters, digits, spaces, _ and -, with no space at either end, so a
-		// name is always a file name.
+		// Letters, digits, spaces, _ and -, with no space at either end and
+		// none of Windows' device names, so a name is always a file name.
 		bool IsValidName(const std::string& name);
+
+		// Whether two names are the same file.
+		bool SameName(const std::string& a, const std::string& b);
 
 		// The layouts saved in the folder, sorted.
 		std::vector<std::string> Names(const std::filesystem::path& folder);
 
-		// Each false when the file could not be written, read or removed.
+		// Each false when the file could not be written, read or removed. Load
+		// gives the IDs of the windows the layout has a place for.
 		bool Save(const std::filesystem::path& folder, const std::string& name);
-		bool Load(const std::filesystem::path& folder, const std::string& name);
+		bool Load(const std::filesystem::path& folder, const std::string& name, std::vector<ImGuiID>* windows = nullptr);
 		bool Delete(const std::filesystem::path& folder, const std::string& name);
 	};
 };

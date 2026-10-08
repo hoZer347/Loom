@@ -102,6 +102,12 @@ namespace Loom
 		// In a tab of the Shaders panel, which comes forward.
 		void OpenShader(const std::string& path);
 
+		// A layout from the Layout menu: loaded at the top of the next frame,
+		// saved once the panels have been drawn, or asked a name for.
+		void LoadLayout(const std::string& name) { m_pendingLayout = name; };
+		void SaveLayout(const std::string& name) { m_layoutToSave = name; };
+		void ShowSaveLayoutPrompt();
+
 		// Writes a new project (scenes, scripts, a Visual Studio solution) into
 		// folder/name and opens it.
 		bool CreateProject(const std::string& folder, const std::string& name);
@@ -273,7 +279,14 @@ namespace Loom
 		void BuildDefaultLayout(unsigned int dockspace_id);
 
 		// The panels the Window menu toggles, by the name ImGui knows each by.
-		std::vector<std::pair<const char*, bool*>> Panels();
+		struct Panel
+		{
+			const char* name;
+			bool* shown;
+			bool shownByDefault;
+		};
+
+		std::vector<Panel> Panels();
 
 		// Puts which panels are open into ImGui's settings, so the layout file
 		// and every saved layout carry it along with the docking.
@@ -467,6 +480,13 @@ namespace Loom
 		// Set when a layout has been put in place, so the next frame checks it
 		// has every panel; the first frame's is the one the last run left.
 		bool m_checkLayout = false;
+
+		// The windows a loaded layout has a place for. Empty for the layout the
+		// last run left, which ImGui's own settings answer for.
+		std::vector<unsigned int> m_layoutWindows{ };
+
+		// Saved once the panels have been drawn, for --save-layout.
+		std::string m_layoutToSave{ };
 
 		// Loaded at the top of the next frame, before the dockspace it replaces
 		// is submitted.

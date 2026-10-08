@@ -154,6 +154,9 @@ namespace
 			<< "  --open-scene <file>            open a scene beside those already open, even\n"
 			<< "                                 one of them again\n"
 			<< "  --open-shader <file>           open a shader in the Shaders panel\n"
+			<< "  --layout <name>                load a layout saved from the Layout menu\n"
+			<< "  --save-layout <name>           save the layout once the panels are drawn\n"
+			<< "  --save-layout-prompt           start with Layout > Save Layout... open\n"
 			<< "  --undo, --redo                 step the history once the imports have landed\n"
 			<< "  --vulkan, --opengl             run on that graphics API this time\n"
 			<< "  --screenshot <file> [frames]   write the editor to a bitmap and exit,\n"
@@ -442,6 +445,21 @@ int main(int argc, char** argv)
 
 			editor.OpenShader(argv[++i]);
 		}
+		else if (argument == "--layout" || argument == "--save-layout")
+		{
+			if (i + 1 >= argc)
+			{
+				std::cerr << argument << " needs a layout name" << std::endl;
+				return 1;
+			};
+
+			if (argument == "--layout")
+				editor.LoadLayout(argv[++i]);
+			else
+				editor.SaveLayout(argv[++i]);
+		}
+		else if (argument == "--save-layout-prompt")
+			editor.ShowSaveLayoutPrompt();
 		else if (argument == "--open-demo")
 		{
 			if (i + 1 >= argc)

@@ -19,7 +19,6 @@
 #include "Utilities/StateMachineMonitor.h"
 
 #include "EditCommands.h"
-#include "EditorLayouts.h"
 #include "EditorFileDialogs.h"
 #include "FieldNames.h"
 #include "ModelImporter.h"
@@ -229,6 +228,9 @@ namespace Loom
 
 		// What is docked in the middle: the views, and the shader editor.
 		constexpr const char* centre_windows[] = { scene_window_id, game_window, debug_window, ShaderEditor::window };
+
+		// The ImGui settings entry that holds which panels are open.
+		constexpr const char* panel_settings = "LoomEditor";
 
 		constexpr ImGuiWindowFlags view_flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 
@@ -469,6 +471,13 @@ namespace Loom
 
 	Editor::~Editor()
 	{
+		// The handler reads this editor's panels, and ImGui would otherwise
+		// call it when the engine destroys the context, after this is gone.
+		ImGuiIO& io = ImGui::GetIO();
+		ImGui::SaveIniSettingsToDisk(io.IniFilename);
+		io.IniFilename = nullptr;
+		ImGui::RemoveSettingsHandler(panel_settings);
+
 		SetDropCallback(nullptr);
 		drop_receiver = nullptr;
 
@@ -1095,7 +1104,7 @@ namespace Loom
 
 		if (!m_pendingLayout.empty())
 		{
-			if (EditorLayouts::Load(LayoutsFolder(), m_pendingLayout))
+			if (EditorLayouts::Load(LayoutsFolder(), m_pendingLayout, &m_layoutWindows))
 				m_checkLayout = true;
 			else
 				std::cerr << "Could not read the layout '" << m_pendingLayout << "'" << std::endl;
@@ -1124,9 +1133,18 @@ namespace Loom
 			// joins the others in the middle.
 			else if (const ImGuiDockNode* centre = ImGui::DockBuilderGetCentralNode(dockspace_id))
 				for (const char* window : centre_windows)
-					if (ImGui::FindWindowSettingsByID(ImHashStr(window)) == nullptr)
-						ImGui::DockBuilderDockWindow(window, centre->ID);
+				{
+					const ImGuiID id = ImHashStr(window);
 
+					const bool placed = m_layoutWindows.empty()
+						? ImGui::FindWindowSettingsByID(id) != nullptr
+						: std::find(m_layoutWindows.begin(), m_layoutWindows.end(), id) != m_layoutWindows.end();
+
+					if (!placed)
+						ImGui::DockBuilderDockWindow(window, centre->ID);
+				};
+
+			m_layoutWindows.clear();
 			m_checkLayout = false;
 		};
 
@@ -1151,6 +1169,9 @@ namespace Loom
 		{
 			m_rebuildLayout = false;
 			BuildDefaultLayout(dockspace_id);
+
+			for (const Panel& panel : Panels())
+				*panel.shown = panel.shownByDefault;
 		};
 
 		if (m_showProject)		DrawProject();
@@ -1177,6 +1198,14 @@ namespace Loom
 			CaptureFrame();
 
 		DrawFolderPrompt();
+		if (!m_layoutToSave.empty() && !m_firstFrame)
+		{
+			if (!EditorLayouts::Save(LayoutsFolder(), m_layoutToSave))
+				std::cerr << "Could not write the layout '" << m_layoutToSave << "'" << std::endl;
+
+			m_layoutToSave.clear();
+		};
+
 		DrawNewProjectPrompt();
 		DrawSaveLayoutPrompt();
 		DrawCreateAssetPrompt();
@@ -1233,19 +1262,19 @@ namespace Loom
 		ImGui::DockBuilderFinish(dockspace_id);
 	};
 
-	std::vector<std::pair<const char*, bool*>> Editor::Panels()
+	std::vector<Editor::Panel> Editor::Panels()
 	{
 		return {
-			{ "Hierarchy", &m_showHierarchy },
-			{ "Project", &m_showProject },
-			{ "Inspector", &m_showInspector },
-			{ "Scene", &m_showScene },
-			{ game_window, &m_showGame },
-			{ debug_window, &m_showDebug },
-			{ "Scene Data", &m_showSceneData },
-			{ "Console", &m_showConsole },
-			{ ShaderEditor::window, &m_showShaders },
-			{ "Stats", &m_showStats } };
+			{ "Hierarchy", &m_showHierarchy, true },
+			{ "Project", &m_showProject, true },
+			{ "Inspector", &m_showInspector, true },
+			{ "Scene", &m_showScene, true },
+			{ game_window, &m_showGame, true },
+			{ debug_window, &m_showDebug, true },
+			{ "Scene Data", &m_showSceneData, true },
+			{ "Console", &m_showConsole, true },
+			{ ShaderEditor::window, &m_showShaders, false },
+			{ "Stats", &m_showStats, true } };
 	};
 
 	void Editor::AddPanelSettings()
@@ -1253,7 +1282,7 @@ namespace Loom
 		static constexpr const char* entry = "Panels";
 
 		ImGuiSettingsHandler handler;
-		handler.TypeName = "LoomEditor";
+		handler.TypeName = panel_settings;
 		handler.TypeHash = ImHashStr(handler.TypeName);
 		handler.UserData = this;
 
@@ -1272,22 +1301,29 @@ namespace Loom
 
 			const std::string name(line, equals);
 
-			for (const auto& [panel, shown] : ((Editor*)editor)->Panels())
-				if (name == panel)
-					*shown = equals[1] == '1';
+			for (const Panel& panel : ((Editor*)editor)->Panels())
+				if (name == panel.name)
+					*panel.shown = equals[1] == '1';
 		};
 
 		handler.WriteAllFn = [](ImGuiContext*, ImGuiSettingsHandler* handler, ImGuiTextBuffer* buffer)
 		{
 			buffer->appendf("[%s][%s]\n", handler->TypeName, entry);
 
-			for (const auto& [panel, shown] : ((Editor*)handler->UserData)->Panels())
-				buffer->appendf("%s=%d\n", panel, *shown ? 1 : 0);
+			for (const Panel& panel : ((Editor*)handler->UserData)->Panels())
+				buffer->appendf("%s=%d\n", panel.name, *panel.shown ? 1 : 0);
 
 			buffer->append("\n");
 		};
 
 		ImGui::AddSettingsHandler(&handler);
+	};
+
+	void Editor::ShowSaveLayoutPrompt()
+	{
+		m_layouts = EditorLayouts::Names(LayoutsFolder());
+		m_layoutName[0] = 0;
+		m_askForLayoutName = true;
 	};
 
 	void Editor::DrawSaveLayoutPrompt()
@@ -1332,7 +1368,10 @@ namespace Loom
 				"%s",
 				!usable
 					? "Pick a usable name."
-					: std::find(m_layouts.begin(), m_layouts.end(), m_layoutName) != m_layouts.end()
+					: std::any_of(
+						m_layouts.begin(),
+						m_layouts.end(),
+						[this](const std::string& layout) { return EditorLayouts::SameName(layout, m_layoutName); })
 						? "Replaces the saved layout of that name."
 						: "Listed in the Layout menu once saved.");
 
@@ -1451,8 +1490,8 @@ namespace Loom
 
 		if (ImGui::BeginMenu("Window"))
 		{
-			for (const auto& [name, shown] : Panels())
-				ImGui::MenuItem(name, nullptr, shown);
+			for (const Panel& panel : Panels())
+				ImGui::MenuItem(panel.name, nullptr, panel.shown);
 
 			ImGui::Separator();
 			ImGui::MenuItem("ImGui Demo", nullptr, &m_showImGuiDemo);
@@ -1478,10 +1517,7 @@ namespace Loom
 			ImGui::Separator();
 
 			if (ImGui::MenuItem("Save Layout..."))
-			{
-				m_layoutName[0] = 0;
-				m_askForLayoutName = true;
-			};
+				ShowSaveLayoutPrompt();
 
 			if (ImGui::BeginMenu("Delete Layout", !m_layouts.empty()))
 			{
