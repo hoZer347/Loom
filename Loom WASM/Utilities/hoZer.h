@@ -9,7 +9,8 @@
 ///	                       machine that matches the owner. StateMachine<Self> sits on a
 ///	                       GameObject and is self-typed, since Component is CRTP.
 ///	                       StaticStateMachine is always on and owned by nothing.
-///	                       States are State<Self, Focus>.
+///	                       Basic::StateMachine is the plain case, listed under Add
+///	                       Component as StateMachine. States are State<Self, Focus>.
 ///
 ///	  Attributes           Attribute<T, CacheMode> with its modifiers and triggers. An
 ///	                       owner declares its attributes once with HOZER_ATTRIBUTES,
