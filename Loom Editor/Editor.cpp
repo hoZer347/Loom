@@ -1981,7 +1981,7 @@ namespace Loom
 	{
 		ImGui::PushItemWidth(-FLT_MIN);
 
-		const std::vector<std::vector<FieldNames::Enumerator>> enumerators = FieldNames::EnumeratorsOf(object);
+		const std::vector<const std::vector<FieldNames::Enumerator>*> enumerators = FieldNames::EnumeratorsOf(object);
 
 		for (size_t i = 0; i < object.GetFields().size(); i++)
 		{
@@ -1994,8 +1994,8 @@ namespace Loom
 			const char* label = "##value";
 			bool changed = false;
 
-			if (!enumerators[i].empty())
-				changed = DrawEnumField(label, field, enumerators[i]);
+			if (enumerators[i])
+				changed = DrawEnumField(label, field, *enumerators[i]);
 			else switch (field.type)
 			{
 			case FieldType::Bool:

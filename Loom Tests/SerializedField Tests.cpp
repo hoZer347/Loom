@@ -171,19 +171,25 @@ TEST_SUITE("SerializedField")
 		Enumerated object;
 		Pump();
 
-		const std::vector<std::vector<Loom::FieldNames::Enumerator>> enumerators = Loom::FieldNames::EnumeratorsOf(object);
+		const std::vector<const std::vector<Loom::FieldNames::Enumerator>*> enumerators = Loom::FieldNames::EnumeratorsOf(object);
 
 		REQUIRE(enumerators.size() == 3);
-		REQUIRE(enumerators[0].size() == 3);
-		REQUIRE(enumerators[1].size() == 2);
+		REQUIRE(enumerators[0] != nullptr);
+		REQUIRE(enumerators[1] != nullptr);
 
-		CHECK(enumerators[0][0].label == "Light");
-		CHECK(enumerators[0][0].value == Light);
-		CHECK(enumerators[0][2].label == "Dark Grey");
-		CHECK(enumerators[0][2].value == DarkGrey);
-		CHECK(enumerators[1][1].label == "Extra Large");
-		CHECK(enumerators[1][1].value == (long long)Size::ExtraLarge);
-		CHECK(enumerators[2].empty());
+		const std::vector<Loom::FieldNames::Enumerator>& shades = *enumerators[0];
+		const std::vector<Loom::FieldNames::Enumerator>& sizes = *enumerators[1];
+
+		REQUIRE(shades.size() == 3);
+		REQUIRE(sizes.size() == 2);
+
+		CHECK(shades[0].label == "Light");
+		CHECK(shades[0].value == Light);
+		CHECK(shades[2].label == "Dark Grey");
+		CHECK(shades[2].value == DarkGrey);
+		CHECK(sizes[1].label == "Extra Large");
+		CHECK(sizes[1].value == (long long)Size::ExtraLarge);
+		CHECK(enumerators[2] == nullptr);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh's primitive and draw type are dropdowns")
@@ -192,14 +198,16 @@ TEST_SUITE("SerializedField")
 		Pump();
 
 		const std::vector<std::string> labels = Loom::FieldNames::Of(mesh);
-		const std::vector<std::vector<Loom::FieldNames::Enumerator>> enumerators = Loom::FieldNames::EnumeratorsOf(mesh);
+		const std::vector<const std::vector<Loom::FieldNames::Enumerator>*> enumerators = Loom::FieldNames::EnumeratorsOf(mesh);
 
 		REQUIRE(labels.size() == 4);
+		REQUIRE(enumerators[1] != nullptr);
+		REQUIRE(enumerators[2] != nullptr);
 
 		CHECK(labels[1] == "Primitive Id");
-		CHECK(enumerators[1].size() == 7);
+		CHECK(enumerators[1]->size() == 7);
 		CHECK(labels[2] == "Draw Type");
-		CHECK(enumerators[2].size() == 3);
+		CHECK(enumerators[2]->size() == 3);
 	};
 #endif
 
