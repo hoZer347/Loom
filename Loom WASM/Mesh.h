@@ -12,10 +12,26 @@ namespace Loom
 
 	struct LOOM_API Mesh : Component<Mesh>
 	{
-		// GL_TRIANGLES, spelled out so this header does not have to pull in GL
-		static constexpr uint32_t triangles = 0x0004;
+		// The GL values, spelled out so this header does not have to pull in GL.
+		enum Primitive : uint32_t
+		{
+			Points = 0x0000,
+			Lines = 0x0001,
+			LineLoop = 0x0002,
+			LineStrip = 0x0003,
+			Triangles = 0x0004,
+			TriangleStrip = 0x0005,
+			TriangleFan = 0x0006,
+		};
 
-		Mesh(uint32_t primitive = triangles);
+		enum DrawType : uint32_t
+		{
+			Stream = 0x88E0,
+			Static = 0x88E4,
+			Dynamic = 0x88E8,
+		};
+
+		Mesh(Primitive primitive = Triangles);
 		~Mesh();
 
 		// Whether there is a material with a shader to draw with, finding the
@@ -34,8 +50,8 @@ namespace Loom
 		void OnGui() override;
 
 		Serial<Material*> material;
-		Serial<uint32_t> primitive_id;
-		Serial<uint32_t> m_draw_type = 0x88E4;	// GL_STATIC_DRAW
+		Serial<Primitive> primitive_id;
+		Serial<DrawType> m_draw_type = Static;
 		Serial<std::vector<float>> m_vertices;
 		std::vector<uint32_t> m_indices;
 	};

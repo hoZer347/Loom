@@ -183,7 +183,7 @@ namespace Loom
 			GameObject* target = parts.size() == 1 ? model : model->AddChild(part.name);
 
 			target->Attach<Material>()->SetShaderPath(ProjectTemplate::shader_path);
-			target->Attach<Mesh>((uint32_t)GL_TRIANGLES)->m_vertices = std::move(part.vertices);
+			target->Attach<Mesh>(Mesh::Triangles)->m_vertices = std::move(part.vertices);
 		};
 
 		std::cout << "Imported " << path << " (" << parts.size() << " mesh(es))" << std::endl;

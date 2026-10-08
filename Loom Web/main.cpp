@@ -324,8 +324,8 @@ static GameObject* AddWireShape(
 	Material* material = object->Attach<Material>();
 	material->shader = shader;
 
-	Mesh* mesh = object->Attach<Mesh>(GL_LINES);
-	mesh->m_draw_type = GL_DYNAMIC_DRAW; // rewritten every frame
+	Mesh* mesh = object->Attach<Mesh>(Mesh::Lines);
+	mesh->m_draw_type = Mesh::Dynamic; // rewritten every frame
 	mesh->material = material;
 
 	return object;

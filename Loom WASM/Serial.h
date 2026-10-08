@@ -30,11 +30,13 @@ namespace Loom
 
 	// Every type the scene format can write, named by the member's own type.
 	// Anything else is a compile error rather than a field that quietly writes
-	// the wrong bytes.
+	// the wrong bytes. An enum is written as its underlying integer, and the
+	// editor offers its enumerators as a dropdown.
 	template <typename T>
 	constexpr FieldType FieldTypeOf()
 	{
-		if constexpr (std::is_same_v<T, bool>)						return FieldType::Bool;
+		if constexpr (std::is_enum_v<T>)							return FieldTypeOf<std::underlying_type_t<T>>();
+		else if constexpr (std::is_same_v<T, bool>)					return FieldType::Bool;
 		else if constexpr (std::is_same_v<T, int>)					return FieldType::Int;
 		else if constexpr (std::is_same_v<T, unsigned int>)			return FieldType::UInt;
 		else if constexpr (std::is_same_v<T, long long>)			return FieldType::Int64;

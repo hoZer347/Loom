@@ -93,6 +93,17 @@ namespace
 		Settings settings;
 	};
 
+	enum Shade : int { Light = -1, Medium, DarkGrey = 7 };
+
+	enum struct Size : unsigned int { Small = 10, ExtraLarge = 4000000000 };
+
+	struct Enumerated final : Loom::LoomObject
+	{
+		Loom::Serial<Shade> m_shade = Medium;
+		Loom::Serial<Size> size = Size::Small;
+		Loom::Serial<int> m_plain;
+	};
+
 	// Fields are numbered by declaration order; these are EveryField's.
 	enum Every { Flag, Count, UnsignedCount, Big, UnsignedBig, Ratio, Precise, Label, Pair, Triple, Quad, Numbers };
 
@@ -154,7 +165,64 @@ TEST_SUITE("SerializedField")
 
 		CHECK(Loom::FieldNames::Of(host.owned) == std::vector<std::string>{ "First", "Second", "Field 2" });
 	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an enum field offers its enumerators, labelled like members")
+	{
+		Enumerated object;
+		Pump();
+
+		const std::vector<std::vector<Loom::FieldNames::Enumerator>> enumerators = Loom::FieldNames::EnumeratorsOf(object);
+
+		REQUIRE(enumerators.size() == 3);
+		REQUIRE(enumerators[0].size() == 3);
+		REQUIRE(enumerators[1].size() == 2);
+
+		CHECK(enumerators[0][0].label == "Light");
+		CHECK(enumerators[0][0].value == Light);
+		CHECK(enumerators[0][2].label == "Dark Grey");
+		CHECK(enumerators[0][2].value == DarkGrey);
+		CHECK(enumerators[1][1].label == "Extra Large");
+		CHECK(enumerators[1][1].value == (long long)Size::ExtraLarge);
+		CHECK(enumerators[2].empty());
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh's primitive and draw type are dropdowns")
+	{
+		Loom::Mesh mesh;
+		Pump();
+
+		const std::vector<std::string> labels = Loom::FieldNames::Of(mesh);
+		const std::vector<std::vector<Loom::FieldNames::Enumerator>> enumerators = Loom::FieldNames::EnumeratorsOf(mesh);
+
+		REQUIRE(labels.size() == 4);
+
+		CHECK(labels[1] == "Primitive Id");
+		CHECK(enumerators[1].size() == 7);
+		CHECK(labels[2] == "Draw Type");
+		CHECK(enumerators[2].size() == 3);
+	};
 #endif
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an enum is written as its underlying integer")
+	{
+		Enumerated object;
+		Pump();
+
+		CHECK(Field(object, 0).type == Loom::FieldType::Int);
+		CHECK(Field(object, 1).type == Loom::FieldType::UInt);
+
+		object.m_shade = Light;
+		object.size = Size::ExtraLarge;
+
+		CHECK(Field(object, 0).Write() == "-1");
+		CHECK(Field(object, 1).Write() == "4000000000");
+
+		REQUIRE(Field(object, 0).Read("7"));
+		REQUIRE(Field(object, 1).Read("10"));
+
+		CHECK(*object.m_shade == DarkGrey);
+		CHECK(*object.size == Size::Small);
+	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "fields are declared in the order they are registered")
 	{
@@ -379,7 +447,7 @@ TEST_SUITE("SerializedField")
 		Loom::Scene scene("detached component");
 		Pump();
 
-		Loom::Mesh* mesh = scene.GetRoot().Attach<Loom::Mesh>((uint32_t)4);
+		Loom::Mesh* mesh = scene.GetRoot().Attach<Loom::Mesh>(Loom::Mesh::Triangles);
 		Loom::Material* material = scene.GetRoot().Attach<Loom::Material>();
 		Pump();
 
