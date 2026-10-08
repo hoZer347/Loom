@@ -223,9 +223,8 @@ namespace Loom
 			// The closed lid is the lower one, so its lashes hang below it.
 			for (float position : eye_lash_positions)
 			{
-				const float t = (position + 1.0f) * 0.5f;
 				const ImVec2 root(
-					left.x + (right.x - left.x) * t,
+					centre.x + half * position,
 					centre.y + bow * (1.0f - position * position));
 
 				draw->AddLine(
@@ -1806,9 +1805,12 @@ namespace Loom
 			flags |= ImGuiTreeNodeFlags_Selected;
 
 		const bool is_active = scene == m_activeScene;
+		const bool styled = is_active || root.IsHidden();
 
-		if (is_active)
-			ImGui::PushStyleColor(ImGuiCol_Text, EditorTheme::AccentText);
+		if (styled)
+			ImGui::PushStyleColor(
+				ImGuiCol_Text,
+				root.IsHidden() ? ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled) : EditorTheme::AccentText);
 
 		if (m_expand.contains(root.GetGuid()))
 			ImGui::SetNextItemOpen(true);
@@ -1820,7 +1822,7 @@ namespace Loom
 			scene->NameAndID().c_str(),
 			is_active ? "  [active]" : "");
 
-		if (is_active)
+		if (styled)
 			ImGui::PopStyleColor();
 
 		DragSource(*scene);
@@ -1976,12 +1978,9 @@ namespace Loom
 			? ImGuiCol_TextDisabled
 			: ImGuiCol_Text;
 
-		const ImVec2 min = ImGui::GetItemRectMin();
-		const ImVec2 max = ImGui::GetItemRectMax();
-
 		DrawEye(
 			ImGui::GetWindowDrawList(),
-			ImVec2((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f),
+			ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()).GetCenter(),
 			size,
 			shown,
 			ImGui::GetColorU32(colour, parent_hidden ? eye_hidden_by_parent_alpha : 1.0f));
