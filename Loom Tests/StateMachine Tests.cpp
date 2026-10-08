@@ -23,6 +23,9 @@ namespace
 
 	struct StateTestWalk final : Loom::State
 	{
+		void OnExit(Loom::State* nextState) override { exits++; };
+
+		static inline int exits = 0;
 	};
 
 	HOZER_REGISTER_STATE(StateTestIdle);
@@ -173,5 +176,34 @@ TEST_SUITE("StateMachine")
 			CHECK(patrol.machine->IsDisabled());
 			CHECK(patrol.machine->m_current->StateType().empty());
 		};
+
+		SUBCASE("and set to nothing and then a state, ends the one it set aside")
+		{
+			const int exits = StateTestWalk::exits;
+
+			patrol.machine->m_current = Loom::StateReference{ };
+			patrol.machine->OnFieldChanged(patrol.Field(currentField));
+			patrol.machine->OnFieldChanged(patrol.Field(currentField));
+
+			CHECK(StateTestWalk::exits == exits);
+
+			patrol.machine->m_current = Loom::StateReference::Named("StateTestIdle");
+			patrol.machine->OnFieldChanged(patrol.Field(currentField));
+
+			CHECK(StateTestWalk::exits == exits + 1);
+			CHECK_FALSE(patrol.machine->IsDisabled());
+			CHECK(dynamic_cast<const StateTestIdle*>(patrol.machine->Current()) != nullptr);
+		};
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "disabling a machine that has not started leaves Current alone")
+	{
+		Machine patrol;
+		patrol.machine->m_current = Loom::StateReference::Named("StateTestWalk");
+
+		patrol.machine->Disable();
+		patrol.machine->Enable();
+
+		CHECK(patrol.machine->m_current->StateType() == "StateTestWalk");
 	};
 };

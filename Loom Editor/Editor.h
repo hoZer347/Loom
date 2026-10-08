@@ -171,6 +171,12 @@ namespace Loom
 		// and confirmed.
 		void CreateScriptAsset(AssetKind kind, const std::string& name);
 
+		// Opens the Create prompt for that kind of asset, named the first default
+		// name nothing is using.
+		void AskForAsset(AssetKind kind, const std::string& folder);
+
+		const std::string& GetProjectPath() const { return m_projectPath; };
+
 	private:
 		void DrawGui();
 
@@ -179,10 +185,6 @@ namespace Loom
 		void DrawAssetNode(const AssetNode& node, int depth);
 		void DrawAssetContextMenu(const AssetNode& node);
 		void DrawCreateMenu(const std::string& folder);
-
-		// Opens the Create prompt for that kind of asset, named the first default
-		// name nothing is using.
-		void AskForAsset(AssetKind kind, const std::string& folder);
 		void DrawCreateAssetPrompt();
 		void DrawScriptsSection();
 		void DrawHierarchy();

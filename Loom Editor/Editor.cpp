@@ -2007,6 +2007,9 @@ namespace Loom
 			const float spacing = ImGui::GetStyle().ItemSpacing.x;
 			const float half = (ImGui::GetContentRegionAvail().x - spacing) / 2.0f;
 
+			// A script goes in a project's scripts project, which needs a project.
+			ImGui::BeginDisabled(m_projectPath.empty());
+
 			if (ImGui::Button("New State", ImVec2(half, 0.0f)))
 				AskForAsset(AssetKind::State, m_projectPath);
 
@@ -2014,6 +2017,8 @@ namespace Loom
 
 			if (ImGui::Button("New State Machine", ImVec2(half, 0.0f)))
 				AskForAsset(AssetKind::StateMachine, m_projectPath);
+
+			ImGui::EndDisabled();
 		};
 
 		component->OnGui();

@@ -18,7 +18,10 @@
 #include <cctype>
 #include <cstdlib>
 #include <iostream>
+#include <optional>
 #include <string>
+#include <string_view>
+#include <utility>
 
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
@@ -54,6 +57,25 @@ namespace
 	{
 		{ ProjectTemplate::extension, L"Loom.Project", L"Loom Project" },
 		{ SceneSerializer::extension, L"Loom.Scene", L"Loom Scene" },
+	};
+
+	// --create-<kind> <name>, for each of these.
+	constexpr std::string_view createPrefix = "--create-";
+
+	std::optional<AssetKind> ScriptKindNamed(std::string_view kind)
+	{
+		constexpr std::pair<std::string_view, AssetKind> kinds[] =
+		{
+			{ "script", AssetKind::Script },
+			{ "state", AssetKind::State },
+			{ "state-machine", AssetKind::StateMachine },
+		};
+
+		for (const auto& [name, found] : kinds)
+			if (kind == name)
+				return found;
+
+		return std::nullopt;
 	};
 
 	// Makes this executable what opens the editor's files for the current
@@ -118,6 +140,8 @@ namespace
 			<< "                                 scripts project if it has none\n"
 			<< "  --create-state <name>          the same for Create > State\n"
 			<< "  --create-state-machine <name>  and for Create > State Machine\n"
+			<< "  --create-prompt <kind>         start with the Create prompt open for a\n"
+			<< "                                 script, state or state-machine\n"
 			<< "  --compile                      build the project's scripts on startup\n"
 			<< "  --play                         start with the scene running\n"
 			<< "  --play-web                     build the scene for the web and open it\n"
@@ -274,6 +298,7 @@ int main(int argc, char** argv)
 	std::string selection;
 	std::string new_script;
 	AssetKind new_script_kind = AssetKind::Script;
+	std::optional<AssetKind> create_prompt;
 	int frames = 240;
 
 	for (int i = 1; i < argc; i++)
@@ -341,10 +366,17 @@ int main(int argc, char** argv)
 
 			preview = argv[++i];
 		}
-		else if (
-			argument == "--create-script" ||
-			argument == "--create-state" ||
-			argument == "--create-state-machine")
+		else if (argument == "--create-prompt")
+		{
+			if (i + 1 >= argc || !ScriptKindNamed(argv[i + 1]))
+			{
+				std::cerr << "--create-prompt needs script, state or state-machine" << std::endl;
+				return 1;
+			};
+
+			create_prompt = ScriptKindNamed(argv[++i]);
+		}
+		else if (argument.starts_with(createPrefix) && ScriptKindNamed(argument.substr(createPrefix.size())))
 		{
 			if (i + 1 >= argc)
 			{
@@ -352,11 +384,7 @@ int main(int argc, char** argv)
 				return 1;
 			};
 
-			new_script_kind =
-				argument == "--create-script" ? AssetKind::Script :
-				argument == "--create-state" ? AssetKind::State :
-				AssetKind::StateMachine;
-
+			new_script_kind = *ScriptKindNamed(argument.substr(createPrefix.size()));
 			new_script = argv[++i];
 		}
 		else if (argument == "--select")
@@ -431,6 +459,9 @@ int main(int argc, char** argv)
 
 	if (settings)
 		editor.ShowSettings();
+
+	if (create_prompt)
+		editor.AskForAsset(*create_prompt, editor.GetProjectPath());
 
 	// After the project is open, since opening its scene selects that instead.
 	if (!preview.empty())
