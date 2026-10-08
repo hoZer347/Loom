@@ -72,6 +72,11 @@ TEST_SUITE("StateMachine")
 		CHECK(Loom::ComponentRegistry::All().contains("StateTestMachine"));
 	};
 
+	TEST_CASE("a plain StateMachine is offered under Add Component")
+	{
+		CHECK(Loom::ComponentRegistry::All().contains("StateMachine"));
+	};
+
 	TEST_CASE("a State registers itself under its type name, and a StateOf does not")
 	{
 		CHECK(Loom::StateRegistry::Contains("StateTestIdle"));

@@ -287,4 +287,14 @@ namespace Loom
 	private:
 		bool _physics_dispatched = false;
 	};
+
+	namespace Basic
+	{
+		/// A machine with no behaviour of its own, for when the states are the whole of
+		/// it. In a namespace of its own so it can be called StateMachine beside the
+		/// template, and the registry, which drops namespaces, offers it as that.
+		struct StateMachine final : Loom::StateMachine<StateMachine>
+		{
+		};
+	};
 };
