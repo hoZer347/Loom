@@ -22,6 +22,7 @@
 #include <vector>
 
 struct ImGuiContext;
+struct ImRect;
 
 
 namespace Loom
@@ -210,7 +211,7 @@ namespace Loom
 
 		// The eye at the right of the row just drawn, which disables or enables
 		// the object. Faded when an ancestor already disables it.
-		void DrawEnableToggle(GameObject* gameObject, bool parent_disabled);
+		void DrawEnableToggle(GameObject* gameObject, bool parent_disabled, const ImRect& eye);
 
 		// Marks every node that has gained a child since the last frame, and the
 		// nodes above it, to be drawn open.

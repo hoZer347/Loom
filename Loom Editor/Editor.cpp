@@ -189,6 +189,17 @@ namespace Loom
 		// Where each lash leaves the lower lid, as a fraction of its width.
 		constexpr float eye_lash_positions[] = { -0.5f, 0.0f, 0.5f };
 
+		// Where the eye goes on the Hierarchy row about to be drawn: square, at
+		// its right end.
+		ImRect EyeRect()
+		{
+			const float size = ImGui::GetFontSize();
+			const ImVec2 start = ImGui::GetCursorScreenPos();
+			const float right = start.x + ImGui::GetContentRegionAvail().x;
+
+			return ImRect(ImVec2(right - size, start.y), ImVec2(right, start.y + size));
+		};
+
 		void DrawEye(ImDrawList* draw, ImVec2 centre, float size, bool open, ImU32 colour)
 		{
 			const float half = size * eye_half_width;
@@ -1815,6 +1826,8 @@ namespace Loom
 		if (m_expand.contains(root.GetGuid()))
 			ImGui::SetNextItemOpen(true);
 
+		const ImRect eye = EyeRect();
+
 		const bool open = ImGui::TreeNodeEx(
 			scene->GetGuid().ToString().c_str(),
 			flags,
@@ -1851,7 +1864,7 @@ namespace Loom
 			ImGui::EndPopup();
 		};
 
-		DrawEnableToggle(&root, false);
+		DrawEnableToggle(&root, false, eye);
 
 		if (!open)
 			return;
@@ -1883,6 +1896,8 @@ namespace Loom
 		const bool renaming = m_renaming && m_selected == gameObject;
 		const bool disabled = parent_disabled || gameObject->IsDisabled();
 
+		const ImRect eye = EyeRect();
+
 		if (disabled)
 			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 
@@ -1907,7 +1922,8 @@ namespace Loom
 
 		if (ImGui::IsItemHovered() &&
 			ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
-			!ImGui::IsItemToggledOpen())
+			!ImGui::IsItemToggledOpen() &&
+			!ImGui::IsMouseHoveringRect(eye.Min, eye.Max))
 		{
 			snprintf(
 				m_nameBuffer,
@@ -1937,7 +1953,7 @@ namespace Loom
 		if (renaming)
 			DrawRenameField(gameObject);
 
-		DrawEnableToggle(gameObject, parent_disabled);
+		DrawEnableToggle(gameObject, parent_disabled, eye);
 
 		if (!open)
 			return;
@@ -1950,19 +1966,14 @@ namespace Loom
 		ImGui::TreePop();
 	};
 
-	void Editor::DrawEnableToggle(GameObject* gameObject, bool parent_disabled)
+	void Editor::DrawEnableToggle(GameObject* gameObject, bool parent_disabled, const ImRect& eye)
 	{
-		const float size = ImGui::GetFontSize();
-
-		// Measured from the line below, which still spans the whole row.
-		const float right = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
-
 		ImGui::SameLine();
-		ImGui::SetCursorScreenPos(ImVec2(right - size, ImGui::GetCursorScreenPos().y));
+		ImGui::SetCursorScreenPos(eye.Min);
 
 		ImGui::PushID(gameObject);
 
-		if (ImGui::InvisibleButton("##enabled", ImVec2(size, size)))
+		if (ImGui::InvisibleButton("##enabled", eye.GetSize()))
 		{
 			gameObject->SetDisabled(!gameObject->IsDisabled());
 			m_historyDirty = true;
@@ -1980,8 +1991,8 @@ namespace Loom
 
 		DrawEye(
 			ImGui::GetWindowDrawList(),
-			ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()).GetCenter(),
-			size,
+			eye.GetCenter(),
+			eye.GetWidth(),
 			enabled,
 			ImGui::GetColorU32(colour, parent_disabled ? eye_disabled_by_parent_alpha : 1.0f));
 	};
