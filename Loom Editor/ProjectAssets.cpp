@@ -2,6 +2,8 @@
 
 #include "ComponentRegistry.h"
 
+#include "Utilities/StateReference.h"
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -105,6 +107,127 @@ namespace {NAMESPACE}
 		void OnUpdate() override
 		{
 		};
+	};
+};
+)";
+
+		const char* const state = R"(#pragma once
+
+#include "Utilities/StateMachine.h"
+
+
+namespace {NAMESPACE}
+{
+	// One step of a state machine's behaviour. Registered by name, so a
+	// StateMachine's Start and Current can be set to it in the inspector.
+	// gameObject is the object the machine is on. Proceed() moves the machine
+	// on to the next queued state, SetState<Other>() straight to another.
+	struct {NAME} : Loom::State
+	{
+		void OnEnter(Loom::State* lastState) override
+		{
+		};
+
+		void OnUpdate() override
+		{
+		};
+
+		void OnExit(Loom::State* nextState) override
+		{
+		};
+	};
+
+	HOZER_REGISTER_STATE({NAME});
+};
+)";
+
+		const char* const state_machine = R"(#pragma once
+
+#include "Utilities/StateMachine.h"
+
+#include <cmath>
+
+
+namespace {NAMESPACE}
+{
+	// A state machine is a component whose behaviour is its states. This one
+	// patrols: it waits, walks its GameObject out along X, waits, walks back.
+	// It starts in {NAME}Waiting; set Current in the inspector while it runs
+	// to send it straight to either state.
+	struct {NAME} : Loom::StateMachineOf<{NAME}>
+	{
+		{NAME}();
+
+		Loom::Serial<float> m_distance = 2.0f;
+		Loom::Serial<float> m_speed = 1.0f;
+		Loom::Serial<float> m_pause = 1.0f;
+
+		// Where the patrol starts from, and whether the next walk is away
+		// from it.
+		float m_home = 0.0f;
+		bool m_outward = false;
+
+	protected:
+		void OnMachineStart() override
+		{
+			m_home = m_gameObject->transform.position->x;
+		};
+	};
+
+	// Stands still for the machine's Pause, then turns round.
+	struct {NAME}Waiting : Loom::StateOf<{NAME}>
+	{
+		void OnUpdate() override;
+
+	private:
+		float m_waited = 0.0f;
+	};
+
+	// Walks to the end it is heading for at the machine's Speed.
+	struct {NAME}Walking : Loom::StateOf<{NAME}>
+	{
+		void OnUpdate() override;
+	};
+
+	HOZER_REGISTER_STATE({NAME}Waiting);
+	HOZER_REGISTER_STATE({NAME}Walking);
+
+	// Defined below both states, since each hands over to the other.
+	inline {NAME}::{NAME}()
+	{
+		m_start = Loom::StateReference::Of<{NAME}Waiting>();
+	};
+
+	inline void {NAME}Waiting::OnUpdate()
+	{
+		m_waited += Loom::Time::DeltaTime();
+
+		if (m_waited < Focus()->m_pause)
+			return;
+
+		Focus()->m_outward = !Focus()->m_outward;
+
+		SetState<{NAME}Walking>();
+	};
+
+	inline void {NAME}Walking::OnUpdate()
+	{
+		const {NAME}& patrol = *Focus();
+
+		glm::vec3& position = *gameObject->transform.position;
+
+		const float target = patrol.m_home + (patrol.m_outward ? *patrol.m_distance : 0.0f);
+		const float step = patrol.m_speed * Loom::Time::DeltaTime();
+
+		if (std::abs(target - position.x) > step)
+		{
+			position.x += std::copysign(step, target - position.x);
+			return;
+		};
+
+		position.x = target;
+
+		SetState<{NAME}Waiting>();
 	};
 };
 )";
@@ -297,6 +420,9 @@ void main()
 		if (ComponentRegistry::All().contains(name))
 			return "A component called " + name + " already exists.";
 
+		if (StateRegistry::Contains(name))
+			return "A state called " + name + " already exists.";
+
 		const std::filesystem::path root = std::filesystem::path(scripts_project).parent_path();
 		const std::string header = name + ".hpp";
 
@@ -368,6 +494,7 @@ void main()
 		const std::string& scripts_project,
 		const std::string& folder,
 		const std::string& name,
+		ScriptKind kind,
 		std::string* error)
 	{
 		if (const std::string problem = ScriptNameProblem(scripts_project, name); !problem.empty())
@@ -396,7 +523,12 @@ void main()
 				return "";
 			};
 
-		const std::string text = Replace(Replace(script, "{NAME}", name), "{NAMESPACE}", RootNamespace(scripts_project));
+		const char* const templates[] = { script, state, state_machine };
+
+		const std::string text = Replace(
+			Replace(templates[(int)kind], "{NAME}", name),
+			"{NAMESPACE}",
+			RootNamespace(scripts_project));
 
 		return WriteNew(header, text, error)
 			? header.string()

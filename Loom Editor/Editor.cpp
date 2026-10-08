@@ -15,6 +15,8 @@
 #include "Transform.h"
 
 #include "Utilities/AxisGui.h"
+#include "Utilities/StateMachine.h"
+#include "Utilities/StateMachineMonitor.h"
 
 #include "EditCommands.h"
 #include "EditorFileDialogs.h"
@@ -2000,6 +2002,20 @@ namespace Loom
 
 		DrawFields(*component, labels, LabelColumn(labels, 0.0f));
 
+		if (dynamic_cast<StateMachineBase*>(component))
+		{
+			const float spacing = ImGui::GetStyle().ItemSpacing.x;
+			const float half = (ImGui::GetContentRegionAvail().x - spacing) / 2.0f;
+
+			if (ImGui::Button("New State", ImVec2(half, 0.0f)))
+				AskForAsset(AssetKind::State, m_projectPath);
+
+			ImGui::SameLine(0.0f, spacing);
+
+			if (ImGui::Button("New State Machine", ImVec2(half, 0.0f)))
+				AskForAsset(AssetKind::StateMachine, m_projectPath);
+		};
+
 		component->OnGui();
 
 		ImGui::PopID();
@@ -2085,6 +2101,10 @@ namespace Loom
 
 			case FieldType::Reference:
 				changed = DrawReferenceField(field);
+				break;
+
+			case FieldType::State:
+				changed = StateMachineMonitor::DrawStateField(*(StateReference*)field.data);
 				break;
 
 			case FieldType::Uniforms:

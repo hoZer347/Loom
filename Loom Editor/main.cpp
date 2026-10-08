@@ -116,6 +116,8 @@ namespace
 			<< "                                 printing its path\n"
 			<< "  --create-script <name>         Create > Script in the project, adding a\n"
 			<< "                                 scripts project if it has none\n"
+			<< "  --create-state <name>          the same for Create > State\n"
+			<< "  --create-state-machine <name>  and for Create > State Machine\n"
 			<< "  --compile                      build the project's scripts on startup\n"
 			<< "  --play                         start with the scene running\n"
 			<< "  --play-web                     build the scene for the web and open it\n"
@@ -201,7 +203,12 @@ int main(int argc, char** argv)
 			};
 
 			std::string error;
-			const std::string path = ProjectAssets::CreateScript(argv[i + 1], argv[i + 2], argv[i + 3], &error);
+			const std::string path = ProjectAssets::CreateScript(
+				argv[i + 1],
+				argv[i + 2],
+				argv[i + 3],
+				ProjectAssets::ScriptKind::Component,
+				&error);
 
 			if (path.empty())
 			{
@@ -266,6 +273,7 @@ int main(int argc, char** argv)
 	std::string preview;
 	std::string selection;
 	std::string new_script;
+	AssetKind new_script_kind = AssetKind::Script;
 	int frames = 240;
 
 	for (int i = 1; i < argc; i++)
@@ -333,13 +341,21 @@ int main(int argc, char** argv)
 
 			preview = argv[++i];
 		}
-		else if (argument == "--create-script")
+		else if (
+			argument == "--create-script" ||
+			argument == "--create-state" ||
+			argument == "--create-state-machine")
 		{
 			if (i + 1 >= argc)
 			{
-				std::cerr << "--create-script needs a name" << std::endl;
+				std::cerr << argument << " needs a name" << std::endl;
 				return 1;
 			};
+
+			new_script_kind =
+				argument == "--create-script" ? AssetKind::Script :
+				argument == "--create-state" ? AssetKind::State :
+				AssetKind::StateMachine;
 
 			new_script = argv[++i];
 		}
@@ -397,7 +413,7 @@ int main(int argc, char** argv)
 	};
 
 	if (!new_script.empty())
-		editor.CreateScriptAsset(new_script);
+		editor.CreateScriptAsset(new_script_kind, new_script);
 
 	if (compile)
 		editor.CompileScripts();

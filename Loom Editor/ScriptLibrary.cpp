@@ -2,11 +2,14 @@
 
 #include "ComponentRegistry.h"
 
+#include "Utilities/StateReference.h"
+
 #include <algorithm>
 #include <array>
 #include <cstdio>
 #include <filesystem>
 #include <iostream>
+#include <iterator>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -475,11 +478,15 @@ namespace Loom
 		// already exists, and that factory has to come back rather than stay
 		// behind pointing into a library that is no longer mapped.
 		const std::map<std::string, ComponentRegistry::Factory> before = ComponentRegistry::All();
+		const std::vector<std::string> states_before = StateRegistry::Names();
 
 		HMODULE module = LoadLibraryA(copy.string().c_str());
 
 		m_types.clear();
 		m_before.clear();
+		m_states.clear();
+
+		std::ranges::set_difference(StateRegistry::Names(), states_before, std::back_inserter(m_states));
 
 		for (const auto& [name, factory] : ComponentRegistry::All())
 		{
@@ -507,12 +514,16 @@ namespace Loom
 		m_loadedCopy = copy.string();
 
 		m_status =
-			"Loaded " + std::to_string(m_types.size()) + " component type(s).";
+			"Loaded " + std::to_string(m_types.size()) + " component type(s) and " +
+			std::to_string(m_states.size()) + " state(s).";
 
 		std::cout << "Scripts: " << m_status << std::endl;
 
 		for (const std::string& type : m_types)
 			std::cout << "  " << type << std::endl;
+
+		for (const std::string& state : m_states)
+			std::cout << "  " << state << " (state)" << std::endl;
 
 		return true;
 	};
@@ -521,6 +532,11 @@ namespace Loom
 	{
 		for (const std::string& type : m_types)
 			ComponentRegistry::Unregister(type);
+
+		for (const std::string& state : m_states)
+			StateRegistry::Unregister(state);
+
+		m_states.clear();
 
 		// And put back what was there before, which restores anything the
 		// library registered over the top of.

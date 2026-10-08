@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <map>
+#include <mutex>
 #include <ranges>
 #include <sstream>
 
@@ -22,6 +23,11 @@ namespace Loom
 	void StateRegistry::Register(const std::string& name, std::function<std::shared_ptr<State>()> create)
 	{
 		Registry()[name] = std::move(create);
+	};
+
+	void StateRegistry::Unregister(const std::string& name)
+	{
+		Registry().erase(name);
 	};
 
 	std::shared_ptr<State> StateRegistry::Create(const std::string& name)
@@ -47,13 +53,21 @@ namespace Loom
 	{
 		StateReference reference;
 
-		if (!StateRegistry::Contains(name))
-			return reference;
-
 		reference._type_name = name;
-		reference._create = [name]() { return StateRegistry::Create(name); };
 
 		return reference;
+	};
+
+	bool StateReference::IsSet() const
+	{
+		return _create || StateRegistry::Contains(_type_name);
+	};
+
+	std::shared_ptr<State> StateReference::Create() const
+	{
+		return _create
+			? _create()
+			: StateRegistry::Create(_type_name);
 	};
 
 	#pragma endregion
@@ -137,25 +151,43 @@ namespace Loom
 
 	#pragma region Lifetime
 
+	namespace
+	{
+		// Here rather than static members of an exported class, which a script
+		// module importing it could not define. Function-local, like the
+		// registry, so a machine built by a static initialiser finds them.
+		std::vector<StateMachineBase*>& Machines()
+		{
+			static std::vector<StateMachineBase*> machines{ };
+			return machines;
+		};
+
+		std::recursive_mutex& MachinesMutex()
+		{
+			static std::recursive_mutex mutex{ };
+			return mutex;
+		};
+	};
+
 	StateMachineBase::StateMachineBase()
 	{
-		std::scoped_lock lock(_all_mutex);
+		std::scoped_lock lock(MachinesMutex());
 
-		_all.push_back(this);
+		Machines().push_back(this);
 	};
 
 	StateMachineBase::~StateMachineBase()
 	{
-		std::scoped_lock lock(_all_mutex);
+		std::scoped_lock lock(MachinesMutex());
 
-		std::erase(_all, this);
+		std::erase(Machines(), this);
 	};
 
 	std::vector<StateMachineBase*> StateMachineBase::All()
 	{
-		std::scoped_lock lock(_all_mutex);
+		std::scoped_lock lock(MachinesMutex());
 
-		return _all;
+		return Machines();
 	};
 
 	#pragma endregion
@@ -171,7 +203,7 @@ namespace Loom
 
 		OnMachineStart();
 
-		if (std::shared_ptr<State> first = startState.Create())
+		if (std::shared_ptr<State> first = FirstState())
 			Enter(std::move(first));
 	};
 
@@ -344,6 +376,8 @@ namespace Loom
 				for (const auto& state : parallel->SubStates)
 					Adopt(state);
 
+			OnMachineStateChanged();
+
 			current->OnEnter(previousState.get());
 		};
 
@@ -359,11 +393,15 @@ namespace Loom
 	{
 		disabledState = current;
 		current = nullptr;
+
+		OnMachineStateChanged();
 	};
 
 	void StateMachineBase::Enable()
 	{
 		current = disabledState;
+
+		OnMachineStateChanged();
 	};
 
 	#pragma endregion

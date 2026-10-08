@@ -2,8 +2,10 @@
 
 #include "StateMachine.h"
 
+#include "EditorGui.h"
 #include "imgui.h"
 
+#include <filesystem>
 #include <iostream>
 
 
@@ -13,7 +15,6 @@ namespace Loom
 	{
 		const State* current = machine.Current();
 
-		ImGui::Text("Current:  %s", current ? current->Name().c_str() : "<none>");
 		ImGui::Text("Elapsed:  %.3f", machine.ElapsedTime());
 
 		if (machine.IsDisabled())
@@ -70,6 +71,52 @@ namespace Loom
 		};
 	};
 
+	bool StateMachineMonitor::DrawStateField(StateReference& reference)
+	{
+		constexpr const char* none = "None";
+
+		const std::string& name = reference.StateType();
+
+		// A name nothing is registered under is kept rather than dropped, since
+		// the scripts that register it may just not be built yet.
+		const std::string shown =
+			name.empty() ? none :
+			reference.IsSet() ? name :
+			name + " (missing)";
+
+		std::string picked = name;
+
+		if (ImGui::BeginCombo("##state", shown.c_str()))
+		{
+			if (ImGui::Selectable(none, name.empty()))
+				picked.clear();
+
+			for (const std::string& registered : StateRegistry::Names())
+				if (ImGui::Selectable(registered.c_str(), registered == name))
+					picked = registered;
+
+			ImGui::EndCombo();
+		};
+
+		// A state's header is named after it.
+		if (std::string dropped; AcceptAssetDrop(dropped))
+		{
+			const std::string stem = std::filesystem::path(dropped).stem().string();
+
+			if (StateRegistry::Contains(stem))
+				picked = stem;
+		};
+
+		if (picked == name)
+			return false;
+
+		reference = picked.empty()
+			? StateReference{ }
+			: StateReference::Named(picked);
+
+		return true;
+	};
+
 	void StateMachineMonitor::Draw(bool* open)
 	{
 		if (!ImGui::Begin("State Machines", open))
@@ -93,6 +140,10 @@ namespace Loom
 
 			if (ImGui::TreeNode(machine, "%s", machine->MachineName().c_str()))
 			{
+				const State* current = machine->Current();
+
+				ImGui::Text("Current:  %s", current ? current->Name().c_str() : "<none>");
+
 				DrawInline(*machine);
 
 				ImGui::TreePop();

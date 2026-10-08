@@ -5,6 +5,8 @@
 #include "Scene.h"
 #include "ShaderVariables.h"
 
+#include "Utilities/StateReference.h"
+
 #include <cstdio>
 #include <cctype>
 #include <cstdlib>
@@ -176,6 +178,15 @@ namespace Loom
 
 		case FieldType::Uniforms:	return Quote(((UniformValues*)data)->Write());
 
+		case FieldType::State:
+		{
+			const std::string& name = ((StateReference*)data)->StateType();
+
+			return name.empty()
+				? "null"
+				: Quote(name);
+		};
+
 		case FieldType::Reference:
 		{
 			const LoomObject* target = GetReference();
@@ -232,6 +243,12 @@ namespace Loom
 		};
 
 		case FieldType::Uniforms:	((UniformValues*)data)->Read(Unquote(text));	return true;
+
+		case FieldType::State:
+			*(StateReference*)data = text == "null"
+				? StateReference{ }
+				: StateReference::Named(Unquote(text));
+			return true;
 
 		case FieldType::Reference:
 		{

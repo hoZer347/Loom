@@ -120,6 +120,7 @@
     <ClCompile Include="Threading Tests.cpp" />
     <ClCompile Include="AxisGui Tests.cpp" />
     <ClCompile Include="SpeedManager Tests.cpp" />
+    <ClCompile Include="StateMachine Tests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Test Support.h" />
