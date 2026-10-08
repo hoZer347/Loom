@@ -781,10 +781,8 @@ namespace Loom
 		if (!m_scripts.HasProject())
 			return false;
 
-		const std::filesystem::path extension = std::filesystem::path(path).extension();
-
 		return
-			(extension == ".hpp" || extension == ".h" || extension == ".cpp") &&
+			ProjectAssets::IsScriptFile(path) &&
 			ProjectAssets::IsUnder(path, std::filesystem::path(m_scripts.GetProject()).parent_path().string());
 	};
 

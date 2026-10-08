@@ -163,6 +163,7 @@ TEST_SUITE("ProjectAssets")
 		CHECK(Loom::ProjectAssets::IsGameFile("Hero.png"));
 		CHECK(Loom::ProjectAssets::IsGameFile("Sky.JPG"));
 		CHECK(Loom::ProjectAssets::IsGameFile("Spinner.hpp"));
+		CHECK(Loom::ProjectAssets::IsGameFile("Spinner.CPP"));
 
 		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("GameScripts.sln"));
 		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("GameScripts.vcxproj"));

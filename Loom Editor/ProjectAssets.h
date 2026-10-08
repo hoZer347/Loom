@@ -3,6 +3,7 @@
 #include "Shaders.h"
 
 #include <string>
+#include <string_view>
 
 
 namespace Loom
@@ -26,6 +27,7 @@ namespace Loom
 
 		static constexpr const char* shaderExtension = Shader::extension;
 		static constexpr const char* textureExtension = ".png";
+		static constexpr std::string_view scriptExtensions[] = { ".hpp", ".h", ".cpp" };
 
 		// The shader every new one starts from: a flat colour.
 		static const char* const defaultShader;
@@ -59,6 +61,7 @@ namespace Loom
 		// panel lists along with models. Anything else in the project folder
 		// (Visual Studio's files, notes) is not part of the game.
 		static bool IsGameFile(const std::string& name);
+		static bool IsScriptFile(const std::string& name);
 
 		// Whether path is folder or somewhere inside it.
 		static bool IsUnder(const std::string& path, const std::string& folder);

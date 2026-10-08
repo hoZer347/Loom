@@ -14,7 +14,6 @@
 #include <fstream>
 #include <iterator>
 #include <regex>
-#include <string_view>
 #include <vector>
 
 
@@ -24,13 +23,26 @@ namespace Loom
 	{
 		constexpr size_t maxNameLength = 64;
 
-		// Textures are whatever Textures.cpp has stb_image decode.
+		// Scripts aside. Textures are whatever Textures.cpp has stb_image decode.
 		constexpr std::string_view gameFileExtensions[] =
 		{
 			SceneSerializer::extension,
-			Shader::extension,
-			".png", ".jpg", ".jpeg", ".bmp", ".tga",
-			".hpp", ".h", ".cpp",
+			ProjectAssets::shaderExtension,
+			ProjectAssets::textureExtension, ".jpg", ".jpeg", ".bmp", ".tga",
+		};
+
+		template <size_t count>
+		bool HasExtension(const std::string& name, const std::string_view (&extensions)[count])
+		{
+			std::string extension = std::filesystem::path(name).extension().string();
+
+			std::transform(
+				extension.begin(),
+				extension.end(),
+				extension.begin(),
+				[](unsigned char c) { return (char)std::tolower(c); });
+
+			return std::find(std::begin(extensions), std::end(extensions), extension) != std::end(extensions);
 		};
 
 		// Windows forbids the first lot in a file name; the rest mean something
@@ -501,14 +513,11 @@ void main()
 
 	bool ProjectAssets::IsGameFile(const std::string& name)
 	{
-		std::string extension = std::filesystem::path(name).extension().string();
+		return HasExtension(name, gameFileExtensions) || IsScriptFile(name);
+	};
 
-		std::transform(
-			extension.begin(),
-			extension.end(),
-			extension.begin(),
-			[](unsigned char c) { return (char)std::tolower(c); });
-
-		return std::find(std::begin(gameFileExtensions), std::end(gameFileExtensions), extension) != std::end(gameFileExtensions);
+	bool ProjectAssets::IsScriptFile(const std::string& name)
+	{
+		return HasExtension(name, scriptExtensions);
 	};
 };
