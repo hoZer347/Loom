@@ -87,7 +87,28 @@ namespace Loom
 			return
 				line.find(COMMON_SECTION) != std::string::npos ||
 				line.find(VERTEX_SECTION) != std::string::npos ||
-				line.find(FRAGMENT_SECTION) != std::string::npos;
+				line.find(FRAGMENT_SECTION) != std::string::npos ||
+				line.find(SETTINGS_SECTION) != std::string::npos;
+		};
+
+		constexpr const char* SETTING_ON = "on";
+		constexpr const char* SETTING_OFF = "off";
+
+		const std::regex& SettingPattern()
+		{
+			// The setting's name, then on or off.
+			static const std::regex pattern(R"(^\s*(\w+)\s*=\s*(\w+)\s*(?://.*)?$)");
+
+			return pattern;
+		};
+
+		constexpr size_t SETTING_NAME_MATCH = 1;
+		constexpr size_t SETTING_VALUE_MATCH = 2;
+
+		// Each setting by the name the file gives it.
+		std::array<std::pair<const char*, bool ShaderSettings::*>, 2> SettingNames()
+		{
+			return { { { "shading", &ShaderSettings::shading }, { "shadows", &ShaderSettings::shadows } } };
 		};
 
 		// A shader file as lines, and the line ending to write it back with.
@@ -555,7 +576,103 @@ namespace Loom
 		return file.Write(path, error);
 	};
 
-	void ApplyShaderVariables(uint32_t program, const std::vector<ShaderVariable>& variables, const UniformValues& material, const UniformValues* instance)
+	ShaderSettings ParseShaderSettings(const std::string& source)
+	{
+		ShaderSettings settings;
+
+		std::istringstream lines(source);
+		std::string line;
+		bool inSettings = false;
+
+		while (std::getline(lines, line))
+		{
+			if (!line.empty() && line.back() == '\r')
+				line.pop_back();
+
+			if (IsSectionMarker(line))
+			{
+				inSettings = line.find(SETTINGS_SECTION) != std::string::npos;
+				continue;
+			};
+
+			const std::string trimmed = Trimmed(line);
+
+			if (!inSettings || trimmed.empty() || trimmed.starts_with("//"))
+				continue;
+
+			std::smatch match;
+			bool* setting = nullptr;
+
+			if (std::regex_match(line, match, SettingPattern()))
+				for (const auto& [name, member] : SettingNames())
+					if (match[SETTING_NAME_MATCH] == name)
+						setting = &(settings.*member);
+
+			const std::string value = match.empty() ? "" : match[SETTING_VALUE_MATCH].str();
+
+			if (!setting || (value != SETTING_ON && value != SETTING_OFF))
+				throw std::runtime_error("'" + trimmed + "' is not a setting: shading or shadows, = on or off");
+
+			*setting = value == SETTING_ON;
+		};
+
+		return settings;
+	};
+
+	bool WriteShaderSettings(const std::string& path, const ShaderSettings& settings, std::string& error)
+	{
+		ShaderFile file;
+
+		if (!file.Read(path, error))
+			return false;
+
+		const auto IsSettingsMarker = [](const std::string& line) { return line.find(SETTINGS_SECTION) != std::string::npos; };
+
+		size_t marker = std::find_if(file.lines.begin(), file.lines.end(), IsSettingsMarker) - file.lines.begin();
+
+		// In front of the first stage, below whatever comments head the file.
+		if (marker == file.lines.size())
+		{
+			marker = std::find_if(file.lines.begin(), file.lines.end(), IsSectionMarker) - file.lines.begin();
+			file.lines.insert(file.lines.begin() + marker, { std::string("// ") + SETTINGS_SECTION, "" });
+		};
+
+		const size_t start = marker + 1;
+		size_t end = start;
+
+		while (end < file.lines.size() && !IsSectionMarker(file.lines[end]))
+			end++;
+
+		// A setting the section is missing goes after the ones it has.
+		size_t append = start;
+		std::smatch match;
+
+		for (size_t i = start; i < end; i++)
+			if (std::regex_match(file.lines[i], match, SettingPattern()))
+				append = i + 1;
+
+		for (const auto& [name, member] : SettingNames())
+		{
+			const std::string written = std::string(name) + " = " + (settings.*member ? SETTING_ON : SETTING_OFF);
+
+			size_t at = start;
+
+			while (at < end && !(std::regex_match(file.lines[at], match, SettingPattern()) && match[SETTING_NAME_MATCH] == name))
+				at++;
+
+			if (at < end)
+				file.lines[at] = written;
+			else
+			{
+				file.lines.insert(file.lines.begin() + append++, written);
+				end++;
+			};
+		};
+
+		return file.Write(path, error);
+	};
+
+	void ApplyShaderVariables(uint32_t program,const std::vector<ShaderVariable>& variables, const UniformValues& material, const UniformValues* instance)
 	{
 		Renderer* renderer = Renderer::Get();
 

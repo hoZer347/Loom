@@ -15,10 +15,31 @@
 namespace Loom
 {
 	// The lines that split a shader file into its sections. COMMON goes in
-	// front of both stages.
+	// front of both stages. SETTINGS is not GLSL: it holds the lines
+	// ShaderSettings reads.
 	inline constexpr const char* COMMON_SECTION = "===COMMON===";
 	inline constexpr const char* VERTEX_SECTION = "===VERTEX===";
 	inline constexpr const char* FRAGMENT_SECTION = "===FRAGMENT===";
+	inline constexpr const char* SETTINGS_SECTION = "===SETTINGS===";
+
+	/**
+	* Loom::ShaderSettings
+	* - Which of the engine's sections a shader is compiled with, on top of the
+	*   stages its file holds. Off, the stages compile as written
+	* - The file's SETTINGS section says, one line each, such as
+	*     shading = on
+	*   and a setting the section leaves out is off
+	*/
+	struct ShaderSettings
+	{
+		// Lit by the scene's light: ambient plus diffuse, multiplied into the
+		// colour the fragment stage writes.
+		bool shading = false;
+
+		// Drawn into the light's shadow map by a second program built from the
+		// vertex stage, and, when shaded, darkened where the map says so.
+		bool shadows = false;
+	};
 
 	// Whether a variable is filled in once on the Material, or on each Mesh
 	// drawn with it.
@@ -89,6 +110,14 @@ namespace Loom
 
 	// Takes the line declaring the variable out of the shader file.
 	LOOM_API bool RemoveShaderVariable(const std::string& path, const std::string& name, std::string& error);
+
+	// What the source's SETTINGS section turns on. Throws std::runtime_error,
+	// naming the line, at one that is not a setting.
+	LOOM_API ShaderSettings ParseShaderSettings(const std::string& source);
+
+	// Writes every setting into the shader file's SETTINGS section, over the
+	// line already saying it, adding the section at the top when there is none.
+	LOOM_API bool WriteShaderSettings(const std::string& path, const ShaderSettings& settings, std::string& error);
 
 	// Hands each variable its value: a per-material one from material, a
 	// per-instance one from instance when there is one, the default otherwise.

@@ -133,8 +133,26 @@ namespace Loom
 		if (shader == nullptr)
 			return;
 
+		DrawSettings();
 		DrawShaderVariables(shader->variables, UniformScope::Material, variables);
 		DrawDeclarations();
+	};
+
+	void Material::DrawSettings()
+	{
+		ShaderSettings settings = shader->settings;
+
+		bool changed = ImGui::Checkbox("Shading", &settings.shading);
+		ImGui::SetItemTooltip("Lit by the scene's light. Written into the shader file's settings");
+
+		changed |= ImGui::Checkbox("Shadows", &settings.shadows);
+		ImGui::SetItemTooltip("Casts shadows, and is darkened by them when shading is on. Written into the shader file's settings");
+
+		if (!changed)
+			return;
+
+		std::string error;
+		Edited(WriteShaderSettings(shader->file_path, settings, error), error);
 	};
 
 	void Material::DrawDeclarations()

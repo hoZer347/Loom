@@ -31,9 +31,9 @@ namespace Loom
 		void OnRender() override
 		{ };
 
-		// A link that opens the shader file, the values of its per-material
-		// variables, and the declarations themselves, which are edited in the
-		// file.
+		// A link that opens the shader file, its settings, the values of its
+		// per-material variables, and the declarations themselves. The settings
+		// and declarations are edited in the file.
 		void OnGui() override;
 
 		void OnFieldChanged(const SerializedField& field) override;
@@ -57,13 +57,15 @@ namespace Loom
 		// Declared after the path, which fixes its position in scene files.
 		Serial<glm::vec3> color = glm::vec3(1.0f, 1.0f, 1.0f);
 
-		// Off, what is drawn with it neither casts shadows nor has them cast on it.
+		// Off, what is drawn with it neither casts shadows nor has them cast on
+		// it, whatever its shader's settings say.
 		Serial<bool> shadows = true;
 
 		// The per-material variables' values.
 		Serial<UniformValues> variables;
 
 	private:
+		void DrawSettings();
 		void DrawDeclarations();
 
 		// After the shader file has been rewritten, or failed to be, with why

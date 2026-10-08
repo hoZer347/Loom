@@ -17,9 +17,12 @@ namespace Loom
 	* Loom::Light
 	* - A directional light, and the shadow map it casts
 	* - Scene::Render uses the first one in the hierarchy, renders every
-	*   Mesh and shadow-casting Sprite under the scene into its shadow map,
-	*   then hands it to each one's program as the main pass draws. In a scene without one, Light::ApplyNone
-	*   stands in, and a lit shader shows its colour flat
+	*   Mesh whose shader has shadows on, and every shadow-casting Sprite,
+	*   under the scene into its shadow map, then hands it to each one's
+	*   program as the main pass draws. In a scene without one,
+	*   Light::ApplyNone stands in, and a lit shader shows its colour flat
+	* - A shader with shading on has the engine light it (see ShaderSettings);
+	*   one with it off can still light itself with the functions below
 	* - The shadow map covers a box of shadowExtent either side of shadowCenter,
 	*   seen along direction; geometry outside it is lit
 	* - A shader lights itself by calling into the GLSL the engine puts in
@@ -30,6 +33,8 @@ namespace Loom
 	*                 how much light reaches the fragment, 0 to 1
 	*               vec3 LoomLight(vec3 normal, vec4 lightSpace)
 	*                 ambient plus the shadowed diffuse, to multiply a colour by
+	*               vec3 LoomLight(vec3 normal)
+	*                 the same, unshadowed
 	* - That GLSL declares u_lightViewProjection, u_lightDirection, u_lightColor,
 	*   u_ambient, u_shadowMap and u_shadowsOff, so a stage that uses it must
 	*   not declare them
@@ -86,7 +91,7 @@ namespace Loom
 		bool Allocate();
 		void Release();
 
-		void DrawCasters(GameObject& gameObject, uint32_t program) const;
+		void DrawCasters(GameObject& gameObject) const;
 
 		uint32_t m_depth_texture = 0;
 

@@ -7,6 +7,31 @@
 #include <type_traits>
 
 
+namespace
+{
+	const std::string FRAGMENT =
+		"// ===FRAGMENT===\n"
+		"out vec4 FragColor;\n"
+		"void main() { FragColor = vec4(1.0); }\n";
+
+	const std::string VERTEX =
+		"// ===VERTEX===\n"
+		"layout(location = 0) in vec3 aPos;\n"
+		"uniform mat4 u_model;\n"
+		"void main() { gl_Position = u_model * vec4(aPos, 1.0); }\n";
+
+	size_t Count(const std::string& text, const std::string& part)
+	{
+		size_t count = 0;
+
+		for (size_t at = text.find(part); at != std::string::npos; at = text.find(part, at + part.size()))
+			count++;
+
+		return count;
+	};
+};
+
+
 TEST_SUITE("Shader")
 {
 	// Shader compiles on construction, so most of it needs a GL context. What
@@ -67,5 +92,108 @@ TEST_SUITE("Shader")
 		// held by pointer; this records that copying one is not defended against.
 		CHECK(std::is_copy_constructible_v<Loom::Shader>);
 		CHECK_FALSE(std::is_copy_assignable_v<Loom::Shader>);
+	};
+
+	TEST_CASE("a file with only a fragment stage is given the engine's vertex stage, and nothing else")
+	{
+		const Loom::Shader::Stages stages = Loom::Shader::Assemble(FRAGMENT);
+
+		CHECK(stages.vertex.find("gl_Position = u_viewProjection * u_model * vec4(aPos, 1.0);") != std::string::npos);
+		CHECK(stages.fragment == "out vec4 FragColor;\nvoid main() { FragColor = vec4(1.0); }\n");
+		CHECK(stages.shadowVertex.empty());
+		CHECK(stages.shadowFragment.empty());
+		CHECK_FALSE(stages.settings.shading);
+		CHECK_FALSE(stages.settings.shadows);
+	};
+
+	TEST_CASE("with its settings off, a file's stages compile as written")
+	{
+		const Loom::Shader::Stages stages = Loom::Shader::Assemble(
+			"// ===SETTINGS===\n"
+			"// Nothing on yet.\n"
+			"shading = off\n"
+			"\n" +
+			VERTEX + FRAGMENT);
+
+		CHECK(stages.vertex == "layout(location = 0) in vec3 aPos;\nuniform mat4 u_model;\nvoid main() { gl_Position = u_model * vec4(aPos, 1.0); }\n");
+		CHECK(stages.fragment == "out vec4 FragColor;\nvoid main() { FragColor = vec4(1.0); }\n");
+	};
+
+	TEST_CASE("shading wraps each stage's main and lights the colour the fragment stage writes")
+	{
+		const Loom::Shader::Stages stages = Loom::Shader::Assemble("// ===SETTINGS===\nshading = on\n" + VERTEX + FRAGMENT);
+
+		CHECK(stages.settings.shading);
+
+		// The stage's own main still runs, first.
+		CHECK(stages.vertex.find("void loom_main() { gl_Position") != std::string::npos);
+		CHECK(stages.vertex.find("out vec3 loom_World;") != std::string::npos);
+		CHECK(stages.fragment.find("void loom_main() { FragColor") != std::string::npos);
+		CHECK(stages.fragment.find("FragColor.rgb *= LoomLight(loom_normal);") != std::string::npos);
+
+		// Calling LoomLight brings the light's GLSL in.
+		CHECK(stages.fragment.find("uniform vec3 u_lightDirection;") != std::string::npos);
+
+		// What the stage declares itself is not declared again.
+		CHECK(Count(stages.vertex, "in vec3 aPos;") == 1);
+		CHECK(Count(stages.vertex, "uniform mat4 u_model;") == 1);
+
+		CHECK(stages.vertex.find("loom_LightSpace") == std::string::npos);
+		CHECK(stages.shadowVertex.empty());
+	};
+
+	TEST_CASE("shading a vertex stage that never declared its inputs declares them")
+	{
+		const Loom::Shader::Stages stages = Loom::Shader::Assemble(
+			"// ===SETTINGS===\nshading = on\n"
+			"// ===VERTEX===\nvoid main() { gl_Position = vec4(0.0); }\n" +
+			FRAGMENT);
+
+		CHECK(Count(stages.vertex, "layout(location = 0) in vec3 aPos;") == 1);
+		CHECK(Count(stages.vertex, "uniform mat4 u_model;") == 1);
+	};
+
+	TEST_CASE("shadows add a shadow pass made of the vertex stage, and shade by the shadow map")
+	{
+		const Loom::Shader::Stages stages = Loom::Shader::Assemble("// ===SETTINGS===\nshading = on\nshadows = on\n" + FRAGMENT);
+
+		CHECK(stages.vertex.find("loom_LightSpace = LoomLightSpace(loom_world);") != std::string::npos);
+		CHECK(stages.vertex.find("uniform mat4 u_lightViewProjection;") != std::string::npos);
+		CHECK(stages.fragment.find("FragColor.rgb *= LoomLight(loom_normal, loom_LightSpace);") != std::string::npos);
+
+		// The pass is the vertex stage as it was before shading wrapped it.
+		CHECK(stages.shadowVertex.find("void main()\n{\n\tgl_Position = u_viewProjection * u_model") != std::string::npos);
+		CHECK(stages.shadowVertex.find("loom_") == std::string::npos);
+		CHECK(stages.shadowFragment.find("void main()") != std::string::npos);
+	};
+
+	TEST_CASE("shadows without shading cast them, and leave the colour as written")
+	{
+		const Loom::Shader::Stages stages = Loom::Shader::Assemble("// ===SETTINGS===\nshadows = on\n" + FRAGMENT);
+
+		CHECK(stages.fragment == "out vec4 FragColor;\nvoid main() { FragColor = vec4(1.0); }\n");
+		CHECK_FALSE(stages.shadowVertex.empty());
+	};
+
+	TEST_CASE("shading a stage it has nothing to add to is refused")
+	{
+		// No colour to light.
+		CHECK_THROWS_AS(
+			Loom::Shader::Assemble("// ===SETTINGS===\nshading = on\n// ===FRAGMENT===\nvoid main() { }\n"),
+			std::runtime_error);
+
+		// No main to call.
+		CHECK_THROWS_AS(
+			Loom::Shader::Assemble("// ===SETTINGS===\nshading = on\n// ===VERTEX===\nfloat Helper() { return 1.0; }\n" + FRAGMENT),
+			std::runtime_error);
+	};
+
+	TEST_CASE("a settings line that is not a setting is refused")
+	{
+		for (const char* line : { "bloom = on\n", "shading = maybe\n", "shading on\n" })
+			CHECK_THROWS_AS(Loom::Shader::Assemble(std::string("// ===SETTINGS===\n") + line + FRAGMENT), std::runtime_error);
+
+		// The same words outside the section are the stages' business.
+		CHECK_NOTHROW(Loom::Shader::Assemble("bloom = on\n" + FRAGMENT));
 	};
 };

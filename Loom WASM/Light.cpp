@@ -14,8 +14,6 @@
 #include <cctype>
 #include <cstring>
 #include <initializer_list>
-#include <iostream>
-#include <sstream>
 #include <typeinfo>
 
 
@@ -35,25 +33,6 @@ namespace Loom
 
 		// With no light to shade by, a material shows its colour as it is.
 		constexpr float UNLIT_AMBIENT = 1.0f;
-
-		const char* const DEPTH_SHADER = R"(
-// ===VERTEX===
-
-layout(location = 0) in vec3 aPos;
-
-uniform mat4 u_model;
-
-void main()
-{
-	gl_Position = LoomLightSpace(u_model * vec4(aPos, 1.0));
-}
-
-// ===FRAGMENT===
-
-void main()
-{
-}
-)";
 
 		const char* const VERTEX_LIBRARY = R"(
 uniform mat4 u_lightViewProjection;
@@ -108,11 +87,19 @@ float LoomShadow(vec4 lightSpace)
 	return lit / taps;
 }
 
+float LoomDiffuse(vec3 normal)
+{
+	return max(dot(normal, -u_lightDirection), 0.0);
+}
+
 vec3 LoomLight(vec3 normal, vec4 lightSpace)
 {
-	float diffuse = max(dot(normal, -u_lightDirection), 0.0);
+	return vec3(u_ambient) + LoomDiffuse(normal) * LoomShadow(lightSpace) * u_lightColor;
+}
 
-	return vec3(u_ambient) + diffuse * LoomShadow(lightSpace) * u_lightColor;
+vec3 LoomLight(vec3 normal)
+{
+	return vec3(u_ambient) + LoomDiffuse(normal) * u_lightColor;
 }
 )";
 
@@ -142,27 +129,6 @@ vec3 LoomLight(vec3 normal, vec4 lightSpace)
 			};
 
 			return false;
-		};
-
-		// One program shared by every light. Like the materials' shaders, it
-		// lives until the process ends.
-		uint32_t DepthProgram()
-		{
-			static const uint32_t program = []() -> uint32_t
-			{
-				try
-				{
-					std::istringstream source(DEPTH_SHADER);
-					return (new Shader("Loom Shadow Depth", source))->id;
-				}
-				catch (const std::exception& e)
-				{
-					std::cerr << "Light: " << e.what() << std::endl;
-					return 0;
-				};
-			}();
-
-			return program;
 		};
 
 		// A one-texel map at the far plane: nothing is in shadow. Bound in place
@@ -236,14 +202,11 @@ vec3 LoomLight(vec3 normal, vec4 lightSpace)
 		renderer->PushTarget(m_depth_texture);
 		renderer->Clear(nullptr, true);
 
-		const uint32_t program = DepthProgram();
-
-		if (castShadows && program)
+		if (castShadows)
 		{
-			renderer->SetUniform(program, "u_lightViewProjection", m_view_projection);
 			renderer->SetDepthBias(SLOPE_OFFSET, CONSTANT_OFFSET);
 
-			DrawCasters(root, program);
+			DrawCasters(root);
 
 			renderer->SetDepthBias(0.0f, 0.0f);
 		};
@@ -306,8 +269,10 @@ vec3 LoomLight(vec3 normal, vec4 lightSpace)
 		m_depth_texture = 0;
 	};
 
-	void Light::DrawCasters(GameObject& gameObject, uint32_t program) const
+	void Light::DrawCasters(GameObject& gameObject) const
 	{
+		Renderer& renderer = *Renderer::Get();
+
 		// By type name, the way GetComponent matches: a script library's Mesh
 		// carries its own copy of the type info.
 		for (ComponentBase* component : gameObject.GetComponents())
@@ -315,13 +280,25 @@ vec3 LoomLight(vec3 normal, vec4 lightSpace)
 			{
 				Mesh* mesh = (Mesh*)component;
 
-				if (mesh->IsDrawable() && mesh->material->shadows)
-					mesh->Draw(program);
+				if (!mesh->IsDrawable() || !mesh->material->shadows)
+					continue;
+
+				const uint32_t program = mesh->material->shader->shadow_id;
+
+				if (!program)
+					continue;
+
+				// The pass is the shader's own vertex stage seen from the light,
+				// so it is handed the light's view-projection in the camera's place.
+				mesh->material->Apply(program, &*mesh->variables);
+				renderer.SetUniform(program, "u_viewProjection", m_view_projection);
+				renderer.SetUniform(program, "u_lightViewProjection", m_view_projection);
+				mesh->Draw(program);
 			}
 			else if (strcmp(component->GetTypeName(), typeid(Sprite).name()) == 0)
 				((Sprite*)component)->DrawShadow(m_view_projection);
 
 		for (GameObject* child : gameObject.GetChildren())
-			DrawCasters(*child, program);
+			DrawCasters(*child);
 	};
 };

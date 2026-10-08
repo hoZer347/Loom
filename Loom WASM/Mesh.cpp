@@ -55,6 +55,9 @@ namespace Loom
 
 		if (Camera::current)
 			Camera::current->Apply(material->shader->id);
+		// Without a camera, world space is what the screen shows.
+		else if (Renderer* renderer = Renderer::Get())
+			renderer->SetUniform(material->shader->id, "u_viewProjection", glm::mat4(1.0f));
 
 		if (Light::current)
 			Light::current->Apply(material->shader->id);

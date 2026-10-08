@@ -13,6 +13,8 @@
 #include <fstream>
 #include <filesystem>
 #include <iterator>
+#include <regex>
+#include <stdexcept>
 
 #define SHADER_PATH ""
 
@@ -20,6 +22,125 @@
 namespace Loom
 {
 	static inline std::string defaultShader;
+
+	namespace
+	{
+		// The vertex stage of a file without one: the mesh's positions, through
+		// its transform and the camera.
+		constexpr const char* DEFAULT_VERTEX = R"(
+layout(location = 0) in vec3 aPos;
+
+uniform mat4 u_model;
+uniform mat4 u_viewProjection;
+
+void main()
+{
+	gl_Position = u_viewProjection * u_model * vec4(aPos, 1.0);
+}
+)";
+
+		// The depth the vertex stage puts out is all the shadow map needs.
+		constexpr const char* SHADOW_FRAGMENT = R"(
+void main()
+{
+}
+)";
+
+		constexpr const char* SHADOW_PROGRAM_SUFFIX = " shadows";
+
+		// What the shading section's vertex half reads, and the declaration it
+		// adds when the stage has not made its own.
+		struct ShadingInput
+		{
+			const char* name;
+			const char* declaration;
+		};
+
+		constexpr ShadingInput SHADING_INPUTS[] =
+		{
+			{ "aPos", "layout(location = 0) in vec3 aPos;" },
+			{ "u_model", "uniform mat4 u_model;" },
+		};
+
+		const std::regex& MainPattern()
+		{
+			static const std::regex pattern(R"(\bvoid\s+main\s*\(\s*(?:void\s*)?\))");
+
+			return pattern;
+		};
+
+		// The fragment stage's colour, by name.
+		const std::regex& ColorPattern()
+		{
+			static const std::regex pattern(R"(\bout\s+(?:(?:lowp|mediump|highp)\s+)?vec4\s+(\w+)\s*;)");
+
+			return pattern;
+		};
+
+		bool Declares(const std::string& stage, const std::string& name)
+		{
+			const std::regex declaration(R"(\b(?:in|uniform)\s+(?:(?:lowp|mediump|highp)\s+)?\w+\s+)" + name + R"(\s*;)");
+
+			return std::regex_search(stage, declaration);
+		};
+
+		// The stage's own main, renamed for the engine's to call before adding
+		// its sections.
+		std::string WithMainRenamed(const std::string& stage, const std::string& which)
+		{
+			if (!std::regex_search(stage, MainPattern()))
+				throw std::runtime_error("Shading needs the " + which + " stage to have a main()");
+
+			return std::regex_replace(stage, MainPattern(), "void loom_main()");
+		};
+
+		std::string ShadedVertex(const std::string& stage, bool shadows)
+		{
+			std::string shaded = WithMainRenamed(stage, "vertex") + '\n';
+
+			for (const ShadingInput& input : SHADING_INPUTS)
+				if (!Declares(stage, input.name))
+					shaded += std::string(input.declaration) + '\n';
+
+			shaded += "out vec3 loom_World;\n";
+
+			if (shadows)
+				shaded += "out vec4 loom_LightSpace;\n";
+
+			shaded +=
+				"\nvoid main()\n{\n"
+				"\tloom_main();\n\n"
+				"\tvec4 loom_world = u_model * vec4(aPos, 1.0);\n"
+				"\tloom_World = loom_world.xyz;\n";
+
+			if (shadows)
+				shaded += "\tloom_LightSpace = LoomLightSpace(loom_world);\n";
+
+			return shaded + "}\n";
+		};
+
+		std::string ShadedFragment(const std::string& stage, bool shadows)
+		{
+			std::smatch color;
+
+			if (!std::regex_search(stage, color, ColorPattern()))
+				throw std::runtime_error("Shading needs the fragment stage to write an out vec4 colour");
+
+			std::string shaded = WithMainRenamed(stage, "fragment") + "\nin vec3 loom_World;\n";
+
+			if (shadows)
+				shaded += "in vec4 loom_LightSpace;\n";
+
+			// Normals are not in the vertex format. The surface's slope across
+			// the screen gives one, exact for flat faces.
+			return shaded +
+				"\nvoid main()\n{\n"
+				"\tloom_main();\n\n"
+				"\tvec3 loom_normal = normalize(cross(dFdx(loom_World), dFdy(loom_World)));\n\n"
+				"\t" + color[1].str() + ".rgb *= LoomLight(loom_normal" + (shadows ? ", loom_LightSpace" : "") + ");\n"
+				"}\n";
+		};
+	};
 
 	Shader::Shader() :
 		id(CompileSource(defaultShader))
@@ -44,17 +165,25 @@ namespace Loom
 		shaders.erase(file_path);
 
 		if (Renderer* renderer = Renderer::Get())
+		{
 			renderer->DeleteProgram(id);
+
+			if (shadow_id)
+				renderer->DeleteProgram(shadow_id);
+		};
 	};
 
-	enum class ShaderType { NONE, COMMON, VERTEX, FRAGMENT };
+	enum class ShaderType { NONE, COMMON, VERTEX, FRAGMENT, SETTINGS };
 
 	uint32_t Shader::CompileSource(const std::string& file_path)
 	{
 		std::scoped_lock lock{ mutex };
 
 		if (shaders.contains(file_path))
-			return shaders[file_path];
+		{
+			shadow_id = shaders[file_path].shadow;
+			return shaders[file_path].id;
+		};
 
 		std::istringstream file(ReadSource(file_path));
 
@@ -84,6 +213,7 @@ namespace Loom
 		std::scoped_lock lock{ mutex };
 
 		const uint32_t previous = id;
+		const uint32_t previous_shadow = shadow_id;
 
 		try
 		{
@@ -97,7 +227,12 @@ namespace Loom
 		};
 
 		if (Renderer* renderer = Renderer::Get())
+		{
 			renderer->DeleteProgram(previous);
+
+			if (previous_shadow)
+				renderer->DeleteProgram(previous_shadow);
+		};
 
 		return true;
 	};
@@ -116,52 +251,101 @@ namespace Loom
 		std::scoped_lock lock{ mutex };
 
 		if (shaders.contains(name))
-			return shaders[name];
+		{
+			shadow_id = shaders[name].shadow;
+			return shaders[name].id;
+		};
 
 		return Build(name, source);
+	};
+
+	Shader::Stages Shader::Assemble(const std::string& source)
+	{
+		std::istringstream lines(source);
+
+		std::unordered_map<ShaderType, std::stringstream> sections;
+		ShaderType current = ShaderType::NONE;
+		bool has_vertex = false;
+
+		std::string line;
+		while (std::getline(lines, line))
+			if (line.find(VERTEX_SECTION) != std::string::npos)
+			{
+				current = ShaderType::VERTEX;
+				has_vertex = true;
+			}
+			else if (line.find(FRAGMENT_SECTION) != std::string::npos)
+				current = ShaderType::FRAGMENT;
+			else if (line.find(COMMON_SECTION) != std::string::npos)
+				current = ShaderType::COMMON;
+			else if (line.find(SETTINGS_SECTION) != std::string::npos)
+				current = ShaderType::SETTINGS;
+			else if (current != ShaderType::NONE)
+				sections[current] << line << '\n';
+
+		Stages stages;
+		stages.settings = ParseShaderSettings(source);
+
+		const ShaderSettings& settings = stages.settings;
+		const std::string common = sections[ShaderType::COMMON].str();
+		const std::string vertex = common + (has_vertex ? sections[ShaderType::VERTEX].str() : DEFAULT_VERTEX);
+		const std::string fragment = common + sections[ShaderType::FRAGMENT].str();
+
+		stages.vertex = settings.shading ? ShadedVertex(vertex, settings.shadows) : vertex;
+		stages.fragment = settings.shading ? ShadedFragment(fragment, settings.shadows) : fragment;
+
+		if (settings.shadows)
+		{
+			stages.shadowVertex = vertex;
+			stages.shadowFragment = common + SHADOW_FRAGMENT;
+		};
+
+		// The engine's GLSL goes first, so a shader's own COMMON block (its
+		// precision statements included) has the last word.
+		for (std::string* stage : { &stages.vertex, &stages.shadowVertex })
+			if (!stage->empty())
+				*stage = Light::VertexLibrary(*stage) + *stage;
+
+		for (std::string* stage : { &stages.fragment, &stages.shadowFragment })
+			if (!stage->empty())
+				*stage = Light::FragmentLibrary(*stage) + *stage;
+
+		return stages;
 	};
 
 	uint32_t Shader::Build(const std::string& name, std::istream& source)
 	{
 		const std::string text(std::istreambuf_iterator<char>(source), { });
-		std::istringstream lines(text);
-
-		std::unordered_map<ShaderType, std::stringstream> sources;
-		ShaderType current = ShaderType::NONE;
-
-		std::string line;
-		while (std::getline(lines, line))
-			if (line.find(VERTEX_SECTION) != std::string::npos)
-				current = ShaderType::VERTEX;
-			else if (line.find(FRAGMENT_SECTION) != std::string::npos)
-				current = ShaderType::FRAGMENT;
-			else if (line.find(COMMON_SECTION) != std::string::npos)
-				current = ShaderType::COMMON;
-			else if (current != ShaderType::NONE)
-				sources[current] << line << '\n';
 
 		Renderer* renderer = Renderer::Get();
 
 		if (!renderer)
 			throw std::runtime_error("No renderer to compile " + name + " with");
 
-		// The engine's GLSL goes first, so a shader's own COMMON block (its
-		// precision statements included) has the last word.
-		const std::string common = sources[ShaderType::COMMON].str();
-		const std::string vertex = common + sources[ShaderType::VERTEX].str();
-		const std::string fragment = common + sources[ShaderType::FRAGMENT].str();
+		const Stages stages = Assemble(text);
 
-		const uint32_t program = renderer->CreateProgram(
-			name,
-			Light::VertexLibrary(vertex) + vertex,
-			Light::FragmentLibrary(fragment) + fragment);
+		Programs programs;
+		programs.id = renderer->CreateProgram(name, stages.vertex, stages.fragment);
 
-		// After the program, so a reload that fails leaves them describing the
-		// program still in use.
+		if (stages.settings.shadows)
+			try
+			{
+				programs.shadow = renderer->CreateProgram(name + SHADOW_PROGRAM_SUFFIX, stages.shadowVertex, stages.shadowFragment);
+			}
+			catch (...)
+			{
+				renderer->DeleteProgram(programs.id);
+				throw;
+			};
+
+		// After the programs, so a reload that fails leaves these describing
+		// the ones still in use.
 		variables = ParseShaderVariables(text);
-		shaders[name] = program;
+		settings = stages.settings;
+		shadow_id = programs.shadow;
+		shaders[name] = programs;
 
-		return program;
+		return programs.id;
 	};
 
 #ifdef __EMSCRIPTEN__

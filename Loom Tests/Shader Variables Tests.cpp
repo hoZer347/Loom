@@ -87,7 +87,7 @@ namespace
 
 		void SetTexture(uint32_t, const char* name, uint32_t texture) override { textures[name] = texture; };
 
-		void Draw(uint32_t, uint32_t, const float*, size_t, uint32_t) override { draws++; };
+		void Draw(uint32_t program, uint32_t, const float*, size_t, uint32_t) override { drawn.push_back(program); };
 
 		uint32_t CreateTexture(int, int, const uint8_t*) override { return ++m_handles; };
 		uint32_t CreateDepthTarget(int) override { return ++m_handles; };
@@ -107,7 +107,7 @@ namespace
 		std::map<std::string, Uniform> uniforms;
 		std::map<std::string, uint32_t> textures;
 		std::vector<uint32_t> deleted;
-		size_t draws = 0;
+		std::vector<uint32_t> drawn;
 
 	private:
 		Renderer* m_previous;
@@ -291,6 +291,50 @@ TEST_SUITE("Shader variables")
 			"\r\n"
 			"float Helper() { return 1.0; }\r\n"
 			"// ===VERTEX===\r\n");
+	};
+
+	TEST_CASE("writing the settings into a file without them adds the section in front of the stages")
+	{
+		const ShaderFile file("settings without section.shader", "// A header comment.\n\n" + STAGES);
+
+		std::string error;
+		REQUIRE(Loom::WriteShaderSettings(file.path.string(), { .shading = true }, error));
+
+		CHECK(file.Text() == "// A header comment.\n\n// ===SETTINGS===\nshading = on\nshadows = off\n\n" + STAGES);
+
+		const Loom::ShaderSettings read = Loom::ParseShaderSettings(file.Text());
+
+		CHECK(read.shading);
+		CHECK_FALSE(read.shadows);
+	};
+
+	TEST_CASE("writing the settings rewrites their lines in place, keeping the file's comments and line endings")
+	{
+		const ShaderFile file(
+			"settings in place.shader",
+			"// ===SETTINGS===\r\n"
+			"// Lit, for now.\r\n"
+			"shading = on\r\n"
+			"\r\n"
+			"// ===FRAGMENT===\r\n"
+			"void main() { }\r\n");
+
+		std::string error;
+		REQUIRE(Loom::WriteShaderSettings(file.path.string(), { .shading = false, .shadows = true }, error));
+
+		CHECK(file.Text() ==
+			"// ===SETTINGS===\r\n"
+			"// Lit, for now.\r\n"
+			"shading = off\r\n"
+			"shadows = on\r\n"
+			"\r\n"
+			"// ===FRAGMENT===\r\n"
+			"void main() { }\r\n");
+
+		// A variable declared afterwards goes in its own section, not the settings.
+		REQUIRE(Loom::DeclareShaderVariable(file.path.string(), "", { "u_speed" }, error));
+		CHECK_NOTHROW(Loom::ParseShaderSettings(file.Text()));
+		CHECK(Loom::ParseShaderVariables(file.Text()).size() == 1);
 	};
 
 	TEST_CASE("redeclaring a variable rewrites its line where it is")
@@ -477,11 +521,36 @@ TEST_SUITE("Shader variables")
 		CHECK(renderer.uniforms["u_tint"].Float(0) == 0.0f);
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader with shadows on has its own shadow program, deleted along with it")
+	{
+		RecordingRenderer renderer;
+
+		uint32_t main = 0;
+		uint32_t shadow = 0;
+
+		{
+			std::istringstream source("// ===SETTINGS===\nshadows = on\n" + STAGES);
+			Loom::Shader shader("own shadow program", source);
+
+			main = shader.id;
+			shadow = shader.shadow_id;
+
+			CHECK(shader.settings.shadows);
+			CHECK(shadow != 0);
+			CHECK(shadow != main);
+		};
+
+		CHECK(renderer.deleted == std::vector<uint32_t>{ main, shadow });
+
+		std::istringstream unshadowed(STAGES);
+		CHECK(Loom::Shader("no shadow program", unshadowed).shadow_id == 0);
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a material with shadows off is left out of the shadow map and drawn fully lit")
 	{
 		RecordingRenderer renderer;
 
-		std::istringstream source(STAGES);
+		std::istringstream source("// ===SETTINGS===\nshadows = on\n" + STAGES);
 		Loom::Shader shader("shadow casters", source);
 
 		Loom::Scene scene("shadow casters");
@@ -508,7 +577,8 @@ TEST_SUITE("Shader variables")
 
 		light->RenderShadowMap(scene.GetRoot());
 
-		CHECK(renderer.draws == 1);
+		// With the shader's own shadow program.
+		CHECK(renderer.drawn == std::vector<uint32_t>{ shader.shadow_id });
 
 		materials[0]->Apply(shader.id);
 		CHECK(renderer.floats["u_shadowsOff"] == 0.0f);
