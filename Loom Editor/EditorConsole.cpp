@@ -62,6 +62,11 @@ namespace Loom
 
 			ImGui::Separator();
 
+			// Taken here rather than in the child, so the chords still work
+			// once a click on the toolbar has focused the panel itself.
+			const bool copy = std::exchange(m_copy, false) || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_C);
+			const bool select_all = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_A);
+
 			if (ImGui::BeginChild(
 				"##lines",
 				ImVec2(0.0f, 0.0f),
@@ -69,13 +74,13 @@ namespace Loom
 				ImGuiWindowFlags_HorizontalScrollbar))
 			{
 				const char* filter = m_filter;
-				const bool copy = std::exchange(m_copy, false) || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_C);
-				const bool select_all = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_A);
+				const bool tracking = m_dragging || ImGui::IsWindowHovered();
 
 				const ImVec2 origin = ImGui::GetCursorScreenPos();
 				const ImVec2 visible = ImGui::GetContentRegionAvail();
 				const ImVec2 mouse = ImGui::GetMousePos();
 				const float line_height = ImGui::GetTextLineHeight();
+				const float line_spacing = ImGui::GetTextLineHeightWithSpacing();
 				const float newline_width = ImGui::CalcTextSize(" ").x;
 				const ImU32 highlight = ImGui::GetColorU32(ImGuiCol_TextSelectedBg);
 				ImDrawList* const draw_list = ImGui::GetWindowDrawList();
@@ -90,6 +95,7 @@ namespace Loom
 				float text_bottom = origin.y;
 				float text_width = visible.x;
 				std::string copied;
+				bool copying = false;
 
 				EditorLog::Get().ForEach(
 					[&](size_t id, const std::string& line, bool is_error)
@@ -113,7 +119,7 @@ namespace Loom
 						text_end = line_end;
 						text_bottom = at.y + line_height;
 
-						if (mouse.y >= at.y)
+						if (tracking && mouse.y >= at.y && mouse.y < at.y + line_spacing)
 						{
 							under_mouse = { id, TextOffsetAt(line, mouse.x - at.x) };
 							under_mouse_length = line.size();
@@ -137,10 +143,11 @@ namespace Loom
 
 							if (copy)
 							{
-								copied.append(line, from, to - from);
-
-								if (last.line != id)
+								if (copying)
 									copied += '\n';
+
+								copied.append(line, from, to - from);
+								copying = true;
 							};
 						};
 
