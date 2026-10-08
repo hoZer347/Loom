@@ -357,14 +357,14 @@ namespace Loom
 			info.DescriptorPool = m_imguiPool;
 			info.MinImageCount = m_minImageCount;
 			info.ImageCount = (uint32_t)m_swapImages.size();
-			info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+			info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
 			// ImGui draws in a pass of its own over the window's colour, with no
-			// depth, which is also all a window dragged out of this one has.
+			// depth. The backend sets up the windows dragged out of this one.
 			info.UseDynamicRendering = true;
-			info.PipelineRenderingCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR };
-			info.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
-			info.PipelineRenderingCreateInfo.pColorAttachmentFormats = &m_swapFormat;
+			info.PipelineInfoMain.PipelineRenderingCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR };
+			info.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+			info.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats = &m_swapFormat;
 
 			info.CheckVkResultFn = [](VkResult result) { Succeeded(result, "ImGui"); };
 
@@ -405,13 +405,6 @@ namespace Loom
 		{
 			ImGui::UpdatePlatformWindows();
 			ImGui::RenderPlatformWindowsDefault();
-		};
-
-		void ReleaseImGuiFonts() override
-		{
-			// The frames in flight may still be drawing with it.
-			vkDeviceWaitIdle(m_device);
-			ImGui_ImplVulkan_DestroyFontsTexture();
 		};
 
 		void BeginFrame() override

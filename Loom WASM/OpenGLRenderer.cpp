@@ -243,11 +243,6 @@ namespace Loom
 			glfwMakeContextCurrent(context);
 		};
 
-		void ReleaseImGuiFonts() override
-		{
-			ImGui_ImplOpenGL3_DestroyFontsTexture();
-		};
-
 		void BeginFrame() override
 		{ };
 

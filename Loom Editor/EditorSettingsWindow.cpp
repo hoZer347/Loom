@@ -44,7 +44,7 @@ namespace Loom
 		};
 
 		style.ScaleAllSizes(scale);
-		ImGui::GetIO().FontGlobalScale = scale;
+		style.FontScaleMain = scale;
 	};
 
 	void EditorSettings::QueueFont() const
@@ -53,9 +53,6 @@ namespace Loom
 			[file = font, size = fontSize]()
 			{
 				EditorTheme::LoadFont(file, size);
-
-				if (Renderer* renderer = Renderer::Get())
-					renderer->ReleaseImGuiFonts();
 			});
 	};
 

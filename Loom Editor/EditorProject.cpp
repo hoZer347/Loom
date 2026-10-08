@@ -501,7 +501,7 @@ namespace Loom
 				if (ImGui::Button(change))
 					m_dialogs->folder.Open();
 
-				ImGui::BeginChild("##assets", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border);
+				ImGui::BeginChild("##assets", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders);
 
 				if (m_assets.children.empty())
 					ImGui::TextDisabled("Nothing here yet. Right-click to create something.");
@@ -830,7 +830,7 @@ namespace Loom
 		std::error_code code;
 
 		if (std::filesystem::is_regular_file(path, code))
-			static_cast<Editor*>(ImGui::GetIO().PlatformOpenInShellUserData)->OpenAsset(path);
+			static_cast<Editor*>(ImGui::GetPlatformIO().Platform_OpenInShellUserData)->OpenAsset(path);
 		else
 			Shell(path, "");
 

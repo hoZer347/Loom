@@ -93,7 +93,7 @@ namespace Loom
 	void EditorTheme::LoadFont(const std::string& file, float size)
 	{
 		ImFontAtlas& atlas = *ImGui::GetIO().Fonts;
-		atlas.Clear();
+		atlas.ClearFonts();
 
 		const std::filesystem::path path = FontFolder() / file;
 		std::error_code code;

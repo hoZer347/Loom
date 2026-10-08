@@ -60,10 +60,6 @@ namespace Loom
 		// The ImGui windows dragged out of the main one.
 		virtual void RenderImGuiWindows() = 0;
 
-		// Drops ImGui's font texture, which the next frame builds again from
-		// the font atlas. For after the atlas has changed, between frames.
-		virtual void ReleaseImGuiFonts() = 0;
-
 		// Starts a frame on the window, which is the target until something is
 		// pushed over it, and presents it.
 		virtual void BeginFrame() = 0;

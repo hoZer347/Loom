@@ -56,7 +56,6 @@ namespace
 		void NewImGuiFrame() override { };
 		void RenderImGui(ImDrawData*) override { };
 		void RenderImGuiWindows() override { };
-		void ReleaseImGuiFonts() override { };
 		void BeginFrame() override { };
 		void EndFrame() override { };
 		void Capture(const CaptureHandler&) override { };

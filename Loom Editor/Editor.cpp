@@ -449,8 +449,8 @@ namespace Loom
 		// Clicking a number field types into it, Unity-style; dragging still scrubs.
 		ImGui::GetIO().ConfigDragClickToInputText = true;
 
-		ImGui::GetIO().PlatformOpenInShellFn = OpenInShell;
-		ImGui::GetIO().PlatformOpenInShellUserData = this;
+		ImGui::GetPlatformIO().Platform_OpenInShellFn = OpenInShell;
+		ImGui::GetPlatformIO().Platform_OpenInShellUserData = this;
 
 		drop_receiver = this;
 
@@ -1103,7 +1103,7 @@ namespace Loom
 			else if (const ImGuiDockNode* centre = ImGui::DockBuilderGetCentralNode(dockspace_id))
 				for (const char* window : view_windows)
 					if (ImGui::FindWindowSettingsByID(ImHashStr(window)) == nullptr)
-						ImGui::DockBuilderDockWindow(window, centre->m_ID);
+						ImGui::DockBuilderDockWindow(window, centre->ID);
 
 			// Nothing remembered from a previous run: ask where the scenes live.
 			if (m_projectPath.empty())
