@@ -434,7 +434,7 @@ namespace Loom
 	std::string Editor::NewAssetProblem() const
 	{
 		if (IsScript(m_newAssetKind))
-			return ProjectAssets::ScriptNameProblem(ScriptsProject(), m_newAssetName);
+			return ProjectAssets::ScriptNameProblem(ScriptsProject(), m_newAssetName, InfoOf(m_newAssetKind).script);
 
 		if (!ProjectAssets::IsValidName(m_newAssetName))
 			return "Not a usable file name.";

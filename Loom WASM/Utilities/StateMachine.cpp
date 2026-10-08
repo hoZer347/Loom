@@ -397,6 +397,15 @@ namespace Loom
 		OnMachineStateChanged();
 	};
 
+	void StateMachineBase::ExitDisabled()
+	{
+		if (!IsDisabled())
+			return;
+
+		disabledState->OnExit(nullptr);
+		disabledState = nullptr;
+	};
+
 	void StateMachineBase::Enable()
 	{
 		current = disabledState;

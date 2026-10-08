@@ -21,9 +21,9 @@ namespace Loom
 	/// configured instance to be copied, so each call yields a fresh state and there is no
 	/// shared template to mutate by accident.
 	///
-	///		machine->startState = StateReference::Of&lt;St_Idle&gt;();
+	///		m_start = StateReference::Of&lt;St_Idle&gt;();
 	///
-	///		machine->startState = StateReference::Of&lt;St_Walk&gt;(
+	///		m_start = StateReference::Of&lt;St_Walk&gt;(
 	///			[](St_Walk& state) { state.speed = 4.0f; });
 	///
 	/// A Serial&lt;StateReference&gt; is written to a scene by its name alone, so only a

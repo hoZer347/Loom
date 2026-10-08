@@ -153,6 +153,10 @@ namespace Loom
 		/// The state the machine enters when it starts, or null to start on nothing.
 		virtual std::shared_ptr<State> FirstState() const { return nullptr; };
 
+		/// Ends the state Disable put aside, for when another is entered in its place
+		/// rather than it being enabled again.
+		void ExitDisabled();
+
 	private:
 		struct St_Parallel;
 
@@ -250,8 +254,12 @@ namespace Loom
 				return;
 
 			if (std::shared_ptr<State> state = m_current->Create())
+			{
+				ExitDisabled();
 				Enter(std::move(state));
-			else Disable();
+			}
+			else if (!IsDisabled())
+				Disable();
 		};
 
 	protected:
@@ -264,6 +272,11 @@ namespace Loom
 
 		void OnMachineStateChanged() override
 		{
+			// Before the machine runs, Current is what the inspector set, which a
+			// Disable in edit mode is not to wipe.
+			if (!IsStarted())
+				return;
+
 			const State* state = Current();
 
 			m_current = state

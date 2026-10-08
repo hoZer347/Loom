@@ -98,6 +98,24 @@ TEST_SUITE("ProjectAssets")
 		CHECK(text.find("{NAME}") == std::string::npos);
 	};
 
+	TEST_CASE("a state machine cannot be named so that one of its states is taken")
+	{
+		const ScriptsProject scripts("loom project assets machine states");
+
+		std::ofstream(scripts.root / "GuardWalking.hpp") << "struct GuardWalking : Loom::State { };\n";
+
+		CHECK(Loom::ProjectAssets::ScriptNameProblem(scripts.project.string(), "Guard").empty());
+		CHECK_FALSE(Loom::ProjectAssets::ScriptNameProblem(
+			scripts.project.string(),
+			"Guard",
+			Loom::ProjectAssets::ScriptKind::StateMachine).empty());
+
+		std::string error;
+
+		CHECK(scripts.Create("Guard", &error, Loom::ProjectAssets::ScriptKind::StateMachine).empty());
+		CHECK(error.find("GuardWalking") != std::string::npos);
+	};
+
 	TEST_CASE("a script cannot take a registered state's name")
 	{
 		const ScriptsProject scripts("loom project assets registered state");
