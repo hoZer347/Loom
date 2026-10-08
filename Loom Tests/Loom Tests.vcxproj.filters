@@ -49,6 +49,9 @@
     <ClCompile Include="EditorCamera Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="EditorConsole Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="Sprite Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

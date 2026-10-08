@@ -101,6 +101,7 @@
     <ClCompile Include="ProjectAssets Tests.cpp" />
     <ClCompile Include="ProjectTemplate Tests.cpp" />
     <ClCompile Include="EditorCamera Tests.cpp" />
+    <ClCompile Include="EditorConsole Tests.cpp" />
     <ClCompile Include="EditCommands Tests.cpp" />
     <ClCompile Include="WebPlayer Tests.cpp" />
     <ClCompile Include="SerializedField Tests.cpp" />
@@ -141,8 +142,8 @@
     <ClCompile Include="..\Loom WASM\Utilities\*.cpp" Exclude="..\Loom WASM\Utilities\_*.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <!-- The editor's undo history and edit shortcuts, the parts of it that do
-         not need a window. The rest of the editor stays out. -->
+    <!-- The editor's undo history, edit shortcuts and console, the parts of
+         it that do not need a window. The rest of the editor stays out. -->
     <ClCompile Include="..\Loom Editor\SceneHistory.cpp" />
     <ClCompile Include="..\Loom Editor\EditCommands.cpp" />
     <ClCompile Include="..\Loom Editor\FieldNames.cpp" />
@@ -150,6 +151,9 @@
     <ClCompile Include="..\Loom Editor\ProjectAssets.cpp" />
     <ClCompile Include="..\Loom Editor\ProjectTemplate.cpp" />
     <ClCompile Include="..\Loom Editor\EditorCamera.cpp" />
+    <ClCompile Include="..\Loom Editor\EditorConsole.cpp" />
+    <ClCompile Include="..\Loom Editor\EditorLog.cpp" />
+    <ClCompile Include="..\Loom Editor\EditorTheme.cpp" />
   </ItemGroup>
   <ItemGroup>
     <!-- ImGui is linked rather than recompiled: Component<T>::Gui and

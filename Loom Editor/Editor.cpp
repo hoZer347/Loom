@@ -1135,7 +1135,7 @@ namespace Loom
 		if (m_showGame)			DrawGame();
 		if (m_showDebug)		DrawDebug();
 		if (m_showSceneData)	DrawSceneData();
-		if (m_showConsole)		DrawConsole();
+		if (m_showConsole)		m_console.Draw(&m_showConsole);
 		if (m_showStats)		DrawStats();
 		if (m_showImGuiDemo)	ImGui::ShowDemoWindow(&m_showImGuiDemo);
 
@@ -2436,59 +2436,6 @@ namespace Loom
 
 				ImGui::EndChild();
 			};
-		};
-
-		ImGui::End();
-	};
-
-	void Editor::DrawConsole()
-	{
-		if (ImGui::Begin("Console", &m_showConsole))
-		{
-			if (ImGui::Button("Clear"))
-				EditorLog::Get().Clear();
-
-			ImGui::SameLine();
-			ImGui::Checkbox("Auto-scroll", &m_consoleAutoScroll);
-
-			ImGui::SameLine();
-			ImGui::SetNextItemWidth(-FLT_MIN);
-			ImGui::InputTextWithHint(
-				"##filter",
-				"Filter",
-				m_consoleFilter,
-				sizeof(m_consoleFilter));
-
-			ImGui::Separator();
-
-			if (ImGui::BeginChild(
-				"##lines",
-				ImVec2(0.0f, 0.0f),
-				ImGuiChildFlags_None,
-				ImGuiWindowFlags_HorizontalScrollbar))
-			{
-				const char* filter = m_consoleFilter;
-
-				EditorLog::Get().ForEach(
-					[filter](const std::string& line, bool is_error)
-					{
-						if (filter[0] && line.find(filter) == std::string::npos)
-							return;
-
-						if (is_error)
-							ImGui::PushStyleColor(ImGuiCol_Text, EditorTheme::ErrorText);
-
-						ImGui::TextUnformatted(line.c_str());
-
-						if (is_error)
-							ImGui::PopStyleColor();
-					});
-
-				if (m_consoleAutoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
-					ImGui::SetScrollHereY(1.0f);
-			};
-
-			ImGui::EndChild();
 		};
 
 		ImGui::End();
