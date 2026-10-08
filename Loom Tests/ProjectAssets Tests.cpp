@@ -155,4 +155,20 @@ TEST_SUITE("ProjectAssets")
 
 		CHECK(ReadAll(scripts.Create("Spinner")).find("namespace GameScripts") != std::string::npos);
 	};
+
+	TEST_CASE("scenes, shaders, textures and scripts are game files, the project's other files are not")
+	{
+		CHECK(Loom::ProjectAssets::IsGameFile("Level.loomscene"));
+		CHECK(Loom::ProjectAssets::IsGameFile("Flat.shader"));
+		CHECK(Loom::ProjectAssets::IsGameFile("Hero.png"));
+		CHECK(Loom::ProjectAssets::IsGameFile("Sky.JPG"));
+		CHECK(Loom::ProjectAssets::IsGameFile("Spinner.hpp"));
+
+		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("GameScripts.sln"));
+		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("GameScripts.vcxproj"));
+		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("GameScripts.vcxproj.filters"));
+		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("Game.loomproject"));
+		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("README.txt"));
+		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("Spinner"));
+	};
 };

@@ -77,8 +77,9 @@ namespace Loom
 			return InfoOf(kind).appearsIn != nullptr;
 		};
 
-		// Folders first, then files, each alphabetically. Dot-prefixed entries
-		// (.vs, .gitignore) and the build output are not assets.
+		// Folders first, then files, each alphabetically. Only files the game
+		// uses are assets, and dot-prefixed folders (.vs) and the build output
+		// are left out.
 		void Scan(
 			const std::filesystem::path& folder,
 			const std::filesystem::path& skip,
@@ -96,6 +97,9 @@ namespace Loom
 					continue;
 
 				AssetNode child{ path.string(), name, entry.is_directory(code) };
+
+				if (!child.folder && !ProjectAssets::IsGameFile(name) && !IsModelFile(name))
+					continue;
 
 				if (child.folder)
 				{

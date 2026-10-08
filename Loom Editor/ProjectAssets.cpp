@@ -1,6 +1,7 @@
 #include "ProjectAssets.h"
 
 #include "ComponentRegistry.h"
+#include "SceneSerializer.h"
 
 #include "Utilities/StateReference.h"
 
@@ -13,6 +14,7 @@
 #include <fstream>
 #include <iterator>
 #include <regex>
+#include <string_view>
 #include <vector>
 
 
@@ -21,6 +23,15 @@ namespace Loom
 	namespace
 	{
 		constexpr size_t maxNameLength = 64;
+
+		// Textures are whatever Textures.cpp has stb_image decode.
+		constexpr std::string_view gameFileExtensions[] =
+		{
+			SceneSerializer::extension,
+			Shader::extension,
+			".png", ".jpg", ".jpeg", ".bmp", ".tga",
+			".hpp", ".h", ".cpp",
+		};
 
 		// Windows forbids the first lot in a file name; the rest mean something
 		// to MSBuild, or to the XML a project is written in.
@@ -486,5 +497,18 @@ void main()
 			std::filesystem::path(path).lexically_relative(folder);
 
 		return !relative.empty() && *relative.begin() != "..";
+	};
+
+	bool ProjectAssets::IsGameFile(const std::string& name)
+	{
+		std::string extension = std::filesystem::path(name).extension().string();
+
+		std::transform(
+			extension.begin(),
+			extension.end(),
+			extension.begin(),
+			[](unsigned char c) { return (char)std::tolower(c); });
+
+		return std::find(std::begin(gameFileExtensions), std::end(gameFileExtensions), extension) != std::end(gameFileExtensions);
 	};
 };
