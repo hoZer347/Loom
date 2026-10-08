@@ -46,7 +46,7 @@ namespace Loom
 
 		static std::string Replace(std::string text, const std::string& token, const std::string& value);
 
-		// Whether path is somewhere inside folder, not folder itself.
+		// Whether path is folder or somewhere inside it.
 		static bool IsUnder(const std::string& path, const std::string& folder);
 
 		struct OpenCommand
