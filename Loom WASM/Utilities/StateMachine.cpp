@@ -1,5 +1,7 @@
 #include "StateMachine.h"
 
+#include "StateMachineMonitor.h"
+
 #include <algorithm>
 #include <map>
 #include <mutex>
@@ -222,16 +224,11 @@ namespace Loom
 
 	void StateMachineBase::StepAttached()
 	{
-		const std::vector<StateMachineBase*> machines = All();
-
-		for (StateMachineBase* machine : machines)
-		{
-			// A state may destroy a machine, its own or another, mid-frame.
-			const std::vector<StateMachineBase*> alive = All();
-
-			if (std::ranges::find(alive, machine) != alive.end() && machine->GetGameObject())
+		// One snapshot holds for the whole frame: a GameObject or component is only
+		// ever destroyed by a queued task, at the start of the next one.
+		for (StateMachineBase* machine : All())
+			if (machine->GetGameObject())
 				machine->Step();
-		};
 	};
 
 	void StateMachineBase::Advance(float deltaTime)
@@ -246,6 +243,13 @@ namespace Loom
 	{
 		if (current)
 			current->OnGui();
+	};
+
+	void StateMachineBase::DrawMachineGui()
+	{
+		StateMachineMonitor::DrawInline(*this);
+
+		PumpGui();
 	};
 
 	#pragma endregion

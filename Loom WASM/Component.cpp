@@ -14,6 +14,7 @@ namespace Loom
 		if (ImGui::TreeNode((void*)this, "%s", ComponentRegistry::NameOf(*this).c_str()))
 		{
 			OnGui();
+			ExtraGui();
 			ImGui::TreePop();
 		};
 
