@@ -144,15 +144,33 @@
           DestinationFolder="$(OutDir)"
           SkipUnchangedFiles="true" />
   </Target>
+  <PropertyGroup>
+    <DemosDir>$(MSBuildProjectDirectory)\..\Demos\</DemosDir>
+    <DemoManifest>$(IntDir)CopyDemos.manifest</DemoManifest>
+    <!-- Visual Studio's own up-to-date check never looks at the demos, so it would skip CopyDemos -->
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+  </PropertyGroup>
   <ItemGroup>
     <DemoSource Include="$(MSBuildProjectDirectory)\..\Demo Sources\**\*" />
   </ItemGroup>
   <!-- Inputs and Outputs pair up, so only demo files whose source is newer than the copy are refreshed -->
   <Target Name="CopyDemos" AfterTargets="Build"
           Inputs="@(DemoSource)"
-          Outputs="@(DemoSource->'$(MSBuildProjectDirectory)\..\Demos\%(RecursiveDir)%(Filename)%(Extension)')">
+          Outputs="@(DemoSource->'$(DemosDir)%(RecursiveDir)%(Filename)%(Extension)')">
     <Copy SourceFiles="@(DemoSource)"
-          DestinationFiles="@(DemoSource->'$(MSBuildProjectDirectory)\..\Demos\%(RecursiveDir)%(Filename)%(Extension)')" />
+          DestinationFiles="@(DemoSource->'$(DemosDir)%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
+  <!-- Deletes the copies of files since removed from Demo Sources, leaving files made while debugging -->
+  <Target Name="PruneDemos" AfterTargets="CopyDemos">
+    <ReadLinesFromFile File="$(DemoManifest)">
+      <Output TaskParameter="Lines" ItemName="CopiedDemo" />
+    </ReadLinesFromFile>
+    <ItemGroup>
+      <DemoRelative Include="@(DemoSource->'%(RecursiveDir)%(Filename)%(Extension)')" />
+      <CopiedDemo Remove="@(DemoRelative)" />
+    </ItemGroup>
+    <Delete Files="@(CopiedDemo->'$(DemosDir)%(Identity)')" />
+    <WriteLinesToFile File="$(DemoManifest)" Lines="@(DemoRelative)" Overwrite="true" WriteOnlyWhenDifferent="true" />
   </Target>
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
