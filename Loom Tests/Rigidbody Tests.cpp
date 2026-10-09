@@ -32,6 +32,11 @@ namespace
 	constexpr float STILL = 0.1f;
 	constexpr float CLOSE = 0.01f;
 
+	// Of a uniform box about its centre, by its half extents; of a solid
+	// sphere, by its radius.
+	constexpr float BOX_INERTIA = 1.0f / 3.0f;
+	constexpr float SPHERE_INERTIA = 2.0f / 5.0f;
+
 	float Gravity()
 	{
 		return -Loom::Physics::GetGravity().y;
@@ -449,6 +454,196 @@ TEST_SUITE("Rigidbody")
 
 		CHECK(Position(*upper).y == doctest::Approx(1.0f + HALF).epsilon(REST));
 		CHECK(Position(*lower).y == doctest::Approx(HALF).epsilon(REST));
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a sleeping body falls once what held it up is gone")
+	{
+		Loom::Scene scene("support gone");
+		Pump();
+
+		Floor(scene);
+		Loom::GameObject* floor = scene.GetRoot().GetChildren()[0];
+
+		Loom::Rigidbody* box = Body<Loom::BoxCollider>(scene, glm::vec3(0.0f, HALF, 0.0f));
+
+		Run(scene, 2.0f);
+		REQUIRE(box->IsSleeping());
+
+		floor->SetDisabled(true);
+		Run(scene, 1.0f);
+
+		CHECK_FALSE(box->IsSleeping());
+		CHECK(Position(*box).y < -1.0f);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a slow kinematic body wakes a sleeper it touches and pushes it along")
+	{
+		constexpr float SLOW = 0.3f;
+
+		Loom::Scene scene("slow pusher");
+		Pump();
+
+		Floor(scene);
+
+		Loom::Rigidbody* sleeper = Body<Loom::BoxCollider>(scene, glm::vec3(0.0f, HALF, 0.0f));
+
+		Run(scene, 2.0f);
+		REQUIRE(sleeper->IsSleeping());
+
+		// Starting a little apart, so it has to close the gap first.
+		constexpr float GAP = 0.1f;
+
+		Loom::Rigidbody* pusher = Body<Loom::BoxCollider>(scene, glm::vec3(-1.0f - GAP, HALF, 0.0f));
+		pusher->isKinematic = true;
+		pusher->velocity = glm::vec3(SLOW, 0.0f, 0.0f);
+
+		Run(scene, 3.0f);
+
+		// It travelled SLOW * 3 seconds, the gap of it on its own.
+		const float pushed = SLOW * 3.0f - GAP;
+
+		CHECK(Position(*sleeper).x == doctest::Approx(pushed).epsilon(STILL));
+		CHECK(Position(*sleeper).x > Position(*pusher).x + 1.0f - STILL);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a body turned by its script past ninety degrees keeps the turn it was given")
+	{
+		Loom::Scene scene("turned by script");
+		Pump();
+
+		Loom::GameObject* object = Spawn(scene, "Turned", glm::vec3(0.0f));
+		object->Attach<Loom::BoxCollider>();
+		object->Attach<Loom::Rigidbody>()->isKinematic = true;
+		Pump();
+
+		const glm::vec3 turn(120.0f, 30.0f, 10.0f);
+		object->transform.rotation = turn;
+
+		Run(scene, 0.5f);
+
+		CHECK(*object->transform.rotation == turn);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "forces and torques act in every mode as Unity's do")
+	{
+		constexpr float MASS = 2.0f;
+		constexpr float PUSH = 4.0f;
+
+		Loom::Scene scene("force modes");
+		Pump();
+
+		const glm::vec3 gravity = Loom::Physics::GetGravity();
+		Loom::Physics::SetGravity(glm::vec3(0.0f));
+
+		const float step = Loom::Physics::FixedDeltaTime();
+		const glm::vec3 along(PUSH, 0.0f, 0.0f);
+		const glm::vec3 about(0.0f, PUSH, 0.0f);
+
+		// A solid ball of radius half a unit.
+		const float inertia = SPHERE_INERTIA * MASS * HALF * HALF;
+
+		struct Expected
+		{
+			Loom::ForceMode mode;
+			float speed;
+			float spin;
+		};
+
+		const Expected modes[] =
+		{
+			{ Loom::ForceMode::Force, PUSH / MASS * step, PUSH / inertia * step },
+			{ Loom::ForceMode::Acceleration, PUSH * step, PUSH * step },
+			{ Loom::ForceMode::Impulse, PUSH / MASS, PUSH / inertia },
+			{ Loom::ForceMode::VelocityChange, PUSH, PUSH },
+		};
+
+		// Far enough apart that nothing touches.
+		constexpr float APART = 10.0f;
+		float offset = 0.0f;
+
+		for (const Expected& expected : modes)
+		{
+			offset += APART;
+
+			Loom::Rigidbody* pushed = Body<Loom::SphereCollider>(scene, glm::vec3(offset, 0.0f, 0.0f));
+			Loom::Rigidbody* turned = Body<Loom::SphereCollider>(scene, glm::vec3(offset, 0.0f, APART));
+
+			for (Loom::Rigidbody* body : { pushed, turned })
+			{
+				body->mass = MASS;
+				body->angularDrag = 0.0f;
+			};
+
+			pushed->AddForce(along, expected.mode);
+			turned->AddTorque(about, expected.mode);
+
+			scene.Physics();
+
+			CHECK(pushed->velocity.x == doctest::Approx(expected.speed).epsilon(CLOSE));
+			CHECK(turned->angularVelocity.y == doctest::Approx(expected.spin).epsilon(CLOSE));
+		};
+
+		Loom::Physics::SetGravity(gravity);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an angular impulse turns a stretched, turned body about its own axes")
+	{
+		Loom::Scene scene("turned impulse");
+		Pump();
+
+		const glm::vec3 gravity = Loom::Physics::GetGravity();
+		Loom::Physics::SetGravity(glm::vec3(0.0f));
+
+		// Twice as long along its own X, which the turn about Y lays along
+		// world -Z, so a twist about world Z turns it about its own X.
+		Loom::GameObject* object = Spawn(scene, "Long", glm::vec3(0.0f));
+		object->transform.scale = glm::vec3(2.0f, 1.0f, 1.0f);
+		object->transform.rotation = glm::vec3(0.0f, 90.0f, 0.0f);
+		object->Attach<Loom::BoxCollider>();
+		Loom::Rigidbody* body = object->Attach<Loom::Rigidbody>();
+		body->angularDrag = 0.0f;
+		Pump();
+
+		const float aboutOwnX = BOX_INERTIA * (HALF * HALF + HALF * HALF);
+
+		body->AddTorque(glm::vec3(0.0f, 0.0f, 1.0f), Loom::ForceMode::Impulse);
+		scene.Physics();
+
+		Loom::Physics::SetGravity(gravity);
+
+		CHECK(body->angularVelocity.z == doctest::Approx(1.0f / aboutOwnX).epsilon(CLOSE));
+		CHECK(std::abs(body->angularVelocity.x) < CLOSE);
+		CHECK(std::abs(body->angularVelocity.y) < CLOSE);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a collider attached after its Rigidbody moves with it from the first step")
+	{
+		Loom::Scene scene("rigidbody first");
+		Pump();
+
+		const glm::vec3 gravity = Loom::Physics::GetGravity();
+		Loom::Physics::SetGravity(glm::vec3(0.0f));
+
+		// A rod along X; a body with no collider found would spin as a
+		// small ball would, a dozen times faster.
+		constexpr float LENGTH = 4.0f;
+		constexpr float THICKNESS = 0.2f;
+
+		Loom::GameObject* object = Spawn(scene, "Rod", glm::vec3(0.0f));
+		Loom::Rigidbody* body = object->Attach<Loom::Rigidbody>();
+		body->angularDrag = 0.0f;
+		object->Attach<Loom::BoxCollider>()->size = glm::vec3(LENGTH, THICKNESS, THICKNESS);
+		Pump();
+
+		body->AddTorque(glm::vec3(0.0f, 1.0f, 0.0f), Loom::ForceMode::Impulse);
+		scene.Physics();
+
+		Loom::Physics::SetGravity(gravity);
+
+		const float half = LENGTH * HALF;
+		const float thin = THICKNESS * HALF;
+
+		CHECK(body->angularVelocity.y == doctest::Approx(1.0f / (BOX_INERTIA * (half * half + thin * thin))).epsilon(CLOSE));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a body under a moved and turned parent lands where the world says, and a disabled one stays put")

@@ -25,11 +25,11 @@ namespace Loom
 
 	ImGuiIO* io;
 
-	// Frame time the physics steps have not covered yet.
-	float s_physicsTime = 0.0f;
-
 	namespace
 	{
+		// Frame time the physics steps have not covered yet.
+		float s_physicsTime = 0.0f;
+
 		// GL hands pixels back red first; a bitmap stores them blue first.
 		enum Channel { RED, GREEN, BLUE, BYTES_PER_PIXEL };
 		enum BitmapChannel { BITMAP_BLUE, BITMAP_GREEN, BITMAP_RED };

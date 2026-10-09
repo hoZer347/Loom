@@ -146,6 +146,9 @@ namespace Loom
 			unsigned step;
 		};
 
+		// Fills in a body Add only noted, false for one that cannot move.
+		bool Ready(Body& body);
+
 		void Gather(float seconds);
 		void Prepare(Pair& pair, float seconds);
 		void Solve(Pair& pair);
@@ -153,6 +156,10 @@ namespace Loom
 		// Gives a's side of the contact -impulse and b's +impulse.
 		void Push(const Pair& pair, const Contact& contact, const glm::vec3& impulse);
 		void Wake(int body);
+
+		// The Rigidbody the collider moves with, if it has one, at once and
+		// from outside a step too.
+		static void WakeOwner(const Collider& collider);
 		void Integrate(Body& body, float seconds);
 		void Report();
 

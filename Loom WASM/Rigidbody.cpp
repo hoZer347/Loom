@@ -2,8 +2,6 @@
 
 #include "Simulation.h"
 
-#include "glm/gtc/quaternion.hpp"
-
 
 namespace Loom
 {
@@ -32,20 +30,10 @@ namespace Loom
 	{
 		switch (mode)
 		{
-		case ForceMode::Force:			m_torque += torque;		break;
-		case ForceMode::Acceleration:	m_spin += torque;		break;
+		case ForceMode::Force:			m_torque += torque;			break;
+		case ForceMode::Acceleration:	m_spin += torque;			break;
+		case ForceMode::Impulse:		m_angularImpulse += torque;	break;
 		case ForceMode::VelocityChange:	angularVelocity += torque;	break;
-
-		case ForceMode::Impulse:
-		{
-			// Through the inertia the last step found, turned the way the body
-			// faces now.
-			const glm::mat3 turned = glm::mat3_cast(glm::quat_cast(glm::mat3(m_gameObject->WorldMatrix())));
-			const glm::vec3 own = glm::transpose(turned) * torque;
-
-			angularVelocity += turned * (own * m_inverseInertia);
-			break;
-		};
 		};
 
 		WakeUp();

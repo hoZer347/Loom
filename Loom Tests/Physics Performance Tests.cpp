@@ -302,6 +302,7 @@ TEST_SUITE("PhysicsPerformance")
 
 		CHECK(many / few <= MOST_GROWTH);
 	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "bodies dropped into a pit pile up inside it and fall asleep")
 	{
 		constexpr int COUNT = 200;
@@ -323,8 +324,9 @@ TEST_SUITE("PhysicsPerformance")
 		constexpr float LARGEST = 0.9f;
 
 		// How many may still be stirring by the end: balls still rolling to a
-		// stop, mostly. A pile that never settles keeps them all awake.
-		constexpr int MOST_AWAKE = COUNT / 4;
+		// stop, and what they wake as they leave it. A pile that never
+		// settles keeps them all awake.
+		constexpr int MOST_AWAKE = COUNT / 2;
 
 		// Nothing slows a ball rolling on a floor, here as in Unity, so a
 		// scene that wants its balls to stop gives them angular drag.

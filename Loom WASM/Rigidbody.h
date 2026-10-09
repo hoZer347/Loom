@@ -38,7 +38,8 @@ namespace Loom
 	* - Bounciness and friction are a material's in Unity; here they are the
 	*   body's, and a static collider takes on whatever touches it
 	* - Comes to rest asleep once it has barely moved for a while, skipping
-	*   the simulation until something touches it or a force is added
+	*   the simulation until it is struck hard, touched by a kinematic body,
+	*   loses something it was touching, or is given a force or a velocity
 	*/
 	struct LOOM_API Rigidbody : Component<Rigidbody, "Physics">
 	{
@@ -71,10 +72,12 @@ namespace Loom
 		friend struct Simulation;
 
 		// What AddForce and AddTorque have gathered for the next step: an
-		// acceleration, a torque, and an angular acceleration.
+		// acceleration, a torque, an angular acceleration, and an angular
+		// impulse, the last two through the inertia that step finds.
 		glm::vec3 m_force{ 0.0f };
 		glm::vec3 m_torque{ 0.0f };
 		glm::vec3 m_spin{ 0.0f };
+		glm::vec3 m_angularImpulse{ 0.0f };
 
 		bool m_sleeping = false;
 

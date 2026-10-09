@@ -84,12 +84,19 @@ namespace Loom
 
 	void Simulation::Add(Rigidbody& rigidbody)
 	{
-		GameObject* object = rigidbody.m_gameObject;
-		const glm::mat4 world = object->WorldMatrix();
-
 		Body body{ };
 		body.rigidbody = &rigidbody;
-		body.object = object;
+		body.object = rigidbody.m_gameObject;
+
+		m_bodies.push_back(std::move(body));
+	};
+
+	bool Simulation::Ready(Body& body)
+	{
+		Rigidbody& rigidbody = *body.rigidbody;
+		GameObject* object = body.object;
+		const glm::mat4 world = object->WorldMatrix();
+
 		body.position = glm::vec3(world[3]);
 
 		glm::mat3 rotation(1.0f);
@@ -100,7 +107,7 @@ namespace Loom
 			scale[axis] = glm::length(glm::vec3(world[axis]));
 
 			if (scale[axis] == 0.0f)
-				return;
+				return false;
 
 			rotation[axis] = glm::vec3(world[axis]) / scale[axis];
 		};
@@ -111,9 +118,8 @@ namespace Loom
 		body.baseInverseMass = dynamic ? 1.0f / rigidbody.mass : 0.0f;
 
 		// Spread as its first box or sphere is; a body with neither is a
-		// sphere half a unit across.
+		// sphere of radius half a unit.
 		glm::vec3 inertia(SPHERE_INERTIA * rigidbody.mass * HALF * HALF);
-		const int index = (int)m_bodies.size();
 
 		for (ComponentBase* component : object->GetComponents())
 		{
@@ -122,7 +128,6 @@ namespace Loom
 			if (collider == nullptr || collider->m_tree != &m_tree)
 				continue;
 
-			collider->m_body = index;
 
 			if (body.colliders.empty())
 			{
@@ -173,12 +178,24 @@ namespace Loom
 		body.inverseMass = body.awake ? body.baseInverseMass : 0.0f;
 		body.inverseInertia = body.awake ? body.baseInverseInertia : glm::mat3(0.0f);
 
-		m_bodies.push_back(std::move(body));
+		return true;
 	};
 
 	void Simulation::Step(float seconds)
 	{
 		m_step++;
+
+		// Once the tree is in step, so a collider attached since the body
+		// was is in it and moves with the body.
+		for (Body& body : m_bodies)
+			if (!Ready(body))
+				body.object = nullptr;
+
+		std::erase_if(m_bodies, [](const Body& body) { return body.object == nullptr; });
+
+		for (int index = 0; index < (int)m_bodies.size(); index++)
+			for (Collider* collider : m_bodies[index].colliders)
+				collider->m_body = index;
 
 		const glm::vec3 gravity = Physics::GetGravity();
 
@@ -189,7 +206,8 @@ namespace Loom
 			if (body.awake && body.inverseMass > 0.0f)
 			{
 				rigidbody.velocity += (rigidbody.m_force + (rigidbody.useGravity ? gravity : glm::vec3(0.0f))) * seconds;
-				rigidbody.angularVelocity += (body.inverseInertia * rigidbody.m_torque + rigidbody.m_spin) * seconds;
+				rigidbody.angularVelocity += (body.inverseInertia * rigidbody.m_torque + rigidbody.m_spin) * seconds
+					+ body.inverseInertia * rigidbody.m_angularImpulse;
 
 				rigidbody.velocity /= 1.0f + seconds * rigidbody.drag;
 				rigidbody.angularVelocity /= 1.0f + seconds * rigidbody.angularDrag;
@@ -198,6 +216,7 @@ namespace Loom
 			rigidbody.m_force = glm::vec3(0.0f);
 			rigidbody.m_torque = glm::vec3(0.0f);
 			rigidbody.m_spin = glm::vec3(0.0f);
+			rigidbody.m_angularImpulse = glm::vec3(0.0f);
 
 			body.velocity = rigidbody.velocity;
 			body.angularVelocity = rigidbody.angularVelocity;
@@ -232,7 +251,24 @@ namespace Loom
 	void Simulation::Forget(const Collider& collider)
 	{
 		std::erase_if(m_touching,
-			[&](const auto& entry) { return entry.first.first == &collider || entry.first.second == &collider; });
+			[&](const auto& entry)
+			{
+				const bool first = entry.first.first == &collider;
+
+				if (!first && entry.first.second != &collider)
+					return false;
+
+				// What it held up has to be free to fall.
+				WakeOwner(*(first ? entry.first.second : entry.first.first));
+
+				return true;
+			});
+	};
+
+	void Simulation::WakeOwner(const Collider& collider)
+	{
+		if (Rigidbody* rigidbody = collider.m_gameObject->GetComponent<Rigidbody>())
+			rigidbody->WakeUp();
 	};
 
 	int Simulation::BodyOf(const Collider& collider) const
@@ -364,9 +400,12 @@ namespace Loom
 							pair.bounciness = only->bounciness;
 						};
 
-						// A sleeper struck hard enough wakes.
-						if (otherBody != NONE && !m_bodies[otherBody].awake && !pair.trigger
-							&& glm::length(m_bodies[index].velocity) > WAKE_SPEED)
+						// A sleeper wakes when struck hard enough, or touched by
+						// something that will not stop for it.
+						const bool striking = glm::length(m_bodies[index].velocity) > WAKE_SPEED
+							|| (pair.touching && !dynamic(index));
+
+						if (otherBody != NONE && !m_bodies[otherBody].awake && !pair.trigger && striking)
 							Wake(otherBody);
 
 						m_pairs.push_back(pair);
@@ -507,32 +546,45 @@ namespace Loom
 		if (!body.awake)
 			return;
 
-		body.position += body.velocity * seconds;
+		// Only what moved is written back, so a body set still, a kinematic
+		// one moved by its script especially, keeps the pose it was given.
+		const bool moving = body.velocity != glm::vec3(0.0f);
+		const bool turning = body.angularVelocity != glm::vec3(0.0f);
 
-		const glm::quat spin(0.0f, body.angularVelocity);
-		body.orientation = glm::normalize(body.orientation + spin * body.orientation * (HALF * seconds));
+		if (moving || turning)
+		{
+			body.position += body.velocity * seconds;
 
-		// Back into its parent's space, keeping its own scale.
-		const GameObject* parent = body.object->GetParent();
-		const glm::mat4 parentWorld = parent ? parent->WorldMatrix() : glm::mat4(1.0f);
-		const glm::mat4 local = glm::inverse(parentWorld)
-			* glm::translate(glm::mat4(1.0f), body.position)
-			* glm::mat4_cast(body.orientation);
+			const glm::quat spin(0.0f, body.angularVelocity);
+			body.orientation = glm::normalize(body.orientation + spin * body.orientation * (HALF * seconds));
 
-		glm::mat4 turned(1.0f);
+			// Back into its parent's space, keeping its own scale.
+			const GameObject* parent = body.object->GetParent();
+			const glm::mat4 parentWorld = parent ? parent->WorldMatrix() : glm::mat4(1.0f);
+			const glm::mat4 local = glm::inverse(parentWorld)
+				* glm::translate(glm::mat4(1.0f), body.position)
+				* glm::mat4_cast(body.orientation);
 
-		for (int axis = 0; axis < glm::vec3::length(); axis++)
-			turned[axis] = glm::vec4(glm::normalize(glm::vec3(local[axis])), 0.0f);
+			if (moving)
+				body.object->transform.position = glm::vec3(local[3]);
 
-		// Transform turns about Y, then X, then Z.
-		glm::vec3 radians;
-		glm::extractEulerAngleYXZ(turned, radians.y, radians.x, radians.z);
+			if (turning)
+			{
+				glm::mat4 turned(1.0f);
 
-		body.object->transform.position = glm::vec3(local[3]);
-		body.object->transform.rotation = glm::degrees(radians);
+				for (int axis = 0; axis < glm::vec3::length(); axis++)
+					turned[axis] = glm::vec4(glm::normalize(glm::vec3(local[axis])), 0.0f);
 
-		for (Collider* collider : body.colliders)
-			m_tree.Sync(*collider);
+				// Transform turns about Y, then X, then Z.
+				glm::vec3 radians;
+				glm::extractEulerAngleYXZ(turned, radians.y, radians.x, radians.z);
+
+				body.object->transform.rotation = glm::degrees(radians);
+			};
+
+			for (Collider* collider : body.colliders)
+				m_tree.Sync(*collider);
+		};
 
 		if (body.inverseMass == 0.0f)
 			return;
@@ -540,13 +592,13 @@ namespace Loom
 		// The spin's energy about the body's own axes, its inertia being the
 		// inverse of what the solver turns it by.
 		const glm::vec3 spinOwn = glm::transpose(glm::mat3_cast(body.orientation)) * body.angularVelocity;
-		float turning = 0.0f;
+		float spinning = 0.0f;
 
 		for (int axis = 0; axis < glm::vec3::length(); axis++)
 			if (rigidbody.m_inverseInertia[axis] > 0.0f)
-				turning += spinOwn[axis] * spinOwn[axis] / rigidbody.m_inverseInertia[axis];
+				spinning += spinOwn[axis] * spinOwn[axis] / rigidbody.m_inverseInertia[axis];
 
-		const float energy = HALF * (glm::dot(body.velocity, body.velocity) + turning * body.inverseMass);
+		const float energy = HALF * (glm::dot(body.velocity, body.velocity) + spinning * body.inverseMass);
 
 		if (energy < SLEEP_ENERGY)
 		{
@@ -691,6 +743,12 @@ namespace Loom
 
 			Collider* a = const_cast<Collider*>(entry->first.first);
 			Collider* b = const_cast<Collider*>(entry->first.second);
+
+			if (!touching.trigger)
+			{
+				WakeOwner(*a);
+				WakeOwner(*b);
+			};
 
 			report(*a, *b, BodyOf(*a), BodyOf(*b), touching.trigger, nullptr, 0, LEAVING);
 

@@ -31,6 +31,7 @@ namespace RaycastsScripts
 		static constexpr int KINDS = 2;
 		static constexpr unsigned SEED = 1;
 
+		static constexpr float HALF = 0.5f;
 		static constexpr float LEAST_SIZE = 0.4f;
 		static constexpr float MOST_SIZE = 1.4f;
 
@@ -56,7 +57,7 @@ namespace RaycastsScripts
 			const int perLayer = perRow * perRow;
 
 			// A little off the grid, so they do not fall in lockstep.
-			std::uniform_real_distribution<float> jitter(-(SPACING - MOST_SIZE) * 0.5f, (SPACING - MOST_SIZE) * 0.5f);
+			std::uniform_real_distribution<float> jitter(-(SPACING - MOST_SIZE) * HALF, (SPACING - MOST_SIZE) * HALF);
 			std::uniform_real_distribution<float> size(LEAST_SIZE, MOST_SIZE);
 			std::uniform_real_distribution<float> angle(0.0f, FULL_TURN);
 			std::uniform_int_distribution<size_t> colour(0, std::size(COLOURS) - 1);
@@ -67,9 +68,9 @@ namespace RaycastsScripts
 
 				const int cell = i % perLayer;
 				const glm::vec3 slot(
-					(cell % perRow - (perRow - 1) * 0.5f) * SPACING,
+					(cell % perRow - (perRow - 1) * HALF) * SPACING,
 					*m_above + (i / perLayer) * SPACING,
-					(cell / perRow - (perRow - 1) * 0.5f) * SPACING);
+					(cell / perRow - (perRow - 1) * HALF) * SPACING);
 
 				object->transform.position = slot + glm::vec3(jitter(random), jitter(random), jitter(random));
 				object->transform.rotation = glm::vec3(angle(random), angle(random), angle(random));

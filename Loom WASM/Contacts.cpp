@@ -29,7 +29,7 @@ namespace Contacts
 		constexpr float HALF = 0.5f;
 
 		// A face clipped by four planes has at most eight corners.
-		constexpr int MOST_CORNERS = 16;
+		constexpr int MOST_CORNERS = 8;
 
 		struct Sphere
 		{
@@ -753,11 +753,11 @@ namespace Contacts
 			};
 		};
 
-		// The manifolds of b against a, turned to run from a into b.
-		void Reversed(const std::vector<Manifold>& from, size_t first, std::vector<Manifold>& manifolds)
+		// Turns the manifolds from first on to run the other way.
+		void Reverse(std::vector<Manifold>& manifolds, size_t first)
 		{
-			for (size_t i = first; i < from.size(); i++)
-				manifolds[i].normal = -from[i].normal;
+			for (size_t i = first; i < manifolds.size(); i++)
+				manifolds[i].normal = -manifolds[i].normal;
 		};
 	};
 
@@ -812,7 +812,7 @@ namespace Contacts
 		};
 
 		if (swapped)
-			Reversed(manifolds, before, manifolds);
+			Reverse(manifolds, before);
 	};
 };
 };
