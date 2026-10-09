@@ -86,6 +86,32 @@ TEST_SUITE("Camera")
 		CHECK(Loom::Camera::current == nullptr);
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene with no camera of its own is seen through another open scene's")
+	{
+		Loom::Scene with("with a camera");
+		Loom::Scene without("without a camera");
+		Pump();
+
+		Loom::Camera* camera = with.Attach<Loom::Camera>();
+		CameraWitness* witness = without.Attach<CameraWitness>();
+		Pump();
+
+		without.Render();
+		CHECK(witness->seen == camera);
+
+		// One whose own camera is off still draws nothing rather than borrowing.
+		Loom::GameObject* holder = without.AddChild("Camera");
+		Pump();
+
+		holder->Attach<Loom::Camera>();
+		holder->SetDisabled(true);
+		Pump();
+
+		witness->seen = nullptr;
+		without.Render();
+		CHECK(witness->seen == nullptr);
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene whose only camera is disabled draws nothing")
 	{
 		Loom::Scene scene("camera off");

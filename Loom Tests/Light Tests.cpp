@@ -12,13 +12,53 @@
 #include <cmath>
 
 using LoomTests::Pump;
+using LoomTests::RecordingRenderer;
 
 // How far a projected coordinate may drift from where the math puts it.
 static constexpr float EPSILON = 1e-4f;
 
 
+namespace
+{
+	// A component that notes which light was current when it was drawn.
+	struct LightWitness final : Loom::Component<LightWitness>
+	{
+		void OnRender() override { seen = Loom::Light::current; };
+
+		Loom::Light* seen = nullptr;
+	};
+};
+
+
 TEST_SUITE("Light")
 {
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene with no light of its own is lit by another open scene's")
+	{
+		RecordingRenderer renderer;
+
+		Loom::Scene lit("lit");
+		Loom::Scene unlit("unlit");
+		Pump();
+
+		Loom::Light* light = lit.Attach<Loom::Light>();
+		LightWitness* witness = unlit.Attach<LightWitness>();
+		Pump();
+
+		unlit.Render();
+		CHECK(witness->seen == light);
+
+		// One whose own light is off stays unlit rather than borrowing.
+		Loom::GameObject* holder = unlit.AddChild("Light");
+		Pump();
+
+		holder->Attach<Loom::Light>();
+		holder->SetDisabled(true);
+		Pump();
+
+		unlit.Render();
+		CHECK(witness->seen == nullptr);
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a light is a built-in component the editor can add by name")
 	{
 		Loom::Scene scene("light by name");

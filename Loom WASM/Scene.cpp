@@ -12,6 +12,19 @@
 
 namespace Loom
 {
+	namespace
+	{
+		template <typename T>
+		T* FirstAmong(const std::vector<Scene*>& scenes)
+		{
+			for (Scene* scene : scenes)
+				if (T* found = scene->GetRoot().FindComponent<T>())
+					return found;
+
+			return nullptr;
+		};
+	};
+
 	Scene::Scene(
 		const std::string& name,
 		int thread_id) :
@@ -36,13 +49,22 @@ namespace Loom
 	{
 		Camera* seen = camera ? camera : root.FindComponent<Camera>();
 
-		// A scene with no camera is drawn in world space, but one whose cameras
-		// are all disabled shows nothing.
+		// A scene whose cameras are all disabled shows nothing.
 		if (seen == nullptr && root.FindComponent<Camera>(true) != nullptr)
 			return;
 
-		// The shadow map has to be finished before the first mesh samples it.
+		// Scenes open together are one world: one with no camera or light of
+		// its own is seen through and lit by the first among them, and drawn in
+		// world space when no scene has a camera.
+		if (seen == nullptr)
+			seen = FirstAmong<Camera>(allScenes);
+
 		Light* light = root.FindComponent<Light>();
+
+		if (light == nullptr && root.FindComponent<Light>(true) == nullptr)
+			light = FirstAmong<Light>(allScenes);
+
+		// The shadow map has to be finished before the first mesh samples it.
 
 		if (light)
 			light->RenderShadowMap(root);
