@@ -160,6 +160,7 @@ namespace Loom
 		// The Rigidbody the collider moves with, if it has one, at once and
 		// from outside a step too.
 		static void WakeOwner(const Collider& collider);
+
 		void Integrate(Body& body, float seconds);
 		void Report();
 

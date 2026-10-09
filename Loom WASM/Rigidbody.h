@@ -5,7 +5,6 @@
 #include "Component.h"
 
 #include "glm/glm.hpp"
-#include "glm/gtc/quaternion.hpp"
 
 
 namespace Loom

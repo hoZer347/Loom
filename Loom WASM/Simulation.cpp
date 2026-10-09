@@ -128,7 +128,6 @@ namespace Loom
 			if (collider == nullptr || collider->m_tree != &m_tree)
 				continue;
 
-
 			if (body.colliders.empty())
 			{
 				if (collider->Shape() == ColliderShape::Box)

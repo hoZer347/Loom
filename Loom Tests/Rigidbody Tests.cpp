@@ -497,10 +497,12 @@ TEST_SUITE("Rigidbody")
 		pusher->isKinematic = true;
 		pusher->velocity = glm::vec3(SLOW, 0.0f, 0.0f);
 
-		Run(scene, 3.0f);
+		constexpr float PUSHING = 3.0f;
 
-		// It travelled SLOW * 3 seconds, the gap of it on its own.
-		const float pushed = SLOW * 3.0f - GAP;
+		Run(scene, PUSHING);
+
+		// All it travelled but the gap it closed on its own.
+		const float pushed = SLOW * PUSHING - GAP;
 
 		CHECK(Position(*sleeper).x == doctest::Approx(pushed).epsilon(STILL));
 		CHECK(Position(*sleeper).x > Position(*pusher).x + 1.0f - STILL);
