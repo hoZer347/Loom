@@ -35,10 +35,11 @@ namespace Loom
 
 		// Where each part of a pipeline's key sits: the topology in the low
 		// byte, then the colour format, then whether there is depth, then
-		// whether the viewport is flipped.
+		// whether the viewport is flipped, then whether colour is written.
 		constexpr int FORMAT_SHIFT = 8;
 		constexpr int DEPTH_SHIFT = 40;
 		constexpr int FLIP_SHIFT = 41;
+		constexpr int COLOR_WRITE_SHIFT = 42;
 
 		constexpr VkFormat COLOR_TARGET_FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
 		constexpr VkFormat DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
@@ -805,12 +806,17 @@ namespace Loom
 				vkCmdSetDepthBias(Command(), m_biasConstant, 0.0f, m_biasSlope);
 		};
 
-		void SetDepthWrite(bool write) override
+		void SetColorWrite(bool write) override
 		{
-			m_depthWrite = write;
+			m_colorWrite = write;
+		};
+
+		void SetDepthTestEqual(bool equal) override
+		{
+			m_depthCompare = equal ? VK_COMPARE_OP_LESS_OR_EQUAL : VK_COMPARE_OP_LESS;
 
 			if (m_rendering)
-				vkCmdSetDepthWriteEnable(Command(), m_depthWrite);
+				vkCmdSetDepthCompareOp(Command(), m_depthCompare);
 		};
 
 		glm::ivec2 TargetSize() const override
@@ -1413,7 +1419,7 @@ namespace Loom
 			vkCmdSetViewport(command, 0, 1, &viewport);
 			vkCmdSetScissor(command, 0, 1, &scissor);
 			vkCmdSetDepthBias(command, m_biasConstant, 0.0f, m_biasSlope);
-			vkCmdSetDepthWriteEnable(command, m_depthWrite);
+			vkCmdSetDepthCompareOp(command, m_depthCompare);
 		};
 
 		void EndRendering()
@@ -1499,7 +1505,8 @@ namespace Loom
 				(uint64_t)topology
 				| ((uint64_t)m_renderingFormat << FORMAT_SHIFT)
 				| ((uint64_t)m_renderingDepth << DEPTH_SHIFT)
-				| ((uint64_t)flipped << FLIP_SHIFT);
+				| ((uint64_t)flipped << FLIP_SHIFT)
+				| ((uint64_t)m_colorWrite << COLOR_WRITE_SHIFT);
 
 			const auto found = program.pipelines.find(key);
 
@@ -1573,7 +1580,7 @@ namespace Loom
 			blendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
 			blendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
 			blendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-			blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+			blendAttachment.colorWriteMask = m_colorWrite ? VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT : 0;
 
 			const bool hasColor = m_renderingFormat != VK_FORMAT_UNDEFINED;
 
@@ -1581,7 +1588,7 @@ namespace Loom
 			blend.attachmentCount = hasColor ? 1 : 0;
 			blend.pAttachments = &blendAttachment;
 
-			const VkDynamicState dynamics[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_DEPTH_BIAS, VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE };
+			const VkDynamicState dynamics[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_DEPTH_BIAS, VK_DYNAMIC_STATE_DEPTH_COMPARE_OP };
 
 			VkPipelineDynamicStateCreateInfo dynamic{ VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
 			dynamic.dynamicStateCount = (uint32_t)std::size(dynamics);
@@ -2051,7 +2058,8 @@ namespace Loom
 
 		float m_biasSlope = 0.0f;
 		float m_biasConstant = 0.0f;
-		bool m_depthWrite = true;
+		bool m_colorWrite = true;
+		VkCompareOp m_depthCompare = VK_COMPARE_OP_LESS;
 
 		CaptureHandler m_capture;
 

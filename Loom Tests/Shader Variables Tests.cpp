@@ -590,7 +590,7 @@ TEST_SUITE("Shader variables")
 		CHECK(renderer.drawn == std::vector<uint32_t>{ borrower_shader.shadow_id, borrower_shader.id });
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader with transparency on is drawn after everything opaque, farthest first, writing no depth")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader with transparency on is drawn after everything opaque, farthest first, depth before colour")
 	{
 		RecordingRenderer renderer;
 
@@ -627,7 +627,8 @@ TEST_SUITE("Shader variables")
 
 		scene.Render();
 
-		CHECK(renderer.drawn == std::vector<uint32_t>{ opaque.id, far.id, near.id });
-		CHECK(renderer.depthWrites == std::vector<bool>{ false, true });
+		CHECK(renderer.drawn == std::vector<uint32_t>{ opaque.id, far.id, far.id, near.id, near.id });
+		CHECK(renderer.colorWrites == std::vector<bool>{ false, true, false, true });
+		CHECK(renderer.depthTestsEqual == std::vector<bool>{ true, false });
 	};
 };

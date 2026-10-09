@@ -128,12 +128,20 @@ namespace Loom
 
 		std::stable_sort(byDepth.begin(), byDepth.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
 
-		renderer->SetDepthWrite(false);
+		// Each mesh lays down its depth before its colour, so only its nearest
+		// surface blends over what is behind it, and one with opaque colours
+		// draws just as it would with transparency off.
+		renderer->SetDepthTestEqual(true);
 
 		for (const auto& [depth, mesh] : byDepth)
+		{
+			renderer->SetColorWrite(false);
 			mesh->OnRender();
+			renderer->SetColorWrite(true);
+			mesh->OnRender();
+		};
 
-		renderer->SetDepthWrite(true);
+		renderer->SetDepthTestEqual(false);
 	};
 
 	void Mesh::OnGui()

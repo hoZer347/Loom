@@ -177,7 +177,8 @@ namespace LoomTests
 		void PopTarget() override { m_targets.pop_back(); };
 		void Clear(const float*, bool) override { };
 		void SetDepthBias(float, float) override { };
-		void SetDepthWrite(bool write) override { depthWrites.push_back(write); };
+		void SetColorWrite(bool write) override { colorWrites.push_back(write); };
+		void SetDepthTestEqual(bool equal) override { depthTestsEqual.push_back(equal); };
 
 		glm::ivec2 TargetSize() const override
 		{
@@ -192,7 +193,8 @@ namespace LoomTests
 		std::map<std::string, uint32_t> textures;
 		std::vector<uint32_t> deleted;
 		std::vector<uint32_t> drawn;
-		std::vector<bool> depthWrites;
+		std::vector<bool> colorWrites;
+		std::vector<bool> depthTestsEqual;
 
 		// What each of drawn was drawn into: a target, or WINDOW.
 		std::vector<uint32_t> drawnInto;

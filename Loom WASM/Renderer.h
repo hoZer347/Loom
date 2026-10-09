@@ -114,8 +114,13 @@ namespace Loom
 		// glPolygonOffset does. Zeroes turn it off.
 		virtual void SetDepthBias(float slope, float constant) = 0;
 
-		// Whether what is drawn next writes depth, as well as testing against it.
-		virtual void SetDepthWrite(bool write) = 0;
+		// Whether what is drawn next writes colour. Off, it only lays down depth.
+		virtual void SetColorWrite(bool write) = 0;
+
+		// Whether what is drawn next passes the depth test at exactly the depth
+		// already there as well as nearer, so a second draw of a mesh lands on
+		// the depth its first left.
+		virtual void SetDepthTestEqual(bool equal) = 0;
 
 		// The size of what is being drawn into.
 		virtual glm::ivec2 TargetSize() const = 0;

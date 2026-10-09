@@ -585,9 +585,15 @@ namespace Loom
 			glPolygonOffset(slope, constant);
 		};
 
-		void SetDepthWrite(bool write) override
+		void SetColorWrite(bool write) override
 		{
-			glDepthMask(write ? GL_TRUE : GL_FALSE);
+			const GLboolean mask = write ? GL_TRUE : GL_FALSE;
+			glColorMask(mask, mask, mask, mask);
+		};
+
+		void SetDepthTestEqual(bool equal) override
+		{
+			glDepthFunc(equal ? GL_LEQUAL : GL_LESS);
 		};
 
 		glm::ivec2 TargetSize() const override
