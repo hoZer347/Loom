@@ -65,7 +65,8 @@ namespace Loom
 				& (other.min.x <= max.x) & (other.min.y <= max.y) & (other.min.z <= max.z);
 		};
 
-		Bounds Union(const Bounds& other) const { return { glm::min(min, other.min), glm::max(max, other.max) }; };
+		// Parenthesised, past windows.h's min and max macros.
+		Bounds Union(const Bounds& other) const { return { (glm::min)(min, other.min), (glm::max)(max, other.max) }; };
 		Bounds Expanded(float margin) const { return { min - glm::vec3(margin), max + glm::vec3(margin) }; };
 
 		// The stretch of the ray's parameter that lies inside the box, entry
