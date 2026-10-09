@@ -8,6 +8,7 @@
 namespace Loom
 {
 	struct Collider;
+	struct MeshCollider;
 
 	/**
 	* Loom::Contacts
@@ -23,6 +24,35 @@ namespace Loom
 	namespace Contacts
 	{
 		constexpr int MOST_POINTS = 4;
+		constexpr int AXES = 3;
+
+		struct Sphere
+		{
+			glm::vec3 center{ 0.0f };
+			float radius = 0.0f;
+		};
+
+		// Its axes are unit length; half is how far it reaches along each.
+		struct Box
+		{
+			glm::vec3 center{ 0.0f };
+			glm::vec3 axes[AXES];
+			glm::vec3 half{ 0.0f };
+		};
+
+		// A collider as it stands in the world. A mesh is its triangles,
+		// posed by world when they are needed.
+		struct Shape
+		{
+			enum Kind { NONE, SPHERE, BOX, MESH } kind = NONE;
+
+			Sphere sphere{ };
+			Box box{ };
+			const MeshCollider* mesh = nullptr;
+			glm::mat4 world{ 1.0f };
+		};
+
+		Shape Pose(const Collider& collider, const glm::mat4& world);
 
 		// The points of one touching surface, with the normal pointing out of
 		// the first collider into the second. A depth below zero is a gap.
@@ -36,10 +66,6 @@ namespace Loom
 
 		// Appends a manifold for each surface where a touches b, or comes
 		// within margin of it; a mesh gives one for each of its triangles.
-		void Collide(
-			const Collider& a, const glm::mat4& worldA,
-			const Collider& b, const glm::mat4& worldB,
-			float margin,
-			std::vector<Manifold>& manifolds);
+		void Collide(const Shape& a, const Shape& b, float margin, std::vector<Manifold>& manifolds);
 	};
 };

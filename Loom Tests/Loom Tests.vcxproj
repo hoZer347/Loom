@@ -119,6 +119,7 @@
     <ClCompile Include="Component Tests.cpp" />
     <ClCompile Include="GameObject Tests.cpp" />
     <ClCompile Include="Scene Tests.cpp" />
+    <ClCompile Include="Benchmark Tests.cpp" />
     <ClCompile Include="Camera Tests.cpp" />
     <ClCompile Include="Light Tests.cpp" />
     <ClCompile Include="Audio Tests.cpp" />

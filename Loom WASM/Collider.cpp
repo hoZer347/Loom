@@ -132,34 +132,57 @@ namespace Loom
 
 	bool BoxCollider::Intersect(const glm::mat4& world, const Ray& ray, float maxDistance, RaycastHit& hit) const
 	{
-		// Flattened by a zero scale: nothing to hit, and no inverse to find.
-		if (glm::determinant(glm::mat3(world)) == 0.0f)
+		const Contacts::Shape shape = Contacts::Pose(*this, world);
+
+		// Flattened by a zero scale: nothing to hit.
+		if (shape.kind != Contacts::Shape::BOX)
 			return false;
 
-		const glm::mat4 toLocal = glm::inverse(world);
+		const Contacts::Box& box = shape.box;
+		const glm::vec3 offset = box.center - ray.origin;
 
-		// The same parameter reaches the same point in either space, so the
-		// distance found locally is already the world distance.
-		const Ray local
+		// The slabs between each pair of faces, along the box's own axes, so
+		// no matrix has to be inverted.
+		float entry = -INFINITE_DISTANCE;
+		float exit = INFINITE_DISTANCE;
+		glm::vec3 normal(0.0f);
+
+		for (int axis = 0; axis < Contacts::AXES; axis++)
 		{
-			glm::vec3(toLocal * glm::vec4(ray.origin, 1.0f)),
-			glm::mat3(toLocal) * ray.direction
+			const float across = glm::dot(box.axes[axis], offset);
+			const float along = glm::dot(box.axes[axis], ray.direction);
+
+			if (along == 0.0f)
+			{
+				if (std::abs(across) > box.half[axis])
+					return false;
+
+				continue;
+			};
+
+			float near = (across - box.half[axis]) / along;
+			float far = (across + box.half[axis]) / along;
+
+			if (near > far)
+				std::swap(near, far);
+
+			if (near > entry)
+			{
+				entry = near;
+				normal = along > 0.0f ? -box.axes[axis] : box.axes[axis];
+			};
+
+			exit = std::min(exit, far);
+
+			if (entry > exit)
+				return false;
 		};
 
-		const glm::vec3 half = glm::abs(*size) * 0.5f;
-		const Bounds box{ *center - half, *center + half };
-
-		float entry, exit;
-		int axis;
-
-		if (!box.IntersectRay(local, entry, exit, axis) || entry < 0.0f || entry > maxDistance)
+		if (entry < 0.0f || entry > maxDistance)
 			return false;
 
-		glm::vec3 normal(0.0f);
-		normal[axis] = local.direction[axis] > 0.0f ? -1.0f : 1.0f;
-
 		hit.point = ray.GetPoint(entry);
-		hit.normal = glm::normalize(glm::transpose(glm::mat3(toLocal)) * normal);
+		hit.normal = normal;
 		hit.distance = entry;
 
 		return true;

@@ -36,6 +36,11 @@ namespace Loom
 		// body coming to rest keeps its contacts from step to step.
 		constexpr float SPECULATIVE_SLACK = 0.02f;
 
+		// Closer than this counts as touching, as Unity's contactOffset has
+		// it, so a resting contact hovering about zero does not flicker
+		// between touching and apart, and wake its neighbours each time.
+		constexpr float CONTACT_OFFSET = 0.01f;
+
 		// A body whose kinetic energy, over its mass, stays below this for
 		// SLEEP_AFTER seconds goes to sleep, as Unity's sleepThreshold has it.
 		// Spin counts by the body's inertia, so a small body spinning in
@@ -94,8 +99,33 @@ namespace Loom
 	bool Simulation::Ready(Body& body)
 	{
 		Rigidbody& rigidbody = *body.rigidbody;
-		GameObject* object = body.object;
-		const glm::mat4 world = object->WorldMatrix();
+
+		for (ComponentBase* component : body.object->GetComponents())
+		{
+			Collider* collider = dynamic_cast<Collider*>(component);
+
+			if (collider != nullptr && collider->m_tree == &m_tree)
+				body.colliders.push_back(collider);
+		};
+
+		body.dynamic = !rigidbody.isKinematic && rigidbody.mass > 0.0f;
+
+		// Anything set on a sleeping body since it fell asleep wakes it.
+		if (rigidbody.m_sleeping && (rigidbody.velocity != glm::vec3(0.0f) || rigidbody.angularVelocity != glm::vec3(0.0f)))
+			rigidbody.WakeUp();
+
+		// Asleep, it holds still against whatever touches it, and is only
+		// weighed if something wakes it.
+		body.awake = !rigidbody.m_sleeping;
+
+		return !body.awake || Weigh(body);
+	};
+
+	bool Simulation::Weigh(Body& body)
+	{
+		Rigidbody& rigidbody = *body.rigidbody;
+		// The walk has just synced its colliders, so the first already knows.
+		const glm::mat4 world = body.colliders.empty() ? body.object->WorldMatrix() : body.colliders.front()->m_synced;
 
 		body.position = glm::vec3(world[3]);
 
@@ -114,46 +144,35 @@ namespace Loom
 
 		body.orientation = glm::normalize(glm::quat_cast(rotation));
 
-		const bool dynamic = !rigidbody.isKinematic && rigidbody.mass > 0.0f;
-		body.baseInverseMass = dynamic ? 1.0f / rigidbody.mass : 0.0f;
-
 		// Spread as its first box or sphere is; a body with neither is a
 		// sphere of radius half a unit.
 		glm::vec3 inertia(SPHERE_INERTIA * rigidbody.mass * HALF * HALF);
 
-		for (ComponentBase* component : object->GetComponents())
+		if (!body.colliders.empty())
 		{
-			Collider* collider = dynamic_cast<Collider*>(component);
+			const Collider* first = body.colliders.front();
 
-			if (collider == nullptr || collider->m_tree != &m_tree)
-				continue;
-
-			if (body.colliders.empty())
+			if (first->Shape() == ColliderShape::Box)
 			{
-				if (collider->Shape() == ColliderShape::Box)
-				{
-					const glm::vec3 half = glm::abs(*static_cast<BoxCollider*>(collider)->size) * scale * HALF;
-					const glm::vec3 squared = half * half;
+				const glm::vec3 half = glm::abs(*static_cast<const BoxCollider*>(first)->size) * scale * HALF;
+				const glm::vec3 squared = half * half;
 
-					inertia = BOX_INERTIA * rigidbody.mass * glm::vec3(
-						squared.y + squared.z,
-						squared.x + squared.z,
-						squared.x + squared.y);
-				}
-				else if (collider->Shape() == ColliderShape::Sphere)
-				{
-					glm::vec3 centre;
-					float radius;
-					static_cast<SphereCollider*>(collider)->InWorld(world, centre, radius);
+				inertia = BOX_INERTIA * rigidbody.mass * glm::vec3(
+					squared.y + squared.z,
+					squared.x + squared.z,
+					squared.x + squared.y);
+			}
+			else if (first->Shape() == ColliderShape::Sphere)
+			{
+				glm::vec3 centre;
+				float radius;
+				static_cast<const SphereCollider*>(first)->InWorld(world, centre, radius);
 
-					inertia = glm::vec3(SPHERE_INERTIA * rigidbody.mass * radius * radius);
-				};
+				inertia = glm::vec3(SPHERE_INERTIA * rigidbody.mass * radius * radius);
 			};
-
-			body.colliders.push_back(collider);
 		};
 
-		rigidbody.m_inverseInertia = dynamic
+		rigidbody.m_inverseInertia = body.dynamic
 			? glm::vec3(
 				inertia.x > 0.0f ? 1.0f / inertia.x : 0.0f,
 				inertia.y > 0.0f ? 1.0f / inertia.y : 0.0f,
@@ -166,16 +185,8 @@ namespace Loom
 			0.0f, rigidbody.m_inverseInertia.y, 0.0f,
 			0.0f, 0.0f, rigidbody.m_inverseInertia.z);
 
-		body.baseInverseInertia = turned * own * glm::transpose(turned);
-
-		// Anything set on a sleeping body since it fell asleep wakes it.
-		if (rigidbody.m_sleeping && (rigidbody.velocity != glm::vec3(0.0f) || rigidbody.angularVelocity != glm::vec3(0.0f)))
-			rigidbody.WakeUp();
-
-		// Asleep, it holds still against whatever touches it until woken.
-		body.awake = !rigidbody.m_sleeping;
-		body.inverseMass = body.awake ? body.baseInverseMass : 0.0f;
-		body.inverseInertia = body.awake ? body.baseInverseInertia : glm::mat3(0.0f);
+		body.inverseInertia = turned * own * glm::transpose(turned);
+		body.inverseMass = body.dynamic ? 1.0f / rigidbody.mass : 0.0f;
 
 		return true;
 	};
@@ -202,7 +213,7 @@ namespace Loom
 		{
 			Rigidbody& rigidbody = *body.rigidbody;
 
-			if (body.awake && body.inverseMass > 0.0f)
+			if (body.awake && body.dynamic)
 			{
 				rigidbody.velocity += (rigidbody.m_force + (rigidbody.useGravity ? gravity : glm::vec3(0.0f))) * seconds;
 				rigidbody.angularVelocity += (body.inverseInertia * rigidbody.m_torque + rigidbody.m_spin) * seconds
@@ -230,6 +241,8 @@ namespace Loom
 			for (Pair& pair : m_pairs)
 				Solve(pair);
 
+		m_lastParent = nullptr;
+
 		for (Body& body : m_bodies)
 		{
 			body.rigidbody->velocity = body.velocity;
@@ -247,8 +260,19 @@ namespace Loom
 		m_bodies.clear();
 	};
 
+	Simulation::Key Simulation::Ordered(const Collider* a, const Collider* b)
+	{
+		return a < b ? Key{ a, b } : Key{ b, a };
+	};
+
 	void Simulation::Forget(const Collider& collider)
 	{
+		const auto involves =
+			[&](const Key& key) { return key.first == &collider || key.second == &collider; };
+
+		std::erase_if(m_candidates, involves);
+		std::erase_if(m_candidateSet, involves);
+
 		std::erase_if(m_touching,
 			[&](const auto& entry)
 			{
@@ -275,12 +299,14 @@ namespace Loom
 		return collider.m_body;
 	};
 
-	glm::vec3 Simulation::VelocityAt(int body, const glm::vec3& point) const
+	Simulation::Body& Simulation::At(int body)
 	{
-		if (body == NONE)
-			return glm::vec3(0.0f);
+		return body == NONE ? m_ground : m_bodies[body];
+	};
 
-		const Body& moving = m_bodies[body];
+	glm::vec3 Simulation::VelocityAt(int body, const glm::vec3& point)
+	{
+		const Body& moving = At(body);
 
 		return moving.velocity + glm::cross(moving.angularVelocity, point - moving.position);
 	};
@@ -289,128 +315,162 @@ namespace Loom
 	{
 		Body& sleeper = m_bodies[body];
 
+		if (!Weigh(sleeper))
+			return;
+
 		sleeper.rigidbody->WakeUp();
 		sleeper.awake = true;
-		sleeper.inverseMass = sleeper.baseInverseMass;
-		sleeper.inverseInertia = sleeper.baseInverseInertia;
 	};
 
 	void Simulation::Gather(float seconds)
 	{
 		m_pairs.clear();
 		m_contacts.clear();
-		m_found.clear();
 
-		const auto dynamic =
-			[&](int body) { return body != NONE && m_bodies[body].baseInverseMass > 0.0f; };
+		for (Body& body : m_bodies)
+			body.travel = glm::length(body.velocity) * seconds;
 
-		// A MeshCollider moves nothing on a body that can be pushed.
-		const auto collides =
-			[&](const Collider& collider, int body)
-			{
-				return !dynamic(body) || collider.Shape() != ColliderShape::Mesh;
-			};
-
-		const auto travel =
-			[&](int body) { return body == NONE ? 0.0f : glm::length(m_bodies[body].velocity) * seconds; };
-
-		for (int index = 0; index < (int)m_bodies.size(); index++)
+		// New candidates: each leaf put in or refitted since the last step,
+		// against whatever it now overlaps. Leaves stretch along their
+		// bodies' travel, so two that can meet this step overlap.
+		for (Collider* moved : m_tree.TakeMoved())
 		{
-			if (!m_bodies[index].awake)
+			const Bounds* padded = m_tree.PaddedBounds(*moved);
+
+			if (padded == nullptr)
 				continue;
 
-			const float reach = travel(index);
+			m_tree.Query(*padded,
+				[&](Collider& other)
+				{
+					if (&other == moved)
+						return;
 
-			for (Collider* collider : m_bodies[index].colliders)
-			{
-				const Bounds* padded = m_tree.PaddedBounds(*collider);
+					const Key key = Ordered(moved, &other);
 
-				if (padded == nullptr || !collides(*collider, index))
-					continue;
-
-				m_tree.Query(padded->Expanded(reach),
-					[&](Collider& other)
-					{
-						const int otherBody = BodyOf(other);
-
-						if (&other == collider || otherBody == index || !collides(other, otherBody))
-							return;
-
-						Pair pair{ };
-						pair.a = collider;
-						pair.b = &other;
-						pair.bodyA = index;
-						pair.bodyB = otherBody;
-
-						if (pair.a > pair.b)
-						{
-							std::swap(pair.a, pair.b);
-							std::swap(pair.bodyA, pair.bodyB);
-						};
-
-						// Each pair once, whichever body's reach found it.
-						if (!m_found.insert({ pair.a, pair.b }).second)
-							return;
-
-						pair.trigger = collider->IsTrigger() || other.IsTrigger();
-
-						if (!pair.trigger && !dynamic(index) && !dynamic(otherBody))
-							return;
-
-						const float margin = pair.trigger ? 0.0f : travel(pair.bodyA) + travel(pair.bodyB) + SPECULATIVE_SLACK;
-
-						m_manifolds.clear();
-						Contacts::Collide(*pair.a, pair.a->m_synced, *pair.b, pair.b->m_synced, margin, m_manifolds);
-
-						pair.first = m_contacts.size();
-
-						for (const Contacts::Manifold& manifold : m_manifolds)
-							for (int i = 0; i < manifold.count; i++)
-							{
-								Contact contact{ };
-								contact.point = manifold.points[i];
-								contact.normal = manifold.normal;
-								contact.depth = manifold.depths[i];
-
-								pair.touching |= contact.depth >= 0.0f;
-								m_contacts.push_back(contact);
-							};
-
-						pair.count = m_contacts.size() - pair.first;
-
-						if (pair.count == 0 || (pair.trigger && !pair.touching))
-						{
-							m_contacts.resize(pair.first);
-							return;
-						};
-
-						const Rigidbody* first = pair.bodyA == NONE ? nullptr : m_bodies[pair.bodyA].rigidbody;
-						const Rigidbody* second = pair.bodyB == NONE ? nullptr : m_bodies[pair.bodyB].rigidbody;
-
-						if (first && second)
-						{
-							pair.friction = std::sqrt(first->friction * second->friction);
-							pair.bounciness = std::max(*first->bounciness, *second->bounciness);
-						}
-						else
-						{
-							const Rigidbody* only = first ? first : second;
-							pair.friction = only->friction;
-							pair.bounciness = only->bounciness;
-						};
-
-						// A sleeper wakes when struck hard enough, or touched by
-						// something that will not stop for it.
-						const bool striking = glm::length(m_bodies[index].velocity) > WAKE_SPEED
-							|| (pair.touching && !dynamic(index));
-
-						if (otherBody != NONE && !m_bodies[otherBody].awake && !pair.trigger && striking)
-							Wake(otherBody);
-
-						m_pairs.push_back(pair);
-					});
-			};
+					if (m_candidateSet.insert(key).second)
+						m_candidates.push_back(key);
+				});
 		};
+
+		// Candidates whose leaves have parted are dropped, and the rest looked
+		// at. Where neither side is awake, nothing has moved to part them.
+		for (size_t i = 0; i < m_candidates.size(); )
+		{
+			const Key key = m_candidates[i];
+
+			if (!Awake(BodyOf(*key.first)) && !Awake(BodyOf(*key.second)))
+			{
+				i++;
+				continue;
+			};
+
+			const Bounds* first = m_tree.PaddedBounds(*key.first);
+			const Bounds* second = m_tree.PaddedBounds(*key.second);
+
+			if (first == nullptr || second == nullptr || !first->Overlaps(*second))
+			{
+				m_candidateSet.erase(key);
+				m_candidates[i] = m_candidates.back();
+				m_candidates.pop_back();
+				continue;
+			};
+
+			Consider(*const_cast<Collider*>(key.first), *const_cast<Collider*>(key.second));
+			i++;
+		};
+	};
+
+	bool Simulation::Awake(int body) const
+	{
+		return body != NONE && m_bodies[body].awake;
+	};
+
+	void Simulation::Consider(Collider& a, Collider& b)
+	{
+		const auto dynamic =
+			[&](int body) { return body != NONE && m_bodies[body].dynamic; };
+
+		const auto awake =
+			[&](int body) { return Awake(body); };
+
+		const auto travel =
+			[&](int body) { return body == NONE ? 0.0f : m_bodies[body].travel; };
+
+		Pair pair{ };
+		pair.a = &a;
+		pair.b = &b;
+		pair.bodyA = BodyOf(a);
+		pair.bodyB = BodyOf(b);
+
+		// Nothing to do between parts of one body.
+		if (pair.bodyA == pair.bodyB)
+			return;
+
+		// A MeshCollider moves nothing on a body that can be pushed.
+		if ((dynamic(pair.bodyA) && a.Shape() == ColliderShape::Mesh) || (dynamic(pair.bodyB) && b.Shape() == ColliderShape::Mesh))
+			return;
+
+		pair.trigger = a.IsTrigger() || b.IsTrigger();
+
+		if (!pair.trigger && !dynamic(pair.bodyA) && !dynamic(pair.bodyB))
+			return;
+
+		const float margin = pair.trigger ? 0.0f : travel(pair.bodyA) + travel(pair.bodyB) + SPECULATIVE_SLACK;
+
+		// Their own boxes still too far apart to touch this step.
+		if (!a.m_bounds.Expanded(margin).Overlaps(b.m_bounds))
+			return;
+
+		m_manifolds.clear();
+		Contacts::Collide(a.m_shape, b.m_shape, margin, m_manifolds);
+
+		pair.first = m_contacts.size();
+
+		for (const Contacts::Manifold& manifold : m_manifolds)
+			for (int i = 0; i < manifold.count; i++)
+			{
+				Contact contact{ };
+				contact.point = manifold.points[i];
+				contact.normal = manifold.normal;
+				contact.depth = manifold.depths[i];
+
+				pair.touching |= contact.depth >= -CONTACT_OFFSET;
+				m_contacts.push_back(contact);
+			};
+
+		pair.count = m_contacts.size() - pair.first;
+
+		if (pair.count == 0 || (pair.trigger && !pair.touching))
+		{
+			m_contacts.resize(pair.first);
+			return;
+		};
+
+		const Rigidbody* first = pair.bodyA == NONE ? nullptr : m_bodies[pair.bodyA].rigidbody;
+		const Rigidbody* second = pair.bodyB == NONE ? nullptr : m_bodies[pair.bodyB].rigidbody;
+
+		if (first && second)
+		{
+			pair.friction = std::sqrt(first->friction * second->friction);
+			pair.bounciness = std::max(*first->bounciness, *second->bounciness);
+		}
+		else
+		{
+			const Rigidbody* only = first ? first : second;
+			pair.friction = only->friction;
+			pair.bounciness = only->bounciness;
+		};
+
+		// A sleeper wakes when struck hard enough, or touched by something
+		// that will not stop for it.
+		if (!pair.trigger)
+			for (const auto& [striker, sleeper] : { std::pair{ pair.bodyA, pair.bodyB }, std::pair{ pair.bodyB, pair.bodyA } })
+				if (awake(striker) && sleeper != NONE && !m_bodies[sleeper].awake
+					&& (glm::length(m_bodies[striker].velocity) > WAKE_SPEED || (pair.touching && !dynamic(striker))))
+					Wake(sleeper);
+
+		m_pairs.push_back(pair);
 	};
 
 	void Simulation::Prepare(Pair& pair, float seconds)
@@ -418,8 +478,8 @@ namespace Loom
 		if (pair.trigger)
 			return;
 
-		const Body* a = pair.bodyA == NONE ? nullptr : &m_bodies[pair.bodyA];
-		const Body* b = pair.bodyB == NONE ? nullptr : &m_bodies[pair.bodyB];
+		Body& a = At(pair.bodyA);
+		Body& b = At(pair.bodyB);
 
 		const auto found = m_touching.find({ pair.a, pair.b });
 		const std::vector<Contact>* before = found == m_touching.end() ? nullptr : &found->second.contacts;
@@ -428,32 +488,32 @@ namespace Loom
 		{
 			Contact& contact = m_contacts[i];
 
-			contact.fromA = a ? contact.point - a->position : glm::vec3(0.0f);
-			contact.fromB = b ? contact.point - b->position : glm::vec3(0.0f);
+			const glm::vec3 fromA = contact.point - a.position;
+			const glm::vec3 fromB = contact.point - b.position;
 
-			// The impulse it takes to change the speed along a direction by one.
-			const auto massAlong =
-				[&](const glm::vec3& direction)
-				{
-					float inverse = 0.0f;
+			const glm::vec3 tangent = Perpendicular(contact.normal);
+			const glm::vec3 directions[DIRECTIONS] = { contact.normal, tangent, glm::cross(contact.normal, tangent) };
 
-					if (a)
-						inverse += a->inverseMass + glm::dot(direction, glm::cross(a->inverseInertia * glm::cross(contact.fromA, direction), contact.fromA));
+			// What a push along each direction does to each side, worked out
+			// once here so the iterations need only dot products.
+			for (int d = 0; d < DIRECTIONS; d++)
+			{
+				Axis& axis = contact.axes[d];
 
-					if (b)
-						inverse += b->inverseMass + glm::dot(direction, glm::cross(b->inverseInertia * glm::cross(contact.fromB, direction), contact.fromB));
+				axis.direction = directions[d];
+				axis.angularA = glm::cross(fromA, axis.direction);
+				axis.angularB = glm::cross(fromB, axis.direction);
+				axis.turnA = a.inverseInertia * axis.angularA;
+				axis.turnB = b.inverseInertia * axis.angularB;
 
-					return inverse > 0.0f ? 1.0f / inverse : 0.0f;
-				};
+				const float inverse = a.inverseMass + b.inverseMass
+					+ glm::dot(axis.angularA, axis.turnA) + glm::dot(axis.angularB, axis.turnB);
 
-			contact.normalMass = massAlong(contact.normal);
-			contact.tangents[0] = Perpendicular(contact.normal);
-			contact.tangents[1] = glm::cross(contact.normal, contact.tangents[0]);
+				axis.mass = inverse > 0.0f ? 1.0f / inverse : 0.0f;
+				axis.impulse = 0.0f;
+			};
 
-			for (int k = 0; k < TANGENTS; k++)
-				contact.tangentMass[k] = massAlong(contact.tangents[k]);
-
-			const float closing = -glm::dot(VelocityAt(pair.bodyB, contact.point) - VelocityAt(pair.bodyA, contact.point), contact.normal);
+			const float closing = -Speed(a, b, contact.axes[NORMAL]);
 			const bool bouncing = pair.bounciness > 0.0f && closing > BOUNCE_SPEED;
 
 			if (contact.depth >= 0.0f)
@@ -473,38 +533,32 @@ namespace Loom
 				for (const Contact& old : *before)
 					if (glm::length(old.point - contact.point) < SAME_DISTANCE && glm::dot(old.normal, contact.normal) > SAME_FACING)
 					{
-						contact.normalImpulse = old.normalImpulse;
-
-						for (int k = 0; k < TANGENTS; k++)
-							contact.tangentImpulse[k] = old.tangentImpulse[k];
+						// The tangents are the same two, the normal being so close.
+						for (int d = 0; d < DIRECTIONS; d++)
+							contact.axes[d].impulse = old.axes[d].impulse;
 
 						break;
 					};
 
-			glm::vec3 impulse = contact.normal * contact.normalImpulse;
-
-			for (int k = 0; k < TANGENTS; k++)
-				impulse += contact.tangents[k] * contact.tangentImpulse[k];
-
-			Push(pair, contact, impulse);
+			for (const Axis& axis : contact.axes)
+				Push(a, b, axis, axis.impulse);
 		};
 	};
 
-	void Simulation::Push(const Pair& pair, const Contact& contact, const glm::vec3& impulse)
+	float Simulation::Speed(const Body& a, const Body& b, const Axis& axis)
 	{
-		if (pair.bodyA != NONE)
-		{
-			Body& a = m_bodies[pair.bodyA];
-			a.velocity -= impulse * a.inverseMass;
-			a.angularVelocity -= a.inverseInertia * glm::cross(contact.fromA, impulse);
-		};
+		return glm::dot(b.velocity - a.velocity, axis.direction)
+			+ glm::dot(b.angularVelocity, axis.angularB)
+			- glm::dot(a.angularVelocity, axis.angularA);
+	};
 
-		if (pair.bodyB != NONE)
-		{
-			Body& b = m_bodies[pair.bodyB];
-			b.velocity += impulse * b.inverseMass;
-			b.angularVelocity += b.inverseInertia * glm::cross(contact.fromB, impulse);
-		};
+	void Simulation::Push(Body& a, Body& b, const Axis& axis, float impulse)
+	{
+		a.velocity -= axis.direction * (impulse * a.inverseMass);
+		a.angularVelocity -= axis.turnA * impulse;
+
+		b.velocity += axis.direction * (impulse * b.inverseMass);
+		b.angularVelocity += axis.turnB * impulse;
 	};
 
 	void Simulation::Solve(Pair& pair)
@@ -512,29 +566,31 @@ namespace Loom
 		if (pair.trigger)
 			return;
 
+		Body& a = At(pair.bodyA);
+		Body& b = At(pair.bodyB);
+
 		for (size_t i = pair.first; i < pair.first + pair.count; i++)
 		{
 			Contact& contact = m_contacts[i];
-
-			const auto relative =
-				[&]() { return VelocityAt(pair.bodyB, contact.point) - VelocityAt(pair.bodyA, contact.point); };
+			Axis& normal = contact.axes[NORMAL];
 
 			// Friction first, held within what the normal impulse allows.
-			for (int k = 0; k < TANGENTS; k++)
-			{
-				const float limit = pair.friction * contact.normalImpulse;
-				const float wanted = -contact.tangentMass[k] * glm::dot(relative(), contact.tangents[k]);
-				const float total = glm::clamp(contact.tangentImpulse[k] + wanted, -limit, limit);
+			const float limit = pair.friction * normal.impulse;
 
-				Push(pair, contact, contact.tangents[k] * (total - contact.tangentImpulse[k]));
-				contact.tangentImpulse[k] = total;
+			for (int d = NORMAL + 1; d < DIRECTIONS; d++)
+			{
+				Axis& axis = contact.axes[d];
+
+				const float total = glm::clamp(axis.impulse - axis.mass * Speed(a, b, axis), -limit, limit);
+
+				Push(a, b, axis, total - axis.impulse);
+				axis.impulse = total;
 			};
 
-			const float wanted = contact.normalMass * (contact.bias - glm::dot(relative(), contact.normal));
-			const float total = std::max(contact.normalImpulse + wanted, 0.0f);
+			const float total = std::max(normal.impulse + normal.mass * (contact.bias - Speed(a, b, normal)), 0.0f);
 
-			Push(pair, contact, contact.normal * (total - contact.normalImpulse));
-			contact.normalImpulse = total;
+			Push(a, b, normal, total - normal.impulse);
+			normal.impulse = total;
 		};
 	};
 
@@ -557,10 +613,17 @@ namespace Loom
 			const glm::quat spin(0.0f, body.angularVelocity);
 			body.orientation = glm::normalize(body.orientation + spin * body.orientation * (HALF * seconds));
 
-			// Back into its parent's space, keeping its own scale.
+			// Back into its parent's space, keeping its own scale. Siblings
+			// share a parent, so its inverse is kept from body to body.
 			const GameObject* parent = body.object->GetParent();
-			const glm::mat4 parentWorld = parent ? parent->WorldMatrix() : glm::mat4(1.0f);
-			const glm::mat4 local = glm::inverse(parentWorld)
+
+			if (parent != m_lastParent)
+			{
+				m_lastParent = parent;
+				m_parentInverse = parent ? glm::inverse(parent->WorldMatrix()) : glm::mat4(1.0f);
+			};
+
+			const glm::mat4 local = m_parentInverse
 				* glm::translate(glm::mat4(1.0f), body.position)
 				* glm::mat4_cast(body.orientation);
 
@@ -581,8 +644,16 @@ namespace Loom
 				body.object->transform.rotation = glm::degrees(radians);
 			};
 
+			// Leaves stretched ahead along the travel, so the next steps'
+			// motion stays inside them.
+			// Synced from the transform just written, exactly as the next
+			// walk will find it, so that walk leaves the leaf alone.
 			for (Collider* collider : body.colliders)
-				m_tree.Sync(*collider);
+				m_tree.Sync(*collider, body.velocity * seconds);
+
+			// Whatever hangs under it has a parent somewhere new.
+			if (!body.object->GetChildren().empty())
+				m_lastParent = nullptr;
 		};
 
 		if (body.inverseMass == 0.0f)
@@ -673,7 +744,7 @@ namespace Loom
 						for (size_t i = 0; i < count; i++)
 						{
 							told.contacts.push_back({ contacts[i].point, contacts[i].normal * facing, -contacts[i].depth });
-							pushed += contacts[i].normalImpulse;
+							pushed += contacts[i].axes[NORMAL].impulse;
 						};
 
 						if (count > 0)

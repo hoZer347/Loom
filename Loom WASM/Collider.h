@@ -4,6 +4,7 @@
 
 #include "Component.h"
 #include "ColliderTree.h"
+#include "Contacts.h"
 #include "Physics.h"
 
 #include "glm/glm.hpp"
@@ -74,8 +75,14 @@ namespace Loom
 		ColliderTree* m_tree = nullptr;
 		int m_node = ColliderTree::NONE;
 
-		// Where the last sync found it, which the tree's raycasts test against.
+		// Where the last sync found it, which the tree's raycasts test against,
+		// and the box it covered there, which a shape refreshed between syncs
+		// updates however it is asked.
 		glm::mat4 m_synced{ 1.0f };
+		mutable Bounds m_bounds{ };
+
+		// Its shape there, for the contacts between steps' syncs to use.
+		mutable Contacts::Shape m_shape{ };
 
 		// The body it moves with during a physics step, as the simulation
 		// numbers them, or -1 for none.
@@ -86,6 +93,8 @@ namespace Loom
 	* Loom::BoxCollider
 	* - A box of size around center, hit from outside: a ray starting inside
 	*   does not hit it
+	* - Under a parent scaled unevenly and turned, which would shear it, it is
+	*   taken as the box its own axes make, as Unity's is
 	*/
 	struct LOOM_API BoxCollider : Component<BoxCollider, "Physics", Collider>
 	{

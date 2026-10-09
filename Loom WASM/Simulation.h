@@ -55,7 +55,6 @@ namespace Loom
 
 	private:
 		static constexpr int NONE = -1;
-		static constexpr int TANGENTS = 2;
 
 		struct Body
 		{
@@ -73,13 +72,33 @@ namespace Loom
 			float inverseMass;
 			glm::mat3 inverseInertia;
 
-			// What it is moved by once awake.
-			float baseInverseMass;
-			glm::mat3 baseInverseInertia;
-
+			bool dynamic;
 			bool awake;
 
+			// How far it goes this step.
+			float travel;
+
 			std::vector<Collider*> colliders;
+		};
+
+		// The normal, then two tangents.
+		static constexpr int DIRECTIONS = 3;
+		static constexpr int NORMAL = 0;
+
+		// One direction a contact pushes along, and what a push along it does
+		// to each side.
+		struct Axis
+		{
+			glm::vec3 direction;
+
+			// From the centre of mass to the contact, crossed with direction;
+			// and that, through the inverse inertia.
+			glm::vec3 angularA, angularB;
+			glm::vec3 turnA, turnB;
+
+			// The impulse it takes to change the speed along it by one.
+			float mass;
+			float impulse;
 		};
 
 		struct Contact
@@ -90,15 +109,10 @@ namespace Loom
 			// Below zero, the gap still between them.
 			float depth;
 
-			glm::vec3 fromA, fromB;
-			glm::vec3 tangents[TANGENTS];
-
-			float normalMass;
-			float tangentMass[TANGENTS];
+			// The speed along the normal the solver aims for.
 			float bias;
 
-			float normalImpulse;
-			float tangentImpulse[TANGENTS];
+			Axis axes[DIRECTIONS];
 		};
 
 		// Ordered by address, so each pair has one key.
@@ -149,12 +163,27 @@ namespace Loom
 		// Fills in a body Add only noted, false for one that cannot move.
 		bool Ready(Body& body);
 
+		// Its pose, mass and inertia, for one that is awake; false for one
+		// scaled to nothing.
+		bool Weigh(Body& body);
+
 		void Gather(float seconds);
+
+		// Collides a candidate pair, adding it to this step's pairs if they
+		// touch or soon will.
+		void Consider(Collider& a, Collider& b);
+
+		static Key Ordered(const Collider* a, const Collider* b);
+
+		bool Awake(int body) const;
 		void Prepare(Pair& pair, float seconds);
 		void Solve(Pair& pair);
 
-		// Gives a's side of the contact -impulse and b's +impulse.
-		void Push(const Pair& pair, const Contact& contact, const glm::vec3& impulse);
+		// How fast b moves away from a along axis, at its contact.
+		static float Speed(const Body& a, const Body& b, const Axis& axis);
+
+		// Gives a -impulse along axis and b +impulse.
+		static void Push(Body& a, Body& b, const Axis& axis, float impulse);
 		void Wake(int body);
 
 		// The Rigidbody the collider moves with, if it has one, at once and
@@ -165,19 +194,33 @@ namespace Loom
 		void Report();
 
 		int BodyOf(const Collider& collider) const;
-		glm::vec3 VelocityAt(int body, const glm::vec3& point) const;
+
+		// The body, or for NONE one that never moves.
+		Body& At(int body);
+		glm::vec3 VelocityAt(int body, const glm::vec3& point);
 
 		ColliderTree& m_tree;
 
 		std::vector<Body> m_bodies{ };
 
+		// Stands in for a static collider: no mass, no velocity.
+		Body m_ground{ };
+
+		// The parent the last body integrated was under, and its inverse world.
+		const GameObject* m_lastParent = nullptr;
+		glm::mat4 m_parentInverse{ 1.0f };
+
 		// This step's, reused from step to step.
 		std::vector<Pair> m_pairs{ };
 		std::vector<Contact> m_contacts{ };
-		std::unordered_set<Key, KeyHash> m_found{ };
 		std::vector<Contacts::Manifold> m_manifolds{ };
 
 		std::unordered_map<Key, Touching, KeyHash> m_touching{ };
+
+		// Pairs whose leaves overlap, kept from step to step, in the order
+		// they were found so the solver's order is the same every run.
+		std::vector<Key> m_candidates{ };
+		std::unordered_set<Key, KeyHash> m_candidateSet{ };
 		unsigned m_step = 0;
 	};
 };

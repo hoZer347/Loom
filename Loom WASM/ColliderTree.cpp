@@ -21,6 +21,25 @@ namespace Loom
 		// or stops does not go on catching rays it is nowhere near.
 		constexpr float MOST_PADDING = PADDING * 4.0f;
 
+		// How many steps' travel a moving leaf is stretched ahead by when it
+		// is refitted. It is refitted once it no longer covers the next one.
+		// Measured against two and four on the Crowd benchmark.
+		constexpr float PREDICTION = 3.0f;
+
+		// bounds stretched along ahead, to cover where it is going.
+		Bounds Stretched(Bounds bounds, const glm::vec3& ahead)
+		{
+			bounds.min += glm::min(ahead, glm::vec3(0.0f));
+			bounds.max += glm::max(ahead, glm::vec3(0.0f));
+
+			return bounds;
+		};
+
+		Bounds Padded(const Bounds& bounds, const glm::vec3& travel)
+		{
+			return Stretched(bounds, travel * PREDICTION).Expanded(PADDING);
+		};
+
 		// A branch whose children's heights differ by more than this is rotated.
 		constexpr int MOST_IMBALANCE = 1;
 
@@ -88,7 +107,7 @@ namespace Loom
 		m_sync++;
 	};
 
-	void ColliderTree::Sync(Collider& collider)
+	void ColliderTree::Sync(Collider& collider, const glm::vec3& travel)
 	{
 		const glm::mat4 world = collider.m_gameObject->WorldMatrix();
 		const bool reshaped = collider.Refresh();
@@ -104,6 +123,8 @@ namespace Loom
 		collider.m_synced = world;
 
 		const Bounds bounds = collider.BoundsIn(collider.m_synced);
+		collider.m_bounds = bounds;
+		collider.m_shape = Contacts::Pose(collider, collider.m_synced);
 
 		if (collider.m_tree != this)
 		{
@@ -112,38 +133,46 @@ namespace Loom
 
 			const int leaf = Allocate();
 
-			m_nodes[leaf].bounds = bounds.Expanded(PADDING);
+			m_nodes[leaf].bounds = Padded(bounds, travel);
 			m_nodes[leaf].collider = &collider;
 			m_nodes[leaf].height = 0;
 
 			InsertLeaf(leaf);
+			m_moved.push_back(&collider);
 
 			collider.m_tree = this;
 			collider.m_node = leaf;
 			m_leaves++;
 		}
 		else
-			Fit(collider.m_node, bounds);
+			Fit(collider.m_node, bounds, travel);
 
 		m_nodes[collider.m_node].sync = m_sync;
 	};
 
 	void ColliderTree::Resize(const Collider& collider)
 	{
-		if (collider.m_tree == this)
-			Fit(collider.m_node, collider.BoundsIn(collider.m_synced));
+		if (collider.m_tree != this)
+			return;
+
+		collider.m_bounds = collider.BoundsIn(collider.m_synced);
+		collider.m_shape = Contacts::Pose(collider, collider.m_synced);
+		Fit(collider.m_node, collider.m_bounds, glm::vec3(0.0f));
 	};
 
-	void ColliderTree::Fit(int leaf, const Bounds& bounds)
+	void ColliderTree::Fit(int leaf, const Bounds& bounds, const glm::vec3& travel)
 	{
 		const Bounds& padded = m_nodes[leaf].bounds;
+		const Bounds wanted = Padded(bounds, travel);
 
-		if (padded.Contains(bounds) && bounds.Expanded(MOST_PADDING).Contains(padded))
+		if (padded.Contains(Stretched(bounds, travel)) && wanted.Expanded(MOST_PADDING).Contains(padded))
 			return;
 
 		RemoveLeaf(leaf);
-		m_nodes[leaf].bounds = bounds.Expanded(PADDING);
+		m_nodes[leaf].bounds = wanted;
 		InsertLeaf(leaf);
+
+		m_moved.push_back(m_nodes[leaf].collider);
 	};
 
 	void ColliderTree::EndSync()
@@ -161,6 +190,8 @@ namespace Loom
 
 		if (onRemove)
 			onRemove(collider);
+
+		std::erase(m_moved, &collider);
 
 		RemoveLeaf(collider.m_node);
 		Free(collider.m_node);

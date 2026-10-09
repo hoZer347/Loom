@@ -31,6 +31,9 @@
     <ClCompile Include="Scene Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="Benchmark Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="Camera Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

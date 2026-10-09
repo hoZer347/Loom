@@ -14,7 +14,6 @@ namespace Contacts
 {
 	namespace
 	{
-		constexpr int AXES = 3;
 		constexpr int CORNERS = 3;
 		constexpr int FACE_CORNERS = 4;
 
@@ -30,20 +29,6 @@ namespace Contacts
 
 		// A face clipped by four planes has at most eight corners.
 		constexpr int MOST_CORNERS = 8;
-
-		struct Sphere
-		{
-			glm::vec3 center;
-			float radius;
-		};
-
-		// Its axes are unit length; half is how far it reaches along each.
-		struct Box
-		{
-			glm::vec3 center;
-			glm::vec3 axes[AXES];
-			glm::vec3 half;
-		};
 
 		using Triangle = std::array<glm::vec3, CORNERS>;
 
@@ -695,47 +680,10 @@ namespace Contacts
 				manifolds.push_back(manifold);
 		};
 
-		// The shapes a collider can be, posed. A mesh is its triangles.
-		struct Posed
-		{
-			enum Kind { NONE, SPHERE, BOX, MESH } kind = NONE;
-
-			Sphere sphere{ };
-			Box box{ };
-			const MeshCollider* mesh = nullptr;
-			glm::mat4 world{ 1.0f };
-		};
-
-		Posed Pose(const Collider& collider, const glm::mat4& world)
-		{
-			Posed posed;
-			posed.world = world;
-
-			switch (collider.Shape())
-			{
-			case ColliderShape::Sphere:
-				posed.kind = Posed::SPHERE;
-				static_cast<const SphereCollider&>(collider).InWorld(world, posed.sphere.center, posed.sphere.radius);
-				break;
-
-			case ColliderShape::Box:
-				if (BoxOf(static_cast<const BoxCollider&>(collider), world, posed.box))
-					posed.kind = Posed::BOX;
-				break;
-
-			case ColliderShape::Mesh:
-				posed.kind = Posed::MESH;
-				posed.mesh = &static_cast<const MeshCollider&>(collider);
-				break;
-			};
-
-			return posed;
-		};
-
 		// The manifolds of the solid against the mesh, normals from solid into mesh.
-		void SolidMesh(const Posed& solid, const Posed& mesh, float margin, std::vector<Manifold>& manifolds)
+		void SolidMesh(const Shape& solid, const Shape& mesh, float margin, std::vector<Manifold>& manifolds)
 		{
-			const Bounds near = (solid.kind == Posed::BOX ? BoundsOf(solid.box) : BoundsOf(solid.sphere)).Expanded(margin);
+			const Bounds near = (solid.kind == Shape::BOX ? BoundsOf(solid.box) : BoundsOf(solid.sphere)).Expanded(margin);
 
 			// Reused from call to call.
 			thread_local std::vector<glm::vec3> corners{ };
@@ -746,7 +694,7 @@ namespace Contacts
 			{
 				const Triangle triangle{ corners[i], corners[i + 1], corners[i + 2] };
 
-				if (solid.kind == Posed::BOX)
+				if (solid.kind == Shape::BOX)
 					BoxTriangle(solid.box, triangle, margin, manifolds);
 				else
 					SphereTriangle(solid.sphere, triangle, margin, manifolds);
@@ -761,15 +709,34 @@ namespace Contacts
 		};
 	};
 
-	void Collide(
-		const Collider& a, const glm::mat4& worldA,
-		const Collider& b, const glm::mat4& worldB,
-		float margin,
-		std::vector<Manifold>& manifolds)
+	Shape Pose(const Collider& collider, const glm::mat4& world)
 	{
-		const Posed first = Pose(a, worldA);
-		const Posed second = Pose(b, worldB);
+		Shape posed;
+		posed.world = world;
 
+		switch (collider.Shape())
+		{
+		case ColliderShape::Sphere:
+			posed.kind = Shape::SPHERE;
+			static_cast<const SphereCollider&>(collider).InWorld(world, posed.sphere.center, posed.sphere.radius);
+			break;
+
+		case ColliderShape::Box:
+			if (BoxOf(static_cast<const BoxCollider&>(collider), world, posed.box))
+				posed.kind = Shape::BOX;
+			break;
+
+		case ColliderShape::Mesh:
+			posed.kind = Shape::MESH;
+			posed.mesh = &static_cast<const MeshCollider&>(collider);
+			break;
+		};
+
+		return posed;
+	};
+
+	void Collide(const Shape& first, const Shape& second, float margin, std::vector<Manifold>& manifolds)
+	{
 		const size_t before = manifolds.size();
 
 		// Each pair is written with the simpler shape first; the ones run the
@@ -778,29 +745,29 @@ namespace Contacts
 
 		switch (first.kind)
 		{
-		case Posed::SPHERE:
-			if (second.kind == Posed::SPHERE)
+		case Shape::SPHERE:
+			if (second.kind == Shape::SPHERE)
 				SphereSphere(first.sphere, second.sphere, margin, manifolds);
-			else if (second.kind == Posed::BOX)
+			else if (second.kind == Shape::BOX)
 				SphereBox(first.sphere, second.box, margin, manifolds);
-			else if (second.kind == Posed::MESH)
+			else if (second.kind == Shape::MESH)
 				SolidMesh(first, second, margin, manifolds);
 			break;
 
-		case Posed::BOX:
-			if (second.kind == Posed::SPHERE)
+		case Shape::BOX:
+			if (second.kind == Shape::SPHERE)
 			{
 				SphereBox(second.sphere, first.box, margin, manifolds);
 				swapped = true;
 			}
-			else if (second.kind == Posed::BOX)
+			else if (second.kind == Shape::BOX)
 				BoxBox(first.box, second.box, margin, manifolds);
-			else if (second.kind == Posed::MESH)
+			else if (second.kind == Shape::MESH)
 				SolidMesh(first, second, margin, manifolds);
 			break;
 
-		case Posed::MESH:
-			if (second.kind == Posed::SPHERE || second.kind == Posed::BOX)
+		case Shape::MESH:
+			if (second.kind == Shape::SPHERE || second.kind == Shape::BOX)
 			{
 				SolidMesh(second, first, margin, manifolds);
 				swapped = true;

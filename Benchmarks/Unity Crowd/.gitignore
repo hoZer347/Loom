@@ -1,0 +1,11 @@
+# Unity makes these on every run.
+Library/
+Temp/
+Logs/
+UserSettings/
+obj/
+*.csproj
+*.sln
+
+# The repository ignores NuGet package folders; this one is Unity's list.
+!Packages/manifest.json

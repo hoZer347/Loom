@@ -5,6 +5,7 @@
 #include "Physics.h"
 
 #include <functional>
+#include <utility>
 #include <vector>
 
 
@@ -40,7 +41,9 @@ namespace Loom
 		~ColliderTree();
 
 		void BeginSync();
-		void Sync(Collider& collider);
+		// travel, for a moving body, is how far it went this step: its leaf is
+		// stretched that much further ahead, as Box2D's are.
+		void Sync(Collider& collider, const glm::vec3& travel = glm::vec3(0.0f));
 		void EndSync();
 
 		void Remove(Collider& collider);
@@ -58,6 +61,11 @@ namespace Loom
 
 		// Calls visit for every collider whose padded bounds overlap bounds.
 		void Query(const Bounds& bounds, const std::function<void(Collider&)>& visit) const;
+
+		// The colliders whose leaves went in or were refitted since the last
+		// call, for whoever pairs them up to look at again; the rest overlap
+		// what they did.
+		std::vector<Collider*> TakeMoved() { return std::exchange(m_moved, { }); };
 
 		// Told of every collider that leaves the tree, while it still exists.
 		std::function<void(const Collider&)> onRemove{ };
@@ -95,7 +103,7 @@ namespace Loom
 		void Free(int node);
 
 		// Puts leaf where bounds needs it, unless its padding still covers them.
-		void Fit(int leaf, const Bounds& bounds);
+		void Fit(int leaf, const Bounds& bounds, const glm::vec3& travel);
 
 		void InsertLeaf(int leaf);
 		void RemoveLeaf(int leaf);
@@ -107,6 +115,7 @@ namespace Loom
 		void Refit(int node);
 
 		std::vector<Node> m_nodes{ };
+		std::vector<Collider*> m_moved{ };
 		int m_root = NONE;
 		int m_free = NONE;
 		size_t m_leaves = 0;
