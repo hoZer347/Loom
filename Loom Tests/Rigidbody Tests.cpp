@@ -327,7 +327,7 @@ TEST_SUITE("Rigidbody")
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a ball sent suddenly fast at a thin slab stops on it however it got its speed")
 	{
-		// Over a metre a step, ten times the slab and twenty the ball.
+		// Two metres a step: twenty times the slab, ten times the ball across.
 		constexpr float SUDDEN = 120.0f;
 		constexpr float THIN = 0.1f;
 		constexpr float SMALL = 0.1f;
