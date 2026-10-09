@@ -25,6 +25,8 @@ namespace Loom
 	*/
 	struct LOOM_API Camera : Component<Camera>
 	{
+		static constexpr const char* category = "Rendering";
+
 		// World space to clip space, for a target of the given width over height.
 		glm::mat4 ViewProjection(float aspect) const;
 

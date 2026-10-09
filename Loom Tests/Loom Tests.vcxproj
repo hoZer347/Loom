@@ -105,6 +105,7 @@
     <ClCompile Include="ProjectTemplate Tests.cpp" />
     <ClCompile Include="EditorCamera Tests.cpp" />
     <ClCompile Include="EditorConsole Tests.cpp" />
+    <ClCompile Include="ComponentMenu Tests.cpp" />
     <ClCompile Include="EditorLayouts Tests.cpp" />
     <ClCompile Include="ShaderEditor Tests.cpp" />
     <ClCompile Include="SpriteEditor Tests.cpp" />
@@ -161,6 +162,7 @@
     <ClCompile Include="..\Loom Editor\ProjectTemplate.cpp" />
     <ClCompile Include="..\Loom Editor\EditorCamera.cpp" />
     <ClCompile Include="..\Loom Editor\EditorConsole.cpp" />
+    <ClCompile Include="..\Loom Editor\ComponentMenu.cpp" />
     <ClCompile Include="..\Loom Editor\EditorLayouts.cpp" />
     <ClCompile Include="..\Loom Editor\ShaderEditor.cpp" />
     <ClCompile Include="..\Loom Editor\SpriteEditor.cpp" />

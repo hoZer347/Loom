@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ComponentMenu.h"
 #include "EditorCamera.h"
 #include "EditorConsole.h"
 #include "EditorLayouts.h"
@@ -113,6 +114,10 @@ namespace Loom
 		void ShowSaveLayoutPrompt();
 		// In a tab of the Sprites panel, which comes forward.
 		void OpenSprite(const std::string& path);
+
+		// The Inspector's Add Component menu, opened on the selection the next
+		// time it is drawn.
+		void ShowAddComponent() { m_openAddComponent = true; };
 
 		// Writes a new project (scenes, scripts, a Visual Studio solution) into
 		// folder/name and opens it.
@@ -245,6 +250,12 @@ namespace Loom
 		void DrawTransform(GameObject* gameObject, float column);
 		void DrawThread(GameObject* gameObject, float column);
 		void DrawComponent(GameObject* gameObject, ComponentBase* component);
+		void DrawComponentMenu(GameObject* gameObject, const ComponentMenu::Node& node);
+
+		// Right-click on a component in the Add Component menu: the category it
+		// is filed under in this project.
+		void DrawCategoryPopup(const std::string& component);
+		void SetComponentCategory(const std::string& component, const std::string& category);
 		void DrawFields(LoomObject& object, const std::vector<std::string>& labels, float column);
 		void DrawModelPreview();
 		void DrawScene();
@@ -552,6 +563,12 @@ namespace Loom
 
 		bool m_askForLayoutName = false;
 		char m_layoutName[EditorLayouts::MaxNameLength + 1]{ };
+
+		static constexpr size_t max_category_length = 128;
+
+		ComponentMenu m_componentMenu;
+		char m_categoryBuffer[max_category_length + 1]{ };
+		bool m_openAddComponent = false;
 
 		// Set by "Step": updating is switched on for exactly one frame and
 		// switched back off at the top of the next one.

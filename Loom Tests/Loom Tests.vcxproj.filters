@@ -55,6 +55,9 @@
     <ClCompile Include="EditorConsole Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="ComponentMenu Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="EditorLayouts Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

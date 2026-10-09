@@ -162,6 +162,7 @@ namespace
 			<< "  --save-layout <name>           save the layout once the panels are drawn\n"
 			<< "  --save-layout-prompt           start with Layout > Save Layout... open\n"
 			<< "  --open-sprite <file>           open an image in the Sprites panel\n"
+			<< "  --add-component-prompt         start with Add Component open on the selection\n"
 			<< "  --undo, --redo                 step the history once the imports have landed\n"
 			<< "  --click <x y> [x y]            left click there once the scripts are built,\n"
 			<< "                                 letting go at the second point if given\n"
@@ -511,6 +512,8 @@ int main(int argc, char** argv)
 
 			editor.OpenSprite(argv[++i]);
 		}
+		else if (argument == "--add-component-prompt")
+			editor.ShowAddComponent();
 		else if (argument == "--open-demo")
 		{
 			if (i + 1 >= argc)

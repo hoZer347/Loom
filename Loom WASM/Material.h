@@ -14,6 +14,8 @@ namespace Loom
 
 	struct LOOM_API Material : Component<Material>
 	{
+		static constexpr const char* category = "Rendering";
+
 		// Names the shader to compile. Read by OnAttach, so a script sets it on
 		// the material it just attached. Changed after that, it takes effect the
 		// next time the material is attached, which for a scene means reloading,

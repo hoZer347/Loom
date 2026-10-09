@@ -52,6 +52,8 @@ namespace Loom
 	/// bindings, the states, the timing -- is unchanged.
 	struct DialogueManager : StateMachine<DialogueManager>
 	{
+		static constexpr const char* category = "Logic";
+
 		DialogueManager();
 
 		#pragma region Script

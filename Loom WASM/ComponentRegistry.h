@@ -26,6 +26,13 @@ namespace Loom
 	*   the editor offers under "Add Component"
 	* - Every default-constructible Component<T> puts itself in here, under its
 	*   own type name, as the statics of each module that includes it start up
+	* - A type that declares a static `category` string is filed under it in the
+	*   Add Component menu, with '/' between nested categories:
+	*
+	*	struct Mesh : Component<Mesh>
+	*	{
+	*		static constexpr const char* category = "Rendering/3D";
+	*	};
 	*/
 	struct LOOM_API ComponentRegistry final
 	{
@@ -34,7 +41,8 @@ namespace Loom
 		static void Register(
 			const std::string& name,
 			const char* type_name,
-			const Factory& factory);
+			const Factory& factory,
+			const std::string& category = "");
 
 		// Registers T under a display name, constructing it with the given
 		// arguments every time one is created. The arguments are copied into the
@@ -50,7 +58,8 @@ namespace Loom
 				[args...](auto& gameObject) -> ComponentBase*
 				{
 					return gameObject.template Attach<T>(args...);
-				});
+				},
+				CategoryOfType<T>());
 		};
 
 		// What Component<T> runs for every type derived from it. One that cannot
@@ -82,11 +91,24 @@ namespace Loom
 
 		static const std::map<std::string, Factory>& All();
 
+		// Where a registered name files itself in the Add Component menu. Empty
+		// for a type that declares no category.
+		static std::string CategoryOf(const std::string& name);
+
 		// What to call this component in a file or a header: its registered name
 		// when it has one, otherwise its type name tidied up.
 		static std::string NameOf(const ComponentBase& component);
 
 	private:
+		template <typename T>
+		static std::string CategoryOfType()
+		{
+			if constexpr (requires { std::string(T::category); })
+				return T::category;
+			else
+				return "";
+		};
+
 		// Whether a type registering itself may take the name. Not when it
 		// already has it, which is a second module including the same type, and
 		// not when another type does: the names drop namespaces, and whichever
@@ -95,5 +117,6 @@ namespace Loom
 
 		static std::map<std::string, Factory>& Factories();
 		static std::map<std::string, std::string>& DisplayNames();
+		static std::map<std::string, std::string>& Categories();
 	};
 };

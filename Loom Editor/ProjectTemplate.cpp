@@ -295,10 +295,18 @@ Scripts are Loom components written in headers: add a .hpp to Scripts/ with
 
     struct Name : Loom::Component<Name> { ... };
 
-in it and it is compiled and offered under Add Component, with nothing to
-register. One header can hold several. With the engine's Loom Visual Studio
-extension installed (Loom Visual Studio/install.ps1), right-click in Solution
-Explorer and pick Add > Loom Script... to write one there.
+in it and it is compiled and offered under Add Component's Custom section,
+with nothing to register. One header can hold several. A member
+
+    static constexpr const char* category = "Gameplay/AI";
+
+files it in a category of its own instead, '/' nesting one in another, and
+right-clicking any component in the menu files it somewhere else for this
+project.
+
+With the engine's Loom Visual Studio extension installed (Loom Visual
+Studio/install.ps1), right-click in Solution Explorer and pick Add > Loom
+Script... to write one there.
 
 Each header is compiled on its own and they may include one another, so
 anything defined outside a struct has to be inline. Pressing Play in the

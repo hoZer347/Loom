@@ -2313,17 +2313,22 @@ namespace Loom
 				if (!components.empty())
 					ImGui::Separator();
 
-				if (ImGui::Button("Add Component", ImVec2(-FLT_MIN, 0.0f)))
+				if (ImGui::Button("Add Component", ImVec2(-FLT_MIN, 0.0f)) || m_openAddComponent)
+				{
 					ImGui::OpenPopup("##add_component");
+					m_openAddComponent = false;
+				};
+
+				ImGui::SetNextWindowPos(
+					ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y),
+					ImGuiCond_Appearing);
 
 				if (ImGui::BeginPopup("##add_component"))
 				{
 					if (ComponentRegistry::All().empty())
 						ImGui::TextDisabled("Nothing registered.");
 
-					for (const auto& [name, factory] : ComponentRegistry::All())
-						if (ImGui::MenuItem(name.c_str()))
-							factory(*gameObject);
+					DrawComponentMenu(gameObject, m_componentMenu.Build(m_scripts.GetTypes()));
 
 					ImGui::EndPopup();
 				};
@@ -2331,6 +2336,77 @@ namespace Loom
 		};
 
 		ImGui::End();
+	};
+
+	void Editor::DrawComponentMenu(GameObject* gameObject, const ComponentMenu::Node& node)
+	{
+		for (const ComponentMenu::Node& child : node.children)
+			if (ImGui::BeginMenu(child.name.c_str()))
+			{
+				DrawComponentMenu(gameObject, child);
+				ImGui::EndMenu();
+			};
+
+		if (!node.children.empty() && !node.components.empty())
+			ImGui::Separator();
+
+		for (const std::string& component : node.components)
+		{
+			if (ImGui::MenuItem(component.c_str()))
+				ComponentRegistry::Create(component, *gameObject);
+
+			if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+				ImGui::SetTooltip("Right-click to change its category");
+
+			DrawCategoryPopup(component);
+		};
+	};
+
+	void Editor::DrawCategoryPopup(const std::string& component)
+	{
+		constexpr float field_width = 240.0f;
+
+		if (!ImGui::BeginPopupContextItem())
+			return;
+
+		if (ImGui::IsWindowAppearing())
+		{
+			const std::string category = m_componentMenu.CategoryOf(
+				component,
+				std::ranges::find(m_scripts.GetTypes(), component) != m_scripts.GetTypes().end());
+
+			snprintf(m_categoryBuffer, sizeof(m_categoryBuffer), "%s", category.c_str());
+			ImGui::SetKeyboardFocusHere();
+		};
+
+		ImGui::SetNextItemWidth(field_width);
+
+		if (ImGui::InputTextWithHint(
+			"##category",
+			"Category, '/' between nested ones",
+			m_categoryBuffer,
+			sizeof(m_categoryBuffer),
+			ImGuiInputTextFlags_EnterReturnsTrue))
+		{
+			SetComponentCategory(component, m_categoryBuffer);
+			ImGui::CloseCurrentPopup();
+		};
+
+		if (ImGui::MenuItem("Use Its Own Category", nullptr, false, m_componentMenu.IsFiled(component)))
+			SetComponentCategory(component, "");
+
+		if (m_projectFile.empty())
+			ImGui::TextDisabled("No project is open to keep this in.");
+
+		ImGui::EndPopup();
+	};
+
+	void Editor::SetComponentCategory(const std::string& component, const std::string& category)
+	{
+		m_componentMenu.Set(component, category);
+
+		if (!m_projectFile.empty() && !m_componentMenu.Save(m_projectFile))
+			std::cerr << "Could not write the component categories to " << m_projectFile << std::endl;
 	};
 
 	void Editor::DrawModelPreview()

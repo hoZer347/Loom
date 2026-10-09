@@ -43,6 +43,7 @@ namespace Loom
 	{
 		m_scripts.Clear();
 		m_projectFile.clear();
+		m_componentMenu.Clear();
 
 		// Unless the project file names it otherwise.
 		m_projectName = std::filesystem::path(m_projectPath).filename().string();
@@ -79,6 +80,8 @@ namespace Loom
 
 			if (const std::string value = ProjectTemplate::ValueOf(line, ProjectTemplate::library_key); !value.empty())
 				library = Resolve(m_projectPath, value);
+
+			m_componentMenu.Read(line);
 		};
 
 		if (project.empty())

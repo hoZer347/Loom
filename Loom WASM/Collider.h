@@ -9,6 +9,8 @@ namespace Loom
 	{
 		struct Collider : Component<Collider>
 		{
+			static constexpr const char* category = "Physics";
+
 			~Collider();
 
 			void OnPhysics() override;

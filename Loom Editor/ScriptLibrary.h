@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 
@@ -117,8 +118,8 @@ namespace Loom
 		// Kept in full rather than just the entries it went on to displace, because
 		// std::functions cannot be compared: unloading puts all of it back, which
 		// restores anything the library registered over the top of and is a no-op
-		// for the rest.
-		std::map<std::string, ComponentRegistry::Factory> m_before{ };
+		// for the rest. Each with the category it was filed under.
+		std::map<std::string, std::pair<ComponentRegistry::Factory, std::string>> m_before{ };
 
 		mutable std::chrono::steady_clock::time_point m_staleCheckedAt{ };
 		mutable bool m_stale = false;

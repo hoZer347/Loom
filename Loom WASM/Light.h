@@ -43,6 +43,8 @@ namespace Loom
 	*/
 	struct LOOM_API Light : Component<Light>
 	{
+		static constexpr const char* category = "Rendering";
+
 		~Light();
 
 		// The transform the shadow map is rendered with, from world space into

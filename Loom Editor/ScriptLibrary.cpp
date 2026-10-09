@@ -473,7 +473,10 @@ namespace Loom
 		// stands now is kept alongside: a script may register over a name that
 		// already exists, and that factory has to come back rather than stay
 		// behind pointing into a library that is no longer mapped.
-		const std::map<std::string, ComponentRegistry::Factory> before = ComponentRegistry::All();
+		std::map<std::string, std::pair<ComponentRegistry::Factory, std::string>> before{ };
+
+		for (const auto& [name, factory] : ComponentRegistry::All())
+			before.emplace(name, std::make_pair(factory, ComponentRegistry::CategoryOf(name)));
 		const std::vector<std::string> states_before = StateRegistry::Names();
 
 		HMODULE module = LoadLibraryA(copy.string().c_str());
@@ -490,7 +493,7 @@ namespace Loom
 
 			if (previous == before.end())
 				m_types.push_back(name);
-			else m_before.emplace(*previous);
+			else m_before.emplace(name, previous->second);
 		};
 
 		// A library whose initialisation threw is unmapped again, possibly after
@@ -536,8 +539,8 @@ namespace Loom
 
 		// And put back what was there before, which restores anything the
 		// library registered over the top of.
-		for (const auto& [name, factory] : m_before)
-			ComponentRegistry::Register(name, nullptr, factory);
+		for (const auto& [name, entry] : m_before)
+			ComponentRegistry::Register(name, nullptr, entry.first, entry.second);
 
 		m_types.clear();
 		m_before.clear();

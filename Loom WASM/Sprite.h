@@ -28,6 +28,8 @@ namespace Loom
 	*/
 	struct LOOM_API Sprite : Component<Sprite>
 	{
+		static constexpr const char* category = "Rendering/2D";
+
 		void OnRender() override;
 
 		// The texture named by texturePath, loading it the first time it is asked

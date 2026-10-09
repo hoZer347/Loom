@@ -22,12 +22,24 @@ namespace Loom
 		return names;
 	};
 
+	std::map<std::string, std::string>& ComponentRegistry::Categories()
+	{
+		static std::map<std::string, std::string> categories{ };
+		return categories;
+	};
+
 	void ComponentRegistry::Register(
 		const std::string& name,
 		const char* type_name,
-		const Factory& factory)
+		const Factory& factory,
+		const std::string& category)
 	{
 		Factories()[name] = factory;
+
+		if (category.empty())
+			Categories().erase(name);
+		else
+			Categories()[name] = category;
 
 		if (type_name)
 			DisplayNames()[type_name] = name;
@@ -60,6 +72,7 @@ namespace Loom
 	void ComponentRegistry::Unregister(const std::string& name)
 	{
 		Factories().erase(name);
+		Categories().erase(name);
 
 		for (auto it = DisplayNames().begin(); it != DisplayNames().end(); )
 			it = it->second == name
@@ -70,6 +83,15 @@ namespace Loom
 	const std::map<std::string, ComponentRegistry::Factory>& ComponentRegistry::All()
 	{
 		return Factories();
+	};
+
+	std::string ComponentRegistry::CategoryOf(const std::string& name)
+	{
+		const auto found = Categories().find(name);
+
+		return found == Categories().end()
+			? ""
+			: found->second;
 	};
 
 	std::string ComponentRegistry::NameOf(const ComponentBase& component)

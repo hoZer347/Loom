@@ -27,6 +27,8 @@ namespace Loom
 	/// drawing order.
 	struct SpriteManager : Component<SpriteManager>
 	{
+		static constexpr const char* category = "Rendering/2D";
+
 		SpriteManager();
 		~SpriteManager();
 

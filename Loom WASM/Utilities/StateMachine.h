@@ -257,6 +257,7 @@ namespace Loom
 		/// template, and the registry, which drops namespaces, offers it as that.
 		struct StateMachine final : Loom::StateMachine<StateMachine>
 		{
+			static constexpr const char* category = "Logic";
 		};
 	};
 };
