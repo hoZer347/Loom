@@ -19,7 +19,7 @@ namespace Loom
 	* Loom::Audio
 	* - Plays sound files (wav, mp3 or flac, by path relative to the project
 	*   folder, as Sprite's textures are) through the default output device,
-	*   opened the first time anything plays
+	*   opened the first time anything plays or an AudioSource loads
 	* - Sounds are heard from the first enabled AudioListener among the open
 	*   scenes, or from the world origin, facing -Z, while there is none
 	* - The output pauses while Engine::updateScenes is off, which is how the
