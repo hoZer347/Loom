@@ -70,12 +70,10 @@ namespace Loom
 		constexpr size_t PAIR_GRAIN = 64;
 		constexpr size_t PRUNE_GRAIN = 512;
 
-		// The solver splits the bodies in pairs into up to this many slabs,
-		// whatever the machine, so it gives the same results on any; with no
-		// fewer bodies to a slab than this, so each is worth handing out; cut
-		// where a histogram of this many bins along the slabs' axis has them
-		// share the contacts evenly.
-		constexpr size_t MOST_SLABS = 8;
+		// The solver splits the bodies in pairs into a slab for each of the
+		// machine's cores, but no fewer bodies to a slab than this, so each is
+		// worth handing out; cut where a histogram of this many bins along the
+		// slabs' axis has them share the contacts evenly.
 		constexpr size_t SLAB_BODIES = 64;
 		constexpr size_t BINS = 256;
 
@@ -832,7 +830,7 @@ namespace Loom
 				};
 		};
 
-		const size_t slabs = std::clamp<size_t>(loaded / SLAB_BODIES, 1, MOST_SLABS);
+		const size_t slabs = std::clamp<size_t>(loaded / SLAB_BODIES, 1, Jobs::Cores());
 
 		// Cut along the widest axis where an equal share of the load lies
 		// either side, from a histogram of it.

@@ -9,6 +9,7 @@
 #include "EditorGui.h"
 #include "Engine.h"
 #include "GameObject.h"
+#include "Jobs.h"
 #include "LoomObject.h"
 #include "Material.h"
 #include "Scene.h"
@@ -3060,6 +3061,7 @@ namespace Loom
 				(int)std::ceil(io.Framerate),
 				(int)std::ceil(milliseconds_per_second / io.Framerate));
 			ImGui::Text("Graphics API: %s", EditorSettings::BackendLabel(Engine::backend));
+			ImGui::Text("Job threads: %u of %u", Jobs::Threads(), Jobs::Cores());
 
 			ImGui::Text("Scenes: %d", (int)Scene::GetScenes().size());
 			ImGui::Text("GameObjects: %d", (int)GameObject::GetObjectCount());

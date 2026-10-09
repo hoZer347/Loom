@@ -30,7 +30,7 @@ $webLinkFlags = @(
     '-sFETCH'                       # Shaders are fetched over HTTP...
     '-sASYNCIFY'                    # ...and waited on with emscripten_sleep.
     '-sALLOW_MEMORY_GROWTH=1'
-    '-sPTHREAD_POOL_SIZE=8'         # Pre-spawned: a later thread cannot start while main blocks in join.
+    '-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency'  # One pre-spawned for each thread the browser runs: a later one cannot start while main blocks.
     '-Wno-pthreads-mem-growth'
 )
 

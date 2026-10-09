@@ -129,7 +129,7 @@ if (-not $NoBuild)
         '-sASYNCIFY'                    # ...and waits on the fetch with emscripten_sleep.
         '-sALLOW_MEMORY_GROWTH=1'
         '-pthread'                      # Same threading the site build ships with.
-        '-sPTHREAD_POOL_SIZE=8'         # Pre-spawned: a later thread cannot start while main blocks in join.
+        '-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency'  # One pre-spawned for each thread the browser runs: a later one cannot start while main blocks.
         '-Wno-pthreads-mem-growth'
         '-sEXIT_RUNTIME=1'              # So the process exit code is the test result.
         '-sENVIRONMENT=node'

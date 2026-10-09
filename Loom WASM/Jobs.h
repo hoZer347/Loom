@@ -12,9 +12,9 @@ namespace Loom
 	/**
 	* Loom::Jobs
 	* - A pool of worker threads, one fewer than the machine has cores, or on
-	*   the web than the threads a page starts with, for work that splits
-	*   into independent pieces. The calling thread works alongside them, and
-	*   For returns once every piece is done
+	*   the web than the threads the browser runs at once, for work that
+	*   splits into independent pieces. The calling thread works alongside
+	*   them, and For returns once every piece is done
 	* - The pieces are chunks of a range, numbered in order, so what each
 	*   chunk writes to its own slot can be put together the same way every
 	*   run, however the threads happened to share them out
@@ -34,6 +34,11 @@ namespace Loom
 		// for work split so its pieces wait on the few they follow rather than
 		// on all. Whatever raises counter notifies it.
 		static void WaitFor(const std::atomic<int>& counter, int value);
+
+		// The caller and the workers the pool was made with. Unlike Threads,
+		// the same however many have started and whatever the limit, so work
+		// split by it splits the same way every run on a machine.
+		static unsigned Cores();
 
 		// The caller and the workers running, within the limit.
 		static unsigned Threads();

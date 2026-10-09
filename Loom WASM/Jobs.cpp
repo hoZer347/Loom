@@ -33,20 +33,13 @@ namespace Loom
 		// no longer, so one it waits on that has lost its core gets this one.
 		constexpr unsigned MOST_SPINS = 1024;
 
-#if defined(__EMSCRIPTEN__)
-		// The threads a page starts with, WebBuild.ps1's PTHREAD_POOL_SIZE:
-		// one past them cannot start while the main thread waits on it.
-		constexpr unsigned PAGE_THREADS = 8;
-#endif
-
 		// The machine's cores, rather than the threads they run at once: two
 		// threads on one core share its units, so a second that only waits
-		// slows the first, and one that works gains little.
-		unsigned Cores()
+		// slows the first, and one that works gains little. A browser tells
+		// only the threads, as many as the page starts with.
+		unsigned MachineCores()
 		{
-#if defined(__EMSCRIPTEN__)
-			return std::clamp(std::thread::hardware_concurrency(), 1u, PAGE_THREADS);
-#elif defined(_WIN32)
+#if defined(_WIN32)
 			DWORD length = 0;
 			GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &length);
 
@@ -121,7 +114,7 @@ namespace Loom
 		{
 			Pool()
 			{
-				const unsigned cores = Cores();
+				const unsigned cores = MachineCores();
 
 				for (unsigned i = 1; i < cores; i++)
 					workers.emplace_back([this]() { Run(++started); });
@@ -231,6 +224,11 @@ namespace Loom
 	void Jobs::WaitFor(const std::atomic<int>& counter, int value)
 	{
 		Await(counter, [&]() { return counter.load(std::memory_order_acquire) >= value; });
+	};
+
+	unsigned Jobs::Cores()
+	{
+		return (unsigned)Workers().workers.size() + 1;
 	};
 
 	unsigned Jobs::Threads()
