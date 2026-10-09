@@ -128,7 +128,6 @@ namespace Loom
 		colliders.BeginSync();
 
 		root.Physics();
-
 		colliders.SyncEnlisted();
 		colliders.EndSync();
 		simulation.Step(Loom::Physics::FixedDeltaTime());

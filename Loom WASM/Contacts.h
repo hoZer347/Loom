@@ -40,8 +40,8 @@ namespace Loom
 			glm::vec3 half{ 0.0f };
 		};
 
-		// A collider as it stands in the world. A mesh is its triangles,
-		// posed by world when they are needed.
+		// A collider as it stands in the world. A mesh is its collider, whose
+		// triangles Pose has put where world has them.
 		struct Shape
 		{
 			enum Kind { NONE, SPHERE, BOX, MESH } kind = NONE;
@@ -49,7 +49,6 @@ namespace Loom
 			Sphere sphere{ };
 			Box box{ };
 			const MeshCollider* mesh = nullptr;
-			glm::mat4 world{ 1.0f };
 		};
 
 		Shape Pose(const Collider& collider, const glm::mat4& world);

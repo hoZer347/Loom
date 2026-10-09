@@ -11,7 +11,14 @@
 #include "glm/gtx/euler_angles.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
+#include <limits>
+#include <memory>
+
+#if defined(_M_X64) || defined(__SSE2__)
+#include <immintrin.h>
+#endif
 
 
 namespace Loom
@@ -53,13 +60,33 @@ namespace Loom
 		// above sleeping speed, so jostling neighbours do not keep a pile awake.
 		constexpr float WAKE_SPEED = 0.5f;
 
-		// How many leaves one job's chunk queries, how many candidates it
-		// collides, and how many bodies it readies or moves: enough that a
+		// How many leaves one job's chunk queries, how many bodies it readies
+		// or moves, how many candidates it collides, how many pairs it
+		// reports and how many candidates it checks for parting: enough that a
 		// chunk outweighs handing it out.
-		constexpr size_t QUERY_GRAIN = 64;
+		constexpr size_t QUERY_GRAIN = 16;
 		constexpr size_t BODY_GRAIN = 64;
-		constexpr size_t PAIR_GRAIN = 64;
 		constexpr size_t CONSIDER_GRAIN = 128;
+		constexpr size_t PAIR_GRAIN = 64;
+		constexpr size_t PRUNE_GRAIN = 512;
+
+		// The candidate set grows to keep at least this many slots for each
+		// key, from this many; and mixes a key's two addresses by two large
+		// odd numbers, keeping the high bits, which they stir the most.
+		constexpr size_t MOST_FULL = 2;
+		constexpr size_t LEAST_SLOTS = 1024;
+		constexpr uint64_t FIRST_MIX = 0x9E3779B97F4A7C15ull;
+		constexpr uint64_t SECOND_MIX = 0xC2B2AE3D27D4EB4Full;
+		constexpr int HASH_SHIFT = 32;
+
+		// The solver splits the bodies in pairs into up to this many slabs,
+		// whatever the machine, so it gives the same results on any; with no
+		// fewer bodies to a slab than this, so each is worth handing out; cut
+		// where a histogram of this many bins along the slabs' axis has them
+		// share the contacts evenly.
+		constexpr size_t MOST_SLABS = 8;
+		constexpr size_t SLAB_BODIES = 64;
+		constexpr size_t BINS = 256;
 
 		// A contact this close to one from the last step, facing nearly the
 		// same way, is taken to be the same one.
@@ -71,6 +98,38 @@ namespace Loom
 		constexpr float BOX_INERTIA = 1.0f / 3.0f;
 		constexpr float SPHERE_INERTIA = 2.0f / 5.0f;
 		constexpr float HALF = 0.5f;
+
+#if defined(_M_X64) || defined(__SSE2__)
+		// The four lanes of a vec4 at once.
+		struct Wide
+		{
+			__m128 lanes;
+		};
+
+		// The shuffle that brings a vector's second lane to its first.
+		constexpr int SECOND_LANE = 1;
+
+		Wide Load(const glm::vec4& v) { return { _mm_loadu_ps(&v.x) }; };
+		void Store(glm::vec4& v, Wide wide) { _mm_storeu_ps(&v.x, wide.lanes); };
+
+		Wide operator+(Wide a, Wide b) { return { _mm_add_ps(a.lanes, b.lanes) }; };
+		Wide operator-(Wide a, Wide b) { return { _mm_sub_ps(a.lanes, b.lanes) }; };
+		Wide operator*(Wide a, Wide b) { return { _mm_mul_ps(a.lanes, b.lanes) }; };
+		Wide operator*(Wide a, float scale) { return { _mm_mul_ps(a.lanes, _mm_set1_ps(scale)) }; };
+
+		float Sum(Wide wide)
+		{
+			const __m128 halves = _mm_add_ps(wide.lanes, _mm_movehl_ps(wide.lanes, wide.lanes));
+			return _mm_cvtss_f32(_mm_add_ss(halves, _mm_shuffle_ps(halves, halves, SECOND_LANE)));
+		};
+#else
+		typedef glm::vec4 Wide;
+
+		Wide Load(const glm::vec4& v) { return v; };
+		void Store(glm::vec4& v, Wide wide) { v = wide; };
+
+		float Sum(Wide wide) { return wide.x + wide.y + wide.z + wide.w; };
+#endif
 
 		glm::vec3 Perpendicular(const glm::vec3& normal)
 		{
@@ -98,24 +157,29 @@ namespace Loom
 
 	void Simulation::Add(Rigidbody& rigidbody)
 	{
-		Body body{ };
+		m_joining.push_back({ &rigidbody, m_noted.size() });
+	};
+
+	bool Simulation::Ready(Body& body, const Joining& joining)
+	{
+		Rigidbody& rigidbody = *joining.rigidbody;
+
+		body = Body{ };
 		body.rigidbody = &rigidbody;
 		body.object = rigidbody.m_gameObject;
 
-		m_bodies.push_back(std::move(body));
-	};
+		// Those on its GameObject, on either side of where it was added,
+		// all in the tree by now.
+		size_t first = joining.noted;
+		size_t end = joining.noted;
 
-	bool Simulation::Ready(Body& body)
-	{
-		Rigidbody& rigidbody = *body.rigidbody;
+		while (first > 0 && m_noted[first - 1]->m_gameObject == body.object)
+			first--;
 
-		for (ComponentBase* component : body.object->GetComponents())
-		{
-			Collider* collider = dynamic_cast<Collider*>(component);
+		while (end < m_noted.size() && m_noted[end]->m_gameObject == body.object)
+			end++;
 
-			if (collider != nullptr && collider->m_tree == &m_tree)
-				body.colliders.push_back(collider);
-		};
+		body.colliders = std::span(m_noted).subspan(first, end - first);
 
 		body.dynamic = !rigidbody.isKinematic && rigidbody.mass > 0.0f;
 
@@ -138,20 +202,26 @@ namespace Loom
 
 		body.position = glm::vec3(world[3]);
 
-		glm::mat3 rotation(1.0f);
-		glm::vec3 scale;
-
-		for (int axis = 0; axis < glm::vec3::length(); axis++)
+		if (world != rigidbody.m_posedAt)
 		{
-			scale[axis] = glm::length(glm::vec3(world[axis]));
+			glm::mat3 rotation(1.0f);
 
-			if (scale[axis] == 0.0f)
-				return false;
+			for (int axis = 0; axis < glm::vec3::length(); axis++)
+			{
+				rigidbody.m_posedScale[axis] = glm::length(glm::vec3(world[axis]));
 
-			rotation[axis] = glm::vec3(world[axis]) / scale[axis];
+				if (rigidbody.m_posedScale[axis] == 0.0f)
+					return false;
+
+				rotation[axis] = glm::vec3(world[axis]) / rigidbody.m_posedScale[axis];
+			};
+
+			rigidbody.m_posedAt = world;
+			rigidbody.m_posedOrientation = glm::normalize(glm::quat_cast(rotation));
 		};
 
-		body.orientation = glm::normalize(glm::quat_cast(rotation));
+		body.orientation = rigidbody.m_posedOrientation;
+		const glm::vec3 scale = rigidbody.m_posedScale;
 
 		// Spread as its first box or sphere is; a body with neither is a
 		// sphere of radius half a unit.
@@ -188,13 +258,12 @@ namespace Loom
 				inertia.z > 0.0f ? 1.0f / inertia.z : 0.0f)
 			: glm::vec3(0.0f);
 
+		// Turned into the world: each own axis's inverse inertia along it.
 		const glm::mat3 turned = glm::mat3_cast(body.orientation);
-		const glm::mat3 own(
-			rigidbody.m_inverseInertia.x, 0.0f, 0.0f,
-			0.0f, rigidbody.m_inverseInertia.y, 0.0f,
-			0.0f, 0.0f, rigidbody.m_inverseInertia.z);
+		body.inverseInertia = glm::mat3(0.0f);
 
-		body.inverseInertia = turned * own * glm::transpose(turned);
+		for (int axis = 0; axis < glm::vec3::length(); axis++)
+			body.inverseInertia += glm::outerProduct(turned[axis], turned[axis]) * rigidbody.m_inverseInertia[axis];
 		body.inverseMass = body.dynamic ? 1.0f / rigidbody.mass : 0.0f;
 
 		return true;
@@ -205,47 +274,58 @@ namespace Loom
 		m_step++;
 
 		// Once the tree is in step, so a collider attached since the body
-		// was is in it and moves with the body.
-		Jobs::For(m_bodies.size(), BODY_GRAIN,
-			[&](size_t, size_t begin, size_t end)
-			{
-				for (size_t i = begin; i < end; i++)
-					if (!Ready(m_bodies[i]))
-						m_bodies[i].object = nullptr;
-			});
+		// was is in it and moves with the body. The bodies are kept from step
+		// to step, so readying one only overwrites it.
+		m_bodies.resize(m_joining.size());
 
-		std::erase_if(m_bodies, [](const Body& body) { return body.object == nullptr; });
-
-		for (int index = 0; index < (int)m_bodies.size(); index++)
-			for (Collider* collider : m_bodies[index].colliders)
-				collider->m_body = index;
-
+		// Each readied, then gravity and what AddForce gathered taken into
+		// its velocity, and how far that takes it found.
 		const glm::vec3 gravity = Physics::GetGravity();
 
 		Jobs::For(m_bodies.size(), BODY_GRAIN,
 			[&](size_t, size_t begin, size_t end)
 			{
 				for (size_t i = begin; i < end; i++)
-					Accelerate(m_bodies[i], gravity, seconds);
+				{
+					Body& body = m_bodies[i];
+
+					if (!Ready(body, m_joining[i]))
+					{
+						body.object = nullptr;
+						continue;
+					};
+
+					for (Collider* collider : body.colliders)
+						collider->m_body = (int)i;
+
+					Accelerate(body, gravity, seconds);
+
+					body.travel = glm::length(body.velocity) * seconds;
+					body.refit = body.awake && Outgrown(body, seconds);
+				};
 			});
+
+		// Numbered again, past any that cannot move.
+		if (std::erase_if(m_bodies, [](const Body& body) { return body.object == nullptr; }) > 0)
+			for (int index = 0; index < (int)m_bodies.size(); index++)
+				for (Collider* collider : m_bodies[index].colliders)
+					collider->m_body = index;
 
 		Gather(seconds);
 
-		// Each pair's contacts made ready at once, from the velocities before
-		// any warm start, then the warm starts applied in order.
-		Jobs::For(m_pairs.size(), PAIR_GRAIN,
+		Partition();
+
+		// Every pair's contacts made ready at once, from the velocities before
+		// any warm start.
+		Jobs::For(m_groups.size(), 1,
 			[&](size_t, size_t begin, size_t end)
 			{
-				for (size_t i = begin; i < end; i++)
-					Prepare(m_pairs[i], seconds);
+				for (size_t group = begin; group < end; group++)
+					for (size_t pair : m_groups[group])
+						Prepare(m_pairs[pair], seconds);
 			});
 
-		for (Pair& pair : m_pairs)
-			WarmStart(pair);
-
-		for (int iteration = 0; iteration < ITERATIONS; iteration++)
-			for (Pair& pair : m_pairs)
-				Solve(pair);
+		SolveSlabs();
 
 		// A body with others hanging under it moves first, outermost first,
 		// so those under it are placed from where it ends up; the rest move at
@@ -254,6 +334,9 @@ namespace Loom
 
 		for (Body& body : m_bodies)
 		{
+			body.velocity = glm::vec3(body.linear);
+			body.angularVelocity = glm::vec3(body.angular);
+
 			body.rigidbody->velocity = body.velocity;
 			body.rigidbody->angularVelocity = body.angularVelocity;
 
@@ -278,9 +361,25 @@ namespace Loom
 						Integrate(m_bodies[i], seconds);
 			});
 
-		for (Body& body : m_bodies)
-			if (body.object->GetChildren().empty())
-				Place(body, seconds);
+		// The moved leaves placed in the tree as one piece of work, the first
+		// handed out, while the rest keep what each touching pair ended on.
+		const size_t keeping = Jobs::Chunks(m_pairs.size(), PAIR_GRAIN);
+
+		Jobs::For(1 + keeping, 1,
+			[&](size_t chunk, size_t, size_t)
+			{
+				if (chunk == 0)
+				{
+					for (Body& body : m_bodies)
+						if (body.object->GetChildren().empty())
+							Place(body, seconds);
+
+					return;
+				};
+
+				const size_t begin = (chunk - 1) * PAIR_GRAIN;
+				Keep(begin, std::min(begin + PAIR_GRAIN, m_pairs.size()));
+			});
 
 		Report();
 
@@ -288,12 +387,85 @@ namespace Loom
 			for (Collider* collider : body.colliders)
 				collider->m_body = NONE;
 
-		m_bodies.clear();
+		m_joining.clear();
+		m_noted.clear();
+	};
+
+	bool Simulation::KeySet::Insert(const Key& key)
+	{
+		if ((m_count + 1) * MOST_FULL > m_slots.size())
+			Grow();
+
+		const size_t mask = m_slots.size() - 1;
+
+		for (size_t slot = Home(key); ; slot = (slot + 1) & mask)
+		{
+			if (m_slots[slot] == key)
+				return false;
+
+			if (m_slots[slot].first == nullptr)
+			{
+				m_slots[slot] = key;
+				m_count++;
+
+				return true;
+			};
+		};
+	};
+
+	void Simulation::KeySet::Erase(const Key& key)
+	{
+		if (m_slots.empty())
+			return;
+
+		const size_t mask = m_slots.size() - 1;
+		size_t hole = Home(key);
+
+		for (; m_slots[hole] != key; hole = (hole + 1) & mask)
+			if (m_slots[hole].first == nullptr)
+				return;
+
+		m_count--;
+
+		// Those after it that would rather sit in the hole move back into it,
+		// so none is left past a gap from where it belongs.
+		for (size_t next = (hole + 1) & mask; m_slots[next].first != nullptr; next = (next + 1) & mask)
+		{
+			const size_t home = Home(m_slots[next]);
+			const bool between = hole <= next ? hole < home && home <= next : hole < home || home <= next;
+
+			if (!between)
+			{
+				m_slots[hole] = m_slots[next];
+				hole = next;
+			};
+		};
+
+		m_slots[hole] = Key{ };
+	};
+
+	size_t Simulation::KeySet::Home(const Key& key) const
+	{
+		const uint64_t mixed = (uint64_t)(uintptr_t)key.first * FIRST_MIX ^ (uint64_t)(uintptr_t)key.second * SECOND_MIX;
+
+		return (size_t)(mixed >> HASH_SHIFT) & (m_slots.size() - 1);
+	};
+
+	void Simulation::KeySet::Grow()
+	{
+		std::vector<Key> old = std::move(m_slots);
+
+		m_slots.assign(std::max(old.size() * 2, LEAST_SLOTS), Key{ });
+		m_count = 0;
+
+		for (const Key& key : old)
+			if (key.first != nullptr)
+				Insert(key);
 	};
 
 	Simulation::Key Simulation::Ordered(const Collider* a, const Collider* b)
 	{
-		return a < b ? Key{ a, b } : Key{ b, a };
+		return a->m_made < b->m_made ? Key{ a, b } : Key{ b, a };
 	};
 
 	void Simulation::Accelerate(Body& body, const glm::vec3& gravity, float seconds)
@@ -317,6 +489,9 @@ namespace Loom
 
 		body.velocity = rigidbody.velocity;
 		body.angularVelocity = rigidbody.angularVelocity;
+
+		body.linear = glm::vec4(body.velocity, 0.0f);
+		body.angular = glm::vec4(body.angularVelocity, 0.0f);
 	};
 
 	void Simulation::Forget(const Collider& collider)
@@ -324,22 +499,24 @@ namespace Loom
 		const auto involves =
 			[&](const Key& key) { return key.first == &collider || key.second == &collider; };
 
-		std::erase_if(m_candidates, involves);
-		std::erase_if(m_candidateSet, involves);
+		m_candidateSet.EraseIf(involves);
 
-		std::erase_if(m_touching,
-			[&](const auto& entry)
+		std::erase_if(m_candidates,
+			[&](const Candidate& candidate)
 			{
-				const bool first = entry.first.first == &collider;
+				const bool first = candidate.key.first == &collider;
 
-				if (!first && entry.first.second != &collider)
+				if (!first && candidate.key.second != &collider)
 					return false;
 
 				// What it held up has to be free to fall.
-				WakeOwner(*(first ? entry.first.second : entry.first.first));
+				if (candidate.touching)
+					WakeOwner(*(first ? candidate.key.second : candidate.key.first));
 
 				return true;
 			});
+
+		std::erase_if(m_parted, [&](const Candidate& candidate) { return involves(candidate.key); });
 	};
 
 	void Simulation::WakeOwner(const Collider& collider)
@@ -379,18 +556,18 @@ namespace Loom
 	void Simulation::Gather(float seconds)
 	{
 		m_pairs.clear();
-		m_contacts.clear();
 
 		// Each moving body's leaf reaches along the travel it is about to
-		// make, which a velocity set or changed since the last step may not.
+		// make, which a velocity set or changed since the last step may not:
+		// those found to have outgrown theirs are refitted.
 		for (Body& body : m_bodies)
-		{
-			body.travel = glm::length(body.velocity) * seconds;
-
-			if (body.awake)
+			if (body.refit)
+			{
 				for (const Collider* collider : body.colliders)
 					m_tree.Reach(*collider, body.velocity * seconds);
-		};
+
+				body.refit = false;
+			};
 
 		// New candidates: each leaf put in or refitted since the last step,
 		// against whatever it now overlaps, found in parallel and taken in
@@ -425,38 +602,72 @@ namespace Loom
 
 		for (size_t chunk = 0; chunk < Jobs::Chunks(moved.size(), QUERY_GRAIN); chunk++)
 			for (const Key& key : m_found[chunk])
-				if (m_candidateSet.insert(key).second)
-					m_candidates.push_back(key);
+				if (m_candidateSet.Insert(key))
+					m_candidates.push_back({ key });
 
 		// Candidates whose leaves have parted are dropped, and the rest to be
 		// looked at gathered. Where neither side is awake, nothing has moved
 		// to part them.
+		m_fates.resize(m_candidates.size());
+
+		Jobs::For(m_candidates.size(), PRUNE_GRAIN,
+			[&](size_t, size_t begin, size_t end)
+			{
+				for (size_t i = begin; i < end; i++)
+				{
+					const Key& key = m_candidates[i].key;
+
+					if (!Awake(BodyOf(*key.first)) && !Awake(BodyOf(*key.second)))
+					{
+						m_fates[i] = Fate::Still;
+						continue;
+					};
+
+					const Bounds* first = m_tree.PaddedBounds(*key.first);
+					const Bounds* second = m_tree.PaddedBounds(*key.second);
+
+					if (first == nullptr || second == nullptr || !first->Overlaps(*second))
+					{
+						m_fates[i] = Fate::Parted;
+						continue;
+					};
+
+					// Their own boxes, as far apart as Consider would find them
+					// without a trigger, which only brings them closer.
+					const float margin = Travel(BodyOf(*key.first)) + Travel(BodyOf(*key.second)) + SPECULATIVE_SLACK;
+
+					m_fates[i] = key.first->m_bounds.Expanded(margin).Overlaps(key.second->m_bounds) ? Fate::Live : Fate::Still;
+				};
+			});
+
+		// From the back, each parted one swapped for the last, which has
+		// already been seen.
+		for (size_t i = m_candidates.size(); i-- > 0; )
+		{
+			if (m_fates[i] != Fate::Parted)
+				continue;
+
+			Candidate& candidate = m_candidates[i];
+			m_candidateSet.Erase(candidate.key);
+
+			if (candidate.touching)
+				m_parted.push_back(std::move(candidate));
+
+			if (i + 1 < m_candidates.size())
+			{
+				candidate = std::move(m_candidates.back());
+				m_fates[i] = m_fates.back();
+			};
+
+			m_candidates.pop_back();
+			m_fates.pop_back();
+		};
+
 		m_live.clear();
 
-		for (size_t i = 0; i < m_candidates.size(); )
-		{
-			const Key key = m_candidates[i];
-
-			if (!Awake(BodyOf(*key.first)) && !Awake(BodyOf(*key.second)))
-			{
-				i++;
-				continue;
-			};
-
-			const Bounds* first = m_tree.PaddedBounds(*key.first);
-			const Bounds* second = m_tree.PaddedBounds(*key.second);
-
-			if (first == nullptr || second == nullptr || !first->Overlaps(*second))
-			{
-				m_candidateSet.erase(key);
-				m_candidates[i] = m_candidates.back();
-				m_candidates.pop_back();
-				continue;
-			};
-
-			m_live.push_back(key);
-			i++;
-		};
+		for (size_t i = 0; i < m_candidates.size(); i++)
+			if (m_fates[i] == Fate::Live)
+				m_live.push_back(i);
 
 		// Collided in parallel, each chunk into its own slot, then put
 		// together in chunk order, with the sleepers they wake woken after.
@@ -472,19 +683,19 @@ namespace Loom
 				out.wakes.clear();
 
 				for (size_t i = begin; i < end; i++)
-					Consider(*const_cast<Collider*>(m_live[i].first), *const_cast<Collider*>(m_live[i].second), out);
+					Consider(m_live[i], out);
 			});
 
 		for (size_t chunk = 0; chunk < chunks; chunk++)
 		{
-			const Considered& out = m_considered[chunk];
-			const size_t base = m_contacts.size();
+			Considered& out = m_considered[chunk];
+			Contact* contacts = out.contacts.data();
 
-			m_contacts.insert(m_contacts.end(), out.contacts.begin(), out.contacts.end());
-
+			// Each pair's contacts follow the last's.
 			for (Pair pair : out.pairs)
 			{
-				pair.first += base;
+				pair.contacts = contacts;
+				contacts += pair.count;
 				m_pairs.push_back(pair);
 			};
 
@@ -494,22 +705,28 @@ namespace Loom
 		};
 	};
 
+	float Simulation::Travel(int body) const
+	{
+		return body == NONE ? 0.0f : m_bodies[body].travel;
+	};
+
 	bool Simulation::Awake(int body) const
 	{
 		return body != NONE && m_bodies[body].awake;
 	};
 
-	void Simulation::Consider(Collider& a, Collider& b, Considered& out) const
+	void Simulation::Consider(size_t candidate, Considered& out) const
 	{
+		Collider& a = *const_cast<Collider*>(m_candidates[candidate].key.first);
+		Collider& b = *const_cast<Collider*>(m_candidates[candidate].key.second);
+
 		const auto dynamic =
 			[&](int body) { return body != NONE && m_bodies[body].dynamic; };
-
-		const auto travel =
-			[&](int body) { return body == NONE ? 0.0f : m_bodies[body].travel; };
 
 		Pair pair{ };
 		pair.a = &a;
 		pair.b = &b;
+		pair.candidate = candidate;
 		pair.bodyA = BodyOf(a);
 		pair.bodyB = BodyOf(b);
 
@@ -526,7 +743,7 @@ namespace Loom
 		if (!pair.trigger && !dynamic(pair.bodyA) && !dynamic(pair.bodyB))
 			return;
 
-		const float margin = pair.trigger ? 0.0f : travel(pair.bodyA) + travel(pair.bodyB) + SPECULATIVE_SLACK;
+		const float margin = pair.trigger ? 0.0f : Travel(pair.bodyA) + Travel(pair.bodyB) + SPECULATIVE_SLACK;
 
 		// Their own boxes still too far apart to touch this step.
 		if (!a.m_bounds.Expanded(margin).Overlaps(b.m_bounds))
@@ -535,7 +752,7 @@ namespace Loom
 		out.manifolds.clear();
 		Contacts::Collide(a.m_shape, b.m_shape, margin, out.manifolds);
 
-		pair.first = out.contacts.size();
+		const size_t start = out.contacts.size();
 
 		for (const Contacts::Manifold& manifold : out.manifolds)
 			for (int i = 0; i < manifold.count; i++)
@@ -549,13 +766,16 @@ namespace Loom
 				out.contacts.push_back(contact);
 			};
 
-		pair.count = out.contacts.size() - pair.first;
+		pair.count = out.contacts.size() - start;
 
 		if (pair.count == 0 || (pair.trigger && !pair.touching))
 		{
-			out.contacts.resize(pair.first);
+			out.contacts.resize(start);
 			return;
 		};
+
+		pair.aListens = Listens(*a.m_gameObject);
+		pair.bListens = Listens(*b.m_gameObject);
 
 		const Rigidbody* first = pair.bodyA == NONE ? nullptr : m_bodies[pair.bodyA].rigidbody;
 		const Rigidbody* second = pair.bodyB == NONE ? nullptr : m_bodies[pair.bodyB].rigidbody;
@@ -591,12 +811,16 @@ namespace Loom
 		const Body& a = pair.bodyA == NONE ? m_ground : m_bodies[pair.bodyA];
 		const Body& b = pair.bodyB == NONE ? m_ground : m_bodies[pair.bodyB];
 
-		const auto found = m_touching.find({ pair.a, pair.b });
-		const std::vector<Contact>* before = found == m_touching.end() ? nullptr : &found->second.contacts;
+		const Candidate& candidate = m_candidates[pair.candidate];
+		const bool movesA = a.inverseMass > 0.0f;
+		const bool movesB = b.inverseMass > 0.0f;
+		const bool spinsA = movesA || a.angularVelocity != glm::vec3(0.0f);
+		const bool spinsB = movesB || b.angularVelocity != glm::vec3(0.0f);
+		const bool warm = candidate.touching && candidate.movableA == movesA && candidate.movableB == movesB;
 
-		for (size_t i = pair.first; i < pair.first + pair.count; i++)
+		for (size_t i = 0; i < pair.count; i++)
 		{
-			Contact& contact = m_contacts[i];
+			Contact& contact = pair.contacts[i];
 
 			const glm::vec3 fromA = contact.point - a.position;
 			const glm::vec3 fromB = contact.point - b.position;
@@ -610,14 +834,21 @@ namespace Loom
 			{
 				Axis& axis = contact.axes[d];
 
-				axis.direction = directions[d];
-				axis.angularA = glm::cross(fromA, axis.direction);
-				axis.angularB = glm::cross(fromB, axis.direction);
-				axis.turnA = a.inverseInertia * axis.angularA;
-				axis.turnB = b.inverseInertia * axis.angularB;
+				// Nothing turns a side the solver cannot move, and one not
+				// spinning adds nothing to the speed.
+				const glm::vec3 angularA = spinsA ? glm::cross(fromA, directions[d]) : glm::vec3(0.0f);
+				const glm::vec3 angularB = spinsB ? glm::cross(fromB, directions[d]) : glm::vec3(0.0f);
+				const glm::vec3 turnA = movesA ? a.inverseInertia * angularA : glm::vec3(0.0f);
+				const glm::vec3 turnB = movesB ? b.inverseInertia * angularB : glm::vec3(0.0f);
+
+				axis.direction = glm::vec4(directions[d], 0.0f);
+				axis.angularA = glm::vec4(angularA, 0.0f);
+				axis.angularB = glm::vec4(angularB, 0.0f);
+				axis.turnA = glm::vec4(turnA, 0.0f);
+				axis.turnB = glm::vec4(turnB, 0.0f);
 
 				const float inverse = a.inverseMass + b.inverseMass
-					+ glm::dot(axis.angularA, axis.turnA) + glm::dot(axis.angularB, axis.turnB);
+					+ glm::dot(angularA, turnA) + glm::dot(angularB, turnB);
 
 				axis.mass = inverse > 0.0f ? 1.0f / inverse : 0.0f;
 				axis.impulse = 0.0f;
@@ -639,18 +870,214 @@ namespace Loom
 				contact.bias = bouncing && closing * seconds > gap ? pair.bounciness * closing : -gap / seconds;
 			};
 
-			if (before)
-				for (const Contact& old : *before)
-					if (glm::length(old.point - contact.point) < SAME_DISTANCE && glm::dot(old.normal, contact.normal) > SAME_FACING)
+			if (warm)
+				for (const Kept& old : candidate.kept)
+				{
+					const glm::vec3 apart = old.point - contact.point;
+
+					if (glm::dot(apart, apart) < SAME_DISTANCE * SAME_DISTANCE && glm::dot(old.normal, contact.normal) > SAME_FACING)
 					{
 						// The tangents are the same two, the normal being so close.
 						for (int d = 0; d < DIRECTIONS; d++)
-							contact.axes[d].impulse = old.axes[d].impulse;
+							contact.axes[d].impulse = old.impulses[d];
 
 						break;
 					};
+				};
 
 		};
+	};
+
+	void Simulation::Partition()
+	{
+		// How many contacts each body has, which is what the slabs share out,
+		// and how far apart those in any lie along each axis.
+		Bounds spread{ glm::vec3(std::numeric_limits<float>::max()), glm::vec3(std::numeric_limits<float>::lowest()) };
+		size_t loaded = 0;
+		size_t load = 0;
+
+		for (const Pair& pair : m_pairs)
+		{
+			if (pair.trigger)
+				continue;
+
+			for (Body* body : { Solved(pair.bodyA), Solved(pair.bodyB) })
+				if (body)
+				{
+					loaded += body->load == 0;
+					body->load += pair.count;
+					load += pair.count;
+
+					spread.min = glm::min(spread.min, body->position);
+					spread.max = glm::max(spread.max, body->position);
+				};
+		};
+
+		const size_t slabs = std::clamp<size_t>(loaded / SLAB_BODIES, 1, MOST_SLABS);
+
+		// Cut along the widest axis where an equal share of the load lies
+		// either side, from a histogram of it.
+		const glm::vec3 extent = spread.max - spread.min;
+		const int axis = extent.x >= extent.y && extent.x >= extent.z ? 0 : extent.y >= extent.z ? 1 : 2;
+		const float low = spread.min[axis];
+		const float width = extent[axis] / BINS;
+
+		m_cuts.assign(slabs - 1, std::numeric_limits<float>::max());
+
+		if (slabs > 1 && width > 0.0f)
+		{
+			m_histogram.assign(BINS, 0);
+
+			for (const Body& body : m_bodies)
+				if (body.load > 0)
+					m_histogram[std::min<size_t>((size_t)((body.position[axis] - low) / width), BINS - 1)] += body.load;
+
+			size_t below = 0;
+			size_t cut = 0;
+
+			for (size_t bin = 0; bin < BINS && cut < m_cuts.size(); bin++)
+			{
+				below += m_histogram[bin];
+
+				while (cut < m_cuts.size() && below * slabs >= load * (cut + 1))
+					m_cuts[cut++] = low + width * (bin + 1);
+			};
+		};
+
+		for (Body& body : m_bodies)
+			body.slab = (int)(std::upper_bound(m_cuts.begin(), m_cuts.end(), body.position[axis]) - m_cuts.begin());
+
+		// A pair inside one slab is that slab's to solve; one across two
+		// side by side, the border's; any other, solved alone; and one with
+		// nothing to move only made ready, for what it reports.
+		const size_t borders = slabs - 1;
+		const size_t across = slabs + borders;
+		const size_t idle = across + 1;
+
+		m_groups.resize(idle + 1);
+
+		for (std::vector<size_t>& group : m_groups)
+			group.clear();
+
+		for (size_t i = 0; i < m_pairs.size(); i++)
+		{
+			const Pair& pair = m_pairs[i];
+
+			const Body* a = Solved(pair.bodyA);
+			const Body* b = Solved(pair.bodyB);
+
+			if (pair.trigger)
+				continue;
+
+			if (a == nullptr && b == nullptr)
+			{
+				m_groups[idle].push_back(i);
+				continue;
+			};
+
+			const int slabA = a ? a->slab : b->slab;
+			const int slabB = b ? b->slab : a->slab;
+
+			if (slabA == slabB)
+				m_groups[slabA].push_back(i);
+			else if (std::abs(slabA - slabB) == 1)
+				m_groups[slabs + std::min(slabA, slabB)].push_back(i);
+			else
+				m_groups[across].push_back(i);
+		};
+
+		m_slabs = slabs;
+	};
+
+	void Simulation::SolveSlabs()
+	{
+		const int slabs = (int)m_slabs;
+		const size_t alone = 2 * m_slabs - 1;
+		const bool lonely = !m_groups[alone].empty();
+
+		// How many passes each slab, each border and those alone have been
+		// through.
+		const std::unique_ptr<std::atomic<int>[]> slabsDone(new std::atomic<int>[slabs]());
+		const std::unique_ptr<std::atomic<int>[]> bordersDone(new std::atomic<int>[slabs]());
+		std::atomic<int> aloneDone{ 0 };
+
+		// The warm start, then each iteration.
+		const auto run =
+			[&](size_t group, int pass)
+			{
+				for (size_t pair : m_groups[group])
+					if (pass == 0)
+						WarmStart(m_pairs[pair]);
+					else
+						Solve(m_pairs[pair]);
+			};
+
+		const int team = (int)std::min<size_t>(Jobs::Threads(), m_slabs);
+
+		// Each member keeps its slabs, and the border after each, through
+		// every pass, waiting only on those it shares bodies with. Every
+		// body meets its slab, its even border, its odd border, then those
+		// alone, pass after pass: as one thread doing them all in that order
+		// would, so the result is the same however many share them.
+		Jobs::For(team, 1,
+			[&](size_t member, size_t, size_t)
+			{
+				for (int pass = 0; pass <= ITERATIONS; pass++)
+				{
+					for (int k = (int)member; k < slabs; k += team)
+					{
+						if (k > 0)
+							Jobs::WaitFor(bordersDone[k - 1], pass);
+
+						if (lonely)
+							Jobs::WaitFor(aloneDone, pass);
+
+						run(k, pass);
+						slabsDone[k].store(pass + 1, std::memory_order_release);
+						slabsDone[k].notify_all();
+					};
+
+					for (int parity = 0; parity < 2; parity++)
+						for (int k = (int)member; k < slabs - 1; k += team)
+						{
+							if (k % 2 != parity)
+								continue;
+
+							Jobs::WaitFor(slabsDone[k + 1], pass + 1);
+
+							// An odd border follows the even ones either side.
+							if (parity == 1)
+							{
+								Jobs::WaitFor(bordersDone[k - 1], pass + 1);
+
+								if (k + 1 < slabs - 1)
+									Jobs::WaitFor(bordersDone[k + 1], pass + 1);
+							};
+
+							run(m_slabs + k, pass);
+							bordersDone[k].store(pass + 1, std::memory_order_release);
+							bordersDone[k].notify_all();
+						};
+
+					if (lonely && member == 0)
+					{
+						for (int k = 0; k < slabs; k++)
+							Jobs::WaitFor(slabsDone[k], pass + 1);
+
+						for (int k = 0; k < slabs - 1; k++)
+							Jobs::WaitFor(bordersDone[k], pass + 1);
+
+						run(alone, pass);
+						aloneDone.store(pass + 1, std::memory_order_release);
+						aloneDone.notify_all();
+					};
+				};
+			});
+	};
+
+	Simulation::Body* Simulation::Solved(int body)
+	{
+		return body != NONE && m_bodies[body].inverseMass > 0.0f ? &m_bodies[body] : nullptr;
 	};
 
 	void Simulation::WarmStart(Pair& pair)
@@ -661,25 +1088,33 @@ namespace Loom
 		Body& a = At(pair.bodyA);
 		Body& b = At(pair.bodyB);
 
-		for (size_t i = pair.first; i < pair.first + pair.count; i++)
-			for (const Axis& axis : m_contacts[i].axes)
+		for (size_t i = 0; i < pair.count; i++)
+			for (const Axis& axis : pair.contacts[i].axes)
 				Push(a, b, axis, axis.impulse);
 	};
 
 	float Simulation::Speed(const Body& a, const Body& b, const Axis& axis)
 	{
-		return glm::dot(b.velocity - a.velocity, axis.direction)
-			+ glm::dot(b.angularVelocity, axis.angularB)
-			- glm::dot(a.angularVelocity, axis.angularA);
+		return Sum((Load(b.linear) - Load(a.linear)) * Load(axis.direction)
+			+ Load(b.angular) * Load(axis.angularB)
+			- Load(a.angular) * Load(axis.angularA));
 	};
 
 	void Simulation::Push(Body& a, Body& b, const Axis& axis, float impulse)
 	{
-		a.velocity -= axis.direction * (impulse * a.inverseMass);
-		a.angularVelocity -= axis.turnA * impulse;
+		// One that does not move is left untouched, as pairs in other slabs
+		// may be pushing on it at once.
+		if (a.inverseMass > 0.0f)
+		{
+			Store(a.linear, Load(a.linear) - Load(axis.direction) * (impulse * a.inverseMass));
+			Store(a.angular, Load(a.angular) - Load(axis.turnA) * impulse);
+		};
 
-		b.velocity += axis.direction * (impulse * b.inverseMass);
-		b.angularVelocity += axis.turnB * impulse;
+		if (b.inverseMass > 0.0f)
+		{
+			Store(b.linear, Load(b.linear) + Load(axis.direction) * (impulse * b.inverseMass));
+			Store(b.angular, Load(b.angular) + Load(axis.turnB) * impulse);
+		};
 	};
 
 	void Simulation::Solve(Pair& pair)
@@ -690,9 +1125,9 @@ namespace Loom
 		Body& a = At(pair.bodyA);
 		Body& b = At(pair.bodyB);
 
-		for (size_t i = pair.first; i < pair.first + pair.count; i++)
+		for (size_t i = 0; i < pair.count; i++)
 		{
-			Contact& contact = m_contacts[i];
+			Contact& contact = pair.contacts[i];
 			Axis& normal = contact.axes[NORMAL];
 
 			// Friction first, held within what the normal impulse allows.
@@ -736,11 +1171,14 @@ namespace Loom
 
 			// Back into its parent's space, keeping its own scale.
 			const GameObject* parent = body.object->GetParent();
-			const glm::mat4 parentInverse = parent ? glm::inverse(parent->WorldMatrix()) : glm::mat4(1.0f);
+			const glm::mat4 above = parent ? parent->WorldMatrix() : glm::mat4(1.0f);
+			const bool flat = above == glm::mat4(1.0f);
 
-			const glm::mat4 local = parentInverse
-				* glm::translate(glm::mat4(1.0f), body.position)
-				* glm::mat4_cast(body.orientation);
+			glm::mat4 local = glm::mat4_cast(body.orientation);
+			local[3] = glm::vec4(body.position, 1.0f);
+
+			if (!flat)
+				local = glm::inverse(above) * local;
 
 			if (moving)
 				body.object->transform.position = glm::vec3(local[3]);
@@ -759,12 +1197,36 @@ namespace Loom
 				body.object->transform.rotation = glm::degrees(radians);
 			};
 
-			// From the transform just written, exactly as the next walk will
-			// find it, so that walk leaves the leaf alone.
-			for (Collider* collider : body.colliders)
-				m_tree.Measure(*collider);
+			// Where its colliders are now: under a parent that changes
+			// nothing, its own pose and scale, without working the transform
+			// just written back out; the next walk finds that as it was left,
+			// so keeps this.
+			glm::mat4 world = glm::mat4_cast(body.orientation);
 
-			body.moved = true;
+			if (flat)
+			{
+				const glm::vec3 size = body.object->transform.scale;
+
+				for (int axis = 0; axis < glm::vec3::length(); axis++)
+					world[axis] *= size[axis];
+
+				world[3] = glm::vec4(body.position, 1.0f);
+			}
+			else
+				world = body.object->WorldMatrix();
+
+			for (Collider* collider : body.colliders)
+				m_tree.Measure(*collider, world);
+
+			// What the next step's Weigh would work back out of world.
+			if (flat)
+			{
+				rigidbody.m_posedAt = world;
+				rigidbody.m_posedOrientation = body.orientation;
+				rigidbody.m_posedScale = body.object->transform.scale;
+			};
+
+			body.refit = Outgrown(body, seconds);
 		};
 
 		if (body.inverseMass == 0.0f)
@@ -794,14 +1256,23 @@ namespace Loom
 
 	void Simulation::Place(Body& body, float seconds)
 	{
-		if (!body.moved)
+		if (!body.refit)
 			return;
 
 		// Stretched along the travel, so the next steps' motion stays inside.
 		for (Collider* collider : body.colliders)
 			m_tree.Place(*collider, true, body.velocity * seconds);
 
-		body.moved = false;
+		body.refit = false;
+	};
+
+	bool Simulation::Outgrown(const Body& body, float seconds) const
+	{
+		for (const Collider* collider : body.colliders)
+			if (!m_tree.Fits(*collider, body.velocity * seconds))
+				return true;
+
+		return false;
 	};
 
 	int Simulation::Depth(const GameObject& object)
@@ -812,6 +1283,40 @@ namespace Loom
 			depth++;
 
 		return depth;
+	};
+
+	void Simulation::Keep(size_t begin, size_t end)
+	{
+		for (size_t i = begin; i < end; i++)
+		{
+			Pair& pair = m_pairs[i];
+
+			if (!pair.touching)
+				continue;
+
+			Candidate& candidate = m_candidates[pair.candidate];
+
+			pair.entering = !candidate.touching;
+
+			candidate.touching = true;
+			candidate.trigger = pair.trigger;
+			candidate.step = m_step;
+			candidate.movableA = At(pair.bodyA).inverseMass > 0.0f;
+			candidate.movableB = At(pair.bodyB).inverseMass > 0.0f;
+			candidate.kept.resize(pair.count);
+
+			for (size_t k = 0; k < pair.count; k++)
+			{
+				const Contact& contact = pair.contacts[k];
+				Kept& kept = candidate.kept[k];
+
+				kept.point = contact.point;
+				kept.normal = contact.normal;
+
+				for (int d = 0; d < DIRECTIONS; d++)
+					kept.impulses[d] = contact.axes[d].impulse;
+			};
+		};
 	};
 
 	void Simulation::Report()
@@ -833,11 +1338,8 @@ namespace Loom
 		enum Phase { ENTERING, STAYING, LEAVING };
 
 		const auto report =
-			[&](Collider& a, Collider& b, int bodyA, int bodyB, bool trigger, const Contact* contacts, size_t count, Phase phase)
+			[&](Collider& a, Collider& b, bool aListens, bool bListens, int bodyA, int bodyB, bool trigger, const Contact* contacts, size_t count, Phase phase)
 			{
-				const bool aListens = Listens(*a.m_gameObject);
-				const bool bListens = Listens(*b.m_gameObject);
-
 				if (trigger)
 				{
 					const auto triggered =
@@ -904,20 +1406,10 @@ namespace Loom
 					collided(b, bodyB, a, bodyA, 1.0f);
 			};
 
+		// Those that listen told, in order, of the pairs Keep has kept.
 		for (const Pair& pair : m_pairs)
-		{
-			if (!pair.touching)
-				continue;
-
-			const auto [entry, entering] = m_touching.try_emplace({ pair.a, pair.b });
-			Touching& touching = entry->second;
-
-			touching.trigger = pair.trigger;
-			touching.contacts.assign(m_contacts.begin() + pair.first, m_contacts.begin() + pair.first + pair.count);
-			touching.step = m_step;
-
-			report(*pair.a, *pair.b, pair.bodyA, pair.bodyB, pair.trigger, &m_contacts[pair.first], pair.count, entering ? ENTERING : STAYING);
-		};
+			if (pair.touching && (pair.aListens || pair.bListens))
+				report(*pair.a, *pair.b, pair.aListens, pair.bListens, pair.bodyA, pair.bodyB, pair.trigger, pair.contacts, pair.count, pair.entering ? ENTERING : STAYING);
 
 		const auto awake =
 			[&](const Collider* collider)
@@ -926,36 +1418,44 @@ namespace Loom
 				return body != NONE && m_bodies[body].awake;
 			};
 
-		for (auto entry = m_touching.begin(); entry != m_touching.end(); )
-		{
-			Touching& touching = entry->second;
-
-			if (touching.step == m_step)
+		const auto part =
+			[&](Candidate& candidate)
 			{
-				++entry;
-				continue;
+				Collider& a = *const_cast<Collider*>(candidate.key.first);
+				Collider& b = *const_cast<Collider*>(candidate.key.second);
+
+				candidate.touching = false;
+
+				if (!candidate.trigger)
+				{
+					WakeOwner(a);
+					WakeOwner(b);
+				};
+
+				report(a, b, Listens(*a.m_gameObject), Listens(*b.m_gameObject), BodyOf(a), BodyOf(b), candidate.trigger, nullptr, 0, LEAVING);
 			};
+
+		for (Candidate& candidate : m_parted)
+			part(candidate);
+
+		m_parted.clear();
+
+		// By index, as a listener may remove a collider and its candidates.
+		for (size_t i = 0; i < m_candidates.size(); i++)
+		{
+			Candidate& candidate = m_candidates[i];
+
+			if (!candidate.touching || candidate.step == m_step)
+				continue;
 
 			// Asleep on both sides, it is still touching; it was only not looked at.
-			if (!awake(entry->first.first) && !awake(entry->first.second))
+			if (!awake(candidate.key.first) && !awake(candidate.key.second))
 			{
-				touching.step = m_step;
-				++entry;
+				candidate.step = m_step;
 				continue;
 			};
 
-			Collider* a = const_cast<Collider*>(entry->first.first);
-			Collider* b = const_cast<Collider*>(entry->first.second);
-
-			if (!touching.trigger)
-			{
-				WakeOwner(*a);
-				WakeOwner(*b);
-			};
-
-			report(*a, *b, BodyOf(*a), BodyOf(*b), touching.trigger, nullptr, 0, LEAVING);
-
-			entry = m_touching.erase(entry);
+			part(candidate);
 		};
 	};
 };

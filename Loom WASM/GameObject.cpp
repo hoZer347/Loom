@@ -166,9 +166,13 @@ namespace Loom
 
 	glm::mat4 GameObject::WorldMatrix() const
 	{
-		return parent
-			? parent->WorldMatrix() * LocalMatrix()
-			: LocalMatrix();
+		if (!parent)
+			return LocalMatrix();
+
+		// Under a parent that changes nothing, such as the scene's root.
+		const glm::mat4 above = parent->WorldMatrix();
+
+		return above == glm::mat4(1.0f) ? LocalMatrix() : above * LocalMatrix();
 	};
 
 	void GameObject::Update(const int& thread)

@@ -189,24 +189,62 @@ namespace Loom
 			};
 	};
 
-	void MeshCollider::TrianglesNear(const glm::mat4& world, const Bounds& near, std::vector<glm::vec3>& corners) const
+	bool MeshCollider::IntersectPosed(const Ray& ray, float maxDistance, RaycastHit& hit) const
 	{
-		if (m_nodes.empty() || glm::determinant(glm::mat3(world)) == 0.0f)
-			return;
+		float nearest = maxDistance;
+		glm::vec3 normal(0.0f);
 
-		// near's corners in the mesh's own space, boxed again there.
-		const glm::mat4 toLocal = glm::inverse(world);
-		Bounds local = Around(glm::vec3(toLocal * glm::vec4(near.min, 1.0f)));
+		if (m_posedBounds.empty() || !Nearest(m_posed, [&](uint32_t node) -> const Bounds& { return m_posedBounds[node]; }, ray, nearest, normal))
+			return false;
 
-		for (uint32_t corner = 0; corner < BOX_CORNERS; corner++)
+		const float length = glm::length(normal);
+
+		if (length == 0.0f)
+			return false;
+
+		hit.point = ray.GetPoint(nearest);
+		hit.normal = glm::dot(normal, ray.direction) > 0.0f ? -normal / length : normal / length;
+		hit.distance = nearest;
+
+		return true;
+	};
+
+	void MeshCollider::Pose(const glm::mat4& world) const
+	{
+		m_posed.resize(m_triangles.size());
+
+		for (size_t i = 0; i < m_triangles.size(); i++)
+			for (uint32_t corner = 0; corner < CORNERS; corner++)
+				m_posed[i].corners[corner] = glm::vec3(world * glm::vec4(m_triangles[i].corners[corner], 1.0f));
+
+		// A branch's children come after it, so from the back each node's
+		// are boxed before it is.
+		m_posedBounds.resize(m_nodes.size());
+
+		for (size_t i = m_nodes.size(); i-- > 0; )
 		{
-			const glm::vec3 point(
-				corner & 1 ? near.max.x : near.min.x,
-				corner & 2 ? near.max.y : near.min.y,
-				corner & 4 ? near.max.z : near.min.z);
+			const Node& node = m_nodes[i];
 
-			local = local.Union(Around(glm::vec3(toLocal * glm::vec4(point, 1.0f))));
+			if (node.count == 0)
+			{
+				m_posedBounds[i] = m_posedBounds[i + 1].Union(m_posedBounds[node.second]);
+				continue;
+			};
+
+			Bounds bounds = Around(m_posed[node.first].corners[0]);
+
+			for (uint32_t t = node.first; t < node.first + node.count; t++)
+				for (const glm::vec3& corner : m_posed[t].corners)
+					bounds = bounds.Union(Around(corner));
+
+			m_posedBounds[i] = bounds;
 		};
+	};
+
+	void MeshCollider::TrianglesNear(const Bounds& near, std::vector<glm::vec3>& corners) const
+	{
+		if (m_posedBounds.empty())
+			return;
 
 		std::array<uint32_t, MOST_DEPTH> pending;
 		size_t count = 0;
@@ -217,7 +255,7 @@ namespace Loom
 			const uint32_t index = pending[--count];
 			const Node& node = m_nodes[index];
 
-			if (!node.bounds.Overlaps(local))
+			if (!m_posedBounds[index].Overlaps(near))
 				continue;
 
 			if (node.count == 0)
@@ -227,10 +265,82 @@ namespace Loom
 				continue;
 			};
 
+			// Only those whose own boxes reach near: a leaf's box covers
+			// several, and testing one against a shape costs far more.
 			for (uint32_t i = node.first; i < node.first + node.count; i++)
-				for (const glm::vec3& corner : m_triangles[i].corners)
-					corners.push_back(glm::vec3(world * glm::vec4(corner, 1.0f)));
+			{
+				const glm::vec3* posed = m_posed[i].corners;
+
+				if (Around(posed[0]).Union(Around(posed[1])).Union(Around(posed[2])).Overlaps(near))
+					corners.insert(corners.end(), posed, posed + CORNERS);
+			};
 		};
+	};
+
+	template<typename BoxOf>
+	bool MeshCollider::Nearest(const std::vector<Triangle>& triangles, const BoxOf& boxOf, const Ray& ray, float& nearest, glm::vec3& normal) const
+	{
+		bool found = false;
+
+		std::array<uint32_t, MOST_DEPTH> pending;
+		size_t count = 0;
+		pending[count++] = 0;
+
+		while (count > 0)
+		{
+			const uint32_t index = pending[--count];
+			const Node& node = m_nodes[index];
+
+			float entry, exit;
+			int axis;
+
+			if (!boxOf(index).IntersectRay(ray, entry, exit, axis) || exit < 0.0f || entry > nearest)
+				continue;
+
+			if (node.count == 0)
+			{
+				pending[count++] = node.second;
+				pending[count++] = index + 1;
+				continue;
+			};
+
+			// Moller and Trumbore's test, in their names, from either side.
+			for (uint32_t i = node.first; i < node.first + node.count; i++)
+			{
+				const glm::vec3* corners = triangles[i].corners;
+				const glm::vec3 edge1 = corners[1] - corners[0];
+				const glm::vec3 edge2 = corners[2] - corners[0];
+
+				const glm::vec3 p = glm::cross(ray.direction, edge2);
+				const float determinant = glm::dot(edge1, p);
+
+				if (determinant == 0.0f)
+					continue;
+
+				const glm::vec3 offset = ray.origin - corners[0];
+				const float u = glm::dot(offset, p) / determinant;
+
+				if (u < 0.0f || u > 1.0f)
+					continue;
+
+				const glm::vec3 q = glm::cross(offset, edge1);
+				const float v = glm::dot(ray.direction, q) / determinant;
+
+				if (v < 0.0f || u + v > 1.0f)
+					continue;
+
+				const float distance = glm::dot(edge2, q) / determinant;
+
+				if (distance < 0.0f || distance > nearest)
+					continue;
+
+				nearest = distance;
+				normal = glm::cross(edge1, edge2);
+				found = true;
+			};
+		};
+
+		return found;
 	};
 
 	bool MeshCollider::Intersect(const glm::mat4& world, const Ray& ray, float maxDistance, RaycastHit& hit) const
@@ -249,64 +359,7 @@ namespace Loom
 
 		float nearest = maxDistance;
 		glm::vec3 normal(0.0f);
-		bool found = false;
-
-		std::array<uint32_t, MOST_DEPTH> pending;
-		size_t count = 0;
-		pending[count++] = 0;
-
-		while (count > 0)
-		{
-			const Node& node = m_nodes[pending[--count]];
-
-			float entry, exit;
-			int axis;
-
-			if (!node.bounds.IntersectRay(local, entry, exit, axis) || exit < 0.0f || entry > nearest)
-				continue;
-
-			if (node.count == 0)
-			{
-				pending[count++] = node.second;
-				pending[count++] = (uint32_t)(&node - m_nodes.data()) + 1;
-				continue;
-			};
-
-			// Moller and Trumbore's test, in their names, from either side.
-			for (uint32_t i = node.first; i < node.first + node.count; i++)
-			{
-				const glm::vec3* corners = m_triangles[i].corners;
-				const glm::vec3 edge1 = corners[1] - corners[0];
-				const glm::vec3 edge2 = corners[2] - corners[0];
-
-				const glm::vec3 p = glm::cross(local.direction, edge2);
-				const float determinant = glm::dot(edge1, p);
-
-				if (determinant == 0.0f)
-					continue;
-
-				const glm::vec3 offset = local.origin - corners[0];
-				const float u = glm::dot(offset, p) / determinant;
-
-				if (u < 0.0f || u > 1.0f)
-					continue;
-
-				const glm::vec3 q = glm::cross(offset, edge1);
-				const float v = glm::dot(local.direction, q) / determinant;
-
-				if (v < 0.0f || u + v > 1.0f)
-					continue;
-
-				const float distance = glm::dot(edge2, q) / determinant;
-
-				if (distance < 0.0f || distance > nearest)
-					continue;
-
-				nearest = distance;
-				normal = glm::cross(edge1, edge2);
-				found = true;
-			};
-		};
+		const bool found = Nearest(m_triangles, [&](uint32_t node) -> const Bounds& { return m_nodes[node].bounds; }, local, nearest, normal);
 
 		if (!found)
 			return false;

@@ -32,9 +32,17 @@ namespace Loom
 		bool IsTrigger() const override { return isTrigger; };
 		ColliderShape Shape() const override { return ColliderShape::Mesh; };
 
-		// The triangles that may reach into near, a box in world space, posed
-		// by world: three corners each, in world space.
-		void TrianglesNear(const glm::mat4& world, const Bounds& near, std::vector<glm::vec3>& corners) const;
+		// Puts the triangles where world has them, for TrianglesNear: done
+		// when the collider is synced somewhere new, so that finding contacts
+		// against it moves nothing.
+		void Pose(const glm::mat4& world) const;
+
+		// The triangles that may reach into near, a box in world space, as
+		// the last Pose put them: three corners each.
+		void TrianglesNear(const Bounds& near, std::vector<glm::vec3>& corners) const;
+
+		// Intersect, against the triangles where the last Pose put them.
+		bool IntersectPosed(const Ray& ray, float maxDistance, RaycastHit& hit) const;
 
 		Serial<bool> isTrigger;
 
@@ -67,6 +75,12 @@ namespace Loom
 		};
 
 		void Rebuild() const;
+
+		// The nearest of triangles the ray meets within nearest, through the
+		// tree with each node's box as boxOf gives it: its distance, in place
+		// of nearest, and its face's normal, of any length.
+		template<typename BoxOf>
+		bool Nearest(const std::vector<Triangle>& triangles, const BoxOf& boxOf, const Ray& ray, float& nearest, glm::vec3& normal) const;
 		void Build(uint32_t first, uint32_t count) const;
 
 		// What the tree was built from, to tell when the mesh has changed.
@@ -76,5 +90,10 @@ namespace Loom
 
 		mutable std::vector<Triangle> m_triangles{ };
 		mutable std::vector<Node> m_nodes{ };
+
+		// The triangles, and each node's box around them, as the last Pose
+		// put them.
+		mutable std::vector<Triangle> m_posed{ };
+		mutable std::vector<Bounds> m_posedBounds{ };
 	};
 };

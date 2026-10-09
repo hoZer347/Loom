@@ -9,7 +9,7 @@
     with a row of 160 raycasts every step. Loom runs it as the Benchmark suite
     in Loom Tests, built in Release; Unity runs it headless from
     "Benchmarks\Unity Crowd", stepping physics by hand, once with its job
-    threads and once on one thread, since Loom's physics runs on one.
+    threads and once on one thread.
 
     Both step 1/60 of a second 1200 times and report, per step: the slowest,
     the average, the average over the first six seconds while everything

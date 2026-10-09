@@ -2,6 +2,7 @@
 
 #include "Collider.h"
 #include "Jobs.h"
+#include "MeshCollider.h"
 
 #include <algorithm>
 #include <array>
@@ -9,6 +10,10 @@
 #include <limits>
 #include <optional>
 #include <utility>
+
+#if defined(_M_X64) || defined(__SSE2__)
+#include <immintrin.h>
+#endif
 #include <vector>
 
 
@@ -18,7 +23,7 @@ namespace Loom
 	{
 		// How far a leaf's bounds reach past its collider's, so a collider
 		// moving a little each frame stays in its leaf.
-		constexpr float PADDING = 0.1f;
+		constexpr float PADDING = 0.05f;
 
 		// Past this much slack a leaf is refitted anyway, so one that shrinks
 		// or stops does not go on catching rays it is nowhere near.
@@ -26,12 +31,19 @@ namespace Loom
 
 		// How many steps' travel a moving leaf is stretched ahead by when it
 		// is refitted. It is refitted once it no longer covers the next one.
-		// Measured against two and four on the Crowd benchmark.
-		constexpr float PREDICTION = 3.0f;
+		// Measured against three and six on the Crowd benchmark, as the
+		// padding was against a tenth.
+		constexpr float PREDICTION = 10.0f;
 
 		// The inverse of a ray's direction along an axis it runs parallel to:
 		// large enough that it crosses that axis's slab nowhere near.
 		constexpr float PARALLEL = 1e30f;
+
+		// The shuffles that bring a vector's y and z to its first lane, and
+		// the mask of the first three lanes' signs.
+		constexpr int Y_LANE = 1;
+		constexpr int Z_LANE = 2;
+		constexpr int AXIS_LANES = 0b0111;
 
 		// What a ray's entry into a node it misses is taken as.
 		constexpr float MISSED = std::numeric_limits<float>::infinity();
@@ -125,9 +137,36 @@ namespace Loom
 		Place(collider, Measure(collider), travel);
 	};
 
+	bool ColliderTree::Unmoved(const Collider& collider) const
+	{
+		if (collider.m_tree != this)
+			return false;
+
+		int level = 0;
+
+		for (const GameObject* at = collider.m_gameObject; at != nullptr; at = at->GetParent(), level++)
+		{
+			if (level == collider.m_placedLevels)
+				return false;
+
+			const Collider::Placed& placed = collider.m_placed[level];
+
+			if (placed.object != at || *at->transform.position != placed.position
+				|| *at->transform.rotation != placed.rotation || *at->transform.scale != placed.scale)
+				return false;
+		};
+
+		return level == collider.m_placedLevels;
+	};
+
 	bool ColliderTree::Measure(Collider& collider) const
 	{
-		const glm::mat4 world = collider.m_gameObject->WorldMatrix();
+		// One whose transforms are all as they were has its world as it was.
+		return Measure(collider, Unmoved(collider) ? collider.m_synced : collider.m_gameObject->WorldMatrix());
+	};
+
+	bool ColliderTree::Measure(Collider& collider, const glm::mat4& world) const
+	{
 		const bool reshaped = collider.Refresh();
 
 		// Most colliders have not moved since the last step, and those leaves
@@ -136,6 +175,16 @@ namespace Loom
 			return false;
 
 		collider.m_synced = world;
+
+		int level = 0;
+		const GameObject* at = collider.m_gameObject;
+
+		for (; at != nullptr && level < Collider::SYNCED_LEVELS; at = at->GetParent(), level++)
+			collider.m_placed[level] = { at, at->transform.position, at->transform.rotation, at->transform.scale };
+
+		// Too far down to keep them all, none are kept.
+		collider.m_placedLevels = at == nullptr ? level : 0;
+
 		collider.m_bounds = collider.BoundsIn(collider.m_synced);
 		collider.m_shape = Contacts::Pose(collider, collider.m_synced);
 
@@ -150,11 +199,19 @@ namespace Loom
 			[&](size_t, size_t begin, size_t end)
 			{
 				for (size_t i = begin; i < end; i++)
-					m_measured[i] = Measure(*m_enlisted[i]);
+				{
+					Collider& collider = *m_enlisted[i];
+					m_measured[i] = Measure(collider) || collider.m_tree != this;
+
+					// Each leaf is its own, so stamped at once.
+					if (!m_measured[i])
+						m_nodes[collider.m_node].sync = m_sync;
+				};
 			});
 
 		for (size_t i = 0; i < m_enlisted.size(); i++)
-			Place(*m_enlisted[i], m_measured[i]);
+			if (m_measured[i])
+				Place(*m_enlisted[i], true);
 
 		m_enlisted.clear();
 	};
@@ -209,16 +266,27 @@ namespace Loom
 			Fit(collider.m_node, collider.m_bounds, travel);
 	};
 
+	bool ColliderTree::Fits(const Collider& collider, const glm::vec3& travel) const
+	{
+		if (collider.m_tree != this)
+			return false;
+
+		const Bounds& padded = m_nodes[collider.m_node].bounds;
+
+		// As much slack behind as ahead, so a leaf a steadily moving
+		// collider has moved along is not taken for one too big.
+		const Bounds most = Stretched(Padded(collider.m_bounds, travel), -travel * PREDICTION).Expanded(MOST_PADDING);
+
+		return padded.Contains(Stretched(collider.m_bounds, travel)) && most.Contains(padded);
+	};
+
 	void ColliderTree::Fit(int leaf, const Bounds& bounds, const glm::vec3& travel)
 	{
-		const Bounds& padded = m_nodes[leaf].bounds;
-		const Bounds wanted = Padded(bounds, travel);
-
-		if (padded.Contains(Stretched(bounds, travel)) && wanted.Expanded(MOST_PADDING).Contains(padded))
+		if (Fits(*m_nodes[leaf].collider, travel))
 			return;
 
 		RemoveLeaf(leaf);
-		m_nodes[leaf].bounds = wanted;
+		m_nodes[leaf].bounds = Padded(bounds, travel);
 		InsertLeaf(leaf);
 
 		m_moved.push_back(m_nodes[leaf].collider);
@@ -267,7 +335,28 @@ namespace Loom
 
 		const glm::vec3 origin = ray.origin;
 
-		// Where the ray enters node, or MISSED.
+#if defined(_M_X64) || defined(__SSE2__)
+		// All three axes at once. Each load's fourth lane is whatever follows
+		// in the node, and only the first three are ever read back.
+		const __m128 from = _mm_setr_ps(origin.x, origin.y, origin.z, 0.0f);
+		const __m128 across = _mm_setr_ps(inverse.x, inverse.y, inverse.z, 0.0f);
+
+		const auto entering =
+			[&](int node)
+			{
+				const Bounds& bounds = m_nodes[node].bounds;
+				const __m128 toMin = _mm_mul_ps(_mm_sub_ps(_mm_loadu_ps(&bounds.min.x), from), across);
+				const __m128 toMax = _mm_mul_ps(_mm_sub_ps(_mm_loadu_ps(&bounds.max.x), from), across);
+
+				const __m128 near = _mm_min_ps(toMin, toMax);
+				const __m128 far = _mm_max_ps(toMin, toMax);
+
+				const float entry = _mm_cvtss_f32(_mm_max_ss(_mm_max_ss(near, _mm_shuffle_ps(near, near, Y_LANE)), _mm_shuffle_ps(near, near, Z_LANE)));
+				const float exit = _mm_cvtss_f32(_mm_min_ss(_mm_min_ss(far, _mm_shuffle_ps(far, far, Y_LANE)), _mm_shuffle_ps(far, far, Z_LANE)));
+
+				return entry <= exit && exit >= 0.0f ? entry : MISSED;
+			};
+#else
 		const auto entering =
 			[&](int node)
 			{
@@ -283,6 +372,7 @@ namespace Loom
 
 				return entry <= exit && exit >= 0.0f ? entry : MISSED;
 			};
+#endif
 
 		const auto within =
 			[&](float entry) { return entry != MISSED && entry <= maxDistance; };
@@ -306,21 +396,19 @@ namespace Loom
 				Collider& collider = *current.collider;
 				RaycastHit hit;
 
-				// A box or a sphere is tested as it was posed at its last sync.
-				bool struck = false;
+				// Each is tested as it was posed at its last sync.
+				const bool struck = collider.m_shape.kind == Contacts::Shape::MESH
+					? collider.m_shape.mesh->IntersectPosed(ray, maxDistance, hit)
+					: Contacts::Raycast(collider.m_shape, ray.origin, ray.direction, maxDistance, hit.distance, hit.normal);
 
-				if (collider.m_shape.kind == Contacts::Shape::MESH)
-					struck = collider.RaycastAt(collider.m_synced, ray, hit, maxDistance);
-				else if (Contacts::Raycast(collider.m_shape, ray.origin, ray.direction, maxDistance, hit.distance, hit.normal))
+				if (struck)
 				{
 					hit.point = ray.GetPoint(hit.distance);
 					hit.collider = &collider;
 					hit.gameObject = collider.m_gameObject;
-					struck = true;
-				};
 
-				if (struck)
 					maxDistance = visit(hit, maxDistance);
+				};
 
 				continue;
 			};
@@ -351,12 +439,27 @@ namespace Loom
 		SmallStack<int, INLINE_PENDING> pending;
 		pending.Push(m_root);
 
+#if defined(_M_X64) || defined(__SSE2__)
+		const __m128 lowest = _mm_setr_ps(bounds.min.x, bounds.min.y, bounds.min.z, 0.0f);
+		const __m128 highest = _mm_setr_ps(bounds.max.x, bounds.max.y, bounds.max.z, 0.0f);
+#endif
+
 		while (!pending.Empty())
 		{
 			const Node& node = m_nodes[pending.Pop()];
 
+#if defined(_M_X64) || defined(__SSE2__)
+			// All three axes at once, as Raycast does: apart along any of
+			// the first three lanes is apart.
+			const __m128 above = _mm_cmpgt_ps(_mm_loadu_ps(&node.bounds.min.x), highest);
+			const __m128 below = _mm_cmplt_ps(_mm_loadu_ps(&node.bounds.max.x), lowest);
+
+			if (_mm_movemask_ps(_mm_or_ps(above, below)) & AXIS_LANES)
+				continue;
+#else
 			if (!node.bounds.Overlaps(bounds))
 				continue;
+#endif
 
 			if (node.IsLeaf())
 			{
@@ -540,14 +643,21 @@ namespace Loom
 	{
 		while (node != NONE)
 		{
-			node = Balance(node);
+			const int balanced = Balance(node);
 
-			Node& branch = m_nodes[node];
+			Node& branch = m_nodes[balanced];
 			const Node& first = m_nodes[branch.children[0]];
 			const Node& second = m_nodes[branch.children[1]];
 
-			branch.bounds = first.bounds.Union(second.bounds);
-			branch.height = 1 + std::max(first.height, second.height);
+			const Bounds bounds = first.bounds.Union(second.bounds);
+			const int height = 1 + std::max(first.height, second.height);
+
+			// A branch left as it was leaves everything above it as it was.
+			if (balanced == node && height == branch.height && bounds.min == branch.bounds.min && bounds.max == branch.bounds.max)
+				return;
+
+			branch.bounds = bounds;
+			branch.height = height;
 
 			node = branch.parent;
 		};

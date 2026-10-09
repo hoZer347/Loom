@@ -50,6 +50,10 @@ namespace Loom
 		// and says whether its leaf has to move; Place then moves it, or only
 		// marks it synced.
 		bool Measure(Collider& collider) const;
+
+		// Measure, where collider's world is already known: as the simulation
+		// knows a body's, having just moved it.
+		bool Measure(Collider& collider, const glm::mat4& world) const;
 		void Place(Collider& collider, bool moved, const glm::vec3& travel = glm::vec3(0.0f));
 
 		// A collider to sync from the walk Scene::Physics makes, all of them
@@ -61,6 +65,11 @@ namespace Loom
 		// covers the travel it is about to make, so a body that has just sped
 		// up is paired with what lies along its new path.
 		void Reach(const Collider& collider, const glm::vec3& travel);
+
+		// Whether collider's leaf covers where it was last measured and the
+		// travel, so Reach or Place would leave it be. Reads only, so many
+		// are asked at once.
+		bool Fits(const Collider& collider, const glm::vec3& travel) const;
 		void EndSync();
 
 		void Remove(Collider& collider);
@@ -115,6 +124,10 @@ namespace Loom
 
 			bool IsLeaf() const { return children[0] == NONE; };
 		};
+
+		// Whether collider's GameObject and those above it are all where they
+		// were at its last sync.
+		bool Unmoved(const Collider& collider) const;
 
 		int Allocate();
 		void Free(int node);

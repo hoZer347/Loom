@@ -1,5 +1,7 @@
 #include "Collider.h"
 
+#include "Simulation.h"
+
 #include "glm/gtc/constants.hpp"
 
 #include <algorithm>
@@ -29,6 +31,9 @@ namespace Loom
 	{
 		if (ColliderTree::current)
 			ColliderTree::current->Enlist(*this);
+
+		if (Simulation::current)
+			Simulation::current->Note(*this);
 	};
 
 	void Collider::CatchUp() const

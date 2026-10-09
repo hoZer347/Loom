@@ -3,6 +3,7 @@
 #include "Loom API.h"
 
 #include <cstddef>
+#include <atomic>
 #include <functional>
 
 
@@ -10,7 +11,7 @@ namespace Loom
 {
 	/**
 	* Loom::Jobs
-	* - A pool of worker threads, one fewer than the machine runs at once, for
+	* - A pool of worker threads, one fewer than the machine has cores, for
 	*   work that splits into independent pieces. The calling thread works
 	*   alongside them, and For returns once every piece is done
 	* - The pieces are chunks of a range, numbered in order, so what each
@@ -27,6 +28,11 @@ namespace Loom
 		static void For(size_t count, size_t grain, const Work& work);
 
 		static size_t Chunks(size_t count, size_t grain) { return (count + grain - 1) / grain; };
+
+		// Spins a while, then sleeps, until counter reaches at least value,
+		// for work split so its pieces wait on the few they follow rather than
+		// on all. Whatever raises counter notifies it.
+		static void WaitFor(const std::atomic<int>& counter, int value);
 
 		// The caller and the workers.
 		static unsigned Threads();

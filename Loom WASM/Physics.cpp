@@ -8,35 +8,6 @@
 
 namespace Loom
 {
-	float Bounds::HalfArea() const
-	{
-		const glm::vec3 size = max - min;
-
-		return size.x * size.y + size.y * size.z + size.z * size.x;
-	};
-
-	bool Bounds::Contains(const Bounds& inner) const
-	{
-		return glm::all(glm::lessThanEqual(min, inner.min))
-			&& glm::all(glm::lessThanEqual(inner.max, max));
-	};
-
-	bool Bounds::Overlaps(const Bounds& other) const
-	{
-		return glm::all(glm::lessThanEqual(min, other.max))
-			&& glm::all(glm::lessThanEqual(other.min, max));
-	};
-
-	Bounds Bounds::Union(const Bounds& other) const
-	{
-		return { glm::min(min, other.min), glm::max(max, other.max) };
-	};
-
-	Bounds Bounds::Expanded(float margin) const
-	{
-		return { min - glm::vec3(margin), max + glm::vec3(margin) };
-	};
-
 	bool Bounds::IntersectRay(const Ray& ray, float& entry, float& exit, int& entryAxis) const
 	{
 		entry = -INFINITE_DISTANCE;

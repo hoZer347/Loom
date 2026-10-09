@@ -5,6 +5,7 @@
 #include "Component.h"
 
 #include "glm/glm.hpp"
+#include "glm/gtc/quaternion.hpp"
 
 
 namespace Loom
@@ -85,5 +86,11 @@ namespace Loom
 
 		// Spin inertia's inverse about the body's own axes.
 		glm::vec3 m_inverseInertia{ 0.0f };
+
+		// The world the simulation last found it at, with the orientation and
+		// scale that world has, so finding it there again works neither out.
+		glm::mat4 m_posedAt{ 0.0f };
+		glm::quat m_posedOrientation{ };
+		glm::vec3 m_posedScale{ 0.0f };
 	};
 };

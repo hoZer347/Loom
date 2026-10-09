@@ -25,6 +25,11 @@ namespace Contacts
 		// to step rather than flickering to an edge.
 		constexpr float FACE_SLACK = 0.01f;
 
+		// Two of a mesh's contacts this close, facing this nearly the same
+		// way, are one.
+		constexpr float SAME_POINT = 0.001f;
+		constexpr float SAME_FACING = 0.999f;
+
 		constexpr float HALF = 0.5f;
 
 		// A face clipped by four planes has at most eight corners.
@@ -84,16 +89,6 @@ namespace Contacts
 			return { sphere.center - glm::vec3(sphere.radius), sphere.center + glm::vec3(sphere.radius) };
 		};
 
-		float Radius(const Box& box, const glm::vec3& axis)
-		{
-			float radius = 0.0f;
-
-			for (int i = 0; i < AXES; i++)
-				radius += box.half[i] * std::abs(glm::dot(box.axes[i], axis));
-
-			return radius;
-		};
-
 		void Add(Manifold& manifold, const glm::vec3& point, float depth)
 		{
 			if (manifold.count < MOST_POINTS)
@@ -132,10 +127,14 @@ namespace Contacts
 					if (taken[i])
 						continue;
 
+					// Squared, which orders them the same.
 					float nearest = INFINITE_DISTANCE;
 
 					for (int k = 0; k < manifold.count; k++)
-						nearest = std::min(nearest, glm::length(candidates.points[i] - manifold.points[k]));
+					{
+						const glm::vec3 apart = candidates.points[i] - manifold.points[k];
+						nearest = std::min(nearest, glm::dot(apart, apart));
+					};
 
 					if (nearest > most)
 					{
@@ -153,20 +152,23 @@ namespace Contacts
 		Polygon Clip(const Polygon& polygon, const glm::vec3& normal, float offset)
 		{
 			Polygon kept;
+			float sides[MOST_CORNERS];
+
+			for (int i = 0; i < polygon.count; i++)
+				sides[i] = glm::dot(normal, polygon.points[i]) - offset;
 
 			for (int i = 0; i < polygon.count; i++)
 			{
+				const int next = i + 1 == polygon.count ? 0 : i + 1;
+
 				const glm::vec3& from = polygon.points[i];
-				const glm::vec3& to = polygon.points[(i + 1) % polygon.count];
+				const glm::vec3& to = polygon.points[next];
 
-				const float fromSide = glm::dot(normal, from) - offset;
-				const float toSide = glm::dot(normal, to) - offset;
-
-				if (fromSide <= 0.0f)
+				if (sides[i] <= 0.0f)
 					kept.Add(from);
 
-				if ((fromSide <= 0.0f) != (toSide <= 0.0f))
-					kept.Add(from + (to - from) * (fromSide / (fromSide - toSide)));
+				if ((sides[i] <= 0.0f) != (sides[next] <= 0.0f))
+					kept.Add(from + (to - from) * (sides[i] / (sides[i] - sides[next])));
 			};
 
 			return kept;
@@ -415,6 +417,23 @@ namespace Contacts
 		{
 			const glm::vec3 between = b.center - a.center;
 
+			// b's axes and the gap between the centres, in a's frame, which
+			// every axis below is tested with, as Gottschalk's OBB test does.
+			float turned[AXES][AXES];
+			float across[AXES][AXES];
+			float gap[AXES];
+
+			for (int i = 0; i < AXES; i++)
+			{
+				gap[i] = glm::dot(between, a.axes[i]);
+
+				for (int j = 0; j < AXES; j++)
+				{
+					turned[i][j] = glm::dot(a.axes[i], b.axes[j]);
+					across[i][j] = std::abs(turned[i][j]);
+				};
+			};
+
 			float bestOverlap = INFINITE_DISTANCE;
 			glm::vec3 bestAxis(0.0f);
 
@@ -422,11 +441,13 @@ namespace Contacts
 			constexpr int FACES = 2 * AXES;
 			int best = -1;
 
+			// How far each box reaches along an axis of the given length, and
+			// how far along it b's centre is from a's; axis gives it, only
+			// once it is the best so far.
 			const auto test =
-				[&](const glm::vec3& axis, int index)
+				[&](float reachA, float reachB, float distance, float length, int index, const auto& axis)
 				{
-					const float distance = glm::dot(between, axis);
-					const float overlap = Radius(a, axis) + Radius(b, axis) - std::abs(distance);
+					const float overlap = (reachA + reachB - std::abs(distance)) / length;
 
 					if (overlap < -margin)
 						return false;
@@ -434,7 +455,7 @@ namespace Contacts
 					if (overlap + (index >= FACES ? FACE_SLACK : 0.0f) < bestOverlap)
 					{
 						bestOverlap = overlap;
-						bestAxis = distance < 0.0f ? -axis : axis;
+						bestAxis = axis() / (distance < 0.0f ? -length : length);
 						best = index;
 					};
 
@@ -442,19 +463,39 @@ namespace Contacts
 				};
 
 			for (int i = 0; i < AXES; i++)
-				if (!test(a.axes[i], i) || !test(b.axes[i], AXES + i))
+			{
+				const float reachB = b.half[0] * across[i][0] + b.half[1] * across[i][1] + b.half[2] * across[i][2];
+
+				if (!test(a.half[i], reachB, gap[i], 1.0f, i, [&]() { return a.axes[i]; }))
 					return;
+
+				const float reachA = a.half[0] * across[0][i] + a.half[1] * across[1][i] + a.half[2] * across[2][i];
+				const float distance = gap[0] * turned[0][i] + gap[1] * turned[1][i] + gap[2] * turned[2][i];
+
+				if (!test(reachA, b.half[i], distance, 1.0f, AXES + i, [&]() { return b.axes[i]; }))
+					return;
+			};
 
 			for (int i = 0; i < AXES; i++)
 				for (int j = 0; j < AXES; j++)
 				{
-					glm::vec3 axis = glm::cross(a.axes[i], b.axes[j]);
-					const float length = glm::length(axis);
+					// Both axes being unit length, their cross product's is the
+					// sine between them.
+					const float length = std::sqrt(std::max(1.0f - turned[i][j] * turned[i][j], 0.0f));
 
 					if (length < EPSILON)
 						continue;
 
-					if (!test(axis / length, FACES + i * AXES + j))
+					const int i1 = (i + 1) % AXES;
+					const int i2 = (i + 2) % AXES;
+					const int j1 = (j + 1) % AXES;
+					const int j2 = (j + 2) % AXES;
+
+					const float reachA = a.half[i1] * across[i2][j] + a.half[i2] * across[i1][j];
+					const float reachB = b.half[j1] * across[i][j2] + b.half[j2] * across[i][j1];
+					const float distance = gap[i2] * turned[i1][j] - gap[i1] * turned[i2][j];
+
+					if (!test(reachA, reachB, distance, length, FACES + i * AXES + j, [&]() { return glm::cross(a.axes[i], b.axes[j]); }))
 						return;
 				};
 
@@ -556,25 +597,36 @@ namespace Contacts
 			constexpr int FACES = AXES + 1;
 			int best = -1;
 
-			const auto test =
-				[&](const glm::vec3& axis, int index)
-				{
-					const float middle = glm::dot(box.center, axis);
-					const float reach = Radius(box, axis);
+			// The triangle in the box's own frame, where the box reaches half
+			// its size along each axis and every axis below is a few products.
+			glm::vec3 local[CORNERS];
 
-					float least = glm::dot(triangle[0], axis);
+			for (int corner = 0; corner < CORNERS; corner++)
+			{
+				const glm::vec3 offset = triangle[corner] - box.center;
+				local[corner] = glm::vec3(glm::dot(offset, box.axes[0]), glm::dot(offset, box.axes[1]), glm::dot(offset, box.axes[2]));
+			};
+
+			// axis in the box's frame, of the given length; world gives it in
+			// the world, only once it is the best so far.
+			const auto test =
+				[&](const glm::vec3& axis, float length, int index, const auto& world)
+				{
+					const float reach = box.half.x * std::abs(axis.x) + box.half.y * std::abs(axis.y) + box.half.z * std::abs(axis.z);
+
+					float least = glm::dot(local[0], axis);
 					float most = least;
 
 					for (int corner = 1; corner < CORNERS; corner++)
 					{
-						const float along = glm::dot(triangle[corner], axis);
+						const float along = glm::dot(local[corner], axis);
 						least = std::min(least, along);
 						most = std::max(most, along);
 					};
 
 					// How far the box would go back along -axis, or along axis, to clear it.
-					const float back = middle + reach - least;
-					const float forward = most - (middle - reach);
+					const float back = (reach - least) / length;
+					const float forward = (most + reach) / length;
 
 					if (back < -margin || forward < -margin)
 						return false;
@@ -584,30 +636,44 @@ namespace Contacts
 					if (overlap + (index >= FACES ? FACE_SLACK : 0.0f) < bestOverlap)
 					{
 						bestOverlap = overlap;
-						bestAxis = back < forward ? axis : -axis;
+						bestAxis = world() / (back < forward ? length : -length);
 						best = index;
 					};
 
 					return true;
 				};
 
-			for (int i = 0; i < AXES; i++)
-				if (!test(box.axes[i], i))
-					return;
+			// The triangle's own face first: one near the box but not touching
+			// it is most often apart along that.
+			const glm::vec3 faceLocal(glm::dot(faceNormal, box.axes[0]), glm::dot(faceNormal, box.axes[1]), glm::dot(faceNormal, box.axes[2]));
 
-			if (!test(faceNormal, TRIANGLE_FACE))
+			if (!test(faceLocal, 1.0f, TRIANGLE_FACE, [&]() { return faceNormal; }))
 				return;
+
+			for (int i = 0; i < AXES; i++)
+			{
+				glm::vec3 axis(0.0f);
+				axis[i] = 1.0f;
+
+				if (!test(axis, 1.0f, i, [&]() { return box.axes[i]; }))
+					return;
+			};
+
+			const glm::vec3 edgesLocal[CORNERS] = { local[1] - local[0], local[2] - local[1], local[0] - local[2] };
 
 			for (int i = 0; i < AXES; i++)
 				for (int j = 0; j < CORNERS; j++)
 				{
-					const glm::vec3 axis = glm::cross(box.axes[i], edges[j]);
+					glm::vec3 unit(0.0f);
+					unit[i] = 1.0f;
+
+					const glm::vec3 axis = glm::cross(unit, edgesLocal[j]);
 					const float length = glm::length(axis);
 
 					if (length < EPSILON)
 						continue;
 
-					if (!test(axis / length, FACES + i * CORNERS + j))
+					if (!test(axis, length, FACES + i * CORNERS + j, [&]() { return glm::cross(box.axes[i], edges[j]); }))
 						return;
 				};
 
@@ -688,8 +754,9 @@ namespace Contacts
 			// Reused from call to call.
 			thread_local std::vector<glm::vec3> corners{ };
 			corners.clear();
-			mesh.mesh->TrianglesNear(mesh.world, near, corners);
+			mesh.mesh->TrianglesNear(near, corners);
 
+			const size_t first = manifolds.size();
 			for (size_t i = 0; i + CORNERS <= corners.size(); i += CORNERS)
 			{
 				const Triangle triangle{ corners[i], corners[i + 1], corners[i + 2] };
@@ -699,6 +766,43 @@ namespace Contacts
 				else
 					SphereTriangle(solid.sphere, triangle, margin, manifolds);
 			};
+
+			// Triangles sharing an edge or a corner find the same point there,
+			// facing the same way; each is kept once.
+			size_t kept = first;
+
+			for (size_t m = first; m < manifolds.size(); m++)
+			{
+				Manifold manifold = manifolds[m];
+				int count = 0;
+
+				for (int i = 0; i < manifold.count; i++)
+				{
+					bool again = false;
+
+					for (size_t earlier = first; earlier < kept && !again; earlier++)
+						if (glm::dot(manifolds[earlier].normal, manifold.normal) > SAME_FACING)
+							for (int k = 0; k < manifolds[earlier].count && !again; k++)
+							{
+								const glm::vec3 apart = manifolds[earlier].points[k] - manifold.points[i];
+								again = glm::dot(apart, apart) < SAME_POINT * SAME_POINT;
+							};
+
+					if (!again)
+					{
+						manifold.points[count] = manifold.points[i];
+						manifold.depths[count] = manifold.depths[i];
+						count++;
+					};
+				};
+
+				manifold.count = count;
+
+				if (count > 0)
+					manifolds[kept++] = manifold;
+			};
+
+			manifolds.resize(kept);
 		};
 
 		// Turns the manifolds from first on to run the other way.
@@ -712,7 +816,6 @@ namespace Contacts
 	Shape Pose(const Collider& collider, const glm::mat4& world)
 	{
 		Shape posed;
-		posed.world = world;
 
 		switch (collider.Shape())
 		{
@@ -729,6 +832,7 @@ namespace Contacts
 		case ColliderShape::Mesh:
 			posed.kind = Shape::MESH;
 			posed.mesh = &static_cast<const MeshCollider&>(collider);
+			posed.mesh->Pose(world);
 			break;
 		};
 

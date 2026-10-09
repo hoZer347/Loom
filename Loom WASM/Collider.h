@@ -77,15 +77,37 @@ namespace Loom
 
 		// Where the last sync found it, which the tree's raycasts test against,
 		// with the box it covered there and its shape posed there. The tree's
-		// Sync and Resize keep all three current.
+		// Measure and Resize keep all three current.
 		glm::mat4 m_synced{ 1.0f };
 		mutable Bounds m_bounds{ };
+
+		// Its GameObject's transform, and each one's above it, at that sync:
+		// while all are as they were, so is its world. Kept for this many
+		// levels; a collider further down is worked out again at every sync.
+		static constexpr int SYNCED_LEVELS = 4;
+
+		struct Placed
+		{
+			const GameObject* object;
+			glm::vec3 position;
+			glm::vec3 rotation;
+			glm::vec3 scale;
+		};
+
+		Placed m_placed[SYNCED_LEVELS]{ };
+		int m_placedLevels = 0;
 
 		mutable Contacts::Shape m_shape{ };
 
 		// The body it moves with during a physics step, as the simulation
 		// numbers them, or -1 for none.
 		int m_body = -1;
+
+		// Which collider made this was, counting from the first: the order
+		// the simulation puts each pair's two in, the same every run as
+		// their addresses are not.
+		static inline unsigned s_made = 0;
+		const unsigned m_made = s_made++;
 	};
 
 	/**

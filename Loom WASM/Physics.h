@@ -41,14 +41,32 @@ namespace Loom
 		glm::vec3 Center() const { return (min + max) * 0.5f; };
 		glm::vec3 Extents() const { return (max - min) * 0.5f; };
 
+		// These are asked millions of times a second by the collider tree, so
+		// are inline, and compare all six sides at once rather than branch on
+		// each.
+
 		// Half the surface area, which is all the tree's cost estimates compare.
-		float HalfArea() const;
+		float HalfArea() const
+		{
+			const glm::vec3 size = max - min;
 
-		bool Contains(const Bounds& inner) const;
-		bool Overlaps(const Bounds& other) const;
+			return size.x * size.y + size.y * size.z + size.z * size.x;
+		};
 
-		Bounds Union(const Bounds& other) const;
-		Bounds Expanded(float margin) const;
+		bool Contains(const Bounds& inner) const
+		{
+			return (min.x <= inner.min.x) & (min.y <= inner.min.y) & (min.z <= inner.min.z)
+				& (inner.max.x <= max.x) & (inner.max.y <= max.y) & (inner.max.z <= max.z);
+		};
+
+		bool Overlaps(const Bounds& other) const
+		{
+			return (min.x <= other.max.x) & (min.y <= other.max.y) & (min.z <= other.max.z)
+				& (other.min.x <= max.x) & (other.min.y <= max.y) & (other.min.z <= max.z);
+		};
+
+		Bounds Union(const Bounds& other) const { return { glm::min(min, other.min), glm::max(max, other.max) }; };
+		Bounds Expanded(float margin) const { return { min - glm::vec3(margin), max + glm::vec3(margin) }; };
 
 		// The stretch of the ray's parameter that lies inside the box, entry
 		// negative when the origin is inside, and the axis the ray enters
