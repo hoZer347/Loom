@@ -296,6 +296,37 @@ TEST_SUITE("ColliderTree")
 		CHECK(scene.Raycast({ glm::vec3(10.0f, 0.0f, 0.0f), FORWARD }, hit));
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a collider resized without moving is found at its new size from the next step")
+	{
+		Loom::Scene scene("resized");
+		Pump();
+
+		Loom::BoxCollider* box = Place<Loom::BoxCollider>(scene, glm::vec3(0.0f, 0.0f, -5.0f));
+		Loom::SphereCollider* sphere = Place<Loom::SphereCollider>(scene, glm::vec3(0.0f, 0.0f, -15.0f));
+
+		scene.Physics();
+
+		// Both reach out past where their leaves were padded to.
+		constexpr float RADIUS = 4.0f;
+		constexpr float SIZE = 8.0f;
+		const Loom::Ray aside{ glm::vec3(3.0f, 0.0f, 0.0f), FORWARD };
+
+		Loom::RaycastHit hit;
+		REQUIRE_FALSE(scene.Raycast(aside, hit));
+
+		sphere->radius = RADIUS;
+		scene.Physics();
+
+		REQUIRE(scene.Raycast(aside, hit));
+		CHECK(hit.collider == sphere);
+
+		box->size = glm::vec3(SIZE);
+		scene.Physics();
+
+		REQUIRE(scene.Raycast(aside, hit));
+		CHECK(hit.collider == box);
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a disabled, detached or destroyed collider drops out of the tree")
 	{
 		Loom::Scene scene("dropping out");

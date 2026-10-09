@@ -90,8 +90,18 @@ namespace Loom
 
 	void ColliderTree::Sync(Collider& collider)
 	{
-		collider.m_synced = collider.m_gameObject->WorldMatrix();
-		collider.Refresh();
+		const glm::mat4 world = collider.m_gameObject->WorldMatrix();
+		const bool reshaped = collider.Refresh();
+
+		// Most colliders have not moved since the last step, and those leaves
+		// already fit.
+		if (collider.m_tree == this && !reshaped && world == collider.m_synced)
+		{
+			m_nodes[collider.m_node].sync = m_sync;
+			return;
+		};
+
+		collider.m_synced = world;
 
 		const Bounds bounds = collider.BoundsIn(collider.m_synced);
 

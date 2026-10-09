@@ -41,8 +41,9 @@ namespace Loom
 		std::vector<glm::vec3> Wireframe() const;
 
 	protected:
-		// Catches up with whatever the shape is built from, before it is
-		// synced or asked for anything directly. Whether the shape changed.
+		// Catches up with what the shape is made from, its own fields or
+		// another component, before it is synced or asked for anything
+		// directly. Whether the shape changed since it last looked.
 		virtual bool Refresh() const { return false; };
 
 		virtual Bounds BoundsIn(const glm::mat4& world) const = 0;
@@ -79,9 +80,16 @@ namespace Loom
 		Serial<glm::vec3> size = glm::vec3(1.0f);
 
 	protected:
+		bool Refresh() const override;
+
 		Bounds BoundsIn(const glm::mat4& world) const override;
 		void WireframeIn(const glm::mat4& world, std::vector<glm::vec3>& lines) const override;
 		bool Intersect(const glm::mat4& world, const Ray& ray, float maxDistance, RaycastHit& hit) const override;
+
+	private:
+		// What center and size were when last refreshed.
+		mutable glm::vec3 m_center{ 0.0f };
+		mutable glm::vec3 m_size{ 0.0f };
 	};
 
 	/**
@@ -96,6 +104,8 @@ namespace Loom
 		Serial<float> radius = 0.5f;
 
 	protected:
+		bool Refresh() const override;
+
 		Bounds BoundsIn(const glm::mat4& world) const override;
 
 		// A circle around each world axis, as Unity draws it.
@@ -105,5 +115,9 @@ namespace Loom
 	private:
 		// Where it is and how big, in world space.
 		void Place(const glm::mat4& world, glm::vec3& worldCenter, float& worldRadius) const;
+
+		// What center and radius were when last refreshed.
+		mutable glm::vec3 m_center{ 0.0f };
+		mutable float m_radius = 0.0f;
 	};
 };

@@ -78,6 +78,17 @@ namespace Loom
 		return true;
 	};
 
+	bool BoxCollider::Refresh() const
+	{
+		if (*center == m_center && *size == m_size)
+			return false;
+
+		m_center = *center;
+		m_size = *size;
+
+		return true;
+	};
+
 	Bounds BoxCollider::BoundsIn(const glm::mat4& world) const
 	{
 		const glm::vec3 half = glm::abs(*size) * 0.5f;
@@ -150,6 +161,17 @@ namespace Loom
 		hit.point = ray.GetPoint(entry);
 		hit.normal = glm::normalize(glm::transpose(glm::mat3(toLocal)) * normal);
 		hit.distance = entry;
+
+		return true;
+	};
+
+	bool SphereCollider::Refresh() const
+	{
+		if (*center == m_center && *radius == m_radius)
+			return false;
+
+		m_center = *center;
+		m_radius = *radius;
 
 		return true;
 	};
