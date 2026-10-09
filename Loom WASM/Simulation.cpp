@@ -58,6 +58,7 @@ namespace Loom
 		// chunk outweighs handing it out.
 		constexpr size_t QUERY_GRAIN = 64;
 		constexpr size_t BODY_GRAIN = 64;
+		constexpr size_t PAIR_GRAIN = 64;
 		constexpr size_t CONSIDER_GRAIN = 128;
 
 		// A contact this close to one from the last step, facing nearly the
@@ -221,33 +222,26 @@ namespace Loom
 
 		const glm::vec3 gravity = Physics::GetGravity();
 
-		for (Body& body : m_bodies)
-		{
-			Rigidbody& rigidbody = *body.rigidbody;
-
-			if (body.awake && body.dynamic)
+		Jobs::For(m_bodies.size(), BODY_GRAIN,
+			[&](size_t, size_t begin, size_t end)
 			{
-				rigidbody.velocity += (rigidbody.m_force + (rigidbody.useGravity ? gravity : glm::vec3(0.0f))) * seconds;
-				rigidbody.angularVelocity += (body.inverseInertia * rigidbody.m_torque + rigidbody.m_spin) * seconds
-					+ body.inverseInertia * rigidbody.m_angularImpulse;
-
-				rigidbody.velocity /= 1.0f + seconds * rigidbody.drag;
-				rigidbody.angularVelocity /= 1.0f + seconds * rigidbody.angularDrag;
-			};
-
-			rigidbody.m_force = glm::vec3(0.0f);
-			rigidbody.m_torque = glm::vec3(0.0f);
-			rigidbody.m_spin = glm::vec3(0.0f);
-			rigidbody.m_angularImpulse = glm::vec3(0.0f);
-
-			body.velocity = rigidbody.velocity;
-			body.angularVelocity = rigidbody.angularVelocity;
-		};
+				for (size_t i = begin; i < end; i++)
+					Accelerate(m_bodies[i], gravity, seconds);
+			});
 
 		Gather(seconds);
 
+		// Each pair's contacts made ready at once, from the velocities before
+		// any warm start, then the warm starts applied in order.
+		Jobs::For(m_pairs.size(), PAIR_GRAIN,
+			[&](size_t, size_t begin, size_t end)
+			{
+				for (size_t i = begin; i < end; i++)
+					Prepare(m_pairs[i], seconds);
+			});
+
 		for (Pair& pair : m_pairs)
-			Prepare(pair, seconds);
+			WarmStart(pair);
 
 		for (int iteration = 0; iteration < ITERATIONS; iteration++)
 			for (Pair& pair : m_pairs)
@@ -300,6 +294,29 @@ namespace Loom
 	Simulation::Key Simulation::Ordered(const Collider* a, const Collider* b)
 	{
 		return a < b ? Key{ a, b } : Key{ b, a };
+	};
+
+	void Simulation::Accelerate(Body& body, const glm::vec3& gravity, float seconds)
+	{
+		Rigidbody& rigidbody = *body.rigidbody;
+
+		if (body.awake && body.dynamic)
+		{
+			rigidbody.velocity += (rigidbody.m_force + (rigidbody.useGravity ? gravity : glm::vec3(0.0f))) * seconds;
+			rigidbody.angularVelocity += (body.inverseInertia * rigidbody.m_torque + rigidbody.m_spin) * seconds
+				+ body.inverseInertia * rigidbody.m_angularImpulse;
+
+			rigidbody.velocity /= 1.0f + seconds * rigidbody.drag;
+			rigidbody.angularVelocity /= 1.0f + seconds * rigidbody.angularDrag;
+		};
+
+		rigidbody.m_force = glm::vec3(0.0f);
+		rigidbody.m_torque = glm::vec3(0.0f);
+		rigidbody.m_spin = glm::vec3(0.0f);
+		rigidbody.m_angularImpulse = glm::vec3(0.0f);
+
+		body.velocity = rigidbody.velocity;
+		body.angularVelocity = rigidbody.angularVelocity;
 	};
 
 	void Simulation::Forget(const Collider& collider)
@@ -571,8 +588,8 @@ namespace Loom
 		if (pair.trigger)
 			return;
 
-		Body& a = At(pair.bodyA);
-		Body& b = At(pair.bodyB);
+		const Body& a = pair.bodyA == NONE ? m_ground : m_bodies[pair.bodyA];
+		const Body& b = pair.bodyB == NONE ? m_ground : m_bodies[pair.bodyB];
 
 		const auto found = m_touching.find({ pair.a, pair.b });
 		const std::vector<Contact>* before = found == m_touching.end() ? nullptr : &found->second.contacts;
@@ -633,9 +650,20 @@ namespace Loom
 						break;
 					};
 
-			for (const Axis& axis : contact.axes)
-				Push(a, b, axis, axis.impulse);
 		};
+	};
+
+	void Simulation::WarmStart(Pair& pair)
+	{
+		if (pair.trigger)
+			return;
+
+		Body& a = At(pair.bodyA);
+		Body& b = At(pair.bodyB);
+
+		for (size_t i = pair.first; i < pair.first + pair.count; i++)
+			for (const Axis& axis : m_contacts[i].axes)
+				Push(a, b, axis, axis.impulse);
 	};
 
 	float Simulation::Speed(const Body& a, const Body& b, const Axis& axis)

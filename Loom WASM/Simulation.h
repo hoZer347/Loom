@@ -191,7 +191,16 @@ namespace Loom
 		static Key Ordered(const Collider* a, const Collider* b);
 
 		bool Awake(int body) const;
+		// Gravity and what AddForce gathered, into the body's velocity.
+		static void Accelerate(Body& body, const glm::vec3& gravity, float seconds);
+
+		// Makes a pair's contacts ready to solve, from the velocities as they
+		// stand; reads the bodies and writes only the pair's own contacts, so
+		// many pairs are made ready at once.
 		void Prepare(Pair& pair, float seconds);
+
+		// Gives a pair's bodies the impulses its contacts kept from last step.
+		void WarmStart(Pair& pair);
 		void Solve(Pair& pair);
 
 		// How fast b moves away from a along axis, at its contact.
