@@ -128,6 +128,7 @@
     <ClCompile Include="Textures Tests.cpp" />
     <ClCompile Include="Collider Tests.cpp" />
     <ClCompile Include="ColliderGizmos Tests.cpp" />
+    <ClCompile Include="MeshCollider Tests.cpp" />
     <ClCompile Include="Input Tests.cpp" />
     <ClCompile Include="Threading Tests.cpp" />
     <ClCompile Include="AxisGui Tests.cpp" />

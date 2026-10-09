@@ -102,6 +102,7 @@
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Collider.cpp" />
     <ClCompile Include="ColliderTree.cpp" />
+    <ClCompile Include="MeshCollider.cpp" />
     <ClCompile Include="Component.cpp" />
     <ClCompile Include="ComponentRegistry.cpp" />
     <ClCompile Include="Engine.cpp" />
@@ -146,6 +147,7 @@
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Collider.h" />
     <ClInclude Include="ColliderTree.h" />
+    <ClInclude Include="MeshCollider.h" />
     <ClInclude Include="Component.h" />
     <ClInclude Include="ComponentRegistry.h" />
     <ClInclude Include="Engine.h" />

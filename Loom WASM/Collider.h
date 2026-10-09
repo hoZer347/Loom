@@ -41,6 +41,10 @@ namespace Loom
 		std::vector<glm::vec3> Wireframe() const;
 
 	protected:
+		// Catches up with whatever the shape is built from, before it is
+		// synced or asked for anything directly.
+		virtual void Refresh() const { };
+
 		virtual Bounds BoundsIn(const glm::mat4& world) const = 0;
 		virtual void WireframeIn(const glm::mat4& world, std::vector<glm::vec3>& lines) const = 0;
 

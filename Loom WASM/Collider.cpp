@@ -33,17 +33,23 @@ namespace Loom
 
 	bool Collider::Raycast(const Ray& ray, RaycastHit& hit, float maxDistance)
 	{
+		Refresh();
+
 		return RaycastAt(WorldOf(m_gameObject), ray, hit, maxDistance);
 	};
 
 	Bounds Collider::WorldBounds() const
 	{
+		Refresh();
+
 		return BoundsIn(WorldOf(m_gameObject));
 	};
 
 	std::vector<glm::vec3> Collider::Wireframe() const
 	{
 		std::vector<glm::vec3> lines{ };
+
+		Refresh();
 		WireframeIn(WorldOf(m_gameObject), lines);
 
 		return lines;

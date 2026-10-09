@@ -91,6 +91,7 @@ namespace Loom
 	void ColliderTree::Sync(Collider& collider)
 	{
 		collider.m_synced = collider.m_gameObject->WorldMatrix();
+		collider.Refresh();
 
 		const Bounds bounds = collider.BoundsIn(collider.m_synced);
 

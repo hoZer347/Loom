@@ -72,6 +72,7 @@ needs Chrome or Edge installed.
 | `Texture` | The type exists; it has no state yet |
 | `Collider` | Box and sphere colliders by name and through `GetComponent<Collider>`, where rays meet them under any transform, misses from inside or past `maxDistance`, bounds and wireframes |
 | `ColliderTree` | A scene's colliders found once a physics step syncs them and where it left them, nearest hit and every hit, dropping out when disabled, detached, destroyed or moved to another scene, `Physics::Raycast` over every scene, and a tree of hundreds staying shallow and agreeing with testing every collider through moves, removals and reinsertions |
+| `MeshCollider` | Hitting a mesh's triangles from either side with the normal toward the ray, under any transform, from triangles, strips and fans but not points or lines, nothing without a Mesh, catching up with edited vertices, and thousands of triangles agreeing with testing each one |
 | `ColliderGizmos` | The colliders under a selection drawn in one go over the view, and nothing drawn or compiled without an enabled one |
 | `Input` | Button edges: down for one frame, held, up for one frame, a click inside one frame, buttons GLFW does not have; cursor and screen fields |
 | `SpeedManager` | `ClampMagnitude` and `MoveTowards`: clamping, no overshoot, zero-length input |

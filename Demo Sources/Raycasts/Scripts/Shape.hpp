@@ -16,10 +16,13 @@
 namespace RaycastsScripts
 {
 	// Draws a unit cube, or a sphere half a unit across, the shapes a
-	// BoxCollider and a SphereCollider have before they are resized. Scaling
+	// BoxCollider and a SphereCollider have before they are resized, or a
+	// ring half a unit across around Z for a MeshCollider to follow. Scaling
 	// the GameObject sizes the shape and its collider together.
 	struct Shape : Loom::Component<Shape>
 	{
+		enum Kind { Cube, Sphere, Torus };
+
 		void OnAttach() override
 		{
 			m_material = m_gameObject->GetComponent<Loom::Material>();
@@ -36,7 +39,7 @@ namespace RaycastsScripts
 				mesh = m_gameObject->Attach<Loom::Mesh>();
 
 			mesh->material = m_material;
-			mesh->m_vertices = m_sphere ? Sphere() : Cube();
+			mesh->m_vertices = Build(m_kind);
 		};
 
 		// Drawn in colour from its next update, and in its own again at the
@@ -58,6 +61,20 @@ namespace RaycastsScripts
 		static constexpr int SPHERE_STACKS = 16;
 		static constexpr int SPHERE_SLICES = 32;
 		static constexpr float HALF = 0.5f;
+		static constexpr int RING_SEGMENTS = 48;
+		static constexpr int TUBE_SEGMENTS = 16;
+		static constexpr float RING_RADIUS = 0.35f;
+		static constexpr float TUBE_RADIUS = 0.15f;
+
+		static std::vector<float> Build(Kind kind)
+		{
+			switch (kind)
+			{
+			case Sphere:	return SphereVertices();
+			case Torus:		return TorusVertices();
+			default:		return CubeVertices();
+			};
+		};
 
 		static void Add(std::vector<float>& vertices, const glm::vec3& point)
 		{
@@ -70,7 +87,7 @@ namespace RaycastsScripts
 				Add(vertices, point);
 		};
 
-		static std::vector<float> Cube()
+		static std::vector<float> CubeVertices()
 		{
 			std::vector<float> vertices{ };
 
@@ -93,7 +110,7 @@ namespace RaycastsScripts
 			return vertices;
 		};
 
-		static std::vector<float> Sphere()
+		static std::vector<float> SphereVertices()
 		{
 			std::vector<float> vertices{ };
 
@@ -120,7 +137,34 @@ namespace RaycastsScripts
 			return vertices;
 		};
 
-		Loom::Serial<bool> m_sphere;
+		static std::vector<float> TorusVertices()
+		{
+			std::vector<float> vertices{ };
+
+			const auto at =
+				[](int ring, int tube)
+				{
+					const float around = glm::two_pi<float>() * ring / RING_SEGMENTS;
+					const float turn = glm::two_pi<float>() * tube / TUBE_SEGMENTS;
+
+					const glm::vec3 outward(std::cos(around), std::sin(around), 0.0f);
+
+					return outward * RING_RADIUS
+						+ (outward * std::cos(turn) + glm::vec3(0.0f, 0.0f, std::sin(turn))) * TUBE_RADIUS;
+				};
+
+			for (int ring = 0; ring < RING_SEGMENTS; ring++)
+				for (int tube = 0; tube < TUBE_SEGMENTS; tube++)
+					AddQuad(vertices,
+						at(ring, tube),
+						at(ring + 1, tube),
+						at(ring + 1, tube + 1),
+						at(ring, tube + 1));
+
+			return vertices;
+		};
+
+		Loom::Serial<Kind> m_kind = Cube;
 		Loom::Serial<glm::vec3> m_color = glm::vec3(0.8f, 0.8f, 0.8f);
 		Loom::Serial<std::string> m_shader = "Assets/Lit.shader";
 

@@ -82,6 +82,9 @@
     <ClCompile Include="ColliderTree.cpp">
       <Filter>Collider</Filter>
     </ClCompile>
+    <ClCompile Include="MeshCollider.cpp">
+      <Filter>Collider</Filter>
+    </ClCompile>
     <ClCompile Include="Physics.cpp">
       <Filter>Collider</Filter>
     </ClCompile>
@@ -287,6 +290,9 @@
       <Filter>Collider</Filter>
     </ClInclude>
     <ClInclude Include="ColliderTree.h">
+      <Filter>Collider</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshCollider.h">
       <Filter>Collider</Filter>
     </ClInclude>
     <ClInclude Include="Physics.h">
