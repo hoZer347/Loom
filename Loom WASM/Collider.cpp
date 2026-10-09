@@ -132,58 +132,10 @@ namespace Loom
 
 	bool BoxCollider::Intersect(const glm::mat4& world, const Ray& ray, float maxDistance, RaycastHit& hit) const
 	{
-		const Contacts::Shape shape = Contacts::Pose(*this, world);
-
-		// Flattened by a zero scale: nothing to hit.
-		if (shape.kind != Contacts::Shape::BOX)
+		if (!Contacts::Raycast(Contacts::Pose(*this, world), ray.origin, ray.direction, maxDistance, hit.distance, hit.normal))
 			return false;
 
-		const Contacts::Box& box = shape.box;
-		const glm::vec3 offset = box.center - ray.origin;
-
-		// The slabs between each pair of faces, along the box's own axes, so
-		// no matrix has to be inverted.
-		float entry = -INFINITE_DISTANCE;
-		float exit = INFINITE_DISTANCE;
-		glm::vec3 normal(0.0f);
-
-		for (int axis = 0; axis < Contacts::AXES; axis++)
-		{
-			const float across = glm::dot(box.axes[axis], offset);
-			const float along = glm::dot(box.axes[axis], ray.direction);
-
-			if (along == 0.0f)
-			{
-				if (std::abs(across) > box.half[axis])
-					return false;
-
-				continue;
-			};
-
-			float near = (across - box.half[axis]) / along;
-			float far = (across + box.half[axis]) / along;
-
-			if (near > far)
-				std::swap(near, far);
-
-			if (near > entry)
-			{
-				entry = near;
-				normal = along > 0.0f ? -box.axes[axis] : box.axes[axis];
-			};
-
-			exit = std::min(exit, far);
-
-			if (entry > exit)
-				return false;
-		};
-
-		if (entry < 0.0f || entry > maxDistance)
-			return false;
-
-		hit.point = ray.GetPoint(entry);
-		hit.normal = normal;
-		hit.distance = entry;
+		hit.point = ray.GetPoint(hit.distance);
 
 		return true;
 	};
@@ -254,35 +206,10 @@ namespace Loom
 
 	bool SphereCollider::Intersect(const glm::mat4& world, const Ray& ray, float maxDistance, RaycastHit& hit) const
 	{
-		glm::vec3 middle;
-		float reach;
-
-		InWorld(world, middle, reach);
-
-		if (reach <= 0.0f)
+		if (!Contacts::Raycast(Contacts::Pose(*this, world), ray.origin, ray.direction, maxDistance, hit.distance, hit.normal))
 			return false;
 
-		const glm::vec3 offset = ray.origin - middle;
-		const float along = glm::dot(offset, ray.direction);
-		const float outside = glm::dot(offset, offset) - reach * reach;
-
-		// Starting inside, or on the surface, is not a hit.
-		if (outside <= 0.0f)
-			return false;
-
-		const float discriminant = along * along - outside;
-
-		if (discriminant < 0.0f)
-			return false;
-
-		const float entry = -along - std::sqrt(discriminant);
-
-		if (entry < 0.0f || entry > maxDistance)
-			return false;
-
-		hit.point = ray.GetPoint(entry);
-		hit.normal = (hit.point - middle) / reach;
-		hit.distance = entry;
+		hit.point = ray.GetPoint(hit.distance);
 
 		return true;
 	};

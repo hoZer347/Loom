@@ -54,6 +54,11 @@ namespace Loom
 
 		Shape Pose(const Collider& collider, const glm::mat4& world);
 
+		// Where a ray with a normalised direction first meets a posed box or
+		// sphere from outside, within maxDistance: false for a mesh, which
+		// its collider tests itself, and for one the ray starts inside.
+		bool Raycast(const Shape& shape, const glm::vec3& origin, const glm::vec3& direction, float maxDistance, float& distance, glm::vec3& normal);
+
 		// The points of one touching surface, with the normal pointing out of
 		// the first collider into the second. A depth below zero is a gap.
 		struct Manifold

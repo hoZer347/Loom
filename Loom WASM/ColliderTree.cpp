@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
+#include <limits>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -25,6 +27,13 @@ namespace Loom
 		// is refitted. It is refitted once it no longer covers the next one.
 		// Measured against two and four on the Crowd benchmark.
 		constexpr float PREDICTION = 3.0f;
+
+		// The inverse of a ray's direction along an axis it runs parallel to:
+		// large enough that it crosses that axis's slab nowhere near.
+		constexpr float PARALLEL = 1e30f;
+
+		// What a ray's entry into a node it misses is taken as.
+		constexpr float MISSED = std::numeric_limits<float>::infinity();
 
 		// bounds stretched along ahead, to cover where it is going.
 		Bounds Stretched(Bounds bounds, const glm::vec3& ahead)
@@ -211,26 +220,43 @@ namespace Loom
 	{
 		SmallStack<Pending, INLINE_PENDING> pending;
 
-		// Where the ray enters node within maxDistance, if it does.
-		const auto reach =
-			[&](int node) -> std::optional<Pending>
+		// Each axis's slab is crossed at (plane - origin) / direction; the
+		// division is done once here. Parallel to an axis, the ray crosses
+		// that slab nowhere, which a huge inverse with the same sign gives.
+		glm::vec3 inverse;
+
+		for (int axis = 0; axis < glm::vec3::length(); axis++)
+		{
+			const float along = ray.direction[axis];
+			inverse[axis] = along != 0.0f ? 1.0f / along : std::copysign(PARALLEL, along);
+		};
+
+		const glm::vec3 origin = ray.origin;
+
+		// Where the ray enters node, or MISSED.
+		const auto entering =
+			[&](int node)
 			{
-				float entry, exit;
-				int axis;
+				const Bounds& bounds = m_nodes[node].bounds;
+				const glm::vec3 toMin = (bounds.min - origin) * inverse;
+				const glm::vec3 toMax = (bounds.max - origin) * inverse;
 
-				if (m_nodes[node].bounds.IntersectRay(ray, entry, exit, axis)
-					&& exit >= 0.0f
-					&& entry <= maxDistance)
-					return Pending{ node, entry };
+				const glm::vec3 near = glm::min(toMin, toMax);
+				const glm::vec3 far = glm::max(toMin, toMax);
 
-				return std::nullopt;
+				const float entry = std::max(std::max(near.x, near.y), near.z);
+				const float exit = std::min(std::min(far.x, far.y), far.z);
+
+				return entry <= exit && exit >= 0.0f ? entry : MISSED;
 			};
 
-		if (m_root == NONE)
+		const auto within =
+			[&](float entry) { return entry != MISSED && entry <= maxDistance; };
+
+		if (m_root == NONE || !within(entering(m_root)))
 			return;
 
-		if (const std::optional<Pending> root = reach(m_root))
-			pending.Push(*root);
+		pending.Push({ m_root, 0.0f });
 
 		while (!pending.Empty())
 		{
@@ -243,24 +269,43 @@ namespace Loom
 
 			if (current.IsLeaf())
 			{
+				Collider& collider = *current.collider;
 				RaycastHit hit;
 
-				if (current.collider->RaycastAt(current.collider->m_synced, ray, hit, maxDistance))
+				// A box or a sphere is tested as it was posed at its last sync.
+				bool struck = false;
+
+				if (collider.m_shape.kind == Contacts::Shape::MESH)
+					struck = collider.RaycastAt(collider.m_synced, ray, hit, maxDistance);
+				else if (Contacts::Raycast(collider.m_shape, ray.origin, ray.direction, maxDistance, hit.distance, hit.normal))
+				{
+					hit.point = ray.GetPoint(hit.distance);
+					hit.collider = &collider;
+					hit.gameObject = collider.m_gameObject;
+					struck = true;
+				};
+
+				if (struck)
 					maxDistance = visit(hit, maxDistance);
 
 				continue;
 			};
 
-			std::optional<Pending> first = reach(current.children[0]);
-			std::optional<Pending> second = reach(current.children[1]);
+			const int first = current.children[0];
+			const int second = current.children[1];
+			const float firstEntry = entering(first);
+			const float secondEntry = entering(second);
 
 			// The nearer child last, so it is the next one taken.
-			if (first && second && first->entry < second->entry)
-				std::swap(first, second);
+			const bool firstNearer = firstEntry < secondEntry;
+			const Pending nearer = firstNearer ? Pending{ first, firstEntry } : Pending{ second, secondEntry };
+			const Pending farther = firstNearer ? Pending{ second, secondEntry } : Pending{ first, firstEntry };
 
-			for (const std::optional<Pending>& child : { first, second })
-				if (child)
-					pending.Push(*child);
+			if (within(farther.entry))
+				pending.Push(farther);
+
+			if (within(nearer.entry))
+				pending.Push(nearer);
 		};
 	};
 

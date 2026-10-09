@@ -735,6 +735,87 @@ namespace Contacts
 		return posed;
 	};
 
+	bool Raycast(const Shape& shape, const glm::vec3& origin, const glm::vec3& direction, float maxDistance, float& distance, glm::vec3& normal)
+	{
+		if (shape.kind == Shape::SPHERE)
+		{
+			const Sphere& sphere = shape.sphere;
+
+			if (sphere.radius <= 0.0f)
+				return false;
+
+			const glm::vec3 offset = origin - sphere.center;
+			const float along = glm::dot(offset, direction);
+			const float outside = glm::dot(offset, offset) - sphere.radius * sphere.radius;
+
+			// Starting inside, or on the surface, is not a hit.
+			if (outside <= 0.0f)
+				return false;
+
+			const float discriminant = along * along - outside;
+
+			if (discriminant < 0.0f)
+				return false;
+
+			distance = -along - std::sqrt(discriminant);
+
+			if (distance < 0.0f || distance > maxDistance)
+				return false;
+
+			normal = (origin + direction * distance - sphere.center) / sphere.radius;
+
+			return true;
+		};
+
+		if (shape.kind != Shape::BOX)
+			return false;
+
+		// The slabs between each pair of faces, along the box's own axes.
+		const Box& box = shape.box;
+		const glm::vec3 offset = box.center - origin;
+
+		float entry = -INFINITE_DISTANCE;
+		float exit = INFINITE_DISTANCE;
+
+		for (int axis = 0; axis < AXES; axis++)
+		{
+			const float across = glm::dot(box.axes[axis], offset);
+			const float along = glm::dot(box.axes[axis], direction);
+
+			if (along == 0.0f)
+			{
+				if (std::abs(across) > box.half[axis])
+					return false;
+
+				continue;
+			};
+
+			float near = (across - box.half[axis]) / along;
+			float far = (across + box.half[axis]) / along;
+
+			if (near > far)
+				std::swap(near, far);
+
+			if (near > entry)
+			{
+				entry = near;
+				normal = along > 0.0f ? -box.axes[axis] : box.axes[axis];
+			};
+
+			exit = std::min(exit, far);
+
+			if (entry > exit)
+				return false;
+		};
+
+		if (entry < 0.0f || entry > maxDistance)
+			return false;
+
+		distance = entry;
+
+		return true;
+	};
+
 	void Collide(const Shape& first, const Shape& second, float margin, std::vector<Manifold>& manifolds)
 	{
 		const size_t before = manifolds.size();
