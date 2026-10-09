@@ -70,15 +70,6 @@ namespace Loom
 		constexpr size_t PAIR_GRAIN = 64;
 		constexpr size_t PRUNE_GRAIN = 512;
 
-		// The candidate set grows to keep at least this many slots for each
-		// key, from this many; and mixes a key's two addresses by two large
-		// odd numbers, keeping the high bits, which they stir the most.
-		constexpr size_t MOST_FULL = 2;
-		constexpr size_t LEAST_SLOTS = 1024;
-		constexpr uint64_t FIRST_MIX = 0x9E3779B97F4A7C15ull;
-		constexpr uint64_t SECOND_MIX = 0xC2B2AE3D27D4EB4Full;
-		constexpr int HASH_SHIFT = 32;
-
 		// The solver splits the bodies in pairs into up to this many slabs,
 		// whatever the machine, so it gives the same results on any; with no
 		// fewer bodies to a slab than this, so each is worth handing out; cut
@@ -389,78 +380,6 @@ namespace Loom
 
 		m_joining.clear();
 		m_noted.clear();
-	};
-
-	bool Simulation::KeySet::Insert(const Key& key)
-	{
-		if ((m_count + 1) * MOST_FULL > m_slots.size())
-			Grow();
-
-		const size_t mask = m_slots.size() - 1;
-
-		for (size_t slot = Home(key); ; slot = (slot + 1) & mask)
-		{
-			if (m_slots[slot] == key)
-				return false;
-
-			if (m_slots[slot].first == nullptr)
-			{
-				m_slots[slot] = key;
-				m_count++;
-
-				return true;
-			};
-		};
-	};
-
-	void Simulation::KeySet::Erase(const Key& key)
-	{
-		if (m_slots.empty())
-			return;
-
-		const size_t mask = m_slots.size() - 1;
-		size_t hole = Home(key);
-
-		for (; m_slots[hole] != key; hole = (hole + 1) & mask)
-			if (m_slots[hole].first == nullptr)
-				return;
-
-		m_count--;
-
-		// Those after it that would rather sit in the hole move back into it,
-		// so none is left past a gap from where it belongs.
-		for (size_t next = (hole + 1) & mask; m_slots[next].first != nullptr; next = (next + 1) & mask)
-		{
-			const size_t home = Home(m_slots[next]);
-			const bool between = hole <= next ? hole < home && home <= next : hole < home || home <= next;
-
-			if (!between)
-			{
-				m_slots[hole] = m_slots[next];
-				hole = next;
-			};
-		};
-
-		m_slots[hole] = Key{ };
-	};
-
-	size_t Simulation::KeySet::Home(const Key& key) const
-	{
-		const uint64_t mixed = (uint64_t)(uintptr_t)key.first * FIRST_MIX ^ (uint64_t)(uintptr_t)key.second * SECOND_MIX;
-
-		return (size_t)(mixed >> HASH_SHIFT) & (m_slots.size() - 1);
-	};
-
-	void Simulation::KeySet::Grow()
-	{
-		std::vector<Key> old = std::move(m_slots);
-
-		m_slots.assign(std::max(old.size() * 2, LEAST_SLOTS), Key{ });
-		m_count = 0;
-
-		for (const Key& key : old)
-			if (key.first != nullptr)
-				Insert(key);
 	};
 
 	Simulation::Key Simulation::Ordered(const Collider* a, const Collider* b)
@@ -987,13 +906,13 @@ namespace Loom
 		};
 
 		m_slabs = slabs;
+		m_alone = across;
 	};
 
 	void Simulation::SolveSlabs()
 	{
 		const int slabs = (int)m_slabs;
-		const size_t alone = 2 * m_slabs - 1;
-		const bool lonely = !m_groups[alone].empty();
+		const bool lonely = !m_groups[m_alone].empty();
 
 		// How many passes each slab, each border and those alone have been
 		// through.
@@ -1067,7 +986,7 @@ namespace Loom
 						for (int k = 0; k < slabs - 1; k++)
 							Jobs::WaitFor(bordersDone[k], pass + 1);
 
-						run(alone, pass);
+						run(m_alone, pass);
 						aloneDone.store(pass + 1, std::memory_order_release);
 						aloneDone.notify_all();
 					};
@@ -1435,10 +1354,13 @@ namespace Loom
 				report(a, b, Listens(*a.m_gameObject), Listens(*b.m_gameObject), BodyOf(a), BodyOf(b), candidate.trigger, nullptr, 0, LEAVING);
 			};
 
-		for (Candidate& candidate : m_parted)
-			part(candidate);
-
+		// Taken out first, as a listener may remove a collider, and with it
+		// those that name it.
+		std::vector<Candidate> parted = std::move(m_parted);
 		m_parted.clear();
+
+		for (Candidate& candidate : parted)
+			part(candidate);
 
 		// By index, as a listener may remove a collider and its candidates.
 		for (size_t i = 0; i < m_candidates.size(); i++)

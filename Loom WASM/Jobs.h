@@ -2,8 +2,8 @@
 
 #include "Loom API.h"
 
-#include <cstddef>
 #include <atomic>
+#include <cstddef>
 #include <functional>
 
 
@@ -11,9 +11,10 @@ namespace Loom
 {
 	/**
 	* Loom::Jobs
-	* - A pool of worker threads, one fewer than the machine has cores, for
-	*   work that splits into independent pieces. The calling thread works
-	*   alongside them, and For returns once every piece is done
+	* - A pool of worker threads, one fewer than the machine has cores, or on
+	*   the web than the threads a page starts with, for work that splits
+	*   into independent pieces. The calling thread works alongside them, and
+	*   For returns once every piece is done
 	* - The pieces are chunks of a range, numbered in order, so what each
 	*   chunk writes to its own slot can be put together the same way every
 	*   run, however the threads happened to share them out
@@ -34,7 +35,11 @@ namespace Loom
 		// on all. Whatever raises counter notifies it.
 		static void WaitFor(const std::atomic<int>& counter, int value);
 
-		// The caller and the workers.
+		// The caller and the workers running, within the limit.
 		static unsigned Threads();
+
+		// At most this many threads share a For, the caller among them, so a
+		// test can compare what fewer give; none for no limit.
+		static void SetMostThreads(unsigned most);
 	};
 };

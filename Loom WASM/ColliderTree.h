@@ -41,11 +41,8 @@ namespace Loom
 		~ColliderTree();
 
 		void BeginSync();
-		// travel, for a moving body, is how far it went this step: its leaf is
-		// stretched a few times that far ahead, as Box2D's are.
-		void Sync(Collider& collider, const glm::vec3& travel = glm::vec3(0.0f));
 
-		// Sync in two halves. Measure works out where collider is now,
+		// A sync in two halves. Measure works out where collider is now,
 		// touching nothing but the collider, so many can be measured at once,
 		// and says whether its leaf has to move; Place then moves it, or only
 		// marks it synced.
@@ -104,7 +101,7 @@ namespace Loom
 		const Bounds* PaddedBounds(const Collider& collider) const;
 
 		// The current tree during Scene::Physics, which a collider's OnPhysics
-		// syncs itself into.
+		// enlists itself in.
 		static inline ColliderTree* current = nullptr;
 
 	private:

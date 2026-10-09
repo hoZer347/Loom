@@ -5,6 +5,7 @@
 #include "Collider.h"
 #include "Collision.h"
 #include "ComponentRegistry.h"
+#include "Jobs.h"
 #include "Mesh.h"
 #include "MeshCollider.h"
 #include "Physics.h"
@@ -721,5 +722,68 @@ TEST_SUITE("Rigidbody")
 		CHECK(landed.z == doctest::Approx(start.z).epsilon(CLOSE));
 
 		CHECK(*off->transform.position == glm::vec3(-5.0f, 3.0f, 0.0f));
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a pile ends up the same however many threads share its steps")
+	{
+		// Enough for the solver to split them between several slabs, a layer
+		// of a row by a row at a time.
+		constexpr int COUNT = 300;
+		constexpr int PER_ROW = 10;
+		constexpr float SPACING = 1.2f;
+		constexpr float FIRST_LAYER = 1.0f;
+		constexpr float SECONDS = 3.0f;
+
+		// Boxes and balls by turns; degrees between one body's turn and the
+		// next's, so no two lie alike.
+		constexpr int KINDS = 2;
+		constexpr float TURN = 37.0f;
+
+		const auto pile =
+			[&]()
+			{
+				Loom::Scene scene("pile");
+				Pump();
+
+				Floor(scene);
+
+				std::vector<Loom::Rigidbody*> bodies{ };
+
+				for (int i = 0; i < COUNT; i++)
+				{
+					const glm::vec3 position(
+						(i % PER_ROW - PER_ROW * HALF) * SPACING,
+						FIRST_LAYER + i / (PER_ROW * PER_ROW) * SPACING,
+						(i / PER_ROW % PER_ROW - PER_ROW * HALF) * SPACING);
+
+					Loom::GameObject* object = Spawn(scene, "Body", position);
+					object->transform.rotation = glm::vec3(TURN * i, TURN * 2 * i, TURN * 3 * i);
+
+					if (i % KINDS == 0)
+						object->Attach<Loom::BoxCollider>();
+					else
+						object->Attach<Loom::SphereCollider>();
+
+					bodies.push_back(object->Attach<Loom::Rigidbody>());
+				};
+
+				Pump();
+				Run(scene, SECONDS);
+
+				std::vector<glm::mat4> poses{ };
+
+				for (const Loom::Rigidbody* body : bodies)
+					poses.push_back(body->GetGameObject()->WorldMatrix());
+
+				return poses;
+			};
+
+		Loom::Jobs::SetMostThreads(1);
+		const std::vector<glm::mat4> alone = pile();
+
+		Loom::Jobs::SetMostThreads(0);
+		const std::vector<glm::mat4> shared = pile();
+
+		CHECK(alone == shared);
 	};
 };

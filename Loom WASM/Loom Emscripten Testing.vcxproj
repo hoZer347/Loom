@@ -117,6 +117,7 @@
     <ClCompile Include="Guid.cpp" />
     <ClCompile Include="Input.cpp" />
     <ClCompile Include="Jobs.cpp" />
+    <ClCompile Include="KeySet.cpp" />
     <ClCompile Include="Light.cpp" />
     <ClCompile Include="LoomObject.cpp" />
     <ClCompile Include="Material.cpp" />
@@ -170,6 +171,7 @@
     <ClInclude Include="Guid.h" />
     <ClInclude Include="Input.h" />
     <ClInclude Include="Jobs.h" />
+    <ClInclude Include="KeySet.h" />
     <ClInclude Include="Light.h" />
     <ClInclude Include="Loom API.h" />
     <ClInclude Include="Loom.h" />

@@ -434,6 +434,10 @@ namespace Contacts
 				};
 			};
 
+			// A box mirrored by its scale has its axes the other way round, which
+			// turns every cross product taken in its frame.
+			const float handed = glm::dot(glm::cross(a.axes[0], a.axes[1]), a.axes[2]) < 0.0f ? -1.0f : 1.0f;
+
 			float bestOverlap = INFINITE_DISTANCE;
 			glm::vec3 bestAxis(0.0f);
 
@@ -493,7 +497,7 @@ namespace Contacts
 
 					const float reachA = a.half[i1] * across[i2][j] + a.half[i2] * across[i1][j];
 					const float reachB = b.half[j1] * across[i][j2] + b.half[j2] * across[i][j1];
-					const float distance = gap[i2] * turned[i1][j] - gap[i1] * turned[i2][j];
+					const float distance = (gap[i2] * turned[i1][j] - gap[i1] * turned[i2][j]) * handed;
 
 					if (!test(reachA, reachB, distance, length, FACES + i * AXES + j, [&]() { return glm::cross(a.axes[i], b.axes[j]); }))
 						return;
@@ -673,7 +677,7 @@ namespace Contacts
 					if (length < EPSILON)
 						continue;
 
-					if (!test(axis, length, FACES + i * CORNERS + j, [&]() { return glm::cross(box.axes[i], edges[j]); }))
+					if (!test(axis, length, FACES + i * CORNERS + j, [&]() { return box.axes[0] * axis.x + box.axes[1] * axis.y + box.axes[2] * axis.z; }))
 						return;
 				};
 

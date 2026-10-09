@@ -138,12 +138,19 @@ if (-not $NoBuild)
 
     New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 
+    # Every argument goes in a response file: emcc is a batch file, and the
+    # sources alone run past cmd's limit on a command line.
+    $arguments = @($flags) + @($includes) + @($sources) + @('-o', $output) |
+        ForEach-Object { '"' + ($_ -replace '\\', '/') + '"' }
+    $response = Join-Path $outputDir 'emcc.rsp'
+    [IO.File]::WriteAllLines($response, [string[]]$arguments)
+
     # PowerShell 5.1 wraps a native command's stderr in a NativeCommandError,
     # which the 'Stop' preference above would treat as fatal -- and emcc writes
     # ordinary notes there. Judge it by its exit code instead.
     $previous = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    try { & $emcc @flags @includes @sources -o $output }
+    try { & $emcc "@$response" }
     finally { $ErrorActionPreference = $previous }
 
     if ($LASTEXITCODE -ne 0)

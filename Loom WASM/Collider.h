@@ -9,6 +9,7 @@
 
 #include "glm/glm.hpp"
 
+#include <atomic>
 #include <vector>
 
 
@@ -103,10 +104,10 @@ namespace Loom
 		// numbers them, or -1 for none.
 		int m_body = -1;
 
-		// Which collider made this was, counting from the first: the order
-		// the simulation puts each pair's two in, the same every run as
-		// their addresses are not.
-		static inline unsigned s_made = 0;
+		// The order colliders were made in, which orders each pair's two the
+		// same way every run, as their addresses do not. Atomic, as colliders
+		// may be made on any thread.
+		static inline std::atomic<unsigned> s_made{ 0 };
 		const unsigned m_made = s_made++;
 	};
 

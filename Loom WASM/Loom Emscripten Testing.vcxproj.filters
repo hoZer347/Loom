@@ -19,6 +19,9 @@
     <ClCompile Include="Jobs.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
+    <ClCompile Include="KeySet.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
     <ClCompile Include="Shaders.cpp">
       <Filter>Shaders</Filter>
     </ClCompile>
@@ -243,6 +246,9 @@
       <Filter>Engine</Filter>
     </ClInclude>
     <ClInclude Include="Jobs.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="KeySet.h">
       <Filter>Engine</Filter>
     </ClInclude>
     <ClInclude Include="Shaders.h">

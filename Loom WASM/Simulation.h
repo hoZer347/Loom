@@ -3,12 +3,11 @@
 #include "Collision.h"
 #include "Contacts.h"
 #include "Jobs.h"
+#include "KeySet.h"
 
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
 
-#include <algorithm>
-#include <cstdint>
 #include <span>
 #include <utility>
 #include <vector>
@@ -147,41 +146,7 @@ namespace Loom
 		};
 
 		// Ordered by when each was made, so each pair has one key.
-		typedef std::pair<const Collider*, const Collider*> Key;
-
-		// A set of keys in one array, open addressed, which the thousands of
-		// lookups a step makes go through far faster than a node each.
-		struct KeySet
-		{
-			// False for one already in.
-			bool Insert(const Key& key);
-			void Erase(const Key& key);
-
-			template <typename Doomed>
-			void EraseIf(const Doomed& doomed)
-			{
-				std::vector<Key> kept{ };
-
-				for (const Key& key : m_slots)
-					if (key.first != nullptr && !doomed(key))
-						kept.push_back(key);
-
-				std::fill(m_slots.begin(), m_slots.end(), Key{ });
-				m_count = 0;
-
-				for (const Key& key : kept)
-					Insert(key);
-			};
-
-		private:
-			// Where key would sit with nothing in its way.
-			size_t Home(const Key& key) const;
-			void Grow();
-
-			// Empty ones hold nulls.
-			std::vector<Key> m_slots{ };
-			size_t m_count = 0;
-		};
+		typedef KeySet::Key Key;
 
 		struct Pair
 		{
@@ -370,6 +335,9 @@ namespace Loom
 		// ready; and how many slabs.
 		std::vector<std::vector<size_t>> m_groups{ };
 		size_t m_slabs = 0;
+
+		// The group of those solved alone.
+		size_t m_alone = 0;
 
 		// Where the slabs are cut, and the load along their axis.
 		std::vector<float> m_cuts{ };

@@ -109,6 +109,15 @@
     <ClCompile Include="Physics Performance Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="Contacts Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="Jobs Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="KeySet Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="Rigidbody Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

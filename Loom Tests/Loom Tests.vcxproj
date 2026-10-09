@@ -134,6 +134,9 @@
     <ClCompile Include="ColliderGizmos Tests.cpp" />
     <ClCompile Include="MeshCollider Tests.cpp" />
     <ClCompile Include="Physics Performance Tests.cpp" />
+    <ClCompile Include="Contacts Tests.cpp" />
+    <ClCompile Include="Jobs Tests.cpp" />
+    <ClCompile Include="KeySet Tests.cpp" />
     <ClCompile Include="Rigidbody Tests.cpp" />
     <ClCompile Include="Input Tests.cpp" />
     <ClCompile Include="Threading Tests.cpp" />

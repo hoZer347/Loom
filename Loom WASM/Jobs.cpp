@@ -33,12 +33,20 @@ namespace Loom
 		// no longer, so one it waits on that has lost its core gets this one.
 		constexpr unsigned MOST_SPINS = 1024;
 
+#if defined(__EMSCRIPTEN__)
+		// The threads a page starts with, WebBuild.ps1's PTHREAD_POOL_SIZE:
+		// one past them cannot start while the main thread waits on it.
+		constexpr unsigned PAGE_THREADS = 8;
+#endif
+
 		// The machine's cores, rather than the threads they run at once: two
 		// threads on one core share its units, so a second that only waits
 		// slows the first, and one that works gains little.
 		unsigned Cores()
 		{
-#if defined(_WIN32)
+#if defined(__EMSCRIPTEN__)
+			return std::clamp(std::thread::hardware_concurrency(), 1u, PAGE_THREADS);
+#elif defined(_WIN32)
 			DWORD length = 0;
 			GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &length);
 
@@ -116,7 +124,7 @@ namespace Loom
 				const unsigned cores = Cores();
 
 				for (unsigned i = 1; i < cores; i++)
-					workers.emplace_back([this]() { Run(); });
+					workers.emplace_back([this]() { Run(++started); });
 			};
 
 			~Pool()
@@ -129,7 +137,8 @@ namespace Loom
 					worker.join();
 			};
 
-			void Run()
+			// number counts the workers in the order they started, from one.
+			void Run(unsigned number)
 			{
 				unsigned seen = 0;
 
@@ -155,10 +164,11 @@ namespace Loom
 					seen = generation;
 
 					// Counted in before it looks, so the caller, having taken
-					// its job down, waits for any that found it.
+					// its job down, waits for any that found it. One past the
+					// limit stays out.
 					helping++;
 
-					if (Job* job = current)
+					if (Job* job = current; job && number < Jobs::Threads())
 						Help(*job);
 
 					helping--;
@@ -167,6 +177,11 @@ namespace Loom
 			};
 
 			std::vector<std::thread> workers{ };
+
+			// Workers running, and how many threads may share a For; none for
+			// no limit.
+			std::atomic<unsigned> started{ 0 };
+			std::atomic<unsigned> most{ 0 };
 
 			std::atomic<unsigned> generation{ 0 };
 			std::atomic<Job*> current{ nullptr };
@@ -186,7 +201,7 @@ namespace Loom
 		const size_t chunks = Chunks(count, grain);
 		Pool& pool = Workers();
 
-		if (chunks <= 1 || pool.workers.empty())
+		if (chunks <= 1 || Threads() == 1)
 		{
 			for (size_t chunk = 0; chunk < chunks; chunk++)
 				work(chunk, chunk * grain, std::min((chunk + 1) * grain, count));
@@ -220,6 +235,14 @@ namespace Loom
 
 	unsigned Jobs::Threads()
 	{
-		return (unsigned)Workers().workers.size() + 1;
+		const Pool& pool = Workers();
+		const unsigned running = pool.started + 1;
+
+		return pool.most == 0 ? running : std::min(running, pool.most.load());
+	};
+
+	void Jobs::SetMostThreads(unsigned most)
+	{
+		Workers().most = most;
 	};
 };

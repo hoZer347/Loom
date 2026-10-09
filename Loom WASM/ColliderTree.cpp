@@ -10,11 +10,11 @@
 #include <limits>
 #include <optional>
 #include <utility>
+#include <vector>
 
 #if defined(_M_X64) || defined(__SSE2__)
 #include <immintrin.h>
 #endif
-#include <vector>
 
 
 namespace Loom
@@ -130,11 +130,6 @@ namespace Loom
 	void ColliderTree::BeginSync()
 	{
 		m_sync++;
-	};
-
-	void ColliderTree::Sync(Collider& collider, const glm::vec3& travel)
-	{
-		Place(collider, Measure(collider), travel);
 	};
 
 	bool ColliderTree::Unmoved(const Collider& collider) const
