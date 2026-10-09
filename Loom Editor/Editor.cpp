@@ -176,6 +176,10 @@ namespace Loom
 		// than into it.
 		constexpr float sibling_edge = 0.25f;
 
+		// A window docked on the frame it first appears only takes its tab on
+		// the one after.
+		constexpr int scene_focus_frames = 2;
+
 		// How often the editor checks whether a shader file was edited outside it.
 		constexpr double shader_poll_seconds = 0.5;
 
@@ -882,6 +886,14 @@ namespace Loom
 			m_startupScene = path->second;
 
 		SaveSettings();
+	};
+
+	void Editor::ShowInSceneView(Scene* scene)
+	{
+		SetActiveScene(scene);
+
+		m_showScene = true;
+		m_sceneFocusFrames = scene_focus_frames;
 	};
 
 	void Editor::Select(GameObject* gameObject)
@@ -1854,7 +1866,7 @@ namespace Loom
 		if (ImGui::BeginPopupContextItem())
 		{
 			if (ImGui::MenuItem("Open In Scene View"))
-				SetActiveScene(scene);
+				ShowInSceneView(scene);
 
 			if (ImGui::MenuItem("Add GameObject"))
 				Select(scene->AddChild());
@@ -2105,6 +2117,13 @@ namespace Loom
 
 		if (payload->IsDelivery())
 		{
+			// Each scene is seen through its own camera, so an object moved into
+			// another scene is followed there rather than vanishing from view.
+			Scene* destination = EditCommands::SceneOf(*gameObject);
+
+			if (destination != EditCommands::SceneOf(*dragged))
+				ShowInSceneView(destination);
+
 			dragged->SetParent(parent, before);
 			Select(dragged);
 
@@ -2668,6 +2687,12 @@ namespace Loom
 		const std::string title =
 			std::string(EditorIcons::Scene) + " " +
 			(m_activeScene ? m_activeScene->GetName() : std::string("Scene")) + EditorPanels::SceneId;
+
+		if (m_sceneFocusFrames > 0)
+		{
+			m_sceneFocusFrames--;
+			ImGui::SetNextWindowFocus();
+		};
 
 		if (ImGui::Begin(title.c_str(), &m_showScene, view_flags))
 		{

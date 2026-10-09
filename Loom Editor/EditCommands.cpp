@@ -10,21 +10,6 @@
 
 namespace Loom
 {
-	namespace
-	{
-		Scene* SceneOf(const GameObject* gameObject)
-		{
-			while (gameObject->GetParent() != nullptr)
-				gameObject = gameObject->GetParent();
-
-			for (Scene* scene : Scene::GetScenes())
-				if (&scene->GetRoot() == gameObject)
-					return scene;
-
-			return nullptr;
-		};
-	};
-
 	EditCommand EditCommands::FromShortcut(bool hierarchy_focused)
 	{
 		if (ImGui::GetIO().WantTextInput)
@@ -76,8 +61,8 @@ namespace Loom
 			if (above == &dragged)
 				return false;
 
-		Scene* from = SceneOf(&dragged);
-		Scene* to = SceneOf(&target);
+		Scene* from = SceneOf(dragged);
+		Scene* to = SceneOf(target);
 
 		if (from == nullptr || to == nullptr)
 			return false;
@@ -88,5 +73,19 @@ namespace Loom
 		const auto is_owned = [&](Scene* scene) { return std::find(owned.begin(), owned.end(), scene) != owned.end(); };
 
 		return is_owned(from) && is_owned(to) && from->GetGuid() != to->GetGuid();
+	};
+
+	Scene* EditCommands::SceneOf(const GameObject& gameObject)
+	{
+		const GameObject* root = &gameObject;
+
+		while (root->GetParent() != nullptr)
+			root = root->GetParent();
+
+		for (Scene* scene : Scene::GetScenes())
+			if (&scene->GetRoot() == root)
+				return scene;
+
+		return nullptr;
 	};
 };

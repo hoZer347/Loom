@@ -171,6 +171,10 @@ namespace Loom
 
 		void SetActiveScene(Scene* scene);
 
+		// Makes the scene active and brings the Scene view, opened if closed,
+		// to the front.
+		void ShowInSceneView(Scene* scene);
+
 		// Deselects any GameObject; the Inspector shows the model instead.
 		void SelectModel(const std::string& path);
 
@@ -646,6 +650,9 @@ namespace Loom
 		// in the same buffer as the inspector's name box.
 		bool m_renaming = false;
 		bool m_focusRename = false;
+
+		// Frames left in which the Scene view asks for focus.
+		int m_sceneFocusFrames = 0;
 
 		std::string m_screenshotPath{ };
 		int m_screenshotFrame = 0;

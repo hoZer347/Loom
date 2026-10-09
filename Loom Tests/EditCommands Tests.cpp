@@ -340,6 +340,16 @@ TEST_SUITE("EditCommands")
 		CHECK(Loom::LoomObject::GetByGuid<Loom::GameObject>(original) == restored);
 	};
 
+	TEST_CASE_FIXTURE(Selection, "an object's scene is the one whose root it is under")
+	{
+		Loom::Scene other("Other");
+		Pump();
+
+		CHECK(Loom::EditCommands::SceneOf(*grandchild) == scene);
+		CHECK(Loom::EditCommands::SceneOf(scene->GetRoot()) == scene);
+		CHECK(Loom::EditCommands::SceneOf(other.GetRoot()) == &other);
+	};
+
 	TEST_CASE_FIXTURE(Selection, "a drag moves within a scene, never under itself")
 	{
 		const std::vector<Loom::Scene*> owned{ scene };

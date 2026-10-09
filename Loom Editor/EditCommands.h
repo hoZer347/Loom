@@ -39,5 +39,8 @@ namespace Loom
 		// when both are owned, since only those are saved and undone, and
 		// never between two copies of one scene, which are kept identical.
 		bool CanMove(const GameObject& dragged, const GameObject& target, const std::vector<Scene*>& owned);
+
+		// The scene whose root the object is under, or null if none.
+		Scene* SceneOf(const GameObject& gameObject);
 	};
 };
