@@ -14,7 +14,7 @@ namespace Loom
 		constexpr size_t COMPONENTS = 3;
 		constexpr uint32_t CORNERS = 3;
 
-		// Fewer than this many triangles are tested one by one rather than split.
+		// At most this many triangles are tested one by one rather than split.
 		constexpr uint32_t LEAF_TRIANGLES = 4;
 
 		// Splitting at the median halves every branch, so the tree is never
@@ -33,22 +33,27 @@ namespace Loom
 		return (corners[0] + corners[1] + corners[2]) / (float)CORNERS;
 	};
 
-	void MeshCollider::Refresh() const
+	bool MeshCollider::Refresh() const
 	{
-		static const std::vector<float> none{ };
+		static const std::vector<float> no_vertices{ };
+		static const std::vector<uint32_t> no_indices{ };
 
 		Mesh* mesh = m_gameObject ? m_gameObject->GetComponent<Mesh>() : nullptr;
 
-		const std::vector<float>& vertices = mesh ? *mesh->m_vertices : none;
+		const std::vector<float>& vertices = mesh ? *mesh->m_vertices : no_vertices;
+		const std::vector<uint32_t>& indices = mesh ? mesh->m_indices : no_indices;
 		const uint32_t primitive = mesh ? (uint32_t)*mesh->primitive_id : (uint32_t)Mesh::Triangles;
 
-		if (primitive == m_primitive && vertices == m_source)
-			return;
+		if (primitive == m_primitive && vertices == m_source && indices == m_indices)
+			return false;
 
 		m_source = vertices;
+		m_indices = indices;
 		m_primitive = primitive;
 
 		Rebuild();
+
+		return true;
 	};
 
 	void MeshCollider::Rebuild() const
@@ -56,7 +61,16 @@ namespace Loom
 		m_triangles.clear();
 		m_nodes.clear();
 
-		const size_t points = m_source.size() / COMPONENTS;
+		const size_t vertices = m_source.size() / COMPONENTS;
+
+		// The corners in drawing order: through the indices when there are any.
+		const size_t points = m_indices.empty() ? vertices : m_indices.size();
+
+		const auto vertex =
+			[&](size_t corner)
+			{
+				return m_indices.empty() ? corner : (size_t)m_indices[corner];
+			};
 
 		const auto point =
 			[&](size_t i)
@@ -64,10 +78,17 @@ namespace Loom
 				return glm::vec3(m_source[i * COMPONENTS], m_source[i * COMPONENTS + 1], m_source[i * COMPONENTS + 2]);
 			};
 
+		// An index past the vertices leaves its triangle out.
 		const auto add =
 			[&](size_t a, size_t b, size_t c)
 			{
-				m_triangles.push_back({ { point(a), point(b), point(c) } });
+				const size_t corners[] = { vertex(a), vertex(b), vertex(c) };
+
+				for (const size_t corner : corners)
+					if (corner >= vertices)
+						return;
+
+				m_triangles.push_back({ { point(corners[0]), point(corners[1]), point(corners[2]) } });
 			};
 
 		switch (m_primitive)

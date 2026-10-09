@@ -31,16 +31,22 @@ namespace Loom
 			ColliderTree::current->Sync(*this);
 	};
 
+	void Collider::CatchUp() const
+	{
+		if (Refresh() && m_tree)
+			m_tree->Resize(*this);
+	};
+
 	bool Collider::Raycast(const Ray& ray, RaycastHit& hit, float maxDistance)
 	{
-		Refresh();
+		CatchUp();
 
 		return RaycastAt(WorldOf(m_gameObject), ray, hit, maxDistance);
 	};
 
 	Bounds Collider::WorldBounds() const
 	{
-		Refresh();
+		CatchUp();
 
 		return BoundsIn(WorldOf(m_gameObject));
 	};
@@ -49,7 +55,7 @@ namespace Loom
 	{
 		std::vector<glm::vec3> lines{ };
 
-		Refresh();
+		CatchUp();
 		WireframeIn(WorldOf(m_gameObject), lines);
 
 		return lines;

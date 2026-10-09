@@ -113,19 +113,27 @@ namespace Loom
 			m_leaves++;
 		}
 		else
-		{
-			const int leaf = collider.m_node;
-			const Bounds& padded = m_nodes[leaf].bounds;
-
-			if (!padded.Contains(bounds) || !bounds.Expanded(MOST_PADDING).Contains(padded))
-			{
-				RemoveLeaf(leaf);
-				m_nodes[leaf].bounds = bounds.Expanded(PADDING);
-				InsertLeaf(leaf);
-			};
-		};
+			Fit(collider.m_node, bounds);
 
 		m_nodes[collider.m_node].sync = m_sync;
+	};
+
+	void ColliderTree::Resize(const Collider& collider)
+	{
+		if (collider.m_tree == this)
+			Fit(collider.m_node, collider.BoundsIn(collider.m_synced));
+	};
+
+	void ColliderTree::Fit(int leaf, const Bounds& bounds)
+	{
+		const Bounds& padded = m_nodes[leaf].bounds;
+
+		if (padded.Contains(bounds) && bounds.Expanded(MOST_PADDING).Contains(padded))
+			return;
+
+		RemoveLeaf(leaf);
+		m_nodes[leaf].bounds = bounds.Expanded(PADDING);
+		InsertLeaf(leaf);
 	};
 
 	void ColliderTree::EndSync()

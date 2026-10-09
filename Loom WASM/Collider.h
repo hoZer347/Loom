@@ -29,8 +29,8 @@ namespace Loom
 		void OnPhysics() override;
 
 		// The nearest point along the ray, within maxDistance, where it meets
-		// this collider from outside, where its transform has it now rather
-		// than where the last physics step left it.
+		// this collider, where its transform has it now rather than where the
+		// last physics step left it.
 		bool Raycast(const Ray& ray, RaycastHit& hit, float maxDistance = INFINITE_DISTANCE);
 
 		// What the collider covers now, as a box in world space.
@@ -42,8 +42,8 @@ namespace Loom
 
 	protected:
 		// Catches up with whatever the shape is built from, before it is
-		// synced or asked for anything directly.
-		virtual void Refresh() const { };
+		// synced or asked for anything directly. Whether the shape changed.
+		virtual bool Refresh() const { return false; };
 
 		virtual Bounds BoundsIn(const glm::mat4& world) const = 0;
 		virtual void WireframeIn(const glm::mat4& world, std::vector<glm::vec3>& lines) const = 0;
@@ -57,6 +57,10 @@ namespace Loom
 
 		bool RaycastAt(const glm::mat4& world, const Ray& ray, RaycastHit& hit, float maxDistance);
 
+		// Refresh, between syncs: a shape that changed is refitted in its tree,
+		// so the tree's raycasts still reach all of it.
+		void CatchUp() const;
+
 		ColliderTree* m_tree = nullptr;
 		int m_node = ColliderTree::NONE;
 
@@ -66,7 +70,8 @@ namespace Loom
 
 	/**
 	* Loom::BoxCollider
-	* - A box of size around center
+	* - A box of size around center, hit from outside: a ray starting inside
+	*   does not hit it
 	*/
 	struct LOOM_API BoxCollider : Component<BoxCollider, "Physics", Collider>
 	{
@@ -83,6 +88,7 @@ namespace Loom
 	* Loom::SphereCollider
 	* - A sphere of radius around center. A transform scaled unevenly keeps it
 	*   round, sized by its largest scale, as Unity's is
+	* - Hit from outside: a ray starting inside does not hit it
 	*/
 	struct LOOM_API SphereCollider : Component<SphereCollider, "Physics", Collider>
 	{

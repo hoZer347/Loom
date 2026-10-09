@@ -45,6 +45,10 @@ namespace Loom
 
 		void Remove(Collider& collider);
 
+		// Refits collider's leaf to what it covers where it was last synced,
+		// for a shape that changed between syncs.
+		void Resize(const Collider& collider);
+
 		// Calls visit with every hit within maxDistance on a collider where it
 		// was last synced, roughly nearest first. visit answers the distance to
 		// keep looking within: the hit's, to find only nearer ones, or the one
@@ -83,6 +87,9 @@ namespace Loom
 
 		int Allocate();
 		void Free(int node);
+
+		// Puts leaf where bounds needs it, unless its padding still covers them.
+		void Fit(int leaf, const Bounds& bounds);
 
 		void InsertLeaf(int leaf);
 		void RemoveLeaf(int leaf);

@@ -197,6 +197,51 @@ TEST_SUITE("MeshCollider")
 		CHECK(hit.distance == doctest::Approx(7.0f));
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an indexed mesh's triangles go through its indices")
+	{
+		Loom::Scene scene("indexed");
+		Pump();
+
+		// The square's four corners once each, with an index past them that
+		// leaves its triangle out.
+		const std::vector<float> corners
+		{
+			-1.0f, -1.0f, 0.0f,   1.0f, -1.0f, 0.0f,   1.0f, 1.0f, 0.0f,   -1.0f, 1.0f, 0.0f,
+		};
+		constexpr uint32_t PAST = 4;
+
+		Loom::MeshCollider* collider = PlaceMesh(scene, glm::vec3(0.0f, 0.0f, -5.0f), corners);
+		Loom::Mesh* mesh = scene.GetRoot().GetChildren()[0]->GetComponent<Loom::Mesh>();
+
+		mesh->m_indices = { 0, 1, 2, 0, 2, 3, 0, 1, PAST };
+
+		Loom::RaycastHit hit;
+		REQUIRE(collider->Raycast({ glm::vec3(-0.5f, 0.5f, 0.0f), FORWARD }, hit));
+		CHECK(hit.distance == doctest::Approx(5.0f));
+		CHECK(collider->TriangleCount() == 2);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh edited and asked directly between steps is refitted in the scene's tree")
+	{
+		Loom::Scene scene("refitted");
+		Pump();
+
+		Loom::MeshCollider* collider = PlaceMesh(scene, glm::vec3(0.0f, 0.0f, -5.0f), SQUARE);
+		Loom::Mesh* mesh = scene.GetRoot().GetChildren()[0]->GetComponent<Loom::Mesh>();
+
+		scene.Physics();
+
+		// Moved well outside the leaf it was synced into.
+		constexpr float AWAY = 10.0f;
+
+		for (size_t x = 0; x < mesh->m_vertices->size(); x += COMPONENTS)
+			(*mesh->m_vertices)[x] += AWAY;
+
+		Loom::RaycastHit hit;
+		REQUIRE(collider->Raycast({ glm::vec3(AWAY, 0.0f, 0.0f), FORWARD }, hit));
+		CHECK(scene.Raycast({ glm::vec3(AWAY, 0.0f, 0.0f), FORWARD }, hit));
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the wireframe is every triangle's edges")
 	{
 		Loom::Scene scene("mesh wireframe");
@@ -246,14 +291,15 @@ TEST_SUITE("MeshCollider")
 		Loom::MeshCollider* collider = PlaceMesh(scene, glm::vec3(0.0f), vertices);
 
 		int agreed = 0;
+		int hits = 0;
 
 		for (int i = 0; i < RAYS; i++)
 		{
 			const glm::vec3 origin(place(random), place(random), place(random));
 			const glm::vec3 direction = glm::normalize(glm::vec3(place(random), place(random), place(random)));
 
-			// Every triangle by itself, through a one-triangle mesh's own test
-			// being the same maths: the plane, then inside all three edges.
+			// Every triangle by brute force, by other maths than the collider's:
+			// the plane, then inside all three edges.
 			float nearest = Loom::INFINITE_DISTANCE;
 
 			for (size_t t = 0; t < corners.size(); t += CORNERS)
@@ -285,6 +331,9 @@ TEST_SUITE("MeshCollider")
 					nearest = distance;
 			};
 
+			if (nearest != Loom::INFINITE_DISTANCE)
+				hits++;
+
 			Loom::RaycastHit hit;
 			const bool found = collider->Raycast({ origin, direction }, hit);
 
@@ -293,6 +342,7 @@ TEST_SUITE("MeshCollider")
 				agreed++;
 		};
 
+		CHECK(hits > 0);
 		CHECK(agreed == RAYS);
 	};
 };
