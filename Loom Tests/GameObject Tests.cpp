@@ -362,6 +362,27 @@ TEST_SUITE("GameObject")
 		CHECK(b->GetParent() == a);
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "SetParent moves an object and its children into another scene")
+	{
+		Loom::Scene from("set parent from");
+		Loom::Scene to("set parent to");
+		Pump();
+
+		Loom::GameObject* moved = from.GetRoot().AddChild("Moved");
+		Loom::GameObject* stays = to.GetRoot().AddChild("Stays");
+		Pump();
+
+		Loom::GameObject* child = moved->AddChild("Child");
+		Pump();
+
+		moved->SetParent(&to.GetRoot(), stays);
+		Pump();
+
+		CHECK(from.GetRoot().GetChildren().empty());
+		CHECK(to.GetRoot().GetChildren() == std::vector<Loom::GameObject*>{ moved, stays });
+		CHECK(moved->GetChildren() == std::vector<Loom::GameObject*>{ child });
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "SetParent refuses a root, a cycle, and placing an object before itself")
 	{
 		Loom::Scene scene("set parent refusals");
