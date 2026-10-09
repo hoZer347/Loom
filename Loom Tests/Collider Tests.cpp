@@ -393,7 +393,7 @@ TEST_SUITE("ColliderTree")
 		constexpr unsigned SEED = 7;
 		constexpr float SPREAD = 20.0f;
 
-		// Moved farther than any padding, so a moved leaf is always reinserted.
+		// Far enough past the padding that most moves reinsert their leaf.
 		constexpr float JUMP = 3.0f;
 
 		// A balanced tree of COUNT leaves is about log2(COUNT) deep; this
