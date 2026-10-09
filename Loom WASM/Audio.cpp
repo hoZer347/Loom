@@ -12,6 +12,8 @@
 #include <algorithm>
 #include <iostream>
 #include <list>
+#include <unordered_set>
+#include <vector>
 
 
 namespace Loom
@@ -29,6 +31,12 @@ namespace Loom
 		// needs no threads of its own.
 		constexpr ma_uint32 LOAD_FLAGS = MA_SOUND_FLAG_DECODE;
 
+		constexpr ma_uint32 LISTENER = 0;
+
+		// Where sounds are heard from with no AudioListener.
+		constexpr glm::vec3 FORWARD(0.0f, 0.0f, -1.0f);
+		constexpr glm::vec3 UP(0.0f, 1.0f, 0.0f);
+
 		struct Output final
 		{
 			ma_resource_manager resources;
@@ -38,6 +46,14 @@ namespace Loom
 			// mixer is reading it while others come and go.
 			std::list<ma_sound> shots;
 
+			// The files PlayAt and Play have registered, which keeps them decoded
+			// between one shot and the next.
+			std::unordered_set<std::string> registered;
+
+			// The files that would not load, so a sound played over and over is
+			// reported once rather than every time.
+			std::unordered_set<std::string> failed;
+
 			bool running = true;
 		};
 
@@ -46,6 +62,13 @@ namespace Loom
 		// still lets go of its sources against it.
 		Output* output = nullptr;
 		bool opening_failed = false;
+
+		// Every AudioSource there is. Never destroyed, for the same reason.
+		std::vector<AudioSource*>& Sources()
+		{
+			static std::vector<AudioSource*>* const sources = new std::vector<AudioSource*>();
+			return *sources;
+		};
 
 		// Removes every sound that has finished, or every sound when all is set.
 		void Reap(bool all)
@@ -68,13 +91,28 @@ namespace Loom
 
 			Reap(false);
 
+			if (!output->registered.contains(path))
+			{
+				const ma_result result = ma_resource_manager_register_file(&output->resources, path.c_str(), MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_DECODE);
+
+				if (result != MA_SUCCESS)
+				{
+					if (output->failed.insert(path).second)
+						std::cerr << "Audio: could not load " << path << ": " << ma_result_description(result) << std::endl;
+
+					return false;
+				};
+
+				output->registered.insert(path);
+			};
+
 			ma_sound& shot = output->shots.emplace_back();
 			const ma_result result = ma_sound_init_from_file(engine, path.c_str(), LOAD_FLAGS, nullptr, nullptr, &shot);
 
 			if (result != MA_SUCCESS)
 			{
 				output->shots.pop_back();
-				std::cerr << "Audio: could not load " << path << ": " << ma_result_description(result) << std::endl;
+				std::cerr << "Audio: could not play " << path << ": " << ma_result_description(result) << std::endl;
 
 				return false;
 			};
@@ -94,6 +132,26 @@ namespace Loom
 		glm::vec3 Direction(const glm::vec3& vector, const glm::vec3& otherwise)
 		{
 			return glm::length(vector) > 0.0f ? glm::normalize(vector) : otherwise;
+		};
+
+		void Listen(ma_engine* engine)
+		{
+			glm::vec3 position(0.0f);
+			glm::vec3 forward = FORWARD;
+			glm::vec3 up = UP;
+
+			if (const AudioListener* listener = AudioListener::Current())
+			{
+				const glm::mat4 world = listener->GetGameObject()->WorldMatrix();
+
+				position = world[3];
+				forward = Direction(-glm::vec3(world[2]), FORWARD);
+				up = Direction(world[1], UP);
+			};
+
+			ma_engine_listener_set_position(engine, LISTENER, position.x, position.y, position.z);
+			ma_engine_listener_set_direction(engine, LISTENER, forward.x, forward.y, forward.z);
+			ma_engine_listener_set_world_up(engine, LISTENER, up.x, up.y, up.z);
 		};
 	};
 
@@ -160,6 +218,20 @@ namespace Loom
 			Reap(true);
 	};
 
+	void Audio::Unload()
+	{
+		if (!output)
+			return;
+
+		Reap(true);
+
+		for (const std::string& path : output->registered)
+			ma_resource_manager_unregister_file(&output->resources, path.c_str());
+
+		output->registered.clear();
+		output->failed.clear();
+	};
+
 	size_t Audio::PlayingCount()
 	{
 		if (!output)
@@ -177,6 +249,12 @@ namespace Loom
 
 		Reap(false);
 
+		if (Engine::updateScenes)
+			for (AudioSource* source : Sources())
+				source->Hold();
+
+		Listen(&output->engine);
+
 		if (output->running == Engine::updateScenes)
 			return;
 
@@ -185,6 +263,16 @@ namespace Loom
 		if (output->running)
 			ma_engine_start(&output->engine);
 		else ma_engine_stop(&output->engine);
+	};
+
+	void Audio::Mix(uint64_t frames)
+	{
+		// A device is already reading the mix on a thread of its own.
+		if (!output || !output->running || ma_engine_get_device(&output->engine))
+			return;
+
+		std::vector<float> mixed(frames * ma_engine_get_channels(&output->engine));
+		ma_engine_read_pcm_frames(&output->engine, mixed.data(), frames, nullptr);
 	};
 
 	AudioListener* AudioListener::Current()
@@ -196,34 +284,27 @@ namespace Loom
 		return nullptr;
 	};
 
-	void AudioListener::OnUpdate()
+	AudioSource::AudioSource()
 	{
-		ma_engine* engine = Current() == this ? Audio::Get() : nullptr;
-
-		if (!engine)
-			return;
-
-		constexpr ma_uint32 LISTENER = 0;
-		constexpr glm::vec3 FORWARD(0.0f, 0.0f, -1.0f);
-		constexpr glm::vec3 UP(0.0f, 1.0f, 0.0f);
-
-		const glm::mat4 world = m_gameObject->WorldMatrix();
-		const glm::vec3 position = world[3];
-		const glm::vec3 forward = Direction(-glm::vec3(world[2]), FORWARD);
-		const glm::vec3 up = Direction(world[1], UP);
-
-		ma_engine_listener_set_position(engine, LISTENER, position.x, position.y, position.z);
-		ma_engine_listener_set_direction(engine, LISTENER, forward.x, forward.y, forward.z);
-		ma_engine_listener_set_world_up(engine, LISTENER, up.x, up.y, up.z);
+		Sources().push_back(this);
 	};
 
 	AudioSource::~AudioSource()
 	{
 		Release();
+		std::erase(Sources(), this);
 	};
 
 	void AudioSource::OnUpdate()
 	{
+		m_updated = true;
+
+		if (m_held)
+		{
+			m_held = false;
+			ma_sound_start(m_sound);
+		};
+
 		if (!m_started && playOnStart)
 			Play();
 
@@ -235,6 +316,7 @@ namespace Loom
 	void AudioSource::Play()
 	{
 		m_started = true;
+		m_held = false;
 
 		ma_sound* sound = Load();
 
@@ -248,6 +330,8 @@ namespace Loom
 
 	void AudioSource::Stop()
 	{
+		m_held = false;
+
 		if (!m_sound)
 			return;
 
@@ -260,10 +344,24 @@ namespace Loom
 		return m_sound && ma_sound_is_playing(m_sound);
 	};
 
+	void AudioSource::Hold()
+	{
+		const bool updated = m_updated;
+		m_updated = false;
+
+		if (updated || !IsPlaying())
+			return;
+
+		ma_sound_stop(m_sound);
+		m_held = true;
+	};
+
 	ma_sound* AudioSource::Load()
 	{
 		if (*clipPath == m_loaded_path)
 			return m_sound;
+
+		const bool playing = IsPlaying();
 
 		Release();
 		m_loaded_path = clipPath;
@@ -285,6 +383,9 @@ namespace Loom
 		};
 
 		m_sound = sound;
+
+		if (playing)
+			ma_sound_start(m_sound);
 
 		return m_sound;
 	};
@@ -309,6 +410,8 @@ namespace Loom
 
 	void AudioSource::Release()
 	{
+		m_held = false;
+
 		if (!m_sound)
 			return;
 

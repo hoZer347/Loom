@@ -65,7 +65,7 @@ needs Chrome or Edge installed.
 | `GameObject` | Deferred `Attach`, `GetComponent` by type, selective update/render/physics registration, children, `Destroy`, `DetachComponent`, thread inheritance, the transform's fields and matrix |
 | `Scene` | Registration in `GetScenes`, root delegation, `Update`/`Render`/`Physics` walking the hierarchy |
 | `Light` | Registration, `FindComponent` reaching it through the hierarchy, the shadow map's light-space transform |
-| `Audio` | One-shots from `PlayAt` and `Play` until `StopAll`, files that will not load, an `AudioSource` starting on its first update or on `Play` and swapping clips, and which `AudioListener` listens |
+| `Audio` | One-shots from `PlayAt` and `Play` until they play through or `StopAll`, holding while the scenes are paused, files read once until `Unload` or not at all, an `AudioSource` starting on its first update or on `Play`, held while its object is disabled and swapping clips, and which `AudioListener` listens |
 | `Camera` | Registration, aiming down the transform or at a target, depth order and aspect, a camera looking straight down, toggling the target without turning the view |
 | `Mesh` | Geometry and draw-type defaults, and that rendering without a material or shader stops before it touches GL |
 | `Material` | Defaults, and being found by a `Mesh` on the same GameObject |

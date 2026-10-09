@@ -3,6 +3,7 @@
 #include "EditorLog.h"
 #include "EditorTheme.h"
 
+#include "Audio.h"
 #include "Component.h"
 #include "ComponentRegistry.h"
 #include "EditorGui.h"
@@ -740,6 +741,8 @@ namespace Loom
 		m_playAfterCompile = false;
 		m_playSnapshots.clear();
 		m_snapshots.clear();
+
+		Audio::Unload();
 
 		CloseAllScenes();
 

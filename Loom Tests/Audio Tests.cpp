@@ -3,6 +3,7 @@
 #include "Test Support.h"
 
 #include "Audio.h"
+#include "Engine.h"
 #include "GameObject.h"
 #include "Scene.h"
 
@@ -18,6 +19,8 @@ using LoomTests::Pump;
 
 namespace
 {
+	constexpr uint32_t SAMPLE_RATE = 48000;
+
 	// Mixes without a device, so the suite plays nothing out loud and runs
 	// where there is no output at all.
 	struct AudioFixture : LoomTests::EngineFixture
@@ -27,16 +30,22 @@ namespace
 			Loom::Audio::useDevice = false;
 		};
 
+		// The scenes left running and nothing left playing, as the next case
+		// expects. Pumped first, which unregisters the case's scenes, so Tick
+		// does not look for a listener in them.
 		~AudioFixture()
 		{
-			Loom::Audio::StopAll();
+			Pump();
+
+			Loom::Engine::updateScenes = true;
+			Loom::Audio::Tick();
+			Loom::Audio::Unload();
 		};
 	};
 
 	// A tenth of a second of 16 bit mono silence, as a wav in the temp folder.
 	std::string WriteWav(const std::string& name)
 	{
-		constexpr uint32_t SAMPLE_RATE = 48000;
 		constexpr uint32_t FRAMES = SAMPLE_RATE / 10;
 		constexpr uint16_t CHANNELS = 1;
 		constexpr uint16_t BITS = 16;
@@ -92,6 +101,44 @@ TEST_SUITE("Audio")
 		CHECK(Loom::Audio::PlayingCount() == 0);
 	};
 
+	TEST_CASE_FIXTURE(AudioFixture, "a one-shot is let go once it has played through")
+	{
+		CHECK(Loom::Audio::Play(WriteWav("loom-audio-through.wav")));
+		CHECK(Loom::Audio::PlayingCount() == 1);
+
+		Loom::Audio::Mix(SAMPLE_RATE);
+		CHECK(Loom::Audio::PlayingCount() == 0);
+	};
+
+	TEST_CASE_FIXTURE(AudioFixture, "sounds hold where they are while the scenes are paused")
+	{
+		const std::string clip = WriteWav("loom-audio-paused.wav");
+		CHECK(Loom::Audio::Play(clip));
+
+		Loom::Engine::updateScenes = false;
+		Loom::Audio::Tick();
+		Loom::Audio::Mix(SAMPLE_RATE);
+		CHECK(Loom::Audio::PlayingCount() == 1);
+
+		Loom::Engine::updateScenes = true;
+		Loom::Audio::Tick();
+		Loom::Audio::Mix(SAMPLE_RATE);
+		CHECK(Loom::Audio::PlayingCount() == 0);
+	};
+
+	TEST_CASE_FIXTURE(AudioFixture, "a file is read once until Unload")
+	{
+		const std::string clip = WriteWav("loom-audio-unload.wav");
+		CHECK(Loom::Audio::Play(clip));
+
+		std::filesystem::remove(clip);
+		CHECK(Loom::Audio::Play(clip));
+
+		Loom::Audio::Unload();
+		CHECK(Loom::Audio::PlayingCount() == 0);
+		CHECK_FALSE(Loom::Audio::Play(clip));
+	};
+
 	TEST_CASE_FIXTURE(AudioFixture, "a file that will not load plays nothing")
 	{
 		CHECK_FALSE(Loom::Audio::PlayAt("no such sound.wav", glm::vec3(0.0f)));
@@ -137,7 +184,31 @@ TEST_SUITE("Audio")
 		CHECK(source->IsPlaying());
 	};
 
-	TEST_CASE_FIXTURE(AudioFixture, "a new clipPath replaces the sound on the next update")
+	TEST_CASE_FIXTURE(AudioFixture, "an AudioSource is held while its object is disabled, and carries on when enabled")
+	{
+		Loom::Scene scene("audio");
+		Loom::GameObject* holder = scene.AddChild("Speaker");
+		Pump();
+
+		Loom::AudioSource* source = holder->Attach<Loom::AudioSource>();
+		source->clipPath = WriteWav("loom-audio-held.wav");
+		Pump();
+
+		scene.Update();
+		Loom::Audio::Tick();
+		CHECK(source->IsPlaying());
+
+		holder->SetDisabled(true);
+		scene.Update();
+		Loom::Audio::Tick();
+		CHECK_FALSE(source->IsPlaying());
+
+		holder->SetDisabled(false);
+		scene.Update();
+		CHECK(source->IsPlaying());
+	};
+
+	TEST_CASE_FIXTURE(AudioFixture, "a new clipPath replaces the sound on the next update, playing if the old one was")
 	{
 		Loom::Scene scene("audio");
 		Pump();
@@ -146,6 +217,10 @@ TEST_SUITE("Audio")
 		source->clipPath = WriteWav("loom-audio-first.wav");
 		Pump();
 
+		scene.Update();
+		CHECK(source->IsPlaying());
+
+		source->clipPath = WriteWav("loom-audio-second.wav");
 		scene.Update();
 		CHECK(source->IsPlaying());
 

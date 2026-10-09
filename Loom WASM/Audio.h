@@ -6,6 +6,7 @@
 
 #include "glm/glm.hpp"
 
+#include <cstdint>
 #include <string>
 
 struct ma_engine;
@@ -23,13 +24,14 @@ namespace Loom
 	*   scenes, or from the world origin, facing -Z, while there is none
 	* - The output pauses while Engine::updateScenes is off, which is how the
 	*   editor's Pause holds every sound where it is
-	* - A file is decoded once, the first time it is played, and shared by
-	*   everything that plays it after
+	* - A file PlayAt or Play is given is decoded the first time, and kept
+	*   until Unload, so a sound played over and over is read once
 	*/
 	struct LOOM_API Audio final
 	{
 		// Plays path through once from position and lets it go. False when the
-		// file will not load or there is no output, having said which.
+		// file will not load or there is no output, having said which the first
+		// time.
 		static bool PlayAt(const std::string& path, const glm::vec3& position, float volume = 1.0f);
 
 		// The same, unpositioned: as loud wherever the listener is.
@@ -38,12 +40,24 @@ namespace Loom
 		// Stops whatever PlayAt and Play started. An AudioSource keeps its own.
 		static void StopAll();
 
+		// Stops them, and forgets every file they decoded or failed to, so the
+		// next play reads it again: for leaving a project, whose paths another
+		// project's files would otherwise be mistaken for, or after a file has
+		// changed.
+		static void Unload();
+
 		// How many of the sounds PlayAt and Play started are still going.
 		static size_t PlayingCount();
 
-		// Lets go of finished sounds, and follows Engine::updateScenes. The
-		// engine calls it once a frame.
+		// Lets go of finished sounds, holds every AudioSource whose object was
+		// not updated this frame, moves the listener to the AudioListener's
+		// pose, and follows Engine::updateScenes. The engine calls it once a
+		// frame, after updating the scenes.
 		static void Tick();
+
+		// With useDevice off, mixes frames as a device would have asked for
+		// them, so sounds move on. Nothing moves while the output is paused.
+		static void Mix(uint64_t frames);
 
 		// Whether sounds go to a device. Set before the first sound: off still
 		// loads and plays them, only nothing is heard, for a test or a tool that
@@ -51,7 +65,6 @@ namespace Loom
 		static inline bool useDevice = true;
 
 	private:
-		friend struct AudioListener;
 		friend struct AudioSource;
 
 		// Opened the first time it is asked for. Null when it would not open.
@@ -66,8 +79,6 @@ namespace Loom
 	*/
 	struct LOOM_API AudioListener : Component<AudioListener, "Audio">
 	{
-		void OnUpdate() override;
-
 		// The one that listens, or null.
 		static AudioListener* Current();
 	};
@@ -76,10 +87,14 @@ namespace Loom
 	* Loom::AudioSource
 	* - A sound file played from its GameObject's position, which it follows
 	*   as the object moves
-	* - Its fields take effect on the next update, a new clipPath included
+	* - Its fields take effect on the next update. A new clipPath carries on
+	*   playing if the old one was
+	* - Held where it is while its GameObject is disabled, and carries on when
+	*   it is enabled again
 	*/
 	struct LOOM_API AudioSource : Component<AudioSource, "Audio">
 	{
+		AudioSource();
 		~AudioSource();
 
 		void OnUpdate() override;
@@ -118,6 +133,12 @@ namespace Loom
 
 		void Release();
 
+		friend struct Audio;
+
+		// Holds the sound while the object was not updated this frame, and lets
+		// it carry on once it is again.
+		void Hold();
+
 		ma_sound* m_sound = nullptr;
 
 		// What was last asked for, loaded or not, so a file that will not load
@@ -125,5 +146,7 @@ namespace Loom
 		std::string m_loaded_path;
 
 		bool m_started = false;
+		bool m_updated = false;
+		bool m_held = false;
 	};
 };

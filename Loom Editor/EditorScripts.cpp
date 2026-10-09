@@ -330,7 +330,7 @@ namespace Loom
 
 		m_playing = false;
 
-		Audio::StopAll();
+		Audio::Unload();
 
 		std::vector<SceneSnapshot> snapshots;
 
