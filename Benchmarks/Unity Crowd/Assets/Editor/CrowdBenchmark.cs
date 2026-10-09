@@ -10,6 +10,8 @@ using UnityEngine;
 // The Raycasts demo's Crowd scene, built in Unity to time against: a walled
 // pit, three ring MeshColliders, fifteen hundred boxes and balls dropped from
 // a jittered grid, and a row of 160 rays cast through the camera every step.
+// Every number matches Loom's Benchmark suite, and so does every body, drawn
+// from the same generator in the same order.
 // Run headless:
 //   Unity -batchmode -nographics -projectPath <this> -executeMethod CrowdBenchmark.Run -quit -benchmarkOutput <file>
 // Loom's own run of the same scene is the Benchmark suite in Loom Tests;
@@ -19,18 +21,36 @@ public static class CrowdBenchmark
 	const int Count = 1500;
 	const int Steps = 1200;
 	const float Step = 1.0f / 60.0f;
-	const int Seed = 1;
+	const uint Seed = 1;
+
+	const float Half = 0.5f;
+	const float FullTurn = 360.0f;
+	const double MicrosecondsPerMillisecond = 1000.0;
 
 	// The drop: a layer at a time, each body in its own cell of a grid.
 	const float LeastSize = 0.4f;
 	const float MostSize = 1.4f;
-	const float Spacing = MostSize * 1.8f;
+	// Room for the largest body, turned any way, in each cell of the drop.
+	const float Room = 1.8f;
+	const float Spacing = MostSize * Room;
 	const float Spread = 10.0f;
 	const float Above = 12.0f;
 	const float Drag = 0.5f;
+	const int Kinds = 2;
 
-	// The pit's inside, for counting what got out.
+	// The pit: a floor and four walls around a square Inside either side of
+	// the middle, its floor's top at y = 0.
 	const float Inside = 12.0f;
+	const float Wall = 4.0f;
+	const float WallHeight = 14.0f;
+
+	// The demo scene's three rings.
+	static readonly (Vector3 position, Vector3 rotation)[] Rings =
+	{
+		(new Vector3(-4.0f, 5.0f, -3.0f), new Vector3(70.0f, 20.0f, 0.0f)),
+		(new Vector3(4.0f, 4.0f, 3.0f), new Vector3(75.0f, -30.0f, 0.0f)),
+		(new Vector3(0.0f, 8.0f, 1.0f), new Vector3(60.0f, 90.0f, 0.0f)),
+	};
 
 	// The torus every ring is: around Z, half a unit across before scaling.
 	const int RingSegments = 48;
@@ -58,16 +78,20 @@ public static class CrowdBenchmark
 		Physics.simulationMode = SimulationMode.Script;
 		Physics.gravity = new Vector3(0.0f, -9.81f, 0.0f);
 
-		Box("Floor", new Vector3(0.0f, -2.0f, 0.0f), new Vector3(32.0f, 4.0f, 32.0f));
-		Box("Wall North", new Vector3(0.0f, 7.0f, -14.0f), new Vector3(32.0f, 14.0f, 4.0f));
-		Box("Wall South", new Vector3(0.0f, 7.0f, 14.0f), new Vector3(32.0f, 14.0f, 4.0f));
-		Box("Wall East", new Vector3(14.0f, 7.0f, 0.0f), new Vector3(4.0f, 14.0f, 24.0f));
-		Box("Wall West", new Vector3(-14.0f, 7.0f, 0.0f), new Vector3(4.0f, 14.0f, 24.0f));
+		float across = (Inside + Wall) / Half;
+		float wallMiddle = Inside + Wall * Half;
+		float wallUp = WallHeight * Half;
+
+		Box("Floor", new Vector3(0.0f, -Wall * Half, 0.0f), new Vector3(across, Wall, across));
+		Box("Wall North", new Vector3(0.0f, wallUp, -wallMiddle), new Vector3(across, WallHeight, Wall));
+		Box("Wall South", new Vector3(0.0f, wallUp, wallMiddle), new Vector3(across, WallHeight, Wall));
+		Box("Wall East", new Vector3(wallMiddle, wallUp, 0.0f), new Vector3(Wall, WallHeight, Inside / Half));
+		Box("Wall West", new Vector3(-wallMiddle, wallUp, 0.0f), new Vector3(Wall, WallHeight, Inside / Half));
 
 		Mesh torus = Torus();
-		Ring(torus, new Vector3(-4.0f, 5.0f, -3.0f), new Vector3(70.0f, 20.0f, 0.0f));
-		Ring(torus, new Vector3(4.0f, 4.0f, 3.0f), new Vector3(75.0f, -30.0f, 0.0f));
-		Ring(torus, new Vector3(0.0f, 8.0f, 1.0f), new Vector3(60.0f, 90.0f, 0.0f));
+
+		foreach ((Vector3 position, Vector3 rotation) in Rings)
+			Ring(torus, position, rotation);
 
 		List<Rigidbody> bodies = Drop();
 		Physics.SyncTransforms();
@@ -125,7 +149,7 @@ public static class CrowdBenchmark
 			"mean_step_ms " + Format(total / Steps),
 			"landing_step_ms " + Format(landing / Landing),
 			"settled_step_ms " + Format(settled / Settled),
-			"ray_us " + Format(rayTime * 1000.0 / rayCount),
+			"ray_us " + Format(rayTime * MicrosecondsPerMillisecond / rayCount),
 			"awake " + awake,
 			"escaped " + escaped,
 		};
@@ -178,8 +202,8 @@ public static class CrowdBenchmark
 
 		Vector3 At(int ring, int tube)
 		{
-			float around = 2.0f * Mathf.PI * ring / RingSegments;
-			float turn = 2.0f * Mathf.PI * tube / TubeSegments;
+			float around = Mathf.PI / Half * ring / RingSegments;
+			float turn = Mathf.PI / Half * tube / TubeSegments;
 			Vector3 outward = new Vector3(Mathf.Cos(around), Mathf.Sin(around), 0.0f);
 
 			return outward * RingRadius + (outward * Mathf.Cos(turn) + new Vector3(0.0f, 0.0f, Mathf.Sin(turn))) * TubeRadius;
@@ -205,18 +229,39 @@ public static class CrowdBenchmark
 		return mesh;
 	}
 
+	// Xorshift32, which Loom's Benchmark suite writes out the same way, so
+	// both engines drop the same bodies.
+	struct Xorshift
+	{
+		// A float takes the top 24 bits, all its mantissa holds.
+		const int DroppedBits = 8;
+		const float PerStep = 1.0f / (1 << 24);
+
+		const int ShiftA = 13;
+		const int ShiftB = 17;
+		const int ShiftC = 5;
+
+		uint state;
+
+		public Xorshift(uint seed) { state = seed; }
+
+		public float Between(float least, float most)
+		{
+			state ^= state << ShiftA;
+			state ^= state >> ShiftB;
+			state ^= state << ShiftC;
+
+			return least + (state >> DroppedBits) * PerStep * (most - least);
+		}
+	}
+
 	static List<Rigidbody> Drop()
 	{
-		System.Random random = new System.Random(Seed);
+		Xorshift random = new Xorshift(Seed);
 
-		float Between(float least, float most)
-		{
-			return least + (float)random.NextDouble() * (most - least);
-		}
-
-		int perRow = Math.Max(1, (int)(2.0f * Spread / Spacing));
+		int perRow = Math.Max(1, (int)(Spread / Half / Spacing));
 		int perLayer = perRow * perRow;
-		float jitter = (Spacing - MostSize) * 0.5f;
+		float jitter = (Spacing - MostSize) * Half;
 
 		List<Rigidbody> bodies = new List<Rigidbody>();
 
@@ -224,16 +269,25 @@ public static class CrowdBenchmark
 		{
 			int cell = i % perLayer;
 			Vector3 slot = new Vector3(
-				(cell % perRow - (perRow - 1) * 0.5f) * Spacing,
+				(cell % perRow - (perRow - 1) * Half) * Spacing,
 				Above + (i / perLayer) * Spacing,
-				(cell / perRow - (perRow - 1) * 0.5f) * Spacing);
+				(cell / perRow - (perRow - 1) * Half) * Spacing);
+
+			// One at a time, in the order Loom's side draws them.
+			float offX = random.Between(-jitter, jitter);
+			float offY = random.Between(-jitter, jitter);
+			float offZ = random.Between(-jitter, jitter);
+			float turnX = random.Between(0.0f, FullTurn);
+			float turnY = random.Between(0.0f, FullTurn);
+			float turnZ = random.Between(0.0f, FullTurn);
+			float size = random.Between(LeastSize, MostSize);
 
 			GameObject body = new GameObject("Body " + i);
-			body.transform.position = slot + new Vector3(Between(-jitter, jitter), Between(-jitter, jitter), Between(-jitter, jitter));
-			body.transform.rotation = Quaternion.Euler(Between(0.0f, 360.0f), Between(0.0f, 360.0f), Between(0.0f, 360.0f));
-			body.transform.localScale = Vector3.one * Between(LeastSize, MostSize);
+			body.transform.position = slot + new Vector3(offX, offY, offZ);
+			body.transform.rotation = Quaternion.Euler(turnX, turnY, turnZ);
+			body.transform.localScale = Vector3.one * size;
 
-			if (i % 2 == 0)
+			if (i % Kinds == 0)
 				body.AddComponent<BoxCollider>();
 			else
 				body.AddComponent<SphereCollider>();
@@ -252,7 +306,7 @@ public static class CrowdBenchmark
 		Vector3 right = Vector3.Cross(forward, Vector3.up).normalized;
 		Vector3 up = Vector3.Cross(right, forward);
 
-		float tall = Mathf.Tan(FieldOfView * 0.5f * Mathf.Deg2Rad);
+		float tall = Mathf.Tan(FieldOfView * Half * Mathf.Deg2Rad);
 		float wide = tall * Aspect;
 
 		List<Ray> rays = new List<Ray>();
@@ -260,8 +314,8 @@ public static class CrowdBenchmark
 		for (int row = 0; row < Rows; row++)
 			for (int column = 0; column < Columns; column++)
 			{
-				float x = 2.0f * (column + 0.5f) / Columns - 1.0f;
-				float y = 1.0f - 2.0f * (row + 0.5f) / Rows;
+				float x = (column + Half) / (Columns * Half) - 1.0f;
+				float y = 1.0f - (row + Half) / (Rows * Half);
 
 				rays.Add(new Ray(Eye, (forward + right * (x * wide) + up * (y * tall)).normalized));
 			}

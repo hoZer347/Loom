@@ -217,8 +217,8 @@ namespace Loom
 
 		std::unordered_map<Key, Touching, KeyHash> m_touching{ };
 
-		// Pairs whose leaves overlap, kept from step to step, in the order
-		// they were found so the solver's order is the same every run.
+		// Pairs whose leaves overlap, kept from step to step in a vector, so
+		// the solver meets them in the same order every run.
 		std::vector<Key> m_candidates{ };
 		std::unordered_set<Key, KeyHash> m_candidateSet{ };
 		unsigned m_step = 0;

@@ -42,8 +42,13 @@ namespace Loom
 
 		void BeginSync();
 		// travel, for a moving body, is how far it went this step: its leaf is
-		// stretched that much further ahead, as Box2D's are.
+		// stretched a few times that far ahead, as Box2D's are.
 		void Sync(Collider& collider, const glm::vec3& travel = glm::vec3(0.0f));
+
+		// Refits collider's leaf, where it was last synced, if it no longer
+		// covers the travel it is about to make, so a body that has just sped
+		// up is paired with what lies along its new path.
+		void Reach(const Collider& collider, const glm::vec3& travel);
 		void EndSync();
 
 		void Remove(Collider& collider);
@@ -102,7 +107,8 @@ namespace Loom
 		int Allocate();
 		void Free(int node);
 
-		// Puts leaf where bounds needs it, unless its padding still covers them.
+		// Puts leaf where bounds and the travel from them need it, unless its
+		// padding still covers them and the next step's travel.
 		void Fit(int leaf, const Bounds& bounds, const glm::vec3& travel);
 
 		void InsertLeaf(int leaf);

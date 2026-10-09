@@ -160,6 +160,12 @@ namespace Loom
 		Fit(collider.m_node, collider.m_bounds, glm::vec3(0.0f));
 	};
 
+	void ColliderTree::Reach(const Collider& collider, const glm::vec3& travel)
+	{
+		if (collider.m_tree == this)
+			Fit(collider.m_node, collider.m_bounds, travel);
+	};
+
 	void ColliderTree::Fit(int leaf, const Bounds& bounds, const glm::vec3& travel)
 	{
 		const Bounds& padded = m_nodes[leaf].bounds;

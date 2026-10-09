@@ -325,6 +325,50 @@ TEST_SUITE("Rigidbody")
 			CHECK(Position(*ball).y == doctest::Approx(SMALL).epsilon(REST));
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a ball sent suddenly fast at a thin slab stops on it however it got its speed")
+	{
+		// Over a metre a step, ten times the slab and twenty the ball.
+		constexpr float SUDDEN = 120.0f;
+		constexpr float THIN = 0.1f;
+		constexpr float SMALL = 0.1f;
+		constexpr float ABOVE = 1.0f;
+
+		enum Start { SET_WHILE_STILL, SET_BEFORE_FIRST_STEP, ADDED_WHILE_STILL, STARTS };
+
+		for (int start = 0; start < STARTS; start++)
+		{
+			Loom::Scene scene("sudden");
+			Pump();
+
+			Loom::GameObject* slab = Spawn(scene, "Slab", glm::vec3(0.0f, -THIN * HALF, 0.0f));
+			slab->Attach<Loom::BoxCollider>()->size = glm::vec3(FLOOR_SIZE, THIN, FLOOR_SIZE);
+
+			Loom::SphereCollider* sphere = nullptr;
+			Loom::Rigidbody* ball = Body<Loom::SphereCollider>(scene, glm::vec3(0.0f, ABOVE, 0.0f), &sphere);
+			sphere->radius = SMALL;
+			ball->useGravity = false;
+
+			const glm::vec3 down(0.0f, -SUDDEN, 0.0f);
+
+			if (start == SET_BEFORE_FIRST_STEP)
+				ball->velocity = down;
+			else
+			{
+				Run(scene, 0.5f);
+
+				if (start == SET_WHILE_STILL)
+					ball->velocity = down;
+				else
+					ball->AddForce(down, Loom::ForceMode::VelocityChange);
+			};
+
+			Run(scene, 1.0f);
+
+			CAPTURE(start);
+			CHECK(Position(*ball).y == doctest::Approx(SMALL).epsilon(REST));
+		};
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a kinematic body pushes others aside and is not pushed back")
 	{
 		Loom::Scene scene("pushing");

@@ -16,7 +16,10 @@
     lands, and over the last second once it has settled; the cost of one
     raycast; how many bodies are still awake; and how many got out of the
     pit. Unity sleeps whole islands of touching bodies together, so one that
-    still twitches keeps its pile awake: compare the timings, not the counts.
+    still twitches keeps its pile awake, while Loom sleeps each body on its
+    own. Once settled, Loom has most of its bodies asleep and Unity most of
+    its awake, so the settled row compares that difference as much as speed;
+    the landing row, with every body awake in both, compares speed alone.
 
 .EXAMPLE
     .\run-physics-benchmark.ps1
@@ -120,7 +123,7 @@ $rows = [ordered]@{
     'peak_step_ms'    = 'Slowest step (ms)'
     'mean_step_ms'    = 'Average step (ms)'
     'landing_step_ms' = 'Landing, first 6 s (ms)'
-    'settled_step_ms' = 'Settled, last 1 s (ms)'
+    'settled_step_ms' = 'Settled, last 1 s (ms; see Still awake)'
     'ray_us'          = 'One raycast (us)'
     'awake'           = 'Still awake'
     'escaped'         = 'Out of the pit'

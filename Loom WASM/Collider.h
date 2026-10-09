@@ -76,12 +76,11 @@ namespace Loom
 		int m_node = ColliderTree::NONE;
 
 		// Where the last sync found it, which the tree's raycasts test against,
-		// and the box it covered there, which a shape refreshed between syncs
-		// updates however it is asked.
+		// with the box it covered there and its shape posed there. The tree's
+		// Sync and Resize keep all three current.
 		glm::mat4 m_synced{ 1.0f };
 		mutable Bounds m_bounds{ };
 
-		// Its shape there, for the contacts between steps' syncs to use.
 		mutable Contacts::Shape m_shape{ };
 
 		// The body it moves with during a physics step, as the simulation

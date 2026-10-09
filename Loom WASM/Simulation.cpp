@@ -327,12 +327,20 @@ namespace Loom
 		m_pairs.clear();
 		m_contacts.clear();
 
+		// Each moving body's leaf reaches along the travel it is about to
+		// make, which a velocity set or changed since the last step may not.
 		for (Body& body : m_bodies)
+		{
 			body.travel = glm::length(body.velocity) * seconds;
 
+			if (body.awake)
+				for (const Collider* collider : body.colliders)
+					m_tree.Reach(*collider, body.velocity * seconds);
+		};
+
 		// New candidates: each leaf put in or refitted since the last step,
-		// against whatever it now overlaps. Leaves stretch along their
-		// bodies' travel, so two that can meet this step overlap.
+		// against whatever it now overlaps. Leaves cover their bodies'
+		// travel, so two that can meet this step overlap.
 		for (Collider* moved : m_tree.TakeMoved())
 		{
 			const Bounds* padded = m_tree.PaddedBounds(*moved);
@@ -390,9 +398,6 @@ namespace Loom
 	{
 		const auto dynamic =
 			[&](int body) { return body != NONE && m_bodies[body].dynamic; };
-
-		const auto awake =
-			[&](int body) { return Awake(body); };
 
 		const auto travel =
 			[&](int body) { return body == NONE ? 0.0f : m_bodies[body].travel; };
@@ -466,7 +471,7 @@ namespace Loom
 		// that will not stop for it.
 		if (!pair.trigger)
 			for (const auto& [striker, sleeper] : { std::pair{ pair.bodyA, pair.bodyB }, std::pair{ pair.bodyB, pair.bodyA } })
-				if (awake(striker) && sleeper != NONE && !m_bodies[sleeper].awake
+				if (Awake(striker) && sleeper != NONE && !m_bodies[sleeper].awake
 					&& (glm::length(m_bodies[striker].velocity) > WAKE_SPEED || (pair.touching && !dynamic(striker))))
 					Wake(sleeper);
 
@@ -644,10 +649,9 @@ namespace Loom
 				body.object->transform.rotation = glm::degrees(radians);
 			};
 
-			// Leaves stretched ahead along the travel, so the next steps'
-			// motion stays inside them.
-			// Synced from the transform just written, exactly as the next
-			// walk will find it, so that walk leaves the leaf alone.
+			// From the transform just written, exactly as the next walk will
+			// find it, so that walk leaves the leaf alone; stretched along the
+			// travel, so the next steps' motion stays inside it.
 			for (Collider* collider : body.colliders)
 				m_tree.Sync(*collider, body.velocity * seconds);
 
