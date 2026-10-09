@@ -475,4 +475,35 @@ TEST_SUITE("SceneHistory")
 		CHECK_FALSE(Redo());
 		CHECK(open.front() == scene);
 	};
+
+	TEST_CASE_FIXTURE(Editing, "an object moved to another scene goes back in one undo, and over again in one redo")
+	{
+		Open("From");
+		Open("To");
+		Loom::GameObject* moved = Root(0).AddChild("Moved");
+		Root(1).AddChild("Stays");
+		Record();
+
+		const std::string from = Text(0);
+		const std::string to = Text(1);
+		const Loom::Guid guid = moved->GetGuid();
+
+		moved->SetParent(&Root(1));
+		Record();
+
+		const std::string from_after = Text(0);
+		const std::string to_after = Text(1);
+
+		REQUIRE(Undo());
+		CHECK(Text(0) == from);
+		CHECK(Text(1) == to);
+		CHECK(Loom::LoomObject::GetByGuid<Loom::GameObject>(guid)->GetParent() == &Root(0));
+		CHECK_FALSE(history.CanUndo());
+
+		REQUIRE(Redo());
+		CHECK(Text(0) == from_after);
+		CHECK(Text(1) == to_after);
+		CHECK(Loom::LoomObject::GetByGuid<Loom::GameObject>(guid)->GetParent() == &Root(1));
+		CHECK_FALSE(history.CanRedo());
+	};
 };

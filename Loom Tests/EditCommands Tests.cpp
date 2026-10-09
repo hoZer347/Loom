@@ -339,4 +339,41 @@ TEST_SUITE("EditCommands")
 		CHECK(pasted->GetGuid() != original);
 		CHECK(Loom::LoomObject::GetByGuid<Loom::GameObject>(original) == restored);
 	};
+
+	TEST_CASE_FIXTURE(Selection, "a drag moves within a scene, never under itself")
+	{
+		const std::vector<Loom::Scene*> owned{ scene };
+
+		CHECK(Loom::EditCommands::CanMove(*grandchild, scene->GetRoot(), owned));
+		CHECK_FALSE(Loom::EditCommands::CanMove(*child, *child, owned));
+		CHECK_FALSE(Loom::EditCommands::CanMove(*child, *grandchild, owned));
+	};
+
+	TEST_CASE_FIXTURE(Selection, "a drag moves between owned scenes, but not into or out of one the editor does not own")
+	{
+		Loom::Scene other("Other");
+		Loom::GameObject* there = other.AddChild("There");
+		Pump();
+
+		CHECK(Loom::EditCommands::CanMove(*child, *there, { scene, &other }));
+		CHECK(Loom::EditCommands::CanMove(*there, scene->GetRoot(), { scene, &other }));
+
+		CHECK_FALSE(Loom::EditCommands::CanMove(*child, *there, { scene }));
+		CHECK_FALSE(Loom::EditCommands::CanMove(*there, *child, { scene }));
+		CHECK(Loom::EditCommands::CanMove(*there, other.GetRoot(), { scene }));
+	};
+
+	TEST_CASE_FIXTURE(Selection, "a drag between two copies of one scene is refused")
+	{
+		Loom::Scene* copy = Loom::SceneSerializer::Deserialize(Loom::SceneSerializer::Serialize(*scene));
+		Pump();
+
+		REQUIRE(copy != nullptr);
+		REQUIRE(copy->GetGuid() == scene->GetGuid());
+
+		CHECK_FALSE(Loom::EditCommands::CanMove(*child, copy->GetRoot(), { scene, copy }));
+
+		delete copy;
+		Pump();
+	};
 };

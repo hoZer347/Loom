@@ -5,9 +5,26 @@
 
 #include "imgui.h"
 
+#include <algorithm>
+
 
 namespace Loom
 {
+	namespace
+	{
+		Scene* SceneOf(const GameObject* gameObject)
+		{
+			while (gameObject->GetParent() != nullptr)
+				gameObject = gameObject->GetParent();
+
+			for (Scene* scene : Scene::GetScenes())
+				if (&scene->GetRoot() == gameObject)
+					return scene;
+
+			return nullptr;
+		};
+	};
+
 	EditCommand EditCommands::FromShortcut(bool hierarchy_focused)
 	{
 		if (ImGui::GetIO().WantTextInput)
@@ -51,5 +68,25 @@ namespace Loom
 		return active
 			? &active->GetRoot()
 			: nullptr;
+	};
+
+	bool EditCommands::CanMove(const GameObject& dragged, const GameObject& target, const std::vector<Scene*>& owned)
+	{
+		for (const GameObject* above = &target; above != nullptr; above = above->GetParent())
+			if (above == &dragged)
+				return false;
+
+		Scene* from = SceneOf(&dragged);
+		Scene* to = SceneOf(&target);
+
+		if (from == nullptr || to == nullptr)
+			return false;
+
+		if (from == to)
+			return true;
+
+		const auto is_owned = [&](Scene* scene) { return std::find(owned.begin(), owned.end(), scene) != owned.end(); };
+
+		return is_owned(from) && is_owned(to) && from->GetGuid() != to->GetGuid();
 	};
 };

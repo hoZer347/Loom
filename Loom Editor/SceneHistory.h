@@ -29,15 +29,15 @@ namespace Loom
 		// Each step keeps a whole scene either side of it, so the oldest go.
 		static constexpr size_t max_steps = 100;
 
-		// Compares each scene with the text it last serialized to, and makes a
-		// step of any difference. A scene seen for the first time is only
-		// remembered.
+		// Compares each scene with the text it last serialized to, and makes one
+		// step of every difference, so an edit that spans scenes, such as moving
+		// an object from one to another, goes back as one. A scene seen for the
+		// first time is only remembered.
 		void Record(const std::vector<Scene*>& scenes);
 
 		// Record first, so an edit not compared yet is the one taken back, then
-		// step the newest scene that is still among scenes. Steps naming a scene
-		// that is not are thrown away on the way. Returns whether a scene was
-		// rebuilt.
+		// step the newest step with a scene still among scenes. Steps with none
+		// are thrown away on the way. Returns whether a scene was rebuilt.
 		bool Undo(const std::vector<Scene*>& scenes, const Rebuild& rebuild);
 		bool Redo(const std::vector<Scene*>& scenes, const Rebuild& rebuild);
 
@@ -55,17 +55,19 @@ namespace Loom
 		static Scene* Replace(Scene* scene, const std::string& text, std::string* error = nullptr);
 
 	private:
-		struct Step
+		struct Change
 		{
 			Guid scene;
 			std::string before;
 			std::string after;
 		};
 
+		using Step = std::vector<Change>;
+
 		bool Move(
 			std::vector<Step>& from,
 			std::vector<Step>& to,
-			std::string Step::* side,
+			std::string Change::* side,
 			const std::vector<Scene*>& scenes,
 			const Rebuild& rebuild);
 

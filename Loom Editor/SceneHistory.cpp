@@ -14,6 +14,8 @@ namespace Loom
 		// AddChild and Destroy defer; the text has to show where they land.
 		Engine::DoTasks();
 
+		Step step{ };
+
 		for (Scene* scene : scenes)
 		{
 			std::string text = SceneSerializer::Serialize(*scene);
@@ -23,30 +25,34 @@ namespace Loom
 			if (added || last->second == text)
 				continue;
 
-			m_undo.push_back(Step{ scene->GetGuid(), std::move(last->second), text });
+			step.push_back(Change{ scene->GetGuid(), std::move(last->second), text });
 			last->second = std::move(text);
-
-			m_redo.clear();
-
-			if (m_undo.size() > max_steps)
-				m_undo.erase(m_undo.begin());
 		};
+
+		if (step.empty())
+			return;
+
+		m_undo.push_back(std::move(step));
+		m_redo.clear();
+
+		if (m_undo.size() > max_steps)
+			m_undo.erase(m_undo.begin());
 	};
 
 	bool SceneHistory::Undo(const std::vector<Scene*>& scenes, const Rebuild& rebuild)
 	{
-		return Move(m_undo, m_redo, &Step::before, scenes, rebuild);
+		return Move(m_undo, m_redo, &Change::before, scenes, rebuild);
 	};
 
 	bool SceneHistory::Redo(const std::vector<Scene*>& scenes, const Rebuild& rebuild)
 	{
-		return Move(m_redo, m_undo, &Step::after, scenes, rebuild);
+		return Move(m_redo, m_undo, &Change::after, scenes, rebuild);
 	};
 
 	bool SceneHistory::Move(
 		std::vector<Step>& from,
 		std::vector<Step>& to,
-		std::string Step::* side,
+		std::string Change::* side,
 		const std::vector<Scene*>& scenes,
 		const Rebuild& rebuild)
 	{
@@ -57,25 +63,36 @@ namespace Loom
 			Step step = std::move(from.back());
 			from.pop_back();
 
-			const auto scene = std::find_if(
-				scenes.begin(),
-				scenes.end(),
-				[&](Scene* open) { return open->GetGuid() == step.scene; });
+			bool rebuilt = false;
 
-			if (scene == scenes.end())
-				continue;
-
-			Scene* replacement = rebuild(*scene, step.*side);
-
-			if (replacement == nullptr)
+			for (const Change& change : step)
 			{
-				Forget(step.scene);
-				return false;
+				// Looked for per change: each rebuild swaps its scene in the list.
+				const auto scene = std::find_if(
+					scenes.begin(),
+					scenes.end(),
+					[&](Scene* open) { return open->GetGuid() == change.scene; });
+
+				if (scene == scenes.end())
+					continue;
+
+				Scene* replacement = rebuild(*scene, change.*side);
+
+				if (replacement == nullptr)
+				{
+					Forget(change.scene);
+					return false;
+				};
+
+				Engine::DoTasks();
+
+				m_text[replacement->GetGuid()] = SceneSerializer::Serialize(*replacement);
+				rebuilt = true;
 			};
 
-			Engine::DoTasks();
+			if (!rebuilt)
+				continue;
 
-			m_text[replacement->GetGuid()] = SceneSerializer::Serialize(*replacement);
 			to.push_back(std::move(step));
 
 			return true;

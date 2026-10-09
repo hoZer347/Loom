@@ -248,25 +248,6 @@ namespace Loom
 			};
 		};
 
-		const Scene* SceneOf(const GameObject* gameObject)
-		{
-			while (gameObject->GetParent() != nullptr)
-				gameObject = gameObject->GetParent();
-
-			for (const Scene* scene : Scene::GetScenes())
-				if (&scene->GetRoot() == gameObject)
-					return scene;
-
-			return nullptr;
-		};
-
-		// Copies of one scene are kept identical, so an object moved from one
-		// into another would be in that scene twice.
-		bool CanMoveBetween(const Scene* from, const Scene* to)
-		{
-			return from && to && (from == to || from->GetGuid() != to->GetGuid());
-		};
-
 		// GLFW's drop callback carries no user data, and there is one editor.
 		Editor* drop_receiver = nullptr;
 
@@ -2073,9 +2054,7 @@ namespace Loom
 			? LoomObject::GetByGuid<GameObject>(*(const Guid*)payload->Data)
 			: nullptr;
 
-		if (dragged == nullptr ||
-			IsInHierarchy(*dragged, gameObject) ||
-			!CanMoveBetween(SceneOf(dragged), SceneOf(gameObject)))
+		if (dragged == nullptr || !EditCommands::CanMove(*dragged, *gameObject, m_ownedScenes))
 		{
 			ImGui::EndDragDropTarget();
 			return;
