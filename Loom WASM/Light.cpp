@@ -23,7 +23,7 @@ namespace Loom
 	{
 		// Pushes the casters' depth back by their slope, which is what keeps a
 		// lit surface from shadowing itself in stripes (shadow acne).
-		constexpr float SLOPE_OFFSET = 2.0f;
+		constexpr float SLOPE_OFFSET = 3.0f;
 		constexpr float CONSTANT_OFFSET = 4.0f;
 
 		// The light sits one extent back from the centre, so the box is two deep.
@@ -53,9 +53,11 @@ uniform highp sampler2DShadow u_shadowMap;
 // nothing has set it in reads, is shadowed.
 uniform float u_shadowsOff;
 
-// Taps either side of the centre texel, on top of the 2x2 the hardware
-// comparison already filters.
-const int LOOM_PCF_RADIUS = 1;
+// A 4x4 grid of taps half a texel off the texel grid, each filtered 2x2 by
+// the hardware comparison. Together they weigh every texel of a 4x4 block
+// equally, so a transparent caster's dither averages back to its alpha.
+const int LOOM_PCF_TAPS = 4;
+const float LOOM_PCF_FIRST = -1.5;
 
 // Clip space runs -1 to 1; the shadow map's texture and depth coordinates run
 // 0 to 1.
@@ -77,10 +79,10 @@ float LoomShadow(vec4 lightSpace)
 	float lit = 0.0;
 	float taps = 0.0;
 
-	for (int x = -LOOM_PCF_RADIUS; x <= LOOM_PCF_RADIUS; x++)
-		for (int y = -LOOM_PCF_RADIUS; y <= LOOM_PCF_RADIUS; y++)
+	for (int x = 0; x < LOOM_PCF_TAPS; x++)
+		for (int y = 0; y < LOOM_PCF_TAPS; y++)
 		{
-			lit += texture(u_shadowMap, vec3(coords.xy + vec2(x, y) * texel, coords.z));
+			lit += texture(u_shadowMap, vec3(coords.xy + (vec2(x, y) + LOOM_PCF_FIRST) * texel, coords.z));
 			taps += 1.0;
 		}
 
@@ -296,6 +298,9 @@ vec3 LoomLight(vec3 normal)
 				// so it is handed the light's view-projection in the camera's place.
 				mesh->material->Apply(program, &*mesh->variables);
 				renderer.SetUniform(program, "u_viewProjection", m_view_projection);
+				// A transparent shader's pass runs its fragment stage, which may
+				// sample the map this pass is drawing.
+				renderer.SetTexture(program, "u_shadowMap", NothingInShadow(renderer));
 				renderer.SetUniform(program, "u_lightViewProjection", m_view_projection);
 				mesh->Draw(program);
 			}

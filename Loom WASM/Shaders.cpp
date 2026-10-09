@@ -65,6 +65,23 @@ void main()
 }
 )";
 
+		// A transparent shader's shadow pass keeps its alpha's share of each
+		// 4x4 block of texels. The shadow map's filtering spans a block, so it
+		// averages them back into a shadow as dark as the alpha.
+		constexpr const char* DITHER_LIBRARY = R"(
+const int LOOM_DITHER_SIZE = 4;
+const float LOOM_DITHER_LEVELS = 16.0;
+const float LOOM_DITHER_CENTRE = 0.5;
+const float LOOM_DITHER[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+
+bool LoomDitheredOut(float alpha)
+{
+	ivec2 cell = ivec2(gl_FragCoord.xy) % LOOM_DITHER_SIZE;
+
+	return alpha * LOOM_DITHER_LEVELS < LOOM_DITHER[cell.y * LOOM_DITHER_SIZE + cell.x] + LOOM_DITHER_CENTRE;
+}
+)";
+
 		constexpr const char* SHADOW_PROGRAM_SUFFIX = " shadows";
 
 		// What the shading section's vertex half reads, and the declaration it
@@ -159,6 +176,24 @@ void main()
 				"\tloom_main();\n\n"
 				"\tvec3 loom_normal = normalize(cross(dFdx(loom_World), dFdy(loom_World)));\n\n"
 				"\t" + color[1].str() + ".rgb *= LoomLight(loom_normal" + (shadows ? ", loom_LightSpace" : "") + ");\n"
+				"}\n";
+		};
+
+		std::string TransparentShadowFragment(const std::string& stage)
+		{
+			std::smatch color;
+
+			if (!std::regex_search(stage, color, ColorPattern()))
+				throw std::runtime_error("Transparency with shadows needs the fragment stage to write an out vec4 colour");
+
+			// The pass has no colour attachment, so the colour becomes a plain variable.
+			const std::string withoutOutput = std::regex_replace(WithMainRenamed(stage, "fragment"), ColorPattern(), "vec4 $1;");
+
+			return withoutOutput + '\n' + EngineCode(DITHER_LIBRARY) +
+				"\nvoid main()\n{\n"
+				"\tloom_main();\n\n"
+				"\tif (LoomDitheredOut(" + color[1].str() + ".a))\n"
+				"\t\tdiscard;\n"
 				"}\n";
 		};
 
@@ -403,7 +438,7 @@ void main()
 		if (settings.shadows)
 		{
 			stages.shadowVertex = vertex;
-			stages.shadowFragment = common + EngineCode(SHADOW_FRAGMENT);
+			stages.shadowFragment = settings.transparency ? TransparentShadowFragment(fragment) : common + EngineCode(SHADOW_FRAGMENT);
 		};
 
 		// The engine's GLSL goes first, so a shader's own COMMON block (its

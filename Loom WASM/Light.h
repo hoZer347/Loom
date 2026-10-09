@@ -20,8 +20,10 @@ namespace Loom
 	* - Scene::Render uses the first enabled one in the hierarchy, renders
 	*   every enabled Mesh whose shader has shadows on, and every enabled
 	*   shadow-casting Sprite, into its shadow map, then hands it to each one's
-	*   program as the main pass draws. In a scene without one,
-	*   Light::ApplyNone stands in, and a lit shader shows its colour flat
+	*   program as the main pass draws. A shader with transparency on casts a
+	*   shadow as dark as the alpha its fragment stage writes. In a scene
+	*   without one, Light::ApplyNone stands in, and a lit shader shows its
+	*   colour flat
 	* - A shader with shading on has the engine light it (see ShaderSettings);
 	*   one with it off can still light itself with the functions below
 	* - The shadow map covers a box of shadowExtent either side of shadowCenter,

@@ -84,7 +84,10 @@ uniform sampler2DShadow u_shadowMap;
 
 out vec4 FragColor;
 
-const int PCF_RADIUS = 1;
+// Sampled the way Light's LoomShadow does, so a transparent caster's dither
+// averages back to its alpha here too.
+const int PCF_TAPS = 4;
+const float PCF_FIRST = -1.5;
 
 // Clip space runs -1 to 1; the shadow map's texture and depth coordinates run
 // 0 to 1.
@@ -102,10 +105,10 @@ float Visibility()
 	float lit = 0.0;
 	float taps = 0.0;
 
-	for (int x = -PCF_RADIUS; x <= PCF_RADIUS; x++)
-		for (int y = -PCF_RADIUS; y <= PCF_RADIUS; y++)
+	for (int x = 0; x < PCF_TAPS; x++)
+		for (int y = 0; y < PCF_TAPS; y++)
 		{
-			lit += texture(u_shadowMap, vec3(coords.xy + vec2(x, y) * texel, coords.z));
+			lit += texture(u_shadowMap, vec3(coords.xy + (vec2(x, y) + PCF_FIRST) * texel, coords.z));
 			taps += 1.0;
 		}
 

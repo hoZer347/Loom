@@ -309,6 +309,19 @@ TEST_SUITE("Shader")
 		CHECK(stages.shadowFragment.find("void main()") != std::string::npos);
 	};
 
+	TEST_CASE("a transparent shader's shadow pass runs its fragment stage and dithers out by its alpha")
+	{
+		const std::string source = "// ===SETTINGS===\nshading = on\nshadows = on\ntransparency = on\n" + FRAGMENT;
+		const Loom::Shader::Stages stages = Loom::Shader::Assemble(source);
+
+		CHECK(stages.shadowFragment.find("FragColor = vec4(1.0);") != std::string::npos);
+		CHECK(stages.shadowFragment.find("out vec4 FragColor;") == std::string::npos);
+		CHECK(stages.shadowFragment.find("if (LoomDitheredOut(FragColor.a))") != std::string::npos);
+#ifndef __EMSCRIPTEN__
+		CHECK(Loom::Shader::Check(source).empty());
+#endif
+	};
+
 	TEST_CASE("shadows without shading cast them, and leave the colour as written")
 	{
 		const Loom::Shader::Stages stages = Loom::Shader::Assemble("// ===SETTINGS===\nshadows = on\n" + FRAGMENT);
