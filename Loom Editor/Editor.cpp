@@ -2313,15 +2313,18 @@ namespace Loom
 				if (!components.empty())
 					ImGui::Separator();
 
-				if (ImGui::Button("Add Component", ImVec2(-FLT_MIN, 0.0f)) || m_openAddComponent)
+				if (ImGui::Button("Add Component", ImVec2(-FLT_MIN, 0.0f)))
+					ImGui::OpenPopup("##add_component");
+
+				// Not while the Inspector is appearing: docking it closes a popup
+				// opened then. With no click to open it at, it opens under the
+				// button.
+				if (m_openAddComponent && !ImGui::IsWindowAppearing())
 				{
+					ImGui::SetNextWindowPos(ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y));
 					ImGui::OpenPopup("##add_component");
 					m_openAddComponent = false;
 				};
-
-				ImGui::SetNextWindowPos(
-					ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y),
-					ImGuiCond_Appearing);
 
 				if (ImGui::BeginPopup("##add_component"))
 				{

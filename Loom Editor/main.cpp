@@ -163,6 +163,10 @@ namespace
 			<< "  --save-layout-prompt           start with Layout > Save Layout... open\n"
 			<< "  --open-sprite <file>           open an image in the Sprites panel\n"
 			<< "  --add-component-prompt         start with Add Component open on the selection\n"
+			<< "  --set-component-category <component> <category>\n"
+			<< "                                 file a component under a category in the\n"
+			<< "                                 project, as right-clicking it in Add\n"
+			<< "                                 Component does; \"\" puts it back\n"
 			<< "  --undo, --redo                 step the history once the imports have landed\n"
 			<< "  --click <x y> [x y]            left click there once the scripts are built,\n"
 			<< "                                 letting go at the second point if given\n"
@@ -321,6 +325,7 @@ int main(int argc, char** argv)
 	std::string selection;
 	std::string new_script;
 	AssetKind new_script_kind = AssetKind::Script;
+	std::vector<std::pair<std::string, std::string>> categories;
 	std::optional<AssetKind> create_prompt;
 	int frames = 240;
 
@@ -434,6 +439,17 @@ int main(int argc, char** argv)
 
 			new_script_kind = *ScriptKindNamed(argument.substr(createPrefix.size()));
 			new_script = argv[++i];
+		}
+		else if (argument == "--set-component-category")
+		{
+			if (i + 2 >= argc)
+			{
+				std::cerr << "--set-component-category needs a component and a category" << std::endl;
+				return 1;
+			};
+
+			categories.emplace_back(argv[i + 1], argv[i + 2]);
+			i += 2;
 		}
 		else if (argument == "--select")
 		{
@@ -556,6 +572,9 @@ int main(int argc, char** argv)
 
 	if (!new_script.empty())
 		editor.CreateScriptAsset(new_script_kind, new_script);
+
+	for (const auto& [component, category] : categories)
+		editor.SetComponentCategory(component, category);
 
 	if (compile)
 		editor.CompileScripts();

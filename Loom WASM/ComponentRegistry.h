@@ -29,9 +29,9 @@ namespace Loom
 	* - A type that declares a static `category` string is filed under it in the
 	*   Add Component menu, with '/' between nested categories:
 	*
-	*	struct Mesh : Component<Mesh>
+	*	struct Patrol : Component<Patrol>
 	*	{
-	*		static constexpr const char* category = "Rendering/3D";
+	*		static constexpr const char* category = "Gameplay/AI";
 	*	};
 	*/
 	struct LOOM_API ComponentRegistry final

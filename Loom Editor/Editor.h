@@ -119,6 +119,10 @@ namespace Loom
 		// time it is drawn.
 		void ShowAddComponent() { m_openAddComponent = true; };
 
+		// Files a component under category in the open project, or back under
+		// its own when category is empty.
+		void SetComponentCategory(const std::string& component, const std::string& category);
+
 		// Writes a new project (scenes, scripts, a Visual Studio solution) into
 		// folder/name and opens it.
 		bool CreateProject(const std::string& folder, const std::string& name);
@@ -255,7 +259,6 @@ namespace Loom
 		// Right-click on a component in the Add Component menu: the category it
 		// is filed under in this project.
 		void DrawCategoryPopup(const std::string& component);
-		void SetComponentCategory(const std::string& component, const std::string& category);
 		void DrawFields(LoomObject& object, const std::vector<std::string>& labels, float column);
 		void DrawModelPreview();
 		void DrawScene();
