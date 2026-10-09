@@ -166,10 +166,7 @@ TEST_SUITE("Scene")
 		CHECK(probe->Count("update") == 1);
 	};
 
-	// See "Physics reaches the hierarchy too" in the GameObject suite:
-	// GameObject::Attach never adds a component to m_physicsables, so the
-	// physics pass has nothing to walk.
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Physics drives OnPhysics" * doctest::should_fail())
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Physics drives OnPhysics")
 	{
 		Loom::Scene scene("Scene physics");
 		Pump();

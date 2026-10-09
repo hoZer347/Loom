@@ -94,6 +94,9 @@
     <ClCompile Include="Collider Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="ColliderGizmos Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="Input Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

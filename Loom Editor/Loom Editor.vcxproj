@@ -117,6 +117,7 @@
     <ClCompile Include="ModelPreview.cpp" />
     <ClCompile Include="SelectionOutline.cpp" />
     <ClCompile Include="SceneHistory.cpp" />
+    <ClCompile Include="ColliderGizmos.cpp" />
     <ClCompile Include="EditCommands.cpp" />
     <ClCompile Include="FieldNames.cpp" />
     <ClCompile Include="UiScript.cpp" />
@@ -144,6 +145,7 @@
     <ClInclude Include="ModelPreview.h" />
     <ClInclude Include="SelectionOutline.h" />
     <ClInclude Include="SceneHistory.h" />
+    <ClInclude Include="ColliderGizmos.h" />
     <ClInclude Include="EditCommands.h" />
     <ClInclude Include="FieldNames.h" />
     <ClInclude Include="UiScript.h" />

@@ -79,6 +79,12 @@
     <ClCompile Include="Collider.cpp">
       <Filter>Collider</Filter>
     </ClCompile>
+    <ClCompile Include="ColliderTree.cpp">
+      <Filter>Collider</Filter>
+    </ClCompile>
+    <ClCompile Include="Physics.cpp">
+      <Filter>Collider</Filter>
+    </ClCompile>
     <ClCompile Include="Utilities\StateMachine.cpp">
       <Filter>Utilities\State Machine</Filter>
     </ClCompile>
@@ -278,6 +284,12 @@
       <Filter>Input</Filter>
     </ClInclude>
     <ClInclude Include="Collider.h">
+      <Filter>Collider</Filter>
+    </ClInclude>
+    <ClInclude Include="ColliderTree.h">
+      <Filter>Collider</Filter>
+    </ClInclude>
+    <ClInclude Include="Physics.h">
       <Filter>Collider</Filter>
     </ClInclude>
     <ClInclude Include="Loom.h" />

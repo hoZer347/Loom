@@ -127,6 +127,7 @@
     <ClCompile Include="Shaders Tests.cpp" />
     <ClCompile Include="Textures Tests.cpp" />
     <ClCompile Include="Collider Tests.cpp" />
+    <ClCompile Include="ColliderGizmos Tests.cpp" />
     <ClCompile Include="Input Tests.cpp" />
     <ClCompile Include="Threading Tests.cpp" />
     <ClCompile Include="AxisGui Tests.cpp" />
@@ -170,6 +171,7 @@
     <ClCompile Include="..\Loom Editor\EditorLog.cpp" />
     <ClCompile Include="..\Loom Editor\EditorTheme.cpp" />
     <ClCompile Include="..\Loom Editor\EditorViewport.cpp" />
+    <ClCompile Include="..\Loom Editor\ColliderGizmos.cpp" />
     <ClCompile Include="..\Loom Editor\SelectionOutline.cpp" />
   </ItemGroup>
   <ItemGroup>

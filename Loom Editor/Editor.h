@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ColliderGizmos.h"
 #include "ComponentMenu.h"
 #include "EditorCamera.h"
 #include "EditorConsole.h"
@@ -458,6 +459,9 @@ namespace Loom
 
 		SelectionOutline m_sceneOutline;
 		SelectionOutline m_debugOutline;
+
+		// Shared: unlike an outline, it keeps nothing the size of a view.
+		ColliderGizmos m_colliderGizmos;
 
 		ScriptLibrary m_scripts;
 		WebPlayer m_webPlayer;

@@ -61,11 +61,15 @@ namespace Loom
 
 
 	// category files T in the Add Component menu, with '/' between nested
-	// categories.
-	template <typename T, Str category = "">
+	// categories. Base is for a family of components the engine handles
+	// together, such as every Collider: an abstract ComponentBase the family
+	// shares, which T derives from through this rather than alongside it.
+	template <typename T, Str category = "", typename Base = ComponentBase>
 		struct Component :
-		public ComponentBase
+		public Base
 	{
+		static_assert(std::is_base_of_v<ComponentBase, Base>, "A component's base must be a ComponentBase");
+
 		// What GameObject checks a type it attaches against: T itself, not a
 		// type derived from it.
 		typedef T ComponentType;
@@ -77,12 +81,12 @@ namespace Loom
 	protected:
 		Component()
 		{
-			m_type_name = typeid(T).name();
+			this->m_type_name = typeid(T).name();
 		};
 
 		void Gui() override
 		{
-			DrawDefaultGui();
+			this->DrawDefaultGui();
 		};
 
 	private:
@@ -96,6 +100,11 @@ namespace Loom
 
 	template <typename T>
 	concept AComponent = std::is_same_v<typename T::ComponentType, T>;
+
+	// The abstract base a family of components shares, such as Collider,
+	// which can be looked for but not attached.
+	template <typename T>
+	concept AComponentFamily = std::is_abstract_v<T> && std::is_base_of_v<ComponentBase, T>;
 };
 
 // The factory Component<T> registers attaches a T to a GameObject, so a file

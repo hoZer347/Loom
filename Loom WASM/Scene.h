@@ -4,7 +4,9 @@
 
 #include "Macro Helpers.h"
 
+#include "ColliderTree.h"
 #include "GameObject.h"
+#include "Physics.h"
 
 #include <thread>
 #include <mutex>
@@ -45,7 +47,16 @@ namespace Loom
 		// open scenes. Shadows are cast by those of drawn, the scenes drawn into
 		// the same view, that share its light.
 		void Render(Camera* camera = nullptr, const std::vector<Scene*>& drawn = allScenes);
+
+		// Brings the collider tree up to date with every enabled collider, then
+		// runs OnPhysics through the hierarchy.
 		void Physics();
+
+		// Against this scene's colliders alone; see Loom::Physics.
+		bool Raycast(const Ray& ray, RaycastHit& hit, float maxDistance = INFINITE_DISTANCE) const;
+		std::vector<RaycastHit> RaycastAll(const Ray& ray, float maxDistance = INFINITE_DISTANCE) const;
+
+		const ColliderTree& GetColliders() const { return colliders; };
 
 		static const std::vector<Scene*>& GetScenes() { return allScenes; };
 
@@ -60,6 +71,9 @@ namespace Loom
 		friend struct MainMenu;
 		friend struct Engine;
 		int thread_id;
+
+		// Before root, so it outlives the colliders root deletes on the spot.
+		ColliderTree colliders;
 
 		GameObject root;
 

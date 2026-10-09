@@ -53,6 +53,13 @@ namespace Loom
 		has_method<T, void>::value &&
 		!std::is_same_v<decltype(&T::OnUpdate), decltype(&ComponentBase::OnUpdate)>> { };
 
+	// Detect override of OnPhysics
+	template <typename T>
+	struct overrides_on_physics
+		: std::integral_constant<bool,
+		has_method<T, void>::value &&
+		!std::is_same_v<decltype(&T::OnPhysics), decltype(&ComponentBase::OnPhysics)>> { };
+
 	// TODO: Turn the above templates into a macro
 
 	struct LOOM_API GameObject final :
@@ -86,6 +93,9 @@ namespace Loom
 					if constexpr (overrides_on_render<T>::value)
 						m_renderables.emplace_back(component);
 
+					if constexpr (overrides_on_physics<T>::value)
+						m_physicsables.emplace_back(component);
+
 					if constexpr (overrides_on_attach<T>::value)
 						component->OnAttach();
 				});
@@ -96,14 +106,24 @@ namespace Loom
 		template <typename T>
 		[[nodiscard]] T* GetComponent()
 		{
-			static_assert(AComponent<T>, "Must be a component");
+			static_assert(AComponent<T> || AComponentFamily<T>, "Must be a component");
 
-			// Compared by value, not by pointer: a script library carries its own
-			// copy of the type name, so the addresses differ across the module
-			// boundary even though the type is the same one.
-			for (auto& component : m_components)
-				if (strcmp(component->m_type_name, typeid(T).name()) == 0)
-					return (T*)component;
+			// A family's abstract base, such as Collider, finds any of its members.
+			if constexpr (std::is_abstract_v<T>)
+			{
+				for (auto& component : m_components)
+					if (T* found = dynamic_cast<T*>(component))
+						return found;
+			}
+			else
+			{
+				// Compared by value, not by pointer: a script library carries its own
+				// copy of the type name, so the addresses differ across the module
+				// boundary even though the type is the same one.
+				for (auto& component : m_components)
+					if (strcmp(component->m_type_name, typeid(T).name()) == 0)
+						return (T*)component;
+			};
 
 			return nullptr;
 		};

@@ -94,7 +94,8 @@ TEST_SUITE("ComponentMenu")
 		CHECK(Holds(Find(root, { "Rendering" }), "Mesh"));
 		CHECK(Holds(Find(root, { "Rendering" }), "Camera"));
 		CHECK(Holds(Find(root, { "Rendering", "2D" }), "Sprite"));
-		CHECK(Holds(Find(root, { "Physics" }), "Collider"));
+		CHECK(Holds(Find(root, { "Physics" }), "BoxCollider"));
+		CHECK(Holds(Find(root, { "Physics" }), "SphereCollider"));
 		CHECK(Holds(Find(root, { "Logic" }), "StateMachine"));
 		CHECK(Holds(Find(root, { "Gameplay", "Enemies" }), "Categorised"));
 		CHECK(Holds(&root, "Uncategorised"));

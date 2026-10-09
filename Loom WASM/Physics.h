@@ -1,0 +1,93 @@
+#pragma once
+
+#include "Loom API.h"
+
+#include "glm/glm.hpp"
+
+#include <limits>
+#include <vector>
+
+
+namespace Loom
+{
+	struct Collider;
+	struct GameObject;
+
+	constexpr float INFINITE_DISTANCE = std::numeric_limits<float>::infinity();
+
+	/**
+	* Loom::Ray
+	* - A half-line from origin along direction. Raycasts normalise direction
+	*   themselves, so distances along a ray are always world units
+	*/
+	struct Ray final
+	{
+		glm::vec3 origin{ 0.0f };
+		glm::vec3 direction{ 0.0f, 0.0f, -1.0f };
+
+		glm::vec3 GetPoint(float distance) const { return origin + direction * distance; };
+	};
+
+	/**
+	* Loom::Bounds
+	* - An axis-aligned box from min to max, in whatever space its user is in:
+	*   world space in the collider tree, a collider's own space in BoxCollider
+	*/
+	struct LOOM_API Bounds final
+	{
+		glm::vec3 min{ 0.0f };
+		glm::vec3 max{ 0.0f };
+
+		glm::vec3 Center() const { return (min + max) * 0.5f; };
+		glm::vec3 Extents() const { return (max - min) * 0.5f; };
+
+		// Half the surface area, which is all the tree's cost estimates compare.
+		float HalfArea() const;
+
+		bool Contains(const Bounds& inner) const;
+
+		Bounds Union(const Bounds& other) const;
+		Bounds Expanded(float margin) const;
+
+		// The stretch of the ray's parameter that lies inside the box, entry
+		// negative when the origin is inside, and the axis the ray enters
+		// through. False when the ray's line misses the box.
+		bool IntersectRay(const Ray& ray, float& entry, float& exit, int& entryAxis) const;
+	};
+
+	/**
+	* Loom::RaycastHit
+	* - Where a ray first met a collider: the point on its surface, the
+	*   surface's outward normal there, and how far along the ray that was
+	*/
+	struct RaycastHit final
+	{
+		Collider* collider = nullptr;
+		GameObject* gameObject = nullptr;
+
+		glm::vec3 point{ 0.0f };
+		glm::vec3 normal{ 0.0f };
+		float distance = 0.0f;
+	};
+
+	/**
+	* Loom::Physics
+	* - Raycasts against every open scene, as Unity's Physics.Raycast does. A
+	*   scene's own Scene::Raycast keeps to that scene
+	* - A collider is where the scene's last physics step left it: the engine
+	*   steps every scene at the start of each frame it updates them, before
+	*   OnUpdate, so a collider moved in OnUpdate is found where it went from
+	*   the next frame on. Scene::Physics steps a scene by hand
+	* - A ray that starts inside a collider does not hit it
+	*/
+	namespace Physics
+	{
+		// The nearest hit within maxDistance, into hit.
+		LOOM_API bool Raycast(const Ray& ray, RaycastHit& hit, float maxDistance = INFINITE_DISTANCE);
+		LOOM_API bool Raycast(const glm::vec3& origin, const glm::vec3& direction, RaycastHit& hit, float maxDistance = INFINITE_DISTANCE);
+
+		// Every hit within maxDistance, nearest first.
+		LOOM_API std::vector<RaycastHit> RaycastAll(const Ray& ray, float maxDistance = INFINITE_DISTANCE);
+		LOOM_API std::vector<RaycastHit> RaycastAll(const glm::vec3& origin, const glm::vec3& direction, float maxDistance = INFINITE_DISTANCE);
+	};
+};

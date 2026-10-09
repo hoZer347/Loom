@@ -278,14 +278,7 @@ TEST_SUITE("GameObject")
 		CHECK(onUnder->Count("render") == 1);
 	};
 
-	// Attach fills m_components, m_updateables and m_renderables, but never
-	// m_physicsables -- so GameObject::Physics walks an always-empty list and no
-	// component's OnPhysics is ever called, on any object, anywhere. Collider,
-	// whose whole interface is OnPhysics, is dead code because of it.
-	//
-	// Marked should_fail: this starts passing the moment Attach registers
-	// physics components, and doctest will say so.
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Physics reaches the hierarchy too" * doctest::should_fail())
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Physics reaches the hierarchy too")
 	{
 		Loom::Scene scene("deep physics");
 		Pump();

@@ -1,11 +1,13 @@
 #include "Scene.h"
 
 #include "Camera.h"
+#include "Collider.h"
 #include "Engine.h"
 #include "Light.h"
 #include "Mesh.h"
 
 #include <algorithm>
+#include <optional>
 #include <vector>
 #include <string>
 
@@ -118,7 +120,68 @@ namespace Loom
 
 	void Scene::Physics()
 	{
+		ColliderTree::current = &colliders;
+		colliders.BeginSync();
+
 		root.Physics();
+
+		colliders.EndSync();
+		ColliderTree::current = nullptr;
+	};
+
+	namespace
+	{
+		// Normalised, so the tree measures distance along it in world units.
+		// Null for a ray going nowhere.
+		std::optional<Ray> Normalised(const Ray& ray)
+		{
+			if (glm::length(ray.direction) == 0.0f)
+				return std::nullopt;
+
+			return Ray{ ray.origin, glm::normalize(ray.direction) };
+		};
+	};
+
+	bool Scene::Raycast(const Ray& given, RaycastHit& hit, float maxDistance) const
+	{
+		const std::optional<Ray> ray = Normalised(given);
+		bool found = false;
+
+		if (!ray)
+			return false;
+
+		colliders.Raycast(*ray, maxDistance,
+			[&](const RaycastHit& nearer, float)
+			{
+				hit = nearer;
+				found = true;
+
+				return nearer.distance;
+			});
+
+		return found;
+	};
+
+	std::vector<RaycastHit> Scene::RaycastAll(const Ray& given, float maxDistance) const
+	{
+		const std::optional<Ray> ray = Normalised(given);
+		std::vector<RaycastHit> hits{ };
+
+		if (!ray)
+			return hits;
+
+		colliders.Raycast(*ray, maxDistance,
+			[&](const RaycastHit& hit, float within)
+			{
+				hits.push_back(hit);
+
+				return within;
+			});
+
+		std::sort(hits.begin(), hits.end(),
+			[](const RaycastHit& a, const RaycastHit& b) { return a.distance < b.distance; });
+
+		return hits;
 	};
 
 	Scene::~Scene()

@@ -196,6 +196,9 @@ namespace Loom
 		if (updateScenes)
 		{
 			for (auto& scene : Scene::allScenes)
+				scene->Physics();
+
+			for (auto& scene : Scene::allScenes)
 				scene->Update();
 
 			Utilities::Update();

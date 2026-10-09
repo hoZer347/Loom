@@ -1,0 +1,20 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RaycastsScripts", "RaycastsScripts.vcxproj", "{B8A3F577-1B62-4F40-B63C-E23C9DA5964B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B8A3F577-1B62-4F40-B63C-E23C9DA5964B}.Debug|x64.ActiveCfg = Debug|x64
+		{B8A3F577-1B62-4F40-B63C-E23C9DA5964B}.Debug|x64.Build.0 = Debug|x64
+		{B8A3F577-1B62-4F40-B63C-E23C9DA5964B}.Release|x64.ActiveCfg = Release|x64
+		{B8A3F577-1B62-4F40-B63C-E23C9DA5964B}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

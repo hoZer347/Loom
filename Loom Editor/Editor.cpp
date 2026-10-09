@@ -2848,7 +2848,10 @@ namespace Loom
 					scene->Render(seen_through, scenes);
 
 				if (ringed)
+				{
 					outline->Draw(*m_selected, *seen_through);
+					m_colliderGizmos.Draw(*m_selected, *seen_through);
+				};
 			});
 
 		if (view.GetTexture())

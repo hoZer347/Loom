@@ -1,0 +1,124 @@
+#include "Physics.h"
+
+#include "Scene.h"
+
+#include <algorithm>
+#include <cmath>
+
+
+namespace Loom
+{
+	float Bounds::HalfArea() const
+	{
+		const glm::vec3 size = max - min;
+
+		return size.x * size.y + size.y * size.z + size.z * size.x;
+	};
+
+	bool Bounds::Contains(const Bounds& inner) const
+	{
+		return glm::all(glm::lessThanEqual(min, inner.min))
+			&& glm::all(glm::lessThanEqual(inner.max, max));
+	};
+
+	Bounds Bounds::Union(const Bounds& other) const
+	{
+		return { glm::min(min, other.min), glm::max(max, other.max) };
+	};
+
+	Bounds Bounds::Expanded(float margin) const
+	{
+		return { min - glm::vec3(margin), max + glm::vec3(margin) };
+	};
+
+	bool Bounds::IntersectRay(const Ray& ray, float& entry, float& exit, int& entryAxis) const
+	{
+		entry = -INFINITE_DISTANCE;
+		exit = INFINITE_DISTANCE;
+		entryAxis = -1;
+
+		for (int axis = 0; axis < glm::vec3::length(); axis++)
+		{
+			const float origin = ray.origin[axis];
+			const float direction = ray.direction[axis];
+
+			// Parallel to this pair of planes: dividing would make 0 * inf of a
+			// ray lying in one of them.
+			if (direction == 0.0f)
+			{
+				if (origin < min[axis] || origin > max[axis])
+					return false;
+
+				continue;
+			};
+
+			float near = (min[axis] - origin) / direction;
+			float far = (max[axis] - origin) / direction;
+
+			if (near > far)
+				std::swap(near, far);
+
+			if (near > entry)
+			{
+				entry = near;
+				entryAxis = axis;
+			};
+
+			exit = std::min(exit, far);
+
+			if (entry > exit)
+				return false;
+		};
+
+		return true;
+	};
+
+	namespace Physics
+	{
+		bool Raycast(const Ray& ray, RaycastHit& hit, float maxDistance)
+		{
+			bool found = false;
+
+			for (Scene* scene : Scene::GetScenes())
+			{
+				RaycastHit sceneHit;
+
+				if (scene->Raycast(ray, sceneHit, maxDistance))
+				{
+					hit = sceneHit;
+					maxDistance = sceneHit.distance;
+					found = true;
+				};
+			};
+
+			return found;
+		};
+
+		bool Raycast(const glm::vec3& origin, const glm::vec3& direction, RaycastHit& hit, float maxDistance)
+		{
+			return Raycast(Ray{ origin, direction }, hit, maxDistance);
+		};
+
+		std::vector<RaycastHit> RaycastAll(const Ray& ray, float maxDistance)
+		{
+			std::vector<RaycastHit> hits{ };
+
+			for (Scene* scene : Scene::GetScenes())
+			{
+				const std::vector<RaycastHit> sceneHits = scene->RaycastAll(ray, maxDistance);
+
+				hits.insert(hits.end(), sceneHits.begin(), sceneHits.end());
+			};
+
+			std::sort(hits.begin(), hits.end(),
+				[](const RaycastHit& a, const RaycastHit& b) { return a.distance < b.distance; });
+
+			return hits;
+		};
+
+		std::vector<RaycastHit> RaycastAll(const glm::vec3& origin, const glm::vec3& direction, float maxDistance)
+		{
+			return RaycastAll(Ray{ origin, direction }, maxDistance);
+		};
+	};
+};
