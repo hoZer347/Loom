@@ -49,7 +49,7 @@ namespace RaycastsScripts
 			Loom::Scene* scene = Own();
 			Loom::Camera* camera = scene ? scene->GetRoot().FindComponent<Loom::Camera>() : nullptr;
 
-			if (camera == nullptr)
+			if (camera == nullptr || m_rows < 1 || m_columns < 1)
 				return;
 
 			m_ticks.resize((size_t)m_rows);
