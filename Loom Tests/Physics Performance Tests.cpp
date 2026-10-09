@@ -6,6 +6,7 @@
 #include "Mesh.h"
 #include "MeshCollider.h"
 #include "Physics.h"
+#include "Rigidbody.h"
 #include "Scene.h"
 
 #include "glm/glm.hpp"
@@ -300,5 +301,119 @@ TEST_SUITE("PhysicsPerformance")
 		MESSAGE(report.str());
 
 		CHECK(many / few <= MOST_GROWTH);
+	};
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "bodies dropped into a pit pile up inside it and fall asleep")
+	{
+		constexpr int COUNT = 200;
+		constexpr float SECONDS = 5.0f;
+		constexpr unsigned SEED = 9;
+
+		// The pit: a floor whose top is at y = 0 and four walls around it.
+		constexpr float INSIDE = 6.0f;
+		constexpr float WALL = 2.0f;
+		constexpr float WALL_HEIGHT = 10.0f;
+
+		// The drop: a layer at a time, a body to each cell of a grid.
+		constexpr float SPACING = 1.6f;
+		constexpr float FIRST_LAYER = 2.0f;
+		constexpr int PER_ROW = 6;
+		constexpr float JITTER = 0.2f;
+
+		// Small enough that, turned any way, it still fits its cell.
+		constexpr float LARGEST = 0.9f;
+
+		// How many may still be stirring by the end: balls still rolling to a
+		// stop, mostly. A pile that never settles keeps them all awake.
+		constexpr int MOST_AWAKE = COUNT / 4;
+
+		// Nothing slows a ball rolling on a floor, here as in Unity, so a
+		// scene that wants its balls to stop gives them angular drag.
+		constexpr float ROLLING_DRAG = 1.0f;
+
+		Loom::Scene scene("pit");
+		Pump();
+
+		const auto wall =
+			[&](const glm::vec3& position, const glm::vec3& size)
+			{
+				Loom::GameObject* object = scene.AddChild("Wall");
+				Pump();
+
+				object->transform.position = position;
+				object->Attach<Loom::BoxCollider>()->size = size;
+			};
+
+		const float outer = INSIDE + WALL * HALF;
+		const float across = (INSIDE + WALL) / HALF;
+
+		wall(glm::vec3(0.0f, -WALL * HALF, 0.0f), glm::vec3(across, WALL, across));
+		wall(glm::vec3(outer, WALL_HEIGHT * HALF, 0.0f), glm::vec3(WALL, WALL_HEIGHT, across));
+		wall(glm::vec3(-outer, WALL_HEIGHT * HALF, 0.0f), glm::vec3(WALL, WALL_HEIGHT, across));
+		wall(glm::vec3(0.0f, WALL_HEIGHT * HALF, outer), glm::vec3(across, WALL_HEIGHT, WALL));
+		wall(glm::vec3(0.0f, WALL_HEIGHT * HALF, -outer), glm::vec3(across, WALL_HEIGHT, WALL));
+
+		std::mt19937 random(SEED);
+		std::uniform_real_distribution<float> jitter(-JITTER, JITTER);
+		std::uniform_real_distribution<float> extent(LEAST_EXTENT, LARGEST);
+		std::uniform_real_distribution<float> angle(0.0f, FULL_TURN);
+
+		std::vector<Loom::Rigidbody*> bodies{ };
+
+		for (int i = 0; i < COUNT; i++)
+		{
+			const int layer = i / (PER_ROW * PER_ROW);
+			const int cell = i % (PER_ROW * PER_ROW);
+
+			Loom::GameObject* object = scene.AddChild("Body");
+			Pump();
+
+			object->transform.position = glm::vec3(
+				(cell % PER_ROW - (PER_ROW - 1) * HALF) * SPACING + jitter(random),
+				FIRST_LAYER + layer * SPACING,
+				(cell / PER_ROW - (PER_ROW - 1) * HALF) * SPACING + jitter(random));
+			object->transform.rotation = glm::vec3(angle(random), angle(random), angle(random));
+
+			if (i % KINDS == BOX)
+				object->Attach<Loom::BoxCollider>()->size = glm::vec3(extent(random), extent(random), extent(random));
+			else
+				object->Attach<Loom::SphereCollider>()->radius = extent(random) * HALF;
+
+			Loom::Rigidbody* body = object->Attach<Loom::Rigidbody>();
+			body->angularDrag = ROLLING_DRAG;
+			bodies.push_back(body);
+		};
+
+		Pump();
+
+		const int steps = (int)std::round(SECONDS / Loom::Physics::FixedDeltaTime());
+		double busiest = 0.0;
+		double last = 0.0;
+
+		for (int step = 0; step < steps; step++)
+		{
+			last = MillisecondsOf([&]() { scene.Physics(); });
+			busiest = std::max(busiest, last);
+		};
+
+		int awake = 0;
+		int inside = 0;
+
+		for (Loom::Rigidbody* body : bodies)
+		{
+			const glm::vec3 position(body->GetGameObject()->WorldMatrix()[3]);
+
+			awake += !body->IsSleeping();
+			inside += position.y > 0.0f && std::abs(position.x) < INSIDE && std::abs(position.z) < INSIDE;
+		};
+
+		std::ostringstream report;
+		report << COUNT << " bodies dropped into a pit, after " << SECONDS << " s:"
+			<< "\n  busiest physics step " << busiest << " ms"
+			<< "\n  last physics step " << last << " ms"
+			<< "\n  " << awake << " still awake, " << inside << " inside the pit";
+		MESSAGE(report.str());
+
+		CHECK(inside == COUNT);
+		CHECK(awake <= MOST_AWAKE);
 	};
 };

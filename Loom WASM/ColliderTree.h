@@ -56,6 +56,12 @@ namespace Loom
 		typedef std::function<float(const RaycastHit& hit, float maxDistance)> Visitor;
 		void Raycast(const Ray& ray, float maxDistance, const Visitor& visit) const;
 
+		// Calls visit for every collider whose padded bounds overlap bounds.
+		void Query(const Bounds& bounds, const std::function<void(Collider&)>& visit) const;
+
+		// Told of every collider that leaves the tree, while it still exists.
+		std::function<void(const Collider&)> onRemove{ };
+
 		size_t Size() const { return m_leaves; };
 
 		// Leaves are height 0. An empty tree is height -1.

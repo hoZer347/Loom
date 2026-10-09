@@ -60,6 +60,17 @@ namespace Loom
 		has_method<T, void>::value &&
 		!std::is_same_v<decltype(&T::OnPhysics), decltype(&ComponentBase::OnPhysics)>> { };
 
+	// Detect override of any collision or trigger callback
+	template <typename T>
+	struct overrides_contacts
+		: std::integral_constant<bool,
+		!std::is_same_v<decltype(&T::OnCollisionEnter), decltype(&ComponentBase::OnCollisionEnter)> ||
+		!std::is_same_v<decltype(&T::OnCollisionStay), decltype(&ComponentBase::OnCollisionStay)> ||
+		!std::is_same_v<decltype(&T::OnCollisionExit), decltype(&ComponentBase::OnCollisionExit)> ||
+		!std::is_same_v<decltype(&T::OnTriggerEnter), decltype(&ComponentBase::OnTriggerEnter)> ||
+		!std::is_same_v<decltype(&T::OnTriggerStay), decltype(&ComponentBase::OnTriggerStay)> ||
+		!std::is_same_v<decltype(&T::OnTriggerExit), decltype(&ComponentBase::OnTriggerExit)>> { };
+
 	// TODO: Turn the above templates into a macro
 
 	struct LOOM_API GameObject final :
@@ -74,6 +85,7 @@ namespace Loom
 
 			// The type name is Component<T>'s doing; what Attach adds is the owner.
 			((ComponentBase*)component)->m_gameObject = this;
+			((ComponentBase*)component)->m_hearsContacts = overrides_contacts<T>::value;
 
 			// On the object immediately, so GetComponent finds it. Two components
 			// attached in the same frame - by a scene load, or by one component's

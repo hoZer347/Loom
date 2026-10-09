@@ -21,6 +21,8 @@ namespace Loom
 	*   physics step brings up to date (see Loom::Physics)
 	* - GetComponent<Collider> finds whichever kind a GameObject has
 	*/
+	enum class ColliderShape { Box, Sphere, Mesh };
+
 	struct LOOM_API Collider : ComponentBase
 	{
 		~Collider();
@@ -40,6 +42,12 @@ namespace Loom
 		// points each, for an editor to draw.
 		std::vector<glm::vec3> Wireframe() const;
 
+		// A trigger reports what overlaps it, through OnTriggerEnter and the
+		// rest, and pushes nothing away.
+		virtual bool IsTrigger() const = 0;
+
+		virtual ColliderShape Shape() const = 0;
+
 	protected:
 		// Catches up with what the shape is made from, its own fields or
 		// another component, before it is synced or asked for anything
@@ -55,6 +63,7 @@ namespace Loom
 
 	private:
 		friend struct ColliderTree;
+		friend struct Simulation;
 
 		bool RaycastAt(const glm::mat4& world, const Ray& ray, RaycastHit& hit, float maxDistance);
 
@@ -67,6 +76,10 @@ namespace Loom
 
 		// Where the last sync found it, which the tree's raycasts test against.
 		glm::mat4 m_synced{ 1.0f };
+
+		// The body it moves with during a physics step, as the simulation
+		// numbers them, or -1 for none.
+		int m_body = -1;
 	};
 
 	/**
@@ -76,8 +89,12 @@ namespace Loom
 	*/
 	struct LOOM_API BoxCollider : Component<BoxCollider, "Physics", Collider>
 	{
+		bool IsTrigger() const override { return isTrigger; };
+		ColliderShape Shape() const override { return ColliderShape::Box; };
+
 		Serial<glm::vec3> center;
 		Serial<glm::vec3> size = glm::vec3(1.0f);
+		Serial<bool> isTrigger;
 
 	protected:
 		bool Refresh() const override;
@@ -100,8 +117,15 @@ namespace Loom
 	*/
 	struct LOOM_API SphereCollider : Component<SphereCollider, "Physics", Collider>
 	{
+		bool IsTrigger() const override { return isTrigger; };
+		ColliderShape Shape() const override { return ColliderShape::Sphere; };
+
+		// Where it is and how big, in world space, posed by world.
+		void InWorld(const glm::mat4& world, glm::vec3& worldCenter, float& worldRadius) const;
+
 		Serial<glm::vec3> center;
 		Serial<float> radius = 0.5f;
+		Serial<bool> isTrigger;
 
 	protected:
 		bool Refresh() const override;
@@ -113,9 +137,6 @@ namespace Loom
 		bool Intersect(const glm::mat4& world, const Ray& ray, float maxDistance, RaycastHit& hit) const override;
 
 	private:
-		// Where it is and how big, in world space.
-		void Place(const glm::mat4& world, glm::vec3& worldCenter, float& worldRadius) const;
-
 		// What center and radius were when last refreshed.
 		mutable glm::vec3 m_center{ 0.0f };
 		mutable float m_radius = 0.0f;

@@ -22,6 +22,8 @@ namespace Loom
 		// fits in memory.
 		constexpr size_t MOST_DEPTH = 64;
 
+		constexpr uint32_t BOX_CORNERS = 8;
+
 		Bounds Around(const glm::vec3& point)
 		{
 			return { point, point };
@@ -185,6 +187,50 @@ namespace Loom
 				lines.push_back(glm::vec3(world * glm::vec4(triangle.corners[corner], 1.0f)));
 				lines.push_back(glm::vec3(world * glm::vec4(triangle.corners[(corner + 1) % CORNERS], 1.0f)));
 			};
+	};
+
+	void MeshCollider::TrianglesNear(const glm::mat4& world, const Bounds& near, std::vector<glm::vec3>& corners) const
+	{
+		if (m_nodes.empty() || glm::determinant(glm::mat3(world)) == 0.0f)
+			return;
+
+		// near's corners in the mesh's own space, boxed again there.
+		const glm::mat4 toLocal = glm::inverse(world);
+		Bounds local = Around(glm::vec3(toLocal * glm::vec4(near.min, 1.0f)));
+
+		for (uint32_t corner = 0; corner < BOX_CORNERS; corner++)
+		{
+			const glm::vec3 point(
+				corner & 1 ? near.max.x : near.min.x,
+				corner & 2 ? near.max.y : near.min.y,
+				corner & 4 ? near.max.z : near.min.z);
+
+			local = local.Union(Around(glm::vec3(toLocal * glm::vec4(point, 1.0f))));
+		};
+
+		std::array<uint32_t, MOST_DEPTH> pending;
+		size_t count = 0;
+		pending[count++] = 0;
+
+		while (count > 0)
+		{
+			const uint32_t index = pending[--count];
+			const Node& node = m_nodes[index];
+
+			if (!node.bounds.Overlaps(local))
+				continue;
+
+			if (node.count == 0)
+			{
+				pending[count++] = node.second;
+				pending[count++] = index + 1;
+				continue;
+			};
+
+			for (uint32_t i = node.first; i < node.first + node.count; i++)
+				for (const glm::vec3& corner : m_triangles[i].corners)
+					corners.push_back(glm::vec3(world * glm::vec4(corner, 1.0f)));
+		};
 	};
 
 	bool MeshCollider::Intersect(const glm::mat4& world, const Ray& ray, float maxDistance, RaycastHit& hit) const

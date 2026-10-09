@@ -14,6 +14,8 @@
 
 namespace Loom
 {
+	struct Collider;
+	struct Collision;
 	struct GameObject;
 
 	/// Summary:
@@ -32,6 +34,17 @@ namespace Loom
 		constexpr virtual void OnRender()	{ };
 		constexpr virtual void OnPhysics()	{ };
 
+		// Called on every component of a GameObject whose collider starts,
+		// keeps on or stops touching another, at most once a physics step for
+		// each pair, as Unity's are. Collisions need a Rigidbody on at least
+		// one side; triggers report overlaps in place of collisions.
+		constexpr virtual void OnCollisionEnter(const Collision&)	{ };
+		constexpr virtual void OnCollisionStay(const Collision&)	{ };
+		constexpr virtual void OnCollisionExit(const Collision&)	{ };
+		constexpr virtual void OnTriggerEnter(Collider&)			{ };
+		constexpr virtual void OnTriggerStay(Collider&)				{ };
+		constexpr virtual void OnTriggerExit(Collider&)				{ };
+
 		virtual ~ComponentBase() { };
 
 		const std::string& GetClassName() const { return m_name; };
@@ -40,6 +53,9 @@ namespace Loom
 		// This is what identifies a component in the editor's inspector.
 		const char* GetTypeName() const { return m_type_name; };
 		GameObject const* GetGameObject() const { return m_gameObject; };
+
+		// Whether it overrides any of the collision or trigger callbacks.
+		bool HearsContacts() const { return m_hearsContacts; };
 
 	protected:
 		friend struct GameObject;
@@ -57,6 +73,8 @@ namespace Loom
 		void DrawDefaultGui();
 
 		const char* m_type_name;
+
+		bool m_hearsContacts = false;
 	};
 
 

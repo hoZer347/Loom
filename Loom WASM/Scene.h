@@ -7,6 +7,7 @@
 #include "ColliderTree.h"
 #include "GameObject.h"
 #include "Physics.h"
+#include "Simulation.h"
 
 #include <thread>
 #include <mutex>
@@ -48,8 +49,9 @@ namespace Loom
 		// the same view, that share its light.
 		void Render(Camera* camera = nullptr, const std::vector<Scene*>& drawn = allScenes);
 
-		// Runs OnPhysics through the hierarchy, which syncs every enabled
-		// collider into this scene's collider tree.
+		// One physics step: runs OnPhysics through the hierarchy, which syncs
+		// every enabled collider into this scene's collider tree and gathers
+		// its rigid bodies, then moves them by FixedDeltaTime.
 		void Physics();
 
 		// Against this scene's colliders alone; see Loom::Physics.
@@ -72,8 +74,9 @@ namespace Loom
 		friend struct Engine;
 		int thread_id;
 
-		// Before root, so it outlives the colliders root deletes on the spot.
+		// Before root, so they outlive the colliders root deletes on the spot.
 		ColliderTree colliders;
+		Simulation simulation;
 
 		GameObject root;
 

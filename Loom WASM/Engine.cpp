@@ -7,10 +7,12 @@
 #include "Renderer.h"
 #include "Scene.h"
 #include "Input.h"
+#include "Physics.h"
 #include "Utilities/Clock.h"
 
 #include <iostream>
 #include <atomic>
+#include <algorithm>
 #include <fstream>
 #include <vector>
 
@@ -22,6 +24,9 @@ namespace Loom
 	const unsigned int SCR_HEIGHT = 600;
 
 	ImGuiIO* io;
+
+	// Frame time the physics steps have not covered yet.
+	float s_physicsTime = 0.0f;
 
 	namespace
 	{
@@ -196,8 +201,22 @@ namespace Loom
 
 		if (updateScenes)
 		{
-			for (auto& scene : Scene::allScenes)
-				scene->Physics();
+			// As many fixed steps as the frame's time covers, carrying the
+			// rest over, and at most a few, so a slow frame does not leave
+			// the next one further behind.
+			constexpr int MOST_STEPS = 4;
+
+			s_physicsTime += Time::DeltaTime();
+
+			for (int step = 0; step < MOST_STEPS && s_physicsTime >= Physics::FixedDeltaTime(); step++)
+			{
+				s_physicsTime -= Physics::FixedDeltaTime();
+
+				for (auto& scene : Scene::allScenes)
+					scene->Physics();
+			};
+
+			s_physicsTime = std::min(s_physicsTime, Physics::FixedDeltaTime());
 
 			for (auto& scene : Scene::allScenes)
 				scene->Update();

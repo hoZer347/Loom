@@ -43,9 +43,12 @@ namespace Loom
 		const std::string& name,
 		int thread_id) :
 		thread_id(thread_id),
+		simulation(colliders),
 		root(nullptr, "Root", thread_id)
 	{
 		SetName(name);
+
+		colliders.onRemove = [this](const Collider& collider) { simulation.Forget(collider); };
 
 		Engine::QueueTask(
 			[this]()
@@ -121,12 +124,16 @@ namespace Loom
 	void Scene::Physics()
 	{
 		ColliderTree::current = &colliders;
+		Simulation::current = &simulation;
 		colliders.BeginSync();
 
 		root.Physics();
 
 		colliders.EndSync();
+		simulation.Step(Loom::Physics::FixedDeltaTime());
+
 		ColliderTree::current = nullptr;
+		Simulation::current = nullptr;
 	};
 
 	namespace

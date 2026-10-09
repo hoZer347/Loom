@@ -176,7 +176,7 @@ namespace Loom
 		return true;
 	};
 
-	void SphereCollider::Place(const glm::mat4& world, glm::vec3& worldCenter, float& worldRadius) const
+	void SphereCollider::InWorld(const glm::mat4& world, glm::vec3& worldCenter, float& worldRadius) const
 	{
 		const float scale = std::max({
 			glm::length(glm::vec3(world[0])),
@@ -192,7 +192,7 @@ namespace Loom
 		glm::vec3 middle;
 		float reach;
 
-		Place(world, middle, reach);
+		InWorld(world, middle, reach);
 
 		return { middle - glm::vec3(reach), middle + glm::vec3(reach) };
 	};
@@ -202,7 +202,7 @@ namespace Loom
 		glm::vec3 middle;
 		float reach;
 
-		Place(world, middle, reach);
+		InWorld(world, middle, reach);
 
 		for (int axis = 0; axis < glm::vec3::length(); axis++)
 		{
@@ -234,7 +234,7 @@ namespace Loom
 		glm::vec3 middle;
 		float reach;
 
-		Place(world, middle, reach);
+		InWorld(world, middle, reach);
 
 		if (reach <= 0.0f)
 			return false;

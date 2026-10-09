@@ -45,6 +45,7 @@ namespace Loom
 		float HalfArea() const;
 
 		bool Contains(const Bounds& inner) const;
+		bool Overlaps(const Bounds& other) const;
 
 		Bounds Union(const Bounds& other) const;
 		Bounds Expanded(float margin) const;
@@ -74,14 +75,22 @@ namespace Loom
 	* Loom::Physics
 	* - Raycasts against every open scene, as Unity's Physics.Raycast does. A
 	*   scene's own Scene::Raycast keeps to that scene
-	* - A collider is where the scene's last physics step left it: the engine
-	*   steps every scene at the start of each frame it updates them, before
-	*   OnUpdate, so a collider moved in OnUpdate is found where it went from
-	*   the next frame on. Scene::Physics steps a scene by hand
-	* - A ray that starts inside a collider does not hit it
+	* - The engine steps every scene's physics at a fixed rate, as Unity's
+	*   FixedUpdate does: as many steps of FixedDeltaTime as the frame's time
+	*   covers, before OnUpdate. Scene::Physics takes one step by hand
+	* - A collider is where the scene's last physics step left it, so one
+	*   moved in OnUpdate is found where it went after the next step
+	* - A ray that starts inside a box or sphere does not hit it
 	*/
 	namespace Physics
 	{
+		LOOM_API glm::vec3 GetGravity();
+		LOOM_API void SetGravity(const glm::vec3& gravity);
+
+		// Seconds a physics step covers.
+		LOOM_API float FixedDeltaTime();
+		LOOM_API void SetFixedDeltaTime(float seconds);
+
 		// The nearest hit within maxDistance, into hit.
 		LOOM_API bool Raycast(const Ray& ray, RaycastHit& hit, float maxDistance = INFINITE_DISTANCE);
 		LOOM_API bool Raycast(const glm::vec3& origin, const glm::vec3& direction, RaycastHit& hit, float maxDistance = INFINITE_DISTANCE);

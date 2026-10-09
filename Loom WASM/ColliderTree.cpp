@@ -159,6 +159,9 @@ namespace Loom
 		if (collider.m_tree != this)
 			return;
 
+		if (onRemove)
+			onRemove(collider);
+
 		RemoveLeaf(collider.m_node);
 		Free(collider.m_node);
 
@@ -221,6 +224,32 @@ namespace Loom
 			for (const std::optional<Pending>& child : { first, second })
 				if (child)
 					pending.Push(*child);
+		};
+	};
+
+	void ColliderTree::Query(const Bounds& bounds, const std::function<void(Collider&)>& visit) const
+	{
+		if (m_root == NONE)
+			return;
+
+		SmallStack<int, INLINE_PENDING> pending;
+		pending.Push(m_root);
+
+		while (!pending.Empty())
+		{
+			const Node& node = m_nodes[pending.Pop()];
+
+			if (!node.bounds.Overlaps(bounds))
+				continue;
+
+			if (node.IsLeaf())
+			{
+				visit(*node.collider);
+				continue;
+			};
+
+			pending.Push(node.children[0]);
+			pending.Push(node.children[1]);
 		};
 	};
 

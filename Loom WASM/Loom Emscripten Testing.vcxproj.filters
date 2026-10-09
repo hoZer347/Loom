@@ -88,6 +88,15 @@
     <ClCompile Include="MeshCollider.cpp">
       <Filter>Collider</Filter>
     </ClCompile>
+    <ClCompile Include="Contacts.cpp">
+      <Filter>Collider</Filter>
+    </ClCompile>
+    <ClCompile Include="Rigidbody.cpp">
+      <Filter>Collider</Filter>
+    </ClCompile>
+    <ClCompile Include="Simulation.cpp">
+      <Filter>Collider</Filter>
+    </ClCompile>
     <ClCompile Include="Physics.cpp">
       <Filter>Collider</Filter>
     </ClCompile>
@@ -302,6 +311,18 @@
       <Filter>Collider</Filter>
     </ClInclude>
     <ClInclude Include="MeshCollider.h">
+      <Filter>Collider</Filter>
+    </ClInclude>
+    <ClInclude Include="Collision.h">
+      <Filter>Collider</Filter>
+    </ClInclude>
+    <ClInclude Include="Contacts.h">
+      <Filter>Collider</Filter>
+    </ClInclude>
+    <ClInclude Include="Rigidbody.h">
+      <Filter>Collider</Filter>
+    </ClInclude>
+    <ClInclude Include="Simulation.h">
       <Filter>Collider</Filter>
     </ClInclude>
     <ClInclude Include="Physics.h">

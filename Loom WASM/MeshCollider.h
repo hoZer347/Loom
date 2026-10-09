@@ -29,6 +29,15 @@ namespace Loom
 	{
 		size_t TriangleCount() const { return m_triangles.size(); };
 
+		bool IsTrigger() const override { return isTrigger; };
+		ColliderShape Shape() const override { return ColliderShape::Mesh; };
+
+		// The triangles that may reach into near, a box in world space, posed
+		// by world: three corners each, in world space.
+		void TrianglesNear(const glm::mat4& world, const Bounds& near, std::vector<glm::vec3>& corners) const;
+
+		Serial<bool> isTrigger;
+
 	protected:
 		bool Refresh() const override;
 

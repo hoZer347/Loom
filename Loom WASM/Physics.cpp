@@ -21,6 +21,12 @@ namespace Loom
 			&& glm::all(glm::lessThanEqual(inner.max, max));
 	};
 
+	bool Bounds::Overlaps(const Bounds& other) const
+	{
+		return glm::all(glm::lessThanEqual(min, other.max))
+			&& glm::all(glm::lessThanEqual(other.min, max));
+	};
+
 	Bounds Bounds::Union(const Bounds& other) const
 	{
 		return { glm::min(min, other.min), glm::max(max, other.max) };
@@ -75,6 +81,19 @@ namespace Loom
 
 	namespace Physics
 	{
+		namespace
+		{
+			// Unity's defaults, but for the step, which is the display's usual rate.
+			glm::vec3 s_gravity(0.0f, -9.81f, 0.0f);
+			float s_fixedDeltaTime = 1.0f / 60.0f;
+		};
+
+		glm::vec3 GetGravity() { return s_gravity; };
+		void SetGravity(const glm::vec3& gravity) { s_gravity = gravity; };
+
+		float FixedDeltaTime() { return s_fixedDeltaTime; };
+		void SetFixedDeltaTime(float seconds) { s_fixedDeltaTime = seconds; };
+
 		bool Raycast(const Ray& ray, RaycastHit& hit, float maxDistance)
 		{
 			bool found = false;
