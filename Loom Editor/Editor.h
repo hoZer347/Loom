@@ -177,6 +177,11 @@ namespace Loom
 		// recorded, one per frame, so an automated run can step back over them.
 		void QueueHistoryStep(bool undo);
 
+		// A left click at x, y in ImGui's coordinates, let go at to_x, to_y,
+		// once the scripts are built, so an automated run can click through
+		// the panels without the real mouse.
+		void QueueClick(float x, float y, float to_x, float to_y);
+
 		// The graphics API the settings file says to start on, which main reads
 		// before the Engine opens its window. OpenGL when nothing is saved.
 		static Backend SavedBackend();
@@ -322,6 +327,7 @@ namespace Loom
 		// Into the folder the drop landed in, selecting the copy.
 		void CopyIntoProject(const std::string& file);
 		void ImportQueued();
+		void ClickQueued();
 
 		// Rescans the project folder: the asset tree the Project panel draws,
 		// and the scenes in it.
@@ -598,6 +604,19 @@ namespace Loom
 
 		// True for an undo, false for a redo.
 		std::vector<bool> m_historySteps{ };
+
+		struct QueuedClick
+		{
+			float x = 0.0f;
+			float y = 0.0f;
+			float toX = 0.0f;
+			float toY = 0.0f;
+
+			// Which of its events goes next, one a frame.
+			int step = 0;
+		};
+
+		std::vector<QueuedClick> m_clicks{ };
 
 		// By GUID rather than pointer, here and in the Hierarchy's tree ids:
 		// undo rebuilds a scene into new objects that keep their GUIDs.

@@ -290,6 +290,29 @@ TEST_SUITE("SpriteEditor")
 		CHECK(Count(driven.Saved(), CLEAR) == Driven::side * Driven::side);
 	};
 
+	TEST_CASE("a tool picked mid-stroke still lets the stroke end, and Ctrl+Z take it back")
+	{
+		Driven driven("loom sprite switch.tga");
+		ImGuiIO& io = ImGui::GetIO();
+
+		io.AddMousePosEvent(middle.x, middle.y);
+		driven.Frame();
+		io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+		driven.Frame();
+
+		io.AddKeyEvent(ImGuiKey_G, true);
+		driven.Frame();
+		io.AddKeyEvent(ImGuiKey_G, false);
+		driven.Frame();
+
+		io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+		driven.Frame();
+
+		driven.Press(ImGuiKey_Z);
+
+		CHECK(Count(driven.Saved(), CLEAR) == Driven::side * Driven::side);
+	};
+
 	TEST_CASE("fill paints the whole image when it is one colour")
 	{
 		Driven driven("loom sprite fill.tga");

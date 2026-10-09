@@ -223,9 +223,16 @@ namespace Loom
 		else if (extension == ".jpg" || extension == ".jpeg")
 			written = stbi_write_jpg_to_func(append, &bytes, width, height, channels, pixels, jpeg_quality);
 
+		// Checked before the file is opened, which empties it.
+		if (!written)
+		{
+			std::cerr << "Sprites: could not encode " << path << std::endl;
+			return false;
+		};
+
 		std::ofstream file(path, std::ios::binary);
 
-		if (!written || !file.write(bytes.data(), (std::streamsize)bytes.size()))
+		if (!file.write(bytes.data(), (std::streamsize)bytes.size()))
 		{
 			std::cerr << "Sprites: could not save " << path << std::endl;
 			return false;
@@ -503,6 +510,20 @@ namespace Loom
 	{
 		Image& image = document.image;
 
+		// Before the tool is looked at, since it may have changed mid-stroke.
+		// A stroke that changed nothing, such as one wholly off the image,
+		// leaves nothing to undo.
+		if (document.stroking && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
+		{
+			document.stroking = false;
+
+			if (image == document.undo.back())
+				document.undo.pop_back();
+
+			document.unsaved = image != document.saved;
+			return;
+		};
+
 		switch (m_tool)
 		{
 		case Tool::Picker:
@@ -537,19 +558,6 @@ namespace Loom
 
 		if (!document.stroking)
 			return;
-
-		// A stroke that changed nothing, such as one wholly off the image,
-		// leaves nothing to undo.
-		if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
-		{
-			document.stroking = false;
-
-			if (image == document.undo.back())
-				document.undo.pop_back();
-
-			document.unsaved = image != document.saved;
-			return;
-		};
 
 		const Colour colour = m_tool == Tool::Eraser ? Colour{ } : m_colour;
 

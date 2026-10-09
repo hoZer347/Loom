@@ -160,6 +160,8 @@ namespace
 			<< "  --save-layout-prompt           start with Layout > Save Layout... open\n"
 			<< "  --open-sprite <file>           open an image in the Sprites panel\n"
 			<< "  --undo, --redo                 step the history once the imports have landed\n"
+			<< "  --click <x y> [x y]            left click there once the scripts are built,\n"
+			<< "                                 letting go at the second point if given\n"
 			<< "  --vulkan, --opengl             run on that graphics API this time\n"
 			<< "  --screenshot <file> [frames]   write the editor to a bitmap and exit,\n"
 			<< "                                 without showing a window\n"
@@ -481,6 +483,25 @@ int main(int argc, char** argv)
 			};
 
 			editor.OpenDemo(argv[++i]);
+		}
+		else if (argument == "--click")
+		{
+			if (i + 2 >= argc)
+			{
+				std::cerr << "--click needs a point" << std::endl;
+				return 1;
+			};
+
+			const float x = (float)atof(argv[++i]);
+			const float y = (float)atof(argv[++i]);
+
+			// An optional point to let go at, which makes it a drag.
+			if (i + 2 < argc && isdigit((unsigned char)argv[i + 1][0]) && isdigit((unsigned char)argv[i + 2][0]))
+			{
+				editor.QueueClick(x, y, (float)atof(argv[i + 1]), (float)atof(argv[i + 2]));
+				i += 2;
+			}
+			else editor.QueueClick(x, y, x, y);
 		}
 		else if (argument == "--undo" || argument == "--redo")
 			editor.QueueHistoryStep(argument == "--undo");

@@ -1077,7 +1077,8 @@ namespace Loom
 
 	void Editor::HandleShortcuts()
 	{
-		// The Sprites panel undoes its own strokes.
+		// The Sprites panel has the keyboard, and none of the scene's
+		// shortcuts mean anything there.
 		if (m_showSprites && m_sprites.IsFocused())
 			return;
 
@@ -1277,6 +1278,7 @@ namespace Loom
 			SaveSettings();
 
 		ImportQueued();
+		ClickQueued();
 		PollScripts();
 
 		// The renderer reads the window back once this frame has finished
@@ -2789,6 +2791,16 @@ namespace Loom
 		if (m_importQueue.empty())
 			return;
 
+		// A build has the scenes down; the files wait for them to come back and
+		// be drawn, so there is something under the mouse to import into.
+		if (!m_scripts.IsIdle())
+		{
+			m_importTarget = nullptr;
+			m_importFolder.clear();
+			m_importPlaced = false;
+			return;
+		};
+
 		const QueuedImport& front = m_importQueue.front();
 
 		// The mouse event lands at the start of the next frame, and the panels
@@ -2799,16 +2811,6 @@ namespace Loom
 			m_importPlaced = true;
 			m_importTarget = nullptr;
 			m_importFolder.clear();
-			return;
-		};
-
-		// A build has the scenes down; the files wait for them to come back and
-		// be drawn, so there is something under the mouse to import into. A
-		// copy into the Project panel needs no scene.
-		if (m_importFolder.empty() && !m_scripts.IsIdle())
-		{
-			m_importTarget = nullptr;
-			m_importPlaced = false;
 			return;
 		};
 
@@ -2852,6 +2854,33 @@ namespace Loom
 		m_importTarget = nullptr;
 		m_importFolder.clear();
 		m_importPlaced = false;
+	};
+
+	void Editor::QueueClick(float x, float y, float to_x, float to_y)
+	{
+		m_clicks.push_back(QueuedClick{ x, y, to_x, to_y });
+	};
+
+	void Editor::ClickQueued()
+	{
+		if (m_clicks.empty() || !m_scripts.IsIdle())
+			return;
+
+		enum { Move, Press, Drag, Release };
+
+		QueuedClick& click = m_clicks.front();
+		ImGuiIO& io = ImGui::GetIO();
+
+		switch (click.step++)
+		{
+		case Move:		io.AddMousePosEvent(click.x, click.y);						break;
+		case Press:		io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);		break;
+		case Drag:		io.AddMousePosEvent(click.toX, click.toY);					break;
+		case Release:
+			io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+			m_clicks.erase(m_clicks.begin());
+			break;
+		};
 	};
 
 	void Editor::TakeImportFolder(const std::string& folder, bool hovered)

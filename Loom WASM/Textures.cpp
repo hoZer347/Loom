@@ -21,8 +21,6 @@ namespace Loom
 	{
 		constexpr int RGBA = 4;
 
-		// One Texture per path, shared by everything that names it, and kept
-		// until the process ends.
 		std::unordered_map<std::string, Texture*> shared{ };
 	};
 
