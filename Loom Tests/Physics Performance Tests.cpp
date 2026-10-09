@@ -37,12 +37,13 @@ namespace
 	constexpr float MOST_EXTENT = 1.5f;
 
 	constexpr float FULL_TURN = 360.0f;
+	constexpr float HALF = 0.5f;
+
 	constexpr double MICROSECONDS_PER_MILLISECOND = 1000.0;
 
 	// A batch is timed this many times and the quickest kept, so a thread
 	// switched out mid-batch costs a retry rather than the result.
 	constexpr int TRIES = 5;
-	constexpr float HALF = 0.5f;
 
 	enum Kind { BOX, SPHERE, KINDS };
 
