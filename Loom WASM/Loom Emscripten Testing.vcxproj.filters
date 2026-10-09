@@ -64,6 +64,9 @@
     <ClCompile Include="Sprite.cpp">
       <Filter>Sprite</Filter>
     </ClCompile>
+    <ClCompile Include="Audio.cpp">
+      <Filter>Audio</Filter>
+    </ClCompile>
     <ClCompile Include="Camera.cpp">
       <Filter>Camera</Filter>
     </ClCompile>
@@ -155,6 +158,9 @@
     </Filter>
     <Filter Include="LoomObject">
       <UniqueIdentifier>{da5e6d83-c126-402d-9369-f5608d3305a6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Audio">
+      <UniqueIdentifier>{8f3b2c71-4d6e-4a95-b1c8-7e2d9f0a6b34}</UniqueIdentifier>
     </Filter>
     <Filter Include="Camera">
       <UniqueIdentifier>{5c1e8a3d-7b42-4f19-9d6e-2a0b3c4d5e61}</UniqueIdentifier>
@@ -269,6 +275,9 @@
     </ClInclude>
     <ClInclude Include="Light.h">
       <Filter>Light</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio.h">
+      <Filter>Audio</Filter>
     </ClInclude>
     <ClInclude Include="Camera.h">
       <Filter>Camera</Filter>

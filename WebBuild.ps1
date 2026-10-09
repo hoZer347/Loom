@@ -11,6 +11,7 @@ $webIncludes = @(
     $webWasm
     (Join-Path $webRoot 'External Libraries\glm')
     (Join-Path $webRoot 'External Libraries\stb')
+    (Join-Path $webRoot 'External Libraries\miniaudio')
     $webImGui
 ) | ForEach-Object { "-I$_" }
 

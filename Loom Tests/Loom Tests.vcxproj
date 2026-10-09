@@ -38,6 +38,7 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Property Files\doctest.props" />
     <Import Project="..\Property Files\stb.props" />
+    <Import Project="..\Property Files\miniaudio.props" />
     <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenGL.props" />
     <Import Project="..\Property Files\Vulkan.props" />
@@ -47,6 +48,7 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Property Files\doctest.props" />
     <Import Project="..\Property Files\stb.props" />
+    <Import Project="..\Property Files\miniaudio.props" />
     <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenGL.props" />
     <Import Project="..\Property Files\Vulkan.props" />
@@ -119,6 +121,7 @@
     <ClCompile Include="Scene Tests.cpp" />
     <ClCompile Include="Camera Tests.cpp" />
     <ClCompile Include="Light Tests.cpp" />
+    <ClCompile Include="Audio Tests.cpp" />
     <ClCompile Include="Sprite Tests.cpp" />
     <ClCompile Include="SelectionOutline Tests.cpp" />
     <ClCompile Include="Mesh Tests.cpp" />

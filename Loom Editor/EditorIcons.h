@@ -19,6 +19,7 @@ namespace Loom
 		constexpr const char* Scene = "🎬";
 		constexpr const char* Shader = "✨";
 		constexpr const char* Texture = "🖼";
+		constexpr const char* Sound = "🔊";
 		constexpr const char* Model = "🧊";
 		constexpr const char* Header = "📑";
 		constexpr const char* Source = "📜";

@@ -1,0 +1,89 @@
+Main(1c6a8dc5-0302-4316-ad17-905e6d22dee6):
+	GameObject Root(09556bb0-49df-4492-ba80-b6ca902009d2)
+		0 = 0
+		1 = false
+		GameObject Camera(7bec652b-dd81-4041-8f0f-0b704abacd9f)
+			0 = 0
+			1 = false
+			2 = (0, 5, 8)
+			Component Camera(489f0816-79e3-402c-9e85-1d598e9a0fdf)
+				0 = true
+				1 = (0, 0.5, 0)
+				2 = 45
+				3 = 0.1
+				4 = 100
+			Component AudioListener(a81d561e-6c59-40f5-8d20-05dffb8870d2)
+		GameObject Sun(a8be586b-5a20-4955-bf8d-a010a4bcbce7)
+			0 = 0
+			1 = false
+			Component Light(29df0c53-4085-4e69-8542-e09ebda75930)
+				0 = (-0.6, -1, -0.4)
+				1 = (1, 1, 1)
+				2 = 1
+				3 = 0.3
+				4 = true
+				5 = 2048
+				6 = (0, 0, 0)
+				7 = 9
+		GameObject Floor(3eccb100-c0bb-4164-a5de-3cd6b42676c2)
+			0 = 0
+			1 = false
+			2 = (0, -0.25, 0)
+			4 = (14, 0.5, 14)
+			Component Shape(cc23928f-5d7b-4c73-846d-1dfa76be8223)
+				0 = false
+				1 = (0.82, 0.8, 0.76)
+				2 = "Assets/Lit.shader"
+		GameObject Hum(6977cdd0-5597-43ff-a914-50969085cc86)
+			0 = 0
+			1 = false
+			2 = (0, 1, 3)
+			4 = (0.8, 0.8, 0.8)
+			Component Shape(602b3f9f-3359-4154-a8b0-b7656019e274)
+				0 = true
+				1 = (0.3, 0.7, 0.75)
+				2 = "Assets/Lit.shader"
+			Component Orbit(280d2d58-41b7-4beb-b1e0-44f6a97f8e61)
+				0 = (0, 1, 0)
+				1 = 3
+				2 = 6
+				3 = 0
+			Component AudioSource(ed4bce0b-a964-44e2-8d00-aea34f7b3ca6)
+				0 = "Assets/Hum.wav"
+				1 = 1
+				2 = 1
+				3 = true
+				4 = true
+				5 = true
+				6 = 3
+				7 = 500
+		GameObject Left Bell(2053659f-e257-4f76-8edf-9f63db484c7a)
+			0 = 0
+			1 = false
+			2 = (-4, 1, 0)
+			4 = (0.8, 2, 0.8)
+			Component Shape(97bbffbb-d38c-4c90-b424-1fbedc310a36)
+				0 = false
+				1 = (0.85, 0.35, 0.25)
+				2 = "Assets/Lit.shader"
+			Component Chime(a072bae1-8a5b-4b4a-8e23-6fafa839da20)
+				0 = "Assets/Bell.wav"
+				1 = 4
+				2 = 2
+				3 = 1
+				4 = (1, 0.9, 0.4)
+		GameObject Right Bell(006760e4-5bf8-489b-ac50-3f17fda724df)
+			0 = 0
+			1 = false
+			2 = (4, 1, 0)
+			4 = (0.8, 2, 0.8)
+			Component Shape(09862dcc-7556-437e-abac-5bf82ef92ec7)
+				0 = false
+				1 = (0.3, 0.5, 0.85)
+				2 = "Assets/Lit.shader"
+			Component Chime(9b76400c-a572-457c-a324-389517384d3c)
+				0 = "Assets/Bell.wav"
+				1 = 4
+				2 = 2
+				3 = 2
+				4 = (1, 0.9, 0.4)

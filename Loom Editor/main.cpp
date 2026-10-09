@@ -12,6 +12,7 @@
 #include "SceneSerializer.h"
 #include "UiScript.h"
 
+#include "Audio.h"
 #include "Engine.h"
 #include "OpenGL.h"
 #include "Scene.h"
@@ -292,6 +293,10 @@ int main(int argc, char** argv)
 		if (argument == "--desktop" && i + 1 < argc)
 			desktop = argv[i + 1];
 	};
+
+	// Nobody is listening to an automated run either, and its sounds would
+	// play over whatever whoever is at the machine is doing.
+	Audio::useDevice = Engine::showWindow;
 
 	// The Engine comes first: it owns the window, the renderer and the ImGui
 	// context the editor draws itself into.

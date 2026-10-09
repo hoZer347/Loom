@@ -2,6 +2,7 @@
 
 #include "imgui.h"
 
+#include "Audio.h"
 #include "OpenGL.h"
 #include "Renderer.h"
 #include "Scene.h"
@@ -203,6 +204,8 @@ namespace Loom
 
 			Utilities::Update();
 		};
+
+		Audio::Tick();
 
 		if (renderScenes)
 			for (auto& scene : Scene::allScenes)

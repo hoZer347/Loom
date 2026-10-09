@@ -39,6 +39,9 @@ namespace Loom
 		if (ProjectAssets::IsTextureFile(path))
 			return Texture;
 
+		if (ProjectAssets::IsSoundFile(path))
+			return Sound;
+
 		if (ProjectAssets::IsScriptFile(path))
 			return extension == sourceExtension ? Source : Header;
 

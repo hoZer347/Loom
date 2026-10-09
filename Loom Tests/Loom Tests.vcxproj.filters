@@ -37,6 +37,9 @@
     <ClCompile Include="Light Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="Audio Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="EditorSettings Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

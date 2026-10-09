@@ -4,6 +4,7 @@
 #include "EditorIcons.h"
 #include "ProjectTemplate.h"
 
+#include "Audio.h"
 #include "Engine.h"
 #include "GameObject.h"
 #include "Scene.h"
@@ -328,6 +329,8 @@ namespace Loom
 			return;
 
 		m_playing = false;
+
+		Audio::StopAll();
 
 		std::vector<SceneSnapshot> snapshots;
 
