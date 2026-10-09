@@ -62,7 +62,7 @@ TEST_SUITE("Mesh")
 
 	TEST_CASE("a mesh is a component and registers itself for rendering")
 	{
-		CHECK(std::is_base_of_v<Loom::Component<Loom::Mesh>, Loom::Mesh>);
+		CHECK(std::is_base_of_v<Loom::Component<Loom::Mesh, "Rendering">, Loom::Mesh>);
 		CHECK(std::is_base_of_v<Loom::ComponentBase, Loom::Mesh>);
 	};
 

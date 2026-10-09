@@ -26,13 +26,10 @@ namespace Loom
 	*   the editor offers under "Add Component"
 	* - Every default-constructible Component<T> puts itself in here, under its
 	*   own type name, as the statics of each module that includes it start up
-	* - A type that declares a static `category` string is filed under it in the
-	*   Add Component menu, with '/' between nested categories:
+	* - A type that names a category after itself is filed under it in the Add
+	*   Component menu, with '/' between nested categories:
 	*
-	*	struct Patrol : Component<Patrol>
-	*	{
-	*		static constexpr const char* category = "Gameplay/AI";
-	*	};
+	*	struct Patrol : Component<Patrol, "Gameplay/AI"> { };
 	*/
 	struct LOOM_API ComponentRegistry final
 	{
@@ -58,22 +55,28 @@ namespace Loom
 				[args...](auto& gameObject) -> ComponentBase*
 				{
 					return gameObject.template Attach<T>(args...);
-				},
-				CategoryOfType<T>());
+				});
 		};
 
 		// What Component<T> runs for every type derived from it. One that cannot
 		// be built from nothing has no place in a menu, and is left to register
 		// itself with the arguments it needs.
 		template <typename T>
-		static bool RegisterType()
+		static bool RegisterType(const char* category = "")
 		{
 			if constexpr (std::is_default_constructible_v<T>)
 			{
 				const std::string name = PrettyTypeName(typeid(T).name());
 
 				if (IsFree(name, typeid(T).name()))
-					Register<T>(name);
+					Register(
+						name,
+						typeid(T).name(),
+						[](auto& gameObject) -> ComponentBase*
+						{
+							return gameObject.template Attach<T>();
+						},
+						category);
 			};
 
 			return true;
@@ -100,15 +103,6 @@ namespace Loom
 		static std::string NameOf(const ComponentBase& component);
 
 	private:
-		template <typename T>
-		static std::string CategoryOfType()
-		{
-			if constexpr (requires { std::string(T::category); })
-				return T::category;
-			else
-				return "";
-		};
-
 		// Whether a type registering itself may take the name. Not when it
 		// already has it, which is a second module including the same type, and
 		// not when another type does: the names drop namespaces, and whichever

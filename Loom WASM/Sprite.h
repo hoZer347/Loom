@@ -26,10 +26,8 @@ namespace Loom
 	*   cutout, so the shadow has the image's shape, holes and all, and follows
 	*   it as the image, the tint or the cutoff change
 	*/
-	struct LOOM_API Sprite : Component<Sprite>
+	struct LOOM_API Sprite : Component<Sprite, "Rendering/2D">
 	{
-		static constexpr const char* category = "Rendering/2D";
-
 		void OnRender() override;
 
 		// The texture named by texturePath, loading it the first time it is asked

@@ -296,11 +296,11 @@ Scripts are Loom components written in headers: add a .hpp to Scripts/ with
     struct Name : Loom::Component<Name> { ... };
 
 in it and it is compiled and offered under Add Component's Custom section,
-with nothing to register. One header can hold several. A member
+with nothing to register. One header can hold several. Naming a category
 
-    static constexpr const char* category = "Gameplay/AI";
+    struct Name : Loom::Component<Name, "Gameplay/AI"> { ... };
 
-files it in a category of its own instead, '/' nesting one in another, and
+files it there instead, '/' nesting one in another, and
 right-clicking any component in the menu files it somewhere else for this
 project.
 

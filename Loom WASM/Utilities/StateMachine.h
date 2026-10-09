@@ -195,9 +195,9 @@ namespace Loom
 	///
 	///		struct Camp : Loom::StateMachine&lt;Camp&gt; { };
 	///		gameObject->Attach&lt;Camp&gt;();
-	template <typename _Self>
+	template <typename _Self, Str _Category = "">
 	struct StateMachine :
-		public Component<_Self>,
+		public Component<_Self, _Category>,
 		public StateMachineBase
 	{
 		/// What the machine enters when play starts, unless Current names a state.
@@ -255,9 +255,8 @@ namespace Loom
 		/// A machine with no behaviour of its own, for when the states are the whole of
 		/// it. In a namespace of its own so it can be called StateMachine beside the
 		/// template, and the registry, which drops namespaces, offers it as that.
-		struct StateMachine final : Loom::StateMachine<StateMachine>
+		struct StateMachine final : Loom::StateMachine<StateMachine, "Logic">
 		{
-			static constexpr const char* category = "Logic";
 		};
 	};
 };

@@ -11,7 +11,7 @@ TEST_SUITE("Collider")
 {
 	TEST_CASE("Collider is a component the physics pass can drive")
 	{
-		CHECK(std::is_base_of_v<Loom::Component<Loom::Physics::Collider>, Loom::Physics::Collider>);
+		CHECK(std::is_base_of_v<Loom::Component<Loom::Physics::Collider, "Physics">, Loom::Physics::Collider>);
 		CHECK(std::is_base_of_v<Loom::ComponentBase, Loom::Physics::Collider>);
 	};
 

@@ -36,7 +36,7 @@ TEST_SUITE("Material")
 
 	TEST_CASE("a material is a component and registers itself for rendering")
 	{
-		CHECK(std::is_base_of_v<Loom::Component<Loom::Material>, Loom::Material>);
+		CHECK(std::is_base_of_v<Loom::Component<Loom::Material, "Rendering">, Loom::Material>);
 		CHECK(std::is_base_of_v<Loom::ComponentBase, Loom::Material>);
 	};
 

@@ -5,6 +5,7 @@
 #include "ComponentRegistry.h"
 #include "imgui.h"
 #include "LoomObject.h"
+#include "Macro Helpers.h"
 
 #include <typeinfo>
 #include <type_traits>
@@ -59,10 +60,16 @@ namespace Loom
 	};
 
 
-	template <typename T>
+	// category files T in the Add Component menu, with '/' between nested
+	// categories.
+	template <typename T, Str category = "">
 		struct Component :
 		public ComponentBase
 	{
+		// What GameObject checks a type it attaches against: T itself, not a
+		// type derived from it.
+		typedef T ComponentType;
+
 		virtual ~Component() { };
 
 	protected:
@@ -77,13 +84,16 @@ namespace Loom
 		};
 
 	private:
-		static inline const bool s_registered = ComponentRegistry::RegisterType<T>();
+		static inline const bool s_registered = ComponentRegistry::RegisterType<T>(category.value);
 
 		// A static member is only defined once something uses it, and nothing in
 		// T would. Naming it in a typedef does: the typedef is instantiated with
 		// this class, which is the moment T derives from it.
 		typedef std::integral_constant<const bool*, &s_registered> Registration;
 	};
+
+	template <typename T>
+	concept AComponent = std::is_same_v<typename T::ComponentType, T>;
 };
 
 // The factory Component<T> registers attaches a T to a GameObject, so a file

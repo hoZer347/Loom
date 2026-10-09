@@ -17,10 +17,8 @@ namespace
 	struct Uncategorised final : Loom::Component<Uncategorised>
 	{ };
 
-	struct Categorised final : Loom::Component<Categorised>
-	{
-		static constexpr const char* category = "Gameplay / Enemies/";
-	};
+	struct Categorised final : Loom::Component<Categorised, "Gameplay / Enemies/">
+	{ };
 
 	// The node at path under root, or null.
 	const Loom::ComponentMenu::Node* Find(const Loom::ComponentMenu::Node& root, const std::vector<std::string>& path)

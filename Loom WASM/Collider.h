@@ -7,10 +7,8 @@ namespace Loom
 {
 	namespace Physics
 	{
-		struct Collider : Component<Collider>
+		struct Collider : Component<Collider, "Physics">
 		{
-			static constexpr const char* category = "Physics";
-
 			~Collider();
 
 			void OnPhysics() override;

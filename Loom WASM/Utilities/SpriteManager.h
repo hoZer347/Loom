@@ -25,10 +25,8 @@ namespace Loom
 	/// costs a uniform rather than a rebuild. The sprite carries its own position, and
 	/// the sheet is a Renderer texture handle the game supplies. sortingOrder is honoured by
 	/// drawing order.
-	struct SpriteManager : Component<SpriteManager>
+	struct SpriteManager : Component<SpriteManager, "Rendering/2D">
 	{
-		static constexpr const char* category = "Rendering/2D";
-
 		SpriteManager();
 		~SpriteManager();
 

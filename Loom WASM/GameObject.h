@@ -61,7 +61,7 @@ namespace Loom
 		template <typename T>
 		T* Attach(auto&&... args)
 		{
-			static_assert(std::is_base_of_v<Component<T>, T>, "Must be a component");
+			static_assert(AComponent<T>, "Must be a component");
 
 			T* component = new T(args...);
 
@@ -96,7 +96,7 @@ namespace Loom
 		template <typename T>
 		[[nodiscard]] T* GetComponent()
 		{
-			static_assert(std::is_base_of_v<Component<T>, T>, "Must be a component");
+			static_assert(AComponent<T>, "Must be a component");
 
 			// Compared by value, not by pointer: a script library carries its own
 			// copy of the type name, so the addresses differ across the module

@@ -11,10 +11,8 @@ namespace Loom
 {
 	struct Material;
 
-	struct LOOM_API Mesh : Component<Mesh>
+	struct LOOM_API Mesh : Component<Mesh, "Rendering">
 	{
-		static constexpr const char* category = "Rendering";
-
 		// The GL values, spelled out so this header does not have to pull in GL.
 		enum Primitive : uint32_t
 		{

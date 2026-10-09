@@ -41,10 +41,8 @@ namespace Loom
 	* - A Material with shadows off is left out of the shadow map, and
 	*   LoomShadow answers fully lit for it
 	*/
-	struct LOOM_API Light : Component<Light>
+	struct LOOM_API Light : Component<Light, "Rendering">
 	{
-		static constexpr const char* category = "Rendering";
-
 		~Light();
 
 		// The transform the shadow map is rendered with, from world space into

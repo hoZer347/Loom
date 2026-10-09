@@ -50,10 +50,8 @@ namespace Loom
 	/// Loom having neither a text renderer nor audio. Everything above that -- the
 	/// tokenising, the
 	/// bindings, the states, the timing -- is unchanged.
-	struct DialogueManager : StateMachine<DialogueManager>
+	struct DialogueManager : StateMachine<DialogueManager, "Logic">
 	{
-		static constexpr const char* category = "Logic";
-
 		DialogueManager();
 
 		#pragma region Script
