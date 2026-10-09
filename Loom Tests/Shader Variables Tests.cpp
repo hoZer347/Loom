@@ -547,7 +547,7 @@ TEST_SUITE("Shader variables")
 		CHECK(renderer.floats["u_shadowsOff"] == 1.0f);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a light's shadow map holds every scene it falls on, whichever is drawn")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a light's shadow map holds every scene drawn in the view that it falls on")
 	{
 		RecordingRenderer renderer;
 
@@ -579,6 +579,15 @@ TEST_SUITE("Shader variables")
 		renderer.drawn.clear();
 		borrower.Render();
 		CHECK(renderer.drawn == std::vector<uint32_t>{ borrower_shader.shadow_id, owner_shader.shadow_id, borrower_shader.id });
+
+		// A view drawing one scene alone shows no shadow from the other.
+		renderer.drawn.clear();
+		owner.Render(nullptr, { &owner });
+		CHECK(renderer.drawn == std::vector<uint32_t>{ owner_shader.shadow_id, owner_shader.id });
+
+		renderer.drawn.clear();
+		borrower.Render(nullptr, { &borrower });
+		CHECK(renderer.drawn == std::vector<uint32_t>{ borrower_shader.shadow_id, borrower_shader.id });
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader with transparency on is drawn after everything opaque, farthest first, writing no depth")

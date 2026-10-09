@@ -2845,7 +2845,7 @@ namespace Loom
 			[&]()
 			{
 				for (Scene* scene : scenes)
-					scene->Render(seen_through);
+					scene->Render(seen_through, scenes);
 
 				if (ringed)
 					outline->Draw(*m_selected, *seen_through);

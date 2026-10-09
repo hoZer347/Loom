@@ -57,7 +57,7 @@ namespace Loom
 		root.Update(thread);
 	};
 
-	void Scene::Render(Camera* camera)
+	void Scene::Render(Camera* camera, const std::vector<Scene*>& drawn)
 	{
 		Camera* seen = camera ? camera : root.FindComponent<Camera>();
 
@@ -74,13 +74,13 @@ namespace Loom
 		Light* light = LightFor(*this, allScenes);
 
 		// The shadow map has to be finished before the first mesh samples it,
-		// and holds every scene the light falls on, so shadows cross between
-		// them.
+		// and holds every scene drawn alongside this one that the light falls
+		// on, so shadows cross between them but not from scenes out of view.
 		if (light)
 		{
 			std::vector<GameObject*> lit{ &root };
 
-			for (Scene* scene : allScenes)
+			for (Scene* scene : drawn)
 				if (scene != this && LightFor(*scene, allScenes) == light)
 					lit.push_back(&scene->root);
 

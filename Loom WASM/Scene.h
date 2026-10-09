@@ -42,8 +42,9 @@ namespace Loom
 		// Seen through camera when one is given, in place of the first Camera in
 		// the hierarchy: the editor's views that look on from outside the game.
 		// A scene with no Camera or Light of its own borrows the first among the
-		// open scenes.
-		void Render(Camera* camera = nullptr);
+		// open scenes. Shadows are cast by those of drawn, the scenes drawn into
+		// the same view, that share its light.
+		void Render(Camera* camera = nullptr, const std::vector<Scene*>& drawn = allScenes);
 		void Physics();
 
 		static const std::vector<Scene*>& GetScenes() { return allScenes; };
