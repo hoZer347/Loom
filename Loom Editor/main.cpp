@@ -18,6 +18,7 @@
 
 #include <cctype>
 #include <cstdlib>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -170,7 +171,7 @@ namespace
 			<< "  --ui-script <file>             click, type and screenshot through the UI\n"
 			<< "                                 from a script (see UiScript.h), then exit,\n"
 			<< "                                 without showing a window\n"
-			<< "  --desktop <id>                show the window on that virtual desktop,\n"
+			<< "  --desktop <id>                 show the window on that virtual desktop,\n"
 			<< "                                 without activating it"
 			<< std::endl;
 	};
@@ -302,6 +303,11 @@ int main(int argc, char** argv)
 	if (!desktop.empty() && !ShowOnDesktop(Engine::window, desktop))
 		return 1;
 
+	// Opening a project moves the working directory into it, and the editor
+	// opens the last one as it starts, so relative paths on the command line
+	// are taken from where it was started.
+	const std::filesystem::path launch_folder = std::filesystem::current_path();
+
 	Editor editor;
 
 	bool compile = false;
@@ -364,7 +370,7 @@ int main(int argc, char** argv)
 				return 1;
 			};
 
-			script = std::make_unique<UiScript>();
+			script = std::make_unique<UiScript>(launch_folder);
 
 			if (!script->Load(argv[++i]))
 				return 1;
@@ -542,7 +548,7 @@ int main(int argc, char** argv)
 			Usage();
 			return 1;
 		}
-		else editor.OpenProject(argument);
+		else editor.OpenProject((launch_folder / argument).string());
 	};
 
 	if (!new_script.empty())

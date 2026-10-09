@@ -81,7 +81,7 @@ namespace Loom
 		ImGuiKey KeyNamed(const std::string& name)
 		{
 			for (int key = ImGuiKey_NamedKey_BEGIN; key < ImGuiKey_NamedKey_END; key++)
-				if (_stricmp(ImGui::GetKeyName((ImGuiKey)key), name.c_str()) == 0)
+				if (ImStricmp(ImGui::GetKeyName((ImGuiKey)key), name.c_str()) == 0)
 					return (ImGuiKey)key;
 
 			return ImGuiKey_None;
@@ -94,8 +94,9 @@ namespace Loom
 		};
 	};
 
-	UiScript::UiScript() :
-		m_context(ImGui::GetCurrentContext())
+	UiScript::UiScript(const std::filesystem::path& folder) :
+		m_context(ImGui::GetCurrentContext()),
+		m_folder(folder)
 	{
 		m_context->TestEngine = this;
 		m_context->TestEngineHookItems = true;
@@ -112,7 +113,7 @@ namespace Loom
 
 	bool UiScript::Load(const std::string& path)
 	{
-		std::ifstream file(path);
+		std::ifstream file(m_folder / path);
 
 		if (!file)
 		{
@@ -207,10 +208,12 @@ namespace Loom
 
 	bool UiScript::Parse(const std::string& line)
 	{
-		const std::vector<std::string> tokens = Tokens(line);
+		const size_t start = line.find_first_not_of(" \t");
 
-		if (tokens.empty() || tokens[0].front() == '#')
+		if (start == std::string::npos || line[start] == '#')
 			return true;
+
+		const std::vector<std::string> tokens = Tokens(line);
 
 		const std::string& verb = tokens[0];
 		ImGuiIO& io = ImGui::GetIO();
@@ -333,7 +336,7 @@ namespace Loom
 				ImGuiKey key = ImGuiKey_None;
 
 				for (const auto& [name, modifier] : modifiers)
-					if (_stricmp(name, part.c_str()) == 0)
+					if (ImStricmp(name, part.c_str()) == 0)
 						key = modifier;
 
 				if (key == ImGuiKey_None)
@@ -380,7 +383,7 @@ namespace Loom
 		}
 		else if (verb == "screenshot" && tokens.size() == 2)
 		{
-			const std::string path = tokens[1];
+			const std::string path = (m_folder / tokens[1]).string();
 
 			m_actions.push_back(
 				[path]()
@@ -391,7 +394,7 @@ namespace Loom
 		}
 		else if (verb == "items" && tokens.size() <= 2)
 		{
-			const std::string path = tokens.size() == 2 ? tokens[1] : "";
+			const std::string path = tokens.size() == 2 ? (m_folder / tokens[1]).string() : "";
 
 			m_actions.push_back(
 				[this, path]()

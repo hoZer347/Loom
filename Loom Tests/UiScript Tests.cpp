@@ -4,6 +4,7 @@
 
 #include "imgui.h"
 
+#include <filesystem>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -34,7 +35,9 @@ namespace
 			int atlas_height = 0;
 			io.Fonts->GetTexDataAsRGBA32(&pixels, &atlas_width, &atlas_height);
 
-			script = std::make_unique<Loom::UiScript>();
+			// No folder: the tests write no files, and the web build has no
+			// working directory to ask for.
+			script = std::make_unique<Loom::UiScript>(std::filesystem::path());
 			script->LoadText(text);
 		};
 
@@ -290,11 +293,11 @@ TEST_SUITE("UiScript")
 		CHECK(errors.text.str().find("line 2") != std::string::npos);
 	};
 
-	TEST_CASE("an unknown command or key fails before anything runs")
+	TEST_CASE("an unknown command or key fails the script")
 	{
 		CapturedErrors errors;
 
-		for (const char* text : { "fly away\n", "key ctrl+nothing\n", "click \"Panel\"\n", "wait\n" })
+		for (const char* text : { "fly away\n", "key ctrl+nothing\n", "click \"Panel\"\n", "wait\n", "\"\" \"Cube\"\n" })
 		{
 			ScriptedUi ui(text);
 			ui.Run([]() { });

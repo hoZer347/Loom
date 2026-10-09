@@ -5,6 +5,7 @@
 #include "imgui_internal.h"
 
 #include <deque>
+#include <filesystem>
 #include <functional>
 #include <ostream>
 #include <string>
@@ -34,13 +35,17 @@ namespace Loom
 	*   "window" "label" [left|right] [dx dy]: the first item with that label in
 	*   a window whose name contains window ("" for any), at its centre or just
 	*   inside an edge, moved by dx dy. A label matches whole, or up to its ##.
-	*   A target not drawn yet is waited for
+	*   A target not drawn yet is waited for. An item with no label of its own,
+	*   like the Hierarchy's eyes, is aimed at through its row:
+	*   click "Hierarchy" "Cube" right
+	* - The script, and the files screenshot and items write, are found from
+	*   the folder it is given, not wherever the working directory has moved to
 	* - The script ends when it runs out of commands, at quit, or at the first
 	*   command that fails, which says why on stderr
 	*/
 	struct UiScript final : ImGuiItemListener
 	{
-		UiScript();
+		explicit UiScript(const std::filesystem::path& folder);
 		~UiScript();
 
 		UiScript(const UiScript&) = delete;
@@ -88,6 +93,7 @@ namespace Loom
 		void Fail(const std::string& why);
 
 		ImGuiContext* m_context = nullptr;
+		std::filesystem::path m_folder{ };
 
 		std::vector<std::string> m_lines{ };
 		size_t m_next = 0;

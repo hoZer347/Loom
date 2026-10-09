@@ -103,6 +103,7 @@ if (-not $NoBuild)
         (Join-Path $imgui 'imgui_widgets.cpp')
         (Join-Path $imgui 'imgui_impl_glfw.cpp')
         (Join-Path $imgui 'imgui_impl_opengl3.cpp')
+        (Join-Path $imgui 'ImGuiItemHooks.cpp')
     )
 
     $includes = @(
