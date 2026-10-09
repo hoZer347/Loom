@@ -126,6 +126,10 @@ namespace Loom
 	{
 		// Start the Dear ImGui frame
 		renderer->NewImGuiFrame();
+
+		if (onImGuiInput)
+			onImGuiInput();
+
 		ImGui::NewFrame();
 
 		// GUI
@@ -221,6 +225,12 @@ namespace Loom
 	{
 		std::lock_guard<std::recursive_mutex> lock(mutex);
 		onUpdate = task;
+	};
+
+	void Engine::SetImGuiInputFunction(const Task& task)
+	{
+		std::lock_guard<std::recursive_mutex> lock(mutex);
+		onImGuiInput = task;
 	};
 
 	void Engine::SetGuiFunction(const Task& task)

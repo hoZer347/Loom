@@ -41,6 +41,11 @@ namespace Loom
 		// calls from it. Pass an empty Task to fall back to the default windows.
 		static void SetGuiFunction(const Task& task);
 
+		// Runs each frame after the platform has queued its input and before
+		// ImGui reads it, so it can queue input of its own: the last event of a
+		// kind wins.
+		static void SetImGuiInputFunction(const Task& task);
+
 		static void QueueTask(const Task& task);
 
 		// Runs everything QueueTask has collected so far, on the calling
@@ -97,6 +102,7 @@ namespace Loom
 
 		static inline Task onUpdate = []() { };
 		static inline Task onGui = nullptr;
+		static inline Task onImGuiInput = nullptr;
 
 		static inline std::recursive_mutex mutex;
 		static inline std::queue<Task> taskQueue;

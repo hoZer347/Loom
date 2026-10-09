@@ -56,7 +56,8 @@
 //#define IMGUI_DISABLE_SSE                                 // Disable use of SSE intrinsics even if available
 
 //---- Enable Test Engine / Automation features.
-//#define IMGUI_ENABLE_TEST_ENGINE                          // Enable imgui_test_engine hooks. Generally set automatically by include "imgui_te_imconfig.h", see Test Engine for details.
+// Loom: the hooks go to ImGuiItemListener (ImGuiItemHooks.h), which the editor's UI scripts use to find items by label.
+#define IMGUI_ENABLE_TEST_ENGINE
 
 //---- Include imgui_user.h at the end of imgui.h as a convenience
 // May be convenient for some users to only explicitly include vanilla imgui.h and have extra stuff included.

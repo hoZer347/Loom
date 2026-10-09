@@ -10,6 +10,7 @@
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
 #include "SceneSerializer.h"
+#include "UiScript.h"
 
 #include "Engine.h"
 #include "OpenGL.h"
@@ -18,6 +19,7 @@
 #include <cctype>
 #include <cstdlib>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -165,7 +167,10 @@ namespace
 			<< "  --vulkan, --opengl             run on that graphics API this time\n"
 			<< "  --screenshot <file> [frames]   write the editor to a bitmap and exit,\n"
 			<< "                                 without showing a window\n"
-			<< "  --desktop <id>                 show the window on that virtual desktop,\n"
+			<< "  --ui-script <file>             click, type and screenshot through the UI\n"
+			<< "                                 from a script (see UiScript.h), then exit,\n"
+			<< "                                 without showing a window\n"
+			<< "  --desktop <id>                show the window on that virtual desktop,\n"
 			<< "                                 without activating it"
 			<< std::endl;
 	};
@@ -254,8 +259,9 @@ int main(int argc, char** argv)
 			return 0;
 		};
 
-	// A screenshot run is automated by definition: it renders, writes its
-	// bitmap and exits, so it does that without putting a window on screen.
+	// A screenshot or UI script run is automated by definition: it renders,
+	// writes its bitmaps and exits, so it does that without putting a window
+	// on screen.
 	// Read before the Engine, which is what opens the window.
 	//
 	// A run on another virtual desktop starts hidden too, and is shown once it
@@ -274,7 +280,7 @@ int main(int argc, char** argv)
 		if (argument == "--opengl")
 			Engine::backend = Backend::OpenGL;
 
-		if (argument == "--screenshot" || argument == "--desktop")
+		if (argument == "--screenshot" || argument == "--ui-script" || argument == "--desktop")
 			Engine::showWindow = false;
 
 		if (argument == "--desktop" && i + 1 < argc)
@@ -311,6 +317,9 @@ int main(int argc, char** argv)
 	std::optional<AssetKind> create_prompt;
 	int frames = 240;
 
+	// After the Engine, whose ImGui context it listens to.
+	std::unique_ptr<UiScript> script;
+
 	for (int i = 1; i < argc; i++)
 	{
 		const std::string argument = argv[i];
@@ -346,6 +355,28 @@ int main(int argc, char** argv)
 			// for the scene to have been ticked.
 			if (i + 1 < argc && isdigit((unsigned char)argv[i + 1][0]))
 				frames = atoi(argv[++i]);
+		}
+		else if (argument == "--ui-script")
+		{
+			if (i + 1 >= argc)
+			{
+				std::cerr << "--ui-script needs a script file" << std::endl;
+				return 1;
+			};
+
+			script = std::make_unique<UiScript>();
+
+			if (!script->Load(argv[++i]))
+				return 1;
+
+			Engine::SetImGuiInputFunction(
+				[&script]()
+				{
+					script->Step();
+
+					if (script->Finished())
+						Engine::Stop();
+				});
 		}
 		else if (argument == "--import")
 		{
@@ -549,5 +580,5 @@ int main(int argc, char** argv)
 
 	engine.Start();
 
-	return 0;
+	return script && script->Failed() ? 1 : 0;
 };

@@ -128,7 +128,7 @@ function Build-WebEngine([string] $Emcc)
         Get-ChildItem -Path (Join-Path $webWasm '*.cpp')
         Get-ChildItem -Path (Join-Path $webWasm 'Utilities\*.cpp') -Exclude '_*.cpp'
         'imgui.cpp', 'imgui_draw.cpp', 'imgui_tables.cpp', 'imgui_widgets.cpp',
-            'imgui_impl_glfw.cpp', 'imgui_impl_opengl3.cpp' |
+            'imgui_impl_glfw.cpp', 'imgui_impl_opengl3.cpp', 'ImGuiItemHooks.cpp' |
             ForEach-Object { Get-Item -LiteralPath (Join-Path $webImGui $_) }
     ) | ForEach-Object { $_.FullName }
 

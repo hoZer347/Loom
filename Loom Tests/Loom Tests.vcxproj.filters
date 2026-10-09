@@ -64,6 +64,9 @@
     <ClCompile Include="SpriteEditor Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="UiScript Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="Sprite Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

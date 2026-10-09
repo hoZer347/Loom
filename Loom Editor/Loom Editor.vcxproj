@@ -118,6 +118,7 @@
     <ClCompile Include="SceneHistory.cpp" />
     <ClCompile Include="EditCommands.cpp" />
     <ClCompile Include="FieldNames.cpp" />
+    <ClCompile Include="UiScript.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -143,6 +144,7 @@
     <ClInclude Include="SceneHistory.h" />
     <ClInclude Include="EditCommands.h" />
     <ClInclude Include="FieldNames.h" />
+    <ClInclude Include="UiScript.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Loom ImGui\Loom ImGui.vcxproj">

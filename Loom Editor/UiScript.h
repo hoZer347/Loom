@@ -1,0 +1,112 @@
+#pragma once
+
+#include "ImGuiItemHooks.h"
+
+#include "imgui_internal.h"
+
+#include <deque>
+#include <functional>
+#include <ostream>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+
+namespace Loom
+{
+	/**
+	* Loom::UiScript
+	* - Drives ImGui from a text file, a command a line, by queueing input
+	*   events in-process. The real mouse and keyboard are never touched, so it
+	*   runs on a hidden window
+	* - Commands, with a line starting # a comment:
+	*     wait <frames>
+	*     move <target>
+	*     click <target>, rightclick <target>, doubleclick <target>
+	*     drag <target> to <target>
+	*     key <chord>          ImGui's key names joined by +: ctrl+z, enter, f2
+	*     type <text>          the rest of the line
+	*     screenshot <file>    the whole window, as a bitmap
+	*     items [file]         every labelled item drawn last frame, to the file
+	*                          or the console: window, label, x, y, width, height
+	*     quit
+	* - A target is x y in pixels from the window's top left, or
+	*   "window" "label" [left|right] [dx dy]: the first item with that label in
+	*   a window whose name contains window ("" for any), at its centre or just
+	*   inside an edge, moved by dx dy. A label matches whole, or up to its ##.
+	*   A target not drawn yet is waited for
+	* - The script ends when it runs out of commands, at quit, or at the first
+	*   command that fails, which says why on stderr
+	*/
+	struct UiScript final : ImGuiItemListener
+	{
+		UiScript();
+		~UiScript();
+
+		UiScript(const UiScript&) = delete;
+		UiScript& operator=(const UiScript&) = delete;
+
+		// False, with why on stderr, when the file cannot be read.
+		bool Load(const std::string& path);
+		void LoadText(const std::string& text);
+
+		// Once a frame, before ImGui::NewFrame, in the context it was made in.
+		void Step();
+
+		bool Finished() const { return m_finished; };
+		bool Failed() const { return m_failed; };
+
+		void ItemAdded(ImGuiID id, const ImRect& rect) override;
+		void ItemLabelled(ImGuiID id, const char* label) override;
+
+	private:
+		struct Item
+		{
+			std::string window;
+			std::string label;
+			ImVec2 min;
+			ImVec2 max;
+		};
+
+		// Retry is for a target not drawn yet: the action runs again next frame.
+		enum class Result
+		{
+			Done,
+			Retry
+		};
+
+		// One frame's worth of a command.
+		using Action = std::function<Result()>;
+
+		bool Parse(const std::string& line);
+
+		// Queues the actions that put the mouse on target, from tokens[first] on.
+		bool Aim(const std::vector<std::string>& tokens, size_t first, size_t* end);
+
+		const Item* Find(const std::string& window, const std::string& label) const;
+		void WriteItems(std::ostream& out) const;
+		void Fail(const std::string& why);
+
+		ImGuiContext* m_context = nullptr;
+
+		std::vector<std::string> m_lines{ };
+		size_t m_next = 0;
+		size_t m_line = 0;
+
+		std::deque<Action> m_actions{ };
+		int m_wait = 0;
+		int m_retries = 0;
+
+		ImVec2 m_mouse{ };
+		bool m_mouseSet = false;
+
+		// What the hooks are hearing about this frame, and what they heard
+		// about the last whole one, which is what targets are found in.
+		std::unordered_map<ImGuiID, ImRect> m_rects{ };
+		std::vector<Item> m_drawing{ };
+		std::vector<Item> m_drawn{ };
+
+		bool m_finished = false;
+		bool m_failed = false;
+	};
+};

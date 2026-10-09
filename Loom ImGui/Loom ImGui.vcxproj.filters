@@ -33,6 +33,9 @@
     <ClInclude Include="TextEditor.h">
       <Filter>ImGui Files</Filter>
     </ClInclude>
+    <ClInclude Include="ImGuiItemHooks.h">
+      <Filter>ImGui Files</Filter>
+    </ClInclude>
     <ClInclude Include="imgui_impl_opengl3.h">
       <Filter>ImGui Files</Filter>
     </ClInclude>
@@ -63,6 +66,9 @@
       <Filter>ImGui Files</Filter>
     </ClCompile>
     <ClCompile Include="TextEditor.cpp">
+      <Filter>ImGui Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiItemHooks.cpp">
       <Filter>ImGui Files</Filter>
     </ClCompile>
     <ClCompile Include="imgui_impl_opengl3.cpp">

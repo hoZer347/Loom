@@ -85,6 +85,9 @@
     <ClCompile Include="FieldNames.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
+    <ClCompile Include="UiScript.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ScriptLibrary.h">
@@ -151,6 +154,9 @@
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="FieldNames.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="UiScript.h">
       <Filter>Editor</Filter>
     </ClInclude>
   </ItemGroup>
