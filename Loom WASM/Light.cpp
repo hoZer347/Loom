@@ -190,7 +190,7 @@ vec3 LoomLight(vec3 normal)
 		return projection * view;
 	};
 
-	void Light::RenderShadowMap(GameObject& root)
+	void Light::RenderShadowMap(const std::vector<GameObject*>& roots)
 	{
 		Renderer* renderer = Renderer::Get();
 
@@ -206,7 +206,8 @@ vec3 LoomLight(vec3 normal)
 		{
 			renderer->SetDepthBias(SLOPE_OFFSET, CONSTANT_OFFSET);
 
-			DrawCasters(root);
+			for (GameObject* root : roots)
+				DrawCasters(*root);
 
 			renderer->SetDepthBias(0.0f, 0.0f);
 		};

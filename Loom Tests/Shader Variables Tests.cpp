@@ -18,6 +18,7 @@
 #include <sstream>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 using LoomTests::Pump;
@@ -533,7 +534,7 @@ TEST_SUITE("Shader variables")
 
 		materials[1]->shadows = false;
 
-		light->RenderShadowMap(scene.GetRoot());
+		light->RenderShadowMap({ &scene.GetRoot() });
 
 		// With the shader's own shadow program, seeing the scene from the light.
 		CHECK(renderer.drawn == std::vector<uint32_t>{ shader.shadow_id });
@@ -544,6 +545,40 @@ TEST_SUITE("Shader variables")
 
 		materials[1]->Apply(shader.id);
 		CHECK(renderer.floats["u_shadowsOff"] == 1.0f);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a light's shadow map holds every scene it falls on, whichever is drawn")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream owner_source("// ===SETTINGS===\nshadows = on\n" + STAGES);
+		Loom::Shader owner_shader("shadows in the light's scene", owner_source);
+
+		std::istringstream borrower_source("// ===SETTINGS===\nshadows = on\n" + STAGES);
+		Loom::Shader borrower_shader("shadows in the borrowing scene", borrower_source);
+
+		Loom::Scene owner("owns the light");
+		Loom::Scene borrower("borrows the light");
+		Pump();
+
+		owner.Attach<Loom::Light>();
+
+		for (const auto& [scene, shader] : { std::pair{ &owner, &owner_shader }, std::pair{ &borrower, &borrower_shader } })
+		{
+			Loom::GameObject* object = scene->AddChild("Caster");
+			object->Attach<Loom::Material>()->shader = shader;
+			object->Attach<Loom::Mesh>()->m_vertices = std::vector<float>{ 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
+		};
+
+		Pump();
+
+		// The shadow pass, both scenes in it, then the scene itself.
+		owner.Render();
+		CHECK(renderer.drawn == std::vector<uint32_t>{ owner_shader.shadow_id, borrower_shader.shadow_id, owner_shader.id });
+
+		renderer.drawn.clear();
+		borrower.Render();
+		CHECK(renderer.drawn == std::vector<uint32_t>{ borrower_shader.shadow_id, owner_shader.shadow_id, borrower_shader.id });
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader with transparency on is drawn after everything opaque, farthest first, writing no depth")

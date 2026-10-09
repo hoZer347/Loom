@@ -23,6 +23,18 @@ namespace Loom
 
 			return nullptr;
 		};
+
+		// The scene's own light, or with none at all, the first among scenes.
+		// One whose own lights are all off stays unlit.
+		Light* LightFor(Scene& scene, const std::vector<Scene*>& scenes)
+		{
+			if (Light* own = scene.GetRoot().FindComponent<Light>())
+				return own;
+
+			return scene.GetRoot().FindComponent<Light>(true) == nullptr
+				? FirstAmong<Light>(scenes)
+				: nullptr;
+		};
 	};
 
 	Scene::Scene(
@@ -59,15 +71,21 @@ namespace Loom
 		if (seen == nullptr)
 			seen = FirstAmong<Camera>(allScenes);
 
-		Light* light = root.FindComponent<Light>();
+		Light* light = LightFor(*this, allScenes);
 
-		if (light == nullptr && root.FindComponent<Light>(true) == nullptr)
-			light = FirstAmong<Light>(allScenes);
-
-		// The shadow map has to be finished before the first mesh samples it.
-
+		// The shadow map has to be finished before the first mesh samples it,
+		// and holds every scene the light falls on, so shadows cross between
+		// them.
 		if (light)
-			light->RenderShadowMap(root);
+		{
+			std::vector<GameObject*> lit{ &root };
+
+			for (Scene* scene : allScenes)
+				if (scene != this && LightFor(*scene, allScenes) == light)
+					lit.push_back(&scene->root);
+
+			light->RenderShadowMap(lit);
+		};
 
 		Light::current = light;
 		Camera::current = seen;
