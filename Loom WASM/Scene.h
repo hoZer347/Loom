@@ -48,8 +48,8 @@ namespace Loom
 		// the same view, that share its light.
 		void Render(Camera* camera = nullptr, const std::vector<Scene*>& drawn = allScenes);
 
-		// Brings the collider tree up to date with every enabled collider, then
-		// runs OnPhysics through the hierarchy.
+		// Runs OnPhysics through the hierarchy, which syncs every enabled
+		// collider into this scene's collider tree.
 		void Physics();
 
 		// Against this scene's colliders alone; see Loom::Physics.

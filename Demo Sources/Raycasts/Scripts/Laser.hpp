@@ -5,6 +5,7 @@
 #include "Material.h"
 #include "Mesh.h"
 #include "Physics.h"
+#include "Shape.hpp"
 
 #include "glm/glm.hpp"
 
@@ -16,8 +17,8 @@ namespace RaycastsScripts
 {
 	// Turns about its Y axis, casting a ray ahead of it every frame with
 	// Loom::Physics::Raycast. It draws the ray as far as the first collider it
-	// meets, with that surface's normal sticking out of the hit, and tints
-	// whatever it is hitting.
+	// meets, with that surface's normal sticking out of the hit, and tints the
+	// Shape it is hitting.
 	struct Laser : Loom::Component<Laser>
 	{
 		void OnAttach() override
@@ -41,11 +42,6 @@ namespace RaycastsScripts
 			Aim(m_range);
 		};
 
-		void OnDetach() override
-		{
-			Untint();
-		};
-
 		void OnUpdate() override
 		{
 			glm::vec3& rotation = *m_gameObject->transform.rotation;
@@ -53,31 +49,18 @@ namespace RaycastsScripts
 
 			const glm::mat4 world = m_gameObject->WorldMatrix();
 			const glm::vec3 origin(world[3]);
-			const glm::vec3 forward = glm::normalize(glm::vec3(world * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)));
+			const glm::vec3 forward = glm::normalize(glm::vec3(world * glm::vec4(AHEAD, 0.0f)));
 
 			Loom::RaycastHit hit;
 
 			if (!Loom::Physics::Raycast(origin, forward, hit, m_range))
 			{
-				Untint();
 				Aim(m_range);
 				return;
 			};
 
-			Loom::Material* struck = hit.gameObject->GetComponent<Loom::Material>();
-
-			if (struck != m_tinted)
-			{
-				Untint();
-
-				if (struck)
-				{
-					m_untinted = *struck->color;
-					struck->color = *m_hitColor;
-				};
-
-				m_tinted = struck;
-			};
+			if (Shape* shape = hit.gameObject->GetComponent<Shape>())
+				shape->Tint(m_hitColor);
 
 			const glm::mat4 toLocal = glm::inverse(world);
 			const glm::vec3 normalEnd(toLocal * glm::vec4(hit.point + hit.normal * *m_normalLength, 1.0f));
@@ -86,10 +69,15 @@ namespace RaycastsScripts
 		};
 
 	private:
+		// The way the laser points in its own space.
+		static constexpr glm::vec3 AHEAD{ 0.0f, 0.0f, -1.0f };
+
 		// The beam, straight ahead to distance in the laser's own space.
 		static std::vector<float> Beam(float distance)
 		{
-			return { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, -distance };
+			const glm::vec3 end = AHEAD * distance;
+
+			return { 0.0f, 0.0f, 0.0f, end.x, end.y, end.z };
 		};
 
 		void Aim(float distance)
@@ -100,18 +88,12 @@ namespace RaycastsScripts
 		// With the normal from the beam's end out to normalEnd.
 		void Aim(float distance, const glm::vec3& normalEnd)
 		{
+			const glm::vec3 end = AHEAD * distance;
+
 			std::vector<float> lines = Beam(distance);
-			lines.insert(lines.end(), { 0.0f, 0.0f, -distance, normalEnd.x, normalEnd.y, normalEnd.z });
+			lines.insert(lines.end(), { end.x, end.y, end.z, normalEnd.x, normalEnd.y, normalEnd.z });
 
 			m_mesh->m_vertices = lines;
-		};
-
-		void Untint()
-		{
-			if (m_tinted)
-				m_tinted->color = m_untinted;
-
-			m_tinted = nullptr;
 		};
 
 		// Degrees a frame.
@@ -123,7 +105,5 @@ namespace RaycastsScripts
 		Loom::Serial<std::string> m_shader = "Assets/Beam.shader";
 
 		Loom::Mesh* m_mesh = nullptr;
-		Loom::Material* m_tinted = nullptr;
-		glm::vec3 m_untinted{ 1.0f };
 	};
 };

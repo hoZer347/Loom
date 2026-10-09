@@ -371,12 +371,30 @@ TEST_SUITE("ColliderTree")
 		CHECK(Loom::Physics::RaycastAll(glm::vec3(0.0f), FORWARD).size() == 2);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the tree stays shallow and answers what testing every collider would")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a collider on an object no thread processes is still synced")
+	{
+		Loom::Scene scene("no thread");
+		Pump();
+
+		Place<Loom::BoxCollider>(scene, glm::vec3(0.0f, 0.0f, -5.0f));
+		scene.GetRoot().GetChildren()[0]->SetThreadID(-1);
+
+		scene.Physics();
+
+		Loom::RaycastHit hit;
+		CHECK(scene.Raycast({ glm::vec3(0.0f), FORWARD }, hit));
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the tree stays shallow and answers what testing every collider would, through moves and removals")
 	{
 		constexpr int COUNT = 300;
-		constexpr int RAYS = 300;
+		constexpr int RAYS = 200;
+		constexpr int ROUNDS = 6;
 		constexpr unsigned SEED = 7;
 		constexpr float SPREAD = 20.0f;
+
+		// Moved farther than any padding, so a moved leaf is always reinserted.
+		constexpr float JUMP = 3.0f;
 
 		// A balanced tree of COUNT leaves is about log2(COUNT) deep; this
 		// allows the rotations some slack and still fails a tree that degrades
@@ -390,8 +408,12 @@ TEST_SUITE("ColliderTree")
 		std::uniform_real_distribution<float> place(-SPREAD, SPREAD);
 		std::uniform_real_distribution<float> extent(0.2f, 2.0f);
 		std::uniform_real_distribution<float> angle(0.0f, 360.0f);
+		std::uniform_real_distribution<float> jump(-JUMP, JUMP);
+		enum Fate { MOVE, DISABLE, ENABLE, KEEP, FATES };
+		std::uniform_int_distribution<int> fate(0, FATES - 1);
 
 		std::vector<Loom::Collider*> colliders{ };
+		std::vector<Loom::GameObject*> objects{ };
 
 		for (int i = 0; i < COUNT; i++)
 		{
@@ -410,45 +432,73 @@ TEST_SUITE("ColliderTree")
 				colliders.push_back(sphere);
 			};
 
-			scene.GetRoot().GetChildren().back()->transform.rotation =
-				glm::vec3(angle(random), angle(random), angle(random));
+			objects.push_back(scene.GetRoot().GetChildren().back());
+			objects.back()->transform.rotation = glm::vec3(angle(random), angle(random), angle(random));
 		};
 
-		scene.Physics();
-
-		CHECK(scene.GetColliders().Size() == COUNT);
-		CHECK(scene.GetColliders().Height() <= MOST_HEIGHT);
-
-		int agreed = 0;
-
-		for (int i = 0; i < RAYS; i++)
+		for (int round = 0; round < ROUNDS; round++)
 		{
-			const Loom::Ray ray
+			// The first round builds the tree; every later one moves a quarter
+			// of the colliders, disables a quarter and enables a quarter.
+			if (round > 0)
+				for (Loom::GameObject* object : objects)
+					switch (fate(random))
+					{
+					case MOVE:
+						object->transform.position = *object->transform.position + glm::vec3(jump(random), jump(random), jump(random));
+						break;
+					case DISABLE:
+						object->SetDisabled(true);
+						break;
+					case ENABLE:
+						object->SetDisabled(false);
+						break;
+					default:
+						break;
+					};
+
+			scene.Physics();
+
+			std::vector<Loom::Collider*> enabled{ };
+
+			for (size_t i = 0; i < objects.size(); i++)
+				if (!objects[i]->IsDisabled())
+					enabled.push_back(colliders[i]);
+
+			CHECK(scene.GetColliders().Size() == enabled.size());
+			CHECK(scene.GetColliders().Height() <= MOST_HEIGHT);
+
+			int agreed = 0;
+
+			for (int i = 0; i < RAYS; i++)
 			{
-				glm::vec3(place(random), place(random), place(random)),
-				glm::vec3(place(random), place(random), place(random))
+				const Loom::Ray ray
+				{
+					glm::vec3(place(random), place(random), place(random)),
+					glm::vec3(place(random), place(random), place(random))
+				};
+
+				Loom::RaycastHit nearest;
+				size_t hits = 0;
+
+				for (Loom::Collider* collider : enabled)
+				{
+					Loom::RaycastHit hit;
+
+					if (collider->Raycast(ray, hit) && (hits++ == 0 || hit.distance < nearest.distance))
+						nearest = hit;
+				};
+
+				Loom::RaycastHit found;
+				const bool hit = scene.Raycast(ray, found);
+
+				if (hit == (hits > 0)
+					&& (!hit || found.collider == nearest.collider)
+					&& scene.RaycastAll(ray).size() == hits)
+					agreed++;
 			};
 
-			Loom::RaycastHit nearest;
-			size_t hits = 0;
-
-			for (Loom::Collider* collider : colliders)
-			{
-				Loom::RaycastHit hit;
-
-				if (collider->Raycast(ray, hit) && (hits++ == 0 || hit.distance < nearest.distance))
-					nearest = hit;
-			};
-
-			Loom::RaycastHit found;
-			const bool hit = scene.Raycast(ray, found);
-
-			if (hit == (hits > 0)
-				&& (!hit || found.collider == nearest.collider)
-				&& scene.RaycastAll(ray).size() == hits)
-				agreed++;
+			CHECK(agreed == RAYS);
 		};
-
-		CHECK(agreed == RAYS);
 	};
 };

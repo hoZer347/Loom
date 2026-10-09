@@ -3,7 +3,10 @@
 #include "Collider.h"
 
 #include <algorithm>
+#include <array>
+#include <optional>
 #include <utility>
+#include <vector>
 
 
 namespace Loom
@@ -20,6 +23,57 @@ namespace Loom
 
 		// A branch whose children's heights differ by more than this is rotated.
 		constexpr int MOST_IMBALANCE = 1;
+
+		// Box2D's insertion cost: a new branch costs twice the area it covers,
+		// once for itself and once for the leaf beside it.
+		constexpr float BRANCH_COST = 2.0f;
+
+		// Deep enough for any tree the rotations leave balanced, so a raycast
+		// never touches the heap; a deeper one spills over rather than fails.
+		constexpr size_t INLINE_PENDING = 64;
+
+		// A stack held on the caller's own stack until it outgrows it.
+		template <typename T, size_t INLINE>
+		struct SmallStack final
+		{
+			void Push(const T& item)
+			{
+				if (m_count < INLINE)
+					m_inline[m_count] = item;
+				else
+					m_spill.push_back(item);
+
+				m_count++;
+			};
+
+			T Pop()
+			{
+				m_count--;
+
+				if (m_count < INLINE)
+					return m_inline[m_count];
+
+				const T item = m_spill.back();
+				m_spill.pop_back();
+
+				return item;
+			};
+
+			bool Empty() const { return m_count == 0; };
+
+		private:
+			std::array<T, INLINE> m_inline;
+			std::vector<T> m_spill{ };
+			size_t m_count = 0;
+		};
+
+		// A node waiting to be visited, with the distance the ray enters it at,
+		// which a nearer hit found meanwhile can rule it out by.
+		struct Pending
+		{
+			int node;
+			float entry;
+		};
 	};
 
 	ColliderTree::~ColliderTree()
@@ -96,12 +150,11 @@ namespace Loom
 
 	void ColliderTree::Raycast(const Ray& ray, float maxDistance, const Visitor& visit) const
 	{
-		// Each node waits with the distance the ray enters it at, which a
-		// nearer hit found meanwhile can rule it out by.
-		std::vector<std::pair<int, float>> pending{ };
+		SmallStack<Pending, INLINE_PENDING> pending;
 
+		// Where the ray enters node within maxDistance, if it does.
 		const auto reach =
-			[&](int node)
+			[&](int node) -> std::optional<Pending>
 			{
 				float entry, exit;
 				int axis;
@@ -109,21 +162,25 @@ namespace Loom
 				if (m_nodes[node].bounds.IntersectRay(ray, entry, exit, axis)
 					&& exit >= 0.0f
 					&& entry <= maxDistance)
-					pending.emplace_back(node, entry);
+					return Pending{ node, entry };
+
+				return std::nullopt;
 			};
 
-		if (m_root != NONE)
-			reach(m_root);
+		if (m_root == NONE)
+			return;
 
-		while (!pending.empty())
+		if (const std::optional<Pending> root = reach(m_root))
+			pending.Push(*root);
+
+		while (!pending.Empty())
 		{
-			const auto [node, entry] = pending.back();
-			pending.pop_back();
+			const Pending next = pending.Pop();
 
-			if (entry > maxDistance)
+			if (next.entry > maxDistance)
 				continue;
 
-			const Node& current = m_nodes[node];
+			const Node& current = m_nodes[next.node];
 
 			if (current.IsLeaf())
 			{
@@ -135,14 +192,16 @@ namespace Loom
 				continue;
 			};
 
+			std::optional<Pending> first = reach(current.children[0]);
+			std::optional<Pending> second = reach(current.children[1]);
+
 			// The nearer child last, so it is the next one taken.
-			const size_t before = pending.size();
+			if (first && second && first->entry < second->entry)
+				std::swap(first, second);
 
-			reach(current.children[0]);
-			reach(current.children[1]);
-
-			if (pending.size() == before + 2 && pending[before].second < pending[before + 1].second)
-				std::swap(pending[before], pending[before + 1]);
+			for (const std::optional<Pending>& child : { first, second })
+				if (child)
+					pending.Push(*child);
 		};
 	};
 
@@ -199,8 +258,8 @@ namespace Loom
 			const Node& branch = m_nodes[sibling];
 			const float combined = branch.bounds.Union(bounds).HalfArea();
 
-			const float here = 2.0f * combined;
-			const float inherited = 2.0f * (combined - branch.bounds.HalfArea());
+			const float here = BRANCH_COST * combined;
+			const float inherited = BRANCH_COST * (combined - branch.bounds.HalfArea());
 
 			float below[2];
 

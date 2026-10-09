@@ -200,9 +200,8 @@ namespace Loom
 		if (m_disabled)
 			return;
 
-		for (auto& renderable : m_physicsables)
-			if (m_threadID != -1)
-				renderable->OnPhysics();
+		for (auto& physicsable : m_physicsables)
+			physicsable->OnPhysics();
 		for (auto& child : m_children)
 			child->Physics();
 	};

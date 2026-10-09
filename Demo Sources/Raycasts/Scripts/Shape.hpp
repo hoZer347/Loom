@@ -8,6 +8,7 @@
 #include "glm/gtc/constants.hpp"
 
 #include <cmath>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -21,25 +22,39 @@ namespace RaycastsScripts
 	{
 		void OnAttach() override
 		{
-			Loom::Material* material = m_gameObject->GetComponent<Loom::Material>();
+			m_material = m_gameObject->GetComponent<Loom::Material>();
 
-			if (material == nullptr)
-				material = m_gameObject->Attach<Loom::Material>();
+			if (m_material == nullptr)
+				m_material = m_gameObject->Attach<Loom::Material>();
 
-			material->SetShaderPath(m_shader);
-			material->color = *m_color;
+			m_material->SetShaderPath(m_shader);
+			m_material->color = *m_color;
 
 			Loom::Mesh* mesh = m_gameObject->GetComponent<Loom::Mesh>();
 
 			if (mesh == nullptr)
 				mesh = m_gameObject->Attach<Loom::Mesh>();
 
-			mesh->material = material;
+			mesh->material = m_material;
 			mesh->m_vertices = m_sphere ? Sphere() : Cube();
+		};
+
+		// Drawn in colour from its next update, and in its own again at the
+		// update after unless asked again.
+		void Tint(const glm::vec3& colour)
+		{
+			m_tint = colour;
+		};
+
+		void OnUpdate() override
+		{
+			m_material->color = m_tint.value_or(*m_color);
+			m_tint.reset();
 		};
 
 	private:
 		static constexpr int CUBE_FACES = 6;
+		static constexpr int FACES_PER_AXIS = 2;
 		static constexpr int SPHERE_STACKS = 16;
 		static constexpr int SPHERE_SLICES = 32;
 		static constexpr float HALF = 0.5f;
@@ -64,13 +79,13 @@ namespace RaycastsScripts
 			// from outside.
 			for (int face = 0; face < CUBE_FACES; face++)
 			{
-				const int axis = face / 2;
-				const float side = face % 2 == 0 ? HALF : -HALF;
+				const int axis = face / FACES_PER_AXIS;
+				const float side = face % FACES_PER_AXIS == 0 ? HALF : -HALF;
 
 				glm::vec3 out(0.0f), across(0.0f), up(0.0f);
 				out[axis] = side;
-				across[(axis + 1) % 3] = side;
-				up[(axis + 2) % 3] = HALF;
+				across[(axis + 1) % glm::vec3::length()] = side;
+				up[(axis + 2) % glm::vec3::length()] = HALF;
 
 				AddQuad(vertices, out - across - up, out + across - up, out + across + up, out - across + up);
 			};
@@ -108,5 +123,8 @@ namespace RaycastsScripts
 		Loom::Serial<bool> m_sphere;
 		Loom::Serial<glm::vec3> m_color = glm::vec3(0.8f, 0.8f, 0.8f);
 		Loom::Serial<std::string> m_shader = "Assets/Lit.shader";
+
+		Loom::Material* m_material = nullptr;
+		std::optional<glm::vec3> m_tint{ };
 	};
 };

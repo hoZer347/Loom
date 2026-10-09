@@ -62,7 +62,7 @@ needs Chrome or Edge installed.
 | `Threading` | Threads running at the same time, work queued from other threads running in order on the draining thread, objects built on other threads keeping their own fields |
 | `LoomObject` | ID allocation, naming, `NameAndID`, the `GetByID` registry, deregistration on destruction |
 | `Component` | Base callbacks as no-ops, virtual dispatch and destruction, type identity |
-| `GameObject` | Deferred `Attach`, `GetComponent` by type, selective update/render registration, children, `Destroy`, `DetachComponent`, thread inheritance, the transform's fields and matrix |
+| `GameObject` | Deferred `Attach`, `GetComponent` by type, selective update/render/physics registration, children, `Destroy`, `DetachComponent`, thread inheritance, the transform's fields and matrix |
 | `Scene` | Registration in `GetScenes`, root delegation, `Update`/`Render`/`Physics` walking the hierarchy |
 | `Light` | Registration, `FindComponent` reaching it through the hierarchy, the shadow map's light-space transform |
 | `Camera` | Registration, aiming down the transform or at a target, depth order and aspect, a camera looking straight down, toggling the target without turning the view |
@@ -70,7 +70,9 @@ needs Chrome or Edge installed.
 | `Material` | Defaults, and being found by a `Mesh` on the same GameObject |
 | `Shader` | Source loading failures on the local build (the web build fetches over HTTP instead, so those cases are skipped there) |
 | `Texture` | The type exists; it has no state yet |
-| `Collider` | Type-level only — see the note in the file |
+| `Collider` | Box and sphere colliders by name and through `GetComponent<Collider>`, where rays meet them under any transform, misses from inside or past `maxDistance`, bounds and wireframes |
+| `ColliderTree` | A scene's colliders found once a physics step syncs them and where it left them, nearest hit and every hit, dropping out when disabled, detached, destroyed or moved to another scene, `Physics::Raycast` over every scene, and a tree of hundreds staying shallow and agreeing with testing every collider through moves, removals and reinsertions |
+| `ColliderGizmos` | The colliders under a selection drawn in one go over the view, and nothing drawn or compiled without an enabled one |
 | `Input` | Button edges: down for one frame, held, up for one frame, a click inside one frame, buttons GLFW does not have; cursor and screen fields |
 | `SpeedManager` | `ClampMagnitude` and `MoveTowards`: clamping, no overshoot, zero-length input |
 | `Browser` | Run by `run-browser-tests.ps1` only: real mouse moves, buttons and the spacebar reaching `Input`, GLFW and `DialogueInput`; the page being cross-origin isolated |
@@ -139,9 +141,6 @@ and letting that fire after the object has gone runs it against freed memory.
   exercises it yet: it was landing while this suite was being written, and it is
   what replaced the old `Loom::State` stack machine, whose suite was removed
   when `Loom WASM/State.h` and `State.cpp` were deleted.
-- `Physics::Collider`'s behaviour. Its constructor reads `m_gameObject` before
-  `Attach` has assigned it, so constructing one is undefined; only type-level
-  checks are possible until that changes.
 - `Loom SQL`, `Loom Demos`, `Space Explorers`, and `Loom Editor` beyond
   `SceneHistory.cpp` and `EditCommands.cpp`, the two of its sources that need
   no window and are compiled into the suite beside the engine's.
