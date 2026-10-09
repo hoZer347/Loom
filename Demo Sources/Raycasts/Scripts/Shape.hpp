@@ -42,6 +42,13 @@ namespace RaycastsScripts
 			mesh->m_vertices = Build(m_kind);
 		};
 
+		// For a Shape made by a script, before it is first drawn.
+		void Configure(Kind kind, const glm::vec3& colour)
+		{
+			m_kind = kind;
+			m_color = colour;
+		};
+
 		// Drawn in colour from its next update, and in its own again at the
 		// update after unless asked again.
 		void Tint(const glm::vec3& colour)

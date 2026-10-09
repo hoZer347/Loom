@@ -4,6 +4,9 @@ Raycasts
 A Loom project showing colliders and raycasts. Press Play.
 
     Scenes/Main.loomscene     a laser among boxes and spheres
+    Scenes/Crowd.loomscene    fifteen hundred colliders swept by a grid of rays
+    Scripts/Crowd.hpp         fills a cube with shapes and turns them all
+    Scripts/Scanner.hpp       casts a row of rays a frame through the camera
     Scripts/Laser.hpp         casts a ray every frame with Loom::Physics::Raycast
     Scripts/Shape.hpp         draws a cube, sphere or ring for its collider
     Scripts/Slider.hpp        keeps one block moving
@@ -16,3 +19,9 @@ tints what it hit and draws the surface's normal from the hit point.
 
 Select a shape in the Hierarchy to see its collider outlined in green in the
 Scene view.
+
+Crowd.loomscene is the stress test. On Play, Crowd fills a cube with shapes and
+their colliders and turns them, so every collider moves every frame. Scanner
+sweeps 160 x 90 rays through the camera, one row a frame, and draws a yellow
+tick along the surface normal at every hit. After each full sweep it writes
+how long the rays took to the Console.
