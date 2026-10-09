@@ -16,6 +16,9 @@
     <ClCompile Include="Engine.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
+    <ClCompile Include="Jobs.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
     <ClCompile Include="Shaders.cpp">
       <Filter>Shaders</Filter>
     </ClCompile>
@@ -237,6 +240,9 @@
       <Filter>Serialization</Filter>
     </ClInclude>
     <ClInclude Include="Engine.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Jobs.h">
       <Filter>Engine</Filter>
     </ClInclude>
     <ClInclude Include="Shaders.h">

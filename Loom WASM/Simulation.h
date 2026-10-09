@@ -169,9 +169,21 @@ namespace Loom
 
 		void Gather(float seconds);
 
-		// Collides a candidate pair, adding it to this step's pairs if they
-		// touch or soon will.
-		void Consider(Collider& a, Collider& b);
+		// What one chunk of candidates gave: its pairs, their contacts, and
+		// the sleepers they wake.
+		struct Considered
+		{
+			std::vector<Pair> pairs;
+			std::vector<Contact> contacts;
+			std::vector<int> wakes;
+
+			// Reused from pair to pair.
+			std::vector<Contacts::Manifold> manifolds;
+		};
+
+		// Collides a candidate pair, adding it to out if they touch or soon
+		// will. Reads only, so chunks of candidates run at once.
+		void Consider(Collider& a, Collider& b, Considered& out) const;
 
 		static Key Ordered(const Collider* a, const Collider* b);
 
@@ -213,7 +225,10 @@ namespace Loom
 		// This step's, reused from step to step.
 		std::vector<Pair> m_pairs{ };
 		std::vector<Contact> m_contacts{ };
-		std::vector<Contacts::Manifold> m_manifolds{ };
+		// Each step's, by chunk, reused from step to step.
+		std::vector<std::vector<Key>> m_found{ };
+		std::vector<Key> m_live{ };
+		std::vector<Considered> m_considered{ };
 
 		std::unordered_map<Key, Touching, KeyHash> m_touching{ };
 

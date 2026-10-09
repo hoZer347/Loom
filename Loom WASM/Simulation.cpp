@@ -3,6 +3,7 @@
 #include "Collider.h"
 #include "ColliderTree.h"
 #include "GameObject.h"
+#include "Jobs.h"
 #include "Physics.h"
 #include "Rigidbody.h"
 
@@ -51,6 +52,11 @@ namespace Loom
 		// A sleeper is woken by a body striking it faster than this, well
 		// above sleeping speed, so jostling neighbours do not keep a pile awake.
 		constexpr float WAKE_SPEED = 0.5f;
+
+		// How many leaves one job's chunk queries, and how many candidates it
+		// collides: enough that a chunk outweighs handing it out.
+		constexpr size_t QUERY_GRAIN = 64;
+		constexpr size_t CONSIDER_GRAIN = 128;
 
 		// A contact this close to one from the last step, facing nearly the
 		// same way, is taken to be the same one.
@@ -339,30 +345,46 @@ namespace Loom
 		};
 
 		// New candidates: each leaf put in or refitted since the last step,
-		// against whatever it now overlaps. Leaves cover their bodies'
-		// travel, so two that can meet this step overlap.
-		for (Collider* moved : m_tree.TakeMoved())
-		{
-			const Bounds* padded = m_tree.PaddedBounds(*moved);
+		// against whatever it now overlaps, found in parallel and taken in
+		// chunk order. Leaves cover their bodies' travel, so two that can
+		// meet this step overlap.
+		const std::vector<Collider*> moved = m_tree.TakeMoved();
 
-			if (padded == nullptr)
-				continue;
+		m_found.resize(std::max(m_found.size(), Jobs::Chunks(moved.size(), QUERY_GRAIN)));
 
-			m_tree.Query(*padded,
-				[&](Collider& other)
+		Jobs::For(moved.size(), QUERY_GRAIN,
+			[&](size_t chunk, size_t begin, size_t end)
+			{
+				std::vector<Key>& found = m_found[chunk];
+				found.clear();
+
+				for (size_t i = begin; i < end; i++)
 				{
-					if (&other == moved)
-						return;
+					const Collider* collider = moved[i];
+					const Bounds* padded = m_tree.PaddedBounds(*collider);
 
-					const Key key = Ordered(moved, &other);
+					if (padded == nullptr)
+						continue;
 
-					if (m_candidateSet.insert(key).second)
-						m_candidates.push_back(key);
-				});
-		};
+					m_tree.Query(*padded,
+						[&](Collider& other)
+						{
+							if (&other != collider)
+								found.push_back(Ordered(collider, &other));
+						});
+				};
+			});
 
-		// Candidates whose leaves have parted are dropped, and the rest looked
-		// at. Where neither side is awake, nothing has moved to part them.
+		for (size_t chunk = 0; chunk < Jobs::Chunks(moved.size(), QUERY_GRAIN); chunk++)
+			for (const Key& key : m_found[chunk])
+				if (m_candidateSet.insert(key).second)
+					m_candidates.push_back(key);
+
+		// Candidates whose leaves have parted are dropped, and the rest to be
+		// looked at gathered. Where neither side is awake, nothing has moved
+		// to part them.
+		m_live.clear();
+
 		for (size_t i = 0; i < m_candidates.size(); )
 		{
 			const Key key = m_candidates[i];
@@ -384,8 +406,43 @@ namespace Loom
 				continue;
 			};
 
-			Consider(*const_cast<Collider*>(key.first), *const_cast<Collider*>(key.second));
+			m_live.push_back(key);
 			i++;
+		};
+
+		// Collided in parallel, each chunk into its own slot, then put
+		// together in chunk order, with the sleepers they wake woken after.
+		const size_t chunks = Jobs::Chunks(m_live.size(), CONSIDER_GRAIN);
+		m_considered.resize(std::max(m_considered.size(), chunks));
+
+		Jobs::For(m_live.size(), CONSIDER_GRAIN,
+			[&](size_t chunk, size_t begin, size_t end)
+			{
+				Considered& out = m_considered[chunk];
+				out.pairs.clear();
+				out.contacts.clear();
+				out.wakes.clear();
+
+				for (size_t i = begin; i < end; i++)
+					Consider(*const_cast<Collider*>(m_live[i].first), *const_cast<Collider*>(m_live[i].second), out);
+			});
+
+		for (size_t chunk = 0; chunk < chunks; chunk++)
+		{
+			const Considered& out = m_considered[chunk];
+			const size_t base = m_contacts.size();
+
+			m_contacts.insert(m_contacts.end(), out.contacts.begin(), out.contacts.end());
+
+			for (Pair pair : out.pairs)
+			{
+				pair.first += base;
+				m_pairs.push_back(pair);
+			};
+
+			for (int sleeper : out.wakes)
+				if (!m_bodies[sleeper].awake)
+					Wake(sleeper);
 		};
 	};
 
@@ -394,7 +451,7 @@ namespace Loom
 		return body != NONE && m_bodies[body].awake;
 	};
 
-	void Simulation::Consider(Collider& a, Collider& b)
+	void Simulation::Consider(Collider& a, Collider& b, Considered& out) const
 	{
 		const auto dynamic =
 			[&](int body) { return body != NONE && m_bodies[body].dynamic; };
@@ -427,12 +484,12 @@ namespace Loom
 		if (!a.m_bounds.Expanded(margin).Overlaps(b.m_bounds))
 			return;
 
-		m_manifolds.clear();
-		Contacts::Collide(a.m_shape, b.m_shape, margin, m_manifolds);
+		out.manifolds.clear();
+		Contacts::Collide(a.m_shape, b.m_shape, margin, out.manifolds);
 
-		pair.first = m_contacts.size();
+		pair.first = out.contacts.size();
 
-		for (const Contacts::Manifold& manifold : m_manifolds)
+		for (const Contacts::Manifold& manifold : out.manifolds)
 			for (int i = 0; i < manifold.count; i++)
 			{
 				Contact contact{ };
@@ -441,14 +498,14 @@ namespace Loom
 				contact.depth = manifold.depths[i];
 
 				pair.touching |= contact.depth >= -CONTACT_OFFSET;
-				m_contacts.push_back(contact);
+				out.contacts.push_back(contact);
 			};
 
-		pair.count = m_contacts.size() - pair.first;
+		pair.count = out.contacts.size() - pair.first;
 
 		if (pair.count == 0 || (pair.trigger && !pair.touching))
 		{
-			m_contacts.resize(pair.first);
+			out.contacts.resize(pair.first);
 			return;
 		};
 
@@ -473,9 +530,9 @@ namespace Loom
 			for (const auto& [striker, sleeper] : { std::pair{ pair.bodyA, pair.bodyB }, std::pair{ pair.bodyB, pair.bodyA } })
 				if (Awake(striker) && sleeper != NONE && !m_bodies[sleeper].awake
 					&& (glm::length(m_bodies[striker].velocity) > WAKE_SPEED || (pair.touching && !dynamic(striker))))
-					Wake(sleeper);
+					out.wakes.push_back(sleeper);
 
-		m_pairs.push_back(pair);
+		out.pairs.push_back(pair);
 	};
 
 	void Simulation::Prepare(Pair& pair, float seconds)
