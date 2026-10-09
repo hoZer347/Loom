@@ -64,10 +64,10 @@ TEST_SUITE("Contacts")
 
 		// The lower cube turned about x, so its top is an edge along x; the
 		// upper turned about z, so its bottom is an edge along z, crossing it.
-		const float reach = HALF * std::sqrt(2.0f);
+		const float reach = HALF * glm::root_two<float>();
 
 		Loom::Contacts::Shape lower = Cube(glm::vec3(0.0f), X);
-		const Loom::Contacts::Shape upper = Cube(glm::vec3(0.0f, reach * 2.0f - SINK, 0.0f), Z);
+		const Loom::Contacts::Shape upper = Cube(glm::vec3(0.0f, reach + reach - SINK, 0.0f), Z);
 
 		CHECK(NormalBetween(lower, upper).y > UPRIGHT);
 

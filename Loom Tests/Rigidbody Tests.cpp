@@ -734,10 +734,10 @@ TEST_SUITE("Rigidbody")
 		constexpr float FIRST_LAYER = 1.0f;
 		constexpr float SECONDS = 3.0f;
 
-		// Boxes and balls by turns; degrees between one body's turn and the
-		// next's, so no two lie alike.
+		// Boxes and balls by turns; degrees between one body's turn about
+		// each axis and the next's, so no two lie alike.
 		constexpr int KINDS = 2;
-		constexpr float TURN = 37.0f;
+		constexpr glm::vec3 TURN(37.0f, 74.0f, 111.0f);
 
 		const auto pile =
 			[&]()
@@ -757,7 +757,7 @@ TEST_SUITE("Rigidbody")
 						(i / PER_ROW % PER_ROW - PER_ROW * HALF) * SPACING);
 
 					Loom::GameObject* object = Spawn(scene, "Body", position);
-					object->transform.rotation = glm::vec3(TURN * i, TURN * 2 * i, TURN * 3 * i);
+					object->transform.rotation = TURN * (float)i;
 
 					if (i % KINDS == 0)
 						object->Attach<Loom::BoxCollider>();
