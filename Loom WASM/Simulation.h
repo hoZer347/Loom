@@ -75,6 +75,9 @@ namespace Loom
 			bool dynamic;
 			bool awake;
 
+			// Moved by Integrate, its leaves not yet placed.
+			bool moved;
+
 			// How far it goes this step.
 			float travel;
 
@@ -202,7 +205,14 @@ namespace Loom
 		// from outside a step too.
 		static void WakeOwner(const Collider& collider);
 
+		// Moves an awake body, writes its transform and measures its
+		// colliders, touching nothing but the body, so many move at once.
 		void Integrate(Body& body, float seconds);
+
+		// Places a moved body's leaves in the tree.
+		void Place(Body& body, float seconds);
+
+		static int Depth(const GameObject& object);
 		void Report();
 
 		int BodyOf(const Collider& collider) const;
@@ -218,9 +228,8 @@ namespace Loom
 		// Stands in for a static collider: no mass, no velocity.
 		Body m_ground{ };
 
-		// The parent the last body integrated was under, and its inverse world.
-		const GameObject* m_lastParent = nullptr;
-		glm::mat4 m_parentInverse{ 1.0f };
+		// This step's bodies with others hanging under them.
+		std::vector<Body*> m_parents{ };
 
 		// This step's, reused from step to step.
 		std::vector<Pair> m_pairs{ };

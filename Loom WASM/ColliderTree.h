@@ -45,6 +45,18 @@ namespace Loom
 		// stretched a few times that far ahead, as Box2D's are.
 		void Sync(Collider& collider, const glm::vec3& travel = glm::vec3(0.0f));
 
+		// Sync in two halves. Measure works out where collider is now,
+		// touching nothing but the collider, so many can be measured at once,
+		// and says whether its leaf has to move; Place then moves it, or only
+		// marks it synced.
+		bool Measure(Collider& collider) const;
+		void Place(Collider& collider, bool moved, const glm::vec3& travel = glm::vec3(0.0f));
+
+		// A collider to sync from the walk Scene::Physics makes, all of them
+		// measured at once by SyncEnlisted once it is over.
+		void Enlist(Collider& collider) { m_enlisted.push_back(&collider); };
+		void SyncEnlisted();
+
 		// Refits collider's leaf, where it was last synced, if it no longer
 		// covers the travel it is about to make, so a body that has just sped
 		// up is paired with what lies along its new path.
@@ -122,6 +134,9 @@ namespace Loom
 
 		std::vector<Node> m_nodes{ };
 		std::vector<Collider*> m_moved{ };
+
+		std::vector<Collider*> m_enlisted{ };
+		std::vector<char> m_measured{ };
 		int m_root = NONE;
 		int m_free = NONE;
 		size_t m_leaves = 0;

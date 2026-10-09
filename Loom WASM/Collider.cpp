@@ -28,7 +28,7 @@ namespace Loom
 	void Collider::OnPhysics()
 	{
 		if (ColliderTree::current)
-			ColliderTree::current->Sync(*this);
+			ColliderTree::current->Enlist(*this);
 	};
 
 	void Collider::CatchUp() const

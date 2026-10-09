@@ -53,9 +53,11 @@ namespace Loom
 		// above sleeping speed, so jostling neighbours do not keep a pile awake.
 		constexpr float WAKE_SPEED = 0.5f;
 
-		// How many leaves one job's chunk queries, and how many candidates it
-		// collides: enough that a chunk outweighs handing it out.
+		// How many leaves one job's chunk queries, how many candidates it
+		// collides, and how many bodies it readies or moves: enough that a
+		// chunk outweighs handing it out.
 		constexpr size_t QUERY_GRAIN = 64;
+		constexpr size_t BODY_GRAIN = 64;
 		constexpr size_t CONSIDER_GRAIN = 128;
 
 		// A contact this close to one from the last step, facing nearly the
@@ -203,9 +205,13 @@ namespace Loom
 
 		// Once the tree is in step, so a collider attached since the body
 		// was is in it and moves with the body.
-		for (Body& body : m_bodies)
-			if (!Ready(body))
-				body.object = nullptr;
+		Jobs::For(m_bodies.size(), BODY_GRAIN,
+			[&](size_t, size_t begin, size_t end)
+			{
+				for (size_t i = begin; i < end; i++)
+					if (!Ready(m_bodies[i]))
+						m_bodies[i].object = nullptr;
+			});
 
 		std::erase_if(m_bodies, [](const Body& body) { return body.object == nullptr; });
 
@@ -247,15 +253,40 @@ namespace Loom
 			for (Pair& pair : m_pairs)
 				Solve(pair);
 
-		m_lastParent = nullptr;
+		// A body with others hanging under it moves first, outermost first,
+		// so those under it are placed from where it ends up; the rest move at
+		// once, then their leaves are placed.
+		m_parents.clear();
 
 		for (Body& body : m_bodies)
 		{
 			body.rigidbody->velocity = body.velocity;
 			body.rigidbody->angularVelocity = body.angularVelocity;
 
-			Integrate(body, seconds);
+			if (!body.object->GetChildren().empty())
+				m_parents.push_back(&body);
 		};
+
+		std::sort(m_parents.begin(), m_parents.end(),
+			[](const Body* a, const Body* b) { return Depth(*a->object) < Depth(*b->object); });
+
+		for (Body* parent : m_parents)
+		{
+			Integrate(*parent, seconds);
+			Place(*parent, seconds);
+		};
+
+		Jobs::For(m_bodies.size(), BODY_GRAIN,
+			[&](size_t, size_t begin, size_t end)
+			{
+				for (size_t i = begin; i < end; i++)
+					if (m_bodies[i].object->GetChildren().empty())
+						Integrate(m_bodies[i], seconds);
+			});
+
+		for (Body& body : m_bodies)
+			if (body.object->GetChildren().empty())
+				Place(body, seconds);
 
 		Report();
 
@@ -675,17 +706,11 @@ namespace Loom
 			const glm::quat spin(0.0f, body.angularVelocity);
 			body.orientation = glm::normalize(body.orientation + spin * body.orientation * (HALF * seconds));
 
-			// Back into its parent's space, keeping its own scale. Siblings
-			// share a parent, so its inverse is kept from body to body.
+			// Back into its parent's space, keeping its own scale.
 			const GameObject* parent = body.object->GetParent();
+			const glm::mat4 parentInverse = parent ? glm::inverse(parent->WorldMatrix()) : glm::mat4(1.0f);
 
-			if (parent != m_lastParent)
-			{
-				m_lastParent = parent;
-				m_parentInverse = parent ? glm::inverse(parent->WorldMatrix()) : glm::mat4(1.0f);
-			};
-
-			const glm::mat4 local = m_parentInverse
+			const glm::mat4 local = parentInverse
 				* glm::translate(glm::mat4(1.0f), body.position)
 				* glm::mat4_cast(body.orientation);
 
@@ -707,14 +732,11 @@ namespace Loom
 			};
 
 			// From the transform just written, exactly as the next walk will
-			// find it, so that walk leaves the leaf alone; stretched along the
-			// travel, so the next steps' motion stays inside it.
+			// find it, so that walk leaves the leaf alone.
 			for (Collider* collider : body.colliders)
-				m_tree.Sync(*collider, body.velocity * seconds);
+				m_tree.Measure(*collider);
 
-			// Whatever hangs under it has a parent somewhere new.
-			if (!body.object->GetChildren().empty())
-				m_lastParent = nullptr;
+			body.moved = true;
 		};
 
 		if (body.inverseMass == 0.0f)
@@ -740,6 +762,28 @@ namespace Loom
 		}
 		else
 			rigidbody.m_still = 0.0f;
+	};
+
+	void Simulation::Place(Body& body, float seconds)
+	{
+		if (!body.moved)
+			return;
+
+		// Stretched along the travel, so the next steps' motion stays inside.
+		for (Collider* collider : body.colliders)
+			m_tree.Place(*collider, true, body.velocity * seconds);
+
+		body.moved = false;
+	};
+
+	int Simulation::Depth(const GameObject& object)
+	{
+		int depth = 0;
+
+		for (const GameObject* above = object.GetParent(); above != nullptr; above = above->GetParent())
+			depth++;
+
+		return depth;
 	};
 
 	void Simulation::Report()

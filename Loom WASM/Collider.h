@@ -28,7 +28,7 @@ namespace Loom
 	{
 		~Collider();
 
-		// Keeps the scene's tree in step with where the collider is now.
+		// Has the scene's tree brought in step with where the collider is now.
 		void OnPhysics() override;
 
 		// The nearest point along the ray, within maxDistance, where it meets

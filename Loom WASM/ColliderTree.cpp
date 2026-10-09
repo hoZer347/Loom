@@ -1,6 +1,7 @@
 #include "ColliderTree.h"
 
 #include "Collider.h"
+#include "Jobs.h"
 
 #include <algorithm>
 #include <array>
@@ -48,6 +49,9 @@ namespace Loom
 		{
 			return Stretched(bounds, travel * PREDICTION).Expanded(PADDING);
 		};
+
+		// How many colliders one job's chunk measures.
+		constexpr size_t MEASURE_GRAIN = 64;
 
 		// A branch whose children's heights differ by more than this is rotated.
 		constexpr int MOST_IMBALANCE = 1;
@@ -118,22 +122,52 @@ namespace Loom
 
 	void ColliderTree::Sync(Collider& collider, const glm::vec3& travel)
 	{
+		Place(collider, Measure(collider), travel);
+	};
+
+	bool ColliderTree::Measure(Collider& collider) const
+	{
 		const glm::mat4 world = collider.m_gameObject->WorldMatrix();
 		const bool reshaped = collider.Refresh();
 
 		// Most colliders have not moved since the last step, and those leaves
 		// already fit.
 		if (collider.m_tree == this && !reshaped && world == collider.m_synced)
+			return false;
+
+		collider.m_synced = world;
+		collider.m_bounds = collider.BoundsIn(collider.m_synced);
+		collider.m_shape = Contacts::Pose(collider, collider.m_synced);
+
+		return true;
+	};
+
+	void ColliderTree::SyncEnlisted()
+	{
+		m_measured.resize(m_enlisted.size());
+
+		Jobs::For(m_enlisted.size(), MEASURE_GRAIN,
+			[&](size_t, size_t begin, size_t end)
+			{
+				for (size_t i = begin; i < end; i++)
+					m_measured[i] = Measure(*m_enlisted[i]);
+			});
+
+		for (size_t i = 0; i < m_enlisted.size(); i++)
+			Place(*m_enlisted[i], m_measured[i]);
+
+		m_enlisted.clear();
+	};
+
+	void ColliderTree::Place(Collider& collider, bool moved, const glm::vec3& travel)
+	{
+		if (!moved && collider.m_tree == this)
 		{
 			m_nodes[collider.m_node].sync = m_sync;
 			return;
 		};
 
-		collider.m_synced = world;
-
-		const Bounds bounds = collider.BoundsIn(collider.m_synced);
-		collider.m_bounds = bounds;
-		collider.m_shape = Contacts::Pose(collider, collider.m_synced);
+		const Bounds& bounds = collider.m_bounds;
 
 		if (collider.m_tree != this)
 		{
