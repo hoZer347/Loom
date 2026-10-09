@@ -135,7 +135,9 @@ vec3 LoomLight(vec3 normal)
 
 		// A one-texel map at the far plane: nothing is in shadow. Bound in place
 		// of a light's own map when there is none, so a shadow sampler always
-		// has a depth texture behind it. Shared, and lives until the process ends.
+		// has a depth texture behind it, and during the shadow pass, so a caster
+		// never samples the map it is drawing into. Shared, and lives until the
+		// process ends.
 		uint32_t NothingInShadow(Renderer& renderer)
 		{
 			static const uint32_t texture = [&renderer]() -> uint32_t
@@ -298,9 +300,9 @@ vec3 LoomLight(vec3 normal)
 				// so it is handed the light's view-projection in the camera's place.
 				mesh->material->Apply(program, &*mesh->variables);
 				renderer.SetUniform(program, "u_viewProjection", m_view_projection);
-				// A transparent shader's pass runs its fragment stage, which may
-				// sample the map this pass is drawing.
-				renderer.SetTexture(program, "u_shadowMap", NothingInShadow(renderer));
+				// A transparent shader's pass runs its fragment stage, which may call LoomShadow.
+				if (mesh->material->shader->settings.transparency)
+					renderer.SetTexture(program, "u_shadowMap", NothingInShadow(renderer));
 				renderer.SetUniform(program, "u_lightViewProjection", m_view_projection);
 				mesh->Draw(program);
 			}

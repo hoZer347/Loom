@@ -38,11 +38,13 @@ namespace Loom
 		bool shading = false;
 
 		// Drawn into the light's shadow map by a second program built from the
-		// vertex stage, and, when shaded, darkened where the map says so.
+		// vertex stage, and, when shaded, darkened where the map says so. With
+		// transparency on, the fragment stage joins it, and the shadow is as
+		// dark as its alpha.
 		bool shadows = false;
 
-		// Drawn after everything opaque, farthest first, without writing depth,
-		// so what is behind it shows through wherever its alpha is under 1.
+		// Drawn after everything opaque, farthest first, each depth before
+		// colour, so what is behind it shows through wherever its alpha is under 1.
 		bool transparency = false;
 	};
 

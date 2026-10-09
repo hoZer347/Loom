@@ -322,6 +322,20 @@ TEST_SUITE("Shader")
 #endif
 	};
 
+	TEST_CASE("a transparent shader's shadow pass drops the layout qualifier along with the out")
+	{
+		const std::string source =
+			"// ===SETTINGS===\nshadows = on\ntransparency = on\n"
+			"// ===FRAGMENT===\n"
+			"layout(location = 0) out vec4 FragColor;\n"
+			"void main() { FragColor = vec4(1.0); }\n";
+
+		CHECK(Loom::Shader::Assemble(source).shadowFragment.find("layout(location = 0)") == std::string::npos);
+#ifndef __EMSCRIPTEN__
+		CHECK(Loom::Shader::Check(source).empty());
+#endif
+	};
+
 	TEST_CASE("shadows without shading cast them, and leave the colour as written")
 	{
 		const Loom::Shader::Stages stages = Loom::Shader::Assemble("// ===SETTINGS===\nshadows = on\n" + FRAGMENT);

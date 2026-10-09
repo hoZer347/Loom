@@ -186,8 +186,11 @@ bool LoomDitheredOut(float alpha)
 			if (!std::regex_search(stage, color, ColorPattern()))
 				throw std::runtime_error("Transparency with shadows needs the fragment stage to write an out vec4 colour");
 
-			// The pass has no colour attachment, so the colour becomes a plain variable.
-			const std::string withoutOutput = std::regex_replace(WithMainRenamed(stage, "fragment"), ColorPattern(), "vec4 $1;");
+			// The pass has no colour attachment, so the colour becomes a plain
+			// variable, losing any layout qualifier with its out.
+			static const std::regex output(R"((?:\blayout\s*\([^)]*\)\s*)?\bout\s+(?:(?:lowp|mediump|highp)\s+)?vec4\s+(\w+)\s*;)");
+
+			const std::string withoutOutput = std::regex_replace(WithMainRenamed(stage, "fragment"), output, "vec4 $1;");
 
 			return withoutOutput + '\n' + EngineCode(DITHER_LIBRARY) +
 				"\nvoid main()\n{\n"
