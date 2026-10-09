@@ -26,7 +26,7 @@ namespace Loom
 		// scene that now stands in for it, or null if there is none.
 		using Rebuild = std::function<Scene*(Scene* scene, const std::string& text)>;
 
-		// Each step keeps a whole scene either side of it, so the oldest go.
+		// Each step keeps whole scenes either side of it, so the oldest go.
 		static constexpr size_t max_steps = 100;
 
 		// Compares each scene with the text it last serialized to, and makes one
