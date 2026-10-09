@@ -18,11 +18,11 @@ namespace
 	struct NotAComponent final
 	{ };
 
-	struct Base : Loom::Component<Base>
+	struct Attachable : Loom::Component<Attachable>
 	{ };
 
-	// Attach would build a Derived but register it as a Base.
-	struct Derived final : Base
+	// Attach would build a DerivedFromAttachable but register it as an Attachable.
+	struct DerivedFromAttachable final : Attachable
 	{ };
 };
 
@@ -147,11 +147,11 @@ TEST_SUITE("Component")
 	TEST_CASE("only a type that is its own Component<T> can be attached")
 	{
 		CHECK(Loom::AComponent<Probe<>>);
-		CHECK(Loom::AComponent<Base>);
+		CHECK(Loom::AComponent<Attachable>);
 		CHECK(Loom::AComponent<Loom::Mesh>);
 		CHECK_FALSE(Loom::AComponent<int>);
 		CHECK_FALSE(Loom::AComponent<NotAComponent>);
-		CHECK_FALSE(Loom::AComponent<Derived>);
+		CHECK_FALSE(Loom::AComponent<DerivedFromAttachable>);
 	};
 
 	// Component<T> exists only to be derived from -- GameObject::Attach builds
