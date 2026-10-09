@@ -60,7 +60,7 @@ needs Chrome or Edge installed.
 | `Macro Helpers` | `HAS_FUNCTION_*`, `HAS_VARIABLE_*`, `Str`, `VARIABLE_NAME` |
 | `Engine` | Unique IDs (including across threads), the task queue and `DoTasks`, frame-loop defaults |
 | `Threading` | Threads running at the same time, work queued from other threads running in order on the draining thread, objects built on other threads keeping their own fields |
-| `Jobs` | Every chunk of a `For` given out once with its own range, whatever the count and over thousands of `For`s, a limit of one thread keeping them all on the caller, `WaitFor` returning at once or sleeping until another thread raises its counter |
+| `Jobs` | Every chunk of a `For` given out once with its own range, whatever the count and over thousands of `For`s, a limit of one thread keeping them all on the caller, the pool's cores unmoved by any limit and covering the threads running, `WaitFor` returning at once or sleeping until another thread raises its counter |
 | `LoomObject` | ID allocation, naming, `NameAndID`, the `GetByID` registry, deregistration on destruction |
 | `Component` | Base callbacks as no-ops, virtual dispatch and destruction, type identity |
 | `GameObject` | Deferred `Attach`, `GetComponent` by type, selective update/render/physics registration, children, `Destroy`, `DetachComponent`, thread inheritance, the transform's fields and matrix |

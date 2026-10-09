@@ -104,6 +104,24 @@ TEST_SUITE("Jobs")
 		CHECK(Loom::Jobs::Threads() >= 1);
 	};
 
+	TEST_CASE("the pool's cores stay put whatever the limit, and cover the threads running")
+	{
+		const unsigned cores = Loom::Jobs::Cores();
+
+		CHECK(cores >= 1);
+		CHECK(cores >= Loom::Jobs::Threads());
+
+		Loom::Jobs::SetMostThreads(1);
+
+		CHECK(Loom::Jobs::Cores() == cores);
+		CHECK(Loom::Jobs::Threads() == 1);
+
+		Loom::Jobs::SetMostThreads(0);
+
+		CHECK(Loom::Jobs::Cores() == cores);
+		CHECK(cores >= Loom::Jobs::Threads());
+	};
+
 	TEST_CASE("WaitFor returns at once for a counter already there")
 	{
 		std::atomic<int> counter{ 3 };
