@@ -70,6 +70,8 @@ namespace Loom
 		// type derived from it.
 		typedef T ComponentType;
 
+		static constexpr const char* ComponentCategory = category.value;
+
 		virtual ~Component() { };
 
 	protected:
@@ -84,7 +86,7 @@ namespace Loom
 		};
 
 	private:
-		static inline const bool s_registered = ComponentRegistry::RegisterType<T>(category.value);
+		static inline const bool s_registered = ComponentRegistry::RegisterType<T>();
 
 		// A static member is only defined once something uses it, and nothing in
 		// T would. Naming it in a typedef does: the typedef is instantiated with

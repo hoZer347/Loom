@@ -20,6 +20,12 @@ namespace
 	struct Categorised final : Loom::Component<Categorised, "Gameplay / Enemies/">
 	{ };
 
+	// Left to register itself by name, since it needs an argument.
+	struct NeedsArgument final : Loom::Component<NeedsArgument, "Gameplay">
+	{
+		explicit NeedsArgument(int) { };
+	};
+
 	// The node at path under root, or null.
 	const Loom::ComponentMenu::Node* Find(const Loom::ComponentMenu::Node& root, const std::vector<std::string>& path)
 	{
@@ -62,6 +68,16 @@ TEST_SUITE("ComponentMenu")
 
 		Loom::ComponentRegistry::Unregister("Transient");
 		CHECK(Loom::ComponentRegistry::CategoryOf("Transient").empty());
+	};
+
+	TEST_CASE("a type registered by name keeps its category")
+	{
+		constexpr int argument = 1;
+
+		Loom::ComponentRegistry::Register<NeedsArgument>("Needs Argument", argument);
+		CHECK(Loom::ComponentRegistry::CategoryOf("Needs Argument") == "Gameplay");
+
+		Loom::ComponentRegistry::Unregister("Needs Argument");
 	};
 
 	TEST_CASE("categories are tidied into parts")

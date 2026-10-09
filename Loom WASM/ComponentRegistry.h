@@ -55,28 +55,22 @@ namespace Loom
 				[args...](auto& gameObject) -> ComponentBase*
 				{
 					return gameObject.template Attach<T>(args...);
-				});
+				},
+				T::ComponentCategory);
 		};
 
 		// What Component<T> runs for every type derived from it. One that cannot
 		// be built from nothing has no place in a menu, and is left to register
 		// itself with the arguments it needs.
 		template <typename T>
-		static bool RegisterType(const char* category = "")
+		static bool RegisterType()
 		{
 			if constexpr (std::is_default_constructible_v<T>)
 			{
 				const std::string name = PrettyTypeName(typeid(T).name());
 
 				if (IsFree(name, typeid(T).name()))
-					Register(
-						name,
-						typeid(T).name(),
-						[](auto& gameObject) -> ComponentBase*
-						{
-							return gameObject.template Attach<T>();
-						},
-						category);
+					Register<T>(name);
 			};
 
 			return true;

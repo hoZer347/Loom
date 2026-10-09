@@ -3,6 +3,7 @@
 #include "Test Support.h"
 
 #include "Component.h"
+#include "Mesh.h"
 #include "Scene.h"
 
 #include <string>
@@ -11,6 +12,19 @@
 
 using LoomTests::Pump;
 using LoomTests::Probe;
+
+namespace
+{
+	struct NotAComponent final
+	{ };
+
+	struct Base : Loom::Component<Base>
+	{ };
+
+	// Attach would build a Derived but register it as a Base.
+	struct Derived final : Base
+	{ };
+};
 
 // Every component is a LoomObject, and a LoomObject queues its own registration
 // on construction. So each case here pumps immediately after building one: that
@@ -128,6 +142,16 @@ TEST_SUITE("Component")
 		CHECK(std::is_base_of_v<Loom::Component<Probe<>>, Probe<>>);
 		CHECK(std::is_base_of_v<Loom::ComponentBase, Probe<>>);
 		CHECK(std::is_base_of_v<Loom::LoomObject, Probe<>>);
+	};
+
+	TEST_CASE("only a type that is its own Component<T> can be attached")
+	{
+		CHECK(Loom::AComponent<Probe<>>);
+		CHECK(Loom::AComponent<Base>);
+		CHECK(Loom::AComponent<Loom::Mesh>);
+		CHECK_FALSE(Loom::AComponent<int>);
+		CHECK_FALSE(Loom::AComponent<NotAComponent>);
+		CHECK_FALSE(Loom::AComponent<Derived>);
 	};
 
 	// Component<T> exists only to be derived from -- GameObject::Attach builds
