@@ -8,8 +8,10 @@
 #include <array>
 #include <cstdio>
 #include <filesystem>
+#include <functional>
 #include <iostream>
 #include <iterator>
+#include <vector>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -25,30 +27,102 @@ namespace Loom
 		const char* const configuration = "Release";
 #endif
 
-		// Runs a command line and pipes everything it says to the console, which
-		// in the editor means the Console panel.
-		bool Run(const std::string& command_line, const char* prefix)
+		// Runs a command line with no console window, handing each line it
+		// writes to either stream to on_line, and says whether it exited with 0.
+		bool Run(std::string command_line, const std::function<void(const std::string&)>& on_line)
 		{
-			FILE* pipe = _popen(('"' + command_line + '"').c_str(), "r");
+			SECURITY_ATTRIBUTES inheritable{ sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE };
+			HANDLE read = nullptr;
+			HANDLE write = nullptr;
 
-			if (pipe == nullptr)
+			if (!CreatePipe(&read, &write, &inheritable, 0))
 				return false;
+
+			SetHandleInformation(read, HANDLE_FLAG_INHERIT, 0);
+
+			// Only the pipe is handed down, so a build running beside the web
+			// player's server holds neither's pipe open for the other.
+			SIZE_T attributes_size = 0;
+			InitializeProcThreadAttributeList(nullptr, 1, 0, &attributes_size);
+
+			std::vector<char> attributes(attributes_size);
+
+			STARTUPINFOEXA startup{ };
+			startup.StartupInfo.cb = sizeof(STARTUPINFOEXA);
+			startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+			startup.StartupInfo.hStdOutput = write;
+			startup.StartupInfo.hStdError = write;
+			startup.lpAttributeList = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attributes.data());
+
+			InitializeProcThreadAttributeList(startup.lpAttributeList, 1, 0, &attributes_size);
+			UpdateProcThreadAttribute(
+				startup.lpAttributeList,
+				0,
+				PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+				&write,
+				sizeof(write),
+				nullptr,
+				nullptr);
+
+			PROCESS_INFORMATION process{ };
+
+			const bool started = CreateProcessA(
+				nullptr,
+				command_line.data(),
+				nullptr,
+				nullptr,
+				TRUE,
+				CREATE_NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT,
+				nullptr,
+				nullptr,
+				&startup.StartupInfo,
+				&process);
+
+			DeleteProcThreadAttributeList(startup.lpAttributeList);
+			CloseHandle(write);
+
+			if (!started)
+			{
+				CloseHandle(read);
+				return false;
+			};
+
+			CloseHandle(process.hThread);
 
 			std::array<char, 512> buffer{ };
 			std::string line;
+			DWORD count = 0;
 
-			while (fgets(buffer.data(), (int)buffer.size(), pipe))
-			{
-				line = buffer.data();
+			while (ReadFile(read, buffer.data(), (DWORD)buffer.size(), &count, nullptr) && count > 0)
+				for (DWORD i = 0; i < count; i++)
+				{
+					const char c = buffer[i];
 
-				while (!line.empty() && (line.back() == '\n' || line.back() == '\r'))
-					line.pop_back();
+					if (c == '\r')
+						continue;
 
-				if (!line.empty())
-					std::cout << prefix << line << std::endl;
-			};
+					if (c != '\n')
+					{
+						line += c;
+						continue;
+					};
 
-			return _pclose(pipe) == 0;
+					on_line(line);
+					line.clear();
+				};
+
+			if (!line.empty())
+				on_line(line);
+
+			CloseHandle(read);
+
+			DWORD exit_code = 1;
+
+			WaitForSingleObject(process.hProcess, INFINITE);
+			GetExitCodeProcess(process.hProcess, &exit_code);
+			CloseHandle(process.hProcess);
+
+			return exit_code == 0;
 		};
 
 		// When the editor itself was built. A script library older than that was
@@ -65,25 +139,6 @@ namespace Loom
 			std::error_code code;
 
 			return std::filesystem::last_write_time(buffer, code);
-		};
-
-		// Same, but hands back the output instead of printing it.
-		std::string Capture(const std::string& command_line)
-		{
-			FILE* pipe = _popen(('"' + command_line + '"').c_str(), "r");
-
-			if (pipe == nullptr)
-				return "";
-
-			std::array<char, 512> buffer{ };
-			std::string output;
-
-			while (fgets(buffer.data(), (int)buffer.size(), pipe))
-				output += buffer.data();
-
-			_pclose(pipe);
-
-			return output;
 		};
 
 		// Asks vswhere for a file inside an installation. It ships with every
@@ -106,26 +161,17 @@ namespace Loom
 			if (!std::filesystem::exists(vswhere, code))
 				return "";
 
-			const std::string output = Capture(
-				'"' + vswhere.string() + "\" -latest -prerelease -products * " + arguments);
+			std::string found;
 
-			std::string line;
-
-			for (const char c : output + '\n')
-			{
-				if (c != '\n' && c != '\r')
+			Run(
+				'"' + vswhere.string() + "\" -latest -prerelease -products * " + arguments,
+				[&](const std::string& line)
 				{
-					line += c;
-					continue;
-				};
+					if (found.empty() && !line.empty() && std::filesystem::exists(line, code))
+						found = line;
+				});
 
-				if (!line.empty() && std::filesystem::exists(line, code))
-					return line;
-
-				line.clear();
-			};
-
-			return "";
+			return found;
 		};
 	};
 
@@ -367,7 +413,13 @@ namespace Loom
 		m_worker = std::thread(
 			[command, build = m_current]()
 			{
-				build->succeeded = Run(command + " 2>&1", "  ");
+				build->succeeded = Run(
+					command,
+					[](const std::string& line)
+					{
+						if (!line.empty())
+							std::cout << "  " << line << std::endl;
+					});
 				build->done = true;
 			});
 
