@@ -55,6 +55,9 @@
     <ClCompile Include="ProjectTemplate Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="Script Exports Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="EditorCamera Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
