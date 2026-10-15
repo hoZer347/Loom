@@ -423,7 +423,15 @@ namespace Loom
 		std::stringstream buffer;
 		buffer << in.rdbuf();
 
-		return Deserialize(buffer.str(), error);
+		const std::string text = buffer.str();
+
+		int line_number = 0;
+		const bool blank = ReadLines(text, line_number, [](int, const std::string&) { return false; });
+
+		if (blank)
+			return new Scene(std::filesystem::path(path).stem().string());
+
+		return Deserialize(text, error);
 	};
 
 	Scene* SceneSerializer::Deserialize(

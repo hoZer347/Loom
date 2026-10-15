@@ -10,6 +10,8 @@
 
 #include "glm/glm.hpp"
 
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -439,6 +441,25 @@ TEST_SUITE("SceneSerializer")
 
 		CHECK(loaded.scene == nullptr);
 		CHECK(loaded.error.find("scene header") != std::string::npos);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an empty file opens as an empty scene named after it")
+	{
+		const std::filesystem::path path = std::filesystem::temp_directory_path() / "Blank.loomscene";
+		std::ofstream(path) << "\n\t\n# nothing yet\n";
+
+		std::string error;
+		std::unique_ptr<Loom::Scene> scene(Loom::SceneSerializer::LoadFromFile(path.string(), &error));
+		Pump();
+
+		REQUIRE(scene != nullptr);
+		CHECK(error.empty());
+		CHECK(scene->GetName() == "Blank");
+		CHECK(scene->GetRoot().GetChildren().empty());
+
+		scene.reset();
+		Pump();
+		std::filesystem::remove(path);
 	};
 
 	// A hand-written scene file is going to have a typo in it eventually, and a

@@ -61,6 +61,8 @@ namespace Loom
 			PendingReferences* pending = nullptr);
 
 		static void ResolveReferences(const PendingReferences& pending);
+
+		// A file with nothing in it is an empty scene named after the file.
 		static Scene* LoadFromFile(const std::string& path, std::string* error = nullptr);
 
 		// One GameObject and everything under it, as a scene writes it. Nothing
