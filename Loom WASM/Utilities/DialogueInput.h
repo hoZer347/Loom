@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Loom API.h"
+
 
 namespace Loom
 {
@@ -15,7 +17,7 @@ namespace Loom
 	///
 	/// GLFW reports only the key's current level, never the press itself, so the edge is
 	/// found here once per frame by Tick.
-	struct DialogueInput final
+	struct LOOM_API DialogueInput final
 	{
 		/// Whether a lettered face button went down this frame -- A, B, X or Y, whatever
 		/// the pad calls them. GLFW names them by position, so the same four buttons are

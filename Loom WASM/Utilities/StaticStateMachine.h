@@ -15,7 +15,7 @@ namespace Loom
 	///
 	/// It IS a StateMachineBase and adds nothing to it. There is deliberately no static
 	/// mirror of the machine API, so changing that API never touches this file.
-	struct StaticStateMachine final : StateMachineBase
+	struct LOOM_API StaticStateMachine final : StateMachineBase
 	{
 		/// The live machine, and the whole public face of this class. Created on demand,
 		/// so touching it before the first frame still works.

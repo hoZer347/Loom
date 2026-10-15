@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Loom API.h"
+
 
 namespace Loom
 {
@@ -9,7 +11,7 @@ namespace Loom
 	/// A row per attribute, showing the base it was given, the value the modifiers made
 	/// of it, and the difference between the two, which is the part anybody is really
 	/// reading.
-	struct AttributeGui final
+	struct LOOM_API AttributeGui final
 	{
 		/// One row. The base is editable for a numeric attribute, so a value can be tried
 		/// without a rebuild.

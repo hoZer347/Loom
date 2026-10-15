@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Loom API.h"
+
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -8,7 +10,7 @@
 namespace Loom
 {
 	/// Turns the inside of a [Binding, arg, arg] token into arguments.
-	struct DialogueArgs final
+	struct LOOM_API DialogueArgs final
 	{
 		/// Splits on commas that are not inside quotes, trimming each argument. Quotes are
 		/// kept at this stage -- Coerce strips them, and only for the types where a quote

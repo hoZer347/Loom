@@ -50,7 +50,7 @@ namespace Loom
 	/// Loom having neither a text renderer nor audio. Everything above that -- the
 	/// tokenising, the
 	/// bindings, the states, the timing -- is unchanged.
-	struct DialogueManager : StateMachine<DialogueManager, "Logic">
+	struct LOOM_API DialogueManager : StateMachine<DialogueManager, "Logic">
 	{
 		DialogueManager();
 

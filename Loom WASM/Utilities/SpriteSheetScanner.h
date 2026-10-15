@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Loom API.h"
+
 #include <vector>
 
 
@@ -51,7 +53,7 @@ namespace Loom
 	/// it is transparent. Each row's length is the column of its last non-empty cell plus
 	/// one -- measuring from the END rather than stopping at the first gap, so a
 	/// deliberate blank frame mid-animation survives while trailing padding does not.
-	struct SpriteSheetScanner final
+	struct LOOM_API SpriteSheetScanner final
 	{
 		/// Frame count per clip, one entry per row of the sheet, top row first. Rows that
 		/// are entirely blank come back as 0.

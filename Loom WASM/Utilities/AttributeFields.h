@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Loom API.h"
+
 #include "Attributes.h"
 
 #include <initializer_list>
@@ -76,7 +78,7 @@ namespace Loom
 		mutable bool m_built = false;
 	};
 
-	struct AttributeFields final
+	struct LOOM_API AttributeFields final
 	{
 		/// Every attribute on an owner, in declaration order.
 		static const std::vector<AttributeField>& Of(const AttributeOwner& owner)

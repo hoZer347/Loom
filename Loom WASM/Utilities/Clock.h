@@ -38,7 +38,7 @@ namespace Loom
 
 	/// The per-frame pump for this library: the clock, the edge-detected input, and the
 	/// state machines.
-	struct Utilities final
+	struct LOOM_API Utilities final
 	{
 		/// The clock, the input and the StaticStateMachine. Loom::Engine calls this first
 		/// thing every frame.
