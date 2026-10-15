@@ -25,6 +25,9 @@
     <ClCompile Include="EditorProject.cpp">
       <Filter>Panels</Filter>
     </ClCompile>
+    <ClCompile Include="HiddenProcess.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
     <ClCompile Include="ScriptLibrary.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
@@ -96,6 +99,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="HiddenProcess.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
     <ClInclude Include="ScriptLibrary.h">
       <Filter>Scripts</Filter>
     </ClInclude>

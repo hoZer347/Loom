@@ -1,17 +1,15 @@
 #include "ScriptLibrary.h"
 
 #include "ComponentRegistry.h"
+#include "HiddenProcess.h"
 
 #include "Utilities/StateReference.h"
 
 #include <algorithm>
-#include <array>
 #include <cstdio>
 #include <filesystem>
-#include <functional>
 #include <iostream>
 #include <iterator>
-#include <vector>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -26,104 +24,6 @@ namespace Loom
 #else
 		const char* const configuration = "Release";
 #endif
-
-		// Runs a command line with no console window, handing each line it
-		// writes to either stream to on_line, and says whether it exited with 0.
-		bool Run(std::string command_line, const std::function<void(const std::string&)>& on_line)
-		{
-			SECURITY_ATTRIBUTES inheritable{ sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE };
-			HANDLE read = nullptr;
-			HANDLE write = nullptr;
-
-			if (!CreatePipe(&read, &write, &inheritable, 0))
-				return false;
-
-			SetHandleInformation(read, HANDLE_FLAG_INHERIT, 0);
-
-			// Only the pipe is handed down, so a build running beside the web
-			// player's server holds neither's pipe open for the other.
-			SIZE_T attributes_size = 0;
-			InitializeProcThreadAttributeList(nullptr, 1, 0, &attributes_size);
-
-			std::vector<char> attributes(attributes_size);
-
-			STARTUPINFOEXA startup{ };
-			startup.StartupInfo.cb = sizeof(STARTUPINFOEXA);
-			startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
-			startup.StartupInfo.hStdOutput = write;
-			startup.StartupInfo.hStdError = write;
-			startup.lpAttributeList = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attributes.data());
-
-			InitializeProcThreadAttributeList(startup.lpAttributeList, 1, 0, &attributes_size);
-			UpdateProcThreadAttribute(
-				startup.lpAttributeList,
-				0,
-				PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
-				&write,
-				sizeof(write),
-				nullptr,
-				nullptr);
-
-			PROCESS_INFORMATION process{ };
-
-			const bool started = CreateProcessA(
-				nullptr,
-				command_line.data(),
-				nullptr,
-				nullptr,
-				TRUE,
-				CREATE_NO_WINDOW | EXTENDED_STARTUPINFO_PRESENT,
-				nullptr,
-				nullptr,
-				&startup.StartupInfo,
-				&process);
-
-			DeleteProcThreadAttributeList(startup.lpAttributeList);
-			CloseHandle(write);
-
-			if (!started)
-			{
-				CloseHandle(read);
-				return false;
-			};
-
-			CloseHandle(process.hThread);
-
-			std::array<char, 512> buffer{ };
-			std::string line;
-			DWORD count = 0;
-
-			while (ReadFile(read, buffer.data(), (DWORD)buffer.size(), &count, nullptr) && count > 0)
-				for (DWORD i = 0; i < count; i++)
-				{
-					const char c = buffer[i];
-
-					if (c == '\r')
-						continue;
-
-					if (c != '\n')
-					{
-						line += c;
-						continue;
-					};
-
-					on_line(line);
-					line.clear();
-				};
-
-			if (!line.empty())
-				on_line(line);
-
-			CloseHandle(read);
-
-			DWORD exit_code = 1;
-
-			WaitForSingleObject(process.hProcess, INFINITE);
-			GetExitCodeProcess(process.hProcess, &exit_code);
-			CloseHandle(process.hProcess);
-
-			return exit_code == 0;
-		};
 
 		// When the editor itself was built. A script library older than that was
 		// compiled against different engine headers, and the class layouts it
@@ -163,7 +63,7 @@ namespace Loom
 
 			std::string found;
 
-			Run(
+			HiddenProcess::Run(
 				'"' + vswhere.string() + "\" -latest -prerelease -products * " + arguments,
 				[&](const std::string& line)
 				{
@@ -208,7 +108,7 @@ namespace Loom
 			m_worker.join();
 
 		// Including the ones nobody wanted: their results go nowhere, but they
-		// are still writing MSBuild's output to a console that is about to go.
+		// are still writing MSBuild's output to a log that is about to go.
 		for (std::thread& abandoned : m_abandoned)
 			if (abandoned.joinable())
 				abandoned.join();
@@ -413,7 +313,7 @@ namespace Loom
 		m_worker = std::thread(
 			[command, build = m_current]()
 			{
-				build->succeeded = Run(
+				build->succeeded = HiddenProcess::Run(
 					command,
 					[](const std::string& line)
 					{

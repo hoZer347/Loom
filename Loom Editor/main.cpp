@@ -18,6 +18,7 @@
 #include "Scene.h"
 
 #include <cctype>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
@@ -237,6 +238,20 @@ namespace
 // answer to that either.
 int main(int argc, char** argv)
 {
+	// The editor is a Windows program, so it opens no console of its own and
+	// its Console panel is where it talks. Started from a terminal, what it
+	// says goes there too, unless that was redirected already.
+	if ((_fileno(stdout) < 0 || _fileno(stderr) < 0) && AttachConsole(ATTACH_PARENT_PROCESS))
+	{
+		FILE* reopened = nullptr;
+
+		if (_fileno(stdout) < 0)
+			freopen_s(&reopened, "CONOUT$", "w", stdout);
+
+		if (_fileno(stderr) < 0)
+			freopen_s(&reopened, "CONOUT$", "w", stderr);
+	};
+
 	// Visual Studio's Add > Loom Script runs this, so it is over before there is
 	// an engine or a window.
 	for (int i = 1; i < argc; i++)

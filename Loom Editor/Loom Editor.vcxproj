@@ -97,6 +97,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Editor.cpp" />
+    <ClCompile Include="HiddenProcess.cpp" />
     <ClCompile Include="ScriptLibrary.cpp" />
     <ClCompile Include="WebPlayer.cpp" />
     <ClCompile Include="ProjectTemplate.cpp" />
@@ -127,6 +128,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Editor.h" />
+    <ClInclude Include="HiddenProcess.h" />
     <ClInclude Include="ScriptLibrary.h" />
     <ClInclude Include="WebPlayer.h" />
     <ClInclude Include="ProjectTemplate.h" />

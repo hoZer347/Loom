@@ -142,7 +142,9 @@ and letting that fire after the object has gone runs it against freed memory.
   `Loom Editor.exe Demos/Shadows --screenshot <file>` is the check for those,
   with the OpenGL debug output on stderr. A clean run prints one GL line,
   "Pixel transfer is synchronized with 3D rendering", which is the screenshot's
-  own readback; anything else is a regression.
+  own readback; anything else is a regression. The editor is a Windows program,
+  so a shell does not wait for it: run it with `Start-Process -Wait -PassThru`,
+  or through a pipe, to wait and read its exit code.
 - Anything needing an ImGui frame: every `OnGui` and `GameObject::Gui`.
 - `Loom WASM/Utilities` (the hoZer state machines, dialogue, attribute and
   sprite layer). It is compiled and linked in, so it has to build, but nothing

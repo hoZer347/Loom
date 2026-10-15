@@ -347,3 +347,44 @@ TEST_SUITE("EditorConsole")
 		CHECK(clipboard == "first");
 	};
 };
+
+namespace
+{
+	// A stream nobody reads any more, like a pipe whose reader has gone.
+	struct Failing final :
+		public std::streambuf
+	{
+	protected:
+		int overflow(int) override { return EOF; };
+		std::streamsize xsputn(const char*, std::streamsize) override { return 0; };
+		int sync() override { return -1; };
+	};
+};
+
+TEST_SUITE("EditorLog")
+{
+	TEST_CASE("the log keeps every line when the stream it passes on to fails")
+	{
+		Failing failing;
+		std::streambuf* const previous = std::cout.rdbuf(&failing);
+
+		Loom::EditorLog::Get().Install();
+		Loom::EditorLog::Get().Clear();
+
+		std::cout << "first" << std::endl;
+		std::cout << 's' << "econd" << std::endl;
+		std::cout << "third" << std::endl;
+
+		const bool still_good = std::cout.good();
+
+		std::vector<std::string> lines;
+		Loom::EditorLog::Get().ForEach([&](size_t, const std::string& text, bool) { lines.push_back(text); });
+
+		Loom::EditorLog::Get().Clear();
+		Loom::EditorLog::Get().Uninstall();
+		std::cout.rdbuf(previous);
+
+		CHECK(still_good);
+		CHECK(lines == std::vector<std::string>{ "first", "second", "third" });
+	};
+};

@@ -133,6 +133,9 @@
     <ClCompile Include="AxisGui Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="HiddenProcess Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="WebPlayer Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

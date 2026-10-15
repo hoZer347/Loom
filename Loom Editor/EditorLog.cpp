@@ -27,8 +27,8 @@ namespace Loom
 		previous_out = std::cout.rdbuf();
 		previous_err = std::cerr.rdbuf();
 
-		// With no console or redirect to write to, a failed write would put
-		// the stream in error and the log would stop hearing it too.
+		// Nothing to pass on to when the editor was started with no console
+		// or redirect.
 		out_sink.log = this;
 		out_sink.passthrough = _fileno(stdout) >= 0 ? previous_out : nullptr;
 		out_sink.is_error = false;
@@ -105,9 +105,12 @@ namespace Loom
 
 		Put((char)c);
 
-		return passthrough
-			? passthrough->sputc((char)c)
-			: c;
+		// Whatever the passthrough says: a pipe whose reader went away would
+		// otherwise put the stream in error, and the log would stop hearing it.
+		if (passthrough)
+			passthrough->sputc((char)c);
+
+		return c;
 	};
 
 	int EditorLog::Sink::sync()
@@ -116,9 +119,10 @@ namespace Loom
 
 		// std::endl flushes the stream, and the stream is this sink; without
 		// passing that on, output to a redirected stdout never reaches the file.
-		return passthrough
-			? passthrough->pubsync()
-			: 0;
+		if (passthrough)
+			passthrough->pubsync();
+
+		return 0;
 	};
 
 	std::streamsize EditorLog::Sink::xsputn(const char* s, std::streamsize n)
@@ -128,8 +132,9 @@ namespace Loom
 		for (std::streamsize i = 0; i < n; i++)
 			Put(s[i]);
 
-		return passthrough
-			? passthrough->sputn(s, n)
-			: n;
+		if (passthrough)
+			passthrough->sputn(s, n);
+
+		return n;
 	};
 };
