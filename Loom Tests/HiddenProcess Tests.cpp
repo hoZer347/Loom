@@ -1,5 +1,8 @@
 #include "doctest.h"
 
+// The editor only runs on Windows, but the web test build compiles this too.
+#ifndef __EMSCRIPTEN__
+
 #include "HiddenProcess.h"
 
 #include <string>
@@ -62,3 +65,5 @@ TEST_SUITE("HiddenProcess")
 		CHECK(lines.empty());
 	};
 };
+
+#endif

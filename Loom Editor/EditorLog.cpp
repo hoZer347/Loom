@@ -1,6 +1,5 @@
 #include "EditorLog.h"
 
-#include <cstdio>
 #include <iostream>
 
 
@@ -27,14 +26,12 @@ namespace Loom
 		previous_out = std::cout.rdbuf();
 		previous_err = std::cerr.rdbuf();
 
-		// Nothing to pass on to when the editor was started with no console
-		// or redirect.
 		out_sink.log = this;
-		out_sink.passthrough = _fileno(stdout) >= 0 ? previous_out : nullptr;
+		out_sink.passthrough = previous_out;
 		out_sink.is_error = false;
 
 		err_sink.log = this;
-		err_sink.passthrough = _fileno(stderr) >= 0 ? previous_err : nullptr;
+		err_sink.passthrough = previous_err;
 		err_sink.is_error = true;
 
 		std::cout.rdbuf(&out_sink);

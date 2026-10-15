@@ -35,8 +35,8 @@ namespace Loom
 		~EditorLog();
 
 		// Splits whatever is written to a stream into lines and appends them,
-		// passing the characters along to the stream's original buffer, when
-		// there is one to write to, so the console does not swallow output.
+		// passing the characters along to the stream's original buffer so the
+		// console does not swallow output.
 		struct Sink final :
 			public std::streambuf
 		{
