@@ -246,7 +246,6 @@ TEST_SUITE("Animator")
 				2.0f, 0.0f, 0.0f, 1.0f, 1.0f,
 				1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
 			};
-			animator->clip = "Slide";
 			animator->OnUpdate();
 		};
 
@@ -271,19 +270,19 @@ TEST_SUITE("Animator")
 
 		// Slide is a second long, so it plays two loops before moving on.
 		animated.animator->Advance(1.9f);
-		CHECK(*animated.animator->clip == "Slide");
+		CHECK(animated.animator->GetClipName() == "Slide");
 
 		animated.animator->Advance(0.2f);
-		CHECK(*animated.animator->clip == "Hold");
+		CHECK(animated.animator->GetClipName() == "Hold");
 		CHECK(animated.animator->GetTime() == doctest::Approx(0.1f));
 
 		// Hold is half a second: three loops.
 		animated.animator->Advance(1.45f);
-		CHECK(*animated.animator->clip == "Slide");
+		CHECK(animated.animator->GetClipName() == "Slide");
 
 		animated.animator->switchAfter = 0.0f;
 		animated.animator->Advance(5.0f);
-		CHECK(*animated.animator->clip == "Slide");
+		CHECK(animated.animator->GetClipName() == "Slide");
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a clip with no length is played for switchAfter seconds before moving on")
@@ -294,10 +293,10 @@ TEST_SUITE("Animator")
 		animated.animator->switchAfter = 1.5f;
 
 		animated.animator->Advance(1.4f);
-		CHECK(*animated.animator->clip == "Pose");
+		CHECK(animated.animator->GetClipName() == "Pose");
 
 		animated.animator->Advance(0.2f);
-		CHECK(*animated.animator->clip == "Slide");
+		CHECK(animated.animator->GetClipName() == "Slide");
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a long frame moves on by one clip, part way into it")
@@ -308,7 +307,7 @@ TEST_SUITE("Animator")
 
 		animated.animator->Advance(100.0f);
 
-		CHECK(*animated.animator->clip == "Hold");
+		CHECK(animated.animator->GetClipName() == "Hold");
 		CHECK(animated.animator->GetTime() < 1.5f);
 	};
 
@@ -345,7 +344,7 @@ TEST_SUITE("Animator")
 		animated.animator->Pose(0.5f);
 
 		CHECK_FALSE(animated.animator->Play("Dance"));
-		CHECK(*animated.animator->clip == "Slide");
+		CHECK(animated.animator->GetClipName() == "Slide");
 
 		CHECK(animated.animator->Play("Hold"));
 		CHECK(animated.animator->GetTime() == 0.0f);
@@ -354,6 +353,29 @@ TEST_SUITE("Animator")
 		animated.animator->Pose(0.25f);
 		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(0.0f), CLOSE)));
 		CHECK(animated.animator->GetClipNames() == std::vector<std::string>{ "Slide", "Hold" });
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "clip picks a clip by its place, the inspector offers the clips by name, and one past them plays nothing")
+	{
+		Animated animated;
+
+		CHECK(animated.animator->Play(1));
+		CHECK(animated.animator->GetClipName() == "Hold");
+		CHECK_FALSE(animated.animator->Play(2));
+		CHECK(*animated.animator->clip == 1);
+
+		const Loom::SerializedField& field = animated.animator->GetFields()[0];
+		CHECK(animated.animator->GetFieldChoices(field) == std::vector<std::string>{ "Slide", "Hold" });
+		CHECK(animated.animator->GetFieldChoices(animated.animator->GetFields()[1]).empty());
+
+		animated.animator->Pose(0.5f);
+		const glm::vec3 held = animated.Position();
+
+		animated.animator->clip = 2;
+		animated.animator->Pose(0.5f);
+		CHECK(animated.animator->GetClipName().empty());
+		CHECK(animated.animator->GetDuration() == 0.0f);
+		CHECK(glm::all(glm::epsilonEqual(animated.Position(), held, CLOSE)));
 	};
 };
 

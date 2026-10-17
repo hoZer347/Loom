@@ -16,8 +16,8 @@ namespace Loom
 	* - Plays a model's animation clips on what is under its GameObject: a
 	*   clip moves joints, found by name, through keyed positions, rotations
 	*   and scales, and sets the weights of the Skins' shape keys
-	* - Plays the clip named by clip, from its start whenever the name
-	*   changes, speed times as fast as the clock. With loop on it starts over
+	* - Plays the clip clip picks, from its start whenever it changes, speed
+	*   times as fast as the clock. With loop on it starts over
 	*   at its end; off, it holds its last pose
 	* - With switchAfter above 0 it moves on to the next clip, in order and
 	*   round to the first again, once the playing one has played that many
@@ -43,12 +43,16 @@ namespace Loom
 		// switchAfter says, and puts the pose there on the joints and Skins.
 		void Advance(float seconds);
 
-		// A choice of the clips, and how far into the playing one it is.
+		// How far into the playing clip it is.
 		void OnGui() override;
 
-		// Starts the named clip from its beginning. False, changing nothing,
-		// for a name it has no clip by.
+		// The clips' names, for clip.
+		std::vector<std::string> GetFieldChoices(const SerializedField& field) override;
+
+		// Starts the named clip, or the clip at that place in the list, from its
+		// beginning. False, changing nothing, for one it has no clip by.
 		bool Play(const std::string& name);
+		bool Play(int index);
 
 		// Puts the playing clip's pose at time seconds into it on the joints and
 		// Skins, wrapped or held by loop, without moving the clock.
@@ -56,12 +60,16 @@ namespace Loom
 
 		std::vector<std::string> GetClipNames();
 
-		// Of the clip named by clip, or 0 when there is none by that name.
+		// The playing clip's name, or empty when clip is past the last.
+		std::string GetClipName();
+
+		// Of the playing clip, or 0 when clip is past the last.
 		float GetDuration();
 
 		float GetTime() const { return m_time; };
 
-		Serial<std::string> clip;
+		// Which clip plays, by its place in m_clips. The inspector offers them by name.
+		Serial<int> clip = 0;
 		Serial<float> speed = 1.0f;
 		Serial<bool> loop = true;
 
@@ -108,7 +116,7 @@ namespace Loom
 		// The value of a channel at time, its keys either side blended.
 		std::vector<float> Sample(const Channel& channel, float time) const;
 
-		// The playing clip's index, or the clip count when none plays.
+		// clip, or the clip count when it is none of them.
 		size_t PlayingIndex() const;
 
 		// Starts the clip after the playing one, or the first after the last.
@@ -139,8 +147,8 @@ namespace Loom
 		bool m_skinsGathered = false;
 		unsigned long long m_skinsChanges = 0;
 
-		// The clip m_time counts from the start of.
-		std::string m_playing;
+		// The clip m_time counts from the start of, or -1 before any has played.
+		int m_playing = -1;
 		float m_time = 0.0f;
 	};
 };

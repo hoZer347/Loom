@@ -73,6 +73,11 @@ namespace Loom
 		// state has to follow it.
 		virtual void OnFieldChanged(const SerializedField& field) { };
 
+		// For an integer field that indexes a list only the object knows, such
+		// as an Animator's clips, the names the editor offers in its place, as
+		// it does an enum's. Empty for a field that is just a number.
+		virtual std::vector<std::string> GetFieldChoices(const SerializedField& field) { return { }; };
+
 	protected:
 		std::string m_name;
 		static inline std::recursive_mutex mutex;

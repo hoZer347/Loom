@@ -468,6 +468,31 @@ namespace Loom
 			};
 		};
 
+		// Whether another of the object's choices was picked, a value indexing
+		// choices. One past them shows as its number.
+		bool DrawChoiceField(const char* label, const SerializedField& field, const std::vector<std::string>& choices)
+		{
+			const long long value = IntegerOf(field);
+			const bool known = value >= 0 && value < (long long)choices.size();
+			const std::string shown = known ? choices[(size_t)value] : std::to_string(value);
+
+			bool changed = false;
+
+			if (ImGui::BeginCombo(label, shown.c_str()))
+			{
+				for (size_t i = 0; i < choices.size(); i++)
+					if (ImGui::Selectable(choices[i].c_str(), (long long)i == value) && (long long)i != value)
+					{
+						SetInteger(field, (long long)i);
+						changed = true;
+					};
+
+				ImGui::EndCombo();
+			};
+
+			return changed;
+		};
+
 		// Whether another enumerator was picked. A value that is none of them
 		// shows as its number.
 		bool DrawEnumField(const char* label, const SerializedField& field, const std::vector<FieldNames::Enumerator>& enumerators)
@@ -2668,7 +2693,11 @@ namespace Loom
 			const char* label = "##value";
 			bool changed = false;
 
-			if (enumerators[i])
+			const std::vector<std::string> choices = object.GetFieldChoices(field);
+
+			if (!choices.empty())
+				changed = DrawChoiceField(label, field, choices);
+			else if (enumerators[i])
 				changed = DrawEnumField(label, field, *enumerators[i]);
 			else switch (field.type)
 			{

@@ -173,10 +173,7 @@ namespace Loom
 
 	size_t Animator::PlayingIndex() const
 	{
-		return std::find_if(
-			m_parsedClips.begin(),
-			m_parsedClips.end(),
-			[&](const Clip& each) { return each.name == m_playing; }) - m_parsedClips.begin();
+		return clip >= 0 && (size_t)clip < m_parsedClips.size() ? (size_t)clip : m_parsedClips.size();
 	};
 
 	const std::vector<Skin*>& Animator::Skins()
@@ -197,13 +194,20 @@ namespace Loom
 	{
 		Parse();
 
-		const bool known = std::any_of(m_parsedClips.begin(), m_parsedClips.end(), [&](const Clip& each) { return each.name == name; });
+		const auto found = std::find_if(m_parsedClips.begin(), m_parsedClips.end(), [&](const Clip& each) { return each.name == name; });
 
-		if (!known)
+		return Play((int)(found - m_parsedClips.begin()));
+	};
+
+	bool Animator::Play(int index)
+	{
+		Parse();
+
+		if (index < 0 || (size_t)index >= m_parsedClips.size())
 			return false;
 
-		clip = name;
-		m_playing = name;
+		clip = index;
+		m_playing = index;
 		m_time = 0.0f;
 
 		return true;
@@ -245,14 +249,14 @@ namespace Loom
 
 	void Animator::PlayNext()
 	{
-		const std::vector<std::string> names = GetClipNames();
+		Parse();
 
-		if (names.empty())
+		if (m_parsedClips.empty())
 			return;
 
-		const size_t playing = std::find(names.begin(), names.end(), *clip) - names.begin();
+		const size_t playing = PlayingIndex();
 
-		clip = names[playing < names.size() ? (playing + 1) % names.size() : 0];
+		clip = playing < m_parsedClips.size() ? (int)((playing + 1) % m_parsedClips.size()) : 0;
 		m_playing = clip;
 	};
 
@@ -333,34 +337,36 @@ namespace Loom
 		return names;
 	};
 
+	std::string Animator::GetClipName()
+	{
+		Parse();
+
+		const size_t playing = PlayingIndex();
+
+		return playing < m_parsedClips.size() ? m_parsedClips[playing].name : std::string();
+	};
+
 	float Animator::GetDuration()
 	{
 		Parse();
 
-		for (const Clip& each : m_parsedClips)
-			if (each.name == *clip)
-				return each.duration;
+		const size_t playing = PlayingIndex();
 
-		return 0.0f;
+		return playing < m_parsedClips.size() ? m_parsedClips[playing].duration : 0.0f;
+	};
+
+	std::vector<std::string> Animator::GetFieldChoices(const SerializedField& field)
+	{
+		if (field.data == &*clip)
+			return GetClipNames();
+
+		return { };
 	};
 
 	void Animator::OnGui()
 	{
-		const std::vector<std::string> names = GetClipNames();
-
-		if (names.empty())
+		if (GetClipNames().empty())
 			return;
-
-		ImGui::SeparatorText("Clips");
-
-		if (ImGui::BeginCombo("Clip", clip->c_str()))
-		{
-			for (const std::string& name : names)
-				if (ImGui::Selectable(name.c_str(), name == *clip))
-					clip = name;
-
-			ImGui::EndCombo();
-		};
 
 		const float duration = GetDuration();
 		const float into = duration <= 0.0f ? 0.0f : loop ? std::fmod(m_time, duration) : std::min(m_time, duration);

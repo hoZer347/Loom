@@ -671,7 +671,6 @@ void main()
 			animator->m_clips = clips;
 			animator->m_channels = channels;
 			animator->m_keys = std::move(keys);
-			animator->clip = ClipName(*scene.mAnimations[0], 0);
 		};
 
 		GameObject* ImportRigged(const aiScene& scene, const std::string& path, GameObject& parent)
