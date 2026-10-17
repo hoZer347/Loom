@@ -37,7 +37,6 @@ namespace Loom
 		// The name m_channels gives each property.
 		static const char* PropertyName(Property property);
 
-		// Advance by the clock.
 		void OnUpdate() override;
 
 		// Moves the playing clip on by seconds of the clock, switching clips as
@@ -114,6 +113,11 @@ namespace Loom
 
 		// Starts the clip after the playing one, or the first after the last.
 		void PlayNext();
+
+		// How long the playing clip plays before switchAfter moves on: the
+		// whole loops that cover switchAfter, or switchAfter itself for a clip
+		// with no length.
+		float PlayFor();
 
 		// The Skins under it, gathered again once anything has been added,
 		// removed or moved.

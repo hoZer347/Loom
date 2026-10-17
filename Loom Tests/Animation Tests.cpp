@@ -286,6 +286,32 @@ TEST_SUITE("Animator")
 		CHECK(*animated.animator->clip == "Slide");
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a clip with no length is played for switchAfter seconds before moving on")
+	{
+		Animated animated;
+		animated.animator->m_clips = "Slide\t1\nPose\t0\n";
+		animated.animator->Play("Pose");
+		animated.animator->switchAfter = 1.5f;
+
+		animated.animator->Advance(1.4f);
+		CHECK(*animated.animator->clip == "Pose");
+
+		animated.animator->Advance(0.2f);
+		CHECK(*animated.animator->clip == "Slide");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a long frame moves on by one clip, part way into it")
+	{
+		Animated animated;
+		animated.animator->Play("Slide");
+		animated.animator->switchAfter = 1.5f;
+
+		animated.animator->Advance(100.0f);
+
+		CHECK(*animated.animator->clip == "Hold");
+		CHECK(animated.animator->GetTime() < 1.5f);
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a Skin added after the clip started has its shape keys set too")
 	{
 		Animated animated;

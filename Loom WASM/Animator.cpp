@@ -224,29 +224,33 @@ namespace Loom
 
 		m_time += seconds * speed;
 
-		const float duration = GetDuration();
-
-		if (switchAfter > 0.0f && duration > 0.0f)
+		if (switchAfter > 0.0f && m_time >= PlayFor())
 		{
-			const float loops = std::ceil(switchAfter / duration);
+			m_time -= PlayFor();
+			PlayNext();
 
-			if (m_time >= loops * duration)
-			{
-				m_time -= loops * duration;
-				PlayNext();
-			};
+			// A long frame moves on one clip, not several.
+			m_time = std::fmod(m_time, PlayFor());
 		};
 
 		Pose(m_time);
 	};
 
+	float Animator::PlayFor()
+	{
+		const float duration = GetDuration();
+
+		return duration > 0.0f ? std::ceil(switchAfter / duration) * duration : *switchAfter;
+	};
+
 	void Animator::PlayNext()
 	{
 		const std::vector<std::string> names = GetClipNames();
-		const size_t playing = std::find(names.begin(), names.end(), *clip) - names.begin();
 
 		if (names.empty())
 			return;
+
+		const size_t playing = std::find(names.begin(), names.end(), *clip) - names.begin();
 
 		clip = names[playing < names.size() ? (playing + 1) % names.size() : 0];
 		m_playing = clip;
