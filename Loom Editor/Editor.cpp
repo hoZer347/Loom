@@ -582,10 +582,18 @@ namespace Loom
 		Engine::renderScenes = true;
 		Engine::updateScenes = true;
 
+		// What loading queued lands before the objects it refers to go, and
+		// what deleting them queues lands while the script library its code is
+		// in is still loaded. A run that never reached its first frame, such as
+		// one stopped by a bad argument, still has all of it queued.
+		Engine::DoTasks();
+
 		for (Scene* scene : m_ownedScenes)
 			delete scene;
 
 		m_ownedScenes.clear();
+
+		Engine::DoTasks();
 
 		EditorLog::Get().Uninstall();
 	};
