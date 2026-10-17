@@ -243,11 +243,13 @@ namespace Loom
 					Engine::updateScenes ? "running" :
 					scripts.IsBuilding() ? "starting once the scripts are built" : "paused") << '\n';
 
-			out << "Scripts: " <<
-				(!scripts.HasProject() ? "none" :
-					scripts.IsBuilding() ? "building" :
-					scripts.IsStale() ? "changed since the last build" :
-					scripts.LastBuildSucceeded() ? "built" : "last build failed") << '\n';
+			// The Scripts panel's own words for it.
+			out << "Scripts: " << (scripts.HasProject() ? scripts.GetStatus() : "none");
+
+			if (scripts.HasProject() && !scripts.IsBuilding() && scripts.IsStale())
+				out << " The sources have changed since.";
+
+			out << '\n';
 
 			out << "Selected: " << (editor.GetSelected() ? Named(*editor.GetSelected()) : "nothing") << '\n';
 
