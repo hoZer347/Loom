@@ -9,6 +9,11 @@
     before showing it), waits for it to exit, then closes every window still on
     that desktop and removes the desktop.
 
+    A dialog the program puts up, such as a runtime abort() or assert box,
+    appears on the current desktop whatever --desktop says. The script prints
+    its text to stderr and stops the program, which takes the dialog with it,
+    and exits with 1.
+
     Creating and removing desktops goes through the shell's undocumented
     IVirtualDesktopManagerInternal, whose layout is specific to Windows 11
     24H2/25H2 (builds 26100+). The script refuses to run on anything older.
@@ -52,6 +57,7 @@ Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace LoomAgentDesktop
 {
@@ -117,8 +123,16 @@ namespace LoomAgentDesktop
         [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
         [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
         [DllImport("user32.dll")] static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+        [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr parent, EnumWindowsProc callback, IntPtr parameter);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr window, StringBuilder name, int capacity);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr window, StringBuilder text, int capacity);
+        [DllImport("user32.dll")] static extern int GetWindowTextLength(IntPtr window);
 
         const uint WM_CLOSE = 0x0010;
+
+        // What a message box or a runtime error dialog is made from.
+        const string DialogClass = "#32770";
+        const int ClassNameCapacity = 256;
 
         // GetAdjacentDesktop directions.
         const int Left = 3;
@@ -180,6 +194,58 @@ namespace LoomAgentDesktop
             }, IntPtr.Zero);
 
             return windows;
+        }
+
+        // A message box the process has put up, such as the runtime's abort()
+        // or assert dialog, which shows on whichever desktop is current.
+        public static List<IntPtr> DialogsOf(uint process)
+        {
+            var dialogs = new List<IntPtr>();
+
+            EnumWindows((window, parameter) =>
+            {
+                if (IsWindowVisible(window) && ProcessOf(window) == process && ClassOf(window) == DialogClass)
+                {
+                    dialogs.Add(window);
+                }
+
+                return true;
+            }, IntPtr.Zero);
+
+            return dialogs;
+        }
+
+        // The dialog's title, then the text of each control in it.
+        public static List<string> TextOf(IntPtr dialog)
+        {
+            var lines = new List<string> { TitleOf(dialog) };
+
+            EnumChildWindows(dialog, (child, parameter) =>
+            {
+                string text = TitleOf(child);
+                if (text.Length > 0)
+                {
+                    lines.Add(text);
+                }
+
+                return true;
+            }, IntPtr.Zero);
+
+            return lines;
+        }
+
+        static string ClassOf(IntPtr window)
+        {
+            var name = new StringBuilder(ClassNameCapacity);
+            GetClassName(window, name, name.Capacity);
+            return name.ToString();
+        }
+
+        static string TitleOf(IntPtr window)
+        {
+            var text = new StringBuilder(GetWindowTextLength(window) + 1);
+            GetWindowText(window, text, text.Capacity);
+            return text.ToString();
         }
 
         public static void Close(IntPtr window)
@@ -303,6 +369,7 @@ if ($Cleanup)
 
 $desktop = [LoomAgentDesktop.Desktops]::Create("$namePrefix $PID")
 $process = $null
+$dialogExitCode = 0
 
 try
 {
@@ -314,12 +381,28 @@ try
     # Without the handle cached now, ExitCode reads as null once it has exited.
     $null = $process.Handle
 
-    if (-not $process.WaitForExit($TimeoutSeconds * 1000))
+    # A dialog the program puts up shows on the user's desktop rather than the
+    # agent's and waits for a click, so it is reported and the program stopped.
+    $deadline = [DateTime]::Now.AddSeconds($TimeoutSeconds)
+    while (-not $process.WaitForExit($pollMilliseconds))
     {
-        Write-Warning "$Exe still running after $TimeoutSeconds s; stopping it."
-        Stop-Process -Id $process.Id -Force
+        $dialogs = [LoomAgentDesktop.Desktops]::DialogsOf($process.Id)
+        if ($dialogs.Count -gt 0)
+        {
+            foreach ($dialog in $dialogs)
+            {
+                $text = [LoomAgentDesktop.Desktops]::TextOf($dialog) -join "`n"
+                [Console]::Error.WriteLine("$Exe put up a dialog; stopping it.`n$text")
+            }
+            $dialogExitCode = 1
+            Stop-Process -Id $process.Id -Force
+        }
+        elseif ([DateTime]::Now -gt $deadline)
+        {
+            Write-Warning "$Exe still running after $TimeoutSeconds s; stopping it."
+            Stop-Process -Id $process.Id -Force
+        }
     }
-    $process.WaitForExit()
 }
 finally
 {
@@ -337,4 +420,5 @@ finally
     }
 }
 
+if ($dialogExitCode) { exit $dialogExitCode }
 exit $process.ExitCode

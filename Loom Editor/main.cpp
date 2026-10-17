@@ -18,6 +18,7 @@
 #include "Scene.h"
 
 #include <cctype>
+#include <crtdbg.h>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -184,6 +185,24 @@ namespace
 			<< std::endl;
 	};
 
+	// An automated run has nobody to answer a crash dialog, which would come up
+	// on the screen of whoever is at the machine and hold the run until they
+	// did. abort(), failed asserts and the debug runtime's errors are written
+	// to stderr instead, and a crash ends the process without Windows Error
+	// Reporting's dialog.
+	void ReportCrashesToStderr()
+	{
+		SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+		_set_error_mode(_OUT_TO_STDERR);
+		_set_abort_behavior(0, _CALL_REPORTFAULT);
+
+		for (const int report : { _CRT_WARN, _CRT_ERROR, _CRT_ASSERT })
+		{
+			_CrtSetReportMode(report, _CRTDBG_MODE_FILE);
+			_CrtSetReportFile(report, _CRTDBG_FILE_STDERR);
+		};
+	};
+
 	// Puts the (still hidden) window on another virtual desktop and shows it
 	// there without activating it, so it never takes the focus. The shell only
 	// tracks a window on a desktop once it has been shown, so it is shown
@@ -309,6 +328,9 @@ int main(int argc, char** argv)
 		if (argument == "--desktop" && i + 1 < argc)
 			desktop = argv[i + 1];
 	};
+
+	if (!Engine::showWindow)
+		ReportCrashesToStderr();
 
 	// Nobody is listening to an automated run either, and its sounds would
 	// play over whatever whoever is at the machine is doing.
