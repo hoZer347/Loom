@@ -100,7 +100,8 @@ namespace Loom
 		// The playing clip's index, or the clip count when none plays.
 		size_t PlayingIndex() const;
 
-		// The Skins under it, gathered again once one of them is gone.
+		// The Skins under it, gathered again once anything has been added,
+		// removed or moved.
 		const std::vector<Skin*>& Skins();
 
 		std::vector<Clip> m_parsedClips;
@@ -116,8 +117,8 @@ namespace Loom
 		NamedObjects m_joints;
 
 		std::vector<Skin*> m_skins;
-		std::vector<Guid> m_skinGuids;
 		bool m_skinsGathered = false;
+		unsigned long long m_skinsChanges = 0;
 
 		// The clip m_time counts from the start of.
 		std::string m_playing;

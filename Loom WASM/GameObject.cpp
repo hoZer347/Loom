@@ -84,6 +84,7 @@ namespace Loom
 				component->OnDetach();
 
 				delete component;
+				hierarchy_changes++;
 			});
 	};
 
@@ -99,6 +100,7 @@ namespace Loom
 						child));
 
 				delete child;
+				hierarchy_changes++;
 			});
 	};
 
@@ -141,6 +143,7 @@ namespace Loom
 			[gameObject, this]()
 			{
 				m_children.emplace_back(gameObject);
+				hierarchy_changes++;
 			});
 
 		return gameObject;
@@ -168,6 +171,8 @@ namespace Loom
 						parent->m_children.end(),
 						before),
 					this);
+
+				hierarchy_changes++;
 			});
 	};
 

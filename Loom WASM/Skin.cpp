@@ -50,9 +50,10 @@ namespace Loom
 		for (size_t i = 0; i < m_guids.size() && !gone; i++)
 			gone = m_guids[i].IsValid() && LoomObject::GetByGuid<GameObject>(m_guids[i]) != m_found[i];
 
-		if (root == m_root && names == m_names && !gone)
+		if (root == m_root && names == m_names && !gone && GameObject::HierarchyChanges() == m_changes)
 			return m_found;
 
+		m_changes = GameObject::HierarchyChanges();
 		m_root = root;
 		m_names = names;
 		m_guids.assign(names.size(), Guid());

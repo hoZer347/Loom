@@ -27,8 +27,9 @@ namespace Loom
 	* - The GameObjects called by a list of names under a root, remembered by
 	*   guid, so finding them again is a lookup rather than a walk of the
 	*   hierarchy and one destroyed since is noticed rather than read
-	* - Walks the hierarchy again when the root or the names change, or one it
-	*   found is gone
+	* - Walks the hierarchy again when the root or the names change, when any
+	*   GameObject has been added, removed or moved since, or when one it found
+	*   is gone, so a name it could not find is found once something has it
 	*/
 	struct LOOM_API NamedObjects final
 	{
@@ -40,6 +41,7 @@ namespace Loom
 		std::vector<std::string> m_names;
 		std::vector<Guid> m_guids;
 		std::vector<GameObject*> m_found;
+		unsigned long long m_changes = 0;
 	};
 
 	// A list of names kept as one name a line, split again only when the text changes.
@@ -63,7 +65,7 @@ namespace Loom
 	* - Its shape keys each move some vertices by an offset, scaled by the
 	*   key's weight, before the joints bend them
 	* - The Mesh's own vertices are never changed: they are bent again, from
-	*   where the model was bound, every time the Mesh draws
+	*   where the model was bound, once a frame, when the Mesh first draws
 	*/
 	struct LOOM_API Skin : Component<Skin, "Rendering">
 	{

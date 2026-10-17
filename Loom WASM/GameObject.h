@@ -110,6 +110,8 @@ namespace Loom
 
 					if constexpr (overrides_on_attach<T>::value)
 						component->OnAttach();
+
+					hierarchy_changes++;
 				});
 
 			return component;
@@ -193,6 +195,11 @@ namespace Loom
 
 		static size_t GetObjectCount() { return num_objects.load(); };
 
+		// Counts every child added, removed or moved and every component
+		// attached or detached, so a cache of what is under an object can tell
+		// when to look again.
+		static unsigned long long HierarchyChanges() { return hierarchy_changes.load(); };
+
 		// Scale, then rotation, then translation, relative to the parent.
 		[[nodiscard]] glm::mat4 LocalMatrix() const;
 
@@ -208,6 +215,7 @@ namespace Loom
 		virtual ~GameObject();
 
 		static inline std::atomic<size_t> num_objects = 0;
+		static inline std::atomic<unsigned long long> hierarchy_changes = 0;
 		static inline std::atomic<size_t> id_counter = 0;
 
 		Serial<int> m_threadID;

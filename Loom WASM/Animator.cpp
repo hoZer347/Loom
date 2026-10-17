@@ -181,20 +181,14 @@ namespace Loom
 
 	const std::vector<Skin*>& Animator::Skins()
 	{
-		for (size_t i = 0; i < m_skins.size() && m_skinsGathered; i++)
-			m_skinsGathered = LoomObject::GetByGuid<Skin>(m_skinGuids[i]) == m_skins[i];
-
-		if (m_skinsGathered)
+		if (m_skinsGathered && GameObject::HierarchyChanges() == m_skinsChanges)
 			return m_skins;
 
 		m_skins.clear();
-		m_skinGuids.clear();
 		CollectSkins(*m_gameObject, m_skins);
 
-		for (const Skin* skin : m_skins)
-			m_skinGuids.push_back(skin->GetGuid());
-
 		m_skinsGathered = true;
+		m_skinsChanges = GameObject::HierarchyChanges();
 
 		return m_skins;
 	};

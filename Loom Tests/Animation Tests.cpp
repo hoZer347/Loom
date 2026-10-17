@@ -188,6 +188,9 @@ TEST_SUITE("Skin")
 		rig.bone->Destroy();
 		Pump();
 
+		// Drawn in between, as a running editor would.
+		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(0.0f, 1.0f, 0.0f), CLOSE)));
+
 		Loom::GameObject* again = rig.scene.GetRoot().AddChild("Bone");
 		Pump();
 		again->transform.position = glm::vec3(-1.0f, 0.0f, 0.0f);
@@ -258,6 +261,21 @@ TEST_SUITE("Animator")
 		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(1.0f, 0.0f, 0.0f), CLOSE)));
 		CHECK(glm::all(glm::epsilonEqual(*animated.rig.bone->transform.rotation, glm::vec3(0.0f, EIGHTH_TURN, 0.0f), CLOSE)));
 		CHECK(animated.rig.skin->GetShapeWeight("Smile") == doctest::Approx(0.5f));
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a Skin added after the clip started has its shape keys set too")
+	{
+		Animated animated;
+		animated.animator->Pose(0.5f);
+
+		Loom::Skin* later = animated.rig.scene.GetRoot().AddChild("Later")->Attach<Loom::Skin>();
+		Pump();
+
+		later->m_shapes = "Smile\n";
+		later->m_shapeWeights = { 0.0f };
+		animated.animator->Pose(0.5f);
+
+		CHECK(later->GetShapeWeight("Smile") == doctest::Approx(0.5f));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a looping clip starts over at its end, and one that does not loop holds its last pose")
