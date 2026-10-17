@@ -21,7 +21,9 @@
 #include <cstring>
 #include <filesystem>
 #include <iostream>
+#include <map>
 #include <thread>
+#include <utility>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -65,9 +67,9 @@ namespace Loom
 		{
 			{ AssetKind::Folder, EditorIcons::Folder, "Folder", "New Folder" },
 			{ AssetKind::Scene, EditorIcons::Scene, "Scene", "New Scene" },
-			{ AssetKind::Script, EditorIcons::Header, "Script", "NewScript", ProjectAssets::ScriptKind::Component, "Add Component" },
-			{ AssetKind::State, EditorIcons::Header, "State", "NewState", ProjectAssets::ScriptKind::State, "a state machine's Start and Current" },
-			{ AssetKind::StateMachine, EditorIcons::Header, "State Machine", "NewStateMachine", ProjectAssets::ScriptKind::StateMachine, "Add Component" },
+			{ AssetKind::Script, EditorIcons::Script, "Script", "NewScript", ProjectAssets::ScriptKind::Component, "Add Component" },
+			{ AssetKind::State, EditorIcons::State, "State", "NewState", ProjectAssets::ScriptKind::State, "a state machine's Start and Current" },
+			{ AssetKind::StateMachine, EditorIcons::Script, "State Machine", "NewStateMachine", ProjectAssets::ScriptKind::StateMachine, "Add Component" },
 			{ AssetKind::Shader, EditorIcons::Shader, "Shader", "NewShader" },
 			{ AssetKind::Texture, EditorIcons::Texture, "Texture", "NewTexture" },
 		};
@@ -124,10 +126,12 @@ namespace Loom
 
 		// Folders first, then files, each alphabetically. Only files the game
 		// uses are assets, and dot-prefixed folders (.vs) and the build output
-		// are left out.
+		// are left out, as is a folder of the scripts project's with nothing
+		// but scripts in it, which are the Scripts panel's.
 		void Scan(
 			const std::filesystem::path& folder,
 			const std::filesystem::path& skip,
+			const std::string& scripts,
 			AssetNode& node,
 			std::vector<std::string>& scenes)
 		{
@@ -151,7 +155,10 @@ namespace Loom
 					if (path == skip)
 						continue;
 
-					Scan(path, skip, child, scenes);
+					Scan(path, skip, scripts, child, scenes);
+
+					if (child.children.empty() && !scripts.empty() && ProjectAssets::IsUnder(child.path, scripts))
+						continue;
 				}
 				else if (path.extension() == SceneSerializer::extension)
 					scenes.push_back(child.path);
@@ -169,6 +176,15 @@ namespace Loom
 
 					return _stricmp(a.name.c_str(), b.name.c_str()) < 0;
 				});
+		};
+
+		// Whether path is the script folder or one inside it, the top holding
+		// every folder.
+		bool InScriptFolder(const std::string& path, const std::string& folder)
+		{
+			return folder.empty() ||
+				path == folder ||
+				path.rfind(folder + ScriptFolders::separator, 0) == 0;
 		};
 
 		void Shell(const char* file, const std::string& parameters)
@@ -460,7 +476,10 @@ namespace Loom
 
 	void Editor::RefreshProjectAssets()
 	{
-		WatchProject();
+		if (m_projectWatch.GetFolder() != m_projectPath)
+			m_projectWatch.Watch(m_projectPath, false);
+
+		RefreshScripts();
 
 		m_projectScenes.clear();
 		m_noThumbnail.clear();
@@ -473,42 +492,13 @@ namespace Loom
 			? std::filesystem::path(m_scripts.GetLibrary()).parent_path().lexically_normal()
 			: std::filesystem::path();
 
-		Scan(m_projectPath, build, m_assets, m_projectScenes);
+		const std::string scripts = m_scripts.HasProject()
+			? std::filesystem::path(m_scripts.GetProject()).parent_path().lexically_normal().string()
+			: "";
+
+		Scan(m_projectPath, build, scripts, m_assets, m_projectScenes);
 
 		std::sort(m_projectScenes.begin(), m_projectScenes.end());
-	};
-
-	void Editor::WatchProject()
-	{
-		if (m_assetWatchPath == m_projectPath)
-			return;
-
-		if (m_assetWatch != nullptr)
-			FindCloseChangeNotification(m_assetWatch);
-
-		m_assetWatch = nullptr;
-		m_assetWatchPath = m_projectPath;
-
-		if (m_projectPath.empty())
-			return;
-
-		const HANDLE watch = FindFirstChangeNotificationA(
-			m_projectPath.c_str(),
-			TRUE,
-			FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME);
-
-		if (watch != INVALID_HANDLE_VALUE)
-			m_assetWatch = watch;
-	};
-
-	bool Editor::ProjectChanged()
-	{
-		if (m_assetWatch == nullptr || WaitForSingleObject(m_assetWatch, 0) != WAIT_OBJECT_0)
-			return false;
-
-		FindNextChangeNotification(m_assetWatch);
-
-		return true;
 	};
 
 	void Editor::DrawProject()
@@ -524,7 +514,7 @@ namespace Loom
 			}
 			else
 			{
-				if (ProjectChanged())
+				if (m_projectWatch.Changed())
 					RefreshProjectAssets();
 
 				const char* const change = "Change...";
@@ -710,8 +700,40 @@ namespace Loom
 			return;
 
 		for (const AssetKindInfo& info : assetKinds)
-			if (ImGui::MenuItem((std::string(info.icon) + " " + info.label).c_str()))
+			if (!IsScript(info.kind) && ImGui::MenuItem((std::string(info.icon) + " " + info.label).c_str()))
 				AskForAsset(info.kind, folder);
+
+		ImGui::EndMenu();
+	};
+
+	void Editor::DrawScriptsCreateMenu(const std::string& folder)
+	{
+		if (!ImGui::BeginMenu("Create"))
+			return;
+
+		// Kept in the project file's .loomscripts, so not without one.
+		if (ImGui::MenuItem((std::string(EditorIcons::Folder) + " Folder").c_str(), nullptr, false, !m_projectFile.empty()))
+		{
+			constexpr const char* newFolder = "New Folder";
+
+			std::string path = m_scriptFolders.AddFolder(folder, newFolder);
+
+			for (int suffix = 1; path.empty() && suffix < maxDefaultNameSuffix; suffix++)
+				path = m_scriptFolders.AddFolder(folder, newFolder + std::to_string(suffix));
+
+			SaveScriptFolders();
+
+			m_renamingFolder = path;
+			snprintf(m_folderName, sizeof(m_folderName), "%s", ScriptFolders::NameOf(path).c_str());
+			m_focusFolderName = true;
+		};
+
+		for (const AssetKindInfo& info : assetKinds)
+			if (IsScript(info.kind) && ImGui::MenuItem((std::string(info.icon) + " " + info.label).c_str()))
+			{
+				AskForAsset(info.kind, m_projectPath);
+				m_newScriptFolder = folder;
+			};
 
 		ImGui::EndMenu();
 	};
@@ -795,6 +817,7 @@ namespace Loom
 	{
 		m_newAssetKind = kind;
 		m_newAssetFolder = m_projectPath;
+		m_newScriptFolder.clear();
 		snprintf(m_newAssetName, sizeof(m_newAssetName), "%s", name.c_str());
 
 		CreateAsset();
@@ -869,8 +892,21 @@ namespace Loom
 			std::cout << name << " shows up in " << appearsIn << " after the next compile." << std::endl;
 
 		m_askForAsset = false;
-		m_selectedAsset = std::filesystem::path(path).lexically_normal().string();
-		m_revealSelectedAsset = true;
+
+		if (IsScript(m_newAssetKind))
+		{
+			m_scriptFolders.Move(name, m_newScriptFolder);
+			SaveScriptFolders();
+
+			m_selectedScript = name;
+			m_revealSelectedScript = true;
+			m_focusScripts = true;
+		}
+		else
+		{
+			m_selectedAsset = std::filesystem::path(path).lexically_normal().string();
+			m_revealSelectedAsset = true;
+		};
 
 		RefreshProjectAssets();
 
@@ -1115,5 +1151,325 @@ namespace Loom
 		};
 
 		ImGui::End();
+	};
+
+	std::string Editor::ScriptFoldersFile() const
+	{
+		return m_projectFile.empty()
+			? ""
+			: std::filesystem::path(m_projectFile).replace_extension(ScriptFolders::extension).string();
+	};
+
+	void Editor::SaveScriptFolders()
+	{
+		if (const std::string file = ScriptFoldersFile(); !m_scriptFolders.Save(file))
+			std::cerr << "Scripts: could not write the folders to " << file << std::endl;
+	};
+
+	void Editor::RefreshScripts()
+	{
+		m_scriptEntries.clear();
+
+		if (!m_scripts.HasProject())
+		{
+			m_scriptWatch.Watch("", false);
+			return;
+		};
+
+		const std::filesystem::path root = std::filesystem::path(m_scripts.GetProject()).parent_path().lexically_normal();
+
+		if (m_scriptWatch.GetFolder() != root.string())
+			m_scriptWatch.Watch(root.string(), true);
+
+		// Every type the headers declare, for the compiled scripts that do not
+		// look like one to DeclaredScripts.
+		std::map<std::string, std::string> headers{ };
+
+		std::error_code code;
+
+		for (auto entry = std::filesystem::recursive_directory_iterator(root, code);
+			entry != std::filesystem::recursive_directory_iterator();
+			entry.increment(code))
+		{
+			const std::string name = entry->path().filename().string();
+
+			if (entry->is_directory(code))
+			{
+				if (!name.empty() && name.front() == '.')
+					entry.disable_recursion_pending();
+
+				continue;
+			};
+
+			if (!ProjectAssets::IsScriptFile(name))
+				continue;
+
+			const std::string path = entry->path().string();
+			const std::string text = ProjectAssets::ReadText(path);
+
+			for (const std::string& type : ProjectAssets::DeclaredTypes(text))
+				headers.try_emplace(type, path);
+
+			for (const ProjectAssets::DeclaredScript& script : ProjectAssets::DeclaredScripts(text))
+				m_scriptEntries.try_emplace(script.name, ScriptEntry{ path, script.state });
+		};
+
+		const auto compiled = [&](const std::string& name, bool state)
+		{
+			ScriptEntry& entry = m_scriptEntries[name];
+
+			entry.state = state;
+			entry.compiled = true;
+
+			if (const auto found = headers.find(name); entry.header.empty() && found != headers.end())
+				entry.header = found->second;
+		};
+
+		for (const std::string& type : m_scripts.GetTypes())
+			compiled(type, false);
+
+		for (const std::string& state : m_scripts.GetStates())
+			compiled(state, true);
+	};
+
+	void Editor::DrawScripts()
+	{
+		if (m_focusScripts)
+		{
+			ImGui::SetNextWindowFocus();
+			m_focusScripts = false;
+		};
+
+		if (ImGui::Begin(EditorPanels::Scripts, &m_showScripts))
+		{
+			if (m_scriptWatch.Changed())
+				RefreshScripts();
+
+			ImGui::BeginChild("##scripts", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders);
+
+			std::vector<std::string> names{ };
+
+			for (const auto& [name, entry] : m_scriptEntries)
+				names.push_back(name);
+
+			const ScriptFolders::Node root = m_scriptFolders.Build(names);
+
+			if (m_projectPath.empty())
+				ImGui::TextDisabled("No project open.");
+			else if (root.children.empty() && root.scripts.empty())
+				ImGui::TextDisabled(m_scripts.HasProject()
+					? "No scripts yet. Right-click to create one."
+					: "No scripts project. Right-click to create a script.");
+
+			for (const ScriptFolders::Node& folder : root.children)
+				DrawScriptFolder(folder);
+
+			for (const std::string& script : root.scripts)
+				DrawScriptEntry(script);
+
+			m_revealSelectedScript = false;
+
+			// Dropped anywhere else in the list, it goes to the top.
+			if (ImGui::BeginDragDropTargetCustom(ImGui::GetCurrentWindow()->InnerRect, ImGui::GetID("##scripts_top")))
+			{
+				DropIntoScriptFolder("");
+				ImGui::EndDragDropTarget();
+			};
+
+			if (!m_projectPath.empty() &&
+				ImGui::BeginPopupContextWindow(
+					"##scripts_create",
+					ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
+			{
+				DrawScriptsCreateMenu("");
+				ImGui::EndPopup();
+			};
+
+			ImGui::EndChild();
+		};
+
+		ImGui::End();
+	};
+
+	void Editor::DrawScriptFolder(const ScriptFolders::Node& node)
+	{
+		const bool renaming = node.path == m_renamingFolder;
+
+		if ((m_revealSelectedScript && InScriptFolder(m_scriptFolders.FolderOf(m_selectedScript), node.path)) ||
+			(m_focusFolderName && InScriptFolder(ScriptFolders::ParentOf(m_renamingFolder), node.path)))
+			ImGui::SetNextItemOpen(true);
+
+		const bool open = ImGui::TreeNodeEx(
+			("folder:" + node.path).c_str(),
+			ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick,
+			"%s %s",
+			EditorIcons::Folder,
+			renaming ? "" : node.name.c_str());
+
+		if (!renaming && ImGui::BeginDragDropSource())
+		{
+			ImGui::SetDragDropPayload(script_folder_payload, node.path.c_str(), node.path.size() + 1);
+			ImGui::Text("%s %s", EditorIcons::Folder, node.name.c_str());
+			ImGui::EndDragDropSource();
+		};
+
+		if (ImGui::BeginDragDropTarget())
+		{
+			DropIntoScriptFolder(node.path);
+			ImGui::EndDragDropTarget();
+		};
+
+		if (ImGui::BeginPopupContextItem())
+		{
+			DrawScriptsCreateMenu(node.path);
+
+			ImGui::Separator();
+
+			if (ImGui::MenuItem("Rename"))
+			{
+				m_renamingFolder = node.path;
+				snprintf(m_folderName, sizeof(m_folderName), "%s", node.name.c_str());
+				m_focusFolderName = true;
+			};
+
+			// Its scripts and folders go up a level rather than with it.
+			if (ImGui::MenuItem("Remove Folder"))
+			{
+				m_scriptFolders.RemoveFolder(node.path);
+				SaveScriptFolders();
+			};
+
+			ImGui::EndPopup();
+		};
+
+		if (renaming)
+			DrawScriptFolderRename();
+
+		if (!open)
+			return;
+
+		for (const ScriptFolders::Node& child : node.children)
+			DrawScriptFolder(child);
+
+		for (const std::string& script : node.scripts)
+			DrawScriptEntry(script);
+
+		ImGui::TreePop();
+	};
+
+	void Editor::DrawScriptFolderRename()
+	{
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(-FLT_MIN);
+
+		if (m_focusFolderName)
+		{
+			ImGui::SetKeyboardFocusHere();
+			m_focusFolderName = false;
+		};
+
+		ImGui::InputText("##rename_folder", m_folderName, sizeof(m_folderName), ImGuiInputTextFlags_AutoSelectAll);
+
+		// Enter and clicking away both keep the new name; Escape has already put
+		// the old one back by the time the field lets go.
+		if (!ImGui::IsItemDeactivated())
+			return;
+
+		const std::string folder = std::exchange(m_renamingFolder, "");
+
+		if (m_scriptFolders.RenameFolder(folder, m_folderName).empty())
+			std::cerr << "Scripts: '" << m_folderName << "' is not a name, or there is already a folder called that there" << std::endl;
+		else
+			SaveScriptFolders();
+	};
+
+	void Editor::DrawScriptEntry(const std::string& name)
+	{
+		const ScriptEntry& entry = m_scriptEntries.at(name);
+		const char* icon = entry.state ? EditorIcons::State : EditorIcons::Script;
+
+		ImGuiTreeNodeFlags flags =
+			ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanAvailWidth;
+
+		if (name == m_selectedScript)
+			flags |= ImGuiTreeNodeFlags_Selected;
+
+		if (!entry.compiled)
+			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+
+		ImGui::TreeNodeEx(("script:" + name).c_str(), flags, "%s %s", icon, name.c_str());
+
+		if (!entry.compiled)
+			ImGui::PopStyleColor();
+
+		if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+			m_selectedScript = name;
+
+		if (!entry.header.empty() &&
+			ImGui::IsItemHovered() &&
+			ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+			OpenAsset(entry.header);
+
+		ImGui::SetItemTooltip(
+			"%s%s",
+			entry.header.empty() ? "Not in any of the scripts project's headers" : entry.header.c_str(),
+			entry.compiled ? "" : "\nNot compiled yet");
+
+		if (ImGui::BeginDragDropSource())
+		{
+			ImGui::SetDragDropPayload(script_payload, name.c_str(), name.size() + 1);
+			ImGui::Text("%s %s", icon, name.c_str());
+			ImGui::EndDragDropSource();
+		};
+
+		if (!ImGui::BeginPopupContextItem())
+			return;
+
+		m_selectedScript = name;
+
+		const std::string folder = m_scriptFolders.FolderOf(name);
+
+		if (ImGui::MenuItem("Open", nullptr, false, !entry.header.empty()))
+			OpenAsset(entry.header);
+
+		if (ImGui::MenuItem("Show in Explorer", nullptr, false, !entry.header.empty()))
+			ShowInExplorer(entry.header);
+
+		if (!folder.empty() && ImGui::MenuItem("Move to Top"))
+		{
+			m_scriptFolders.Move(name, "");
+			SaveScriptFolders();
+		};
+
+		ImGui::Separator();
+
+		DrawScriptsCreateMenu(folder);
+
+		ImGui::EndPopup();
+	};
+
+	void Editor::DropIntoScriptFolder(const std::string& folder)
+	{
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(script_payload))
+		{
+			m_scriptFolders.Move((const char*)payload->Data, folder);
+			SaveScriptFolders();
+		};
+
+		const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(script_folder_payload);
+
+		if (payload == nullptr)
+			return;
+
+		const std::string dragged = (const char*)payload->Data;
+
+		// Let go where it was picked up.
+		if (dragged == folder)
+			return;
+
+		if (m_scriptFolders.MoveFolder(dragged, folder))
+			SaveScriptFolders();
+		else
+			std::cerr << "Scripts: " << dragged << " cannot go inside itself, or beside a folder with its name" << std::endl;
 	};
 };

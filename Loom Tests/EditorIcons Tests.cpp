@@ -20,11 +20,6 @@ TEST_SUITE("EditorIcons")
 		CHECK(EditorIcons::Of("Assets/Tree.JPEG") == EditorIcons::Texture);
 		CHECK(EditorIcons::Of("Assets/Bell.wav") == EditorIcons::Sound);
 		CHECK(EditorIcons::Of("Assets/Theme.MP3") == EditorIcons::Sound);
-		CHECK(EditorIcons::Of("Scripts/Spin.hpp") == EditorIcons::Header);
-		CHECK(EditorIcons::Of("Scripts/Spin.h") == EditorIcons::Header);
-		CHECK(EditorIcons::Of("Scripts/Spin.HPP") == EditorIcons::Header);
-		CHECK(EditorIcons::Of("Scripts/Spin.cpp") == EditorIcons::Source);
-		CHECK(EditorIcons::Of("Scripts/Spin.CPP") == EditorIcons::Source);
 		CHECK(EditorIcons::Of("README.txt") == EditorIcons::File);
 		CHECK(EditorIcons::Of("Makefile") == EditorIcons::File);
 	};

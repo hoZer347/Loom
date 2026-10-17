@@ -70,6 +70,7 @@ namespace Loom
 
 		// The component types the loaded library registered.
 		const std::vector<std::string>& GetTypes() const { return m_types; };
+		const std::vector<std::string>& GetStates() const { return m_states; };
 
 		// devenv.exe from the newest Visual Studio on this machine, or empty
 		// when there is none. Looked up once and held.

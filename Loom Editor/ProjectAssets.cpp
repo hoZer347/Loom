@@ -434,6 +434,26 @@ void main()
 		return names;
 	};
 
+	std::vector<ProjectAssets::DeclaredScript> ProjectAssets::DeclaredScripts(const std::string& text)
+	{
+		static const std::regex declared("\\b(?:struct|class)\\s+(\\w+)\\s*(?:final\\s*)?:([^{;]*)\\{");
+		static const std::regex state("\\bState\\s*<");
+
+		std::vector<DeclaredScript> scripts;
+
+		for (auto match = std::sregex_iterator(text.begin(), text.end(), declared); match != std::sregex_iterator(); match++)
+		{
+			const std::string name = (*match)[1].str();
+			const std::string bases = (*match)[2].str();
+			const std::regex itself("<\\s*" + name + "\\s*[,>]");
+
+			if (std::regex_search(bases, itself))
+				scripts.push_back(DeclaredScript{ name, std::regex_search(bases, state) });
+		};
+
+		return scripts;
+	};
+
 	std::string ProjectAssets::CreateFolder(const std::string& folder, const std::string& name, std::string* error)
 	{
 		const std::filesystem::path path = std::filesystem::path(folder) / name;
@@ -629,7 +649,7 @@ void main()
 
 	bool ProjectAssets::IsGameFile(const std::string& name)
 	{
-		return HasExtension(name, gameFileExtensions) || IsTextureFile(name) || IsSoundFile(name) || IsScriptFile(name);
+		return HasExtension(name, gameFileExtensions) || IsTextureFile(name) || IsSoundFile(name);
 	};
 
 	bool ProjectAssets::IsScriptFile(const std::string& name)

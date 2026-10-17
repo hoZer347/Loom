@@ -160,6 +160,29 @@ TEST_SUITE("ProjectAssets")
 		CHECK(Loom::ProjectAssets::DeclaredTypes(text) == std::vector<std::string>{ "Glow", "Glow", "Shimmer", "GlowSettings" });
 	};
 
+	TEST_CASE("a script is a type that names itself to its base, and a state is one made a State")
+	{
+		const std::string text =
+			"struct Glow;\n"
+			"struct Glow : Loom::Component<Glow, \"Effects\"> { };\n"
+			"class Shimmer final : public Loom::Component<Shimmer> { };\n"
+			"struct St_Idle : Loom::State<St_Idle, Camp> { };\n"
+			"struct Camp : Loom::StateMachine<Camp> { };\n"
+			"struct GlowSettings { };\n"
+			"struct Helper : Base<Other> { };\n";
+
+		const std::vector<Loom::ProjectAssets::DeclaredScript> scripts = Loom::ProjectAssets::DeclaredScripts(text);
+
+		REQUIRE(scripts.size() == 4);
+		CHECK(scripts[0].name == "Glow");
+		CHECK_FALSE(scripts[0].state);
+		CHECK(scripts[1].name == "Shimmer");
+		CHECK(scripts[2].name == "St_Idle");
+		CHECK(scripts[2].state);
+		CHECK(scripts[3].name == "Camp");
+		CHECK_FALSE(scripts[3].state);
+	};
+
 	TEST_CASE("scenes and shaders open in the editor, the scripts project's sources in Visual Studio")
 	{
 		using Loom::ProjectAssets;
@@ -191,7 +214,7 @@ TEST_SUITE("ProjectAssets")
 		CHECK(ReadAll(scripts.Create("Spinner")).find("namespace GameScripts") != std::string::npos);
 	};
 
-	TEST_CASE("scenes, shaders, textures, sounds and scripts are game files, the project's other files are not")
+	TEST_CASE("scenes, shaders, textures and sounds are game files, scripts and the project's other files are not")
 	{
 		CHECK(Loom::ProjectAssets::IsGameFile("Level.loomscene"));
 		CHECK(Loom::ProjectAssets::IsGameFile("Flat.shader"));
@@ -200,9 +223,9 @@ TEST_SUITE("ProjectAssets")
 		CHECK(Loom::ProjectAssets::IsGameFile("Bell.wav"));
 		CHECK(Loom::ProjectAssets::IsGameFile("Theme.MP3"));
 		CHECK(Loom::ProjectAssets::IsGameFile("Rain.flac"));
-		CHECK(Loom::ProjectAssets::IsGameFile("Spinner.hpp"));
-		CHECK(Loom::ProjectAssets::IsGameFile("Spinner.CPP"));
 
+		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("Spinner.hpp"));
+		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("Spinner.CPP"));
 		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("GameScripts.sln"));
 		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("GameScripts.vcxproj"));
 		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("GameScripts.vcxproj.filters"));

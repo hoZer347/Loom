@@ -11,12 +11,6 @@
 
 namespace Loom
 {
-	namespace
-	{
-		// The other script extensions are headers.
-		constexpr const char* sourceExtension = ".cpp";
-	};
-
 	const char* EditorIcons::Of(const std::string& path)
 	{
 		std::string extension = std::filesystem::path(path).extension().string();
@@ -41,9 +35,6 @@ namespace Loom
 
 		if (ProjectAssets::IsSoundFile(path))
 			return Sound;
-
-		if (ProjectAssets::IsScriptFile(path))
-			return extension == sourceExtension ? Source : Header;
 
 		return File;
 	};

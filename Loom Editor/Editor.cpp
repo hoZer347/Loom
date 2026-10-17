@@ -293,6 +293,9 @@ namespace Loom
 		// editors.
 		constexpr const char* centre_windows[] = { EditorPanels::SceneId, EditorPanels::Game, EditorPanels::Debug, EditorPanels::Shaders, EditorPanels::Sprites };
 
+		// Panels docked as a tab beside another, each with the one it goes beside.
+		constexpr std::pair<const char*, const char*> side_windows[] = { { EditorPanels::Scripts, EditorPanels::Project } };
+
 		// The ImGui settings entry that holds which panels are open.
 		constexpr const char* panel_settings = "LoomEditor";
 
@@ -560,9 +563,6 @@ namespace Loom
 		m_ownedScenes.clear();
 
 		EditorLog::Get().Uninstall();
-
-		if (m_assetWatch != nullptr)
-			FindCloseChangeNotification(m_assetWatch);
 	};
 
 	Backend Editor::SavedBackend()
@@ -675,6 +675,16 @@ namespace Loom
 
 			if (ProjectTemplate::EnsureScripts(path, &error).empty())
 				std::cerr << "No scripts project for " << path << ": " << error << std::endl;
+
+			return OpenProject(std::filesystem::absolute(path, code).parent_path().string(), open_scene);
+		};
+
+		// So does the Scripts panel's file, which brings the panel forward.
+		if (std::filesystem::path(path).extension() == ScriptFolders::extension &&
+			std::filesystem::is_regular_file(path, code))
+		{
+			m_showScripts = true;
+			m_focusScripts = true;
 
 			return OpenProject(std::filesystem::absolute(path, code).parent_path().string(), open_scene);
 		};
@@ -1264,19 +1274,28 @@ namespace Loom
 				m_rebuildLayout = true;
 
 			// A layout saved before a window existed has nowhere for it, so it
-			// joins the others in the middle.
-			else if (const ImGuiDockNode* centre = ImGui::DockBuilderGetCentralNode(dockspace_id))
-				for (const char* window : centre_windows)
+			// joins the others in the middle, or the panel it goes beside.
+			else
+			{
+				const auto placed = [this](const char* window)
 				{
 					const ImGuiID id = ImHashStr(window);
 
-					const bool placed = m_layoutWindows.empty()
+					return m_layoutWindows.empty()
 						? ImGui::FindWindowSettingsByID(id) != nullptr
 						: std::find(m_layoutWindows.begin(), m_layoutWindows.end(), id) != m_layoutWindows.end();
-
-					if (!placed)
-						ImGui::DockBuilderDockWindow(window, centre->ID);
 				};
+
+				if (const ImGuiDockNode* centre = ImGui::DockBuilderGetCentralNode(dockspace_id))
+					for (const char* window : centre_windows)
+						if (!placed(window))
+							ImGui::DockBuilderDockWindow(window, centre->ID);
+
+				for (const auto& [window, beside] : side_windows)
+					if (const ImGuiWindowSettings* settings = ImGui::FindWindowSettingsByID(ImHashStr(beside));
+						!placed(window) && settings != nullptr && settings->DockId != 0)
+						ImGui::DockBuilderDockWindow(window, settings->DockId);
+			};
 
 			m_layoutWindows.clear();
 			m_checkLayout = false;
@@ -1311,6 +1330,7 @@ namespace Loom
 		};
 
 		if (m_showProject)		DrawProject();
+		if (m_showScripts)		DrawScripts();
 		if (m_showHierarchy)	DrawHierarchy();
 		if (m_showInspector)	DrawInspector();
 		if (m_showScene)		DrawScene();
@@ -1391,6 +1411,7 @@ namespace Loom
 
 		ImGui::DockBuilderDockWindow(EditorPanels::Hierarchy, left);
 		ImGui::DockBuilderDockWindow(EditorPanels::Project, left_bottom);
+		ImGui::DockBuilderDockWindow(EditorPanels::Scripts, left_bottom);
 		ImGui::DockBuilderDockWindow(EditorPanels::Inspector, right);
 		ImGui::DockBuilderDockWindow(EditorPanels::Console, bottom);
 		ImGui::DockBuilderDockWindow(EditorPanels::SceneData, bottom);
@@ -1407,6 +1428,7 @@ namespace Loom
 		return {
 			{ EditorPanels::Hierarchy, &m_showHierarchy, true },
 			{ EditorPanels::Project, &m_showProject, true },
+			{ EditorPanels::Scripts, &m_showScripts, true },
 			{ EditorPanels::Inspector, &m_showInspector, true },
 			{ EditorPanels::Scene, &m_showScene, true },
 			{ EditorPanels::Game, &m_showGame, true },
@@ -2099,7 +2121,7 @@ namespace Loom
 		if (!ImGui::BeginDragDropTarget())
 			return;
 
-		if (DropAsset(gameObject))
+		if (DropAsset(gameObject) || DropScript(gameObject))
 		{
 			ImGui::EndDragDropTarget();
 			return;
@@ -2233,19 +2255,12 @@ namespace Loom
 
 		const std::string path = (const char*)dragged->Data;
 
-		const bool shader = std::filesystem::path(path).extension() == ProjectAssets::shaderExtension;
-
 		// Anything else dragged out of the Project panel has no place here.
-		if (!shader && !ProjectAssets::IsScriptFile(path))
+		if (std::filesystem::path(path).extension() != ProjectAssets::shaderExtension)
 			return true;
 
-		if (!ImGui::AcceptDragDropPayload(ASSET_PAYLOAD))
-			return true;
-
-		if (shader)
+		if (ImGui::AcceptDragDropPayload(ASSET_PAYLOAD))
 			DropShader(gameObject, path);
-		else
-			DropScript(gameObject, path);
 
 		return true;
 	};
@@ -2263,30 +2278,32 @@ namespace Loom
 		m_historyDirty = true;
 	};
 
-	void Editor::DropScript(GameObject* gameObject, const std::string& path)
+	bool Editor::DropScript(GameObject* gameObject)
 	{
-		const std::string text = ProjectAssets::ReadText((std::filesystem::path(m_projectPath) / path).string());
+		const ImGuiPayload* dragged = ImGui::GetDragDropPayload();
 
-		const std::vector<std::string>& types = m_scripts.GetTypes();
-		const std::vector<std::string> declared = ProjectAssets::DeclaredTypes(text);
+		if (dragged == nullptr || !dragged->IsDataType(script_payload))
+			return false;
 
-		bool attached = false;
+		const std::string name = (const char*)dragged->Data;
 
-		// A name can be declared twice, in a comment or an #if branch, and a
-		// helper type can share an engine component's name.
-		for (auto name = declared.begin(); name != declared.end(); name++)
-			if (std::find(declared.begin(), name, *name) == name &&
-				std::find(types.begin(), types.end(), *name) != types.end())
-				attached |= ComponentRegistry::Create(*name, *gameObject) != nullptr;
+		// A state goes in a state machine's Start or Current, not on an object.
+		if (const auto entry = m_scriptEntries.find(name); entry != m_scriptEntries.end() && entry->second.state)
+			return true;
 
-		if (!attached)
+		if (!ImGui::AcceptDragDropPayload(script_payload))
+			return true;
+
+		if (ComponentRegistry::Create(name, *gameObject) == nullptr)
 		{
-			std::cerr << path << " has no script component to attach. One written since the last compile attaches after the next." << std::endl;
-			return;
+			std::cerr << name << " is not a component the scripts have compiled. One written since the last compile attaches after the next." << std::endl;
+			return true;
 		};
 
 		Select(gameObject);
 		m_historyDirty = true;
+
+		return true;
 	};
 
 	void Editor::PollShaders()

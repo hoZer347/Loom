@@ -6,6 +6,7 @@
 #include "EditorConsole.h"
 #include "EditorLayouts.h"
 #include "EditorViewport.h"
+#include "FolderWatch.h"
 #include "Guid.h"
 #include "EditorSettings.h"
 #include "ShaderEditor.h"
@@ -13,6 +14,7 @@
 #include "ModelPreview.h"
 #include "SelectionOutline.h"
 #include "SceneHistory.h"
+#include "ScriptFolders.h"
 #include "ScriptLibrary.h"
 #include "WebPlayer.h"
 
@@ -237,6 +239,26 @@ namespace Loom
 		void DrawAssetContextMenu(const AssetNode& node);
 		void DrawCreateMenu(const std::string& folder);
 		void DrawCreateAssetPrompt();
+
+		// The project's script types, filed in folders of the Scripts panel's
+		// own that move no files.
+		void DrawScripts();
+		void DrawScriptFolder(const ScriptFolders::Node& node);
+		void DrawScriptEntry(const std::string& name);
+		void DrawScriptsCreateMenu(const std::string& folder);
+		void DrawScriptFolderRename();
+
+		// Takes a script or a folder dropped on the drag and drop target begun
+		// last, into folder.
+		void DropIntoScriptFolder(const std::string& folder);
+
+		// Where the project keeps them: beside its .loomproject, named the same.
+		// Empty for a folder with no project file.
+		std::string ScriptFoldersFile() const;
+		void SaveScriptFolders();
+
+		// Rereads the scripts project's headers for the types they declare.
+		void RefreshScripts();
 		void DrawHierarchy();
 		void DrawSceneNode(Scene* scene);
 		void DrawGameObjectNode(GameObject* gameObject, bool parent_disabled);
@@ -392,9 +414,13 @@ namespace Loom
 		// Gives the GameObject the shader, on its Material or a new one.
 		void DropShader(GameObject* gameObject, const std::string& path);
 
-		// Attaches the script library's components that the script defines, once
-		// each.
-		void DropScript(GameObject* gameObject, const std::string& path);
+		// What the Scripts panel drags: a script type's name, or a folder's path.
+		static constexpr const char* script_payload = "LoomScript";
+		static constexpr const char* script_folder_payload = "LoomScriptFolder";
+
+		// Takes a script dragged out of the Scripts panel onto a GameObject in
+		// the hierarchy, attaching it. Whether the drag was one.
+		bool DropScript(GameObject* gameObject);
 
 		// Recompiles the shaders whose files something else has written, every
 		// so often.
@@ -419,12 +445,6 @@ namespace Loom
 
 		// The path written, or an empty string when it could not be.
 		std::string CreateAsset();
-
-		// Points a change notification at the project folder, so the tree is
-		// rescanned when something under it is added, removed or renamed
-		// rather than on a timer.
-		void WatchProject();
-		bool ProjectChanged();
 
 		// Reads <folder>/*.loomproject, if there is one, and hooks up the script
 		// library it names.
@@ -507,8 +527,7 @@ namespace Loom
 
 		// The project as it stood at the last scan.
 		AssetNode m_assets{ };
-		void* m_assetWatch = nullptr;
-		std::string m_assetWatchPath{ };
+		FolderWatch m_projectWatch;
 		std::string m_selectedAsset{ };
 
 		// Textures that would not load, so each is tried once per scan.
@@ -518,6 +537,32 @@ namespace Loom
 		// A file or folder dropped on a folder, and that folder.
 		std::string m_assetToMove{ };
 		std::string m_assetMoveFolder{ };
+
+		// Where a script is written, and whether it has been compiled.
+		struct ScriptEntry
+		{
+			std::string header;
+			bool state = false;
+			bool compiled = false;
+		};
+
+		// By name: each type the scripts project's headers declare as a script
+		// or its library registered.
+		std::map<std::string, ScriptEntry> m_scriptEntries{ };
+		ScriptFolders m_scriptFolders;
+
+		// Saves to the headers rescan the Scripts panel.
+		FolderWatch m_scriptWatch;
+		std::string m_selectedScript{ };
+		bool m_revealSelectedScript = false;
+
+		// The folder being renamed in place, and the name it is being given.
+		std::string m_renamingFolder{ };
+		char m_folderName[128]{ };
+		bool m_focusFolderName = false;
+
+		// Where the Create prompt's script is filed once it is written.
+		std::string m_newScriptFolder{ };
 
 		// The scene a session opens with: what the settings file said last time,
 		// and then whichever one this session last made active.
@@ -550,6 +595,8 @@ namespace Loom
 		bool m_historyDirty = true;
 
 		bool m_showProject = true;
+		bool m_showScripts = true;
+		bool m_focusScripts = false;
 		bool m_showHierarchy = true;
 		bool m_hierarchyFocused = false;
 		bool m_showInspector = true;

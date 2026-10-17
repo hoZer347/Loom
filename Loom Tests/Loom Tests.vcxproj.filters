@@ -67,6 +67,9 @@
     <ClCompile Include="ComponentMenu Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="ScriptFolders Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="EditorLayouts Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

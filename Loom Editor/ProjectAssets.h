@@ -90,11 +90,23 @@ namespace Loom
 		// defines nothing.
 		static std::vector<std::string> DeclaredTypes(const std::string& text);
 
+		struct DeclaredScript
+		{
+			std::string name;
+			bool state = false;
+		};
+
+		// The types a script's text defines that pass themselves to their base,
+		// the way Component, State and StateMachine are derived from, in order.
+		// Found before a compile, so a script shows before it is built.
+		static std::vector<DeclaredScript> DeclaredScripts(const std::string& text);
+
 		static std::string Replace(std::string text, const std::string& token, const std::string& value);
 
-		// Whether name is a scene, shader, texture, sound or script, which the Project
-		// panel lists along with models. Anything else in the project folder
-		// (Visual Studio's files, notes) is not part of the game.
+		// Whether name is a scene, shader, texture or sound, which the Project
+		// panel lists along with models. The scripts are the Scripts panel's,
+		// and anything else in the project folder (Visual Studio's files,
+		// notes) is not part of the game.
 		static bool IsGameFile(const std::string& name);
 		static bool IsScriptFile(const std::string& name);
 		static bool IsTextureFile(const std::string& name);

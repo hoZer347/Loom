@@ -45,6 +45,7 @@ namespace Loom
 		m_scripts.Clear();
 		m_projectFile.clear();
 		m_componentMenu.Clear();
+		m_scriptFolders.Clear();
 
 		// Unless the project file names it otherwise.
 		m_projectName = std::filesystem::path(m_projectPath).filename().string();
@@ -64,6 +65,8 @@ namespace Loom
 
 		if (m_projectFile.empty())
 			return;
+
+		m_scriptFolders.Load(ScriptFoldersFile());
 
 		std::ifstream in(m_projectFile);
 		std::string line, project, library;

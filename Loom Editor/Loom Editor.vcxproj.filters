@@ -31,6 +31,12 @@
     <ClCompile Include="ScriptLibrary.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
+    <ClCompile Include="ScriptFolders.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
+    <ClCompile Include="FolderWatch.cpp">
+      <Filter>Panels</Filter>
+    </ClCompile>
     <ClCompile Include="WebPlayer.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
@@ -104,6 +110,12 @@
     </ClInclude>
     <ClInclude Include="ScriptLibrary.h">
       <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="ScriptFolders.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="FolderWatch.h">
+      <Filter>Panels</Filter>
     </ClInclude>
     <ClInclude Include="WebPlayer.h">
       <Filter>Scripts</Filter>

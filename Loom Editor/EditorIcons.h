@@ -21,8 +21,8 @@ namespace Loom
 		constexpr const char* Texture = "🖼";
 		constexpr const char* Sound = "🔊";
 		constexpr const char* Model = "🧊";
-		constexpr const char* Header = "📑";
-		constexpr const char* Source = "📜";
+		constexpr const char* Script = "🧩";
+		constexpr const char* State = "🚦";
 		constexpr const char* File = "📄";
 
 		// What the Project panel shows beside a file, models aside, which only
@@ -36,6 +36,7 @@ namespace Loom
 	{
 		constexpr const char* Hierarchy = "🌳 Hierarchy###Hierarchy";
 		constexpr const char* Project = "📁 Project###Project";
+		constexpr const char* Scripts = "🧩 Scripts###Scripts";
 		constexpr const char* Inspector = "🔍 Inspector###Inspector";
 		constexpr const char* Scene = "🎬 Scene###Scene";
 		constexpr const char* SceneId = "###Scene";
