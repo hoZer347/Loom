@@ -11,6 +11,8 @@
 #include "EditCommands.h"
 #include "EditorLog.h"
 #include "FieldNames.h"
+#include "McpProtocol.h"
+#include "SpriteEditor.h"
 #include "UiScript.h"
 
 #include "Component.h"
@@ -20,18 +22,13 @@
 #include "Renderer.h"
 #include "Scene.h"
 
-#include "stb_image_write.h"
-
-#include <nlohmann/json.hpp>
-
 #include <algorithm>
 #include <cctype>
-#include <chrono>
-#include <cstring>
 #include <filesystem>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+#include <string_view>
 #include <vector>
 
 #pragma comment(lib, "ws2_32.lib")
@@ -52,15 +49,15 @@ namespace Loom
 	namespace
 	{
 		constexpr const char* endpoint = "/mcp";
-		constexpr const char* server_name = "loom-editor";
-		constexpr const char* server_version = "1.0";
-
-		// Newest first; a client asking for one not here is offered the newest.
-		const char* const protocol_versions[] = { "2025-06-18", "2025-03-26", "2024-11-05" };
 
 		constexpr size_t max_request_bytes = 1 << 20;
+		constexpr size_t receive_buffer_bytes = 4096;
+		constexpr std::string_view header_end = "\r\n\r\n";
 		constexpr DWORD receive_timeout_ms = 5000;
 		constexpr int listen_backlog = 8;
+
+		// Both how long a request waits for the main thread and how long the
+		// main thread gives a tool to finish before failing it.
 		constexpr std::chrono::minutes call_timeout{ 5 };
 
 		// A capture comes back once the frame it was asked for in is drawn;
@@ -68,12 +65,6 @@ namespace Loom
 		constexpr int capture_frames = 60;
 
 		constexpr size_t default_console_lines = 100;
-
-		// JSON-RPC's own error codes.
-		constexpr int parse_error = -32700;
-		constexpr int invalid_request = -32600;
-		constexpr int method_not_found = -32601;
-		constexpr int invalid_params = -32602;
 
 		constexpr const char* instructions =
 			"The Loom editor, live, as the person at it is using it. "
@@ -95,18 +86,8 @@ namespace Loom
 			EditorMcp::Poll& poll;
 		};
 
-		json Text(const std::string& text)
-		{
-			return { { "content", json::array({ { { "type", "text" }, { "text", text } } }) } };
-		};
-
-		json Failure(const std::string& why)
-		{
-			json result = Text(why);
-			result["isError"] = true;
-
-			return result;
-		};
+		using McpProtocol::Text;
+		using McpProtocol::Failure;
 
 		std::string Argument(const json& arguments, const char* name)
 		{
@@ -322,54 +303,26 @@ namespace Loom
 			return out;
 		};
 
-		std::string Base64(const std::vector<unsigned char>& bytes)
+		// The capture is RGB from the bottom row up, as a bitmap stores it.
+		SpriteEditor::Image Captured(int width, int height, const std::vector<uint8_t>& rgb)
 		{
-			constexpr const char* digits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-			constexpr int group_bytes = 3;
-			constexpr int digit_bits = 6;
-			constexpr unsigned digit_mask = 0x3F;
-			constexpr int byte_bits = 8;
+			constexpr int captured_channels = 3;
+			constexpr int image_channels = 4;
+			constexpr uint8_t opaque = 0xFF;
 
-			std::string out{ };
-			out.reserve((bytes.size() + group_bytes - 1) / group_bytes * (group_bytes + 1));
-
-			for (size_t i = 0; i < bytes.size(); i += group_bytes)
-			{
-				const size_t count = std::min<size_t>(group_bytes, bytes.size() - i);
-				unsigned group = 0;
-
-				for (int b = 0; b < group_bytes; b++)
-					group = (group << byte_bits) | (b < (int)count ? bytes[i + b] : 0);
-
-				for (int d = 0; d <= group_bytes; d++)
-					out += d <= (int)count ? digits[(group >> (digit_bits * (group_bytes - d))) & digit_mask] : '=';
-			};
-
-			return out;
-		};
-
-		// The capture comes bottom row first, as a bitmap stores it.
-		std::vector<unsigned char> Png(int width, int height, const std::vector<uint8_t>& rgb)
-		{
-			constexpr int channels = 3;
-			const size_t row = (size_t)width * channels;
-
-			std::vector<uint8_t> flipped(rgb.size());
+			SpriteEditor::Image image{ width, height, std::vector<uint8_t>((size_t)width * height * image_channels) };
 
 			for (int y = 0; y < height; y++)
-				std::copy_n(rgb.begin() + (height - 1 - y) * row, row, flipped.begin() + y * row);
-
-			std::vector<unsigned char> png{ };
-
-			stbi_write_png_to_func(
-				[](void* context, void* data, int size)
+				for (int x = 0; x < width; x++)
 				{
-					auto* out = (std::vector<unsigned char>*)context;
-					out->insert(out->end(), (unsigned char*)data, (unsigned char*)data + size);
-				},
-				&png, width, height, channels, flipped.data(), (int)row);
+					const uint8_t* from = rgb.data() + ((size_t)(height - 1 - y) * width + x) * captured_channels;
+					uint8_t* to = image.pixels.data() + ((size_t)y * width + x) * image_channels;
 
-			return png;
+					std::copy_n(from, captured_channels, to);
+					to[captured_channels] = opaque;
+				};
+
+			return image;
 		};
 
 		json State(Context& context, const json&)
@@ -628,7 +581,7 @@ namespace Loom
 					capture->result = { { "content", json::array({ {
 						{ "type", "image" },
 						{ "mimeType", "image/png" },
-						{ "data", Base64(Png(width, height, rgb)) } } }) } };
+						{ "data", McpProtocol::Base64(SpriteEditor::Encode(".png", Captured(width, height, rgb))) } } }) } };
 				});
 
 			EditorMcp::Call& call = context.call;
@@ -651,6 +604,7 @@ namespace Loom
 			const std::string script = Argument(arguments, "script");
 			const size_t first_id = NextLogLine();
 
+			context.script.Listen(true);
 			context.script.Run(script);
 
 			UiScript& running = context.script;
@@ -673,14 +627,29 @@ namespace Loom
 			return { };
 		};
 
+		// From the next frame, the first the script has listened to.
 		json UiItems(Context& context, const json& arguments)
 		{
-			std::ostringstream out;
+			const std::string window = OptionalArgument(arguments, "window");
 
-			out << "window\tlabel\tx\ty\twidth\theight\n";
-			context.script.WriteItems(out, OptionalArgument(arguments, "window"));
+			context.script.Listen(true);
 
-			return Text(out.str());
+			UiScript& script = context.script;
+			EditorMcp::Call& call = context.call;
+
+			context.poll =
+				[&script, &call, window]()
+				{
+					std::ostringstream out;
+
+					out << "window\tlabel\tx\ty\twidth\theight\n";
+					script.WriteItems(out, window);
+
+					call.result = Text(out.str());
+					return true;
+				};
+
+			return { };
 		};
 
 		struct Tool
@@ -805,7 +774,7 @@ namespace Loom
 				"Commands: wait <frames>; move, click, rightclick or doubleclick <target>; drag <target> to <target>; "
 				"key <chord> (ImGui key names joined by +, as ctrl+z); type <text>; screenshot <file>; items. "
 				"A target is x y in pixels from the window's top left, or \"window\" \"label\" [left|right] [dx dy], "
-				"which waits for the item to be drawn. The mouse is the person's too, so they may notice it move.",
+				"which waits for the item to be drawn. ImGui takes the injected pointer in place of the person's until they next move the mouse.",
 				R"({
 					"type": "object",
 					"properties": { "script": { "type": "string", "description": "UiScript commands, one a line" } },
@@ -842,35 +811,10 @@ namespace Loom
 			return list;
 		};
 
-		json Error(const json& id, int code, const std::string& message)
-		{
-			return { { "jsonrpc", "2.0" }, { "id", id }, { "error", { { "code", code }, { "message", message } } } };
-		};
-
-		json Result(const json& id, const json& result)
-		{
-			return { { "jsonrpc", "2.0" }, { "id", id }, { "result", result } };
-		};
-
 		std::string Lower(std::string text)
 		{
 			std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return (char)tolower(c); });
 			return text;
-		};
-
-		// A page in a browser can reach a server on this machine; one that
-		// sends no Origin, or this machine's, is not a page from elsewhere.
-		bool LocalOrigin(const std::string& origin)
-		{
-			for (const char* local : { "http://127.0.0.1", "http://localhost", "http://[::1]" })
-			{
-				const size_t length = strlen(local);
-
-				if (origin.compare(0, length, local) == 0 && (origin.size() == length || origin[length] == ':'))
-					return true;
-			};
-
-			return false;
 		};
 
 		void Send(SOCKET client, const char* status, const std::string& body, const char* extra_headers = "")
@@ -898,6 +842,7 @@ namespace Loom
 	EditorMcp::EditorMcp(Editor& editor, UiScript& script) :
 		m_editor(editor),
 		m_script(script),
+		m_scriptListened(script.Listening()),
 		m_listener(INVALID_SOCKET)
 	{
 	};
@@ -981,10 +926,10 @@ namespace Loom
 		setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, (const char*)&receive_timeout_ms, sizeof(receive_timeout_ms));
 
 		std::string request{ };
-		size_t header_end = std::string::npos;
-		char buffer[4096];
+		size_t head_size = std::string::npos;
+		char buffer[receive_buffer_bytes];
 
-		while ((header_end = request.find("\r\n\r\n")) == std::string::npos)
+		while ((head_size = request.find(header_end)) == std::string::npos)
 		{
 			const int count = recv(client, buffer, sizeof(buffer), 0);
 
@@ -997,7 +942,7 @@ namespace Loom
 				return Send(client, "413 Content Too Large", "");
 		};
 
-		std::istringstream head(request.substr(0, header_end));
+		std::istringstream head(request.substr(0, head_size));
 		std::string method, target, line;
 		head >> method >> target;
 		std::getline(head, line);
@@ -1029,7 +974,7 @@ namespace Loom
 		if (target.substr(0, target.find('?')) != endpoint)
 			return Send(client, "404 Not Found", "");
 
-		if (!origin.empty() && !LocalOrigin(origin))
+		if (!origin.empty() && !McpProtocol::LocalOrigin(origin))
 			return Send(client, "403 Forbidden", "");
 
 		if (method != "POST")
@@ -1038,7 +983,7 @@ namespace Loom
 		if (content_length > max_request_bytes)
 			return Send(client, "413 Content Too Large", "");
 
-		std::string body = request.substr(header_end + 4);
+		std::string body = request.substr(head_size + header_end.size());
 
 		while (body.size() < content_length)
 		{
@@ -1052,7 +997,18 @@ namespace Loom
 
 		body.resize(content_length);
 
-		const std::string response = Respond(body);
+		const std::string response = McpProtocol::Respond(body, ToolList(), instructions,
+			[this](const std::string& name, const json& arguments) -> std::optional<json>
+			{
+				if (!ToolNamed(name))
+					return std::nullopt;
+
+				auto call = std::make_shared<Call>();
+				call->tool = name;
+				call->arguments = arguments;
+
+				return Wait(call);
+			});
 
 		if (response.empty())
 			Send(client, "202 Accepted", "");
@@ -1060,72 +1016,22 @@ namespace Loom
 			Send(client, "200 OK", response);
 	};
 
-	std::string EditorMcp::Respond(const std::string& body)
-	{
-		const json message = json::parse(body, nullptr, false);
-
-		if (message.is_discarded())
-			return Error(nullptr, parse_error, "not JSON").dump();
-
-		if (!message.is_object())
-			return Error(nullptr, invalid_request, "not a request").dump();
-
-		// A notification, or a client's answer to a request this server never
-		// makes, neither of which is answered.
-		if (!message.contains("method") || !message.contains("id"))
-			return "";
-
-		const json& id = message["id"];
-		const std::string method = message.value("method", "");
-		const json params = message.value("params", json::object());
-
-		if (method == "initialize")
-		{
-			const std::string asked = params.value("protocolVersion", "");
-			std::string version = protocol_versions[0];
-
-			for (const char* supported : protocol_versions)
-				if (asked == supported)
-					version = asked;
-
-			return Result(id, {
-				{ "protocolVersion", version },
-				{ "capabilities", { { "tools", json::object() } } },
-				{ "serverInfo", { { "name", server_name }, { "version", server_version } } },
-				{ "instructions", instructions } }).dump();
-		};
-
-		if (method == "ping")
-			return Result(id, json::object()).dump();
-
-		if (method == "tools/list")
-			return Result(id, { { "tools", ToolList() } }).dump();
-
-		if (method != "tools/call")
-			return Error(id, method_not_found, method + " is not a method this server has").dump();
-
-		auto call = std::make_shared<Call>();
-		call->tool = params.value("name", "");
-		call->arguments = params.value("arguments", json::object());
-
-		if (!ToolNamed(call->tool))
-			return Error(id, invalid_params, call->tool + " is not a tool this server has").dump();
-
-		Wait(call);
-
-		return Result(id, call->result).dump();
-	};
-
-	void EditorMcp::Wait(const std::shared_ptr<Call>& call)
+	json EditorMcp::Wait(const std::shared_ptr<Call>& call)
 	{
 		std::unique_lock<std::mutex> lock(m_mutex);
 
 		m_calls.push_back(call);
 
-		const bool answered = m_answered.wait_for(lock, call_timeout, [&]() { return call->done || m_stopping; });
+		m_answered.wait_for(lock, call_timeout, [&]() { return call->done || m_stopping; });
 
-		if (!call->done)
-			call->result = Failure(answered ? "the editor is closing" : "the editor did not answer in time");
+		if (call->done)
+			return call->result;
+
+		// One still queued is dropped. One already running finishes, or is
+		// failed by Step, for nobody.
+		std::erase(m_calls, call);
+
+		return Failure(m_stopping ? "the editor is closing" : "the editor did not answer in time");
 	};
 
 	void EditorMcp::Finish(const std::shared_ptr<Call>& call)
@@ -1143,7 +1049,16 @@ namespace Loom
 		if (m_running)
 		{
 			if (!m_poll())
-				return;
+			{
+				if (std::chrono::steady_clock::now() - m_runningSince < call_timeout)
+					return;
+
+				// Only a ui script runs this long, and what it had left is dropped.
+				m_running->result = Failure("did not finish in time");
+				m_script.Run("");
+			};
+
+			m_script.Listen(m_scriptListened);
 
 			Finish(m_running);
 			m_running.reset();
@@ -1170,10 +1085,6 @@ namespace Loom
 			{
 				call->result = ToolNamed(call->tool)->run(context, call->arguments);
 			}
-			catch (const ToolError& error)
-			{
-				call->result = Failure(error.what());
-			}
 			catch (const std::exception& error)
 			{
 				call->result = Failure(error.what());
@@ -1182,6 +1093,7 @@ namespace Loom
 			if (m_poll)
 			{
 				m_running = call;
+				m_runningSince = std::chrono::steady_clock::now();
 				return;
 			};
 

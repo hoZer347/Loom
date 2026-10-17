@@ -61,6 +61,10 @@ namespace Loom
 		static bool Load(const std::string& path, Image& image);
 		static bool Save(const std::string& path, const Image& image);
 
+		// The file Save writes for an extension, such as ".png". Empty for one
+		// it cannot write.
+		static std::vector<char> Encode(const std::string& extension, const Image& image);
+
 		// Opens the file in a tab of its own, or brings its tab forward, and
 		// the panel with it.
 		void Open(const std::string& path);

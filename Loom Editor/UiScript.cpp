@@ -145,10 +145,25 @@ namespace Loom
 
 	void UiScript::Run(const std::string& text)
 	{
+		m_next = m_lines.size();
+		m_actions.clear();
+		m_wait = 0;
+		m_retries = 0;
 		m_finished = false;
 		m_failed = false;
 
 		LoadText(text);
+	};
+
+	void UiScript::Listen(bool listening)
+	{
+		if (m_context->TestEngine == this)
+			m_context->TestEngineHookItems = listening;
+	};
+
+	bool UiScript::Listening() const
+	{
+		return m_context->TestEngine == this && m_context->TestEngineHookItems;
 	};
 
 	void UiScript::Step()

@@ -79,6 +79,9 @@
     <ClCompile Include="SpriteEditor Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="McpProtocol Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="UiScript Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

@@ -199,7 +199,7 @@ namespace Loom
 		return true;
 	};
 
-	bool SpriteEditor::Save(const std::string& path, const Image& image)
+	std::vector<char> SpriteEditor::Encode(const std::string& extension, const Image& image)
 	{
 		std::vector<char> bytes;
 
@@ -209,7 +209,6 @@ namespace Loom
 			out.insert(out.end(), (const char*)data, (const char*)data + size);
 		};
 
-		const std::string extension = LowerExtension(path);
 		const int width = image.width;
 		const int height = image.height;
 		const uint8_t* pixels = image.pixels.data();
@@ -225,8 +224,18 @@ namespace Loom
 		else if (extension == ".jpg" || extension == ".jpeg")
 			written = stbi_write_jpg_to_func(append, &bytes, width, height, channels, pixels, jpeg_quality);
 
-		// Checked before the file is opened, which empties it.
 		if (!written)
+			bytes.clear();
+
+		return bytes;
+	};
+
+	bool SpriteEditor::Save(const std::string& path, const Image& image)
+	{
+		const std::vector<char> bytes = Encode(LowerExtension(path), image);
+
+		// Checked before the file is opened, which empties it.
+		if (bytes.empty())
 		{
 			std::cerr << "Sprites: could not encode " << path << std::endl;
 			return false;

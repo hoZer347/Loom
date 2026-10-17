@@ -1,5 +1,8 @@
 #pragma once
 
+#include <nlohmann/json_fwd.hpp>
+
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
@@ -27,6 +30,7 @@ namespace Loom
 	* - Requests are read on a thread of its own. The tools run in Step, on the
 	*   main thread between frames, so they see the editor as it was drawn and
 	*   their edits are undone like any other
+	* - The UiScript only hears about ImGui's items while a tool needs them
 	*/
 	struct EditorMcp final
 	{
@@ -55,15 +59,15 @@ namespace Loom
 		void Serve();
 		void Answer(uintptr_t connection);
 
-		// The JSON-RPC response to a request, empty for a notification.
-		std::string Respond(const std::string& body);
-
 		// Blocks the server's thread until the main thread has answered.
-		void Wait(const std::shared_ptr<Call>& call);
+		nlohmann::json Wait(const std::shared_ptr<Call>& call);
 		void Finish(const std::shared_ptr<Call>& call);
 
 		Editor& m_editor;
 		UiScript& m_script;
+
+		// Whether the script was listening before a tool turned it on.
+		const bool m_scriptListened;
 
 		uintptr_t m_listener;
 		std::thread m_thread{ };
@@ -75,5 +79,6 @@ namespace Loom
 
 		std::shared_ptr<Call> m_running{ };
 		Poll m_poll{ };
+		std::chrono::steady_clock::time_point m_runningSince{ };
 	};
 };

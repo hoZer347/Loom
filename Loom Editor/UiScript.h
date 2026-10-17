@@ -55,7 +55,7 @@ namespace Loom
 		bool Load(const std::string& path);
 		void LoadText(const std::string& text);
 
-		// More commands after the script has finished, run from where it ended.
+		// Starts over on these commands, dropping whatever was left to run.
 		void Run(const std::string& text);
 
 		// Once a frame, before ImGui::NewFrame, in the context it was made in.
@@ -63,6 +63,12 @@ namespace Loom
 
 		bool Finished() const { return m_finished; };
 		bool Failed() const { return m_failed; };
+
+		// Whether ImGui tells it about the items it draws, which it does from
+		// the start. Not hearing them costs nothing, and leaves nothing to aim
+		// at from the frame after.
+		void Listen(bool listening);
+		bool Listening() const;
 
 		// What items lists, from the windows whose names contain window.
 		void WriteItems(std::ostream& out, const std::string& window = "") const;

@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -434,13 +435,19 @@ int main(int argc, char** argv)
 		}
 		else if (argument == "--mcp")
 		{
-			if (i + 1 >= argc)
+			constexpr long highest_port = std::numeric_limits<unsigned short>::max();
+
+			char* end = nullptr;
+			const long port = i + 1 < argc ? strtol(argv[i + 1], &end, 10) : 0;
+
+			if (i + 1 >= argc || *end != '\0' || port < 1 || port > highest_port)
 			{
-				std::cerr << "--mcp needs a port" << std::endl;
+				std::cerr << "--mcp needs a port from 1 to " << highest_port << std::endl;
 				return 1;
 			};
 
-			mcp_port = (unsigned short)atoi(argv[++i]);
+			mcp_port = (unsigned short)port;
+			i++;
 		}
 		else if (argument == "--import")
 		{
@@ -665,7 +672,10 @@ int main(int argc, char** argv)
 	if (mcp_port != 0)
 	{
 		if (!script)
+		{
 			script = std::make_unique<UiScript>(launch_folder);
+			script->Listen(false);
+		};
 
 		mcp = std::make_unique<EditorMcp>(editor, *script);
 
@@ -693,5 +703,5 @@ int main(int argc, char** argv)
 
 	engine.Start();
 
-	return script && script->Failed() ? 1 : 0;
+	return exit_after_script && script->Failed() ? 1 : 0;
 };

@@ -113,6 +113,7 @@ if (-not $NoBuild)
         (Join-Path $root 'Loom Editor')
         (Join-Path $root 'External Libraries\glm')
         (Join-Path $root 'External Libraries\stb')
+        (Join-Path $root 'External Libraries\json\single_include')
         (Join-Path $root 'External Libraries\miniaudio')
         $imgui
     ) | ForEach-Object { "-I$_" }

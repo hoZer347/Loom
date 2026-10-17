@@ -38,6 +38,7 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Property Files\doctest.props" />
     <Import Project="..\Property Files\stb.props" />
+    <Import Project="..\Property Files\JSON.props" />
     <Import Project="..\Property Files\miniaudio.props" />
     <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenGL.props" />
@@ -48,6 +49,7 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Property Files\doctest.props" />
     <Import Project="..\Property Files\stb.props" />
+    <Import Project="..\Property Files\JSON.props" />
     <Import Project="..\Property Files\miniaudio.props" />
     <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenGL.props" />
@@ -113,6 +115,7 @@
     <ClCompile Include="EditorLayouts Tests.cpp" />
     <ClCompile Include="ShaderEditor Tests.cpp" />
     <ClCompile Include="SpriteEditor Tests.cpp" />
+    <ClCompile Include="McpProtocol Tests.cpp" />
     <ClCompile Include="UiScript Tests.cpp" />
     <ClCompile Include="EditCommands Tests.cpp" />
     <ClCompile Include="HiddenProcess Tests.cpp" />
@@ -183,6 +186,7 @@
     <ClCompile Include="..\Loom Editor\ShaderEditor.cpp" />
     <ClCompile Include="..\Loom Editor\SpriteEditor.cpp" />
     <ClCompile Include="..\Loom Editor\UiScript.cpp" />
+    <ClCompile Include="..\Loom Editor\McpProtocol.cpp" />
     <ClCompile Include="..\Loom Editor\HiddenProcess.cpp" />
     <ClCompile Include="..\Loom Editor\EditorLog.cpp" />
     <ClCompile Include="..\Loom Editor\EditorTheme.cpp" />

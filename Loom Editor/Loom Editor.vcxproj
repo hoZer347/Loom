@@ -110,6 +110,7 @@
     <ClCompile Include="ProjectAssets.cpp" />
     <ClCompile Include="EditorLog.cpp" />
     <ClCompile Include="EditorMcp.cpp" />
+    <ClCompile Include="McpProtocol.cpp" />
     <ClCompile Include="EditorConsole.cpp" />
     <ClCompile Include="ComponentMenu.cpp" />
     <ClCompile Include="EditorLayouts.cpp" />
@@ -143,6 +144,7 @@
     <ClInclude Include="EditorFileDialogs.h" />
     <ClInclude Include="EditorLog.h" />
     <ClInclude Include="EditorMcp.h" />
+    <ClInclude Include="McpProtocol.h" />
     <ClInclude Include="EditorConsole.h" />
     <ClInclude Include="ComponentMenu.h" />
     <ClInclude Include="EditorLayouts.h" />

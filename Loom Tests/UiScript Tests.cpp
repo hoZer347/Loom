@@ -317,4 +317,71 @@ TEST_SUITE("UiScript")
 		CHECK_FALSE(ui.script->Failed());
 		CHECK(presses == 1);
 	};
+
+	TEST_CASE("Run after quit or a failure runs only the new commands")
+	{
+		CapturedErrors errors;
+
+		for (const char* first : { "quit\nclick \"Panel\" \"Left over\"\n", "click \"Panel\" \"Missing\"\nclick \"Panel\" \"Left over\"\n" })
+		{
+			ScriptedUi ui(first);
+			int left_over = 0;
+			int fresh = 0;
+
+			const auto draw = [&]()
+			{
+				Panel(
+					[&]()
+					{
+						if (ImGui::Button("Left over"))
+							left_over++;
+
+						if (ImGui::Button("Fresh"))
+							fresh++;
+					});
+			};
+
+			ui.Run(draw);
+			ui.script->Run("click \"Panel\" \"Fresh\"\n");
+			ui.Run(draw);
+
+			CHECK(ui.script->Finished());
+			CHECK_FALSE(ui.script->Failed());
+			CHECK(left_over == 0);
+			CHECK(fresh == 1);
+		};
+	};
+
+	TEST_CASE("items can be listed from one window, and only while listening")
+	{
+		ScriptedUi ui("wait 2\n");
+
+		const auto draw = [&]()
+		{
+			Panel([]() { ImGui::Button("In panel"); });
+
+			ImGui::Begin("Other");
+			ImGui::Button("In other");
+			ImGui::End();
+		};
+
+		ui.Run(draw);
+
+		std::ostringstream other;
+		ui.script->WriteItems(other, "Other");
+
+		CHECK(other.str().find("In other") != std::string::npos);
+		CHECK(other.str().find("In panel") == std::string::npos);
+
+		ui.script->Listen(false);
+		CHECK_FALSE(ui.script->Listening());
+
+		ui.script->Run("wait 2\n");
+		ui.Run(draw);
+
+		std::ostringstream unheard;
+		ui.script->WriteItems(unheard);
+
+		CHECK(unheard.str().empty());
+	};
 };
