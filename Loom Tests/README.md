@@ -21,12 +21,12 @@ the other shows up as a failure rather than as a surprise in the browser.
 .\run-browser-tests.ps1                  # the cases that need a real page, in headless Chrome
 ```
 
-The first two scripts take `-NoBuild` to run the last binary as-is, and pass anything
-after `--` straight through to doctest:
+The first two scripts take `-NoBuild` to run the last binary as-is, and pass
+`-TestArgs` straight through to doctest:
 
 ```powershell
-.\run-tests.ps1 -- -ts=GameObject       # only the "GameObject" suite
-.\run-web-tests.ps1 -- -tc="*hierarchy*" # only cases matching a pattern
+.\run-tests.ps1 -TestArgs '-ts=GameObject'        # only the "GameObject" suite
+.\run-web-tests.ps1 -TestArgs '-tc=*hierarchy*'   # only cases matching a pattern
 ```
 
 All three exit with the test runner's exit code, so CI can gate on any of them.
@@ -39,7 +39,7 @@ there to find the slowdown and fix it, ending in the usual review window.
 `%LOCALAPPDATA%\Loom\Performance`:
 
 ```powershell
-.\run-tests.ps1 -- -ts=Performance --no-skip  # the Performance suite alone
+.\run-tests.ps1 -TestArgs '-ts=Performance','--no-skip'  # the Performance suite alone
 ```
 
 In Visual Studio, set **Loom Tests** as the startup project and hit Ctrl+F5 for
