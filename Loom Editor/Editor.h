@@ -371,8 +371,15 @@ namespace Loom
 		static bool OpenInShell(ImGuiContext* context, const char* path);
 
 		// Lets a file be dragged out of the Project panel, onto a field that
-		// names a file or a GameObject in the hierarchy.
+		// names a file or a GameObject in the hierarchy, and a file or folder
+		// onto another folder.
 		void DragAsset(const AssetNode& node);
+
+		// Inside a drag and drop target, takes a file or folder dropped there
+		// into folder. The move waits for the end of the panel, since it
+		// rescans the tree being drawn.
+		void AcceptMove(const std::string& folder);
+		void MoveAsset(const std::string& path, const std::string& folder);
 
 		// The texture at path, to show in place of its icon. Null for anything
 		// else, or a texture that will not load.
@@ -507,6 +514,10 @@ namespace Loom
 		// Textures that would not load, so each is tried once per scan.
 		std::unordered_set<std::string> m_noThumbnail{ };
 		bool m_revealSelectedAsset = false;
+
+		// A file or folder dropped on a folder, and that folder.
+		std::string m_assetToMove{ };
+		std::string m_assetMoveFolder{ };
 
 		// The scene a session opens with: what the settings file said last time,
 		// and then whichever one this session last made active.

@@ -12,6 +12,7 @@
 #include "Textures.h"
 
 #include "imgui.h"
+#include "imgui_internal.h"
 
 #include <algorithm>
 #include <chrono>
@@ -37,6 +38,9 @@ namespace Loom
 {
 	namespace
 	{
+		// Fields take files by ASSET_PAYLOAD, so a folder goes by its own.
+		constexpr const char* FOLDER_PAYLOAD = "LoomFolder";
+
 		constexpr float namePromptWidth = 320.0f;
 		constexpr float promptButtonWidth = 120.0f;
 
@@ -554,6 +558,21 @@ namespace Loom
 				// Dropped anywhere else in the list, it goes in the project folder.
 				TakeImportFolder(m_projectPath, ImGui::IsWindowHovered());
 
+				// The empty space under the rows, so a row that turns a drop away
+				// does not pass it on to the project folder.
+				const ImGuiWindow* list = ImGui::GetCurrentWindow();
+				const ImRect below(
+					list->InnerRect.Min.x,
+					(std::max)(ImGui::GetCursorScreenPos().y, list->InnerRect.Min.y),
+					list->InnerRect.Max.x,
+					list->InnerRect.Max.y);
+
+				if (below.GetHeight() > 0.0f && ImGui::BeginDragDropTargetCustom(below, list->ID))
+				{
+					AcceptMove(m_projectPath);
+					ImGui::EndDragDropTarget();
+				};
+
 				m_revealSelectedAsset = false;
 
 				if (ImGui::BeginPopupContextWindow(
@@ -565,6 +584,9 @@ namespace Loom
 				};
 
 				ImGui::EndChild();
+
+				if (!m_assetToMove.empty())
+					MoveAsset(std::exchange(m_assetToMove, { }), m_assetMoveFolder);
 			};
 		};
 
@@ -633,11 +655,18 @@ namespace Loom
 			io.MouseDragMaxDistanceSqr[ImGuiMouseButton_Left] < drag_threshold)
 			OpenSprite(node.path);
 
-		TakeImportFolder(
-			node.folder ? node.path : std::filesystem::path(node.path).parent_path().string(),
-			ImGui::IsItemHovered());
+		// Dropped on a file, it goes beside it.
+		const std::string folder = node.folder ? node.path : std::filesystem::path(node.path).parent_path().string();
+
+		TakeImportFolder(folder, ImGui::IsItemHovered());
 
 		DragAsset(node);
+
+		if (ImGui::BeginDragDropTarget())
+		{
+			AcceptMove(folder);
+			ImGui::EndDragDropTarget();
+		};
 
 		ImGui::SetItemTooltip("%s", node.path.c_str());
 
@@ -946,14 +975,16 @@ namespace Loom
 
 	void Editor::DragAsset(const AssetNode& node)
 	{
-		if (node.folder || !ImGui::BeginDragDropSource())
+		if (!ImGui::BeginDragDropSource())
 			return;
 
 		// Relative, the way components name the files they use.
 		const std::string relative = std::filesystem::path(node.path).lexically_relative(m_projectPath).generic_string();
 
-		ImGui::SetDragDropPayload(ASSET_PAYLOAD, relative.c_str(), relative.size() + 1);
-		if (const Texture* thumbnail = Thumbnail(node.path))
+		ImGui::SetDragDropPayload(node.folder ? FOLDER_PAYLOAD : ASSET_PAYLOAD, relative.c_str(), relative.size() + 1);
+		if (node.folder)
+			ImGui::Text("%s %s", EditorIcons::Folder, relative.c_str());
+		else if (const Texture* thumbnail = Thumbnail(node.path))
 		{
 			ImGui::Image(Renderer::Get()->ImGuiTexture(thumbnail->handle), ThumbnailSize(*thumbnail), thumbnailTop, thumbnailBottom);
 			ImGui::SameLine();
@@ -962,6 +993,59 @@ namespace Loom
 		else ImGui::Text("%s %s", IconOf(node.path), relative.c_str());
 
 		ImGui::EndDragDropSource();
+	};
+
+	void Editor::AcceptMove(const std::string& folder)
+	{
+		const ImGuiPayload* dragged = ImGui::GetDragDropPayload();
+
+		if (dragged == nullptr || (!dragged->IsDataType(ASSET_PAYLOAD) && !dragged->IsDataType(FOLDER_PAYLOAD)))
+			return;
+
+		const std::filesystem::path path = (std::filesystem::path(m_projectPath) / (const char*)dragged->Data).lexically_normal();
+		const std::filesystem::path into = std::filesystem::path(folder).lexically_normal();
+
+		// Where it already is, or inside itself, the folder does not light up.
+		if (path.parent_path() == into || ProjectAssets::IsUnder(into.string(), path.string()))
+			return;
+
+		if (ImGui::AcceptDragDropPayload(dragged->DataType))
+		{
+			m_assetToMove = path.string();
+			m_assetMoveFolder = into.string();
+		};
+	};
+
+	void Editor::MoveAsset(const std::string& path, const std::string& folder)
+	{
+		std::string error;
+		const std::string moved = ProjectAssets::MoveInto(path, folder, &error);
+
+		if (moved.empty())
+		{
+			std::cerr << "Project: " << error << std::endl;
+			return;
+		};
+
+		std::cout << "Moved " << path << " to " << moved << std::endl;
+
+		for (auto& [scene, scenePath] : m_scenePaths)
+			if (!scenePath.empty())
+				scenePath = ProjectAssets::Relocate(scenePath, path, moved);
+
+		if (!m_startupScene.empty())
+			m_startupScene = ProjectAssets::Relocate(m_startupScene, path, moved);
+
+		if (!m_selectedModel.empty())
+			m_selectedModel = ProjectAssets::Relocate(m_selectedModel, path, moved);
+
+		m_shaders.Relocate(path, moved);
+		m_sprites.Relocate(path, moved);
+
+		m_selectedAsset = std::filesystem::path(moved).lexically_normal().string();
+		m_revealSelectedAsset = true;
+
+		RefreshProjectAssets();
 	};
 
 	void Editor::DrawCreateAssetPrompt()

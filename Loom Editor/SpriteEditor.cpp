@@ -1,6 +1,7 @@
 #include "SpriteEditor.h"
 
 #include "EditorIcons.h"
+#include "ProjectAssets.h"
 #include "Textures.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -265,6 +266,12 @@ namespace Loom
 		document->saved = document->image;
 
 		m_documents.push_back(std::move(document));
+	};
+
+	void SpriteEditor::Relocate(const std::string& from, const std::string& to)
+	{
+		for (const std::unique_ptr<Document>& document : m_documents)
+			document->path = ProjectAssets::Relocate(document->path, from, to);
 	};
 
 	std::vector<std::string> SpriteEditor::TakeSaved()

@@ -7,6 +7,7 @@
 #ifndef __EMSCRIPTEN__
 
 #include "EditorTheme.h"
+#include "ProjectAssets.h"
 #include "ShaderVariables.h"
 
 #include "imgui.h"
@@ -112,6 +113,12 @@ namespace Loom
 		const size_t start = line.find_first_not_of(" \t");
 
 		return start == std::string::npos ? std::pair<size_t, size_t>{ 0, line.size() } : std::pair<size_t, size_t>{ start, line.size() };
+	};
+
+	void ShaderEditor::Relocate(const std::string& from, const std::string& to)
+	{
+		for (const std::unique_ptr<Document>& document : m_documents)
+			document->path = ProjectAssets::Relocate(document->path, from, to);
 	};
 
 	void ShaderEditor::Open(const std::string& path)

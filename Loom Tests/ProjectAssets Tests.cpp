@@ -243,4 +243,59 @@ TEST_SUITE("ProjectAssets")
 
 		std::filesystem::remove_all(root);
 	};
+
+	TEST_CASE("a file or folder moved into a folder keeps its name and never replaces anything")
+	{
+		const std::filesystem::path root = std::filesystem::temp_directory_path() / "loom project assets move";
+		const std::filesystem::path sprites = root / "Sprites";
+		const std::filesystem::path art = root / "Art";
+
+		std::filesystem::remove_all(root);
+		std::filesystem::create_directories(sprites);
+		std::filesystem::create_directories(art);
+
+		const std::string hero = (root / "Hero.png").string();
+		std::ofstream(hero, std::ios::binary) << "pixels";
+
+		const std::string moved = Loom::ProjectAssets::MoveInto(hero, sprites.string());
+
+		CHECK(moved == (sprites / "Hero.png").string());
+		CHECK(ReadAll(moved) == "pixels");
+		CHECK_FALSE(std::filesystem::exists(hero));
+
+		// Dropped back where it already is, nothing happens.
+		CHECK(Loom::ProjectAssets::MoveInto(moved, sprites.string()) == moved);
+
+		const std::string folder = Loom::ProjectAssets::MoveInto(sprites.string(), art.string());
+
+		CHECK(folder == (art / "Sprites").string());
+		CHECK(std::filesystem::exists(art / "Sprites" / "Hero.png"));
+
+		std::string error;
+		CHECK(Loom::ProjectAssets::MoveInto(art.string(), folder, &error).empty());
+		CHECK_FALSE(error.empty());
+		CHECK(std::filesystem::exists(art));
+
+		std::ofstream(root / "Hero.png", std::ios::binary) << "other";
+		error.clear();
+		CHECK(Loom::ProjectAssets::MoveInto((root / "Hero.png").string(), folder, &error).empty());
+		CHECK_FALSE(error.empty());
+		CHECK(ReadAll((art / "Sprites" / "Hero.png").string()) == "pixels");
+
+		CHECK(Loom::ProjectAssets::MoveInto((root / "Missing.png").string(), art.string(), &error).empty());
+
+		std::filesystem::remove_all(root);
+	};
+
+	TEST_CASE("a path inside what was moved follows it, and any other stays")
+	{
+		const std::filesystem::path root = std::filesystem::temp_directory_path() / "loom project assets relocate";
+		const std::string from = (root / "Sprites").string();
+		const std::string to = (root / "Art" / "Sprites").string();
+
+		CHECK(Loom::ProjectAssets::Relocate(from, from, to) == to);
+		CHECK(Loom::ProjectAssets::Relocate((root / "Sprites" / "Hero.png").string(), from, to) == (root / "Art" / "Sprites" / "Hero.png").string());
+		CHECK(Loom::ProjectAssets::Relocate((root / "SpritesOld" / "Hero.png").string(), from, to) == (root / "SpritesOld" / "Hero.png").string());
+		CHECK(Loom::ProjectAssets::Relocate((root / "Scenes" / "Main.loomscene").string(), from, to) == (root / "Scenes" / "Main.loomscene").string());
+	};
 };

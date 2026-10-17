@@ -60,6 +60,15 @@ namespace Loom
 		// stays as it is, and its own path comes back.
 		static std::string CopyInto(const std::string& file, const std::string& folder, std::string* error = nullptr);
 
+		// Moves a file or folder into folder under its own name. One already in
+		// folder stays as it is, and its own path comes back. Nothing in folder
+		// is replaced, and a folder never goes inside itself.
+		static std::string MoveInto(const std::string& path, const std::string& folder, std::string* error = nullptr);
+
+		// Where path is once from has moved to to: path itself when it is
+		// neither from nor inside it.
+		static std::string Relocate(const std::string& path, const std::string& from, const std::string& to);
+
 		// Writes <name>.hpp into folder, which has to sit under the scripts
 		// project's own folder.
 		static std::string CreateScript(

@@ -67,6 +67,9 @@ namespace Loom
 
 		void Draw(bool* open);
 
+		// Keeps the tabs of files that were moved saving to where they are now.
+		void Relocate(const std::string& from, const std::string& to);
+
 		// Whether the panel had the keyboard when it was last drawn, so the
 		// scene's own undo keeps out of its way.
 		bool IsFocused() const { return m_focused; };

@@ -502,6 +502,60 @@ void main()
 		return target.string();
 	};
 
+	std::string ProjectAssets::MoveInto(const std::string& path, const std::string& folder, std::string* error)
+	{
+		const std::filesystem::path source(path);
+		std::error_code code;
+
+		if (!std::filesystem::exists(source, code))
+		{
+			Fail(error, path + " does not exist");
+			return "";
+		};
+
+		if (std::filesystem::equivalent(source.parent_path(), folder, code))
+			return source.string();
+
+		if (IsUnder(folder, path))
+		{
+			Fail(error, "Could not move " + path + " inside itself");
+			return "";
+		};
+
+		const std::filesystem::path target = std::filesystem::path(folder) / source.filename();
+
+		if (std::filesystem::exists(target, code))
+		{
+			Fail(error, "Could not move " + path + ": " + target.string() + " already exists");
+			return "";
+		};
+
+		std::filesystem::rename(source, target, code);
+
+		if (code)
+		{
+			Fail(error, "Could not move " + path + " to " + target.string() + ": " + code.message());
+			return "";
+		};
+
+		return target.string();
+	};
+
+	std::string ProjectAssets::Relocate(const std::string& path, const std::string& from, const std::string& to)
+	{
+		std::error_code code;
+		const std::filesystem::path absolute = std::filesystem::absolute(path, code).lexically_normal();
+
+		if (!IsUnder(absolute.string(), from))
+			return path;
+
+		const std::filesystem::path relative = absolute.lexically_relative(from);
+
+		return relative == "."
+			? to
+			: (std::filesystem::path(to) / relative).string();
+	};
+
 	std::string ProjectAssets::CreateScript(
 		const std::string& scripts_project,
 		const std::string& folder,
