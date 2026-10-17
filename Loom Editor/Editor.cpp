@@ -865,7 +865,9 @@ namespace Loom
 			std::filesystem::path file = folder / (m_activeScene->GetName() + SceneSerializer::extension);
 
 			// A scene of the same name already saved keeps its file.
-			for (int copy = 2; std::filesystem::exists(file); copy++)
+			std::error_code code;
+
+			for (int copy = 2; std::filesystem::exists(file, code); copy++)
 				file = folder / (m_activeScene->GetName() + " " + std::to_string(copy) + SceneSerializer::extension);
 
 			path = file.string();
