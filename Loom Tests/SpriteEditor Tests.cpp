@@ -5,6 +5,7 @@
 #include "SpriteEditor.h"
 
 #include "imgui.h"
+#include "imgui_internal.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -139,6 +140,19 @@ namespace
 			return image;
 		};
 
+		// The name of the tab in front, without its ### part.
+		static std::string SelectedTab()
+		{
+			ImGuiContext& g = *ImGui::GetCurrentContext();
+
+			for (int i = 0; i < g.TabBars.GetMapSize(); i++)
+				if (ImGuiTabBar* bar = g.TabBars.TryGetMapData(i))
+					if (ImGuiTabItem* tab = ImGui::TabBarFindTabByID(bar, bar->SelectedTabId))
+						return ImGui::TabBarGetTabName(bar, tab);
+
+			return "";
+		};
+
 		std::string path;
 		ImGuiContext* context = nullptr;
 		SpriteEditor editor;
@@ -258,6 +272,34 @@ TEST_SUITE("SpriteEditor")
 		const SpriteEditor::Image saved = driven.Saved();
 
 		CHECK(Count(saved, CLEAR) == Driven::side * (Driven::side - 1));
+	};
+
+	TEST_CASE("an image moved while its tab is in front stays in front, and Ctrl+S writes where it went")
+	{
+		Driven driven("loom sprite first.tga");
+
+		const std::string opened = LoomTests::WriteTga("loom sprite opened.tga", Driven::side, Driven::side, Blank(Driven::side, Driven::side).pixels);
+		const std::filesystem::path moved = std::filesystem::path(opened).parent_path() / "loom sprite moved.tga";
+
+		driven.editor.Open(opened);
+		driven.Frame();
+
+		std::filesystem::rename(opened, moved);
+		driven.editor.Relocate(std::filesystem::path(opened).lexically_normal().string(), moved.string());
+		driven.Frame();
+
+		CHECK(Driven::SelectedTab().find(moved.filename().string()) != std::string::npos);
+
+		driven.Stroke(middle, middle);
+		driven.Press(ImGuiKey_S);
+
+		SpriteEditor::Image saved;
+		REQUIRE(SpriteEditor::Load(moved.string(), saved));
+
+		CHECK(Count(saved, CLEAR) == Driven::side * Driven::side - 1);
+		CHECK_FALSE(std::filesystem::exists(opened));
+
+		std::filesystem::remove(moved);
 	};
 
 	TEST_CASE("Ctrl+Z takes a stroke back and Ctrl+Y puts it back")

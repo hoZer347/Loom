@@ -1009,6 +1009,11 @@ namespace Loom
 		if (path.parent_path() == into || ProjectAssets::IsUnder(into.string(), path.string()))
 			return;
 
+		// The project file names the scripts project by where it is.
+		if (m_scripts.HasProject() &&
+			ProjectAssets::IsUnder(std::filesystem::path(m_scripts.GetProject()).lexically_normal().string(), path.string()))
+			return;
+
 		if (ImGui::AcceptDragDropPayload(dragged->DataType))
 		{
 			m_assetToMove = path.string();

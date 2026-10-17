@@ -9,6 +9,7 @@
 #include "stb_image_write.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cctype>
 #include <cmath>
 #include <filesystem>
@@ -310,7 +311,9 @@ namespace Loom
 					if (std::exchange(document->select, false))
 						flags |= ImGuiTabItemFlags_SetSelected;
 
-					const std::string label = std::string(EditorIcons::Texture) + " " + std::filesystem::path(document->path).filename().string() + "###" + document->path;
+					// Known by the document rather than its path, so a file moved
+					// in the Project panel keeps its tab.
+					const std::string label = std::string(EditorIcons::Texture) + " " + std::filesystem::path(document->path).filename().string() + "###" + std::to_string((uintptr_t)document.get());
 					bool keep = true;
 					const bool shown = ImGui::BeginTabItem(label.c_str(), &keep, flags);
 

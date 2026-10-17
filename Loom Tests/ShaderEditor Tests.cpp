@@ -183,6 +183,19 @@ namespace
 			return false;
 		};
 
+		// The name of the tab in front, without its ### part.
+		static std::string SelectedTab()
+		{
+			ImGuiContext& g = *ImGui::GetCurrentContext();
+
+			for (int i = 0; i < g.TabBars.GetMapSize(); i++)
+				if (ImGuiTabBar* bar = g.TabBars.TryGetMapData(i))
+					if (ImGuiTabItem* tab = ImGui::TabBarFindTabByID(bar, bar->SelectedTabId))
+						return ImGui::TabBarGetTabName(bar, tab);
+
+			return "";
+		};
+
 		// Whether glslang's messages are listed under the text this frame.
 		static bool Listed()
 		{
@@ -297,6 +310,39 @@ TEST_SUITE("ShaderEditor")
 		Driven driven("// ===VERTEX===\nuniform mat4 u_mine;\n");
 
 		CHECK_FALSE(driven.TooltipAlong(1));
+	};
+
+	TEST_CASE("a shader moved while its tab is in front stays in front, and Ctrl+S writes where it went")
+	{
+		Driven driven;
+
+		const std::filesystem::path opened = driven.path.parent_path() / "ShaderEditor Tests Opened.shader";
+		const std::filesystem::path moved = driven.path.parent_path() / "ShaderEditor Tests Moved.shader";
+
+		std::ofstream(opened, std::ios::binary) << shader;
+
+		driven.editor.Open(opened.string());
+
+		for (int i = 0; i < opening_frames; i++)
+			driven.Frame();
+
+		std::filesystem::rename(opened, moved);
+		driven.editor.Relocate(opened.lexically_normal().string(), moved.string());
+		driven.Frame();
+
+		CHECK(Driven::SelectedTab().find(moved.filename().string()) != std::string::npos);
+
+		driven.Type("x");
+		driven.Press(ImGuiKey_S, true);
+
+		std::ifstream file(moved, std::ios::binary);
+		const std::string saved((std::istreambuf_iterator<char>(file)), { });
+		file.close();
+
+		CHECK(saved.find('x') != std::string::npos);
+		CHECK_FALSE(std::filesystem::exists(opened));
+
+		std::filesystem::remove(moved);
 	};
 };
 
