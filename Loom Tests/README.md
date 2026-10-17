@@ -31,6 +31,17 @@ after `--` straight through to doctest:
 
 All three exit with the test runner's exit code, so CI can gate on any of them.
 
+The `Performance` suite is timed against the clock and takes minutes under node, so
+neither script runs it unless asked to. `daily-performance.ps1` runs it on both builds
+once a day, in a slot brought up to `master`, and when it fails, starts Claude Code
+there to find the slowdown and fix it, ending in the usual review window.
+`daily-performance.ps1 -Register` schedules it, and its logs go to
+`%LOCALAPPDATA%\Loom\Performance`:
+
+```powershell
+.\run-tests.ps1 -- -ts=Performance --no-skip  # the Performance suite alone
+```
+
 In Visual Studio, set **Loom Tests** as the startup project and hit Ctrl+F5 for
 the local build.
 
@@ -78,7 +89,8 @@ needs Chrome or Edge installed.
 | `Contacts` | An edge resting across an edge pushed straight up, off a box mirrored by its scale as off a plain one |
 | `KeySet` | Keys in once and out again through tens of thousands put in and taken out in mixed order, agreeing with `std::set`, and `EraseIf` taking out just what it is told |
 | `Rigidbody` | Falling under gravity, spheres and tumbling boxes coming to rest on boxes and meshes, a stack standing, bounce, an elastic exchange, friction stopping a slide, a kinematic body pushing, a fast small ball unable to pass through a thin box or a mesh, nor one sent suddenly fast by a velocity or a force, both sides told of a collision's start, stay and end with normals out of the other side, triggers passed through and told, sleeping, and waking when struck, touched by a kinematic body or left unsupported, a kinematic body keeping the turn its script gives it, every force and torque mode, a collider attached after its Rigidbody, a body under a moved and turned parent, a pile ending up the same on one thread as on many |
-| `PhysicsPerformance` | Twenty thousand colliders: how long a physics step takes, still and with some moved, and a raycast through the tree against testing every collider, which it must beat twentyfold; a raycast among sixteen times the colliders costing at most six times as much, timed as the quickest of several batches; two hundred bodies dropped into a pit all staying inside it and settling. Reports its timings |
+| `Performance` | Skipped unless asked for with `--no-skip`, and run once a day by `daily-performance.ps1`: twenty thousand colliders, how long a physics step takes, still and with some moved, and a raycast through the tree against testing every collider, which it must beat twentyfold; a raycast among sixteen times the colliders costing at most six times as much, timed as the quickest of several batches. Reports its timings |
+| `PhysicsPiles` | Two hundred bodies dropped into a pit all staying inside it and settling |
 | `Benchmark` | Skipped unless asked for with `--no-skip`: the Crowd scene timed step by step as `Benchmarks/Unity Crowd` times it in Unity. `run-physics-benchmark.ps1` runs both in Release and sets them side by side |
 | `ColliderGizmos` | The colliders under a selection drawn in one go over the view, and nothing drawn or compiled without an enabled one |
 | `Input` | Button edges: down for one frame, held, up for one frame, a click inside one frame, buttons GLFW does not have; cursor and screen fields |

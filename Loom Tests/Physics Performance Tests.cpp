@@ -199,7 +199,9 @@ namespace
 };
 
 
-TEST_SUITE("PhysicsPerformance")
+// Timed against the clock and long under node, so they run once a day from daily-performance.ps1
+// rather than with every change.
+TEST_SUITE("Performance" * doctest::skip())
 {
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene of twenty thousand colliders answers a raycast far faster than testing every one")
 	{
@@ -302,7 +304,11 @@ TEST_SUITE("PhysicsPerformance")
 
 		CHECK(many / few <= MOST_GROWTH);
 	};
+};
 
+
+TEST_SUITE("PhysicsPiles")
+{
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "bodies dropped into a pit pile up inside it and fall asleep")
 	{
 		constexpr int COUNT = 200;
