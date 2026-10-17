@@ -211,14 +211,45 @@ namespace Loom
 
 	void Animator::OnUpdate()
 	{
+		Advance(Time::DeltaTime());
+	};
+
+	void Animator::Advance(float seconds)
+	{
 		if (*clip != m_playing)
 		{
 			m_playing = clip;
 			m_time = 0.0f;
 		};
 
-		m_time += Time::DeltaTime() * speed;
+		m_time += seconds * speed;
+
+		const float duration = GetDuration();
+
+		if (switchAfter > 0.0f && duration > 0.0f)
+		{
+			const float loops = std::ceil(switchAfter / duration);
+
+			if (m_time >= loops * duration)
+			{
+				m_time -= loops * duration;
+				PlayNext();
+			};
+		};
+
 		Pose(m_time);
+	};
+
+	void Animator::PlayNext()
+	{
+		const std::vector<std::string> names = GetClipNames();
+		const size_t playing = std::find(names.begin(), names.end(), *clip) - names.begin();
+
+		if (names.empty())
+			return;
+
+		clip = names[playing < names.size() ? (playing + 1) % names.size() : 0];
+		m_playing = clip;
 	};
 
 	void Animator::Pose(float time)

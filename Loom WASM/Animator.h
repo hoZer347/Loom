@@ -19,6 +19,9 @@ namespace Loom
 	* - Plays the clip named by clip, from its start whenever the name
 	*   changes, speed times as fast as the clock. With loop on it starts over
 	*   at its end; off, it holds its last pose
+	* - With switchAfter above 0 it moves on to the next clip, in order and
+	*   round to the first again, once the playing one has played that many
+	*   seconds, waiting for the end of its loop so no step is cut short
 	* - Between keys, positions, scales and weights are blended straight and
 	*   rotations along the shortest arc
 	* - What a clip has no keys for is left where it is
@@ -34,7 +37,12 @@ namespace Loom
 		// The name m_channels gives each property.
 		static const char* PropertyName(Property property);
 
+		// Advance by the clock.
 		void OnUpdate() override;
+
+		// Moves the playing clip on by seconds of the clock, switching clips as
+		// switchAfter says, and puts the pose there on the joints and Skins.
+		void Advance(float seconds);
 
 		// A choice of the clips, and how far into the playing one it is.
 		void OnGui() override;
@@ -70,6 +78,10 @@ namespace Loom
 		// time in seconds and then its value.
 		Serial<std::vector<float>> m_keys;
 
+		// Seconds before moving on to the next clip, or 0 to stay on one. Last,
+		// so the fields before it keep their places in scenes saved without it.
+		Serial<float> switchAfter = 0.0f;
+
 	private:
 		struct Clip
 		{
@@ -99,6 +111,9 @@ namespace Loom
 
 		// The playing clip's index, or the clip count when none plays.
 		size_t PlayingIndex() const;
+
+		// Starts the clip after the playing one, or the first after the last.
+		void PlayNext();
 
 		// The Skins under it, gathered again once anything has been added,
 		// removed or moved.

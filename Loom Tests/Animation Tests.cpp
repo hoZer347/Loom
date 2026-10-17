@@ -263,6 +263,29 @@ TEST_SUITE("Animator")
 		CHECK(animated.rig.skin->GetShapeWeight("Smile") == doctest::Approx(0.5f));
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "with switchAfter set, the clips play in turn, each to the end of a loop, round to the first again")
+	{
+		Animated animated;
+		animated.animator->Play("Slide");
+		animated.animator->switchAfter = 1.5f;
+
+		// Slide is a second long, so it plays two loops before moving on.
+		animated.animator->Advance(1.9f);
+		CHECK(*animated.animator->clip == "Slide");
+
+		animated.animator->Advance(0.2f);
+		CHECK(*animated.animator->clip == "Hold");
+		CHECK(animated.animator->GetTime() == doctest::Approx(0.1f));
+
+		// Hold is half a second: three loops.
+		animated.animator->Advance(1.45f);
+		CHECK(*animated.animator->clip == "Slide");
+
+		animated.animator->switchAfter = 0.0f;
+		animated.animator->Advance(5.0f);
+		CHECK(*animated.animator->clip == "Slide");
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a Skin added after the clip started has its shape keys set too")
 	{
 		Animated animated;
