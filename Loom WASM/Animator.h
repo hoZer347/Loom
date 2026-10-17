@@ -5,6 +5,8 @@
 #include "Component.h"
 #include "Skin.h"
 
+#include "glm/gtc/quaternion.hpp"
+
 #include <string>
 #include <vector>
 
@@ -22,6 +24,11 @@ namespace Loom
 	* - With switchAfter above 0 it moves on to the next clip, in order and
 	*   round to the first again, once the playing one has played that many
 	*   seconds, waiting for the end of its loop so no step is cut short
+	* - A clip named "<from> to <to>" is a transition: going from the clip
+	*   named from to the one named to, it plays that once on the way, then
+	*   carries on into to. switchAfter passes over transitions
+	* - Whenever the clip changes, the pose eases out of where the joints and
+	*   shape keys were over blendTime seconds, so nothing snaps
 	* - Between keys, positions, scales and weights are blended straight and
 	*   rotations along the shortest arc
 	* - What a clip has no keys for is left where it is
@@ -89,6 +96,9 @@ namespace Loom
 		// so the fields before it keep their places in scenes saved without it.
 		Serial<float> switchAfter = 0.0f;
 
+		// Seconds to ease from one clip's pose into the next, or 0 to cut.
+		Serial<float> blendTime = 0.25f;
+
 	private:
 		struct Clip
 		{
@@ -119,8 +129,24 @@ namespace Loom
 		// clip, or the clip count when it is none of them.
 		size_t PlayingIndex() const;
 
-		// Starts the clip after the playing one, or the first after the last.
-		void PlayNext();
+		// Starts playing the clip at index from its beginning, easing out of the
+		// pose there is now, by way of the transition into it when there is one.
+		void Start(int index);
+
+		// The clip switchAfter moves on to: the next that is not a transition,
+		// round to the first again.
+		int NextIndex();
+
+		// The transition from one clip to another, or -1 when there is none.
+		int TransitionBetween(int from, int to);
+
+		bool IsTransition(size_t index) const;
+
+		// Remembers where the joints and shape keys are, to ease out of.
+		void CaptureBlend();
+
+		// Pose, eased out of the held pose while blendTime runs when blend is on.
+		void Apply(float time, bool blend);
 
 		// How long the playing clip plays before switchAfter moves on: the
 		// whole loops that cover switchAfter, or switchAfter itself for a clip
@@ -150,5 +176,22 @@ namespace Loom
 		// The clip m_time counts from the start of, or -1 before any has played.
 		int m_playing = -1;
 		float m_time = 0.0f;
+
+		// The clip the playing transition leads into, or -1 when it is not one.
+		int m_after = -1;
+
+		struct Held
+		{
+			glm::vec3 position{ 0.0f };
+			glm::quat rotation{ 1.0f, 0.0f, 0.0f, 0.0f };
+			glm::vec3 scale{ 1.0f };
+		};
+
+		// Where each of m_jointNames was, and each shape key's weight by name,
+		// when the clip last changed, and how much of blendTime is left.
+		std::vector<Held> m_heldJoints;
+		std::vector<std::pair<std::string, float>> m_heldWeights;
+		float m_blendLeft = 0.0f;
+		float m_blendFor = 0.0f;
 	};
 };

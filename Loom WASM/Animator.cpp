@@ -15,6 +15,9 @@ namespace Loom
 {
 	namespace
 	{
+		// What a transition's name puts between the clips it goes from and to.
+		constexpr const char* TRANSITION_JOIN = " to ";
+
 		constexpr Animator::Property PROPERTIES[] =
 		{
 			Animator::Property::Translation,
@@ -206,9 +209,7 @@ namespace Loom
 		if (index < 0 || (size_t)index >= m_parsedClips.size())
 			return false;
 
-		clip = index;
-		m_playing = index;
-		m_time = 0.0f;
+		Start(index);
 
 		return true;
 	};
@@ -220,24 +221,34 @@ namespace Loom
 
 	void Animator::Advance(float seconds)
 	{
+		Parse();
+
 		if (*clip != m_playing)
-		{
-			m_playing = clip;
-			m_time = 0.0f;
-		};
+			Start(clip);
 
 		m_time += seconds * speed;
+		m_blendLeft = std::max(0.0f, m_blendLeft - seconds * speed);
 
-		if (switchAfter > 0.0f && m_time >= PlayFor())
+		if (m_after >= 0 && m_time >= GetDuration())
 		{
-			m_time -= PlayFor();
-			PlayNext();
+			// A transition carries on into its clip once, from where it ended.
+			const float over = m_time - GetDuration();
+			const int after = m_after;
+
+			Start(after);
+			m_time = over;
+		}
+		else if (m_after < 0 && switchAfter > 0.0f && m_time >= PlayFor())
+		{
+			const float over = m_time - PlayFor();
+
+			Start(NextIndex());
 
 			// A long frame moves on one clip, not several.
-			m_time = std::fmod(m_time, PlayFor());
+			m_time = std::fmod(over, PlayFor());
 		};
 
-		Pose(m_time);
+		Apply(m_time, true);
 	};
 
 	float Animator::PlayFor()
@@ -247,20 +258,96 @@ namespace Loom
 		return duration > 0.0f ? std::ceil(switchAfter / duration) * duration : *switchAfter;
 	};
 
-	void Animator::PlayNext()
+	bool Animator::IsTransition(size_t index) const
+	{
+		return m_parsedClips[index].name.find(TRANSITION_JOIN) != std::string::npos;
+	};
+
+	int Animator::TransitionBetween(int from, int to)
 	{
 		Parse();
 
-		if (m_parsedClips.empty())
+		const int count = (int)m_parsedClips.size();
+
+		if (from < 0 || from >= count || to < 0 || to >= count)
+			return -1;
+
+		const std::string name = m_parsedClips[from].name + TRANSITION_JOIN + m_parsedClips[to].name;
+
+		for (int i = 0; i < count; i++)
+			if (m_parsedClips[i].name == name)
+				return i;
+
+		return -1;
+	};
+
+	int Animator::NextIndex()
+	{
+		Parse();
+
+		const size_t count = m_parsedClips.size();
+		const size_t playing = PlayingIndex();
+		const size_t from = playing < count ? playing : count - 1;
+
+		for (size_t step = 1; step <= count; step++)
+		{
+			const size_t next = (from + step) % count;
+
+			if (!IsTransition(next))
+				return (int)next;
+		};
+
+		return (int)playing;
+	};
+
+	void Animator::Start(int index)
+	{
+		CaptureBlend();
+
+		const int via = m_after < 0 ? TransitionBetween(m_playing, index) : -1;
+
+		m_after = via >= 0 ? index : -1;
+		clip = via >= 0 ? via : index;
+		m_playing = clip;
+		m_time = 0.0f;
+	};
+
+	void Animator::CaptureBlend()
+	{
+		m_blendLeft = 0.0f;
+
+		if (blendTime <= 0.0f || m_playing < 0)
 			return;
 
-		const size_t playing = PlayingIndex();
+		const std::vector<GameObject*>& joints = m_joints.Find(m_gameObject, m_jointNames);
 
-		clip = playing < m_parsedClips.size() ? (int)((playing + 1) % m_parsedClips.size()) : 0;
-		m_playing = clip;
+		m_heldJoints.assign(joints.size(), Held());
+
+		for (size_t i = 0; i < joints.size(); i++)
+			if (joints[i])
+			{
+				const Transform& transform = joints[i]->transform;
+				m_heldJoints[i] = { *transform.position, Transform::Rotation(*transform.rotation), *transform.scale };
+			};
+
+		m_heldWeights.clear();
+		const std::vector<Skin*>& skins = Skins();
+
+		if (!skins.empty())
+			for (const Channel& channel : m_parsedChannels)
+				if (channel.property == Property::Weight && channel.clip == (size_t)m_playing)
+					m_heldWeights.emplace_back(channel.target, skins.front()->GetShapeWeight(channel.target));
+
+		m_blendLeft = blendTime;
+		m_blendFor = blendTime;
 	};
 
 	void Animator::Pose(float time)
+	{
+		Apply(time, false);
+	};
+
+	void Animator::Apply(float time, bool blend)
 	{
 		Parse();
 
@@ -273,12 +360,17 @@ namespace Loom
 
 		if (duration <= 0.0f)
 			time = 0.0f;
-		else if (loop)
+		else if (loop && !IsTransition(playing))
 			time -= duration * std::floor(time / duration);
 		else time = std::clamp(time, 0.0f, duration);
 
 		const std::vector<GameObject*>& joints = m_joints.Find(m_gameObject, m_jointNames);
 		const std::vector<Skin*>& skins = Skins();
+
+		// How far out of the held pose, eased in and out.
+		const bool blending = blend && m_blendLeft > 0.0f && m_heldJoints.size() == joints.size();
+		const float along = blending ? 1.0f - m_blendLeft / m_blendFor : 1.0f;
+		const float eased = along * along * (3.0f - 2.0f * along);
 
 		for (const Channel& channel : m_parsedChannels)
 		{
@@ -292,8 +384,15 @@ namespace Loom
 
 			if (channel.property == Property::Weight)
 			{
+				float weight = value[0];
+
+				if (blending)
+					for (const auto& [name, held] : m_heldWeights)
+						if (name == channel.target)
+							weight = held + (weight - held) * eased;
+
 				for (Skin* skin : skins)
-					skin->SetShapeWeight(channel.target, value[0]);
+					skin->SetShapeWeight(channel.target, weight);
 
 				continue;
 			};
@@ -304,20 +403,30 @@ namespace Loom
 				continue;
 
 			Transform& transform = joint->transform;
+			const Held* held = blending ? &m_heldJoints[channel.joint] : nullptr;
 
 			switch (channel.property)
 			{
 			case Property::Translation:
-				transform.position = glm::vec3(value[0], value[1], value[2]);
-				break;
+			{
+				const glm::vec3 position(value[0], value[1], value[2]);
+				transform.position = held ? glm::mix(held->position, position, eased) : position;
+			}
+			break;
 
 			case Property::Scale:
-				transform.scale = glm::vec3(value[0], value[1], value[2]);
-				break;
+			{
+				const glm::vec3 scale(value[0], value[1], value[2]);
+				transform.scale = held ? glm::mix(held->scale, scale, eased) : scale;
+			}
+			break;
 
 			case Property::Rotation:
-				transform.rotation = Transform::EulerDegrees(glm::quat(value[3], value[0], value[1], value[2]));
-				break;
+			{
+				const glm::quat rotation(value[3], value[0], value[1], value[2]);
+				transform.rotation = Transform::EulerDegrees(held ? glm::slerp(held->rotation, rotation, eased) : rotation);
+			}
+			break;
 
 			default:
 				break;

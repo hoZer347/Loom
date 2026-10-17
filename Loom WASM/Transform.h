@@ -23,6 +23,9 @@ namespace Loom
 		// A rotation as the Euler angles rotation holds, in degrees.
 		LOOM_API static glm::vec3 EulerDegrees(const glm::quat& rotation);
 
+		// The rotation Euler angles in degrees describe, the reverse of EulerDegrees.
+		LOOM_API static glm::quat Rotation(const glm::vec3& degrees);
+
 		Serial<glm::vec3> position;
 		Serial<glm::vec3> rotation;
 		Serial<glm::vec3> scale = glm::vec3(1.0f);

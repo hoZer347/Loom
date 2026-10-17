@@ -25,6 +25,13 @@ namespace Loom
 		return glm::degrees(glm::vec3(x, y, z));
 	};
 
+	glm::quat Transform::Rotation(const glm::vec3& degrees)
+	{
+		const glm::vec3 radians = glm::radians(degrees);
+
+		return glm::quat_cast(glm::eulerAngleYXZ(radians.y, radians.x, radians.z));
+	};
+
 	GameObject::GameObject(
 		GameObject* parent,
 		const std::string& name,

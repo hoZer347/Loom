@@ -355,6 +355,66 @@ TEST_SUITE("Animator")
 		CHECK(animated.animator->GetClipNames() == std::vector<std::string>{ "Slide", "Hold" });
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "going from one clip to another plays the transition between them once on the way")
+	{
+		Animated animated;
+		animated.animator->m_clips = "Slide\t1\nHold\t0.5\nSlide to Hold\t0.25\n";
+		animated.animator->Play("Slide");
+
+		animated.animator->clip = 1;
+		animated.animator->Advance(0.1f);
+		CHECK(animated.animator->GetClipName() == "Slide to Hold");
+
+		animated.animator->Advance(0.2f);
+		CHECK(animated.animator->GetClipName() == "Hold");
+		CHECK(animated.animator->GetTime() == doctest::Approx(0.05f));
+
+		// Back the other way there is no transition.
+		animated.animator->clip = 0;
+		animated.animator->Advance(0.1f);
+		CHECK(animated.animator->GetClipName() == "Slide");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "switchAfter goes by way of transitions but never stops on one")
+	{
+		Animated animated;
+		animated.animator->m_clips = "Slide\t1\nHold\t0.5\nSlide to Hold\t0.25\n";
+		animated.animator->Play("Slide");
+		animated.animator->switchAfter = 1.0f;
+
+		animated.animator->Advance(1.1f);
+		CHECK(animated.animator->GetClipName() == "Slide to Hold");
+
+		animated.animator->Advance(0.2f);
+		CHECK(animated.animator->GetClipName() == "Hold");
+
+		animated.animator->Advance(1.0f);
+		CHECK(animated.animator->GetClipName() == "Slide");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a change of clip eases out of the pose there was over blendTime")
+	{
+		Animated animated;
+		animated.animator->blendTime = 0.5f;
+		animated.animator->Play("Slide");
+		animated.animator->Advance(0.5f);
+		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(1.0f, 0.0f, 0.0f), CLOSE)));
+
+		// Hold keeps Bone at the origin; half way through the blend, eased, it is half way there.
+		animated.animator->clip = 1;
+		animated.animator->Advance(0.25f);
+		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(0.5f, 0.0f, 0.0f), CLOSE)));
+
+		animated.animator->Advance(0.25f);
+		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(0.0f), CLOSE)));
+
+		// With no blend it cuts.
+		animated.animator->blendTime = 0.0f;
+		animated.animator->clip = 0;
+		animated.animator->Advance(0.5f);
+		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(1.0f, 0.0f, 0.0f), CLOSE)));
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "clip picks a clip by its place, the inspector offers the clips by name, and one past them plays nothing")
 	{
 		Animated animated;
