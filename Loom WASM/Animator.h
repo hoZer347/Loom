@@ -16,8 +16,8 @@ namespace Loom
 	* - Plays a model's animation clips on what is under its GameObject: a
 	*   clip moves joints, found by name, through keyed positions, rotations
 	*   and scales, and sets the weights of the Skins' shape keys
-	* - Plays the clip clip picks, from its start whenever it changes, speed
-	*   times as fast as the clock. With loop on it starts over
+	* - Plays the clip at clip's place in m_clips, from its start whenever it
+	*   changes, speed times as fast as the clock. With loop on it starts over
 	*   at its end; off, it holds its last pose
 	* - With switchAfter above 0 it moves on to the next clip, in order and
 	*   round to the first again, once the playing one has played that many
@@ -60,15 +60,15 @@ namespace Loom
 
 		std::vector<std::string> GetClipNames();
 
-		// The playing clip's name, or empty when clip is past the last.
+		// The playing clip's name, or empty when clip is none of them.
 		std::string GetClipName();
 
-		// Of the playing clip, or 0 when clip is past the last.
+		// Of the playing clip, or 0 when clip is none of them.
 		float GetDuration();
 
 		float GetTime() const { return m_time; };
 
-		// Which clip plays, by its place in m_clips. The inspector offers them by name.
+		// Which clip plays, by its place in m_clips.
 		Serial<int> clip = 0;
 		Serial<float> speed = 1.0f;
 		Serial<bool> loop = true;

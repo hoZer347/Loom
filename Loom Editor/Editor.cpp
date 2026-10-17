@@ -469,7 +469,7 @@ namespace Loom
 		};
 
 		// Whether another of the object's choices was picked, a value indexing
-		// choices. One past them shows as its number.
+		// choices. A value that is none of them shows as its number.
 		bool DrawChoiceField(const char* label, const SerializedField& field, const std::vector<std::string>& choices)
 		{
 			const long long value = IntegerOf(field);

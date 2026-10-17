@@ -365,7 +365,9 @@ namespace Loom
 
 	void Animator::OnGui()
 	{
-		if (GetClipNames().empty())
+		Parse();
+
+		if (m_parsedClips.empty())
 			return;
 
 		const float duration = GetDuration();
