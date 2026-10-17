@@ -43,6 +43,47 @@ namespace Loom
 		return lines;
 	};
 
+	const std::vector<GameObject*>& NamedObjects::Find(GameObject* root, const std::vector<std::string>& names)
+	{
+		bool gone = false;
+
+		for (size_t i = 0; i < m_guids.size() && !gone; i++)
+			gone = m_guids[i].IsValid() && LoomObject::GetByGuid<GameObject>(m_guids[i]) != m_found[i];
+
+		if (root == m_root && names == m_names && !gone)
+			return m_found;
+
+		m_root = root;
+		m_names = names;
+		m_guids.assign(names.size(), Guid());
+		m_found.assign(names.size(), nullptr);
+
+		if (root == nullptr)
+			return m_found;
+
+		const std::unordered_map<std::string, GameObject*> under = DescendantsByName(*root);
+
+		for (size_t i = 0; i < names.size(); i++)
+			if (const auto found = under.find(names[i]); found != under.end())
+			{
+				m_found[i] = found->second;
+				m_guids[i] = found->second->GetGuid();
+			};
+
+		return m_found;
+	};
+
+	const std::vector<std::string>& NameList::Of(const std::string& text)
+	{
+		if (text != m_text)
+		{
+			m_text = text;
+			m_names = SplitLines(text);
+		};
+
+		return m_names;
+	};
+
 	Skin::Skin()
 	{ };
 
@@ -59,24 +100,19 @@ namespace Loom
 
 	std::vector<glm::mat4> Skin::JointMatrices(const Mesh& mesh)
 	{
-		const std::vector<std::string> names = SplitLines(m_joints);
-		GameObject* root = skeleton;
+		const std::vector<std::string>& names = m_jointNames.Of(m_joints);
 
-		if (root == nullptr || names.empty() || m_inverseBinds->size() != names.size() * MATRIX_FLOATS)
+		if (skeleton == nullptr || names.empty() || m_inverseBinds->size() != names.size() * MATRIX_FLOATS)
 			return { };
 
-		const std::unordered_map<std::string, GameObject*> joints = DescendantsByName(*root);
+		const std::vector<GameObject*>& joints = m_jointObjects.Find(skeleton, names);
 		const glm::mat4 toMesh = glm::inverse(mesh.GetGameObject()->WorldMatrix());
 
 		std::vector<glm::mat4> matrices(names.size(), glm::mat4(1.0f));
 
 		for (size_t i = 0; i < names.size(); i++)
-		{
-			const auto found = joints.find(names[i]);
-
-			if (found != joints.end())
-				matrices[i] = toMesh * found->second->WorldMatrix() * glm::make_mat4(m_inverseBinds->data() + i * MATRIX_FLOATS);
-		};
+			if (joints[i])
+				matrices[i] = toMesh * joints[i]->WorldMatrix() * glm::make_mat4(m_inverseBinds->data() + i * MATRIX_FLOATS);
 
 		return matrices;
 	};
@@ -148,7 +184,7 @@ namespace Loom
 
 	void Skin::SetShapeWeight(const std::string& name, float weight)
 	{
-		const std::vector<std::string> names = SplitLines(m_shapes);
+		const std::vector<std::string>& names = m_shapeNames.Of(m_shapes);
 		const auto found = std::find(names.begin(), names.end(), name);
 
 		if (found == names.end())
@@ -158,17 +194,17 @@ namespace Loom
 		(*m_shapeWeights)[found - names.begin()] = weight;
 	};
 
-	float Skin::GetShapeWeight(const std::string& name) const
+	float Skin::GetShapeWeight(const std::string& name)
 	{
-		const std::vector<std::string> names = SplitLines(m_shapes);
+		const std::vector<std::string>& names = m_shapeNames.Of(m_shapes);
 		const size_t index = std::find(names.begin(), names.end(), name) - names.begin();
 
 		return index < m_shapeWeights->size() ? (*m_shapeWeights)[index] : 0.0f;
 	};
 
-	std::vector<std::string> Skin::GetShapeNames() const
+	std::vector<std::string> Skin::GetShapeNames()
 	{
-		return SplitLines(m_shapes);
+		return m_shapeNames.Of(m_shapes);
 	};
 
 	void Skin::OnGui()

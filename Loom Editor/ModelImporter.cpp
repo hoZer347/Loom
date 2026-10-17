@@ -155,10 +155,7 @@ void main()
 
 			return extensions;
 		};
-	};
 
-	namespace
-	{
 		bool HasRig(const aiScene& scene)
 		{
 			if (scene.HasAnimations())
@@ -253,7 +250,7 @@ void main()
 						: material.GetName().C_Str();
 
 					const std::filesystem::path target = folder / (stem + "." + embedded->achFormatHint);
-					std::ofstream((target), std::ios::binary).write((const char*)embedded->pcData, embedded->mWidth);
+					std::ofstream(target, std::ios::binary).write((const char*)embedded->pcData, embedded->mWidth);
 
 					return target.generic_string();
 				};
@@ -267,6 +264,17 @@ void main()
 			};
 
 			return { };
+		};
+
+		// What a clip or a shape key is called, by its place when the file gives it no name.
+		std::string ClipName(const aiAnimation& animation, unsigned int index)
+		{
+			return animation.mName.length ? animation.mName.C_Str() : "Clip " + std::to_string(index + 1);
+		};
+
+		std::string ShapeName(const aiAnimMesh& shape, unsigned int index)
+		{
+			return shape.mName.length ? shape.mName.C_Str() : "Shape " + std::to_string(index + 1);
 		};
 
 		std::string JoinLines(const std::vector<std::string>& lines)
@@ -350,7 +358,7 @@ void main()
 			{
 				const aiAnimMesh& shape = *mesh.mAnimMeshes[a];
 
-				part.shapes.push_back(shape.mName.length ? shape.mName.C_Str() : "Shape " + std::to_string(a + 1));
+				part.shapes.push_back(ShapeName(shape, a));
 
 				const size_t count = part.shapeOffsets.size();
 				part.shapeOffsets.push_back(0.0f);
@@ -531,15 +539,15 @@ void main()
 			std::vector<std::string> names;
 
 			for (unsigned int a = 0; found && a < found->mNumAnimMeshes; a++)
-				names.push_back(found->mAnimMeshes[a]->mName.C_Str());
+				names.push_back(ShapeName(*found->mAnimMeshes[a], a));
 
 			return names;
 		};
 
 		// Every clip's channels into an Animator. A channel that holds its rest
-		// value in every clip is left out; one that moves in any clip is kept in
-		// all of them, so a clip that holds it still puts it back after one that
-		// moved it.
+		// value in every clip is left out; one that moves in any clip is in all
+		// of them, a clip without it holding it at rest, so switching clips
+		// never leaves it where the last one moved it.
 		void AttachAnimator(const aiScene& scene, GameObject& model)
 		{
 			std::vector<Track> tracks;
@@ -550,7 +558,7 @@ void main()
 			{
 				const aiAnimation& animation = *scene.mAnimations[a];
 				const double ticks = animation.mTicksPerSecond > 0.0 ? animation.mTicksPerSecond : 1.0;
-				const std::string name = animation.mName.length ? animation.mName.C_Str() : "Clip " + std::to_string(a + 1);
+				const std::string name = ClipName(animation, a);
 
 				clips += name + '\t' + std::to_string(animation.mDuration / ticks) + '\n';
 
@@ -627,6 +635,22 @@ void main()
 				if (!HoldsRest(track, rests[{ track.target, track.property }]))
 					moving.insert({ track.target, track.property });
 
+			for (unsigned int a = 0; a < scene.mNumAnimations; a++)
+				for (const auto& [target, property] : moving)
+				{
+					const bool keyed = std::any_of(
+						tracks.begin(),
+						tracks.end(),
+						[&](const Track& track) { return track.clip == a && track.target == target && track.property == property; });
+
+					if (keyed)
+						continue;
+
+					Track& held = tracks.emplace_back(Track{ a, property, target });
+					held.keys.push_back(0.0f);
+					held.keys.insert(held.keys.end(), rests[{ target, property }].begin(), rests[{ target, property }].end());
+				};
+
 			std::string channels;
 			std::vector<float> keys;
 
@@ -647,7 +671,7 @@ void main()
 			animator->m_clips = clips;
 			animator->m_channels = channels;
 			animator->m_keys = std::move(keys);
-			animator->clip = scene.mAnimations[0]->mName.C_Str();
+			animator->clip = ClipName(*scene.mAnimations[0], 0);
 		};
 
 		GameObject* ImportRigged(const aiScene& scene, const std::string& path, GameObject& parent)
@@ -679,6 +703,52 @@ void main()
 
 			return model;
 		};
+
+		// The scene's triangles, each mesh with its node's transform applied,
+		// centred and scaled to span model_fit_extent. Empty, with why logged,
+		// when there are none.
+		std::vector<ModelPart> PartsOf(const aiScene& scene, const std::string& path)
+		{
+			std::vector<ModelPart> parts;
+			Collect(scene, *scene.mRootNode, aiMatrix4x4(), parts);
+
+			if (parts.empty())
+			{
+				std::cerr << "Import: " << path << " has no triangles" << std::endl;
+				return { };
+			};
+
+			constexpr float infinity = std::numeric_limits<float>::infinity();
+
+			float low[model_floats_per_vertex] = { infinity, infinity, infinity };
+			float high[model_floats_per_vertex] = { -infinity, -infinity, -infinity };
+
+			for (const ModelPart& part : parts)
+				for (size_t i = 0; i < part.vertices.size(); i++)
+				{
+					const size_t axis = i % model_floats_per_vertex;
+
+					low[axis] = std::min(low[axis], part.vertices[i]);
+					high[axis] = std::max(high[axis], part.vertices[i]);
+				};
+
+			float centre[model_floats_per_vertex];
+			float longest = 0.0f;
+
+			for (size_t axis = 0; axis < model_floats_per_vertex; axis++)
+			{
+				centre[axis] = std::midpoint(low[axis], high[axis]);
+				longest = std::max(longest, high[axis] - low[axis]);
+			};
+
+			const float scale = longest > 0.0f ? model_fit_extent / longest : 1.0f;
+
+			for (ModelPart& part : parts)
+				for (size_t i = 0; i < part.vertices.size(); i++)
+					part.vertices[i] = (part.vertices[i] - centre[i % model_floats_per_vertex]) * scale;
+
+			return parts;
+		};
 	};
 
 	bool IsModelFile(const std::string& path)
@@ -706,58 +776,25 @@ void main()
 			return { };
 		};
 
-		std::vector<ModelPart> parts;
-		Collect(*scene, *scene->mRootNode, aiMatrix4x4(), parts);
-
-		if (parts.empty())
-		{
-			std::cerr << "Import: " << path << " has no triangles" << std::endl;
-			return { };
-		};
-
-		constexpr float infinity = std::numeric_limits<float>::infinity();
-
-		float low[model_floats_per_vertex] = { infinity, infinity, infinity };
-		float high[model_floats_per_vertex] = { -infinity, -infinity, -infinity };
-
-		for (const ModelPart& part : parts)
-			for (size_t i = 0; i < part.vertices.size(); i++)
-			{
-				const size_t axis = i % model_floats_per_vertex;
-
-				low[axis] = std::min(low[axis], part.vertices[i]);
-				high[axis] = std::max(high[axis], part.vertices[i]);
-			};
-
-		float centre[model_floats_per_vertex];
-		float longest = 0.0f;
-
-		for (size_t axis = 0; axis < model_floats_per_vertex; axis++)
-		{
-			centre[axis] = std::midpoint(low[axis], high[axis]);
-			longest = std::max(longest, high[axis] - low[axis]);
-		};
-
-		const float scale = longest > 0.0f ? model_fit_extent / longest : 1.0f;
-
-		for (ModelPart& part : parts)
-			for (size_t i = 0; i < part.vertices.size(); i++)
-				part.vertices[i] = (part.vertices[i] - centre[i % model_floats_per_vertex]) * scale;
-
-		return parts;
+		return PartsOf(*scene, path);
 	};
 
 	GameObject* ImportModel(const std::string& path, GameObject& parent)
 	{
-		{
-			Assimp::Importer importer;
-			const aiScene* scene = importer.ReadFile(path.c_str(), rigged_import_flags);
+		Assimp::Importer importer;
 
-			if (scene && scene->mRootNode && HasRig(*scene))
-				return ImportRigged(*scene, path, parent);
+		const aiScene* scene = importer.ReadFile(path.c_str(), rigged_import_flags);
+
+		if (scene == nullptr || scene->mRootNode == nullptr)
+		{
+			std::cerr << "Import: " << path << ": " << importer.GetErrorString() << std::endl;
+			return nullptr;
 		};
 
-		std::vector<ModelPart> parts = LoadModel(path);
+		if (HasRig(*scene))
+			return ImportRigged(*scene, path, parent);
+
+		std::vector<ModelPart> parts = PartsOf(*scene, path);
 
 		if (parts.empty())
 			return nullptr;

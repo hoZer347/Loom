@@ -440,8 +440,10 @@ namespace Loom
 			glActiveTexture(GL_TEXTURE0);
 
 			// A sampler object overrides all of a texture's sampling, a shadow
-			// map's comparison included, so targets keep their own.
-			const bool nearest = m_pixelated.contains(program) && !m_targets.contains(texture);
+			// map's comparison included, so shadow maps keep their own.
+			const auto target = m_targets.find(texture);
+			const bool shadow = target != m_targets.end() && target->second.compare;
+			const bool nearest = m_pixelated.contains(program) && !shadow;
 			glBindSampler(found->second, nearest ? m_nearest : 0);
 
 			glUniform1i(glGetUniformLocation(program, name), found->second);
@@ -502,6 +504,7 @@ namespace Loom
 			const GLuint previous = BoundFramebuffer();
 			const GLuint bound = BoundTexture();
 			Target target;
+			target.compare = true;
 
 			glGenTextures(1, &target.texture);
 			glBindTexture(GL_TEXTURE_2D, target.texture);
@@ -661,6 +664,9 @@ namespace Loom
 			GLuint texture = 0;
 			GLuint framebuffer = 0;
 			GLuint depth = 0;
+
+			// A shadow map, sampled by comparing.
+			bool compare = false;
 			GLsizei width = 0;
 			GLsizei height = 0;
 		};

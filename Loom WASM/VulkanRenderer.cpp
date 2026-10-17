@@ -2055,9 +2055,6 @@ namespace Loom
 		VkQueue m_queue = VK_NULL_HANDLE;
 
 		PFN_vkCmdPushDescriptorSetKHR m_pushDescriptorSet = nullptr;
-
-		// What a pixelated program samples its colour textures through.
-		VkSampler m_nearestSampler = VK_NULL_HANDLE;
 		PFN_vkCmdBeginRendering m_beginRendering = nullptr;
 		PFN_vkCmdEndRendering m_endRendering = nullptr;
 
@@ -2108,6 +2105,9 @@ namespace Loom
 
 		uint32_t m_nextHandle = 1;
 		std::unordered_map<uint32_t, Program> m_programs;
+
+		// What a pixelated program samples its colour textures through.
+		VkSampler m_nearestSampler = VK_NULL_HANDLE;
 		std::unordered_map<uint32_t, Texture> m_textures;
 		uint32_t m_fallbackColor = 0;
 		uint32_t m_fallbackDepth = 0;

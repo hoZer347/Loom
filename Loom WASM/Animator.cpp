@@ -60,14 +60,16 @@ namespace Loom
 
 	void Animator::Parse()
 	{
-		const std::string from = *m_clips + '\0' + *m_channels + '\0' + std::to_string(m_keys->size());
-
-		if (from == m_parsedFrom)
+		if (*m_clips == m_parsedClipText && *m_channels == m_parsedChannelText && m_keys->size() == m_parsedKeys)
 			return;
 
-		m_parsedFrom = from;
+		m_parsedClipText = m_clips;
+		m_parsedChannelText = m_channels;
+		m_parsedKeys = m_keys->size();
 		m_parsedClips.clear();
 		m_parsedChannels.clear();
+		m_jointNames.clear();
+		m_skinsGathered = false;
 
 		for (const std::string& line : SplitLines(m_clips))
 		{
@@ -106,6 +108,14 @@ namespace Loom
 
 			if (at > keys.size())
 				break;
+
+			if (channel.property != Property::Weight)
+			{
+				channel.joint = std::find(m_jointNames.begin(), m_jointNames.end(), channel.target) - m_jointNames.begin();
+
+				if (channel.joint == m_jointNames.size())
+					m_jointNames.push_back(channel.target);
+			};
 
 			m_parsedChannels.push_back(channel);
 		};
@@ -169,6 +179,26 @@ namespace Loom
 			[&](const Clip& each) { return each.name == m_playing; }) - m_parsedClips.begin();
 	};
 
+	const std::vector<Skin*>& Animator::Skins()
+	{
+		for (size_t i = 0; i < m_skins.size() && m_skinsGathered; i++)
+			m_skinsGathered = LoomObject::GetByGuid<Skin>(m_skinGuids[i]) == m_skins[i];
+
+		if (m_skinsGathered)
+			return m_skins;
+
+		m_skins.clear();
+		m_skinGuids.clear();
+		CollectSkins(*m_gameObject, m_skins);
+
+		for (const Skin* skin : m_skins)
+			m_skinGuids.push_back(skin->GetGuid());
+
+		m_skinsGathered = true;
+
+		return m_skins;
+	};
+
 	bool Animator::Play(const std::string& name)
 	{
 		Parse();
@@ -214,10 +244,8 @@ namespace Loom
 			time -= duration * std::floor(time / duration);
 		else time = std::clamp(time, 0.0f, duration);
 
-		const std::unordered_map<std::string, GameObject*> joints = DescendantsByName(*m_gameObject);
-
-		std::vector<Skin*> skins;
-		CollectSkins(*m_gameObject, skins);
+		const std::vector<GameObject*>& joints = m_joints.Find(m_gameObject, m_jointNames);
+		const std::vector<Skin*>& skins = Skins();
 
 		for (const Channel& channel : m_parsedChannels)
 		{
@@ -237,12 +265,12 @@ namespace Loom
 				continue;
 			};
 
-			const auto found = joints.find(channel.target);
+			GameObject* joint = joints[channel.joint];
 
-			if (found == joints.end())
+			if (joint == nullptr)
 				continue;
 
-			Transform& transform = found->second->transform;
+			Transform& transform = joint->transform;
 
 			switch (channel.property)
 			{

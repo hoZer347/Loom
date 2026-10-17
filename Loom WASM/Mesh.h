@@ -80,6 +80,10 @@ namespace Loom
 		std::vector<float> m_deformed;
 
 	private:
+		// The frame m_deformed was bent for, so the passes after the first in
+		// a frame draw what it bent.
+		unsigned long long m_deformedFrame = 0;
+
 		// Positions and texture coordinates side by side, as the renderer takes
 		// them, rebuilt for every draw.
 		std::vector<float> m_interleaved;

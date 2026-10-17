@@ -9,6 +9,7 @@
 #include "GameObject.h"
 #include "Light.h"
 #include "Skin.h"
+#include "Utilities/Clock.h"
 
 #include <algorithm>
 #include <iostream>
@@ -105,7 +106,14 @@ namespace Loom
 		constexpr size_t UV_COMPONENTS = 2;
 
 		if (Skin* skin = m_gameObject->GetComponent<Skin>())
-			skin->Deform(*this);
+		{
+			if (m_deformed.size() != m_vertices->size() || m_deformedFrame != Time::FrameCount())
+			{
+				skin->Deform(*this);
+				m_deformedFrame = Time::FrameCount();
+			};
+		}
+		else m_deformed.clear();
 
 		const std::vector<float>& positions = m_deformed.size() == m_vertices->size() ? m_deformed : *m_vertices;
 		const size_t count = positions.size() / POSITION_COMPONENTS;

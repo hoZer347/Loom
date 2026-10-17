@@ -2643,7 +2643,7 @@ namespace Loom
 			{
 				std::string& text = *(std::string*)field.data;
 
-				// A list a line, such as a skin's joint names: worth seeing the
+				// One name a line, such as a skin's joints: worth seeing the
 				// length of, not worth one box that cannot show its lines.
 				if (text.find('\n') != std::string::npos)
 				{

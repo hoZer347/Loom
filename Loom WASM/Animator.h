@@ -3,6 +3,7 @@
 #include "Loom API.h"
 
 #include "Component.h"
+#include "Skin.h"
 
 #include <string>
 #include <vector>
@@ -82,6 +83,9 @@ namespace Loom
 			Property property = Property::Translation;
 			std::string target;
 
+			// Its joint's place in m_jointNames, for all but a weight.
+			size_t joint = 0;
+
 			// Where its first key's time is in m_keys, and how many keys follow.
 			size_t first = 0;
 			size_t keys = 0;
@@ -96,9 +100,24 @@ namespace Loom
 		// The playing clip's index, or the clip count when none plays.
 		size_t PlayingIndex() const;
 
+		// The Skins under it, gathered again once one of them is gone.
+		const std::vector<Skin*>& Skins();
+
 		std::vector<Clip> m_parsedClips;
 		std::vector<Channel> m_parsedChannels;
-		std::string m_parsedFrom;
+
+		// What was parsed, to tell when it has changed.
+		std::string m_parsedClipText;
+		std::string m_parsedChannelText;
+		size_t m_parsedKeys = 0;
+
+		// The joints the channels move, each once.
+		std::vector<std::string> m_jointNames;
+		NamedObjects m_joints;
+
+		std::vector<Skin*> m_skins;
+		std::vector<Guid> m_skinGuids;
+		bool m_skinsGathered = false;
 
 		// The clip m_time counts from the start of.
 		std::string m_playing;

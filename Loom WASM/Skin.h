@@ -3,6 +3,7 @@
 #include "Loom API.h"
 
 #include "Component.h"
+#include "Guid.h"
 
 #include "glm/glm.hpp"
 
@@ -20,6 +21,36 @@ namespace Loom
 
 	// One name a line, as Skin and Animator keep their lists of names.
 	LOOM_API std::vector<std::string> SplitLines(const std::string& text);
+
+	/**
+	* Loom::NamedObjects
+	* - The GameObjects called by a list of names under a root, remembered by
+	*   guid, so finding them again is a lookup rather than a walk of the
+	*   hierarchy and one destroyed since is noticed rather than read
+	* - Walks the hierarchy again when the root or the names change, or one it
+	*   found is gone
+	*/
+	struct LOOM_API NamedObjects final
+	{
+		// The objects in the order of names, null for a name nothing under root has.
+		const std::vector<GameObject*>& Find(GameObject* root, const std::vector<std::string>& names);
+
+	private:
+		GameObject* m_root = nullptr;
+		std::vector<std::string> m_names;
+		std::vector<Guid> m_guids;
+		std::vector<GameObject*> m_found;
+	};
+
+	// A list of names kept as one name a line, split again only when the text changes.
+	struct LOOM_API NameList final
+	{
+		const std::vector<std::string>& Of(const std::string& text);
+
+	private:
+		std::string m_text;
+		std::vector<std::string> m_names;
+	};
 
 	/**
 	* Loom::Skin
@@ -57,9 +88,9 @@ namespace Loom
 		void SetShapeWeight(const std::string& name, float weight);
 
 		// 0 for a name the skin has no key for.
-		float GetShapeWeight(const std::string& name) const;
+		float GetShapeWeight(const std::string& name);
 
-		std::vector<std::string> GetShapeNames() const;
+		std::vector<std::string> GetShapeNames();
 
 		// A slider for each shape key.
 		void OnGui() override;
@@ -94,5 +125,9 @@ namespace Loom
 
 		// From the mesh's space, bent by each joint as it now is.
 		std::vector<glm::mat4> JointMatrices(const Mesh& mesh);
+
+		NameList m_jointNames;
+		NameList m_shapeNames;
+		NamedObjects m_jointObjects;
 	};
 };

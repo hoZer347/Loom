@@ -20,6 +20,7 @@ using LoomTests::RecordingRenderer;
 namespace
 {
 	constexpr float CLOSE = 1e-4f;
+	constexpr size_t POSITION_FLOATS = 3;
 	constexpr float QUARTER_TURN = 90.0f;
 	constexpr float EIGHTH_TURN = 45.0f;
 
@@ -47,13 +48,14 @@ namespace
 	{
 		Loom::Scene scene{ "rig" };
 		Loom::GameObject* bone = nullptr;
+		Loom::GameObject* body = nullptr;
 		Loom::Mesh* mesh = nullptr;
 		Loom::Skin* skin = nullptr;
 
 		Rig()
 		{
 			bone = scene.GetRoot().AddChild("Bone");
-			Loom::GameObject* body = scene.GetRoot().AddChild("Body");
+			body = scene.GetRoot().AddChild("Body");
 			mesh = body->Attach<Loom::Mesh>(Loom::Mesh::Triangles);
 			skin = body->Attach<Loom::Skin>();
 			Pump();
@@ -67,7 +69,7 @@ namespace
 		{
 			skin->Deform(*mesh);
 
-			return glm::make_vec3(mesh->m_deformed.data() + vertex * 3);
+			return glm::make_vec3(mesh->m_deformed.data() + vertex * POSITION_FLOATS);
 		};
 	};
 };
@@ -153,6 +155,44 @@ TEST_SUITE("Skin")
 		CHECK(rig.skin->GetShapeWeight("Frown") == 0.0f);
 		CHECK(glm::all(glm::epsilonEqual(rig.Bent(1), glm::vec3(1.0f, 1.0f, 0.0f), CLOSE)));
 		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(0.0f), CLOSE)));
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh whose Skin is taken off draws its own vertices again")
+	{
+		RecordingRenderer renderer;
+
+		Rig rig;
+		rig.mesh->m_vertices = { 0.0f, 1.0f, 0.0f };
+		rig.skin->m_influences = Bound({ 0.0f });
+		rig.bone->transform.position = glm::vec3(2.0f, 0.0f, 0.0f);
+
+		rig.mesh->Draw(1);
+		CHECK(renderer.lastVertices == std::vector<float>{ 2.0f, 1.0f, 0.0f });
+
+		rig.body->DetachComponent(rig.skin);
+		Pump();
+
+		rig.mesh->Draw(1);
+		CHECK(renderer.lastVertices == *rig.mesh->m_vertices);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a joint destroyed and made again under the same name is found again")
+	{
+		Rig rig;
+		rig.mesh->m_vertices = { 0.0f, 1.0f, 0.0f };
+		rig.skin->m_influences = Bound({ 0.0f });
+		rig.bone->transform.position = glm::vec3(2.0f, 0.0f, 0.0f);
+
+		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(2.0f, 1.0f, 0.0f), CLOSE)));
+
+		rig.bone->Destroy();
+		Pump();
+
+		Loom::GameObject* again = rig.scene.GetRoot().AddChild("Bone");
+		Pump();
+		again->transform.position = glm::vec3(-1.0f, 0.0f, 0.0f);
+
+		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(-1.0f, 1.0f, 0.0f), CLOSE)));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the mesh's own vertices are never changed by bending")
