@@ -1,6 +1,7 @@
 #include "ScriptFolders.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstring>
 #include <fstream>
 
@@ -19,7 +20,10 @@ namespace Loom
 
 		bool Alphabetical(const std::string& a, const std::string& b)
 		{
-			return _stricmp(a.c_str(), b.c_str()) < 0;
+			return std::ranges::lexicographical_compare(
+				a,
+				b,
+				[](unsigned char x, unsigned char y) { return std::tolower(x) < std::tolower(y); });
 		};
 
 		// The child of node called name, made if it is not there.
