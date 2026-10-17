@@ -408,11 +408,83 @@ TEST_SUITE("Animator")
 		animated.animator->Advance(0.25f);
 		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(0.0f), CLOSE)));
 
-		// With no blend it cuts.
+		// With no blend it cuts straight to Slide's pose a tenth of a second in.
 		animated.animator->blendTime = 0.0f;
 		animated.animator->clip = 0;
+		animated.animator->Advance(0.1f);
+		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(0.2f, 0.0f, 0.0f), CLOSE)));
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "asking for the same clip every frame lets the transition into it play out")
+	{
+		Animated animated;
+		animated.animator->m_clips = "Slide\t1\nHold\t0.5\nSlide to Hold\t0.25\n";
+		animated.animator->Play("Slide");
+
+		animated.animator->clip = 1;
+		animated.animator->Advance(0.1f);
+		animated.animator->clip = 1;
+		animated.animator->Advance(0.1f);
+		CHECK(animated.animator->GetClipName() == "Slide to Hold");
+		CHECK(*animated.animator->clip == 1);
+
+		animated.animator->clip = 1;
+		animated.animator->Advance(0.1f);
+		CHECK(animated.animator->GetClipName() == "Hold");
+		CHECK(animated.animator->GetTime() == doctest::Approx(0.05f));
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a name with \" to \" in it is a transition only when both halves name clips")
+	{
+		Animated animated;
+		animated.animator->m_clips = "Slide\t1\nRun to Cover\t0.5\n";
+		animated.animator->Play("Slide");
+		animated.animator->switchAfter = 1.0f;
+
+		// switchAfter stops on it like any clip rather than passing over it.
+		animated.animator->Advance(1.1f);
+		CHECK(animated.animator->GetClipName() == "Run to Cover");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Rotation turns Euler degrees back into the rotation they came from")
+	{
+		const glm::quat rotation = glm::angleAxis(0.7f, glm::normalize(glm::vec3(1.0f, 2.0f, 3.0f)));
+		const glm::quat back = Loom::Transform::Rotation(Loom::Transform::EulerDegrees(rotation));
+
+		CHECK(std::abs(glm::dot(rotation, back)) == doctest::Approx(1.0f));
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "rotations and shape weights ease too, and Pose stays exact while they do")
+	{
+		Animated animated;
+		const glm::quat turned = glm::angleAxis(glm::radians(QUARTER_TURN), glm::vec3(0.0f, 1.0f, 0.0f));
+
+		// Two still clips: A unturned with Smile open, B a quarter turn with Smile shut.
+		animated.animator->m_clips = "A\t1\nB\t1\n";
+		animated.animator->m_channels =
+			"0\trotation\tBone\n"
+			"0\tweight\tSmile\n"
+			"1\trotation\tBone\n"
+			"1\tweight\tSmile\n";
+		animated.animator->m_keys =
+		{
+			1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+			1.0f, 0.0f, 0.0f,
+			1.0f, 0.0f, turned.x, turned.y, turned.z, turned.w,
+			1.0f, 0.0f, 1.0f,
+		};
+		animated.animator->blendTime = 0.5f;
+		animated.animator->Play("A");
 		animated.animator->Advance(0.5f);
-		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(1.0f, 0.0f, 0.0f), CLOSE)));
+
+		animated.animator->clip = 1;
+		animated.animator->Advance(0.25f);
+		CHECK(animated.rig.bone->transform.rotation->y == doctest::Approx(EIGHTH_TURN));
+		CHECK(animated.rig.skin->GetShapeWeight("Smile") == doctest::Approx(0.5f));
+
+		animated.animator->Pose(0.0f);
+		CHECK(animated.rig.bone->transform.rotation->y == doctest::Approx(QUARTER_TURN));
+		CHECK(animated.rig.skin->GetShapeWeight("Smile") == doctest::Approx(1.0f));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "clip picks a clip by its place, the inspector offers the clips by name, and one past them plays nothing")

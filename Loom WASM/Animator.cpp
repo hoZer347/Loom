@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <sstream>
 
 
@@ -81,6 +82,31 @@ namespace Loom
 			std::getline(fields, parsed.name, '\t');
 			fields >> parsed.duration;
 		};
+
+		// A transition's name is two other clips' names joined; any other name
+		// with the join in it is just a name.
+		const auto named = [&](const std::string& name)
+		{
+			for (size_t i = 0; i < m_parsedClips.size(); i++)
+				if (m_parsedClips[i].name == name)
+					return (int)i;
+
+			return -1;
+		};
+
+		for (Clip& each : m_parsedClips)
+			for (size_t join = each.name.find(TRANSITION_JOIN); join != std::string::npos; join = each.name.find(TRANSITION_JOIN, join + 1))
+			{
+				const int from = named(each.name.substr(0, join));
+				const int to = named(each.name.substr(join + std::strlen(TRANSITION_JOIN)));
+
+				if (from >= 0 && to >= 0)
+				{
+					each.from = from;
+					each.to = to;
+					break;
+				};
+			};
 
 		const std::vector<float>& keys = *m_keys;
 		size_t at = 0;
@@ -176,7 +202,9 @@ namespace Loom
 
 	size_t Animator::PlayingIndex() const
 	{
-		return clip >= 0 && (size_t)clip < m_parsedClips.size() ? (size_t)clip : m_parsedClips.size();
+		const int playing = m_after >= 0 ? m_playing : *clip;
+
+		return playing >= 0 && (size_t)playing < m_parsedClips.size() ? (size_t)playing : m_parsedClips.size();
 	};
 
 	const std::vector<Skin*>& Animator::Skins()
@@ -223,20 +251,19 @@ namespace Loom
 	{
 		Parse();
 
-		if (*clip != m_playing)
+		if (*clip != (m_after >= 0 ? m_after : m_playing))
 			Start(clip);
 
 		m_time += seconds * speed;
-		m_blendLeft = std::max(0.0f, m_blendLeft - seconds * speed);
+		m_blendLeft = std::max(0.0f, m_blendLeft - seconds * std::abs(speed));
 
 		if (m_after >= 0 && m_time >= GetDuration())
 		{
-			// A transition carries on into its clip once, from where it ended.
-			const float over = m_time - GetDuration();
-			const int after = m_after;
-
-			Start(after);
-			m_time = over;
+			// A transition ends where its clip begins, so it carries on into it
+			// with no easing of its own.
+			m_time -= GetDuration();
+			m_playing = m_after;
+			m_after = -1;
 		}
 		else if (m_after < 0 && switchAfter > 0.0f && m_time >= PlayFor())
 		{
@@ -260,23 +287,19 @@ namespace Loom
 
 	bool Animator::IsTransition(size_t index) const
 	{
-		return m_parsedClips[index].name.find(TRANSITION_JOIN) != std::string::npos;
+		return m_parsedClips[index].from >= 0;
 	};
 
 	int Animator::TransitionBetween(int from, int to)
 	{
 		Parse();
 
-		const int count = (int)m_parsedClips.size();
-
-		if (from < 0 || from >= count || to < 0 || to >= count)
+		if (from < 0 || to < 0)
 			return -1;
 
-		const std::string name = m_parsedClips[from].name + TRANSITION_JOIN + m_parsedClips[to].name;
-
-		for (int i = 0; i < count; i++)
-			if (m_parsedClips[i].name == name)
-				return i;
+		for (size_t i = 0; i < m_parsedClips.size(); i++)
+			if (m_parsedClips[i].from == from && m_parsedClips[i].to == to)
+				return (int)i;
 
 		return -1;
 	};
@@ -307,8 +330,8 @@ namespace Loom
 		const int via = m_after < 0 ? TransitionBetween(m_playing, index) : -1;
 
 		m_after = via >= 0 ? index : -1;
-		clip = via >= 0 ? via : index;
-		m_playing = clip;
+		m_playing = via >= 0 ? via : index;
+		clip = index;
 		m_time = 0.0f;
 	};
 
@@ -330,13 +353,14 @@ namespace Loom
 				m_heldJoints[i] = { *transform.position, Transform::Rotation(*transform.rotation), *transform.scale };
 			};
 
-		m_heldWeights.clear();
 		const std::vector<Skin*>& skins = Skins();
 
+		m_heldWeights.assign(m_parsedChannels.size(), 0.0f);
+
 		if (!skins.empty())
-			for (const Channel& channel : m_parsedChannels)
-				if (channel.property == Property::Weight && channel.clip == (size_t)m_playing)
-					m_heldWeights.emplace_back(channel.target, skins.front()->GetShapeWeight(channel.target));
+			for (size_t i = 0; i < m_parsedChannels.size(); i++)
+				if (m_parsedChannels[i].property == Property::Weight)
+					m_heldWeights[i] = skins.front()->GetShapeWeight(m_parsedChannels[i].target);
 
 		m_blendLeft = blendTime;
 		m_blendFor = blendTime;
@@ -368,12 +392,14 @@ namespace Loom
 		const std::vector<Skin*>& skins = Skins();
 
 		// How far out of the held pose, eased in and out.
-		const bool blending = blend && m_blendLeft > 0.0f && m_heldJoints.size() == joints.size();
-		const float along = blending ? 1.0f - m_blendLeft / m_blendFor : 1.0f;
-		const float eased = along * along * (3.0f - 2.0f * along);
+		const bool blending = blend && m_blendLeft > 0.0f &&
+			m_heldJoints.size() == joints.size() && m_heldWeights.size() == m_parsedChannels.size();
+		const float eased = blending ? glm::smoothstep(0.0f, 1.0f, 1.0f - m_blendLeft / m_blendFor) : 1.0f;
 
-		for (const Channel& channel : m_parsedChannels)
+		for (size_t i = 0; i < m_parsedChannels.size(); i++)
 		{
+			const Channel& channel = m_parsedChannels[i];
+
 			if (channel.clip != playing)
 				continue;
 
@@ -384,12 +410,7 @@ namespace Loom
 
 			if (channel.property == Property::Weight)
 			{
-				float weight = value[0];
-
-				if (blending)
-					for (const auto& [name, held] : m_heldWeights)
-						if (name == channel.target)
-							weight = held + (weight - held) * eased;
+				const float weight = blending ? glm::mix(m_heldWeights[i], value[0], eased) : value[0];
 
 				for (Skin* skin : skins)
 					skin->SetShapeWeight(channel.target, weight);

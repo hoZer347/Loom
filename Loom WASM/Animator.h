@@ -62,7 +62,8 @@ namespace Loom
 		bool Play(int index);
 
 		// Puts the playing clip's pose at time seconds into it on the joints and
-		// Skins, wrapped or held by loop, without moving the clock.
+		// Skins, wrapped or held by loop, a transition always held, without
+		// moving the clock or easing out of an earlier pose.
 		void Pose(float time);
 
 		std::vector<std::string> GetClipNames();
@@ -75,7 +76,8 @@ namespace Loom
 
 		float GetTime() const { return m_time; };
 
-		// Which clip plays, by its place in m_clips.
+		// Which clip plays, by its place in m_clips. While a transition into it
+		// plays, it already names the clip the transition leads to.
 		Serial<int> clip = 0;
 		Serial<float> speed = 1.0f;
 		Serial<bool> loop = true;
@@ -104,6 +106,10 @@ namespace Loom
 		{
 			std::string name;
 			float duration = 0.0f;
+
+			// For a transition, the clips it goes from and to; -1 otherwise.
+			int from = -1;
+			int to = -1;
 		};
 
 		struct Channel
@@ -126,7 +132,8 @@ namespace Loom
 		// The value of a channel at time, its keys either side blended.
 		std::vector<float> Sample(const Channel& channel, float time) const;
 
-		// clip, or the clip count when it is none of them.
+		// The playing clip's index: the transition while one plays, otherwise
+		// clip. The clip count when that is none of them.
 		size_t PlayingIndex() const;
 
 		// Starts playing the clip at index from its beginning, easing out of the
@@ -178,6 +185,7 @@ namespace Loom
 		float m_time = 0.0f;
 
 		// The clip the playing transition leads into, or -1 when it is not one.
+		// While one plays, clip already names where it leads.
 		int m_after = -1;
 
 		struct Held
@@ -187,10 +195,11 @@ namespace Loom
 			glm::vec3 scale{ 1.0f };
 		};
 
-		// Where each of m_jointNames was, and each shape key's weight by name,
-		// when the clip last changed, and how much of blendTime is left.
+		// Where each of m_jointNames was, and the weight of each weight
+		// channel's shape key, when the clip last changed, and how much of
+		// blendTime is left.
 		std::vector<Held> m_heldJoints;
-		std::vector<std::pair<std::string, float>> m_heldWeights;
+		std::vector<float> m_heldWeights;
 		float m_blendLeft = 0.0f;
 		float m_blendFor = 0.0f;
 	};
