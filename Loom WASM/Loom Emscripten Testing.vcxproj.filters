@@ -52,6 +52,12 @@
     <ClCompile Include="Mesh.cpp">
       <Filter>Mesh</Filter>
     </ClCompile>
+    <ClCompile Include="Skin.cpp">
+      <Filter>Mesh</Filter>
+    </ClCompile>
+    <ClCompile Include="Animator.cpp">
+      <Filter>Mesh</Filter>
+    </ClCompile>
     <ClCompile Include="Renderer.cpp">
       <Filter>Renderer</Filter>
     </ClCompile>
@@ -289,6 +295,12 @@
       <Filter>LoomObject</Filter>
     </ClInclude>
     <ClInclude Include="Mesh.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="Skin.h">
+      <Filter>Mesh</Filter>
+    </ClInclude>
+    <ClInclude Include="Animator.h">
       <Filter>Mesh</Filter>
     </ClInclude>
     <ClInclude Include="Renderer.h">

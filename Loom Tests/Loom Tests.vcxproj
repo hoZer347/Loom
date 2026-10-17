@@ -128,6 +128,7 @@
     <ClCompile Include="Sprite Tests.cpp" />
     <ClCompile Include="SelectionOutline Tests.cpp" />
     <ClCompile Include="Mesh Tests.cpp" />
+    <ClCompile Include="Animation Tests.cpp" />
     <ClCompile Include="Material Tests.cpp" />
     <ClCompile Include="Shader Variables Tests.cpp" />
     <ClCompile Include="Shaders Tests.cpp" />

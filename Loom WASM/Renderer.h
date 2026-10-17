@@ -20,6 +20,13 @@ namespace Loom
 {
 	enum class Backend { OpenGL, Vulkan };
 
+	// What each vertex handed to Renderer::Draw holds, its floats one after
+	// another: a position at location 0 (aPos), and with PositionUV a texture
+	// coordinate after it at location 1 (aUV).
+	enum class VertexFormat { Position, PositionUV };
+
+	LOOM_API size_t FloatsPerVertex(VertexFormat format);
+
 	/**
 	* Loom::Renderer
 	* - The graphics API behind everything the engine draws, picked once when
@@ -87,9 +94,22 @@ namespace Loom
 		virtual void SetUniform(uint32_t program, const char* name, UniformType type, const void* components) = 0;
 		virtual void SetTexture(uint32_t program, const char* name, uint32_t texture) = 0;
 
-		// Draws positions, three floats a vertex, as the GL primitive given
-		// (GL_TRIANGLES and the rest). usage is the GL buffer usage hint.
-		virtual void Draw(uint32_t program, uint32_t primitive, const float* positions, size_t vertices, uint32_t usage) = 0;
+		// Draws vertices laid out as format says as the GL primitive given
+		// (GL_TRIANGLES and the rest). usage is the GL buffer usage hint. A
+		// program that reads aUV from vertices without one reads the position's
+		// x and y.
+		virtual void Draw(
+			uint32_t program,
+			uint32_t primitive,
+			const float* vertices,
+			size_t count,
+			uint32_t usage,
+			VertexFormat format = VertexFormat::Position) = 0;
+
+		// Whether the program samples its colour textures nearest, so each texel
+		// draws as a hard-edged square, rather than blending between them. Off
+		// until it is set.
+		virtual void SetPixelated(uint32_t program, bool pixelated) = 0;
 
 		// Eight bit RGBA, bottom row first.
 		virtual uint32_t CreateTexture(int width, int height, const uint8_t* rgba) = 0;

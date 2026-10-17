@@ -46,6 +46,11 @@ namespace Loom
 		// Drawn after everything opaque, farthest first, each depth before
 		// colour, so what is behind it shows through wherever its alpha is under 1.
 		bool transparency = false;
+
+		// Its colour textures are sampled nearest, so each texel draws as a
+		// hard-edged square however close it is, the way pixel art and
+		// PS1-era models want.
+		bool pixelated = false;
 	};
 
 	// A name the engine gives a shader: a uniform Material, Mesh, Camera or

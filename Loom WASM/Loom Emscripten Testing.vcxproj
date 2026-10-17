@@ -122,6 +122,8 @@
     <ClCompile Include="LoomObject.cpp" />
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="Skin.cpp" />
+    <ClCompile Include="Animator.cpp" />
     <ClCompile Include="OpenGLRenderer.cpp" />
     <ClCompile Include="Physics.cpp" />
     <ClCompile Include="Renderer.cpp" />
@@ -179,6 +181,8 @@
     <ClInclude Include="Macro Helpers.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="Mesh.h" />
+    <ClInclude Include="Skin.h" />
+    <ClInclude Include="Animator.h" />
     <ClInclude Include="OpenGL.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="Scene.h" />

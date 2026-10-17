@@ -45,7 +45,8 @@ namespace Loom
 		// Uploads the vertices and the GameObject's world matrix (as u_model) and
 		// draws them with the given program, which is how a pass that is not the
 		// material's (the shadow pass) draws the same geometry. A shader that
-		// declares no u_model draws the vertices untransformed.
+		// declares no u_model draws the vertices untransformed. A Skin on the
+		// GameObject bends them first, and m_textureCoordinates go with them as aUV.
 		void Draw(uint32_t program);
 
 		// Draws the meshes farthest from Camera::current first, writing no
@@ -66,6 +67,21 @@ namespace Loom
 
 		// This mesh's values for its material's per-instance shader variables.
 		Serial<UniformValues> variables;
+
+		// Two floats a vertex, drawn as aUV, when there is a pair for every
+		// vertex. Last, so the fields before it keep their places in scenes
+		// saved without it.
+		Serial<std::vector<float>> m_textureCoordinates;
+
 		std::vector<uint32_t> m_indices;
+
+		// Drawn in place of m_vertices while it holds as many floats. What a
+		// Skin bends the vertices into; never saved.
+		std::vector<float> m_deformed;
+
+	private:
+		// Positions and texture coordinates side by side, as the renderer takes
+		// them, rebuilt for every draw.
+		std::vector<float> m_interleaved;
 	};
 };

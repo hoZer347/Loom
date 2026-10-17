@@ -2640,9 +2640,21 @@ namespace Loom
 				break;
 
 			case FieldType::String:
-				changed = InputTextString(label, *(std::string*)field.data);
-				changed |= AcceptAssetDrop(*(std::string*)field.data);
-				break;
+			{
+				std::string& text = *(std::string*)field.data;
+
+				// A list a line, such as a skin's joint names: worth seeing the
+				// length of, not worth one box that cannot show its lines.
+				if (text.find('\n') != std::string::npos)
+				{
+					ImGui::Text("%d lines", (int)std::count(text.begin(), text.end(), '\n'));
+					break;
+				};
+
+				changed = InputTextString(label, text);
+				changed |= AcceptAssetDrop(text);
+			}
+			break;
 
 			case FieldType::Vec2:
 				changed = AxisGui::DragFloatN(label, (float*)field.data, 2, drag_speed, float_format);

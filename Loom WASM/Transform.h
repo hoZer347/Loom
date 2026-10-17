@@ -5,6 +5,7 @@
 
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/quaternion.hpp"
 
 
 namespace Loom
@@ -19,6 +20,9 @@ namespace Loom
 	*/
 	struct Transform final
 	{
+		// A rotation as the Euler angles rotation holds, in degrees.
+		LOOM_API static glm::vec3 EulerDegrees(const glm::quat& rotation);
+
 		Serial<glm::vec3> position;
 		Serial<glm::vec3> rotation;
 		Serial<glm::vec3> scale = glm::vec3(1.0f);

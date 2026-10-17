@@ -6,6 +6,9 @@
 
 #include "imgui.h"
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include "glm/gtx/euler_angles.hpp"
+
 #include <algorithm>
 #include <thread>
 #include <string>
@@ -13,6 +16,15 @@
 
 namespace Loom
 {
+	glm::vec3 Transform::EulerDegrees(const glm::quat& rotation)
+	{
+		// Matrix turns about Z, then X, then Y, which is glm's YXZ.
+		float y = 0.0f, x = 0.0f, z = 0.0f;
+		glm::extractEulerAngleYXZ(glm::mat4_cast(glm::normalize(rotation)), y, x, z);
+
+		return glm::degrees(glm::vec3(x, y, z));
+	};
+
 	GameObject::GameObject(
 		GameObject* parent,
 		const std::string& name,

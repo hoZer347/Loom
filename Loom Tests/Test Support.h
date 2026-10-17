@@ -16,6 +16,7 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -157,10 +158,19 @@ namespace LoomTests
 
 		void SetTexture(uint32_t, const char* name, uint32_t texture) override { textures[name] = texture; };
 
-		void Draw(uint32_t program, uint32_t, const float*, size_t, uint32_t) override
+		void Draw(uint32_t program, uint32_t, const float* vertices, size_t count, uint32_t, Loom::VertexFormat format) override
 		{
 			drawn.push_back(program);
 			drawnInto.push_back(m_targets.empty() ? WINDOW : m_targets.back());
+			lastVertices.assign(vertices, vertices + count * Loom::FloatsPerVertex(format));
+			lastFormat = format;
+		};
+
+		void SetPixelated(uint32_t program, bool pixelated) override
+		{
+			if (pixelated)
+				pixelatedPrograms.insert(program);
+			else pixelatedPrograms.erase(program);
 		};
 
 		uint32_t CreateTexture(int, int, const uint8_t*) override { return ++m_handles; };
@@ -198,6 +208,12 @@ namespace LoomTests
 
 		// What each of drawn was drawn into: a target, or WINDOW.
 		std::vector<uint32_t> drawnInto;
+
+		// The vertices of the last draw, as handed over, and how they were laid out.
+		std::vector<float> lastVertices;
+		Loom::VertexFormat lastFormat = Loom::VertexFormat::Position;
+
+		std::set<uint32_t> pixelatedPrograms;
 
 		std::map<std::string, uint32_t> programs;
 		std::map<uint32_t, glm::ivec2> targetSizes;

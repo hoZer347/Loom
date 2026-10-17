@@ -88,6 +88,9 @@
     <ClCompile Include="Mesh Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="Animation Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="Material Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

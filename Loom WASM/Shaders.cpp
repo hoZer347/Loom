@@ -471,6 +471,7 @@ bool LoomDitheredOut(float alpha)
 		Programs programs;
 		programs.settings = stages.settings;
 		programs.id = renderer->CreateProgram(name, stages.vertex, stages.fragment);
+		renderer->SetPixelated(programs.id, stages.settings.pixelated);
 
 		if (stages.settings.shadows)
 			try

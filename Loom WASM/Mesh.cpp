@@ -8,6 +8,7 @@
 #include "Material.h"
 #include "GameObject.h"
 #include "Light.h"
+#include "Skin.h"
 
 #include <algorithm>
 #include <iostream>
@@ -100,10 +101,33 @@ namespace Loom
 			return;
 		};
 
-		constexpr size_t COMPONENTS = 3;
+		constexpr size_t POSITION_COMPONENTS = 3;
+		constexpr size_t UV_COMPONENTS = 2;
+
+		if (Skin* skin = m_gameObject->GetComponent<Skin>())
+			skin->Deform(*this);
+
+		const std::vector<float>& positions = m_deformed.size() == m_vertices->size() ? m_deformed : *m_vertices;
+		const size_t count = positions.size() / POSITION_COMPONENTS;
 
 		renderer->SetUniform(program, "u_model", m_gameObject->WorldMatrix());
-		renderer->Draw(program, primitive_id, m_vertices->data(), m_vertices->size() / COMPONENTS, m_draw_type);
+
+		if (m_textureCoordinates->size() != count * UV_COMPONENTS)
+		{
+			renderer->Draw(program, primitive_id, positions.data(), count, m_draw_type);
+			return;
+		};
+
+		m_interleaved.resize(count * FloatsPerVertex(VertexFormat::PositionUV));
+		float* out = m_interleaved.data();
+
+		for (size_t i = 0; i < count; i++)
+		{
+			out = std::copy_n(positions.data() + i * POSITION_COMPONENTS, POSITION_COMPONENTS, out);
+			out = std::copy_n(m_textureCoordinates->data() + i * UV_COMPONENTS, UV_COMPONENTS, out);
+		};
+
+		renderer->Draw(program, primitive_id, m_interleaved.data(), count, m_draw_type, VertexFormat::PositionUV);
 	};
 
 	void Mesh::DrawTransparent(const std::vector<Mesh*>& meshes)
@@ -148,6 +172,7 @@ namespace Loom
 	{
 		ImGui::Text("Vertices: %zu", m_vertices->size());
 		ImGui::Text("Indices:  %zu", m_indices.size());
+		ImGui::Text("UVs:      %zu", m_textureCoordinates->size());
 
 		if (!IsDrawable())
 			return;

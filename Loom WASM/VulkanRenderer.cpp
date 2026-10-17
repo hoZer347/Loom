@@ -35,11 +35,13 @@ namespace Loom
 
 		// Where each part of a pipeline's key sits: the topology in the low
 		// byte, then the colour format, then whether there is depth, then
-		// whether the viewport is flipped, then whether colour is written.
+		// whether the viewport is flipped, then whether colour is written, then
+		// the vertex format.
 		constexpr int FORMAT_SHIFT = 8;
 		constexpr int DEPTH_SHIFT = 40;
 		constexpr int FLIP_SHIFT = 41;
 		constexpr int COLOR_WRITE_SHIFT = 42;
+		constexpr int VERTEX_FORMAT_SHIFT = 43;
 
 		constexpr VkFormat COLOR_TARGET_FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
 		constexpr VkFormat DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
@@ -51,8 +53,9 @@ namespace Loom
 		constexpr uint32_t IMGUI_DESCRIPTORS = 1024;
 
 		constexpr uint32_t POSITION_LOCATION = 0;
+		constexpr uint32_t UV_LOCATION = 1;
 		constexpr uint32_t POSITION_COMPONENTS = 3;
-		constexpr uint32_t POSITION_STRIDE = POSITION_COMPONENTS * sizeof(float);
+		constexpr uint32_t UV_OFFSET = POSITION_COMPONENTS * sizeof(float);
 
 		constexpr float FAR_DEPTH = 1.0f;
 		constexpr uint8_t WHITE = 0xFF;
@@ -188,6 +191,7 @@ namespace Loom
 
 				vkDestroyCommandPool(m_device, m_immediatePool, nullptr);
 				vkDestroyDescriptorPool(m_device, m_imguiPool, nullptr);
+				vkDestroySampler(m_device, m_nearestSampler, nullptr);
 				vkDestroyDevice(m_device, nullptr);
 			};
 
@@ -552,9 +556,17 @@ namespace Loom
 				sampler->second.texture = texture;
 		};
 
-		void Draw(uint32_t handle, uint32_t primitive, const float* positions, size_t vertices, uint32_t) override
+		void SetPixelated(uint32_t handle, bool pixelated) override
 		{
-			if (!m_recording || vertices == 0)
+			const auto found = m_programs.find(handle);
+
+			if (found != m_programs.end())
+				found->second.pixelated = pixelated;
+		};
+
+		void Draw(uint32_t handle, uint32_t primitive, const float* vertices, size_t count, uint32_t, VertexFormat format) override
+		{
+			if (!m_recording || count == 0)
 				return;
 
 			const auto found = m_programs.find(handle);
@@ -570,7 +582,7 @@ namespace Loom
 
 			EnsureRendering(target);
 
-			const VkPipeline pipeline = PipelineFor(program, Topology(primitive), target);
+			const VkPipeline pipeline = PipelineFor(program, Topology(primitive), target, format);
 
 			if (!pipeline)
 				return;
@@ -584,15 +596,16 @@ namespace Loom
 			};
 
 			// A loop is a strip with its first vertex again at the end.
-			const size_t drawn = primitive == GL_LINE_LOOP_ ? vertices + 1 : vertices;
+			const size_t drawn = primitive == GL_LINE_LOOP_ ? count + 1 : count;
+			const size_t stride = FloatsPerVertex(format) * sizeof(float);
 
-			if (program.hasPosition)
+			if (program.hasPosition || program.hasUV)
 			{
-				const Allocation vertexData = Allocate(drawn * POSITION_STRIDE, sizeof(float));
-				memcpy(vertexData.mapped, positions, vertices * POSITION_STRIDE);
+				const Allocation vertexData = Allocate(drawn * stride, sizeof(float));
+				memcpy(vertexData.mapped, vertices, count * stride);
 
-				if (drawn > vertices)
-					memcpy(vertexData.mapped + vertices * POSITION_STRIDE, positions, POSITION_STRIDE);
+				if (drawn > count)
+					memcpy(vertexData.mapped + count * stride, vertices, stride);
 
 				vkCmdBindVertexBuffers(command, 0, 1, &vertexData.buffer, &vertexData.offset);
 			};
@@ -625,7 +638,8 @@ namespace Loom
 			for (const auto& [name, sampler] : program.samplers)
 			{
 				const Texture& texture = SampledTexture(sampler);
-				images.push_back({ texture.sampler, texture.Sampled().view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
+				const VkSampler sampling = program.pixelated && !sampler.shadow ? m_nearestSampler : texture.sampler;
+				images.push_back({ sampling, texture.Sampled().view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
 
 				VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
 				write.dstBinding = sampler.binding;
@@ -911,12 +925,15 @@ namespace Loom
 			VkPipelineLayout layout = VK_NULL_HANDLE;
 
 			bool hasPosition = false;
+			bool hasUV = false;
+			bool pixelated = false;
 			uint32_t blockSize = 0;
 			std::vector<uint8_t> block;
 			ByName<Member> members;
 			ByName<Sampler> samplers;
 
-			// By topology, attachment formats and whether the viewport is flipped.
+			// By topology, attachment formats, whether the viewport is flipped
+			// and the vertex format.
 			std::unordered_map<uint64_t, VkPipeline> pipelines;
 		};
 
@@ -1112,6 +1129,8 @@ namespace Loom
 			m_pushDescriptorSet = (PFN_vkCmdPushDescriptorSetKHR)vkGetDeviceProcAddr(m_device, "vkCmdPushDescriptorSetKHR");
 			m_beginRendering = (PFN_vkCmdBeginRendering)vkGetDeviceProcAddr(m_device, "vkCmdBeginRendering");
 			m_endRendering = (PFN_vkCmdEndRendering)vkGetDeviceProcAddr(m_device, "vkCmdEndRendering");
+
+			m_nearestSampler = CreateSampler(false, VK_FILTER_NEAREST);
 
 			return m_pushDescriptorSet && m_beginRendering && m_endRendering;
 		};
@@ -1498,7 +1517,7 @@ namespace Loom
 				1, &barrier);
 		};
 
-		VkPipeline PipelineFor(Program& program, VkPrimitiveTopology topology, uint32_t target)
+		VkPipeline PipelineFor(Program& program, VkPrimitiveTopology topology, uint32_t target, VertexFormat format)
 		{
 			const bool flipped = target == WINDOW;
 			const uint64_t key =
@@ -1506,7 +1525,8 @@ namespace Loom
 				| ((uint64_t)m_renderingFormat << FORMAT_SHIFT)
 				| ((uint64_t)m_renderingDepth << DEPTH_SHIFT)
 				| ((uint64_t)flipped << FLIP_SHIFT)
-				| ((uint64_t)m_colorWrite << COLOR_WRITE_SHIFT);
+				| ((uint64_t)m_colorWrite << COLOR_WRITE_SHIFT)
+				| ((uint64_t)format << VERTEX_FORMAT_SHIFT);
 
 			const auto found = program.pipelines.find(key);
 
@@ -1531,17 +1551,29 @@ namespace Loom
 			stages[1].pName = "main";
 			stages[1].pSpecializationInfo = &specialization;
 
-			const VkVertexInputBindingDescription binding = { 0, POSITION_STRIDE, VK_VERTEX_INPUT_RATE_VERTEX };
-			const VkVertexInputAttributeDescription attribute = { POSITION_LOCATION, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 };
+			const uint32_t stride = (uint32_t)(FloatsPerVertex(format) * sizeof(float));
+			const VkVertexInputBindingDescription binding = { 0, stride, VK_VERTEX_INPUT_RATE_VERTEX };
+
+			// Without texture coordinates, aUV reads the position's x and y, as
+			// it does under GL.
+			const uint32_t uvOffset = format == VertexFormat::PositionUV ? UV_OFFSET : 0;
+
+			std::vector<VkVertexInputAttributeDescription> attributes;
+
+			if (program.hasPosition)
+				attributes.push_back({ POSITION_LOCATION, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 });
+
+			if (program.hasUV)
+				attributes.push_back({ UV_LOCATION, 0, VK_FORMAT_R32G32_SFLOAT, uvOffset });
 
 			VkPipelineVertexInputStateCreateInfo input{ VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
 
-			if (program.hasPosition)
+			if (!attributes.empty())
 			{
 				input.vertexBindingDescriptionCount = 1;
 				input.pVertexBindingDescriptions = &binding;
-				input.vertexAttributeDescriptionCount = 1;
-				input.pVertexAttributeDescriptions = &attribute;
+				input.vertexAttributeDescriptionCount = (uint32_t)attributes.size();
+				input.pVertexAttributeDescriptions = attributes.data();
 			};
 
 			VkPipelineInputAssemblyStateCreateInfo assembly{ VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
@@ -1673,8 +1705,13 @@ namespace Loom
 				spvReflectEnumerateInputVariables(&module, &count, inputs.data());
 
 				for (const SpvReflectInterfaceVariable* variable : inputs)
-					if (!(variable->decoration_flags & SPV_REFLECT_DECORATION_BUILT_IN) && variable->location == POSITION_LOCATION)
-						program.hasPosition = true;
+				{
+					if (variable->decoration_flags & SPV_REFLECT_DECORATION_BUILT_IN)
+						continue;
+
+					program.hasPosition |= variable->location == POSITION_LOCATION;
+					program.hasUV |= variable->location == UV_LOCATION;
+				};
 			};
 
 			spvReflectDestroyShaderModule(&module);
@@ -1858,11 +1895,11 @@ namespace Loom
 
 		// A shadow sampler compares rather than reads, and linear filtering on
 		// a compared texture is a free 2x2 PCF.
-		VkSampler CreateSampler(bool compare)
+		VkSampler CreateSampler(bool compare, VkFilter filter = VK_FILTER_LINEAR)
 		{
 			VkSamplerCreateInfo info{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
-			info.magFilter = VK_FILTER_LINEAR;
-			info.minFilter = VK_FILTER_LINEAR;
+			info.magFilter = filter;
+			info.minFilter = filter;
 			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
 			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
@@ -2018,6 +2055,9 @@ namespace Loom
 		VkQueue m_queue = VK_NULL_HANDLE;
 
 		PFN_vkCmdPushDescriptorSetKHR m_pushDescriptorSet = nullptr;
+
+		// What a pixelated program samples its colour textures through.
+		VkSampler m_nearestSampler = VK_NULL_HANDLE;
 		PFN_vkCmdBeginRendering m_beginRendering = nullptr;
 		PFN_vkCmdEndRendering m_endRendering = nullptr;
 

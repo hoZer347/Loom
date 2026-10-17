@@ -15,6 +15,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 
@@ -34,6 +35,14 @@ namespace Loom
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+		};
+
+		void SetNearestSampling(GLuint sampler)
+		{
+			glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		};
 
 		void SetColorSampling()
@@ -102,6 +111,9 @@ namespace Loom
 		{
 			if (m_vbo)
 				glDeleteBuffers(1, &m_vbo);
+
+			if (m_nearest)
+				glDeleteSamplers(1, &m_nearest);
 
 #ifndef __EMSCRIPTEN__
 			if (m_vao)
@@ -181,6 +193,9 @@ namespace Loom
 			std::cout << "GLSL Version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
 
 			glGenBuffers(1, &m_vbo);
+
+			glGenSamplers(1, &m_nearest);
+			SetNearestSampling(m_nearest);
 
 #ifndef __EMSCRIPTEN__
 			glGenVertexArrays(1, &m_vao);
@@ -341,6 +356,7 @@ namespace Loom
 				glUseProgram(0);
 
 			m_units.erase(program);
+			m_pixelated.erase(program);
 			glDeleteProgram(program);
 		};
 
@@ -423,26 +439,48 @@ namespace Loom
 			glBindTexture(GL_TEXTURE_2D, texture);
 			glActiveTexture(GL_TEXTURE0);
 
+			// A sampler object overrides all of a texture's sampling, a shadow
+			// map's comparison included, so targets keep their own.
+			const bool nearest = m_pixelated.contains(program) && !m_targets.contains(texture);
+			glBindSampler(found->second, nearest ? m_nearest : 0);
+
 			glUniform1i(glGetUniformLocation(program, name), found->second);
 		};
 
-		void Draw(uint32_t program, uint32_t primitive, const float* positions, size_t vertices, uint32_t usage) override
+		void Draw(uint32_t program, uint32_t primitive, const float* vertices, size_t count, uint32_t usage, VertexFormat format) override
 		{
-			constexpr GLint COMPONENTS = 3;
+			constexpr GLint POSITION_COMPONENTS = 3;
+			constexpr GLint UV_COMPONENTS = 2;
+			constexpr GLuint POSITION_LOCATION = 0;
+			constexpr GLuint UV_LOCATION = 1;
+
+			const GLsizei stride = (GLsizei)(FloatsPerVertex(format) * sizeof(float));
 
 			glUseProgram(program);
 
 			glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-			glBufferData(GL_ARRAY_BUFFER, vertices * COMPONENTS * sizeof(float), positions, usage);
+			glBufferData(GL_ARRAY_BUFFER, count * stride, vertices, usage);
 
-			// Left enabled after the draw: toggling it per draw has the driver
-			// recompile the vertex shader for each state.
-			glVertexAttribPointer(0, COMPONENTS, GL_FLOAT, GL_FALSE, COMPONENTS * sizeof(float), (void*)0);
-			glEnableVertexAttribArray(0);
+			// Both left enabled after the draw: toggling them per draw has the
+			// driver recompile the vertex shader for each state. Without texture
+			// coordinates, aUV reads the position's x and y.
+			const GLsizeiptr uvOffset = format == VertexFormat::PositionUV ? POSITION_COMPONENTS * sizeof(float) : 0;
 
-			glDrawArrays(primitive, 0, (GLsizei)vertices);
+			glVertexAttribPointer(POSITION_LOCATION, POSITION_COMPONENTS, GL_FLOAT, GL_FALSE, stride, (void*)0);
+			glEnableVertexAttribArray(POSITION_LOCATION);
+			glVertexAttribPointer(UV_LOCATION, UV_COMPONENTS, GL_FLOAT, GL_FALSE, stride, (void*)uvOffset);
+			glEnableVertexAttribArray(UV_LOCATION);
+
+			glDrawArrays(primitive, 0, (GLsizei)count);
 
 			glBindBuffer(GL_ARRAY_BUFFER, 0);
+		};
+
+		void SetPixelated(uint32_t program, bool pixelated) override
+		{
+			if (pixelated)
+				m_pixelated.insert(program);
+			else m_pixelated.erase(program);
 		};
 
 		uint32_t CreateTexture(int width, int height, const uint8_t* rgba) override
@@ -687,6 +725,10 @@ namespace Loom
 
 		GLuint m_vbo = 0;
 		GLuint m_vao = 0;
+
+		// What a pixelated program samples its colour textures through.
+		GLuint m_nearest = 0;
+		std::unordered_set<uint32_t> m_pixelated;
 
 		std::unordered_map<uint32_t, Target> m_targets;
 		std::vector<Saved> m_saved;

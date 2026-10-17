@@ -178,6 +178,9 @@ namespace Loom
 		changed |= ImGui::Checkbox("Transparency", &settings.transparency);
 		ImGui::SetItemTooltip("Blends by the alpha its fragment stage writes, drawn after everything opaque, and casts a shadow that dark. Written into the shader file's settings");
 
+		changed |= ImGui::Checkbox("Pixelated", &settings.pixelated);
+		ImGui::SetItemTooltip("Samples its textures nearest, so each texel stays a hard-edged square. Written into the shader file's settings");
+
 		if (!changed)
 			return;
 

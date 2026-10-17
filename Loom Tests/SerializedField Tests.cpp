@@ -200,8 +200,9 @@ TEST_SUITE("SerializedField")
 		const std::vector<std::string> labels = Loom::FieldNames::Of(mesh);
 		const std::vector<const std::vector<Loom::FieldNames::Enumerator>*> enumerators = Loom::FieldNames::EnumeratorsOf(mesh);
 
-		// Material, primitive, draw type, vertices, per-instance variables.
-		REQUIRE(labels.size() == 5);
+		// Material, primitive, draw type, vertices, per-instance variables,
+		// texture coordinates.
+		REQUIRE(labels.size() == 6);
 		REQUIRE(enumerators[1] != nullptr);
 		REQUIRE(enumerators[2] != nullptr);
 
@@ -209,6 +210,7 @@ TEST_SUITE("SerializedField")
 		CHECK(enumerators[1]->size() == 7);
 		CHECK(labels[2] == "Draw Type");
 		CHECK(enumerators[2]->size() == 3);
+		CHECK(labels[5] == "Texture Coordinates");
 	};
 #endif
 

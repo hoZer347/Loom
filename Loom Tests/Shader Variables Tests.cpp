@@ -213,7 +213,7 @@ TEST_SUITE("Shader variables")
 		std::string error;
 		REQUIRE(Loom::WriteShaderSettings(file.path.string(), { .shading = true }, error));
 
-		CHECK(file.Text() == "// A header comment.\n\n// ===SETTINGS===\nshading = on\nshadows = off\ntransparency = off\n\n" + STAGES);
+		CHECK(file.Text() == "// A header comment.\n\n// ===SETTINGS===\nshading = on\nshadows = off\ntransparency = off\npixelated = off\n\n" + STAGES);
 
 		const Loom::ShaderSettings read = Loom::ParseShaderSettings(file.Text());
 
@@ -241,6 +241,7 @@ TEST_SUITE("Shader variables")
 			"shading = off\r\n"
 			"shadows = on\r\n"
 			"transparency = on\r\n"
+			"pixelated = off\r\n"
 			"\r\n"
 			"// ===FRAGMENT===\r\n"
 			"void main() { }\r\n");
