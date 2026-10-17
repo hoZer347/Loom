@@ -9,9 +9,9 @@
 #include "stb_image_write.h"
 
 #include <algorithm>
-#include <cstdint>
 #include <cctype>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
