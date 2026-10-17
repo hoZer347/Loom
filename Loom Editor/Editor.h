@@ -73,8 +73,9 @@ namespace Loom
 	*   that is open, the way a prefab works; the game as its own cameras see
 	*   it; and everything loaded, from a camera the editor flies
 	* - Works out of a project folder: everything under it is listed in the
-	*   Project panel, which also creates new assets, and the scripts are a C++
-	*   project that builds into a library the editor loads
+	*   Project panel, which also creates new assets, apart from the scripts,
+	*   which the Scripts panel lists and creates. They are a C++ project that
+	*   builds into a library the editor loads
 	* - Reads and writes scenes through SceneSerializer, and shows the text form
 	*   of the open scene live in its Scene Data panel
 	* - Takes over Engine's GUI hook on construction and hands it back on

@@ -3,6 +3,7 @@
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
 #include "SceneSerializer.h"
+#include "ScriptFolders.h"
 
 #include <algorithm>
 #include <cctype>
@@ -29,6 +30,9 @@ namespace Loom
 
 		if (extension == ProjectTemplate::extension)
 			return Project;
+
+		if (extension == ScriptFolders::extension)
+			return Script;
 
 		if (ProjectAssets::IsTextureFile(path))
 			return Texture;

@@ -11,7 +11,7 @@ namespace Loom
 {
 	/**
 	* Loom::ProjectAssets
-	* - Writes the new files the Project panel's Create menu offers, each one
+	* - Writes the new files the Project and Scripts panels' Create menus offer, each one
 	*   something the engine or the scripts build can use straight away
 	* - A script is one header the scripts project compiles by its glob, so the
 	*   next compile puts it in Add Component

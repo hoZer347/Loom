@@ -126,16 +126,16 @@ namespace Loom
 
 		// Folders first, then files, each alphabetically. Only files the game
 		// uses are assets, and dot-prefixed folders (.vs) and the build output
-		// are left out, as is a folder of the scripts project's with nothing
-		// but scripts in it, which are the Scripts panel's.
-		void Scan(
+		// are left out, as is a folder with nothing but scripts in it, which
+		// are the Scripts panel's. Whether there were scripts under folder.
+		bool Scan(
 			const std::filesystem::path& folder,
 			const std::filesystem::path& skip,
-			const std::string& scripts,
 			AssetNode& node,
 			std::vector<std::string>& scenes)
 		{
 			std::error_code code;
+			bool scripts = false;
 
 			for (const auto& entry : std::filesystem::directory_iterator(folder, code))
 			{
@@ -147,6 +147,9 @@ namespace Loom
 
 				AssetNode child{ path.string(), name, entry.is_directory(code) };
 
+				if (!child.folder && ProjectAssets::IsScriptFile(name))
+					scripts = true;
+
 				if (!child.folder && !ProjectAssets::IsGameFile(name) && !IsModelFile(name))
 					continue;
 
@@ -155,9 +158,11 @@ namespace Loom
 					if (path == skip)
 						continue;
 
-					Scan(path, skip, scripts, child, scenes);
+					const bool held_scripts = Scan(path, skip, child, scenes);
 
-					if (child.children.empty() && !scripts.empty() && ProjectAssets::IsUnder(child.path, scripts))
+					scripts = scripts || held_scripts;
+
+					if (child.children.empty() && held_scripts)
 						continue;
 				}
 				else if (path.extension() == SceneSerializer::extension)
@@ -176,6 +181,8 @@ namespace Loom
 
 					return _stricmp(a.name.c_str(), b.name.c_str()) < 0;
 				});
+
+			return scripts;
 		};
 
 		// Whether path is the script folder or one inside it, the top holding
@@ -492,11 +499,7 @@ namespace Loom
 			? std::filesystem::path(m_scripts.GetLibrary()).parent_path().lexically_normal()
 			: std::filesystem::path();
 
-		const std::string scripts = m_scripts.HasProject()
-			? std::filesystem::path(m_scripts.GetProject()).parent_path().lexically_normal().string()
-			: "";
-
-		Scan(m_projectPath, build, scripts, m_assets, m_projectScenes);
+		Scan(m_projectPath, build, m_assets, m_projectScenes);
 
 		std::sort(m_projectScenes.begin(), m_projectScenes.end());
 	};
@@ -744,6 +747,7 @@ namespace Loom
 
 		m_newAssetKind = kind;
 		m_newAssetFolder = folder;
+		m_newScriptFolder.clear();
 		m_askForAsset = true;
 		m_focusAssetName = true;
 
