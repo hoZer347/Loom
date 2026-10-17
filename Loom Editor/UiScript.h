@@ -55,11 +55,17 @@ namespace Loom
 		bool Load(const std::string& path);
 		void LoadText(const std::string& text);
 
+		// More commands after the script has finished, run from where it ended.
+		void Run(const std::string& text);
+
 		// Once a frame, before ImGui::NewFrame, in the context it was made in.
 		void Step();
 
 		bool Finished() const { return m_finished; };
 		bool Failed() const { return m_failed; };
+
+		// What items lists, from the windows whose names contain window.
+		void WriteItems(std::ostream& out, const std::string& window = "") const;
 
 		void ItemAdded(ImGuiID id, const ImRect& rect) override;
 		void ItemLabelled(ImGuiID id, const char* label) override;
@@ -89,7 +95,6 @@ namespace Loom
 		bool Aim(const std::vector<std::string>& tokens, size_t first, size_t* end);
 
 		const Item* Find(const std::string& window, const std::string& label) const;
-		void WriteItems(std::ostream& out) const;
 		void Fail(const std::string& why);
 
 		ImGuiContext* m_context = nullptr;

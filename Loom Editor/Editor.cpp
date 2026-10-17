@@ -920,6 +920,13 @@ namespace Loom
 			scene) != m_ownedScenes.end();
 	};
 
+	std::string Editor::ScenePathOf(Scene* scene) const
+	{
+		const auto path = m_scenePaths.find(scene);
+
+		return path == m_scenePaths.end() ? "" : path->second;
+	};
+
 	void Editor::CloseScene(Scene* scene)
 	{
 		if (scene == nullptr)

@@ -7,6 +7,7 @@
 #include <shlobj.h>
 
 #include "Editor.h"
+#include "EditorMcp.h"
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
 #include "SceneSerializer.h"
@@ -181,7 +182,10 @@ namespace
 			<< "                                 from a script (see UiScript.h), then exit,\n"
 			<< "                                 without showing a window\n"
 			<< "  --desktop <id>                 show the window on that virtual desktop,\n"
-			<< "                                 without activating it"
+			<< "                                 without activating it\n"
+			<< "  --mcp <port>                   serve the editor's MCP tools on that port; a\n"
+			<< "                                 run with a window serves them on "
+			<< EditorMcp::default_port << " unasked"
 			<< std::endl;
 	};
 
@@ -374,6 +378,9 @@ int main(int argc, char** argv)
 
 	// After the Engine, whose ImGui context it listens to.
 	std::unique_ptr<UiScript> script;
+	bool exit_after_script = false;
+
+	unsigned short mcp_port = Engine::showWindow ? EditorMcp::default_port : 0;
 
 	for (int i = 1; i < argc; i++)
 	{
@@ -420,18 +427,20 @@ int main(int argc, char** argv)
 			};
 
 			script = std::make_unique<UiScript>(launch_folder);
+			exit_after_script = true;
 
 			if (!script->Load(argv[++i]))
 				return 1;
+		}
+		else if (argument == "--mcp")
+		{
+			if (i + 1 >= argc)
+			{
+				std::cerr << "--mcp needs a port" << std::endl;
+				return 1;
+			};
 
-			Engine::SetImGuiInputFunction(
-				[&script]()
-				{
-					script->Step();
-
-					if (script->Finished())
-						Engine::Stop();
-				});
+			mcp_port = (unsigned short)atoi(argv[++i]);
 		}
 		else if (argument == "--import")
 		{
@@ -648,6 +657,39 @@ int main(int argc, char** argv)
 
 	if (!screenshot.empty())
 		editor.RequestScreenshot(screenshot, frames, true);
+
+	// The server's ui tool runs its commands through the same UiScript as a
+	// --ui-script run, since only one can listen to ImGui's items.
+	std::unique_ptr<EditorMcp> mcp;
+
+	if (mcp_port != 0)
+	{
+		if (!script)
+			script = std::make_unique<UiScript>(launch_folder);
+
+		mcp = std::make_unique<EditorMcp>(editor, *script);
+
+		if (!mcp->Listen(mcp_port))
+		{
+			mcp.reset();
+
+			if (!exit_after_script)
+				script.reset();
+		};
+	};
+
+	if (script)
+		Engine::SetImGuiInputFunction(
+			[&script, &mcp, exit_after_script]()
+			{
+				script->Step();
+
+				if (mcp)
+					mcp->Step();
+
+				if (exit_after_script && script->Finished())
+					Engine::Stop();
+			});
 
 	engine.Start();
 

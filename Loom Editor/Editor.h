@@ -231,6 +231,20 @@ namespace Loom
 
 		const std::string& GetProjectPath() const { return m_projectPath; };
 
+		// What EditorMcp reads the editor through.
+		Scene* GetActiveScene() const { return m_activeScene; };
+		GameObject* GetSelected() const { return m_selected; };
+		const ScriptLibrary& GetScripts() const { return m_scripts; };
+		bool IsOwned(Scene* scene) const;
+
+		// The file an owned scene was opened from or saved to, empty for one
+		// never saved.
+		std::string ScenePathOf(Scene* scene) const;
+
+		// An edit made other than through the panels, recorded for undo like
+		// theirs once nothing is held down.
+		void MarkEdited() { m_historyDirty = true; };
+
 	private:
 		void DrawGui();
 
@@ -481,8 +495,6 @@ namespace Loom
 		// frame rather than trusted.
 		void ValidateSelection();
 		static bool IsInHierarchy(const GameObject& root, const GameObject* target);
-
-		bool IsOwned(Scene* scene) const;
 
 		EditorViewport m_sceneView;
 		EditorViewport m_gameView;

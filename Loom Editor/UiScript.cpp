@@ -143,6 +143,14 @@ namespace Loom
 		};
 	};
 
+	void UiScript::Run(const std::string& text)
+	{
+		m_finished = false;
+		m_failed = false;
+
+		LoadText(text);
+	};
+
 	void UiScript::Step()
 	{
 		m_drawn.swap(m_drawing);
@@ -518,18 +526,19 @@ namespace Loom
 		return nullptr;
 	};
 
-	void UiScript::WriteItems(std::ostream& out) const
+	void UiScript::WriteItems(std::ostream& out, const std::string& window) const
 	{
 		const ImVec2 origin = ImGui::GetMainViewport()->Pos;
 
 		for (const Item& item : m_drawn)
-			out
-				<< item.window << '\t'
-				<< item.label << '\t'
-				<< item.min.x - origin.x << '\t'
-				<< item.min.y - origin.y << '\t'
-				<< item.max.x - item.min.x << '\t'
-				<< item.max.y - item.min.y << '\n';
+			if (item.window.find(window) != std::string::npos)
+				out
+					<< item.window << '\t'
+					<< item.label << '\t'
+					<< item.min.x - origin.x << '\t'
+					<< item.min.y - origin.y << '\t'
+					<< item.max.x - item.min.x << '\t'
+					<< item.max.y - item.min.y << '\n';
 
 		out.flush();
 	};
