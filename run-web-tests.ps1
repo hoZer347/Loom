@@ -15,7 +15,7 @@
 .EXAMPLE
     .\run-web-tests.ps1
     .\run-web-tests.ps1 -Configuration Release
-    .\run-web-tests.ps1 -NoBuild -- -ts=State
+    .\run-web-tests.ps1 -NoBuild -TestArgs '-ts=State'
 
 .NOTES
     Needs an installed emsdk. Set EMSDK, or have it at C:\emsdk or under
@@ -120,16 +120,23 @@ if (-not $NoBuild)
 
     $optimisation = if ($Configuration -eq 'Release') { '-O2' } else { '-O0' }
 
-    $flags = @(
+    $compileFlags = @(
         '-std=c++20'
         $optimisation
         '-fexceptions'                  # doctest reports throwing tests, and Shader throws.
+        '-pthread'                      # Same threading the site build ships with.
+    ) + @($includes)
+
+    $linkFlags = @(
+        '-std=c++20'
+        $optimisation
+        '-fexceptions'
+        '-pthread'
         '-sUSE_GLFW=3'                  # Engine and the ImGui backend link against GLFW.
         '-sFULL_ES3'
         '-sFETCH'                       # Shader::Request fetches shader sources over HTTP.
         '-sASYNCIFY'                    # ...and waits on the fetch with emscripten_sleep.
         '-sALLOW_MEMORY_GROWTH=1'
-        '-pthread'                      # Same threading the site build ships with.
         '-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency'  # One pre-spawned for each thread the browser runs: a later one cannot start while main blocks.
         '-Wno-pthreads-mem-growth'
         '-sEXIT_RUNTIME=1'              # So the process exit code is the test result.
@@ -137,27 +144,60 @@ if (-not $NoBuild)
         '-sNODERAWFS=1'                 # Gives the suite the real filesystem under node.
     )
 
-    New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+    # Each source compiles to its own object, a process per core, and only
+    # when it or a header it includes has changed since, or the flags have.
+    $objects = Join-Path $outputDir 'Objects'
+    New-Item -ItemType Directory -Force -Path $objects | Out-Null
 
-    # Every argument goes in a response file: emcc is a batch file, and the
-    # sources alone run past cmd's limit on a command line.
-    $arguments = @($flags) + @($includes) + @($sources) + @('-o', $output) |
+    $jobs = @(Get-CompileJobs $sources $root $objects)
+    $stamp = Join-Path $objects 'flags.txt'
+    $stale = @(Get-StaleJobs $jobs $compileFlags $stamp)
+
+    if ($stale.Count -gt 0)
+    {
+        Write-Host "Compiling $($stale.Count) of $($jobs.Count) files"
+
+        if (-not (Invoke-Compile $emcc $stale $compileFlags))
+        {
+            Write-Error 'The web test suite failed to compile.'
+            exit 1
+        }
+
+        [IO.File]::WriteAllText($stamp, $compileFlags -join "`n")
+    }
+
+    # The link's arguments go in a response file, as the objects alone run
+    # past cmd's limit on a command line for a batch file like emcc. It is
+    # rewritten only when they change, so its date says when they last did.
+    $arguments = @($linkFlags) + @($jobs | ForEach-Object { $_.Object }) + @('-o', $output) |
         ForEach-Object { '"' + ($_ -replace '\\', '/') + '"' }
     $response = Join-Path $outputDir 'emcc.rsp'
-    [IO.File]::WriteAllLines($response, [string[]]$arguments)
+    $link = $arguments -join "`r`n"
 
-    # PowerShell 5.1 wraps a native command's stderr in a NativeCommandError,
-    # which the 'Stop' preference above would treat as fatal -- and emcc writes
-    # ordinary notes there. Judge it by its exit code instead.
-    $previous = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    try { & $emcc "@$response" }
-    finally { $ErrorActionPreference = $previous }
-
-    if ($LASTEXITCODE -ne 0)
+    if (-not (Test-Path -LiteralPath $response) -or [IO.File]::ReadAllText($response) -ne $link)
     {
-        Write-Error "emcc failed with exit code $LASTEXITCODE"
-        exit $LASTEXITCODE
+        [IO.File]::WriteAllText($response, $link)
+    }
+
+    $linkInputs = @(Get-Item -LiteralPath $response) + @($jobs | ForEach-Object { Get-Item -LiteralPath $_.Object })
+
+    if (Test-Stale $output $linkInputs)
+    {
+        Write-Host 'Linking the web test suite'
+
+        # PowerShell 5.1 wraps a native command's stderr in a NativeCommandError,
+        # which the 'Stop' preference above would treat as fatal -- and emcc writes
+        # ordinary notes there. Judge it by its exit code instead.
+        $previous = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try { & $emcc "@$response" }
+        finally { $ErrorActionPreference = $previous }
+
+        if ($LASTEXITCODE -ne 0)
+        {
+            Write-Error "emcc failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+        }
     }
 }
 

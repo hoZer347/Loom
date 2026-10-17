@@ -68,14 +68,67 @@ function Test-Stale([string] $Target, $Inputs)
 }
 
 # Each source to its own object, named from its path under $Base so files of
-# the same name in different folders do not collide.
+# the same name in different folders do not collide, with the list of the
+# headers its compile read beside it.
 function Get-CompileJobs($Sources, [string] $Base, [string] $Directory)
 {
     foreach ($source in $Sources)
     {
+        $object = Join-Path $Directory (($source.Substring($Base.Length).TrimStart('\') -replace '[\\ ]', '_') + '.o')
+
         [pscustomobject] @{
             Source = $source
-            Object = Join-Path $Directory (($source.Substring($Base.Length).TrimStart('\') -replace '[\\ ]', '_') + '.o')
+            Object = $object
+            Depends = [IO.Path]::ChangeExtension($object, '.d')
+        }
+    }
+}
+
+# The files a compile read, from the make rule emcc's -MMD wrote: the target, a
+# colon, then paths separated by spaces, a space within a path escaped and long
+# lines continued with a backslash.
+function Read-Dependencies([string] $Path)
+{
+    $rule = [IO.File]::ReadAllText($Path) -replace '\\\r?\n', ' '
+    $paths = $rule.Substring($rule.IndexOf(': ') + 2).Trim()
+
+    [regex]::Split($paths, '(?<!\\)\s+') | Where-Object { $_ } | ForEach-Object { $_ -replace '\\ ', ' ' }
+}
+
+# The jobs to compile again: all of them when the flags differ from the ones
+# $Stamp holds from the last build, otherwise those whose object is missing or
+# older than its source or a header it read last time.
+function Get-StaleJobs($Jobs, [string[]] $Flags, [string] $Stamp)
+{
+    if (-not (Test-Path -LiteralPath $Stamp) -or [IO.File]::ReadAllText($Stamp) -ne ($Flags -join "`n"))
+    {
+        return $Jobs
+    }
+
+    $written = @{}
+
+    foreach ($job in $Jobs)
+    {
+        if (-not (Test-Path -LiteralPath $job.Object) -or -not (Test-Path -LiteralPath $job.Depends))
+        {
+            $job
+            continue
+        }
+
+        $built = (Get-Item -LiteralPath $job.Object).LastWriteTimeUtc
+
+        foreach ($input in Read-Dependencies $job.Depends)
+        {
+            if (-not $written.ContainsKey($input))
+            {
+                $written[$input] = if (Test-Path -LiteralPath $input) { (Get-Item -LiteralPath $input).LastWriteTimeUtc } else { [DateTime]::MaxValue }
+            }
+
+            if ($written[$input] -gt $built)
+            {
+                $job
+                break
+            }
         }
     }
 }
@@ -97,7 +150,7 @@ function Invoke-Compile([string] $Emcc, $Jobs, [string[]] $Flags)
         }
 
         # Start-Process joins its arguments with spaces and quotes none of them.
-        $arguments = @($Flags) + @('-c', $job.Source, '-o', $job.Object) |
+        $arguments = @($Flags) + @('-MMD', '-MF', $job.Depends, '-c', $job.Source, '-o', $job.Object) |
             ForEach-Object { '"' + $_ + '"' }
 
         $process = Start-Process -FilePath $Emcc -ArgumentList $arguments -NoNewWindow -PassThru
