@@ -31,6 +31,9 @@ namespace Loom
 		if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_V))
 			return EditCommand::Paste;
 
+		if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S))
+			return EditCommand::Save;
+
 		if (hierarchy_focused && ImGui::IsKeyChordPressed(ImGuiKey_Delete))
 			return EditCommand::Delete;
 

@@ -94,6 +94,12 @@ namespace Loom
 		bool SaveScene(Scene* scene, const std::string& path);
 		void CloseScene(Scene* scene);
 
+		// File > Save Scene and Ctrl+S: the active scene, to the file it was
+		// opened from, or, for one never saved, a new file named after it in
+		// the project's scenes folder. Refused while playing, when the scene
+		// holds what the run has done to it.
+		void SaveActiveScene();
+
 		// The folder the editor works out of. Everything under it is listed in
 		// the Project panel; the choice is remembered between runs, so
 		// the folder prompt only shows up when there is nothing to remember.

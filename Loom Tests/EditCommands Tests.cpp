@@ -129,6 +129,7 @@ TEST_SUITE("EditCommands")
 		CHECK(input.Press({ ImGuiMod_Ctrl, ImGuiKey_C }) == EditCommand::Copy);
 		CHECK(input.Press({ ImGuiMod_Ctrl, ImGuiKey_V }) == EditCommand::Paste);
 		CHECK(input.Press({ ImGuiKey_Delete }, true) == EditCommand::Delete);
+		CHECK(input.Press({ ImGuiMod_Ctrl, ImGuiKey_S }) == EditCommand::Save);
 	};
 
 	TEST_CASE("no keys, or keys that are not a shortcut, ask for nothing")
@@ -213,6 +214,7 @@ TEST_SUITE("EditCommands")
 		CHECK(input.Press({ ImGuiMod_Ctrl, ImGuiKey_Z }, true, text_box) == EditCommand::None);
 		CHECK(input.Press({ ImGuiMod_Ctrl, ImGuiKey_V }, true, text_box) == EditCommand::None);
 		CHECK(input.Press({ ImGuiKey_Delete }, true, text_box) == EditCommand::None);
+		CHECK(input.Press({ ImGuiMod_Ctrl, ImGuiKey_S }, true, text_box) == EditCommand::None);
 
 		// With the text box gone the keys are the editor's again.
 		for (int i = 0; i < frames_to_focus; i++)

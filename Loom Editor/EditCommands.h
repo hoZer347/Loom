@@ -17,6 +17,7 @@ namespace Loom
 		Copy,
 		Paste,
 		Delete,
+		Save,
 	};
 
 	namespace EditCommands

@@ -29,6 +29,10 @@ namespace Loom
 
 		void Draw(bool* open);
 
+		// Whether the panel had the keyboard when it was last drawn, so Ctrl+S
+		// saves its shader rather than the scene.
+		bool IsFocused() const { return m_focused; };
+
 		// Where on the line to underline a message about it: what glslang
 		// quotes, as in "'x' : undeclared identifier", when the line has it as
 		// a word of its own, and otherwise the line from its first non-blank.
@@ -69,5 +73,6 @@ namespace Loom
 
 		// Frames left to ask for focus on.
 		int m_focusFrames = 0;
+		bool m_focused = false;
 	};
 };

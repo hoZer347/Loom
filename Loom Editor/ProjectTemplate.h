@@ -25,6 +25,10 @@ namespace Loom
 
 		static constexpr const char* scripts_folder = "Scripts";
 
+		// Where a project's scenes are, and where a scene saved for the first
+		// time goes.
+		static constexpr const char* scenes_folder = "Scenes";
+
 		// What a project file's lines are, each key=value.
 		static constexpr const char* name_key = "name";
 		static constexpr const char* scripts_key = "scripts";

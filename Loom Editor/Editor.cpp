@@ -840,6 +840,41 @@ namespace Loom
 		return true;
 	};
 
+	void Editor::SaveActiveScene()
+	{
+		if (m_activeScene == nullptr)
+			return;
+
+		if (m_playing)
+		{
+			std::cerr << "Stop before saving: the scene is holding what the run has done to it" << std::endl;
+			return;
+		};
+
+		std::string path = m_scenePaths[m_activeScene];
+
+		if (path.empty())
+		{
+			if (m_projectPath.empty())
+			{
+				std::cerr << "Save Scene needs a project to put '" << m_activeScene->GetName() << "' in" << std::endl;
+				return;
+			};
+
+			const std::filesystem::path folder = std::filesystem::path(m_projectPath) / ProjectTemplate::scenes_folder;
+			std::filesystem::path file = folder / (m_activeScene->GetName() + SceneSerializer::extension);
+
+			// A scene of the same name already saved keeps its file.
+			for (int copy = 2; std::filesystem::exists(file); copy++)
+				file = folder / (m_activeScene->GetName() + " " + std::to_string(copy) + SceneSerializer::extension);
+
+			path = file.string();
+		};
+
+		if (SaveScene(m_activeScene, path))
+			RefreshProjectAssets();
+	};
+
 	bool Editor::IsOwned(Scene* scene) const
 	{
 		return std::find(
@@ -1099,6 +1134,10 @@ namespace Loom
 		case EditCommand::Paste:	Paste();			break;
 		case EditCommand::Delete:	DeleteSelected();	break;
 		case EditCommand::None:							break;
+		case EditCommand::Save:
+			if (!(m_showShaders && m_shaders.IsFocused()))
+				SaveActiveScene();
+			break;
 		};
 	};
 
@@ -1537,6 +1576,9 @@ namespace Loom
 
 			if (ImGui::MenuItem("New Scene"))
 				CreateScene("Scene " + std::to_string(++m_sceneCounter));
+
+			if (ImGui::MenuItem("Save Scene", "Ctrl+S", false, m_activeScene != nullptr && !m_playing))
+				SaveActiveScene();
 
 			ImGui::Separator();
 

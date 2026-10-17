@@ -469,7 +469,7 @@ SpinningTriangle is there as a worked example.
 			return "";
 		};
 
-		std::filesystem::create_directories(root / "Scenes", code);
+		std::filesystem::create_directories(root / scenes_folder, code);
 		std::filesystem::create_directories(root / scripts_folder, code);
 		std::filesystem::create_directories(root / "Assets", code);
 		std::filesystem::create_directories(root / build_folder, code);
@@ -493,7 +493,7 @@ SpinningTriangle is there as a worked example.
 		const bool written =
 			Write(root / (name + extension), fill(loomproject) + fill(scripts_entries), error) &&
 			Write(root / shader_path, ProjectAssets::defaultShader, error) &&
-			Write(root / "Scenes" / (std::string("Main") + SceneSerializer::extension), fill(starter_scene), error) &&
+			Write(root / scenes_folder / (std::string("Main") + SceneSerializer::extension), fill(starter_scene), error) &&
 			Write(root / "README.txt", fill(readme), error) &&
 			WriteScripts(root, name, error);
 

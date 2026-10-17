@@ -168,8 +168,12 @@ namespace Loom
 			ImGui::SetNextWindowFocus();
 		};
 
+		m_focused = false;
+
 		if (ImGui::Begin(EditorPanels::Shaders, open))
 		{
+			m_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+
 			if (m_documents.empty())
 				ImGui::TextDisabled("Double-click a shader in the Project panel to edit it here.");
 			else if (ImGui::BeginTabBar("##shaders", ImGuiTabBarFlags_AutoSelectNewTabs | ImGuiTabBarFlags_FittingPolicyScroll))
