@@ -79,6 +79,14 @@ namespace Loom
 
 		std::error_code code;
 
+		if (m_executable.empty())
+		{
+			std::cerr << "Full refresh: Windows did not say where this editor runs from, so there is nothing to start again." << std::endl;
+
+			finish(false);
+			return;
+		};
+
 		if (!std::filesystem::exists(sources, code) || msbuild.empty())
 		{
 			std::cout
