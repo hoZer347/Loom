@@ -66,6 +66,7 @@ TEST_SUITE("ProjectAssets")
 
 		CHECK(text.find("namespace GameScripts") != std::string::npos);
 		CHECK(text.find("struct Spinner : Loom::Component<Spinner>") != std::string::npos);
+		CHECK(text.find("#include \"Loom.h\"") != std::string::npos);
 		CHECK(text.find("{NAME}") == std::string::npos);
 		CHECK(text.find("{NAMESPACE}") == std::string::npos);
 
@@ -81,6 +82,7 @@ TEST_SUITE("ProjectAssets")
 
 		CHECK(text.find("namespace GameScripts") != std::string::npos);
 		CHECK(text.find("struct Jumping : Loom::State<Jumping>") != std::string::npos);
+		CHECK(text.find("#include \"Loom.h\"") != std::string::npos);
 		CHECK(text.find("{NAME}") == std::string::npos);
 	};
 
@@ -92,6 +94,7 @@ TEST_SUITE("ProjectAssets")
 
 		CHECK(text.find("namespace GameScripts") != std::string::npos);
 		CHECK(text.find("struct Guard : Loom::StateMachine<Guard>") != std::string::npos);
+		CHECK(text.find("#include \"Loom.h\"") != std::string::npos);
 		CHECK(text.find("{NAME}") == std::string::npos);
 	};
 

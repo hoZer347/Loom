@@ -84,6 +84,7 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)..\..\..\Loom WASM\Loom.h">
       <CompileAs>CompileAsCpp</CompileAs>
       <PrecompiledHeader>Create</PrecompiledHeader>
+      <ObjectFileName>$(IntDir)Loom.h.obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="**\*.hpp">
       <CompileAs>CompileAsCpp</CompileAs>

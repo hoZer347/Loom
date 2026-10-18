@@ -47,8 +47,9 @@ namespace Loom
 
 		// Gives a project file a scripts project when it names none that is
 		// there: the first one under the project's folder, or failing that a
-		// new one from the template, and writes it into the file. Returns the
-		// .vcxproj, or an empty string with the reason in error.
+		// new one from the template, and writes it into the file. One from
+		// before the template precompiled the engine's header is given that.
+		// Returns the .vcxproj, or an empty string with the reason in error.
 		static std::string EnsureScripts(const std::string& project_file, std::string* error = nullptr);
 
 		// Where the engine lives, worked out from the running executable

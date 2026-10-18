@@ -144,6 +144,22 @@ namespace {NAME}Scripts
 };
 )";
 
+		// What precompiles the engine's header and forces it into every script,
+		// for the template and for a scripts project from before it did.
+		const char* const pch_settings = R"(      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>Loom.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>Loom.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+)";
+
+		// {HEADERS} is the engine's header folder as the project names it. The
+		// object is named apart from the one a script called Loom.hpp would get.
+		const char* const pch_item = R"(    <ClCompile Include="{HEADERS}\Loom.h">
+      <CompileAs>CompileAsCpp</CompileAs>
+      <PrecompiledHeader>Create</PrecompiledHeader>
+      <ObjectFileName>$(IntDir)Loom.h.obj</ObjectFileName>
+    </ClCompile>
+)";
+
 		const char* const vcxproj = R"(<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
@@ -198,10 +214,7 @@ namespace {NAME}Scripts
       <ConformanceMode>true</ConformanceMode>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <DisableSpecificWarnings>4251;4275</DisableSpecificWarnings>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>Loom.h</PrecompiledHeaderFile>
-      <ForcedIncludeFiles>Loom.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
-      <PreprocessorDefinitions>LOOM_SCRIPT_MODULE;_WIN32_WINNT=0x0601;WIN32;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+{PCH_SETTINGS}      <PreprocessorDefinitions>LOOM_SCRIPT_MODULE;_WIN32_WINNT=0x0601;WIN32;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>{ENGINE}\Loom WASM;{ENGINE}\Loom ImGui;{ENGINE}\External Libraries\glm;{ENGINE}\External Libraries\glew\include;{ENGINE}\External Libraries\glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -227,11 +240,7 @@ namespace {NAME}Scripts
        built (and registers itself) without being listed here. The engine's
        header is precompiled once and forced into each of them. -->
   <ItemGroup>
-    <ClCompile Include="{ENGINE}\Loom WASM\Loom.h">
-      <CompileAs>CompileAsCpp</CompileAs>
-      <PrecompiledHeader>Create</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="**\*.hpp">
+{PCH_ITEM}    <ClCompile Include="**\*.hpp">
       <CompileAs>CompileAsCpp</CompileAs>
     </ClCompile>
   </ItemGroup>
@@ -338,7 +347,9 @@ SpinningTriangle is there as a worked example.
 			const std::string& project,
 			const std::string& project_guid)
 		{
-			std::string filled = ProjectAssets::Replace(text, "{NAME}", name);
+			std::string filled = ProjectAssets::Replace(text, "{PCH_SETTINGS}", pch_settings);
+			filled = ProjectAssets::Replace(filled, "{PCH_ITEM}", ProjectAssets::Replace(pch_item, "{HEADERS}", "{ENGINE}\\Loom WASM"));
+			filled = ProjectAssets::Replace(filled, "{NAME}", name);
 			filled = ProjectAssets::Replace(filled, "{ENGINE}", ProjectTemplate::EngineRoot());
 			filled = ProjectAssets::Replace(filled, "{PROJECT}", project);
 			filled = ProjectAssets::Replace(filled, "{PROJECT_GUID}", project_guid);
@@ -419,6 +430,63 @@ SpinningTriangle is there as a worked example.
 			return found.empty()
 				? std::filesystem::path()
 				: found.front();
+		};
+
+		// The start of the line pos is on.
+		size_t LineStart(const std::string& text, size_t pos)
+		{
+			const size_t newline = text.rfind('\n', pos);
+
+			return newline == std::string::npos
+				? 0
+				: newline + 1;
+		};
+
+		// Gives a scripts project the template wrote before the engine's header
+		// was precompiled the settings that precompile it, naming the engine's
+		// header folder the way the project already does. One that has been
+		// changed past finding where they go is left alone.
+		bool Precompile(const std::filesystem::path& scripts, std::string* error)
+		{
+			constexpr std::string_view includes_tag = "<AdditionalIncludeDirectories>";
+			constexpr std::string_view headers_folder = "Loom WASM";
+			constexpr std::string_view defines_tag = "<PreprocessorDefinitions>LOOM_SCRIPT_MODULE";
+			constexpr std::string_view scripts_item = "<ClCompile Include=\"**\\*.hpp\">";
+
+			std::string text = ProjectAssets::ReadText(scripts.string());
+
+			if (text.find("<PrecompiledHeader>") != std::string::npos)
+				return true;
+
+			const size_t includes = text.find(includes_tag);
+			const size_t defines = text.find(defines_tag);
+			const size_t item = text.find(scripts_item);
+
+			if (includes == std::string::npos || defines == std::string::npos || item == std::string::npos || item < defines)
+				return true;
+
+			const size_t folder_start = includes + includes_tag.size();
+			const size_t folder_end = text.find(headers_folder, folder_start);
+
+			if (folder_end == std::string::npos || folder_end > text.find('<', folder_start))
+				return true;
+
+			const std::string headers = text.substr(folder_start, folder_end + headers_folder.size() - folder_start);
+			const std::string newline = text.find("\r\n") == std::string::npos ? "\n" : "\r\n";
+
+			const auto lines =
+				[&](const std::string& fragment)
+				{
+					return ProjectAssets::Replace(fragment, "\n", newline);
+				};
+
+			// The later one first, so the earlier position still holds.
+			text.insert(LineStart(text, item), lines(ProjectAssets::Replace(pch_item, "{HEADERS}", headers)));
+			text.insert(LineStart(text, defines), lines(pch_settings));
+
+			std::cout << "Precompiled the engine's header for " << scripts.string() << std::endl;
+
+			return Write(scripts, text, error);
 		};
 	};
 
@@ -563,7 +631,9 @@ SpinningTriangle is there as a worked example.
 			const std::filesystem::path scripts = (root / named).lexically_normal();
 
 			if (std::filesystem::is_regular_file(scripts, code))
-				return scripts.string();
+				return Precompile(scripts, error)
+					? scripts.string()
+					: "";
 		};
 
 		std::filesystem::path scripts = FindScriptsProject(root);
@@ -574,6 +644,9 @@ SpinningTriangle is there as a worked example.
 			kept += std::string(library_key) + '=' + PathIn(root, LibraryOf(root, scripts)) + '\n';
 
 			std::cout << "Found the scripts project " << scripts.string() << std::endl;
+
+			if (!Precompile(scripts, error))
+				return "";
 		}
 		else
 		{

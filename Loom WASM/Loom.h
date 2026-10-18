@@ -1,7 +1,7 @@
 #pragma once
 
-// Everything the engine offers a script. Script projects precompile this and
-// force it into every script, so including it costs a script nothing.
+// Everything the engine offers a script. Script projects precompile this once
+// and force it into every script, so a script pays nothing more to include it.
 
 #include "Animator.h"
 #include "Audio.h"

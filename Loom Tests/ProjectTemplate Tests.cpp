@@ -80,6 +80,39 @@ namespace
 
 	const char* const script_module = "<Project><PreprocessorDefinitions>LOOM_SCRIPT_MODULE</PreprocessorDefinitions>"
 		"<TargetName>Found</TargetName></Project>";
+
+	// The parts of a scripts project the template wrote before it precompiled
+	// the engine's header, with the engine named relative to the project.
+	const char* const unprecompiled =
+		"<Project>\r\n"
+		"  <ItemDefinitionGroup>\r\n"
+		"    <ClCompile>\r\n"
+		"      <PreprocessorDefinitions>LOOM_SCRIPT_MODULE;%(PreprocessorDefinitions)</PreprocessorDefinitions>\r\n"
+		"      <AdditionalIncludeDirectories>..\\Engine\\Loom WASM;..\\Engine\\Loom ImGui</AdditionalIncludeDirectories>\r\n"
+		"    </ClCompile>\r\n"
+		"  </ItemDefinitionGroup>\r\n"
+		"  <ItemGroup>\r\n"
+		"    <ClCompile Include=\"**\\*.hpp\">\r\n"
+		"      <CompileAs>CompileAsCpp</CompileAs>\r\n"
+		"    </ClCompile>\r\n"
+		"  </ItemGroup>\r\n"
+		"</Project>\r\n";
+
+	std::string ReadBytes(const std::filesystem::path& path)
+	{
+		std::ifstream in(path, std::ios::binary);
+		return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+	};
+
+	size_t Count(const std::string& text, const std::string& part)
+	{
+		size_t count = 0;
+
+		for (size_t at = text.find(part); at != std::string::npos; at = text.find(part, at + part.size()))
+			count++;
+
+		return count;
+	};
 };
 
 
@@ -99,6 +132,17 @@ TEST_SUITE("ProjectTemplate")
 		CHECK(scripts == Loom::ProjectTemplate::ScriptsProject(project.path.string(), "My Game"));
 		CHECK(std::filesystem::exists(project.path / "Scripts" / "MyGameScripts.sln"));
 		CHECK(ReadAll(scripts).find("<RootNamespace>MyGameScripts</RootNamespace>") != std::string::npos);
+
+		const std::string vcxproj = ReadAll(scripts);
+
+		CHECK(vcxproj.find("<PrecompiledHeader>Use</PrecompiledHeader>") != std::string::npos);
+		CHECK(vcxproj.find("<ForcedIncludeFiles>Loom.h;") != std::string::npos);
+		CHECK(vcxproj.find("<ClCompile Include=\"" + Loom::ProjectTemplate::EngineRoot() + "\\Loom WASM\\Loom.h\">") != std::string::npos);
+		CHECK(vcxproj.find("<PrecompiledHeader>Create</PrecompiledHeader>") != std::string::npos);
+		CHECK(vcxproj.find("<ObjectFileName>$(IntDir)Loom.h.obj</ObjectFileName>") != std::string::npos);
+		CHECK(vcxproj.find("{PCH_") == std::string::npos);
+		CHECK(vcxproj.find("{HEADERS}") == std::string::npos);
+		CHECK(ReadAll(project.path / "Scripts" / "SpinningTriangle.hpp").find("#include \"Loom.h\"") != std::string::npos);
 
 		const std::string file = ReadAll(project.path / "MyGame.loomproject");
 
@@ -192,6 +236,37 @@ TEST_SUITE("ProjectTemplate")
 
 		CHECK(text.find("Gone") == std::string::npos);
 		CHECK(text.find("scripts=Scripts/Found.vcxproj\n") != std::string::npos);
+	};
+
+	TEST_CASE("a scripts project from before the engine's header was precompiled is given it, once")
+	{
+		const ProjectFolder project("loom template precompile", "name=Game\nscripts=Scripts/Game.vcxproj\nlibrary=Build/Game.dll\n");
+		const std::filesystem::path scripts = project.root / "Scripts" / "Game.vcxproj";
+
+		std::filesystem::create_directories(scripts.parent_path());
+		std::ofstream(scripts, std::ios::binary) << unprecompiled;
+
+		REQUIRE_FALSE(project.Ensure().empty());
+		REQUIRE_FALSE(project.Ensure().empty());
+
+		const std::string text = ReadBytes(scripts);
+
+		CHECK(Count(text, "      <PrecompiledHeader>Use</PrecompiledHeader>\r\n") == 1);
+		CHECK(Count(text, "<ForcedIncludeFiles>Loom.h;") == 1);
+		CHECK(Count(text, "    <ClCompile Include=\"..\\Engine\\Loom WASM\\Loom.h\">\r\n") == 1);
+		CHECK(text.find("Loom WASM\\Loom.h\"") < text.find("<ClCompile Include=\"**"));
+		CHECK(text.find("<PrecompiledHeader>Use") < text.find("<PreprocessorDefinitions>LOOM_SCRIPT_MODULE"));
+		CHECK(Count(text, "\n") == Count(text, "\r\n"));
+	};
+
+	TEST_CASE("a scripts project changed past recognising is not precompiled")
+	{
+		const ProjectFolder project("loom template precompile unknown", "name=Game\nscripts=Code/Game.vcxproj\nlibrary=Out/Game.dll\n");
+		project.Add("Code/Game.vcxproj", script_module);
+
+		REQUIRE_FALSE(project.Ensure().empty());
+
+		CHECK(ReadBytes(project.root / "Code" / "Game.vcxproj") == script_module);
 	};
 
 	TEST_CASE("a project with no scripts project anywhere is given one")
