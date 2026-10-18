@@ -441,53 +441,6 @@ SpinningTriangle is there as a worked example.
 				? 0
 				: newline + 1;
 		};
-
-		// Gives a scripts project the template wrote before the engine's header
-		// was precompiled the settings that precompile it, naming the engine's
-		// header folder the way the project already does. One that has been
-		// changed past finding where they go is left alone.
-		bool Precompile(const std::filesystem::path& scripts, std::string* error)
-		{
-			constexpr std::string_view includes_tag = "<AdditionalIncludeDirectories>";
-			constexpr std::string_view headers_folder = "Loom WASM";
-			constexpr std::string_view defines_tag = "<PreprocessorDefinitions>LOOM_SCRIPT_MODULE";
-			constexpr std::string_view scripts_item = "<ClCompile Include=\"**\\*.hpp\">";
-
-			std::string text = ProjectAssets::ReadText(scripts.string());
-
-			if (text.find("<PrecompiledHeader>") != std::string::npos)
-				return true;
-
-			const size_t includes = text.find(includes_tag);
-			const size_t defines = text.find(defines_tag);
-			const size_t item = text.find(scripts_item);
-
-			if (includes == std::string::npos || defines == std::string::npos || item == std::string::npos || item < defines)
-				return true;
-
-			const size_t folder_start = includes + includes_tag.size();
-			const size_t folder_end = text.find(headers_folder, folder_start);
-
-			if (folder_end == std::string::npos || folder_end > text.find('<', folder_start))
-				return true;
-
-			const std::string headers = text.substr(folder_start, folder_end + headers_folder.size() - folder_start);
-			const std::string newline = text.find("\r\n") == std::string::npos ? "\n" : "\r\n";
-
-			const auto lines =
-				[&](const std::string& fragment)
-				{
-					return ProjectAssets::Replace(fragment, "\n", newline);
-				};
-
-			// The later one first, so the earlier position still holds.
-			text.insert(LineStart(text, item), lines(ProjectAssets::Replace(pch_item, "{HEADERS}", headers)));
-			text.insert(LineStart(text, defines), lines(pch_settings));
-
-			std::cout << "Precompiled the engine's header for " << scripts.string() << std::endl;
-
-			return Write(scripts, text, error);
-		};
 	};
 
 	std::string ProjectTemplate::EngineRoot()
@@ -631,9 +584,7 @@ SpinningTriangle is there as a worked example.
 			const std::filesystem::path scripts = (root / named).lexically_normal();
 
 			if (std::filesystem::is_regular_file(scripts, code))
-				return Precompile(scripts, error)
-					? scripts.string()
-					: "";
+				return scripts.string();
 		};
 
 		std::filesystem::path scripts = FindScriptsProject(root);
@@ -644,9 +595,6 @@ SpinningTriangle is there as a worked example.
 			kept += std::string(library_key) + '=' + PathIn(root, LibraryOf(root, scripts)) + '\n';
 
 			std::cout << "Found the scripts project " << scripts.string() << std::endl;
-
-			if (!Precompile(scripts, error))
-				return "";
 		}
 		else
 		{
@@ -674,6 +622,49 @@ SpinningTriangle is there as a worked example.
 			return "";
 
 		return scripts.lexically_normal().string();
+	};
+
+	bool ProjectTemplate::Precompile(const std::string& scripts, std::string* error)
+	{
+		constexpr std::string_view includes_tag = "<AdditionalIncludeDirectories>";
+		constexpr std::string_view headers_folder = "Loom WASM";
+		constexpr std::string_view defines_tag = "<PreprocessorDefinitions>LOOM_SCRIPT_MODULE";
+		constexpr std::string_view scripts_item = "<ClCompile Include=\"**\\*.hpp\">";
+
+		std::string text = ProjectAssets::ReadText(scripts);
+
+		if (text.find("<PrecompiledHeader>") != std::string::npos)
+			return true;
+
+		const size_t includes = text.find(includes_tag);
+		const size_t defines = text.find(defines_tag);
+		const size_t item = text.find(scripts_item);
+
+		if (includes == std::string::npos || defines == std::string::npos || item == std::string::npos || item < defines)
+			return true;
+
+		const size_t folder_start = includes + includes_tag.size();
+		const size_t folder_end = text.find(headers_folder, folder_start);
+
+		if (folder_end == std::string::npos || folder_end > text.find('<', folder_start))
+			return true;
+
+		const std::string headers = text.substr(folder_start, folder_end + headers_folder.size() - folder_start);
+		const std::string newline = text.find("\r\n") == std::string::npos ? "\n" : "\r\n";
+
+		const auto lines =
+			[&](const std::string& fragment)
+			{
+				return ProjectAssets::Replace(fragment, "\n", newline);
+			};
+
+		// The later one first, so the earlier position still holds.
+		text.insert(LineStart(text, item), lines(ProjectAssets::Replace(pch_item, "{HEADERS}", headers)));
+		text.insert(LineStart(text, defines), lines(pch_settings));
+
+		std::cout << "Precompiled the engine's header for " << scripts << std::endl;
+
+		return Write(scripts, text, error);
 	};
 
 	std::string ProjectTemplate::UsableName(const std::string& name)

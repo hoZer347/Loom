@@ -240,14 +240,13 @@ TEST_SUITE("ProjectTemplate")
 
 	TEST_CASE("a scripts project from before the engine's header was precompiled is given it, once")
 	{
-		const ProjectFolder project("loom template precompile", "name=Game\nscripts=Scripts/Game.vcxproj\nlibrary=Build/Game.dll\n");
-		const std::filesystem::path scripts = project.root / "Scripts" / "Game.vcxproj";
+		const Folder project("loom template precompile");
+		const std::filesystem::path scripts = project.path / "Game.vcxproj";
 
-		std::filesystem::create_directories(scripts.parent_path());
 		std::ofstream(scripts, std::ios::binary) << unprecompiled;
 
-		REQUIRE_FALSE(project.Ensure().empty());
-		REQUIRE_FALSE(project.Ensure().empty());
+		REQUIRE(Loom::ProjectTemplate::Precompile(scripts.string()));
+		REQUIRE(Loom::ProjectTemplate::Precompile(scripts.string()));
 
 		const std::string text = ReadBytes(scripts);
 
@@ -261,12 +260,14 @@ TEST_SUITE("ProjectTemplate")
 
 	TEST_CASE("a scripts project changed past recognising is not precompiled")
 	{
-		const ProjectFolder project("loom template precompile unknown", "name=Game\nscripts=Code/Game.vcxproj\nlibrary=Out/Game.dll\n");
-		project.Add("Code/Game.vcxproj", script_module);
+		const Folder project("loom template precompile unknown");
+		const std::filesystem::path scripts = project.path / "Game.vcxproj";
 
-		REQUIRE_FALSE(project.Ensure().empty());
+		std::ofstream(scripts, std::ios::binary) << script_module;
 
-		CHECK(ReadBytes(project.root / "Code" / "Game.vcxproj") == script_module);
+		REQUIRE(Loom::ProjectTemplate::Precompile(scripts.string()));
+
+		CHECK(ReadBytes(scripts) == script_module);
 	};
 
 	TEST_CASE("a project with no scripts project anywhere is given one")

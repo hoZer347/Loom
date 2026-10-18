@@ -91,6 +91,9 @@ namespace Loom
 		if (project.empty())
 			return;
 
+		if (std::string error; !ProjectTemplate::Precompile(project, &error))
+			std::cerr << error << std::endl;
+
 		m_scripts.SetProject(project, library);
 
 		std::cout
