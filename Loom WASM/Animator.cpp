@@ -290,7 +290,6 @@ namespace Loom
 		return -1;
 	};
 
-
 	void Animator::Start(int index)
 	{
 		CaptureBlend();

@@ -142,17 +142,14 @@ namespace Loom
 		// pose there is now, by way of the transition into it when there is one.
 		void Start(int index);
 
-
 		// The transition from one clip to another, or -1 when there is none.
 		int TransitionBetween(int from, int to);
-
 
 		// Remembers where the joints and shape keys are, to ease out of.
 		void CaptureBlend();
 
 		// Pose, eased out of the held pose while blendTime runs when blend is on.
 		void Apply(float time, bool blend);
-
 
 		// The Skins under it, gathered again once anything has been added,
 		// removed or moved.
