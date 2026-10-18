@@ -36,8 +36,9 @@ namespace Loom
 		// saves its shader rather than the scene.
 		bool IsFocused() const { return m_focused; };
 
-		// Every tab with unsaved changes, to its file.
-		void SaveAll();
+		// Every tab with unsaved changes, to its file. False when one could not
+		// be written.
+		bool SaveAll();
 
 		// Where on the line to underline a message about it: what glslang
 		// quotes, as in "'x' : undeclared identifier", when the line has it as

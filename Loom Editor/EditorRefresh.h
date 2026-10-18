@@ -47,9 +47,12 @@ namespace Loom
 
 		bool Succeeded() const { return m_succeeded; };
 
-		// Starts the executable this process was started from, which the build
-		// may have replaced, with those arguments after it.
-		bool Relaunch(const std::string& arguments) const;
+		// The executable this process was started from, which the build may
+		// have replaced.
+		const std::filesystem::path& GetExecutable() const { return m_executable; };
+
+		// Starts it with those arguments after it.
+		static bool Relaunch(const std::filesystem::path& executable, const std::string& arguments);
 
 	private:
 		struct Build

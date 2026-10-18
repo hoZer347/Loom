@@ -249,6 +249,30 @@ TEST_SUITE("ShaderEditor")
 		CHECK(driven.Saved() == shader);
 	};
 
+	TEST_CASE("saving everything writes an edited shader")
+	{
+		Driven driven;
+
+		driven.Type("x");
+		driven.Settle();
+
+		CHECK(driven.editor.SaveAll());
+		CHECK(driven.Saved() != shader);
+		CHECK(driven.Saved().find('x') != std::string::npos);
+	};
+
+	TEST_CASE("saving everything leaves a shader with no edits alone")
+	{
+		constexpr const char* changed_outside = "// written by something else\n";
+
+		Driven driven;
+
+		std::ofstream(driven.path, std::ios::binary) << changed_outside;
+
+		CHECK(driven.editor.SaveAll());
+		CHECK(driven.Saved() == changed_outside);
+	};
+
 	TEST_CASE("opening a shader that is already open adds no tab")
 	{
 		Driven driven;

@@ -925,17 +925,25 @@ namespace Loom
 		return SaveScene(scene, path);
 	};
 
-	void Editor::SaveProject()
+	bool Editor::SaveProject()
 	{
-		for (Scene* scene : m_ownedScenes)
-			SaveToProject(scene);
+		// Scenes Stop or a build just put back are only whole once the queue
+		// has run, since AddChild defers.
+		Engine::DoTasks();
 
-		m_shaders.SaveAll();
-		m_sprites.SaveAll();
+		bool saved = true;
+
+		for (Scene* scene : m_ownedScenes)
+			saved = SaveToProject(scene) && saved;
+
+		saved = m_shaders.SaveAll() && saved;
+		saved = m_sprites.SaveAll() && saved;
 
 		// An active scene saved for the first time just now is the one the
 		// next session starts on.
 		SetActiveScene(m_activeScene);
+
+		return saved;
 	};
 
 	void Editor::FullRefresh()
@@ -958,18 +966,22 @@ namespace Loom
 		};
 
 		Stop();
-		SaveProject();
+
+		if (!SaveProject())
+		{
+			std::cerr << "Full refresh: not everything saved, so this editor stays up rather than lose it." << std::endl;
+			return;
+		};
 
 		m_relaunch = true;
 		Engine::Stop();
 	};
 
-	bool Editor::Relaunch(const std::string& options) const
+	std::string Editor::RelaunchTarget() const
 	{
 		const auto scene = m_activeScene ? m_scenePaths.find(m_activeScene) : m_scenePaths.end();
-		const std::string target = scene != m_scenePaths.end() ? scene->second : m_projectPath;
 
-		return m_refresh.Relaunch(target.empty() ? options : options + " \"" + target + '"');
+		return scene != m_scenePaths.end() ? scene->second : m_projectPath;
 	};
 
 	bool Editor::IsOwned(Scene* scene) const

@@ -374,11 +374,15 @@ namespace Loom
 		};
 	};
 
-	void ShaderEditor::SaveAll()
+	bool ShaderEditor::SaveAll()
 	{
+		bool saved = true;
+
 		for (const std::unique_ptr<Document>& document : m_documents)
 			if (document->unsaved)
-				Save(*document);
+				saved = Save(*document) && saved;
+
+		return saved;
 	};
 
 	bool ShaderEditor::Save(Document& document)

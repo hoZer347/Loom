@@ -78,8 +78,9 @@ namespace Loom
 		// scene's own undo keeps out of its way.
 		bool IsFocused() const { return m_focused; };
 
-		// Every tab with unsaved changes, to its file.
-		void SaveAll();
+		// Every tab with unsaved changes, to its file. False when one could not
+		// be written.
+		bool SaveAll();
 
 		// The files saved since the last call.
 		std::vector<std::string> TakeSaved();

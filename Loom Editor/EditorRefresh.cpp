@@ -170,7 +170,7 @@ namespace Loom
 		return Progress::Finished;
 	};
 
-	bool EditorRefresh::Relaunch(const std::string& arguments) const
+	bool EditorRefresh::Relaunch(const std::filesystem::path& executable, const std::string& arguments)
 	{
 		const int length = MultiByteToWideChar(CP_ACP, 0, arguments.c_str(), -1, nullptr, 0);
 
@@ -178,14 +178,14 @@ namespace Loom
 		MultiByteToWideChar(CP_ACP, 0, arguments.c_str(), -1, wide.data(), length);
 		wide.resize(length - 1);
 
-		std::wstring command = L"\"" + m_executable.wstring() + L"\" " + wide;
+		std::wstring command = L"\"" + executable.wstring() + L"\" " + wide;
 
 		STARTUPINFOW startup{ sizeof(startup) };
 		PROCESS_INFORMATION process{ };
 
-		if (!CreateProcessW(m_executable.c_str(), command.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &startup, &process))
+		if (!CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &startup, &process))
 		{
-			std::cerr << "Full refresh: could not start " << m_executable.string() << " again" << std::endl;
+			std::cerr << "Full refresh: could not start " << executable.string() << " again" << std::endl;
 			return false;
 		};
 

@@ -263,6 +263,20 @@ TEST_SUITE("SpriteEditor")
 		CHECK(Count(driven.Saved(), CLEAR) == Driven::side * Driven::side - 1);
 	};
 
+	TEST_CASE("saving everything writes a painted sprite without Ctrl+S")
+	{
+		Driven driven("loom sprite save all.tga");
+
+		driven.Stroke(middle, middle);
+
+		CHECK(driven.editor.SaveAll());
+
+		SpriteEditor::Image saved;
+		REQUIRE(SpriteEditor::Load(driven.path, saved));
+
+		CHECK(Count(saved, CLEAR) == Driven::side * Driven::side - 1);
+	};
+
 	TEST_CASE("a stroke across the image paints the row it crosses, end to end")
 	{
 		Driven driven("loom sprite stroke.tga");

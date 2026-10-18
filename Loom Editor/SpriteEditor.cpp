@@ -651,11 +651,15 @@ namespace Loom
 		document.zoom = zoom;
 	};
 
-	void SpriteEditor::SaveAll()
+	bool SpriteEditor::SaveAll()
 	{
+		bool saved = true;
+
 		for (const std::unique_ptr<Document>& document : m_documents)
 			if (document->unsaved)
-				SaveDocument(*document);
+				saved = SaveDocument(*document) && saved;
+
+		return saved;
 	};
 
 	bool SpriteEditor::SaveDocument(Document& document)

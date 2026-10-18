@@ -111,10 +111,11 @@ namespace Loom
 		void FullRefresh();
 		bool IsRefreshing() const { return m_refresh.IsRunning() || m_relaunch; };
 
-		// Whether the editor closed to be started again, and the start, on the
-		// scene that was active or the project when none was.
+		// Whether the editor closed to be started again, from which executable
+		// and on what: the scene that was active, or the project when none was.
 		bool WantsRelaunch() const { return m_relaunch; };
-		bool Relaunch(const std::string& options) const;
+		const std::filesystem::path& RelaunchExecutable() const { return m_refresh.GetExecutable(); };
+		std::string RelaunchTarget() const;
 
 		// The folder the editor works out of. Everything under it is listed in
 		// the Project panel; the choice is remembered between runs, so
@@ -486,8 +487,9 @@ namespace Loom
 		// once it has, unless it failed.
 		void PollRefresh();
 
-		// Every owned scene, open shader and sprite, to its file.
-		void SaveProject();
+		// Every owned scene, open shader and sprite, to its file. False when
+		// something could not be saved.
+		bool SaveProject();
 
 		// SaveActiveScene's choice of file, for any owned scene.
 		bool SaveToProject(Scene* scene);

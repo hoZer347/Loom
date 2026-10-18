@@ -341,383 +341,397 @@ int main(int argc, char** argv)
 	// play over whatever whoever is at the machine is doing.
 	Audio::useDevice = Engine::showWindow;
 
-	// The Engine comes first: it owns the window, the renderer and the ImGui
-	// context the editor draws itself into.
-	Engine engine;
+	// A refresh starts the new editor once this one is gone, its MCP port
+	// freed and what it writes as it closes written.
+	std::filesystem::path relaunch;
+	std::string relaunch_arguments;
+	bool failed = false;
 
-	// An automated run is often a scratch build that is deleted afterwards,
-	// which must not take the file association with it.
-	if (Engine::showWindow)
-		ClaimFileTypes();
+	{
+		// The Engine comes first: it owns the window, the renderer and the ImGui
+		// context the editor draws itself into.
+		Engine engine;
 
-	glfwSetWindowTitle(Engine::window, "Loom Editor");
-	glfwSetWindowSize(Engine::window, 1600, 900);
+		// An automated run is often a scratch build that is deleted afterwards,
+		// which must not take the file association with it.
+		if (Engine::showWindow)
+			ClaimFileTypes();
 
-	if (!desktop.empty() && !ShowOnDesktop(Engine::window, desktop))
+		glfwSetWindowTitle(Engine::window, "Loom Editor");
+		glfwSetWindowSize(Engine::window, 1600, 900);
+
+		if (!desktop.empty() && !ShowOnDesktop(Engine::window, desktop))
+			return 1;
+
+		// Opening a project moves the working directory into it, and the editor
+		// opens the last one as it starts, so relative paths on the command line
+		// are taken from where it was started.
+		const std::filesystem::path launch_folder = std::filesystem::current_path();
+
+		Editor editor;
+
+		bool compile = false;
+		bool play = false;
+		bool play_web = false;
+		bool open_project_dialog = false;
+		bool settings = false;
+		std::string screenshot;
+		std::string preview;
+		std::string selection;
+		std::string new_script;
+		AssetKind new_script_kind = AssetKind::Script;
+		std::vector<std::pair<std::string, std::string>> categories;
+		std::optional<AssetKind> create_prompt;
+		int frames = 240;
+
+		// After the Engine, whose ImGui context it listens to.
+		std::unique_ptr<UiScript> script;
+		bool exit_after_script = false;
+
+		unsigned short mcp_port = Engine::showWindow ? EditorMcp::default_port : 0;
+
+		for (int i = 1; i < argc; i++)
+		{
+			const std::string argument = argv[i];
+
+			if (argument == "--help" || argument == "-h")
+			{
+				Usage();
+			}
+			else if (argument == "--new-project")
+			{
+				if (i + 2 >= argc)
+				{
+					std::cerr << "--new-project needs a folder and a name" << std::endl;
+					return 1;
+				};
+
+				if (!editor.CreateProject(argv[i + 1], argv[i + 2]))
+					return 1;
+
+				i += 2;
+			}
+			else if (argument == "--screenshot")
+			{
+				if (i + 1 >= argc)
+				{
+					std::cerr << "--screenshot needs a file to write" << std::endl;
+					return 1;
+				};
+
+				screenshot = argv[++i];
+
+				// An optional frame count: enough of them for a build to finish and
+				// for the scene to have been ticked.
+				if (i + 1 < argc && isdigit((unsigned char)argv[i + 1][0]))
+					frames = atoi(argv[++i]);
+			}
+			else if (argument == "--ui-script")
+			{
+				if (i + 1 >= argc)
+				{
+					std::cerr << "--ui-script needs a script file" << std::endl;
+					return 1;
+				};
+
+				script = std::make_unique<UiScript>(launch_folder);
+				exit_after_script = true;
+
+				if (!script->Load(argv[++i]))
+					return 1;
+			}
+			else if (argument == "--mcp")
+			{
+				constexpr long highest_port = std::numeric_limits<unsigned short>::max();
+
+				char* end = nullptr;
+				const long port = i + 1 < argc ? strtol(argv[i + 1], &end, 10) : 0;
+
+				if (i + 1 >= argc || *end != '\0' || port < 1 || port > highest_port)
+				{
+					std::cerr << "--mcp needs a port from 1 to " << highest_port << std::endl;
+					return 1;
+				};
+
+				mcp_port = (unsigned short)port;
+				i++;
+			}
+			else if (argument == "--import")
+			{
+				if (i + 1 >= argc)
+				{
+					std::cerr << "--import needs a model file" << std::endl;
+					return 1;
+				};
+
+				const std::string path = argv[++i];
+
+				// An optional drop position, which picks the parent the way the
+				// mouse does when a file is dragged in.
+				if (i + 2 < argc && isdigit((unsigned char)argv[i + 1][0]) && isdigit((unsigned char)argv[i + 2][0]))
+				{
+					editor.Drop(path, (float)atof(argv[i + 1]), (float)atof(argv[i + 2]));
+					i += 2;
+				}
+				else editor.QueueImport(path);
+			}
+			else if (argument == "--preview")
+			{
+				if (i + 1 >= argc)
+				{
+					std::cerr << "--preview needs a model file" << std::endl;
+					return 1;
+				};
+
+				preview = argv[++i];
+			}
+			else if (argument == "--create-prompt")
+			{
+				if (i + 1 >= argc || !ScriptKindNamed(argv[i + 1]))
+				{
+					std::cerr << "--create-prompt needs script, state or state-machine" << std::endl;
+					return 1;
+				};
+
+				create_prompt = ScriptKindNamed(argv[++i]);
+			}
+			else if (argument.starts_with(createPrefix) && ScriptKindNamed(argument.substr(createPrefix.size())))
+			{
+				if (i + 1 >= argc)
+				{
+					std::cerr << argument << " needs a name" << std::endl;
+					return 1;
+				};
+
+				new_script_kind = *ScriptKindNamed(argument.substr(createPrefix.size()));
+				new_script = argv[++i];
+			}
+			else if (argument == "--set-component-category")
+			{
+				if (i + 2 >= argc)
+				{
+					std::cerr << "--set-component-category needs a component and a category" << std::endl;
+					return 1;
+				};
+
+				categories.emplace_back(argv[i + 1], argv[i + 2]);
+				i += 2;
+			}
+			else if (argument == "--select")
+			{
+				if (i + 1 >= argc)
+				{
+					std::cerr << "--select needs a GameObject name" << std::endl;
+					return 1;
+				};
+
+				selection = argv[++i];
+			}
+			else if (argument == "--desktop")
+			{
+				if (i + 1 >= argc)
+				{
+					std::cerr << "--desktop needs a virtual desktop id" << std::endl;
+					return 1;
+				};
+
+				i++;
+			}
+			else if (argument == "--vulkan" || argument == "--opengl")
+				continue;
+			else if (argument == "--compile")
+				compile = true;
+			else if (argument == "--play")
+				play = true;
+			else if (argument == "--play-web")
+				play_web = true;
+			else if (argument == "--open-project-dialog")
+				open_project_dialog = true;
+			else if (argument == "--settings")
+				settings = true;
+			else if (argument == "--open-scene")
+			{
+				if (i + 1 >= argc)
+				{
+					std::cerr << "--open-scene needs a scene file" << std::endl;
+					return 1;
+				};
+
+				editor.OpenScene(argv[++i]);
+			}
+			else if (argument == "--open-shader")
+			{
+				if (i + 1 >= argc)
+				{
+					std::cerr << "--open-shader needs a shader file" << std::endl;
+					return 1;
+				};
+
+				editor.OpenShader(argv[++i]);
+			}
+			else if (argument == "--layout" || argument == "--save-layout")
+			{
+				if (i + 1 >= argc)
+				{
+					std::cerr << argument << " needs a layout name" << std::endl;
+					return 1;
+				};
+
+				if (argument == "--layout")
+					editor.LoadLayout(argv[++i]);
+				else
+					editor.SaveLayout(argv[++i]);
+			}
+			else if (argument == "--save-layout-prompt")
+				editor.ShowSaveLayoutPrompt();
+			else if (argument == "--open-sprite")
+			{
+				if (i + 1 >= argc)
+				{
+					std::cerr << "--open-sprite needs an image file" << std::endl;
+					return 1;
+				};
+
+				editor.OpenSprite(argv[++i]);
+			}
+			else if (argument == "--add-component-prompt")
+				editor.ShowAddComponent();
+			else if (argument == "--open-demo")
+			{
+				if (i + 1 >= argc)
+				{
+					std::cerr << "--open-demo needs a demo name" << std::endl;
+					return 1;
+				};
+
+				editor.OpenDemo(argv[++i]);
+			}
+			else if (argument == "--click")
+			{
+				if (i + 2 >= argc)
+				{
+					std::cerr << "--click needs a point" << std::endl;
+					return 1;
+				};
+
+				const float x = (float)atof(argv[++i]);
+				const float y = (float)atof(argv[++i]);
+
+				// An optional point to let go at, which makes it a drag.
+				if (i + 2 < argc && isdigit((unsigned char)argv[i + 1][0]) && isdigit((unsigned char)argv[i + 2][0]))
+				{
+					editor.QueueClick(x, y, (float)atof(argv[i + 1]), (float)atof(argv[i + 2]));
+					i += 2;
+				}
+				else editor.QueueClick(x, y, x, y);
+			}
+			else if (argument == "--undo" || argument == "--redo")
+				editor.QueueHistoryStep(argument == "--undo");
+			else if (argument.rfind("--", 0) == 0)
+			{
+				std::cerr << "Unknown option " << argument << std::endl;
+				Usage();
+				return 1;
+			}
+			else editor.OpenProject((launch_folder / argument).string());
+		};
+
+		if (!new_script.empty())
+			editor.CreateScriptAsset(new_script_kind, new_script);
+
+		for (const auto& [component, category] : categories)
+			editor.SetComponentCategory(component, category);
+
+		if (compile)
+			editor.CompileScripts();
+
+		// The same path the Play button takes, so the scripts are compiled first
+		// here too.
+		if (play)
+			editor.TogglePlay();
+
+		if (play_web)
+			editor.PlayWeb();
+
+		if (open_project_dialog)
+			editor.ShowOpenProjectDialog();
+
+		if (settings)
+			editor.ShowSettings();
+
+		if (create_prompt)
+			editor.AskForAsset(*create_prompt, editor.GetProjectPath());
+
+		// After the project is open, since opening its scene selects that instead.
+		if (!preview.empty())
+			editor.SelectModel(preview);
+
+		if (!selection.empty())
+			editor.RequestSelection(selection);
+
+		if (!screenshot.empty())
+			editor.RequestScreenshot(screenshot, frames, true);
+
+		// The server's ui tool runs its commands through the same UiScript as a
+		// --ui-script run, since only one can listen to ImGui's items.
+		std::unique_ptr<EditorMcp> mcp;
+
+		if (mcp_port != 0)
+		{
+			if (!script)
+			{
+				script = std::make_unique<UiScript>(launch_folder);
+				script->Listen(false);
+			};
+
+			mcp = std::make_unique<EditorMcp>(editor, *script);
+
+			if (!mcp->Listen(mcp_port))
+			{
+				mcp.reset();
+
+				if (!exit_after_script)
+					script.reset();
+			};
+		};
+
+		if (script)
+			Engine::SetImGuiInputFunction(
+				[&script, &mcp, exit_after_script]()
+				{
+					script->Step();
+
+					if (mcp)
+						mcp->Step();
+
+					if (exit_after_script && script->Finished())
+						Engine::Stop();
+				});
+
+		engine.Start();
+
+		if (editor.WantsRelaunch())
+		{
+			std::string options = Engine::backend == Backend::Vulkan ? "--vulkan" : "--opengl";
+
+			if (mcp_port != 0 && mcp_port != EditorMcp::default_port)
+				options += " --mcp " + std::to_string(mcp_port);
+
+			if (!desktop.empty())
+				options += " --desktop " + desktop;
+
+			if (const std::string target = editor.RelaunchTarget(); !target.empty())
+				options += " \"" + target + '"';
+
+			relaunch = editor.RelaunchExecutable();
+			relaunch_arguments = options;
+		};
+
+		failed = exit_after_script && script->Failed();
+	};
+
+	if (!relaunch.empty() && !EditorRefresh::Relaunch(relaunch, relaunch_arguments))
 		return 1;
 
-	// Opening a project moves the working directory into it, and the editor
-	// opens the last one as it starts, so relative paths on the command line
-	// are taken from where it was started.
-	const std::filesystem::path launch_folder = std::filesystem::current_path();
-
-	Editor editor;
-
-	bool compile = false;
-	bool play = false;
-	bool play_web = false;
-	bool open_project_dialog = false;
-	bool settings = false;
-	std::string screenshot;
-	std::string preview;
-	std::string selection;
-	std::string new_script;
-	AssetKind new_script_kind = AssetKind::Script;
-	std::vector<std::pair<std::string, std::string>> categories;
-	std::optional<AssetKind> create_prompt;
-	int frames = 240;
-
-	// After the Engine, whose ImGui context it listens to.
-	std::unique_ptr<UiScript> script;
-	bool exit_after_script = false;
-
-	unsigned short mcp_port = Engine::showWindow ? EditorMcp::default_port : 0;
-
-	for (int i = 1; i < argc; i++)
-	{
-		const std::string argument = argv[i];
-
-		if (argument == "--help" || argument == "-h")
-		{
-			Usage();
-		}
-		else if (argument == "--new-project")
-		{
-			if (i + 2 >= argc)
-			{
-				std::cerr << "--new-project needs a folder and a name" << std::endl;
-				return 1;
-			};
-
-			if (!editor.CreateProject(argv[i + 1], argv[i + 2]))
-				return 1;
-
-			i += 2;
-		}
-		else if (argument == "--screenshot")
-		{
-			if (i + 1 >= argc)
-			{
-				std::cerr << "--screenshot needs a file to write" << std::endl;
-				return 1;
-			};
-
-			screenshot = argv[++i];
-
-			// An optional frame count: enough of them for a build to finish and
-			// for the scene to have been ticked.
-			if (i + 1 < argc && isdigit((unsigned char)argv[i + 1][0]))
-				frames = atoi(argv[++i]);
-		}
-		else if (argument == "--ui-script")
-		{
-			if (i + 1 >= argc)
-			{
-				std::cerr << "--ui-script needs a script file" << std::endl;
-				return 1;
-			};
-
-			script = std::make_unique<UiScript>(launch_folder);
-			exit_after_script = true;
-
-			if (!script->Load(argv[++i]))
-				return 1;
-		}
-		else if (argument == "--mcp")
-		{
-			constexpr long highest_port = std::numeric_limits<unsigned short>::max();
-
-			char* end = nullptr;
-			const long port = i + 1 < argc ? strtol(argv[i + 1], &end, 10) : 0;
-
-			if (i + 1 >= argc || *end != '\0' || port < 1 || port > highest_port)
-			{
-				std::cerr << "--mcp needs a port from 1 to " << highest_port << std::endl;
-				return 1;
-			};
-
-			mcp_port = (unsigned short)port;
-			i++;
-		}
-		else if (argument == "--import")
-		{
-			if (i + 1 >= argc)
-			{
-				std::cerr << "--import needs a model file" << std::endl;
-				return 1;
-			};
-
-			const std::string path = argv[++i];
-
-			// An optional drop position, which picks the parent the way the
-			// mouse does when a file is dragged in.
-			if (i + 2 < argc && isdigit((unsigned char)argv[i + 1][0]) && isdigit((unsigned char)argv[i + 2][0]))
-			{
-				editor.Drop(path, (float)atof(argv[i + 1]), (float)atof(argv[i + 2]));
-				i += 2;
-			}
-			else editor.QueueImport(path);
-		}
-		else if (argument == "--preview")
-		{
-			if (i + 1 >= argc)
-			{
-				std::cerr << "--preview needs a model file" << std::endl;
-				return 1;
-			};
-
-			preview = argv[++i];
-		}
-		else if (argument == "--create-prompt")
-		{
-			if (i + 1 >= argc || !ScriptKindNamed(argv[i + 1]))
-			{
-				std::cerr << "--create-prompt needs script, state or state-machine" << std::endl;
-				return 1;
-			};
-
-			create_prompt = ScriptKindNamed(argv[++i]);
-		}
-		else if (argument.starts_with(createPrefix) && ScriptKindNamed(argument.substr(createPrefix.size())))
-		{
-			if (i + 1 >= argc)
-			{
-				std::cerr << argument << " needs a name" << std::endl;
-				return 1;
-			};
-
-			new_script_kind = *ScriptKindNamed(argument.substr(createPrefix.size()));
-			new_script = argv[++i];
-		}
-		else if (argument == "--set-component-category")
-		{
-			if (i + 2 >= argc)
-			{
-				std::cerr << "--set-component-category needs a component and a category" << std::endl;
-				return 1;
-			};
-
-			categories.emplace_back(argv[i + 1], argv[i + 2]);
-			i += 2;
-		}
-		else if (argument == "--select")
-		{
-			if (i + 1 >= argc)
-			{
-				std::cerr << "--select needs a GameObject name" << std::endl;
-				return 1;
-			};
-
-			selection = argv[++i];
-		}
-		else if (argument == "--desktop")
-		{
-			if (i + 1 >= argc)
-			{
-				std::cerr << "--desktop needs a virtual desktop id" << std::endl;
-				return 1;
-			};
-
-			i++;
-		}
-		else if (argument == "--vulkan" || argument == "--opengl")
-			continue;
-		else if (argument == "--compile")
-			compile = true;
-		else if (argument == "--play")
-			play = true;
-		else if (argument == "--play-web")
-			play_web = true;
-		else if (argument == "--open-project-dialog")
-			open_project_dialog = true;
-		else if (argument == "--settings")
-			settings = true;
-		else if (argument == "--open-scene")
-		{
-			if (i + 1 >= argc)
-			{
-				std::cerr << "--open-scene needs a scene file" << std::endl;
-				return 1;
-			};
-
-			editor.OpenScene(argv[++i]);
-		}
-		else if (argument == "--open-shader")
-		{
-			if (i + 1 >= argc)
-			{
-				std::cerr << "--open-shader needs a shader file" << std::endl;
-				return 1;
-			};
-
-			editor.OpenShader(argv[++i]);
-		}
-		else if (argument == "--layout" || argument == "--save-layout")
-		{
-			if (i + 1 >= argc)
-			{
-				std::cerr << argument << " needs a layout name" << std::endl;
-				return 1;
-			};
-
-			if (argument == "--layout")
-				editor.LoadLayout(argv[++i]);
-			else
-				editor.SaveLayout(argv[++i]);
-		}
-		else if (argument == "--save-layout-prompt")
-			editor.ShowSaveLayoutPrompt();
-		else if (argument == "--open-sprite")
-		{
-			if (i + 1 >= argc)
-			{
-				std::cerr << "--open-sprite needs an image file" << std::endl;
-				return 1;
-			};
-
-			editor.OpenSprite(argv[++i]);
-		}
-		else if (argument == "--add-component-prompt")
-			editor.ShowAddComponent();
-		else if (argument == "--open-demo")
-		{
-			if (i + 1 >= argc)
-			{
-				std::cerr << "--open-demo needs a demo name" << std::endl;
-				return 1;
-			};
-
-			editor.OpenDemo(argv[++i]);
-		}
-		else if (argument == "--click")
-		{
-			if (i + 2 >= argc)
-			{
-				std::cerr << "--click needs a point" << std::endl;
-				return 1;
-			};
-
-			const float x = (float)atof(argv[++i]);
-			const float y = (float)atof(argv[++i]);
-
-			// An optional point to let go at, which makes it a drag.
-			if (i + 2 < argc && isdigit((unsigned char)argv[i + 1][0]) && isdigit((unsigned char)argv[i + 2][0]))
-			{
-				editor.QueueClick(x, y, (float)atof(argv[i + 1]), (float)atof(argv[i + 2]));
-				i += 2;
-			}
-			else editor.QueueClick(x, y, x, y);
-		}
-		else if (argument == "--undo" || argument == "--redo")
-			editor.QueueHistoryStep(argument == "--undo");
-		else if (argument.rfind("--", 0) == 0)
-		{
-			std::cerr << "Unknown option " << argument << std::endl;
-			Usage();
-			return 1;
-		}
-		else editor.OpenProject((launch_folder / argument).string());
-	};
-
-	if (!new_script.empty())
-		editor.CreateScriptAsset(new_script_kind, new_script);
-
-	for (const auto& [component, category] : categories)
-		editor.SetComponentCategory(component, category);
-
-	if (compile)
-		editor.CompileScripts();
-
-	// The same path the Play button takes, so the scripts are compiled first
-	// here too.
-	if (play)
-		editor.TogglePlay();
-
-	if (play_web)
-		editor.PlayWeb();
-
-	if (open_project_dialog)
-		editor.ShowOpenProjectDialog();
-
-	if (settings)
-		editor.ShowSettings();
-
-	if (create_prompt)
-		editor.AskForAsset(*create_prompt, editor.GetProjectPath());
-
-	// After the project is open, since opening its scene selects that instead.
-	if (!preview.empty())
-		editor.SelectModel(preview);
-
-	if (!selection.empty())
-		editor.RequestSelection(selection);
-
-	if (!screenshot.empty())
-		editor.RequestScreenshot(screenshot, frames, true);
-
-	// The server's ui tool runs its commands through the same UiScript as a
-	// --ui-script run, since only one can listen to ImGui's items.
-	std::unique_ptr<EditorMcp> mcp;
-
-	if (mcp_port != 0)
-	{
-		if (!script)
-		{
-			script = std::make_unique<UiScript>(launch_folder);
-			script->Listen(false);
-		};
-
-		mcp = std::make_unique<EditorMcp>(editor, *script);
-
-		if (!mcp->Listen(mcp_port))
-		{
-			mcp.reset();
-
-			if (!exit_after_script)
-				script.reset();
-		};
-	};
-
-	if (script)
-		Engine::SetImGuiInputFunction(
-			[&script, &mcp, exit_after_script]()
-			{
-				script->Step();
-
-				if (mcp)
-					mcp->Step();
-
-				if (exit_after_script && script->Finished())
-					Engine::Stop();
-			});
-
-	engine.Start();
-
-	if (editor.WantsRelaunch())
-	{
-		// The new editor serves on the same port, which this one lets go of first.
-		mcp.reset();
-
-		std::string options = Engine::backend == Backend::Vulkan ? "--vulkan" : "--opengl";
-
-		if (mcp_port != 0 && mcp_port != EditorMcp::default_port)
-			options += " --mcp " + std::to_string(mcp_port);
-
-		if (!desktop.empty())
-			options += " --desktop " + desktop;
-
-		editor.Relaunch(options);
-	};
-
-	return exit_after_script && script->Failed() ? 1 : 0;
+	return failed ? 1 : 0;
 };
