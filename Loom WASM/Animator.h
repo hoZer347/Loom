@@ -21,12 +21,11 @@ namespace Loom
 	* - Plays the clip at clip's place in m_clips, from its start whenever it
 	*   changes, speed times as fast as the clock. With loop on it starts over
 	*   at its end; off, it holds its last pose
-	* - With switchAfter above 0 it moves on to the next clip, in order and
-	*   round to the first again, once the playing one has played that many
-	*   seconds, waiting for the end of its loop so no step is cut short
 	* - A clip named "<from> to <to>" is a transition: going from the clip
 	*   named from to the one named to, it plays that once on the way, then
-	*   carries on into to. switchAfter passes over transitions
+	*   carries on into to
+	* - Which clip plays when is up to whatever sets clip or calls Play, such
+	*   as a script
 	* - Whenever the clip changes, the pose eases out of where the joints and
 	*   shape keys were over blendTime seconds, so nothing snaps
 	* - Between keys, positions, scales and weights are blended straight and
@@ -46,8 +45,8 @@ namespace Loom
 
 		void OnUpdate() override;
 
-		// Moves the playing clip on by seconds of the clock, switching clips as
-		// switchAfter says, and puts the pose there on the joints and Skins.
+		// Moves the playing clip on by seconds of the clock and puts the pose
+		// there on the joints and Skins.
 		void Advance(float seconds);
 
 		// How far into the playing clip it is.
@@ -76,6 +75,13 @@ namespace Loom
 
 		float GetTime() const { return m_time; };
 
+		// Whether the clip at index is a transition, which a script moving
+		// between clips passes over for the Animator to play on the way.
+		bool IsTransition(int index);
+
+		// Whether a transition is playing on the way to clip.
+		bool InTransition() const { return m_after >= 0; };
+
 		// Which clip plays, by its place in m_clips. While a transition into it
 		// plays, it already names the clip the transition leads to.
 		Serial<int> clip = 0;
@@ -93,10 +99,6 @@ namespace Loom
 		// For each channel in turn, how many keys it has, then each key: its
 		// time in seconds and then its value.
 		Serial<std::vector<float>> m_keys;
-
-		// Seconds before moving on to the next clip, or 0 to stay on one. Last,
-		// so the fields before it keep their places in scenes saved without it.
-		Serial<float> switchAfter = 0.0f;
 
 		// Seconds to ease from one clip's pose into the next, or 0 to cut.
 		Serial<float> blendTime = 0.25f;
@@ -140,14 +142,10 @@ namespace Loom
 		// pose there is now, by way of the transition into it when there is one.
 		void Start(int index);
 
-		// The clip switchAfter moves on to: the next that is not a transition,
-		// round to the first again.
-		int NextIndex();
 
 		// The transition from one clip to another, or -1 when there is none.
 		int TransitionBetween(int from, int to);
 
-		bool IsTransition(size_t index) const;
 
 		// Remembers where the joints and shape keys are, to ease out of.
 		void CaptureBlend();
@@ -155,10 +153,6 @@ namespace Loom
 		// Pose, eased out of the held pose while blendTime runs when blend is on.
 		void Apply(float time, bool blend);
 
-		// How long the playing clip plays before switchAfter moves on: the
-		// whole loops that cover switchAfter, or switchAfter itself for a clip
-		// with no length.
-		float PlayFor();
 
 		// The Skins under it, gathered again once anything has been added,
 		// removed or moved.

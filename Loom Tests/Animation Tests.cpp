@@ -262,55 +262,6 @@ TEST_SUITE("Animator")
 		CHECK(animated.rig.skin->GetShapeWeight("Smile") == doctest::Approx(0.5f));
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "with switchAfter set, the clips play in turn, each to the end of a loop, round to the first again")
-	{
-		Animated animated;
-		animated.animator->Play("Slide");
-		animated.animator->switchAfter = 1.5f;
-
-		// Slide is a second long, so it plays two loops before moving on.
-		animated.animator->Advance(1.9f);
-		CHECK(animated.animator->GetClipName() == "Slide");
-
-		animated.animator->Advance(0.2f);
-		CHECK(animated.animator->GetClipName() == "Hold");
-		CHECK(animated.animator->GetTime() == doctest::Approx(0.1f));
-
-		// Hold is half a second: three loops.
-		animated.animator->Advance(1.45f);
-		CHECK(animated.animator->GetClipName() == "Slide");
-
-		animated.animator->switchAfter = 0.0f;
-		animated.animator->Advance(5.0f);
-		CHECK(animated.animator->GetClipName() == "Slide");
-	};
-
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a clip with no length is played for switchAfter seconds before moving on")
-	{
-		Animated animated;
-		animated.animator->m_clips = "Slide\t1\nPose\t0\n";
-		animated.animator->Play("Pose");
-		animated.animator->switchAfter = 1.5f;
-
-		animated.animator->Advance(1.4f);
-		CHECK(animated.animator->GetClipName() == "Pose");
-
-		animated.animator->Advance(0.2f);
-		CHECK(animated.animator->GetClipName() == "Slide");
-	};
-
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a long frame moves on by one clip, part way into it")
-	{
-		Animated animated;
-		animated.animator->Play("Slide");
-		animated.animator->switchAfter = 1.5f;
-
-		animated.animator->Advance(100.0f);
-
-		CHECK(animated.animator->GetClipName() == "Hold");
-		CHECK(animated.animator->GetTime() < 1.5f);
-	};
-
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a Skin added after the clip started has its shape keys set too")
 	{
 		Animated animated;
@@ -375,21 +326,22 @@ TEST_SUITE("Animator")
 		CHECK(animated.animator->GetClipName() == "Slide");
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "switchAfter goes by way of transitions but never stops on one")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a script can tell a transition from a clip, and when one is playing")
 	{
 		Animated animated;
 		animated.animator->m_clips = "Slide\t1\nHold\t0.5\nSlide to Hold\t0.25\n";
 		animated.animator->Play("Slide");
-		animated.animator->switchAfter = 1.0f;
 
-		animated.animator->Advance(1.1f);
-		CHECK(animated.animator->GetClipName() == "Slide to Hold");
+		CHECK_FALSE(animated.animator->IsTransition(0));
+		CHECK(animated.animator->IsTransition(2));
+		CHECK_FALSE(animated.animator->IsTransition(3));
+		CHECK_FALSE(animated.animator->InTransition());
 
-		animated.animator->Advance(0.2f);
-		CHECK(animated.animator->GetClipName() == "Hold");
+		animated.animator->Play("Hold");
+		CHECK(animated.animator->InTransition());
 
-		animated.animator->Advance(1.0f);
-		CHECK(animated.animator->GetClipName() == "Slide");
+		animated.animator->Advance(0.3f);
+		CHECK_FALSE(animated.animator->InTransition());
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a change of clip eases out of the pose there was over blendTime")
@@ -438,12 +390,7 @@ TEST_SUITE("Animator")
 	{
 		Animated animated;
 		animated.animator->m_clips = "Slide\t1\nRun to Cover\t0.5\n";
-		animated.animator->Play("Slide");
-		animated.animator->switchAfter = 1.0f;
-
-		// switchAfter stops on it like any clip rather than passing over it.
-		animated.animator->Advance(1.1f);
-		CHECK(animated.animator->GetClipName() == "Run to Cover");
+		CHECK_FALSE(animated.animator->IsTransition(1));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Rotation turns Euler degrees back into the rotation they came from")

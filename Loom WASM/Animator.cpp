@@ -264,30 +264,16 @@ namespace Loom
 			m_time -= GetDuration();
 			m_playing = m_after;
 			m_after = -1;
-		}
-		else if (m_after < 0 && switchAfter > 0.0f && m_time >= PlayFor())
-		{
-			const float over = m_time - PlayFor();
-
-			Start(NextIndex());
-
-			// A long frame moves on one clip, not several.
-			m_time = std::fmod(over, PlayFor());
 		};
 
 		Apply(m_time, true);
 	};
 
-	float Animator::PlayFor()
+	bool Animator::IsTransition(int index)
 	{
-		const float duration = GetDuration();
+		Parse();
 
-		return duration > 0.0f ? std::ceil(switchAfter / duration) * duration : *switchAfter;
-	};
-
-	bool Animator::IsTransition(size_t index) const
-	{
-		return m_parsedClips[index].from >= 0;
+		return index >= 0 && (size_t)index < m_parsedClips.size() && m_parsedClips[index].from >= 0;
 	};
 
 	int Animator::TransitionBetween(int from, int to)
@@ -304,24 +290,6 @@ namespace Loom
 		return -1;
 	};
 
-	int Animator::NextIndex()
-	{
-		Parse();
-
-		const size_t count = m_parsedClips.size();
-		const size_t playing = PlayingIndex();
-		const size_t from = playing < count ? playing : count - 1;
-
-		for (size_t step = 1; step <= count; step++)
-		{
-			const size_t next = (from + step) % count;
-
-			if (!IsTransition(next))
-				return (int)next;
-		};
-
-		return (int)playing;
-	};
 
 	void Animator::Start(int index)
 	{
@@ -384,7 +352,7 @@ namespace Loom
 
 		if (duration <= 0.0f)
 			time = 0.0f;
-		else if (loop && !IsTransition(playing))
+		else if (loop && !IsTransition((int)playing))
 			time -= duration * std::floor(time / duration);
 		else time = std::clamp(time, 0.0f, duration);
 
