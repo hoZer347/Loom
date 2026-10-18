@@ -100,7 +100,7 @@ function Read-Dependencies([string] $Path)
 # older than its source or a header it read last time.
 function Get-StaleJobs($Jobs, [string[]] $Flags, [string] $Stamp)
 {
-    if (-not (Test-Path -LiteralPath $Stamp) -or [IO.File]::ReadAllText($Stamp) -ne ($Flags -join "`n"))
+    if (-not (Test-Path -LiteralPath $Stamp) -or [IO.File]::ReadAllText($Stamp) -cne ($Flags -join "`n"))
     {
         return $Jobs
     }
@@ -117,14 +117,14 @@ function Get-StaleJobs($Jobs, [string[]] $Flags, [string] $Stamp)
 
         $built = (Get-Item -LiteralPath $job.Object).LastWriteTimeUtc
 
-        foreach ($input in Read-Dependencies $job.Depends)
+        foreach ($dependency in Read-Dependencies $job.Depends)
         {
-            if (-not $written.ContainsKey($input))
+            if (-not $written.ContainsKey($dependency))
             {
-                $written[$input] = if (Test-Path -LiteralPath $input) { (Get-Item -LiteralPath $input).LastWriteTimeUtc } else { [DateTime]::MaxValue }
+                $written[$dependency] = if (Test-Path -LiteralPath $dependency) { (Get-Item -LiteralPath $dependency).LastWriteTimeUtc } else { [DateTime]::MaxValue }
             }
 
-            if ($written[$input] -gt $built)
+            if ($written[$dependency] -gt $built)
             {
                 $job
                 break

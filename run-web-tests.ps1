@@ -120,18 +120,17 @@ if (-not $NoBuild)
 
     $optimisation = if ($Configuration -eq 'Release') { '-O2' } else { '-O0' }
 
-    $compileFlags = @(
+    # What both the compile and the link need.
+    $languageFlags = @(
         '-std=c++20'
         $optimisation
         '-fexceptions'                  # doctest reports throwing tests, and Shader throws.
         '-pthread'                      # Same threading the site build ships with.
-    ) + @($includes)
+    )
 
-    $linkFlags = @(
-        '-std=c++20'
-        $optimisation
-        '-fexceptions'
-        '-pthread'
+    $compileFlags = @($languageFlags) + @($includes)
+
+    $linkFlags = @($languageFlags) + @(
         '-sUSE_GLFW=3'                  # Engine and the ImGui backend link against GLFW.
         '-sFULL_ES3'
         '-sFETCH'                       # Shader::Request fetches shader sources over HTTP.
@@ -144,14 +143,18 @@ if (-not $NoBuild)
         '-sNODERAWFS=1'                 # Gives the suite the real filesystem under node.
     )
 
-    # Each source compiles to its own object, a process per core, and only
-    # when it or a header it includes has changed since, or the flags have.
     $objects = Join-Path $outputDir 'Objects'
     New-Item -ItemType Directory -Force -Path $objects | Out-Null
 
+    # Which emscripten built the objects counts as much as the flags it was
+    # given: its own headers are not among those -MMD lists, so another
+    # version's objects would otherwise be kept.
+    $version = Get-Content -LiteralPath (Join-Path (Split-Path -Parent $emcc) 'emscripten-version.txt') -Raw
+    $stamped = @($compileFlags) + @($emcc, $version.Trim())
+
     $jobs = @(Get-CompileJobs $sources $root $objects)
     $stamp = Join-Path $objects 'flags.txt'
-    $stale = @(Get-StaleJobs $jobs $compileFlags $stamp)
+    $stale = @(Get-StaleJobs $jobs $stamped $stamp)
 
     if ($stale.Count -gt 0)
     {
@@ -163,7 +166,7 @@ if (-not $NoBuild)
             exit 1
         }
 
-        [IO.File]::WriteAllText($stamp, $compileFlags -join "`n")
+        [IO.File]::WriteAllText($stamp, $stamped -join "`n")
     }
 
     # The link's arguments go in a response file, as the objects alone run
@@ -174,14 +177,17 @@ if (-not $NoBuild)
     $response = Join-Path $outputDir 'emcc.rsp'
     $link = $arguments -join "`r`n"
 
-    if (-not (Test-Path -LiteralPath $response) -or [IO.File]::ReadAllText($response) -ne $link)
+    if (-not (Test-Path -LiteralPath $response) -or [IO.File]::ReadAllText($response) -cne $link)
     {
         [IO.File]::WriteAllText($response, $link)
     }
 
     $linkInputs = @(Get-Item -LiteralPath $response) + @($jobs | ForEach-Object { Get-Item -LiteralPath $_.Object })
 
-    if (Test-Stale $output $linkInputs)
+    # The link writes the module and its loader both; a link cut short can leave one behind the other.
+    $module = [IO.Path]::ChangeExtension($output, '.wasm')
+
+    if ((Test-Stale $output $linkInputs) -or (Test-Stale $module $linkInputs))
     {
         Write-Host 'Linking the web test suite'
 
