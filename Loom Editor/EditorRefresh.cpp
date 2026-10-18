@@ -17,9 +17,11 @@ namespace Loom
 		constexpr const char* solution = "Loom.sln";
 		constexpr const char* target = "Loom Editor";
 
-		// <executable>.<process id>.old, so two editors run from one build each
-		// move their own.
+		// <file>.<process id>.old, so two editors run from one build each move
+		// their own.
 		constexpr const char* moved_aside_extension = ".old";
+
+		constexpr const char* symbols_extension = ".pdb";
 
 		std::filesystem::path Executable()
 		{
@@ -32,15 +34,15 @@ namespace Loom
 				: std::filesystem::path(buffer);
 		};
 
-		// What earlier refreshes moved aside. One an editor is still running
-		// from is locked, and left.
-		void SweepMovedAside(const std::filesystem::path& executable)
+		// What earlier refreshes moved aside. What an editor still has open is
+		// locked, and left.
+		void SweepMovedAside(const std::filesystem::path& file)
 		{
-			const std::string prefix = executable.filename().string() + '.';
+			const std::string prefix = file.filename().string() + '.';
 
 			std::error_code code;
 
-			for (const auto& entry : std::filesystem::directory_iterator(executable.parent_path(), code))
+			for (const auto& entry : std::filesystem::directory_iterator(file.parent_path(), code))
 				if (entry.path().filename().string().starts_with(prefix) &&
 					entry.path().extension() == moved_aside_extension)
 					std::filesystem::remove(entry.path(), code);
@@ -88,29 +90,38 @@ namespace Loom
 			return;
 		};
 
-		SweepMovedAside(m_executable);
+		std::filesystem::path symbols = m_executable;
+		symbols.replace_extension(symbols_extension);
 
-		std::filesystem::path aside = m_executable;
-		aside += "." + std::to_string(GetCurrentProcessId()) + moved_aside_extension;
-
-		if (!MoveFileExW(m_executable.c_str(), aside.c_str(), MOVEFILE_REPLACE_EXISTING))
+		for (const std::filesystem::path& file : { m_executable, symbols })
 		{
-			std::cerr << "Full refresh: could not move the running editor aside to build over it." << std::endl;
+			if (!std::filesystem::exists(file, code))
+				continue;
 
-			finish(false);
-			return;
-		};
+			SweepMovedAside(file);
 
-		m_movedAside = aside;
+			std::filesystem::path aside = file;
+			aside += "." + std::to_string(GetCurrentProcessId()) + moved_aside_extension;
 
-		// Kept as it was, timestamps included, so a build with nothing to do
-		// finds it up to date.
-		if (!CopyFileW(aside.c_str(), m_executable.c_str(), FALSE))
-		{
-			std::cerr << "Full refresh: could not put a copy of the editor back to build over." << std::endl;
+			if (!MoveFileExW(file.c_str(), aside.c_str(), MOVEFILE_REPLACE_EXISTING))
+			{
+				std::cerr << "Full refresh: could not move " << file.string() << " aside to build over it." << std::endl;
 
-			finish(false);
-			return;
+				finish(false);
+				return;
+			};
+
+			m_movedAside.emplace_back(file, aside);
+
+			// Kept as it was, timestamps included, so a build with nothing to do
+			// finds it up to date.
+			if (!CopyFileW(aside.c_str(), file.c_str(), FALSE))
+			{
+				std::cerr << "Full refresh: could not put a copy of " << file.string() << " back to build over." << std::endl;
+
+				finish(false);
+				return;
+			};
 		};
 
 		const std::string command =
@@ -148,10 +159,11 @@ namespace Loom
 		m_succeeded = m_current->succeeded;
 		m_current.reset();
 
-		// Renaming the running image back is allowed, as moving it aside was.
-		if (!m_succeeded && !m_movedAside.empty() &&
-			!MoveFileExW(m_movedAside.c_str(), m_executable.c_str(), MOVEFILE_REPLACE_EXISTING))
-			std::cerr << "Full refresh: could not put the editor back at " << m_executable.string() << std::endl;
+		// Renaming them back is allowed, as moving them aside was.
+		if (!m_succeeded)
+			for (const auto& [file, aside] : m_movedAside)
+				if (!MoveFileExW(aside.c_str(), file.c_str(), MOVEFILE_REPLACE_EXISTING))
+					std::cerr << "Full refresh: could not put " << file.string() << " back" << std::endl;
 
 		m_movedAside.clear();
 

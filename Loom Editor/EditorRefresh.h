@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <utility>
+#include <vector>
 
 
 namespace Loom
@@ -14,9 +16,10 @@ namespace Loom
 	* - Ctrl+Shift+R's rebuild of the editor itself, through the engine's
 	*   solution, so whatever has changed in the engine since this executable
 	*   was linked is in the one the editor restarts as
-	* - A running executable cannot be written over, but it can be renamed, so
-	*   it is moved aside and a copy is put back where it was. MSBuild either
-	*   finds the copy up to date or links over it
+	* - A running executable cannot be written over, nor can the symbols
+	*   FieldNames holds open, but both can be renamed. So they are moved aside
+	*   and copies put back where they were, which MSBuild either finds up to
+	*   date or links over
 	* - MSBuild runs on a worker thread, as the scripts' does, and its output
 	*   goes to the Console panel
 	*/
@@ -60,6 +63,8 @@ namespace Loom
 		bool m_succeeded = false;
 
 		std::filesystem::path m_executable{ };
-		std::filesystem::path m_movedAside{ };
+
+		// Each file moved aside, and where to.
+		std::vector<std::pair<std::filesystem::path, std::filesystem::path>> m_movedAside{ };
 	};
 };
