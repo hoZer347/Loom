@@ -67,6 +67,9 @@
     <ClCompile Include="EditorLayouts.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
+    <ClCompile Include="EditorRefresh.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
     <ClCompile Include="ShaderEditor.cpp">
       <Filter>Panels</Filter>
     </ClCompile>
@@ -169,6 +172,9 @@
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="EditorLayouts.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorRefresh.h">
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="EditorTheme.h">

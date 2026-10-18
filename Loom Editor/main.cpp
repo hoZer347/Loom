@@ -703,5 +703,21 @@ int main(int argc, char** argv)
 
 	engine.Start();
 
+	if (editor.WantsRelaunch())
+	{
+		// The new editor serves on the same port, which this one lets go of first.
+		mcp.reset();
+
+		std::string options = Engine::backend == Backend::Vulkan ? "--vulkan" : "--opengl";
+
+		if (mcp_port != 0 && mcp_port != EditorMcp::default_port)
+			options += " --mcp " + std::to_string(mcp_port);
+
+		if (!desktop.empty())
+			options += " --desktop " + desktop;
+
+		editor.Relaunch(options);
+	};
+
 	return exit_after_script && script->Failed() ? 1 : 0;
 };

@@ -374,6 +374,13 @@ namespace Loom
 		};
 	};
 
+	void ShaderEditor::SaveAll()
+	{
+		for (const std::unique_ptr<Document>& document : m_documents)
+			if (document->unsaved)
+				Save(*document);
+	};
+
 	bool ShaderEditor::Save(Document& document)
 	{
 		std::ofstream file(document.path, std::ios::binary);

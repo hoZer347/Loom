@@ -894,30 +894,82 @@ namespace Loom
 			return;
 		};
 
-		std::string path = m_scenePaths[m_activeScene];
+		if (SaveToProject(m_activeScene))
+			RefreshProjectAssets();
+	};
+
+	bool Editor::SaveToProject(Scene* scene)
+	{
+		std::string path = m_scenePaths[scene];
 
 		if (path.empty())
 		{
 			if (m_projectPath.empty())
 			{
-				std::cerr << "Save Scene needs a project to put '" << m_activeScene->GetName() << "' in" << std::endl;
-				return;
+				std::cerr << "Save Scene needs a project to put '" << scene->GetName() << "' in" << std::endl;
+				return false;
 			};
 
 			const std::filesystem::path folder = std::filesystem::path(m_projectPath) / ProjectTemplate::scenes_folder;
-			std::filesystem::path file = folder / (m_activeScene->GetName() + SceneSerializer::extension);
+			std::filesystem::path file = folder / (scene->GetName() + SceneSerializer::extension);
 
 			// A scene of the same name already saved keeps its file.
 			std::error_code code;
 
 			for (int copy = 2; std::filesystem::exists(file, code); copy++)
-				file = folder / (m_activeScene->GetName() + " " + std::to_string(copy) + SceneSerializer::extension);
+				file = folder / (scene->GetName() + " " + std::to_string(copy) + SceneSerializer::extension);
 
 			path = file.string();
 		};
 
-		if (SaveScene(m_activeScene, path))
-			RefreshProjectAssets();
+		return SaveScene(scene, path);
+	};
+
+	void Editor::SaveProject()
+	{
+		for (Scene* scene : m_ownedScenes)
+			SaveToProject(scene);
+
+		m_shaders.SaveAll();
+		m_sprites.SaveAll();
+
+		// An active scene saved for the first time just now is the one the
+		// next session starts on.
+		SetActiveScene(m_activeScene);
+	};
+
+	void Editor::FullRefresh()
+	{
+		if (!IsRefreshing())
+			m_refresh.Start();
+	};
+
+	void Editor::PollRefresh()
+	{
+		// Mid-build the scenes are down, held as text until the scripts are
+		// back, and there is nothing to save until they are.
+		if (!m_scripts.IsIdle() || m_refresh.Poll() != EditorRefresh::Progress::Finished)
+			return;
+
+		if (!m_refresh.Succeeded())
+		{
+			std::cerr << "Full refresh: the editor did not build, so this one carries on." << std::endl;
+			return;
+		};
+
+		Stop();
+		SaveProject();
+
+		m_relaunch = true;
+		Engine::Stop();
+	};
+
+	bool Editor::Relaunch(const std::string& options) const
+	{
+		const auto scene = m_activeScene ? m_scenePaths.find(m_activeScene) : m_scenePaths.end();
+		const std::string target = scene != m_scenePaths.end() ? scene->second : m_projectPath;
+
+		return m_refresh.Relaunch(target.empty() ? options : options + " \"" + target + '"');
 	};
 
 	bool Editor::IsOwned(Scene* scene) const
@@ -1172,6 +1224,10 @@ namespace Loom
 
 	void Editor::HandleShortcuts()
 	{
+		// Wherever the keyboard is: it is about the whole editor.
+		if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_R))
+			FullRefresh();
+
 		// The Sprites panel has the keyboard, and none of the scene's
 		// shortcuts mean anything there.
 		if (m_showSprites && m_sprites.IsFocused())
@@ -1389,6 +1445,7 @@ namespace Loom
 		ImportQueued();
 		ClickQueued();
 		PollScripts();
+		PollRefresh();
 
 		// The renderer reads the window back once this frame has finished
 		// drawing, so the bitmap is the whole editor.
@@ -1662,6 +1719,9 @@ namespace Loom
 			};
 
 			ImGui::Separator();
+
+			if (ImGui::MenuItem("Full Refresh", "Ctrl+Shift+R", false, !IsRefreshing()))
+				FullRefresh();
 
 			if (ImGui::MenuItem("Exit"))
 				Engine::Stop();

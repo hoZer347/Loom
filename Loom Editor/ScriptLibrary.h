@@ -76,6 +76,13 @@ namespace Loom
 		// when there is none. Looked up once and held.
 		static const std::string& FindVisualStudio();
 
+		// The MSBuild this machine has. Empty when none is found.
+		static std::string FindMSBuild();
+
+		// The configuration this editor was built in, which is the one anything
+		// built to run inside it has to be built in too.
+		static const char* Configuration();
+
 
 	private:
 		// Lets go of a build that is no longer wanted. MSBuild is still running
@@ -83,9 +90,6 @@ namespace Loom
 		// result nothing reads - waiting here would stop the editor pumping for
 		// the rest of the compile.
 		void AbandonBuild();
-
-		// The MSBuild this machine has. Empty when none is found.
-		static std::string FindMSBuild();
 
 		// Clears out the copies of a library that earlier editors loaded. The
 		// one a running editor still holds cannot be removed, and is left.

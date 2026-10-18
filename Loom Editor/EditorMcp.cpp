@@ -523,6 +523,8 @@ namespace Loom
 				editor.Undo();
 			else if (command == "redo")
 				editor.Redo();
+			else if (command == "refresh")
+				editor.FullRefresh();
 			else
 				throw ToolError(command + " is not a command");
 
@@ -737,10 +739,12 @@ namespace Loom
 			},
 			{
 				"command",
-				"One of the editor's commands: play, pause, stop, compile (the scripts), save (the active scene), undo or redo. Answers with the state after.",
+				"One of the editor's commands: play, pause, stop, compile (the scripts), save (the active scene), undo, redo or refresh "
+				"(Ctrl+Shift+R: rebuild the editor from the engine's sources, save the project and restart on it, after which this server "
+				"is back on the same port; a failed build says so in the console and the editor carries on). Answers with the state after.",
 				R"({
 					"type": "object",
-					"properties": { "command": { "type": "string", "enum": [ "play", "pause", "stop", "compile", "save", "undo", "redo" ] } },
+					"properties": { "command": { "type": "string", "enum": [ "play", "pause", "stop", "compile", "save", "undo", "redo", "refresh" ] } },
 					"required": [ "command" ] })",
 				Command,
 			},

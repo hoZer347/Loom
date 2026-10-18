@@ -141,6 +141,11 @@ namespace Loom
 		return "";
 	};
 
+	const char* ScriptLibrary::Configuration()
+	{
+		return configuration;
+	};
+
 	const std::string& ScriptLibrary::FindVisualStudio()
 	{
 		// vswhere is a process, so the answer is kept: an installation does not

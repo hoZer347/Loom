@@ -5,6 +5,7 @@
 #include "EditorCamera.h"
 #include "EditorConsole.h"
 #include "EditorLayouts.h"
+#include "EditorRefresh.h"
 #include "EditorViewport.h"
 #include "FolderWatch.h"
 #include "Guid.h"
@@ -102,6 +103,18 @@ namespace Loom
 		// the project's scenes folder. Refused while playing, when the scene
 		// holds what the run has done to it.
 		void SaveActiveScene();
+
+		// File > Full Refresh and Ctrl+Shift+R: rebuilds the editor from the
+		// engine's sources, then stops any run, saves the project and closes,
+		// for main to start the new build on it. A failed build leaves this
+		// editor running.
+		void FullRefresh();
+		bool IsRefreshing() const { return m_refresh.IsRunning() || m_relaunch; };
+
+		// Whether the editor closed to be started again, and the start, on the
+		// scene that was active or the project when none was.
+		bool WantsRelaunch() const { return m_relaunch; };
+		bool Relaunch(const std::string& options) const;
 
 		// The folder the editor works out of. Everything under it is listed in
 		// the Project panel; the choice is remembered between runs, so
@@ -469,6 +482,16 @@ namespace Loom
 		// library is in.
 		void PollScripts();
 
+		// Watches for the refresh's build to finish, and closes the editor
+		// once it has, unless it failed.
+		void PollRefresh();
+
+		// Every owned scene, open shader and sprite, to its file.
+		void SaveProject();
+
+		// SaveActiveScene's choice of file, for any owned scene.
+		bool SaveToProject(Scene* scene);
+
 		// Switches updating on, keeping the state the scenes are in now so Stop
 		// has something to go back to.
 		void BeginPlay();
@@ -510,6 +533,8 @@ namespace Loom
 		ColliderGizmos m_colliderGizmos;
 
 		ScriptLibrary m_scripts;
+		EditorRefresh m_refresh;
+		bool m_relaunch = false;
 		WebPlayer m_webPlayer;
 
 		std::unique_ptr<EditorFileDialogs> m_dialogs;

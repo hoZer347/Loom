@@ -107,6 +107,7 @@
     <ClCompile Include="ProjectTemplate.cpp" />
     <ClCompile Include="EditorScripts.cpp" />
     <ClCompile Include="EditorProject.cpp" />
+    <ClCompile Include="EditorRefresh.cpp" />
     <ClCompile Include="ProjectAssets.cpp" />
     <ClCompile Include="EditorLog.cpp" />
     <ClCompile Include="EditorMcp.cpp" />
@@ -148,6 +149,7 @@
     <ClInclude Include="EditorConsole.h" />
     <ClInclude Include="ComponentMenu.h" />
     <ClInclude Include="EditorLayouts.h" />
+    <ClInclude Include="EditorRefresh.h" />
     <ClInclude Include="ShaderEditor.h" />
     <ClInclude Include="SpriteEditor.h" />
     <ClInclude Include="EditorSettings.h" />
