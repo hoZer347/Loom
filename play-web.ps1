@@ -111,13 +111,47 @@ if (Test-Stale $module $linkInputs)
 
     if ($scripts.Count -gt 0)
     {
-        $scriptJobs = @(Get-CompileJobs $scripts $scriptDir $intermediate)
-        $scriptFlags = @($webCompileFlags) + @($webIncludes) + @("-I$scriptDir", '-Wno-pragma-once-outside-header', '-x', 'c++')
+        # The engine's header is precompiled and forced into each script, as
+        # the Visual Studio project does. Only what changed since the last link
+        # is compiled again, the emscripten that built it counting as a flag.
+        $version = (Get-Content -LiteralPath (Join-Path (Split-Path -Parent $emcc) 'emscripten-version.txt') -Raw).Trim()
 
-        if (-not (Invoke-Compile $emcc $scriptJobs $scriptFlags))
+        $header = [pscustomobject] @{
+            Source = Join-Path $webWasm 'Loom.h'
+            Object = Join-Path $intermediate 'Loom.h.pch'
+            Depends = Join-Path $intermediate 'Loom.h.d'
+        }
+
+        $headerFlags = @($webCompileFlags) + @($webIncludes) + @('-x', 'c++-header')
+        $headerStamp = Join-Path $intermediate 'Loom.h.flags'
+        $headerStamped = @($headerFlags) + @($emcc, $version)
+
+        if (@(Get-StaleJobs @($header) $headerStamped $headerStamp).Count -gt 0)
         {
-            Write-Host 'The scripts failed to build.'
-            exit 1
+            if (-not (Invoke-Compile $emcc @($header) $headerFlags))
+            {
+                Write-Host 'The engine header failed to precompile.'
+                exit 1
+            }
+
+            [IO.File]::WriteAllText($headerStamp, $headerStamped -join "`n")
+        }
+
+        $scriptJobs = @(Get-CompileJobs $scripts $scriptDir $intermediate)
+        $scriptFlags = @($webCompileFlags) + @($webIncludes) + @("-I$scriptDir", '-include-pch', $header.Object, '-Wno-pragma-once-outside-header', '-x', 'c++')
+        $scriptStamp = Join-Path $intermediate 'scripts.flags'
+        $scriptStamped = @($scriptFlags) + @($emcc, $version)
+        $stale = @(Get-StaleJobs $scriptJobs $scriptStamped $scriptStamp)
+
+        if ($stale.Count -gt 0)
+        {
+            if (-not (Invoke-Compile $emcc $stale $scriptFlags))
+            {
+                Write-Host 'The scripts failed to build.'
+                exit 1
+            }
+
+            [IO.File]::WriteAllText($scriptStamp, $scriptStamped -join "`n")
         }
     }
 

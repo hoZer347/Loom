@@ -113,8 +113,7 @@ namespace Loom
 		// its **\*.hpp glob and which registers itself as a component.
 		const char* const script = R"(#pragma once
 
-#include "Component.h"
-#include "GameObject.h"
+#include "Loom.h"
 
 
 namespace {NAMESPACE}
@@ -134,7 +133,7 @@ namespace {NAMESPACE}
 
 		const char* const state = R"(#pragma once
 
-#include "Utilities/StateMachine.h"
+#include "Loom.h"
 
 
 namespace {NAMESPACE}
@@ -162,7 +161,7 @@ namespace {NAMESPACE}
 
 		const char* const state_machine = R"(#pragma once
 
-#include "Utilities/StateMachine.h"
+#include "Loom.h"
 
 
 namespace {NAMESPACE}

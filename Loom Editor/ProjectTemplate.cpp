@@ -67,9 +67,7 @@ library=Build/{NAME}Scripts.dll
 
 		const char* const script = R"(#pragma once
 
-#include "Component.h"
-#include "Material.h"
-#include "Mesh.h"
+#include "Loom.h"
 
 #include <cmath>
 #include <numbers>
@@ -200,6 +198,9 @@ namespace {NAME}Scripts
       <ConformanceMode>true</ConformanceMode>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <DisableSpecificWarnings>4251;4275</DisableSpecificWarnings>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>Loom.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>Loom.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <PreprocessorDefinitions>LOOM_SCRIPT_MODULE;_WIN32_WINNT=0x0601;WIN32;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>{ENGINE}\Loom WASM;{ENGINE}\Loom ImGui;{ENGINE}\External Libraries\glm;{ENGINE}\External Libraries\glew\include;{ENGINE}\External Libraries\glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -223,8 +224,13 @@ namespace {NAME}Scripts
     </ClCompile>
   </ItemDefinitionGroup>
   <!-- Each component is a header, compiled on its own so that a new one is
-       built (and registers itself) without being listed here. -->
+       built (and registers itself) without being listed here. The engine's
+       header is precompiled once and forced into each of them. -->
   <ItemGroup>
+    <ClCompile Include="{ENGINE}\Loom WASM\Loom.h">
+      <CompileAs>CompileAsCpp</CompileAs>
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="**\*.hpp">
       <CompileAs>CompileAsCpp</CompileAs>
     </ClCompile>

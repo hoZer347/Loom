@@ -1,8 +1,6 @@
 #pragma once
 
-#include "Component.h"
-#include "Material.h"
-#include "Mesh.h"
+#include "Loom.h"
 
 #include <cmath>
 #include <numbers>
