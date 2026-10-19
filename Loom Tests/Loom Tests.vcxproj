@@ -147,6 +147,7 @@
     <ClCompile Include="KeySet Tests.cpp" />
     <ClCompile Include="Rigidbody Tests.cpp" />
     <ClCompile Include="Input Tests.cpp" />
+    <ClCompile Include="GameFocus Tests.cpp" />
     <ClCompile Include="Threading Tests.cpp" />
     <ClCompile Include="AxisGui Tests.cpp" />
     <ClCompile Include="SpeedManager Tests.cpp" />
@@ -195,6 +196,7 @@
     <ClCompile Include="..\Loom Editor\EditorViewport.cpp" />
     <ClCompile Include="..\Loom Editor\ColliderGizmos.cpp" />
     <ClCompile Include="..\Loom Editor\SelectionOutline.cpp" />
+    <ClCompile Include="..\Loom Editor\GameFocus.cpp" />
   </ItemGroup>
   <ItemGroup>
     <!-- ImGui is linked rather than recompiled: Component<T>::Gui and

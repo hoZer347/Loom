@@ -8,6 +8,7 @@
 #include "EditorRefresh.h"
 #include "EditorViewport.h"
 #include "FolderWatch.h"
+#include "GameFocus.h"
 #include "Guid.h"
 #include "EditorSettings.h"
 #include "ShaderEditor.h"
@@ -747,7 +748,9 @@ namespace Loom
 		bool m_showScene = true;
 		bool m_showGame = true;
 		bool m_showDebug = true;
-		bool m_gameFocused = false;
+		bool m_gamePanelFocused = false;
+		bool m_gamePanelHovered = false;
+		GameFocus m_gameFocus;
 		bool m_showSceneData = true;
 		bool m_showConsole = true;
 		bool m_showShaders = false;

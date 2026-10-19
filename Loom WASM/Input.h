@@ -36,8 +36,13 @@ namespace Loom
 		static void SetView(int x, int y, int width, int height);
 		static void ClearView();
 
-		// Whether the game hears the mouse and keys: always on its own, and in
-		// an editor only while its Game view has focus. Without it nothing is
+		// For a press made up after this frame's Tick, such as a UI script's,
+		// which this frame hears as though it had been polled with the rest.
+		static void OnMouseButtonThisFrame(int button, bool pressed);
+
+		// Whether the game hears the mouse buttons, which DialogueInput also
+		// asks before it reports keys and pads: always on its own, and in an
+		// editor only while its Game view has focus. Without it nothing is
 		// down or held, and what was held as it went comes up.
 		static void SetFocused(bool focused);
 		static bool IsFocused();

@@ -68,6 +68,15 @@ namespace Loom
 		constexpr ImGuiTreeNodeFlags header_flags =
 			ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap;
 
+		bool AnyMouseClicked()
+		{
+			for (int button = 0; button < ImGuiMouseButton_COUNT; button++)
+				if (ImGui::IsMouseClicked(button))
+					return true;
+
+			return false;
+		};
+
 		GameObject* FindByName(GameObject& root, const std::string& name)
 		{
 			if (root.GetName() == name)
@@ -1556,7 +1565,8 @@ namespace Loom
 		// Nowhere the cursor can be, and nothing heard, unless the Game panel
 		// draws the game below and has focus.
 		Input::SetView(0, 0, 0, 0);
-		m_gameFocused = false;
+		m_gamePanelFocused = false;
+		m_gamePanelHovered = false;
 
 		if (m_showProject)		DrawProject();
 		if (m_showScripts)		DrawScripts();
@@ -1566,7 +1576,7 @@ namespace Loom
 		DrawPrefab();
 		if (m_showGame)			DrawGame();
 		if (m_showDebug)		DrawDebug();
-		Input::SetFocused(m_gameFocused);
+		Input::SetFocused(m_gameFocus.Update(m_gamePanelFocused, m_gamePanelHovered, AnyMouseClicked(), ImGui::IsAnyMouseDown()));
 		if (m_showSceneData)	DrawSceneData();
 		if (m_showConsole)		m_console.Draw(&m_showConsole);
 		if (m_showShaders)		m_shaders.Draw(&m_showShaders);
@@ -3099,10 +3109,8 @@ namespace Loom
 	{
 		if (ImGui::Begin(EditorPanels::Game, &m_showGame, view_flags))
 		{
-			// ImGui only moves focus at the end of the frame, so the click that
-			// gives it would be lost to the game without the second test.
-			m_gameFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)
-				|| (ImGui::IsWindowHovered() && ImGui::IsAnyMouseDown());
+			m_gamePanelFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+			m_gamePanelHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
 
 			DrawToolbar();
 

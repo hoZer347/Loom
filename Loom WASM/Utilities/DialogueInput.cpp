@@ -34,13 +34,15 @@ namespace Loom
 	static bool s_pad_pressed = false;
 	static bool s_mouse_pressed = false;
 
-	bool DialogueInput::Continued() { return s_pad_pressed; };
+	// Asked when read rather than at Tick, which runs before an editor decides
+	// this frame's focus.
+	bool DialogueInput::Continued() { return Input::IsFocused() && s_pad_pressed; };
 
-	bool DialogueInput::ContinuedOnKeyboard() { return s_keyboard_pressed; };
+	bool DialogueInput::ContinuedOnKeyboard() { return Input::IsFocused() && s_keyboard_pressed; };
 
 	bool DialogueInput::ContinuedAnyhow() { return ContinuedOnKeyboard() || Continued(); };
 
-	bool DialogueInput::Clicked() { return s_mouse_pressed; };
+	bool DialogueInput::Clicked() { return Input::IsFocused() && s_mouse_pressed; };
 
 	void DialogueInput::Tick()
 	{
@@ -54,9 +56,7 @@ namespace Loom
 		s_pad = false;
 		s_mouse = false;
 
-		const bool focused = Input::IsFocused();
-
-		if (focused && window != nullptr)
+		if (window != nullptr)
 		{
 			for (const int key : s_keys)
 				if (glfwGetKey(window, key) == GLFW_PRESS)
@@ -73,7 +73,7 @@ namespace Loom
 		// The four lettered face buttons, by position, on the first pad that is one.
 		// Guarded off under Emscripten, whose GLFW port has no gamepad mapping at all --
 		// the browser reads pads through its own API, which is a separate job.
-		for (int pad = GLFW_JOYSTICK_1; focused && pad <= GLFW_JOYSTICK_LAST && !s_pad; pad++)
+		for (int pad = GLFW_JOYSTICK_1; pad <= GLFW_JOYSTICK_LAST && !s_pad; pad++)
 		{
 			if (!glfwJoystickPresent(pad) || !glfwJoystickIsGamepad(pad))
 				continue;

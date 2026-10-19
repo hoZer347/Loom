@@ -95,6 +95,19 @@ namespace Loom
 			went_up[button] = true;
 	};
 
+	void Input::OnMouseButtonThisFrame(int button, bool pressed)
+	{
+		if (!IsButton(button))
+			return;
+
+		held[button] = pressed;
+
+		if (pressed)
+			down_this_frame[button] = true;
+		else
+			up_this_frame[button] = true;
+	};
+
 	void Input::OnMouseMove(int x, int y, int window_width, int window_height)
 	{
 		cursor_x = x;

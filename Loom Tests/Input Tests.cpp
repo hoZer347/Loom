@@ -156,6 +156,28 @@ TEST_SUITE("Input")
 		ReleaseAll();
 	};
 
+	TEST_CASE("a press made up after Tick is heard in the frame it is made")
+	{
+		ReleaseAll();
+
+		Loom::Input::OnMouseButtonThisFrame(left_button, true);
+
+		CHECK(Loom::Input::GetMouseButtonDown(left_button));
+		CHECK(Loom::Input::GetMouseButton(left_button));
+
+		Loom::Input::Tick();
+
+		CHECK_FALSE(Loom::Input::GetMouseButtonDown(left_button));
+		CHECK(Loom::Input::GetMouseButton(left_button));
+
+		Loom::Input::OnMouseButtonThisFrame(left_button, false);
+
+		CHECK(Loom::Input::GetMouseButtonUp(left_button));
+		CHECK_FALSE(Loom::Input::GetMouseButton(left_button));
+
+		ReleaseAll();
+	};
+
 	// The cursor callback writes these; Engine and any scene reads them. They
 	// have to be plain settable ints for the callback to be able to.
 	TEST_CASE("the cursor and screen fields round-trip")

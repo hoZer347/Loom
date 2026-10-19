@@ -254,7 +254,7 @@ namespace Loom
 					{
 						// The game hears it too, as it would a real one.
 						io.AddMouseButtonEvent(button, down);
-						Input::OnMouseButton(button, down);
+						Input::OnMouseButtonThisFrame(button, down);
 						return Result::Done;
 					});
 			};
