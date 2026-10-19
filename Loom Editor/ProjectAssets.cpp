@@ -24,7 +24,7 @@ namespace Loom
 	{
 		constexpr size_t maxNameLength = 64;
 
-		// Scripts, textures and sounds aside.
+		// Scripts, textures, sounds and fonts aside.
 		constexpr std::string_view gameFileExtensions[] =
 		{
 			SceneSerializer::extension,

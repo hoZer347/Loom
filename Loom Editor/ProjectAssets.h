@@ -105,7 +105,7 @@ namespace Loom
 
 		static std::string Replace(std::string text, const std::string& token, const std::string& value);
 
-		// Whether name is a scene, shader, texture or sound, which the Project
+		// Whether name is a scene, shader, texture, sound or font, which the Project
 		// panel lists along with models. The scripts are the Scripts panel's,
 		// and anything else in the project folder (Visual Studio's files,
 		// notes) is not part of the game.
