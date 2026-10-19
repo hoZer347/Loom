@@ -131,6 +131,7 @@
     <ClCompile Include="Light Tests.cpp" />
     <ClCompile Include="Audio Tests.cpp" />
     <ClCompile Include="Sprite Tests.cpp" />
+    <ClCompile Include="Ui Tests.cpp" />
     <ClCompile Include="SelectionOutline Tests.cpp" />
     <ClCompile Include="Mesh Tests.cpp" />
     <ClCompile Include="Animation Tests.cpp" />

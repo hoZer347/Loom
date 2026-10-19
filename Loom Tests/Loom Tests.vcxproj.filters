@@ -88,6 +88,9 @@
     <ClCompile Include="Sprite Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="Ui Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="SelectionOutline Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

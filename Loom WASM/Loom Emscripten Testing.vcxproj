@@ -133,6 +133,7 @@
     <ClCompile Include="Shaders.cpp" />
     <ClCompile Include="GlslCompiler.cpp" />
     <ClCompile Include="Sprite.cpp" />
+    <ClCompile Include="Ui.cpp" />
     <ClCompile Include="Textures.cpp" />
     <ClCompile Include="ShaderVariables.cpp" />
     <ClCompile Include="EditorGui.cpp" />
@@ -193,6 +194,7 @@
     <ClInclude Include="Shaders.h" />
     <ClInclude Include="GlslCompiler.h" />
     <ClInclude Include="Sprite.h" />
+    <ClInclude Include="Ui.h" />
     <ClInclude Include="Textures.h" />
     <ClInclude Include="ShaderVariables.h" />
     <ClInclude Include="EditorGui.h" />
