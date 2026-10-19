@@ -2272,7 +2272,12 @@ namespace Loom
 			if (ImGui::MenuItem("Add Child"))
 				Select(gameObject->AddChild());
 
-			if (ImGui::MenuItem("Save as Prefab", nullptr, false, !m_projectPath.empty() && gameObject != GetPrefabRoot()))
+			if (instance)
+			{
+				if (ImGui::MenuItem("Unpack Prefab"))
+					UnpackPrefab(*gameObject);
+			}
+			else if (ImGui::MenuItem("Save as Prefab", nullptr, false, !m_projectPath.empty() && gameObject != GetPrefabRoot()))
 				SaveAsPrefab(gameObject, "");
 
 			if (ImGui::MenuItem("Delete", nullptr, false, EditCommands::CanTake(m_selected)))

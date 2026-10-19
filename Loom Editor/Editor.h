@@ -115,6 +115,10 @@ namespace Loom
 		// empty when it could not be written.
 		std::string SaveAsPrefab(GameObject* gameObject, const std::string& folder);
 
+		// Takes the link off a prefab instance, leaving its content as plain
+		// GameObjects the prefab no longer keeps alike.
+		void UnpackPrefab(GameObject& gameObject);
+
 		// A new instance of the prefab at path, from the project folder, as
 		// the last child of parent.
 		GameObject* Instantiate(const std::string& path, GameObject& parent);

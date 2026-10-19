@@ -177,6 +177,18 @@ namespace Loom
 		return file.string();
 	};
 
+	void Editor::UnpackPrefab(GameObject& gameObject)
+	{
+		Prefab* link = Prefabs::LinkOf(gameObject);
+
+		if (link == nullptr)
+			return;
+
+		m_linkedInstances.erase({ link->GetGuid().ToString(), *link->path });
+		gameObject.DetachComponent(link);
+		m_historyDirty = true;
+	};
+
 	GameObject* Editor::Instantiate(const std::string& path, GameObject& parent)
 	{
 		const Prefabs::ObjectNode* prefab = LoadPrefab(path);
