@@ -94,7 +94,8 @@ namespace Loom
 		// closed from the Hierarchy; scenes created anywhere else still show up
 		// in it, they just cannot be closed from it.
 		Scene* CreateScene(const std::string& name = "New Scene");
-		Scene* OpenScene(const std::string& path);
+		// Without activate, the active scene and the selection stay as they are.
+		Scene* OpenScene(const std::string& path, bool activate = true);
 		bool SaveScene(Scene* scene, const std::string& path);
 		void CloseScene(Scene* scene);
 
@@ -199,6 +200,20 @@ namespace Loom
 		// to the front.
 		void ShowInSceneView(Scene* scene);
 
+		// Ctrl+click on a scene file in the Project panel: drawn in the Scene
+		// view beside the active scene, opened first if it is not open, or
+		// closed again if it already was drawn there. The active scene itself
+		// cannot be taken out.
+		enum class SceneViewToggle
+		{
+			Add,
+			Remove,
+			Active
+		};
+
+		SceneViewToggle SceneViewToggleOf(const std::string& path) const;
+		void ToggleInSceneView(const std::string& path);
+
 		// Deselects any GameObject; the Inspector shows the model instead.
 		void SelectModel(const std::string& path);
 
@@ -265,6 +280,10 @@ namespace Loom
 		void DrawMainMenuBar();
 		void DrawProject();
 		void DrawAssetNode(const AssetNode& node, int depth);
+
+		// A plus or minus badge beside the mouse, or the not-allowed cursor,
+		// for what a Ctrl+click on this scene file would do.
+		void DrawSceneViewToggleCursor(const std::string& path) const;
 		void DrawAssetContextMenu(const AssetNode& node);
 		void DrawCreateMenu(const std::string& folder);
 		void DrawCreateAssetPrompt();
@@ -551,6 +570,10 @@ namespace Loom
 		// Where each open scene came from, so a scene can be put back after the
 		// script library it depends on is rebuilt.
 		std::map<Scene*, std::string> m_scenePaths{ };
+
+		// The scene files ToggleInSceneView added, by path so they outlast the
+		// scenes being rebuilt into new objects.
+		std::unordered_set<std::string> m_sceneViewAdditions{ };
 
 		std::string m_projectPath{ };
 		std::string m_projectFile{ };

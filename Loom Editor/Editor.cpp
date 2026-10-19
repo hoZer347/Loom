@@ -790,6 +790,7 @@ namespace Loom
 		Audio::Unload();
 
 		CloseAllScenes();
+		m_sceneViewAdditions.clear();
 
 		m_projectPath = resolved;
 
@@ -830,7 +831,7 @@ namespace Loom
 		return scene;
 	};
 
-	Scene* Editor::OpenScene(const std::string& path)
+	Scene* Editor::OpenScene(const std::string& path, bool activate)
 	{
 		std::string error;
 
@@ -851,11 +852,14 @@ namespace Loom
 		m_historyDirty = true;
 		m_scenePaths[scene] = std::filesystem::path(path).lexically_normal().string();
 
-		SetActiveScene(scene);
+		if (activate)
+		{
+			SetActiveScene(scene);
 
-		// A model being previewed stays in the Inspector.
-		if (m_selectedModel.empty())
-			Select(&scene->GetRoot());
+			// A model being previewed stays in the Inspector.
+			if (m_selectedModel.empty())
+				Select(&scene->GetRoot());
+		};
 
 		std::cout
 			<< "Opened '" << path << "' as "
@@ -1021,8 +1025,14 @@ namespace Loom
 		// Deleting a scene mid-GUI would leave the rest of the frame walking a
 		// dangling pointer; deferring puts the delete (and the unregistering it
 		// queues in turn) at the top of the next frame instead.
+		const std::string path = ScenePathOf(scene);
+
 		m_scenePaths.erase(scene);
 		m_history.Forget(scene->GetGuid());
+
+		if (std::none_of(m_scenePaths.begin(), m_scenePaths.end(),
+			[&](const auto& open) { return open.second == path; }))
+			m_sceneViewAdditions.erase(path);
 
 		Engine::QueueTask([scene]() { delete scene; });
 	};
@@ -1050,6 +1060,60 @@ namespace Loom
 
 		m_showScene = true;
 		m_sceneFocusFrames = scene_focus_frames;
+	};
+
+	Editor::SceneViewToggle Editor::SceneViewToggleOf(const std::string& path) const
+	{
+		const std::string normal = std::filesystem::path(path).lexically_normal().string();
+
+		if (m_activeScene != nullptr && ScenePathOf(m_activeScene) == normal)
+			return SceneViewToggle::Active;
+
+		return m_sceneViewAdditions.count(normal) ? SceneViewToggle::Remove : SceneViewToggle::Add;
+	};
+
+	void Editor::ToggleInSceneView(const std::string& path)
+	{
+		const std::string normal = std::filesystem::path(path).lexically_normal().string();
+
+		switch (SceneViewToggleOf(normal))
+		{
+		case SceneViewToggle::Active:
+			break;
+
+		case SceneViewToggle::Remove:
+		{
+			std::vector<Scene*> closing{ };
+
+			for (const auto& [scene, open] : m_scenePaths)
+				if (open == normal)
+					closing.push_back(scene);
+
+			for (Scene* scene : closing)
+				CloseScene(scene);
+
+			m_sceneViewAdditions.erase(normal);
+			break;
+		};
+
+		case SceneViewToggle::Add:
+		{
+			// With nothing to draw it beside, it is simply opened.
+			if (m_activeScene == nullptr)
+			{
+				OpenScene(normal);
+				break;
+			};
+
+			const bool open = std::any_of(m_scenePaths.begin(), m_scenePaths.end(),
+				[&](const auto& entry) { return entry.second == normal; });
+
+			if (open || OpenScene(normal, false) != nullptr)
+				m_sceneViewAdditions.insert(normal);
+
+			break;
+		};
+		};
 	};
 
 	void Editor::Select(GameObject* gameObject)
@@ -2881,9 +2945,24 @@ namespace Loom
 
 	void Editor::DrawScene()
 	{
+		std::vector<Scene*> drawn{ m_activeScene };
+		const std::string active_path = ScenePathOf(m_activeScene);
+
+		for (Scene* scene : m_ownedScenes)
+		{
+			const std::string path = ScenePathOf(scene);
+
+			if (scene != m_activeScene && path != active_path && m_sceneViewAdditions.count(path))
+				drawn.push_back(scene);
+		};
+
+		const size_t added = drawn.size() - 1;
+
 		const std::string title =
 			std::string(EditorIcons::Scene) + " " +
-			(m_activeScene ? m_activeScene->GetName() : std::string("Scene")) + EditorPanels::SceneId;
+			(m_activeScene ? m_activeScene->GetName() : std::string("Scene")) +
+			(added > 0 ? " + " + std::to_string(added) : std::string()) +
+			EditorPanels::SceneId;
 
 		if (m_sceneFocusFrames > 0)
 		{
@@ -2897,7 +2976,7 @@ namespace Loom
 				ImGui::TextDisabled("No scene open. Pick one in the Project panel.");
 			else
 			{
-				DrawView(m_sceneView, { m_activeScene }, &m_sceneCamera, &m_sceneOutline);
+				DrawView(m_sceneView, drawn, &m_sceneCamera, &m_sceneOutline);
 				TakeImportTarget(&m_activeScene->GetRoot());
 			};
 		};

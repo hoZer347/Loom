@@ -50,6 +50,16 @@ namespace Loom
 		// the user to sort out.
 		constexpr int maxDefaultNameSuffix = 1000;
 
+		const char* SceneViewToggleHint(Editor::SceneViewToggle toggle)
+		{
+			switch (toggle)
+			{
+			case Editor::SceneViewToggle::Add:		return "Ctrl+click: draw beside the active scene in the Scene view";
+			case Editor::SceneViewToggle::Remove:	return "Ctrl+click: take out of the Scene view and close";
+			default:								return "The active scene cannot be taken out of the Scene view";
+			};
+		};
+
 		struct AssetKindInfo
 		{
 			AssetKind kind;
@@ -621,7 +631,19 @@ namespace Loom
 		if (thumbnail != nullptr)
 			DrawThumbnail(*thumbnail);
 
-		if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen())
+		const ImGuiIO& io = ImGui::GetIO();
+
+		const bool scene_toggle =
+			!node.folder &&
+			io.KeyCtrl &&
+			std::filesystem::path(node.path).extension() == SceneSerializer::extension;
+
+		if (scene_toggle && ImGui::IsItemHovered())
+			DrawSceneViewToggleCursor(node.path);
+
+		if (scene_toggle && ImGui::IsItemClicked(ImGuiMouseButton_Left))
+			ToggleInSceneView(node.path);
+		else if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen())
 		{
 			m_selectedAsset = node.path;
 
@@ -632,12 +654,12 @@ namespace Loom
 		};
 
 		if (!node.folder &&
+			!scene_toggle &&
 			ImGui::IsItemHovered() &&
 			ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 			OpenAsset(node.path);
 
 		// On the release, so dragging one out to a field leaves the panel shut.
-		const ImGuiIO& io = ImGui::GetIO();
 		const float drag_threshold = io.MouseDragThreshold * io.MouseDragThreshold;
 
 		if (!node.folder &&
@@ -661,7 +683,9 @@ namespace Loom
 			ImGui::EndDragDropTarget();
 		};
 
-		ImGui::SetItemTooltip("%s", node.path.c_str());
+		if (scene_toggle)
+			ImGui::SetItemTooltip("%s", SceneViewToggleHint(SceneViewToggleOf(node.path)));
+		else ImGui::SetItemTooltip("%s", node.path.c_str());
 
 		DrawAssetContextMenu(node);
 
@@ -672,6 +696,39 @@ namespace Loom
 
 			ImGui::TreePop();
 		};
+	};
+
+	void Editor::DrawSceneViewToggleCursor(const std::string& path) const
+	{
+		const SceneViewToggle toggle = SceneViewToggleOf(path);
+
+		if (toggle == SceneViewToggle::Active)
+		{
+			ImGui::SetMouseCursor(ImGuiMouseCursor_NotAllowed);
+			return;
+		};
+
+		// Below and right of the arrow's tip, clear of the arrow itself.
+		constexpr float badge_offset = 1.1f;
+		constexpr float badge_radius = 0.45f;
+		constexpr float bar_half_length = 0.5f;
+		constexpr float bar_thickness = 0.15f;
+
+		const float size = ImGui::GetFontSize();
+		const float radius = size * badge_radius;
+		const float half = radius * bar_half_length;
+		const float thickness = size * bar_thickness;
+		const ImVec2 mouse = ImGui::GetIO().MousePos;
+		const ImVec2 centre(mouse.x + size * badge_offset, mouse.y + size * badge_offset);
+		const ImU32 glyph = ImGui::GetColorU32(ImGuiCol_Text);
+
+		ImDrawList* draw = ImGui::GetForegroundDrawList();
+
+		draw->AddCircleFilled(centre, radius, ImGui::GetColorU32(ImGuiCol_ButtonActive));
+		draw->AddLine(ImVec2(centre.x - half, centre.y), ImVec2(centre.x + half, centre.y), glyph, thickness);
+
+		if (toggle == SceneViewToggle::Add)
+			draw->AddLine(ImVec2(centre.x, centre.y - half), ImVec2(centre.x, centre.y + half), glyph, thickness);
 	};
 
 	void Editor::DrawAssetContextMenu(const AssetNode& node)

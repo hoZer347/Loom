@@ -26,6 +26,8 @@ namespace Loom
 	*     click <target>, rightclick <target>, doubleclick <target>
 	*     drag <target> to <target>
 	*     key <chord>          ImGui's key names joined by +: ctrl+z, enter, f2
+	*     hold <chord>, release <chord>   the key half of it, so ctrl can be
+	*                          held through a click
 	*     type <text>          the rest of the line
 	*     screenshot <file>    the whole window, as a bitmap
 	*     items [file]         every labelled item drawn last frame, to the file

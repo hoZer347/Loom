@@ -342,11 +342,11 @@ namespace Loom
 
 			press(ImGuiMouseButton_Left, false);
 		}
-		else if (verb == "key")
+		else if (verb == "key" || verb == "hold" || verb == "release")
 		{
 			if (tokens.size() != 2)
 			{
-				Fail("key takes one chord, such as ctrl+z");
+				Fail(verb + " takes one chord, such as ctrl+z");
 				return false;
 			};
 
@@ -374,23 +374,25 @@ namespace Loom
 				held.push_back(key);
 			};
 
-			m_actions.push_back(
-				[&io, held]()
-				{
-					for (ImGuiKey key : held)
-						io.AddKeyEvent(key, true);
+			if (verb != "release")
+				m_actions.push_back(
+					[&io, held]()
+					{
+						for (ImGuiKey key : held)
+							io.AddKeyEvent(key, true);
 
-					return Result::Done;
-				});
+						return Result::Done;
+					});
 
-			m_actions.push_back(
-				[&io, held]()
-				{
-					for (auto key = held.rbegin(); key != held.rend(); key++)
-						io.AddKeyEvent(*key, false);
+			if (verb != "hold")
+				m_actions.push_back(
+					[&io, held]()
+					{
+						for (auto key = held.rbegin(); key != held.rend(); key++)
+							io.AddKeyEvent(*key, false);
 
-					return Result::Done;
-				});
+						return Result::Done;
+					});
 		}
 		else if (verb == "type")
 		{
