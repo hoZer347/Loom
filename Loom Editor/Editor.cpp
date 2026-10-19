@@ -2192,12 +2192,12 @@ namespace Loom
 		const std::vector<GameObject*> children = root.GetChildren();
 
 		for (GameObject* child : children)
-			DrawGameObjectNode(child, root.IsDisabled());
+			DrawGameObjectNode(child, root.IsDisabled(), false);
 
 		ImGui::TreePop();
 	};
 
-	void Editor::DrawGameObjectNode(GameObject* gameObject, bool parent_disabled)
+	void Editor::DrawGameObjectNode(GameObject* gameObject, bool parent_disabled, bool parent_in_prefab)
 	{
 		ImGuiTreeNodeFlags flags =
 			ImGuiTreeNodeFlags_OpenOnArrow |
@@ -2215,19 +2215,27 @@ namespace Loom
 
 		const bool renaming = m_renaming && m_selected == gameObject;
 		const bool disabled = parent_disabled || gameObject->IsDisabled();
+		const bool instance = gameObject->GetComponent<Prefab>() != nullptr;
+		const bool in_prefab = parent_in_prefab || instance;
+
+		const std::string label = renaming
+			? std::string()
+			: instance ? std::string(EditorIcons::Prefab) + " " + gameObject->GetName() : gameObject->GetName();
 
 		const ImRect eye = EyeRect();
 
 		if (disabled)
 			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+		else if (in_prefab)
+			ImGui::PushStyleColor(ImGuiCol_Text, EditorTheme::AccentText);
 
 		const bool open = ImGui::TreeNodeEx(
 			gameObject->GetGuid().ToString().c_str(),
 			flags,
 			"%s",
-			renaming ? "" : gameObject->GetName().c_str());
+			label.c_str());
 
-		if (disabled)
+		if (disabled || in_prefab)
 			ImGui::PopStyleColor();
 
 		TakeImportTarget(gameObject);
@@ -2284,7 +2292,7 @@ namespace Loom
 		const std::vector<GameObject*> children = gameObject->GetChildren();
 
 		for (GameObject* child : children)
-			DrawGameObjectNode(child, disabled);
+			DrawGameObjectNode(child, disabled, in_prefab);
 
 		ImGui::TreePop();
 	};
@@ -3076,7 +3084,7 @@ namespace Loom
 		ImGui::Separator();
 		ImGui::TextDisabled("%s %s", EditorIcons::Prefab, m_prefabPath.c_str());
 
-		DrawGameObjectNode(root, false);
+		DrawGameObjectNode(root, false, false);
 	};
 
 	void Editor::DrawGame()

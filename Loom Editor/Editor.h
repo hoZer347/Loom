@@ -317,7 +317,9 @@ namespace Loom
 		void RefreshScripts();
 		void DrawHierarchy();
 		void DrawSceneNode(Scene* scene);
-		void DrawGameObjectNode(GameObject* gameObject, bool parent_disabled);
+		// A prefab instance's row shows the prefab icon, and it and everything
+		// under it take the accent colour.
+		void DrawGameObjectNode(GameObject* gameObject, bool parent_disabled, bool parent_in_prefab);
 
 		// The eye at the right of the row just drawn, which disables or enables
 		// the object. Faded when an ancestor already disables it.
