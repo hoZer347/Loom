@@ -132,11 +132,12 @@ namespace LoomTests
 		void EndFrame() override { };
 		void Capture(const CaptureHandler&) override { };
 
-		uint32_t CreateProgram(const std::string& name, const std::string&, const std::string& fragment) override
+		uint32_t CreateProgram(const std::string& name, const std::string& vertex, const std::string& fragment) override
 		{
 			if (fragment.find(BROKEN) != std::string::npos)
 				throw std::runtime_error("Shader compile error in " + name);
 
+			vertices[name] = vertex;
 			return programs[name] = ++m_handles;
 		};
 
@@ -216,6 +217,7 @@ namespace LoomTests
 		std::set<uint32_t> pixelatedPrograms;
 
 		std::map<std::string, uint32_t> programs;
+		std::map<std::string, std::string> vertices;
 		std::map<uint32_t, glm::ivec2> targetSizes;
 		glm::ivec2 windowSize = glm::ivec2(1);
 

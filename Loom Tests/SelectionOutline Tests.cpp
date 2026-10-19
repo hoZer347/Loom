@@ -21,7 +21,7 @@ using LoomTests::RecordingRenderer;
 
 namespace
 {
-	constexpr const char* MESH_MASK = "Loom Editor Mesh Mask";
+	constexpr const char* MESH_MASK = "Loom Editor Mesh Mask: ";
 	constexpr const char* SPRITE_MASK = "Loom Editor Sprite Mask";
 	constexpr const char* EDGE = "Loom Editor Selection Outline";
 
@@ -74,9 +74,45 @@ TEST_SUITE("SelectionOutline")
 		const uint32_t mask = Mask(renderer);
 
 		CHECK(renderer.targetSizes.at(mask) == VIEW);
-		CHECK(renderer.drawn == std::vector<uint32_t>{ renderer.programs.at(MESH_MASK), renderer.programs.at(EDGE) });
+		CHECK(renderer.drawn == std::vector<uint32_t>{ renderer.programs.at(MESH_MASK + shader.file_path), renderer.programs.at(EDGE) });
 		CHECK(renderer.drawnInto == std::vector<uint32_t>{ mask, RecordingRenderer::WINDOW });
 		CHECK(renderer.textures["u_mask"] == mask);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh's mask is drawn with its own shader's vertex stage, so a shader that places it in clip space is ringed where it shows")
+	{
+		RecordingRenderer renderer;
+		renderer.windowSize = VIEW;
+
+		std::istringstream source(
+			"// ===VERTEX===\n"
+			"layout(location = 0) in vec3 aPos;\n"
+			"void main() { gl_Position = vec4(aPos, 1.0); }\n"
+			"// ===FRAGMENT===\n"
+			"void main() { }\n");
+		Loom::Shader shader("selection outline clip space", source);
+
+		Loom::Scene scene("selection outline clip space");
+		Pump();
+
+		Loom::Camera* camera = scene.Attach<Loom::Camera>();
+		Loom::GameObject* selected = scene.AddChild("Clip Space");
+		Pump();
+
+		selected->Attach<Loom::Material>()->shader = &shader;
+		selected->Attach<Loom::Mesh>()->m_vertices = TRIANGLE;
+		Pump();
+
+		Loom::SelectionOutline outline;
+		outline.Draw(*selected, *camera);
+		outline.Draw(*selected, *camera);
+
+		const std::string mask = MESH_MASK + shader.file_path;
+
+		CHECK(renderer.vertices.at(mask) == shader.vertex);
+		CHECK(renderer.drawn == std::vector<uint32_t>{
+			renderer.programs.at(mask), renderer.programs.at(EDGE),
+			renderer.programs.at(mask), renderer.programs.at(EDGE) });
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh with no material leaves nothing to ring")

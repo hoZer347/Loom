@@ -2,9 +2,11 @@
 
 #include "Camera.h"
 #include "GameObject.h"
+#include "Material.h"
 #include "Mesh.h"
 #include "OpenGL.h"
 #include "Renderer.h"
+#include "Shaders.h"
 #include "Sprite.h"
 
 #include <cstring>
@@ -19,6 +21,8 @@ namespace Loom
 	namespace
 	{
 		constexpr glm::vec4 outline_colour(1.0f, 0.55f, 0.1f, 1.0f);
+
+		constexpr const char* mesh_mask_name = "Loom Editor Mesh Mask";
 
 		constexpr float uncovered[] = { 0.0f, 0.0f, 0.0f, 0.0f };
 
@@ -167,7 +171,7 @@ void main()
 
 		try
 		{
-			m_meshMask = renderer.CreateProgram("Loom Editor Mesh Mask", mesh_mask_vertex, mesh_mask_fragment);
+			m_meshMask = renderer.CreateProgram(mesh_mask_name, mesh_mask_vertex, mesh_mask_fragment);
 			m_spriteMask = renderer.CreateProgram("Loom Editor Sprite Mask", sprite_mask_vertex, sprite_mask_fragment);
 			m_edge = renderer.CreateProgram("Loom Editor Selection Outline", edge_vertex, edge_fragment);
 		}
@@ -184,6 +188,12 @@ void main()
 	{
 		Renderer* renderer = Renderer::Get();
 
+		for (const auto& [shader, mask] : m_meshMasks)
+			if (renderer && mask.program != m_meshMask)
+				renderer->DeleteProgram(mask.program);
+
+		m_meshMasks.clear();
+
 		for (uint32_t* program : { &m_meshMask, &m_spriteMask, &m_edge })
 		{
 			if (renderer && *program)
@@ -193,7 +203,34 @@ void main()
 		};
 	};
 
-	bool SelectionOutline::DrawSilhouettes(GameObject& gameObject)
+	uint32_t SelectionOutline::MeshMask(const Shader& shader)
+	{
+		ShaderMask& mask = m_meshMasks[&shader];
+
+		if (mask.program && mask.shader == shader.id)
+			return mask.program;
+
+		Renderer& renderer = *Renderer::Get();
+
+		if (mask.program && mask.program != m_meshMask)
+			renderer.DeleteProgram(mask.program);
+
+		mask.shader = shader.id;
+
+		try
+		{
+			mask.program = renderer.CreateProgram(std::string(mesh_mask_name) + ": " + shader.file_path, shader.vertex, mesh_mask_fragment);
+		}
+		catch (const std::exception& e)
+		{
+			std::cerr << "Selection outline: " << e.what() << std::endl;
+			mask.program = m_meshMask;
+		};
+
+		return mask.program;
+	};
+
+	bool SelectionOutline::DrawSilhouettes(GameObject& gameObject, const Camera& camera)
 	{
 		bool drew = false;
 
@@ -207,14 +244,18 @@ void main()
 				if (!mesh->IsDrawable())
 					continue;
 
-				mesh->Draw(m_meshMask);
+				const uint32_t program = MeshMask(*mesh->material->shader);
+
+				mesh->material->Apply(program, &*mesh->variables);
+				camera.Apply(program);
+				mesh->Draw(program);
 				drew = true;
 			}
 			else if (strcmp(component->GetTypeName(), typeid(Sprite).name()) == 0)
 				drew |= ((Sprite*)component)->DrawQuad(m_spriteMask);
 
 		for (GameObject* child : gameObject.GetChildren())
-			drew |= DrawSilhouettes(*child);
+			drew |= DrawSilhouettes(*child, camera);
 
 		return drew;
 	};
@@ -241,7 +282,7 @@ void main()
 				camera.Apply(m_spriteMask);
 				camera.Apply(m_meshMask);
 
-				drew = DrawSilhouettes(selected);
+				drew = DrawSilhouettes(selected, camera);
 			});
 
 		if (!drew)

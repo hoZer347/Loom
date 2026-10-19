@@ -375,6 +375,7 @@ bool LoomDitheredOut(float alpha)
 	{
 		settings = programs.settings;
 		shadow_id = programs.shadow;
+		vertex = programs.vertex;
 
 		return programs.id;
 	};
@@ -470,6 +471,7 @@ bool LoomDitheredOut(float alpha)
 
 		Programs programs;
 		programs.settings = stages.settings;
+		programs.vertex = stages.vertex;
 		programs.id = renderer->CreateProgram(name, stages.vertex, stages.fragment);
 		renderer->SetPixelated(programs.id, stages.settings.pixelated);
 

@@ -3,12 +3,14 @@
 #include "EditorViewport.h"
 
 #include <cstdint>
+#include <unordered_map>
 
 
 namespace Loom
 {
 	struct Camera;
 	struct GameObject;
+	struct Shader;
 
 	/**
 	* Loom::SelectionOutline
@@ -37,10 +39,24 @@ namespace Loom
 		void Destroy();
 
 		// Whether anything was drawn.
-		bool DrawSilhouettes(GameObject& gameObject);
+		bool DrawSilhouettes(GameObject& gameObject, const Camera& camera);
+
+		// The mask program for meshes drawn with shader: its own vertex stage,
+		// so the silhouette lands where the mesh does, or the plain one when
+		// that will not compile.
+		uint32_t MeshMask(const Shader& shader);
+
+		// A mask program, and the shader program it was made beside, which a
+		// reloaded shader no longer matches.
+		struct ShaderMask
+		{
+			uint32_t shader = 0;
+			uint32_t program = 0;
+		};
 
 		EditorViewport m_mask;
 
+		std::unordered_map<const Shader*, ShaderMask> m_meshMasks;
 		uint32_t m_meshMask = 0;
 		uint32_t m_spriteMask = 0;
 		uint32_t m_edge = 0;
