@@ -588,6 +588,7 @@ namespace Loom
 		// what deleting them queues lands while the script library its code is
 		// in is still loaded. A run that never reached its first frame, such as
 		// one stopped by a bad argument, still has all of it queued.
+		ClosePrefab();
 		Engine::DoTasks();
 
 		for (Scene* scene : m_ownedScenes)
@@ -1057,12 +1058,12 @@ namespace Loom
 		if (m_selected && IsInHierarchy(scene->GetRoot(), m_selected))
 			Select(nullptr);
 
-		// Deleting a scene mid-GUI would leave the rest of the frame walking a
-		// dangling pointer; deferring puts the delete (and the unregistering it
-		// queues in turn) at the top of the next frame instead.
 		m_scenePaths.erase(scene);
 		m_history.Forget(scene->GetGuid());
 
+		// Deleting a scene mid-GUI would leave the rest of the frame walking a
+		// dangling pointer; deferring puts the delete (and the unregistering it
+		// queues in turn) at the top of the next frame instead.
 		Engine::QueueTask([scene]() { delete scene; });
 	};
 
@@ -1096,13 +1097,15 @@ namespace Loom
 		// Closing the one open clears the path this may have been handed.
 		const std::string opening = path;
 
-		Prefabs::ObjectNode prefab;
+		const Prefabs::ObjectNode* prefab = LoadPrefab(opening);
 
-		if (!LoadPrefab(opening, prefab))
+		if (prefab == nullptr)
 		{
 			std::cerr << "There is no prefab at " << opening << std::endl;
 			return;
 		};
+
+		const std::string text = Prefabs::Write(*prefab);
 
 		ClosePrefab();
 
@@ -1110,7 +1113,7 @@ namespace Loom
 		Scene::Unlist(m_prefabScene);
 
 		std::string error;
-		GameObject* root = SceneSerializer::Deserialize(Prefabs::Write(prefab), m_prefabScene->GetRoot(), &error);
+		GameObject* root = SceneSerializer::Deserialize(text, m_prefabScene->GetRoot(), &error);
 
 		if (root == nullptr)
 		{
@@ -1123,7 +1126,11 @@ namespace Loom
 
 		m_prefabRoot = root->GetGuid();
 		m_prefabPath = opening;
-		m_prefabShape = Prefabs::Shape(prefab, Prefabs::TransformKeys(*root), Prefabs::Part::Whole);
+
+		// Agreed with the file on the next pass, once the copy has its children
+		// and serializes the way it will from then on.
+		m_prefabShape.clear();
+		m_historyDirty = true;
 
 		m_showPrefab = true;
 		m_prefabFocusFrames = scene_focus_frames;
@@ -1146,6 +1153,7 @@ namespace Loom
 		m_prefabRoot = Guid();
 		m_prefabPath.clear();
 		m_prefabShape.clear();
+		m_reshowPrefab = false;
 	};
 
 	GameObject* Editor::GetPrefabRoot() const
@@ -2490,10 +2498,7 @@ namespace Loom
 		// A prefab inside itself would take in its own every edit.
 		if (extension == Prefab::extension)
 		{
-			const bool inside_itself =
-				path == m_prefabPath && m_prefabScene && IsInHierarchy(m_prefabScene->GetRoot(), gameObject);
-
-			if (!inside_itself && ImGui::AcceptDragDropPayload(ASSET_PAYLOAD))
+			if (!IsInPrefab(gameObject, path) && ImGui::AcceptDragDropPayload(ASSET_PAYLOAD))
 				Instantiate(path, *gameObject);
 
 			return true;

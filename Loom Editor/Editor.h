@@ -23,10 +23,10 @@
 #include <filesystem>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <set>
 #include <utility>
 #include <vector>
 
@@ -123,7 +123,6 @@ namespace Loom
 		// only the panel draws, with a light the Hierarchy leaves out.
 		void OpenPrefab(const std::string& path);
 		void ClosePrefab();
-		const std::string& GetOpenPrefab() const { return m_prefabPath; };
 		GameObject* GetPrefabRoot() const;
 
 		// File > Save Scene and Ctrl+S: the active scene, to the file it was
@@ -551,6 +550,31 @@ namespace Loom
 		void ValidateSelection();
 		static bool IsInHierarchy(const GameObject& root, const GameObject* target);
 
+		// The prefab as the file now has it, read again whenever the file
+		// changes. A change from outside the editor unlinks the prefab's
+		// instances, so they take the file, and has the Prefab panel show it.
+		// Null when there is no such prefab.
+		const Prefabs::ObjectNode* LoadPrefab(const std::string& path);
+		bool WritePrefab(const std::string& path, const Prefabs::ObjectNode& prefab);
+		std::filesystem::path PrefabFile(const std::string& path) const;
+
+		// Run with the history: carries an edit made in the Prefab panel or to
+		// an instance to the file and every instance, and brings instances
+		// that do not know their prefab yet into line with it.
+		void SyncPrefabs();
+
+		// The Prefab panel's copy made the file's again, in place: the same
+		// guids, so the selection and the panel's focus stay where they are.
+		void ReshowPrefab();
+
+		// Whether gameObject is in the prefab at path: its scene's copy in the
+		// Prefab panel, or an instance of it. A prefab dropped there would
+		// take in its own every edit.
+		bool IsInPrefab(const GameObject* gameObject, const std::string& path) const;
+
+		// The prefab tree drawn in the Hierarchy, under the open scenes.
+		void DrawPrefabNode();
+
 		EditorViewport m_sceneView;
 		EditorViewport m_gameView;
 		EditorViewport m_debugView;
@@ -574,35 +598,27 @@ namespace Loom
 		std::string m_prefabShape{ };
 		int m_prefabFocusFrames = 0;
 
+		// Set when the file under the Prefab panel changed outside the editor.
+		bool m_reshowPrefab = false;
+
 		// The open prefab, while a build has its scene down.
 		std::string m_prefabBeforeBuild{ };
 
-		// Each prefab file read so far, by its path from the project folder.
-		std::map<std::string, Prefabs::ObjectNode> m_prefabs{ };
+		// Each prefab file read so far, by its path from the project folder,
+		// with when it was written as it was read.
+		struct LoadedPrefab
+		{
+			Prefabs::ObjectNode tree;
+			std::filesystem::file_time_type written;
+		};
+
+		std::map<std::string, LoadedPrefab> m_prefabs{ };
 
 		// The instances known to agree with their prefab, by the guid of the
 		// Prefab component linking them and the path it names. One not in here
 		// takes its prefab's content; one in here that differs from it has been
 		// edited, and its edit goes to the prefab and every other instance.
 		std::set<std::pair<std::string, std::string>> m_linkedInstances{ };
-
-		// The prefab as the file has it, read once. False when there is none.
-		bool LoadPrefab(const std::string& path, Prefabs::ObjectNode& prefab);
-		bool WritePrefab(const std::string& path, const Prefabs::ObjectNode& prefab);
-		std::filesystem::path PrefabFile(const std::string& path) const;
-
-		// Run with the history: carries an edit made in the Prefab panel or to
-		// an instance to the file and every instance, and brings instances
-		// that do not know their prefab yet into line with it.
-		void SyncPrefabs();
-
-		// With the Project panel's rescan: the files may have changed under the
-		// editor, so they are read again, every instance takes its prefab as
-		// the file has it, and the Prefab panel shows what the file now holds.
-		void ForgetPrefabs();
-
-		// The prefab tree drawn in the Hierarchy, under the open scenes.
-		void DrawPrefabNode();
 
 		// Shared: unlike an outline, it keeps nothing the size of a view.
 		ColliderGizmos m_colliderGizmos;

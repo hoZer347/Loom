@@ -228,6 +228,111 @@ TEST_SUITE("Prefabs")
 		CHECK(Loom::Prefabs::Splice(scene, NewGuid(), replacement) == scene);
 	};
 
+	TEST_CASE("references out of a tree are emptied for a prefab, and those within kept")
+	{
+		const Tree tree;
+		const ObjectNode isolated = Loom::Prefabs::Isolated(tree.Node());
+
+		CHECK(isolated.components[0].fields[1].value == tree.child);
+		CHECK(isolated.components[0].fields[2].value == "null");
+	};
+
+	TEST_CASE("a known instance's edit reaches the prefab and the other instances")
+	{
+		const Tree prefab;
+		const Tree edited;
+		const Tree other;
+
+		const Loom::Prefabs::Outcome outcome = Loom::Prefabs::Sync(
+			prefab.Node(),
+			nullptr,
+			"",
+			{ { edited.Node("Goblin", "(9, 9, 9)", "7"), true }, { other.Node("Goblin 3", "(0, 0, 0)"), true } },
+			transform_keys);
+
+		REQUIRE(outcome.prefab);
+		CHECK(outcome.prefab->guid == prefab.top);
+		CHECK(Shared(*outcome.prefab) == Shared(edited.Node("Goblin", "(1, 2, 3)", "7")));
+		CHECK(Whole(*outcome.prefab) == Whole(prefab.Node("Goblin", "(1, 2, 3)", "7")));
+
+		CHECK_FALSE(outcome.instances[0]);
+		REQUIRE(outcome.instances[1]);
+		CHECK(outcome.instances[1]->guid == other.top);
+		CHECK(outcome.instances[1]->fields[1].value == "(0, 0, 0)");
+		CHECK(Shared(*outcome.instances[1]) == Shared(*outcome.prefab));
+	};
+
+	TEST_CASE("an instance that does not know its prefab takes it as it is")
+	{
+		const Tree prefab;
+		const Tree stale;
+
+		const Loom::Prefabs::Outcome outcome = Loom::Prefabs::Sync(
+			prefab.Node(),
+			nullptr,
+			"",
+			{ { stale.Node("Goblin", "(1, 2, 3)", "7"), false } },
+			transform_keys);
+
+		CHECK_FALSE(outcome.prefab);
+		REQUIRE(outcome.instances[0]);
+		CHECK(Shared(*outcome.instances[0]) == Shared(prefab.Node()));
+	};
+
+	TEST_CASE("an edit in the Prefab panel wins over an instance's, and an instance's has the panel show it again")
+	{
+		const Tree prefab;
+		const Tree panel;
+		const Tree instance;
+
+		const std::string agreed = Whole(prefab.Node());
+		const ObjectNode edited = panel.Node("Goblin", "(1, 2, 3)", "8");
+
+		const Loom::Prefabs::Outcome from_panel = Loom::Prefabs::Sync(
+			prefab.Node(),
+			&edited,
+			agreed,
+			{ { instance.Node("Goblin", "(1, 2, 3)", "7"), true } },
+			transform_keys);
+
+		REQUIRE(from_panel.prefab);
+		CHECK(Whole(*from_panel.prefab) == Whole(prefab.Node("Goblin", "(1, 2, 3)", "8")));
+		CHECK_FALSE(from_panel.reshow);
+		REQUIRE(from_panel.instances[0]);
+		CHECK(Shared(*from_panel.instances[0]) == Shared(prefab.Node("Goblin", "(1, 2, 3)", "8")));
+
+		const ObjectNode unchanged = panel.Node();
+
+		const Loom::Prefabs::Outcome from_instance = Loom::Prefabs::Sync(
+			prefab.Node(),
+			&unchanged,
+			agreed,
+			{ { instance.Node("Goblin", "(1, 2, 3)", "7"), true } },
+			transform_keys);
+
+		REQUIRE(from_instance.prefab);
+		CHECK(from_instance.reshow);
+	};
+
+	TEST_CASE("nothing changes when the prefab, the panel and every instance agree")
+	{
+		const Tree prefab;
+		const Tree panel;
+		const Tree instance;
+		const ObjectNode shown = panel.Node();
+
+		const Loom::Prefabs::Outcome outcome = Loom::Prefabs::Sync(
+			prefab.Node(),
+			&shown,
+			Whole(prefab.Node()),
+			{ { instance.Node("Goblin 2", "(5, 5, 5)"), true } },
+			transform_keys);
+
+		CHECK_FALSE(outcome.prefab);
+		CHECK_FALSE(outcome.reshow);
+		CHECK_FALSE(outcome.instances[0]);
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a GameObject's transform is written under the keys the tests use")
 	{
 		Loom::Scene scene("Transforms");

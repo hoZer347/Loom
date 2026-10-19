@@ -4,6 +4,7 @@
 #include "GameObject.h"
 #include "Guid.h"
 #include "Prefab.h"
+#include "SceneSerializer.h"
 
 #include <algorithm>
 #include <cstring>
@@ -15,49 +16,16 @@ namespace Loom
 {
 	namespace
 	{
-		constexpr const char* object_keyword = "GameObject ";
-		constexpr const char* component_keyword = "Component ";
 		constexpr const char* field_separator = " = ";
+		constexpr const char* null_reference = "null";
 
 		// What a reference out of the tree compares as: an instance keeps its
 		// own, and a prefab has nothing outside it to point at.
 		constexpr const char* outside = "out";
 
-		// Four spaces count as a tab, as they do for SceneSerializer.
-		constexpr int spaces_per_tab = 4;
-
 		std::string Indent(int depth)
 		{
 			return std::string((size_t)depth, '\t');
-		};
-
-		int DepthOf(const std::string& line, size_t& content_start)
-		{
-			int depth = 0;
-			int spaces = 0;
-			size_t at = 0;
-
-			for (; at < line.size(); at++)
-			{
-				if (line[at] == '\t')
-				{
-					depth++;
-					spaces = 0;
-				}
-				else if (line[at] == ' ')
-				{
-					if (++spaces == spaces_per_tab)
-					{
-						depth++;
-						spaces = 0;
-					};
-				}
-				else break;
-			};
-
-			content_start = at;
-
-			return depth;
 		};
 
 		bool StartsWith(const std::string& text, const char* prefix)
@@ -72,20 +40,21 @@ namespace Loom
 			return Guid::TryParse(text, guid);
 		};
 
-		// "Player(0f8e...)": the last brackets hold the guid, so a name may have
-		// brackets of its own.
 		bool SplitNameAndGuid(const std::string& text, std::string& name, std::string& guid)
 		{
-			const size_t open = text.find_last_of('(');
-			const size_t close = text.find_last_of(')');
+			Guid parsed;
 
-			if (open == std::string::npos || close == std::string::npos || close < open)
+			if (!SceneSerializer::SplitNameAndGuid(text, name, parsed))
 				return false;
 
-			name = text.substr(0, open);
-			guid = text.substr(open + 1, close - open - 1);
+			guid = parsed.ToString();
 
-			return IsGuid(guid);
+			return true;
+		};
+
+		bool Contains(const std::vector<std::string>& keys, const std::string& key)
+		{
+			return std::find(keys.begin(), keys.end(), key) != keys.end();
 		};
 
 		const Prefabs::Field* FieldNamed(const std::vector<Prefabs::Field>& fields, const std::string& key)
@@ -115,6 +84,18 @@ namespace Loom
 			return content;
 		};
 
+		// Every guid in the tree, by the order it is met in.
+		void Number(const Prefabs::ObjectNode& node, bool top, std::map<std::string, size_t>& numbers)
+		{
+			numbers.emplace(node.guid, numbers.size());
+
+			for (const Prefabs::ComponentNode* component : ContentOf(node, top))
+				numbers.emplace(component->guid, numbers.size());
+
+			for (const Prefabs::ObjectNode& child : node.children)
+				Number(child, false, numbers);
+		};
+
 		void WriteFields(std::string& text, const std::vector<Prefabs::Field>& fields, int depth)
 		{
 			for (const Prefabs::Field& field : fields)
@@ -123,13 +104,13 @@ namespace Loom
 
 		void WriteObject(std::string& text, const Prefabs::ObjectNode& node, int depth)
 		{
-			text += Indent(depth) + object_keyword + node.name + '(' + node.guid + ")\n";
+			text += Indent(depth) + SceneSerializer::gameobject_keyword + node.name + '(' + node.guid + ")\n";
 
 			WriteFields(text, node.fields, depth + 1);
 
 			for (const Prefabs::ComponentNode& component : node.components)
 			{
-				text += Indent(depth + 1) + component_keyword + component.type + '(' + component.guid + ")\n";
+				text += Indent(depth + 1) + SceneSerializer::component_keyword + component.type + '(' + component.guid + ")\n";
 				WriteFields(text, component.fields, depth + 2);
 			};
 
@@ -141,27 +122,12 @@ namespace Loom
 		{
 			const std::vector<std::string>& transform_keys;
 			Prefabs::Part part;
-
-			// Every guid in the tree, by the order it is met in.
 			std::map<std::string, size_t> numbers{ };
-
-			void Number(const Prefabs::ObjectNode& node, bool top)
-			{
-				numbers.emplace(node.guid, numbers.size());
-
-				for (const Prefabs::ComponentNode* component : ContentOf(node, top))
-					numbers.emplace(component->guid, numbers.size());
-
-				for (const Prefabs::ObjectNode& child : node.children)
-					Number(child, false);
-			};
 
 			// Only a GameObject's own fields are its transform.
 			bool Skips(const Prefabs::Field& field, bool object) const
 			{
-				return object &&
-					part == Prefabs::Part::Shared &&
-					std::find(transform_keys.begin(), transform_keys.end(), field.key) != transform_keys.end();
+				return object && part == Prefabs::Part::Shared && Contains(transform_keys, field.key);
 			};
 
 			std::string Value(const std::string& value) const
@@ -209,11 +175,6 @@ namespace Loom
 			// Each of source's guids, to what it is in the result.
 			std::map<std::string, std::string> guids{ };
 
-			bool IsTransform(const std::string& key) const
-			{
-				return std::find(transform_keys.begin(), transform_keys.end(), key) != transform_keys.end();
-			};
-
 			void Match(const Prefabs::ObjectNode& source, const Prefabs::ObjectNode* target, bool top)
 			{
 				guids[source.guid] = target ? target->guid : Guid::New().ToString();
@@ -234,7 +195,7 @@ namespace Loom
 			std::vector<Prefabs::Field> Fields(
 				const std::vector<Prefabs::Field>& fields,
 				const std::vector<Prefabs::Field>* counterparts,
-				bool transforms) const
+				bool object) const
 			{
 				const bool shared = part == Prefabs::Part::Shared;
 				std::vector<Prefabs::Field> result{ };
@@ -244,12 +205,12 @@ namespace Loom
 					const Prefabs::Field* kept = counterparts ? FieldNamed(*counterparts, field.key) : nullptr;
 					std::string value = field.value;
 
-					if (shared && transforms && IsTransform(field.key))
+					if (shared && object && Contains(transform_keys, field.key))
 						value = kept ? kept->value : field.value;
 					else if (const auto mapped = guids.find(field.value); mapped != guids.end())
 						value = mapped->second;
 					else if (shared && IsGuid(field.value))
-						value = kept ? kept->value : "null";
+						value = kept ? kept->value : null_reference;
 
 					result.push_back({ field.key, value });
 				};
@@ -291,6 +252,25 @@ namespace Loom
 
 				return result;
 			};
+		};
+
+		void Isolate(Prefabs::ObjectNode& node, const std::map<std::string, size_t>& inside)
+		{
+			const auto seal =
+				[&](std::vector<Prefabs::Field>& fields)
+				{
+					for (Prefabs::Field& field : fields)
+						if (IsGuid(field.value) && !inside.contains(field.value))
+							field.value = null_reference;
+				};
+
+			seal(node.fields);
+
+			for (Prefabs::ComponentNode& component : node.components)
+				seal(component.fields);
+
+			for (Prefabs::ObjectNode& child : node.children)
+				Isolate(child, inside);
 		};
 	};
 
@@ -349,7 +329,7 @@ namespace Loom
 				line.pop_back();
 
 			size_t start = 0;
-			const int depth = DepthOf(line, start);
+			const int depth = SceneSerializer::DepthOf(line, start);
 			const std::string content = line.substr(start);
 
 			if (content.empty() || content[0] == '#')
@@ -358,9 +338,9 @@ namespace Loom
 			std::string name;
 			std::string guid;
 
-			if (StartsWith(content, object_keyword))
+			if (StartsWith(content, SceneSerializer::gameobject_keyword))
 			{
-				if (!SplitNameAndGuid(content.substr(strlen(object_keyword)), name, guid))
+				if (!SplitNameAndGuid(content.substr(strlen(SceneSerializer::gameobject_keyword)), name, guid))
 					return fail("a GameObject with no guid");
 
 				component = nullptr;
@@ -385,12 +365,12 @@ namespace Loom
 				continue;
 			};
 
-			if (StartsWith(content, component_keyword))
+			if (StartsWith(content, SceneSerializer::component_keyword))
 			{
 				if (depth == 0 || (size_t)depth > objects.size())
 					return fail("a Component with no GameObject to be on");
 
-				if (!SplitNameAndGuid(content.substr(strlen(component_keyword)), name, guid))
+				if (!SplitNameAndGuid(content.substr(strlen(SceneSerializer::component_keyword)), name, guid))
 					return fail("a Component with no guid");
 
 				objects.resize((size_t)depth);
@@ -432,7 +412,7 @@ namespace Loom
 	std::string Prefabs::Shape(const ObjectNode& root, const std::vector<std::string>& transform_keys, Part part)
 	{
 		Shaper shaper{ transform_keys, part };
-		shaper.Number(root, true);
+		Number(root, true, shaper.numbers);
 
 		std::string text{ };
 		shaper.Object(text, root, true, 0);
@@ -452,6 +432,50 @@ namespace Loom
 		return retargeter.Build(source, &target, true);
 	};
 
+	Prefabs::ObjectNode Prefabs::Isolated(const ObjectNode& root)
+	{
+		std::map<std::string, size_t> inside{ };
+		Number(root, true, inside);
+
+		ObjectNode isolated = root;
+		Isolate(isolated, inside);
+
+		return isolated;
+	};
+
+	Prefabs::Outcome Prefabs::Sync(
+		const ObjectNode& prefab,
+		const ObjectNode* panel,
+		const std::string& panel_shape,
+		const std::vector<Instance>& instances,
+		const std::vector<std::string>& transform_keys)
+	{
+		Outcome outcome{ };
+		outcome.instances.resize(instances.size());
+
+		const std::string shared = Shape(prefab, transform_keys, Part::Shared);
+
+		if (panel && Shape(*panel, transform_keys, Part::Whole) != panel_shape)
+			outcome.prefab = Retarget(*panel, prefab, transform_keys, Part::Whole);
+		else
+			for (const Instance& instance : instances)
+				if (instance.known && Shape(instance.tree, transform_keys, Part::Shared) != shared)
+				{
+					outcome.prefab = Retarget(instance.tree, prefab, transform_keys, Part::Shared);
+					outcome.reshow = panel != nullptr;
+					break;
+				};
+
+		const ObjectNode& agreed = outcome.prefab ? *outcome.prefab : prefab;
+		const std::string agreed_shape = outcome.prefab ? Shape(agreed, transform_keys, Part::Shared) : shared;
+
+		for (size_t i = 0; i < instances.size(); i++)
+			if (Shape(instances[i].tree, transform_keys, Part::Shared) != agreed_shape)
+				outcome.instances[i] = Retarget(agreed, instances[i].tree, transform_keys, Part::Shared);
+
+		return outcome;
+	};
+
 	std::string Prefabs::Splice(const std::string& scene, const std::string& guid, const std::string& subtree)
 	{
 		std::vector<std::string> lines{ };
@@ -466,14 +490,14 @@ namespace Loom
 		for (size_t i = 0; i < lines.size() && first == lines.size(); i++)
 		{
 			size_t start = 0;
-			const int at = DepthOf(lines[i], start);
+			const int at = SceneSerializer::DepthOf(lines[i], start);
 			const std::string content = lines[i].substr(start);
 
 			std::string name;
 			std::string found;
 
-			if (StartsWith(content, object_keyword) &&
-				SplitNameAndGuid(content.substr(strlen(object_keyword)), name, found) &&
+			if (StartsWith(content, SceneSerializer::gameobject_keyword) &&
+				SplitNameAndGuid(content.substr(strlen(SceneSerializer::gameobject_keyword)), name, found) &&
 				found == guid)
 			{
 				first = i;
@@ -487,7 +511,7 @@ namespace Loom
 		size_t end = first + 1;
 
 		for (size_t start = 0; end < lines.size(); end++)
-			if (lines[end].find_first_not_of(" \t\r") != std::string::npos && DepthOf(lines[end], start) <= depth)
+			if (lines[end].find_first_not_of(" \t\r") != std::string::npos && SceneSerializer::DepthOf(lines[end], start) <= depth)
 				break;
 
 		std::string text{ };

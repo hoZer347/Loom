@@ -43,8 +43,7 @@ namespace Loom
 
 		// Scenes open in the editor, prefabs in its Prefab panel, shaders in its
 		// Shaders panel, textures in its Sprites panel, the scripts project's
-		// sources in Visual Studio,
-		// and anything else through the shell.
+		// sources in Visual Studio, and anything else through the shell.
 		// scripts_folder is empty when there is no scripts project.
 		static Opener OpenerOf(const std::string& path, const std::string& scripts_folder);
 

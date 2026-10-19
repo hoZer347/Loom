@@ -19,9 +19,6 @@ namespace Loom
 {
 	namespace
 	{
-		const char* const gameobject_keyword = "GameObject ";
-		const char* const component_keyword = "Component ";
-
 		std::string Indent(int depth)
 		{
 			return std::string(depth, '\t');
@@ -61,21 +58,6 @@ namespace Loom
 			return true;
 		};
 
-		// "Player(0f8e...)" -> name "Player", guid parsed. The last bracket wins,
-		// so a name is free to contain brackets of its own.
-		bool SplitNameAndGuid(const std::string& text, std::string& name, Guid& guid)
-		{
-			const size_t open = text.find_last_of('(');
-			const size_t close = text.find_last_of(')');
-
-			if (open == std::string::npos || close == std::string::npos || close < open)
-				return false;
-
-			name = Trim(text.substr(0, open));
-
-			return Guid::TryParse(text.substr(open + 1, close - open - 1), guid);
-		};
-
 		// A field has no name: what identifies it is where its Serial member was
 		// declared, so that is what goes in the file.
 		void WriteFields(std::string& text, const LoomObject& object, int depth)
@@ -89,7 +71,7 @@ namespace Loom
 		void WriteGameObject(std::string& text, GameObject& gameObject, int depth)
 		{
 			text +=
-				Indent(depth) + gameobject_keyword +
+				Indent(depth) + SceneSerializer::gameobject_keyword +
 				gameObject.GetName() + '(' + gameObject.GetGuid().ToString() + ")\n";
 
 			WriteFields(text, gameObject, depth + 1);
@@ -97,7 +79,7 @@ namespace Loom
 			for (ComponentBase* component : gameObject.GetComponents())
 			{
 				text +=
-					Indent(depth + 1) + component_keyword +
+					Indent(depth + 1) + SceneSerializer::component_keyword +
 					ComponentRegistry::NameOf(*component) +
 					'(' + component->GetGuid().ToString() + ")\n";
 
@@ -106,39 +88,6 @@ namespace Loom
 
 			for (GameObject* child : gameObject.GetChildren())
 				WriteGameObject(text, *child, depth + 1);
-		};
-
-		// Tabs are what the format uses; four spaces are accepted as one so a
-		// file that has been through an editor that expands tabs still loads.
-		int DepthOf(const std::string& line, size_t& content_start)
-		{
-			int depth = 0;
-			size_t at = 0;
-			int spaces = 0;
-
-			while (at < line.size())
-			{
-				if (line[at] == '\t')
-				{
-					depth++;
-					spaces = 0;
-				}
-				else if (line[at] == ' ')
-				{
-					if (++spaces == 4)
-					{
-						depth++;
-						spaces = 0;
-					};
-				}
-				else break;
-
-				at++;
-			};
-
-			content_start = at;
-
-			return depth;
 		};
 
 		// A component has no name of its own, so the type is what identifies it
@@ -177,7 +126,7 @@ namespace Loom
 				line_number++;
 
 				size_t content_start = 0;
-				const int depth = DepthOf(line, content_start);
+				const int depth = SceneSerializer::DepthOf(line, content_start);
 				const std::string content = Trim(line.substr(content_start));
 
 				if (content.empty() || content[0] == '#')
@@ -228,12 +177,12 @@ namespace Loom
 
 				const Level& parent = levels[depth - 1];
 
-				if (content.rfind(gameobject_keyword, 0) == 0)
+				if (content.rfind(SceneSerializer::gameobject_keyword, 0) == 0)
 				{
 					std::string name;
 					Guid guid;
 
-					if (!SplitNameAndGuid(content.substr(strlen(gameobject_keyword)), name, guid))
+					if (!SceneSerializer::SplitNameAndGuid(content.substr(strlen(SceneSerializer::gameobject_keyword)), name, guid))
 						return fail("GameObject is missing a valid guid");
 
 					GameObject* gameObject = nullptr;
@@ -252,12 +201,12 @@ namespace Loom
 					return true;
 				};
 
-				if (content.rfind(component_keyword, 0) == 0)
+				if (content.rfind(SceneSerializer::component_keyword, 0) == 0)
 				{
 					std::string name;
 					Guid guid;
 
-					if (!SplitNameAndGuid(content.substr(strlen(component_keyword)), name, guid))
+					if (!SceneSerializer::SplitNameAndGuid(content.substr(strlen(SceneSerializer::component_keyword)), name, guid))
 						return fail("Component is missing a valid guid");
 
 					if (parent.gameObject == nullptr)
@@ -361,6 +310,50 @@ namespace Loom
 					: found->second;
 			};
 		};
+	};
+
+	int SceneSerializer::DepthOf(const std::string& line, size_t& content_start)
+	{
+		int depth = 0;
+		size_t at = 0;
+		int spaces = 0;
+
+		while (at < line.size())
+		{
+			if (line[at] == '\t')
+			{
+				depth++;
+				spaces = 0;
+			}
+			else if (line[at] == ' ')
+			{
+				if (++spaces == spaces_per_tab)
+				{
+					depth++;
+					spaces = 0;
+				};
+			}
+			else break;
+
+			at++;
+		};
+
+		content_start = at;
+
+		return depth;
+	};
+
+	bool SceneSerializer::SplitNameAndGuid(const std::string& text, std::string& name, Guid& guid)
+	{
+		const size_t open = text.find_last_of('(');
+		const size_t close = text.find_last_of(')');
+
+		if (open == std::string::npos || close == std::string::npos || close < open)
+			return false;
+
+		name = Trim(text.substr(0, open));
+
+		return Guid::TryParse(text.substr(open + 1, close - open - 1), guid);
 	};
 
 	std::string SceneSerializer::Serialize(Scene& scene)

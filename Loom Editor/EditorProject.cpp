@@ -9,6 +9,7 @@
 #include "ProjectTemplate.h"
 
 #include "Renderer.h"
+#include "Scene.h"
 #include "SceneSerializer.h"
 #include "Textures.h"
 
@@ -489,7 +490,6 @@ namespace Loom
 			m_projectWatch.Watch(m_projectPath, false);
 
 		RefreshScripts();
-		ForgetPrefabs();
 
 		m_projectScenes.clear();
 		m_noThumbnail.clear();
@@ -862,12 +862,22 @@ namespace Loom
 			break;
 
 		case AssetKind::Prefab:
-			if (WritePrefab(
-				std::filesystem::path(NewAssetPath()).lexically_normal().lexically_relative(m_projectPath).generic_string(),
-				Prefabs::ObjectNode{ name, Guid::New().ToString() }))
+		{
+			// A GameObject of its own, so the file has every field one writes.
+			Scene blank(name);
+			Scene::Unlist(&blank);
+			blank.GetRoot().SetName(name);
+
+			Prefabs::ObjectNode prefab;
+
+			if (Prefabs::Parse(SceneSerializer::Serialize(blank.GetRoot()), prefab) &&
+				WritePrefab(
+					std::filesystem::path(NewAssetPath()).lexically_normal().lexically_relative(m_projectPath).generic_string(),
+					prefab))
 				path = NewAssetPath();
 			else error = "the prefab could not be written";
 			break;
+		};
 
 		case AssetKind::Script:
 		case AssetKind::State:
@@ -1065,7 +1075,10 @@ namespace Loom
 
 		if (dragged && dragged->IsDataType(object_payload))
 		{
-			if (ImGui::AcceptDragDropPayload(object_payload))
+			// The Prefab panel's copy is a prefab already.
+			const bool shown = GetPrefabRoot() && GetPrefabRoot()->GetGuid() == *(const Guid*)dragged->Data;
+
+			if (!shown && ImGui::AcceptDragDropPayload(object_payload))
 			{
 				m_objectToSave = *(const Guid*)dragged->Data;
 				m_assetMoveFolder = std::filesystem::path(folder).lexically_normal().string();

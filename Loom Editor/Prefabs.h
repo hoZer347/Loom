@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -44,12 +45,31 @@ namespace Loom
 		};
 
 		// What a prefab and the trees compared with it agree on: Shared for an
-		// instance, Whole for the prefab viewer's copy, whose transforms and
+		// instance, Whole for the Prefab panel's copy, whose transforms and
 		// name are the file's.
 		enum class Part
 		{
 			Shared,
 			Whole
+		};
+
+		// One instance of a prefab, and whether it agreed with the prefab when
+		// last looked at: one that did and no longer does has been edited, and
+		// one that never did takes the prefab as it is.
+		struct Instance
+		{
+			ObjectNode tree;
+			bool known = false;
+		};
+
+		// What a sync changes: the prefab, when something edited it, each
+		// instance that has to take it, and whether the Prefab panel has to
+		// show it again, an instance having edited it.
+		struct Outcome
+		{
+			std::optional<ObjectNode> prefab;
+			std::vector<std::optional<ObjectNode>> instances;
+			bool reshow = false;
 		};
 
 		// The keys a GameObject's transform fields are written under.
@@ -75,6 +95,21 @@ namespace Loom
 			const ObjectNode& target,
 			const std::vector<std::string>& transform_keys,
 			Part part);
+
+		// The tree with every reference out of it emptied, as a prefab keeps
+		// it: there is nothing outside a prefab to point at.
+		ObjectNode Isolated(const ObjectNode& root);
+
+		// One pass of keeping the prefab and its instances alike. The panel is
+		// the Prefab panel's copy, when it shows this prefab, with the Whole
+		// shape it last agreed with the file at. An edit there wins, then the
+		// first known instance's, and everything else takes the result.
+		Outcome Sync(
+			const ObjectNode& prefab,
+			const ObjectNode* panel,
+			const std::string& panel_shape,
+			const std::vector<Instance>& instances,
+			const std::vector<std::string>& transform_keys);
 
 		// Scene text with the lines of the GameObject with this guid, and of
 		// everything under it, swapped for subtree written at its depth. The

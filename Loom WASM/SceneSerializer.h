@@ -37,6 +37,21 @@ namespace Loom
 	{
 		static constexpr const char* extension = ".loomscene";
 
+		// What starts a GameObject's line and a component's.
+		static constexpr const char* gameobject_keyword = "GameObject ";
+		static constexpr const char* component_keyword = "Component ";
+
+		// Tabs are what the format uses; four spaces are accepted as one so a
+		// file that has been through an editor that expands tabs still loads.
+		static constexpr int spaces_per_tab = 4;
+
+		// A line's depth, and where what follows its indent starts.
+		static int DepthOf(const std::string& line, size_t& content_start);
+
+		// "Player(0f8e...)" -> name "Player", guid parsed. The last bracket wins,
+		// so a name is free to contain brackets of its own.
+		static bool SplitNameAndGuid(const std::string& text, std::string& name, Guid& guid);
+
 		// References written as guids whose objects did not exist yet when the
 		// line naming them was read.
 		using PendingReferences = std::vector<std::pair<const SerializedField*, Guid>>;
