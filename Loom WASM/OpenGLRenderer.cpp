@@ -83,8 +83,7 @@ namespace Loom
 			emscripten_get_canvas_element_size("#canvas", &width, &height);
 			glfwSetWindowSize(Engine::window, width, height);
 
-			Input::screen_width = width;
-			Input::screen_height = height;
+			Input::OnResize(width, height);
 
 			glViewport(0, 0, width, height);
 		};

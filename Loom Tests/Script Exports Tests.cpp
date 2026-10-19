@@ -34,6 +34,34 @@ TEST_SUITE("Script Exports")
 			CHECK(GetProcAddress(executable, name) != nullptr);
 		};
 	};
+
+	TEST_CASE("the UI a script can use is exported from the executable")
+	{
+		// Every out-of-line member a script calls, by its decorated name.
+		const char* const names[] =
+		{
+			"?Screen@Ui@Loom@@SA?AURect@12@XZ",
+			"?Pointer@Ui@Loom@@SA?AU?$vec@$01M$0A@@glm@@XZ",
+			"?IsPointerOver@Ui@Loom@@SA_NXZ",
+			"?IsPointedAt@Ui@Loom@@SA_NAEBUUiRect@2@@Z",
+			"?ScreenRect@UiRect@Loom@@QEBA?AURect@Ui@2@XZ",
+			"?LayOut@UiRect@Loom@@QEBA?AURect@Ui@2@AEBU342@@Z",
+			"?Fill@UiRect@Loom@@QEBA?AU?$vec@$03M$0A@@glm@@XZ",
+			"?Measure@UiText@Loom@@QEBA?AU?$vec@$01M$0A@@glm@@XZ",
+			"?Area@UiText@Loom@@QEBA?AURect@Ui@2@XZ",
+			"?IsHovered@UiButton@Loom@@QEBA_NXZ",
+			"?WasClicked@UiButton@Loom@@QEBA_NXZ",
+			"?Tint@UiButton@Loom@@QEBA?AU?$vec@$03M$0A@@glm@@XZ",
+		};
+
+		const HMODULE executable = GetModuleHandleA(nullptr);
+
+		for (const char* name : names)
+		{
+			CAPTURE(name);
+			CHECK(GetProcAddress(executable, name) != nullptr);
+		};
+	};
 };
 
 #endif

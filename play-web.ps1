@@ -171,10 +171,18 @@ if (Test-Stale $module $linkInputs)
 
 $page = Join-Path $output 'index.html'
 
+# Every font in the project but the builds, by its path under it, for the page
+# to preload where a UiText opens it.
+$fonts = @(Get-ChildItem -LiteralPath $Project -Recurse -File -Include '*.ttf', '*.otf', '*.ttc' |
+    Where-Object { -not $_.FullName.StartsWith((Join-Path $Project 'Build\'), [StringComparison]::OrdinalIgnoreCase) } |
+    ForEach-Object { (Get-UrlPath $_.FullName).TrimStart('/') } |
+    Sort-Object)
+
 (Get-Content -LiteralPath (Join-Path $root 'Loom Web\Player.html') -Raw).
     Replace('{TITLE}', (Split-Path -Leaf $Project)).
     Replace('{SCRIPT}', (Get-UrlPath $module)).
-    Replace('{SCENE}', (Get-UrlPath $Scene)) |
+    Replace('{SCENE}', (Get-UrlPath $Scene)).
+    Replace('{FONTS}', (ConvertTo-Json -InputObject $fonts -Compress)) |
     Set-Content -LiteralPath $page -Encoding UTF8 -NoNewline
 
 # --- Serving ----------------------------------------------------------------

@@ -1,0 +1,3 @@
+name=UI
+scripts=Scripts/UIScripts.vcxproj
+library=Build/UIScripts.dll

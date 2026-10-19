@@ -2,7 +2,6 @@
 
 #include "ComponentRegistry.h"
 #include "HiddenProcess.h"
-#include "ProjectTemplate.h"
 
 #include "Utilities/StateReference.h"
 
@@ -305,17 +304,10 @@ namespace Loom
 
 		const bool rebuild = BuiltAgainstOlderEditor();
 
-		// Against the engine this editor was built from, whichever one the
-		// project names, so the library links with the editor that loads it.
-		const std::filesystem::path engine = ProjectTemplate::EngineRoot();
-		std::error_code found;
-		const bool beside = std::filesystem::exists(engine / "Loom WASM" / "Loom.h", found);
-
 		const std::string command =
 			'"' + msbuild + "\" \"" + m_project + "\"" +
 			(rebuild ? " -t:Rebuild" : "") +
 			" -p:Configuration=" + configuration +
-			(beside ? " \"-p:LoomRoot=" + engine.string() + "\"" : "") +
 			" -p:Platform=x64 -nologo -v:m -m";
 
 		std::cout

@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <!--
-  The page play-web.ps1 writes beside a Play Web build, with {TITLE}, {SCRIPT}
-  and {SCENE} filled in. It is served from the project folder, and the base URL
-  is that folder, so the relative shader paths a scene stores resolve there.
+  The page play-web.ps1 writes beside a Play Web build, with {TITLE}, {SCRIPT},
+  {SCENE} and {FONTS} filled in. It is served from the project folder, and the
+  base URL is that folder, so the relative shader paths a scene stores resolve
+  there.
 -->
 <html lang="en">
   <head>
@@ -37,10 +38,23 @@
       // The scene is fetched into the virtual file system before main runs,
       // so main never waits on the network. Waiting there makes it async, and
       // the unwind the main loop starts with escapes as an unhandled rejection.
+      // So are the project's fonts, at the paths under it a UiText names
+      // them by, which resolve from the root the program runs in.
       var Module = {
         canvas: document.getElementById("canvas"),
         arguments: ["/scene.loomscene"],
-        preRun: [() => Module.FS.createPreloadedFile("/", "scene.loomscene", "{SCENE}", true, false)],
+        preRun: [
+          () => {
+            Module.FS.createPreloadedFile("/", "scene.loomscene", "{SCENE}", true, false);
+
+            for (const font of {FONTS}) {
+              const folder = "/" + font.substring(0, font.lastIndexOf("/") + 1);
+
+              Module.FS.mkdirTree(folder);
+              Module.FS.createPreloadedFile(folder, font.substring(font.lastIndexOf("/") + 1), "/" + font, true, false);
+            }
+          },
+        ],
         // The engine takes its viewport from resize events, and a canvas that
         // is already the right size never sends one. Queued, so it lands once
         // main has made the window.

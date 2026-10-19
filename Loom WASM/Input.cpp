@@ -113,6 +113,11 @@ namespace Loom
 	{
 		cursor_x = x;
 		cursor_y = y;
+		OnResize(window_width, window_height);
+	};
+
+	void Input::OnResize(int window_width, int window_height)
+	{
 		whole_window = { 0, 0, window_width, window_height };
 		Place();
 	};
@@ -158,21 +163,22 @@ namespace Loom
 	{
 		if (eventType == EMSCRIPTEN_EVENT_MOUSEMOVE)
 		{
-			double windowWidth, windowHeight;
+			// In the canvas's own pixels, as the renderer and a resize measure
+			// it, which on a dense screen are more than the page's.
+			int width = 0;
+			int height = 0;
+			double cssWidth = 0.0;
+			double cssHeight = 0.0;
 
-			// Get the current window size
-			EMSCRIPTEN_RESULT res = emscripten_get_element_css_size(
-				"body",
-				&windowWidth,
-				&windowHeight);
-
-			if (res != EMSCRIPTEN_RESULT_SUCCESS)
+			if (emscripten_get_canvas_element_size("#canvas", &width, &height) != EMSCRIPTEN_RESULT_SUCCESS ||
+				emscripten_get_element_css_size("#canvas", &cssWidth, &cssHeight) != EMSCRIPTEN_RESULT_SUCCESS ||
+				cssWidth <= 0.0 || cssHeight <= 0.0)
 			{
-				std::cerr << "Failed to get window size!" << std::endl;
+				std::cerr << "Failed to get the canvas's size!" << std::endl;
 				return EM_FALSE;
 			};
 
-			Input::OnMouseMove(e->clientX, e->clientY, (int)windowWidth, (int)windowHeight);
+			Input::OnMouseMove((int)(e->clientX * width / cssWidth), (int)(e->clientY * height / cssHeight), width, height);
 		};
 
 		return EM_TRUE;

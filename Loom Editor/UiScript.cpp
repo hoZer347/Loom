@@ -182,7 +182,7 @@ namespace Loom
 		// After whatever the platform queued, so the position this frame reads
 		// is the script's.
 		if (m_mouseSet)
-			ImGui::GetIO().AddMousePosEvent(m_mouse.x, m_mouse.y);
+			MoveCursor();
 
 		if (m_wait > 0)
 		{
@@ -326,10 +326,10 @@ namespace Loom
 			press(ImGuiMouseButton_Left, true);
 
 			m_actions.push_back(
-				[this, &io]()
+				[this]()
 				{
 					m_mouse.x += drag_nudge;
-					io.AddMousePosEvent(m_mouse.x, m_mouse.y);
+					MoveCursor();
 					return Result::Done;
 				});
 
@@ -490,7 +490,7 @@ namespace Loom
 
 					m_mouse = ImVec2(origin.x + x, origin.y + y);
 					m_mouseSet = true;
-					ImGui::GetIO().AddMousePosEvent(m_mouse.x, m_mouse.y);
+					MoveCursor();
 					return Result::Done;
 				});
 
@@ -540,11 +540,21 @@ namespace Loom
 
 				m_mouse = ImVec2(point.x + offset.x, point.y + offset.y);
 				m_mouseSet = true;
-				ImGui::GetIO().AddMousePosEvent(m_mouse.x, m_mouse.y);
+				MoveCursor();
 				return Result::Done;
 			});
 
 		return true;
+	};
+
+	void UiScript::MoveCursor()
+	{
+		ImGui::GetIO().AddMousePosEvent(m_mouse.x, m_mouse.y);
+
+		// The game hears it too, from the window's corner, as it would the platform's.
+		const ImGuiViewport* window = ImGui::GetMainViewport();
+
+		Input::OnMouseMove((int)(m_mouse.x - window->Pos.x), (int)(m_mouse.y - window->Pos.y), (int)window->Size.x, (int)window->Size.y);
 	};
 
 	const UiScript::Item* UiScript::Find(const std::string& window, const std::string& label) const

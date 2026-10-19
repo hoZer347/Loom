@@ -8,6 +8,7 @@
 #include "Scene.h"
 #include "Input.h"
 #include "Physics.h"
+#include "Ui.h"
 #include "Utilities/Clock.h"
 
 #include <iostream>
@@ -227,8 +228,14 @@ namespace Loom
 		Audio::Tick();
 
 		if (renderScenes)
+		{
+			Ui::BeginOverlay();
+
 			for (auto& scene : Scene::allScenes)
 				scene->Render();
+
+			Ui::DrawOverlay();
+		};
 
 		renderer->EndFrame();
 	};

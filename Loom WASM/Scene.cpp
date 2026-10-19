@@ -5,7 +5,6 @@
 #include "Engine.h"
 #include "Light.h"
 #include "Mesh.h"
-#include "Ui.h"
 
 #include <algorithm>
 #include <optional>
@@ -99,19 +98,10 @@ namespace Loom
 		std::vector<Mesh*> transparent;
 		Mesh::transparent = &transparent;
 
-		// The game's own view, not one of the editor's cameras.
-		const bool overlay = camera == nullptr;
-
-		if (overlay)
-			Ui::BeginOverlay();
-
 		root.Render();
 
 		Mesh::transparent = nullptr;
 		Mesh::DrawTransparent(transparent);
-
-		if (overlay)
-			Ui::DrawOverlay();
 
 		Light::current = nullptr;
 		Camera::current = nullptr;

@@ -19,6 +19,7 @@
 #include "SceneSerializer.h"
 #include "Textures.h"
 #include "Transform.h"
+#include "Ui.h"
 
 #include "Utilities/AxisGui.h"
 #include "Utilities/StateMachine.h"
@@ -3267,8 +3268,16 @@ namespace Loom
 			Engine::clearColor,
 			[&]()
 			{
+				// Without an editor camera this is the Game view, which shows
+				// the UI over every scene in it.
+				if (!camera)
+					Ui::BeginOverlay();
+
 				for (Scene* scene : scenes)
 					scene->Render(seen_through, scenes);
+
+				if (!camera)
+					Ui::DrawOverlay();
 
 				if (ringed)
 				{

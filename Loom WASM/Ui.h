@@ -13,13 +13,18 @@
 
 namespace Loom
 {
+	struct UiRect;
+
 	/**
 	* Loom::Ui
 	* - What the UI components share: the size of the view the game is drawn
-	*   in, and the pass that draws them over it
+	*   in, which rect the cursor is on, and the overlay they are drawn in
 	* - Screen space is in pixels from the view's top left, y down
-	* - Drawn only when a scene is seen through its own camera, so the game
-	*   view shows the UI and the editor's Scene view does not
+	* - The overlay is drawn over a whole view once every scene in it has
+	*   been: the window, and the editor's Game view, but not its Scene,
+	*   Prefab or Debug views
+	* - The cursor is tested against what the last overlay drew, so the rect
+	*   drawn last under it is the one it is on, whatever is beneath
 	*/
 	struct LOOM_API Ui final
 	{
@@ -28,7 +33,10 @@ namespace Loom
 			glm::vec2 min{ 0.0f };
 			glm::vec2 size{ 0.0f };
 
-			bool Contains(const glm::vec2& point) const;
+			bool Contains(const glm::vec2& point) const
+			{
+				return point.x >= min.x && point.y >= min.y && point.x < min.x + size.x && point.y < min.y + size.y;
+			};
 		};
 
 		// The view the game is drawn in, as Input measures the mouse in it.
@@ -37,12 +45,16 @@ namespace Loom
 		// The cursor in screen space.
 		static glm::vec2 Pointer();
 
-		// Whether the cursor was over a UiRect that blocks it last frame, so a
-		// game can leave a click alone that a menu has taken.
+		// Whether the cursor is on a rect that blocks it, so a game can leave
+		// alone a click a menu has taken.
 		static bool IsPointerOver();
 
+		// Whether rect is the one the cursor is on: the rect that blocks it
+		// drawn last under it, by the overlay of this frame or the one before.
+		static bool IsPointedAt(const UiRect& rect);
+
 		// Between these, every UiRect and UiText rendered is queued, then the
-		// queue is drawn over what the scene drew, in the order it was rendered.
+		// queue is drawn over everything already drawn, in the order queued.
 		static void BeginOverlay();
 		static void DrawOverlay();
 
@@ -62,12 +74,16 @@ namespace Loom
 	* - anchor is the point in the parent (0 to 1 across, from the top left)
 	*   that offset is measured from, and pivot the point in the rectangle
 	*   (0 to 1 across) that lands there
-	* - Filled with color; a clear one lays out its children without drawing
-	* - With blocksPointer, Ui::IsPointerOver is true while the cursor is on it
+	* - Filled with color, or a UiButton's tint when there is one beside it;
+	*   one with no alpha is not drawn, and only lays out its children
+	* - The UiText on its GameObject is drawn over it, and its children over
+	*   both
+	* - With blocksPointer, the cursor on it is on the UI rather than the
+	*   game; without, the cursor passes through it, and so does a click on
+	*   a button it has
 	*/
 	struct LOOM_API UiRect : Component<UiRect, "UI">
 	{
-		void OnUpdate() override;
 		void OnRender() override;
 
 		// Where it lies on the screen now.
@@ -75,6 +91,9 @@ namespace Loom
 
 		// The rectangle laid out in parent, which is in screen space.
 		Ui::Rect LayOut(const Ui::Rect& parent) const;
+
+		// What it is filled with: color, or the tint of the UiButton beside it.
+		glm::vec4 Fill() const;
 
 		Serial<glm::vec2> anchor = glm::vec2(0.5f, 0.5f);
 		Serial<glm::vec2> pivot = glm::vec2(0.5f, 0.5f);
@@ -90,11 +109,16 @@ namespace Loom
 	*   without one, centred on it upright and aligned across it
 	* - fontPath names a TrueType file, relative to the project folder; the
 	*   printable ASCII characters are baked at fontSize pixels the first time
-	*   a size is asked for, and kept for every UiText that uses it
+	*   a size is asked for, and the rest of the text is left out
+	* - A baked size is shared by every UiText that uses it, and let go once
+	*   none has for a while
 	*/
 	struct LOOM_API UiText : Component<UiText, "UI">
 	{
-		enum Alignment { Left, Centre, Right };
+		enum Alignment : int { Left, Centre, Right };
+
+		// A baked size neither drawn nor measured for this many frames is let go.
+		static constexpr unsigned long long unusedFrames = 600;
 
 		void OnRender() override;
 
@@ -109,31 +133,30 @@ namespace Loom
 		Serial<std::string> fontPath;
 		Serial<float> fontSize = 24.0f;
 		Serial<glm::vec4> color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-		Serial<int> alignment = Centre;
+		Serial<Alignment> alignment = Centre;
 	};
 
 	/**
 	* Loom::UiButton
-	* - Makes the UiRect on its GameObject a button: tints it as the cursor is
-	*   over it or pressing it, and reports a left click on it
-	* - onClick runs on the frame it is clicked, and WasClicked says so to
-	*   anything that would rather ask
+	* - Makes the UiRect on its GameObject a button: hovered while the cursor
+	*   is on that rect, tinted for it, and clicked by a left click there
+	* - onClick runs on the frame it is clicked, and WasClicked says so all
+	*   that frame to anything that would rather ask
 	*/
 	struct LOOM_API UiButton : Component<UiButton, "UI">
 	{
 		void OnUpdate() override;
 
-		bool IsHovered() const { return m_hovered; };
-		bool WasClicked() const { return m_clicked; };
+		bool IsHovered() const;
+		bool WasClicked() const;
+
+		// normalColor, hoverColor or pressedColor, as the cursor is now.
+		glm::vec4 Tint() const;
 
 		std::function<void()> onClick;
 
 		Serial<glm::vec4> normalColor = glm::vec4(0.1f, 0.1f, 0.15f, 0.8f);
 		Serial<glm::vec4> hoverColor = glm::vec4(0.25f, 0.3f, 0.45f, 0.9f);
 		Serial<glm::vec4> pressedColor = glm::vec4(0.4f, 0.45f, 0.65f, 1.0f);
-
-	private:
-		bool m_hovered = false;
-		bool m_clicked = false;
 	};
 };

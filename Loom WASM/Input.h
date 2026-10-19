@@ -28,6 +28,9 @@ namespace Loom
 		// the window's top left, and the window's size.
 		static void OnMouseMove(int x, int y, int window_width, int window_height);
 
+		// What the platform's resize callback reports: the window's size.
+		static void OnResize(int window_width, int window_height);
+
 		// Where the game is drawn in the window, in the window's pixels, which
 		// mouse_x, mouse_y, screen_width and screen_height then measure: an
 		// editor's Game view, a part of the editor's window, or no size at all

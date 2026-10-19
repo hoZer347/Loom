@@ -145,7 +145,7 @@ namespace LoomTests
 
 		void SetUniform(uint32_t, const char* name, float value) override { floats[name] = value; };
 		void SetUniform(uint32_t, const char*, const glm::vec3&) override { };
-		void SetUniform(uint32_t, const char*, const glm::vec4&) override { };
+		void SetUniform(uint32_t, const char* name, const glm::vec4& value) override { vec4s[name] = value; };
 		void SetUniform(uint32_t, const char* name, const glm::mat4& value) override { matrices[name] = value; };
 
 		void SetUniform(uint32_t, const char* name, Loom::UniformType type, const void* components) override
@@ -165,6 +165,13 @@ namespace LoomTests
 			drawnInto.push_back(m_targets.empty() ? WINDOW : m_targets.back());
 			lastVertices.assign(vertices, vertices + count * Loom::FloatsPerVertex(format));
 			lastFormat = format;
+
+			const auto color = vec4s.find("u_color");
+			const auto texture = textures.find("u_texture");
+
+			drawnColors.push_back(color == vec4s.end() ? glm::vec4(0.0f) : color->second);
+			drawnTextures.push_back(texture == textures.end() ? 0 : texture->second);
+			drawnVertices.push_back(lastVertices);
 		};
 
 		void SetPixelated(uint32_t program, bool pixelated) override
@@ -182,11 +189,11 @@ namespace LoomTests
 			targetSizes[m_handles] = glm::ivec2(width, height);
 			return m_handles;
 		};
-		void DestroyTexture(uint32_t) override { };
+		void DestroyTexture(uint32_t texture) override { destroyedTextures.push_back(texture); };
 
 		void PushTarget(uint32_t target) override { m_targets.push_back(target); };
 		void PopTarget() override { m_targets.pop_back(); };
-		void Clear(const float*, bool) override { };
+		void Clear(const float* color, bool depth) override { clears.push_back({ color != nullptr, depth }); };
 		void SetDepthBias(float, float) override { };
 		void SetColorWrite(bool write) override { colorWrites.push_back(write); };
 		void SetDepthTestEqual(bool equal) override { depthTestsEqual.push_back(equal); };
@@ -201,8 +208,10 @@ namespace LoomTests
 		std::map<std::string, float> floats;
 		std::map<std::string, glm::mat4> matrices;
 		std::map<std::string, Uniform> uniforms;
+		std::map<std::string, glm::vec4> vec4s;
 		std::map<std::string, uint32_t> textures;
 		std::vector<uint32_t> deleted;
+		std::vector<uint32_t> destroyedTextures;
 		std::vector<uint32_t> drawn;
 		std::vector<bool> colorWrites;
 		std::vector<bool> depthTestsEqual;
@@ -213,6 +222,14 @@ namespace LoomTests
 		// The vertices of the last draw, as handed over, and how they were laid out.
 		std::vector<float> lastVertices;
 		Loom::VertexFormat lastFormat = Loom::VertexFormat::Position;
+
+		// For each of drawn: u_color and u_texture as they were set, and its vertices.
+		std::vector<glm::vec4> drawnColors;
+		std::vector<uint32_t> drawnTextures;
+		std::vector<std::vector<float>> drawnVertices;
+
+		// Each Clear: whether it was given a colour, and whether it cleared depth.
+		std::vector<std::pair<bool, bool>> clears;
 
 		std::set<uint32_t> pixelatedPrograms;
 

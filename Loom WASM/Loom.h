@@ -37,5 +37,6 @@
 #include "Sprite.h"
 #include "Textures.h"
 #include "Transform.h"
+#include "Ui.h"
 
 #include "Utilities/hoZer.h"

@@ -266,4 +266,23 @@ TEST_SUITE("Input")
 
 		Loom::Input::ClearView();
 	};
+
+	TEST_CASE("a resize sizes the whole window and leaves the cursor where it was")
+	{
+		constexpr int window_width = 1280;
+		constexpr int window_height = 720;
+		constexpr int resized_width = 2560;
+		constexpr int resized_height = 1440;
+		constexpr int cursor_x = 300;
+		constexpr int cursor_y = 200;
+
+		Loom::Input::ClearView();
+		Loom::Input::OnMouseMove(cursor_x, cursor_y, window_width, window_height);
+		Loom::Input::OnResize(resized_width, resized_height);
+
+		CHECK(Loom::Input::screen_width == resized_width);
+		CHECK(Loom::Input::screen_height == resized_height);
+		CHECK(Loom::Input::mouse_x == cursor_x);
+		CHECK(Loom::Input::mouse_y == cursor_y);
+	};
 };

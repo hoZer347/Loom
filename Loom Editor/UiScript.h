@@ -105,6 +105,9 @@ namespace Loom
 		const Item* Find(const std::string& window, const std::string& label) const;
 		void Fail(const std::string& why);
 
+		// The cursor to m_mouse, for ImGui and the game alike.
+		void MoveCursor();
+
 		// Lets go of whatever hold left down, so a script that stops early
 		// leaves no key stuck for the person at the keyboard.
 		void ReleaseHeld();

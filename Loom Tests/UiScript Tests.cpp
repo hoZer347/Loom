@@ -2,6 +2,8 @@
 
 #include "UiScript.h"
 
+#include "Input.h"
+
 #include "imgui.h"
 
 #include <filesystem>
@@ -279,6 +281,25 @@ TEST_SUITE("UiScript")
 
 		CHECK_FALSE(ui.script->Failed());
 		CHECK(presses == 1);
+	};
+
+	TEST_CASE("the game hears the script's cursor, from the window's corner")
+	{
+		constexpr int x = 120;
+		constexpr int y = 80;
+
+		Loom::Input::ClearView();
+
+		ScriptedUi ui("move 120 80\n");
+		ImVec2 window;
+
+		ui.Run([&]() { window = ImGui::GetMainViewport()->Size; });
+
+		CHECK_FALSE(ui.script->Failed());
+		CHECK(Loom::Input::mouse_x == x);
+		CHECK(Loom::Input::mouse_y == y);
+		CHECK(Loom::Input::screen_width == (int)window.x);
+		CHECK(Loom::Input::screen_height == (int)window.y);
 	};
 
 	TEST_CASE("a target that never shows up fails the script, saying which line")

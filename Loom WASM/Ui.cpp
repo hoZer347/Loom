@@ -11,12 +11,14 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "imstb_truetype.h"
 
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <iostream>
 #include <iterator>
 #include <map>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <utility>
 #include <vector>
@@ -26,14 +28,16 @@ namespace Loom
 {
 	namespace
 	{
-		constexpr uint32_t STREAM_DRAW = 0x88E0;	// GL_STREAM_DRAW
 		constexpr int LEFT_BUTTON = 0;
 
-		// In front of the whole scene, but behind clip space's near plane at
-		// -1, which clips a quad lying on it; and how much nearer each item
-		// drawn over the last one is, so they stack in the order queued.
-		constexpr float FRONT = -0.99f;
-		constexpr float DEPTH_STEP = 1e-5f;
+		// Every item is drawn at one depth, nearer than the depth buffer is
+		// cleared to, so each lands over the ones before it.
+		constexpr float DEPTH = 0.0f;
+
+		constexpr float HALF = 0.5f;
+
+		// How far across the room beside it each alignment puts a line.
+		constexpr float ALIGNED[] = { 0.0f, HALF, 1.0f };
 
 		constexpr int FIRST_CHARACTER = 32;
 		constexpr int CHARACTERS = 95;
@@ -41,6 +45,9 @@ namespace Loom
 		constexpr int ATLAS_LARGEST = 4096;
 		constexpr int RGBA = 4;
 		constexpr uint8_t OPAQUE = 255;
+
+		// The most of a file stb_truetype reads to find a font in it.
+		constexpr size_t FONT_HEADER = 16;
 
 		const char* const UI_SHADER = R"(
 // ===VERTEX===
@@ -51,12 +58,15 @@ layout(location = 1) in vec2 aUV;
 // The screen's width and height in pixels, in x and y.
 uniform vec4 u_screen;
 
+// Clip space runs -1 to 1, so it is twice as wide as 0 to 1.
+const float CLIP_SPAN = 2.0;
+
 out vec2 v_uv;
 
 void main()
 {
 	v_uv = aUV;
-	gl_Position = vec4(aPos.x / u_screen.x * 2.0 - 1.0, 1.0 - aPos.y / u_screen.y * 2.0, aPos.z, 1.0);
+	gl_Position = vec4(aPos.x / u_screen.x * CLIP_SPAN - 1.0, 1.0 - aPos.y / u_screen.y * CLIP_SPAN, aPos.z, 1.0);
 }
 
 // ===FRAGMENT===
@@ -101,8 +111,7 @@ void main()
 			static const uint32_t texture = []() -> uint32_t
 			{
 				const uint8_t white[RGBA] = { OPAQUE, OPAQUE, OPAQUE, OPAQUE };
-				Renderer* renderer = Renderer::Get();
-				return renderer ? renderer->CreateTexture(1, 1, white) : 0;
+				return Renderer::Get()->CreateTexture(1, 1, white);
 			}();
 
 			return texture;
@@ -116,45 +125,38 @@ void main()
 			float ascent = 0.0f;
 			float lineHeight = 0.0f;
 			stbtt_bakedchar characters[CHARACTERS]{ };
+			unsigned long long lastUsed = 0;
 		};
 
-		// Null when the file will not load or bake, which is reported once.
-		const Font* FontFor(const std::string& path, float size)
+		// Null for a file that will not load or bake, kept so it is reported once.
+		std::map<std::pair<std::string, int>, std::unique_ptr<Font>> fonts;
+
+		std::unique_ptr<Font> Bake(const std::string& path, int pixels)
 		{
-			static std::map<std::pair<std::string, int>, std::unique_ptr<Font>> fonts;
-
-			const int pixels = std::max((int)std::lround(size), 1);
-			const auto key = std::make_pair(path, pixels);
-
-			if (const auto found = fonts.find(key); found != fonts.end())
-				return found->second.get();
-
-			std::unique_ptr<Font>& font = fonts[key];
-
 			std::ifstream file(path, std::ios::binary);
 			const std::vector<unsigned char> ttf((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+			const int offset = ttf.size() < FONT_HEADER ? -1 : stbtt_GetFontOffsetForIndex(ttf.data(), 0);
 			stbtt_fontinfo info;
 
-			if (ttf.empty() || !stbtt_InitFont(&info, ttf.data(), stbtt_GetFontOffsetForIndex(ttf.data(), 0)))
+			if (offset < 0 || !stbtt_InitFont(&info, ttf.data(), offset))
 			{
 				std::cerr << "UiText: no font at " << path << std::endl;
 				return nullptr;
 			};
 
-			auto baked = std::make_unique<Font>();
+			auto font = std::make_unique<Font>();
 			std::vector<unsigned char> coverage;
 
-			for (int side = ATLAS_START; side <= ATLAS_LARGEST && baked->atlasSize == 0; side *= 2)
+			for (int side = ATLAS_START; side <= ATLAS_LARGEST && font->atlasSize == 0; side *= 2)
 			{
 				coverage.assign((size_t)side * side, 0);
 
-				if (stbtt_BakeFontBitmap(ttf.data(), 0, (float)pixels, coverage.data(), side, side, FIRST_CHARACTER, CHARACTERS, baked->characters) > 0)
-					baked->atlasSize = side;
+				if (stbtt_BakeFontBitmap(ttf.data(), offset, (float)pixels, coverage.data(), side, side, FIRST_CHARACTER, CHARACTERS, font->characters) > 0)
+					font->atlasSize = side;
 			};
 
-			Renderer* renderer = Renderer::Get();
-
-			if (baked->atlasSize == 0 || renderer == nullptr)
+			if (font->atlasSize == 0)
 			{
 				std::cerr << "UiText: " << path << " will not bake at " << pixels << " pixels" << std::endl;
 				return nullptr;
@@ -166,63 +168,159 @@ void main()
 			stbtt_GetFontVMetrics(&info, &ascent, &descent, &gap);
 
 			const float scale = stbtt_ScaleForPixelHeight(&info, (float)pixels);
-			baked->ascent = ascent * scale;
-			baked->lineHeight = (ascent - descent) * scale;
+			font->ascent = ascent * scale;
+			font->lineHeight = (ascent - descent) * scale;
 
 			// White, with the coverage as alpha, and bottom row first as the
 			// renderer takes it, where the baker writes the top row first.
-			const int side = baked->atlasSize;
+			const int side = font->atlasSize;
 			std::vector<uint8_t> rgba((size_t)side * side * RGBA, OPAQUE);
 
 			for (int y = 0; y < side; y++)
 				for (int x = 0; x < side; x++)
 					rgba[((size_t)(side - 1 - y) * side + x) * RGBA + RGBA - 1] = coverage[(size_t)y * side + x];
 
-			baked->texture = renderer->CreateTexture(side, side, rgba.data());
-			font = std::move(baked);
+			font->texture = Renderer::Get()->CreateTexture(side, side, rgba.data());
 
-			return font.get();
+			return font;
+		};
+
+		// Null without a renderer to hold the atlas.
+		Font* FontFor(const std::string& path, float size)
+		{
+			if (Renderer::Get() == nullptr)
+				return nullptr;
+
+			const auto key = std::make_pair(path, std::max((int)std::lround(size), 1));
+			auto found = fonts.find(key);
+
+			if (found == fonts.end())
+				found = fonts.emplace(key, Bake(key.first, key.second)).first;
+
+			Font* font = found->second.get();
+
+			if (font != nullptr)
+				font->lastUsed = Time::FrameCount();
+
+			return font;
+		};
+
+		void LetGoOfUnusedFonts()
+		{
+			const unsigned long long now = Time::FrameCount();
+
+			std::erase_if(fonts, [now](const auto& entry)
+			{
+				const Font* font = entry.second.get();
+
+				if (font == nullptr || font->lastUsed + UiText::unusedFrames >= now)
+					return false;
+
+				Renderer::Get()->DestroyTexture(font->texture);
+				return true;
+			});
+		};
+
+		bool IsPrintable(char character)
+		{
+			return character >= FIRST_CHARACTER && character < FIRST_CHARACTER + CHARACTERS;
+		};
+
+		glm::vec2 MeasureWith(const Font& font, const std::string& text)
+		{
+			float width = 0.0f;
+
+			for (const char character : text)
+				if (IsPrintable(character))
+					width += font.characters[character - FIRST_CHARACTER].xadvance;
+
+			return glm::vec2(width, font.lineHeight);
 		};
 
 		// x, y, z, u, v for each corner of a quad's two triangles.
-		void AddQuad(std::vector<float>& vertices, glm::vec2 min, glm::vec2 max, glm::vec2 uvMin, glm::vec2 uvMax, float depth)
+		void AddQuad(std::vector<float>& vertices, glm::vec2 min, glm::vec2 max, glm::vec2 uvMin, glm::vec2 uvMax)
 		{
 			vertices.insert(vertices.end(),
 			{
-				min.x, min.y, depth, uvMin.x, uvMin.y,
-				max.x, min.y, depth, uvMax.x, uvMin.y,
-				max.x, max.y, depth, uvMax.x, uvMax.y,
-				min.x, min.y, depth, uvMin.x, uvMin.y,
-				max.x, max.y, depth, uvMax.x, uvMax.y,
-				min.x, max.y, depth, uvMin.x, uvMax.y,
+				min.x, min.y, DEPTH, uvMin.x, uvMin.y,
+				max.x, min.y, DEPTH, uvMax.x, uvMin.y,
+				max.x, max.y, DEPTH, uvMax.x, uvMax.y,
+				min.x, min.y, DEPTH, uvMin.x, uvMin.y,
+				max.x, max.y, DEPTH, uvMax.x, uvMax.y,
+				min.x, max.y, DEPTH, uvMin.x, uvMax.y,
 			});
 		};
 
 		void Draw(uint32_t program, uint32_t texture, const glm::vec4& color, const std::vector<float>& vertices)
 		{
-			Renderer* renderer = Renderer::Get();
-
 			if (vertices.empty() || texture == 0)
 				return;
 
+			Renderer* renderer = Renderer::Get();
+
 			renderer->SetTexture(program, "u_texture", texture);
 			renderer->SetUniform(program, "u_color", color);
-			renderer->Draw(program, Mesh::Triangles, vertices.data(), vertices.size() / FloatsPerVertex(VertexFormat::PositionUV), STREAM_DRAW, VertexFormat::PositionUV);
+			renderer->Draw(program, Mesh::Triangles, vertices.data(), vertices.size() / FloatsPerVertex(VertexFormat::PositionUV), Mesh::Stream, VertexFormat::PositionUV);
 		};
 
 		bool overlay = false;
 		std::vector<const ComponentBase*> queued;
 
-		// The last frame the cursor was over a UiRect that blocks it.
-		unsigned long long pointerOverFrame = 0;
-		bool pointerEverOver = false;
-	};
+		// The rects that block the pointer the last overlay drew, in the order
+		// drawn, by their IDs, which are never handed out again.
+		struct Hit
+		{
+			uint64_t rect;
+			Ui::Rect where;
+		};
 
-	#pragma region Ui
+		std::vector<Hit> hits;
+		unsigned long long hitsFrame = 0;
+		bool hitsDrawn = false;
 
-	bool Ui::Rect::Contains(const glm::vec2& point) const
-	{
-		return point.x >= min.x && point.y >= min.y && point.x < min.x + size.x && point.y < min.y + size.y;
+		// The ID of the rect the cursor is on, or none.
+		std::optional<uint64_t> Pointed()
+		{
+			if (!hitsDrawn || hitsFrame + 1 < Time::FrameCount())
+				return std::nullopt;
+
+			const glm::vec2 pointer = Ui::Pointer();
+
+			for (auto hit = hits.rbegin(); hit != hits.rend(); hit++)
+				if (hit->where.Contains(pointer))
+					return hit->rect;
+
+			return std::nullopt;
+		};
+
+		void DrawText(uint32_t program, const UiText& text, std::vector<float>& vertices)
+		{
+			const Font* font = FontFor(text.fontPath, text.fontSize);
+
+			if (font == nullptr)
+				return;
+
+			const Ui::Rect within = text.Area();
+			const glm::vec2 measured = MeasureWith(*font, text.text);
+			const int alignment = std::clamp((int)*text.alignment, (int)UiText::Left, (int)UiText::Right);
+
+			float x = within.min.x + (within.size.x - measured.x) * ALIGNED[alignment];
+			float y = within.min.y + (within.size.y - font->lineHeight) * HALF + font->ascent;
+
+			for (const char character : *text.text)
+			{
+				if (!IsPrintable(character))
+					continue;
+
+				stbtt_aligned_quad quad;
+				stbtt_GetBakedQuad(font->characters, font->atlasSize, font->atlasSize, character - FIRST_CHARACTER, &x, &y, &quad, 1);
+
+				// The baker's t runs down from the atlas's top; the texture's v up from its bottom.
+				AddQuad(vertices, { quad.x0, quad.y0 }, { quad.x1, quad.y1 }, { quad.s0, 1.0f - quad.t0 }, { quad.s1, 1.0f - quad.t1 });
+			};
+
+			Draw(program, font->texture, text.color, vertices);
+		};
 	};
 
 	Ui::Rect Ui::Screen()
@@ -237,7 +335,12 @@ void main()
 
 	bool Ui::IsPointerOver()
 	{
-		return pointerEverOver && pointerOverFrame + 1 >= Time::FrameCount();
+		return Pointed().has_value();
+	};
+
+	bool Ui::IsPointedAt(const UiRect& rect)
+	{
+		return Pointed() == rect.m_ID;
 	};
 
 	void Ui::BeginOverlay()
@@ -256,74 +359,52 @@ void main()
 	{
 		overlay = false;
 
+		hits.clear();
+		hitsFrame = Time::FrameCount();
+		hitsDrawn = true;
+
 		const Rect screen = Screen();
+		Renderer* renderer = Renderer::Get();
+		const uint32_t program = queued.empty() || renderer == nullptr ? 0 : UiProgram();
 
-		if (queued.empty() || screen.size.x <= 0.0f || screen.size.y <= 0.0f || Renderer::Get() == nullptr)
-			return;
-
-		const uint32_t program = UiProgram();
-
-		if (program == 0)
-			return;
-
-		Renderer::Get()->SetUniform(program, "u_screen", glm::vec4(screen.size, 0.0f, 0.0f));
-
-		float depth = FRONT + DEPTH_STEP * (float)(queued.size() + 1);
-
-		for (const ComponentBase* component : queued)
+		if (program != 0 && screen.size.x > 0.0f && screen.size.y > 0.0f)
 		{
-			depth -= DEPTH_STEP;
+			renderer->SetUniform(program, "u_screen", glm::vec4(screen.size, 0.0f, 0.0f));
+			renderer->Clear(nullptr, true);
+			renderer->SetDepthTestEqual(true);
 
-			if (const UiRect* rect = dynamic_cast<const UiRect*>(component))
+			std::vector<float> vertices;
+
+			for (const ComponentBase* component : queued)
 			{
-				const Rect where = rect->ScreenRect();
-				std::vector<float> vertices;
+				vertices.clear();
 
-				AddQuad(vertices, where.min, where.min + where.size, glm::vec2(0.0f), glm::vec2(1.0f), depth);
-				Draw(program, WhiteTexture(), rect->color, vertices);
-			}
-			else if (const UiText* text = dynamic_cast<const UiText*>(component))
-			{
-				const Font* font = FontFor(text->fontPath, text->fontSize);
-
-				if (font == nullptr)
-					continue;
-
-				const Rect within = text->Area();
-				const glm::vec2 measured = text->Measure();
-
-				float x = within.min.x;
-
-				if (text->alignment == UiText::Centre)
-					x += (within.size.x - measured.x) / 2.0f;
-				else if (text->alignment == UiText::Right)
-					x += within.size.x - measured.x;
-
-				float y = within.min.y + (within.size.y - font->lineHeight) / 2.0f + font->ascent;
-				std::vector<float> vertices;
-
-				for (const char character : *text->text)
+				if (const UiRect* rect = dynamic_cast<const UiRect*>(component))
 				{
-					if (character < FIRST_CHARACTER || character >= FIRST_CHARACTER + CHARACTERS)
+					const Rect where = rect->ScreenRect();
+					const glm::vec4 fill = rect->Fill();
+
+					if (rect->blocksPointer)
+						hits.push_back({ rect->m_ID, where });
+
+					if (fill.a <= 0.0f)
 						continue;
 
-					stbtt_aligned_quad quad;
-					stbtt_GetBakedQuad(font->characters, font->atlasSize, font->atlasSize, character - FIRST_CHARACTER, &x, &y, &quad, 1);
-
-					// The baker's t runs down from the atlas's top; the texture's v up from its bottom.
-					AddQuad(vertices, { quad.x0, quad.y0 }, { quad.x1, quad.y1 }, { quad.s0, 1.0f - quad.t0 }, { quad.s1, 1.0f - quad.t1 }, depth);
-				};
-
-				Draw(program, font->texture, text->color, vertices);
+					AddQuad(vertices, where.min, where.min + where.size, glm::vec2(0.0f), glm::vec2(1.0f));
+					Draw(program, WhiteTexture(), fill, vertices);
+				}
+				else if (const UiText* text = dynamic_cast<const UiText*>(component))
+					DrawText(program, *text, vertices);
 			};
+
+			renderer->SetDepthTestEqual(false);
 		};
 
 		queued.clear();
+
+		if (renderer != nullptr)
+			LetGoOfUnusedFonts();
 	};
-
-	#pragma endregion
-
-	#pragma region UiRect
 
 	Ui::Rect UiRect::LayOut(const Ui::Rect& parent) const
 	{
@@ -340,38 +421,26 @@ void main()
 		return LayOut(outer ? outer->ScreenRect() : Ui::Screen());
 	};
 
-	void UiRect::OnUpdate()
+	glm::vec4 UiRect::Fill() const
 	{
-		if (blocksPointer && ScreenRect().Contains(Ui::Pointer()))
-		{
-			pointerOverFrame = Time::FrameCount();
-			pointerEverOver = true;
-		};
+		const UiButton* button = m_gameObject->GetComponent<UiButton>();
+
+		return button ? button->Tint() : *color;
 	};
 
 	void UiRect::OnRender()
 	{
 		Ui::Queue(this);
+
+		if (const UiText* text = m_gameObject->GetComponent<UiText>())
+			Ui::Queue(text);
 	};
-
-	#pragma endregion
-
-	#pragma region UiText
 
 	glm::vec2 UiText::Measure() const
 	{
 		const Font* font = FontFor(fontPath, fontSize);
 
-		if (font == nullptr)
-			return glm::vec2(0.0f);
-
-		float width = 0.0f;
-
-		for (const char character : *text)
-			if (character >= FIRST_CHARACTER && character < FIRST_CHARACTER + CHARACTERS)
-				width += font->characters[character - FIRST_CHARACTER].xadvance;
-
-		return glm::vec2(width, font->lineHeight);
+		return font ? MeasureWith(*font, text) : glm::vec2(0.0f);
 	};
 
 	Ui::Rect UiText::Area() const
@@ -383,26 +452,34 @@ void main()
 
 	void UiText::OnRender()
 	{
-		Ui::Queue(this);
+		// One beside a UiRect is queued by it, so it is drawn over it.
+		if (m_gameObject->GetComponent<UiRect>() == nullptr)
+			Ui::Queue(this);
 	};
 
-	#pragma endregion
+	bool UiButton::IsHovered() const
+	{
+		const UiRect* rect = m_gameObject->GetComponent<UiRect>();
 
-	#pragma region UiButton
+		return rect != nullptr && Ui::IsPointedAt(*rect);
+	};
+
+	bool UiButton::WasClicked() const
+	{
+		return IsHovered() && Input::GetMouseButtonDown(LEFT_BUTTON);
+	};
+
+	glm::vec4 UiButton::Tint() const
+	{
+		if (!IsHovered())
+			return normalColor;
+
+		return Input::GetMouseButton(LEFT_BUTTON) ? *pressedColor : *hoverColor;
+	};
 
 	void UiButton::OnUpdate()
 	{
-		UiRect* rect = m_gameObject->GetComponent<UiRect>();
-
-		m_hovered = rect != nullptr && rect->ScreenRect().Contains(Ui::Pointer());
-		m_clicked = m_hovered && Input::GetMouseButtonDown(LEFT_BUTTON);
-
-		if (rect != nullptr)
-			rect->color = m_hovered && Input::GetMouseButton(LEFT_BUTTON) ? *pressedColor : m_hovered ? *hoverColor : *normalColor;
-
-		if (m_clicked && onClick)
+		if (onClick && WasClicked())
 			onClick();
 	};
-
-	#pragma endregion
 };
