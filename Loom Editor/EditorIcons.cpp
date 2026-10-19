@@ -1,5 +1,6 @@
 #include "EditorIcons.h"
 
+#include "Prefab.h"
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
 #include "SceneSerializer.h"
@@ -24,6 +25,9 @@ namespace Loom
 
 		if (extension == SceneSerializer::extension)
 			return Scene;
+
+		if (extension == Loom::Prefab::extension)
+			return Prefab;
 
 		if (extension == ProjectAssets::shaderExtension)
 			return Shader;

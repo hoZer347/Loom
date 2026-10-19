@@ -121,6 +121,11 @@ namespace Loom
 			});
 	};
 
+	void Scene::Unlist(Scene* scene)
+	{
+		Engine::QueueTask([scene]() { std::erase(allScenes, scene); });
+	};
+
 	void Scene::Physics()
 	{
 		ColliderTree::current = &colliders;

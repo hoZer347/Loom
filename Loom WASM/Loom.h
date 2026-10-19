@@ -23,6 +23,7 @@
 #include "Mesh.h"
 #include "MeshCollider.h"
 #include "Physics.h"
+#include "Prefab.h"
 #include "Renderer.h"
 #include "Rigidbody.h"
 #include "Scene.h"

@@ -159,7 +159,10 @@ namespace Loom
 		// them unloaded, so the scenes go out as text and come back the same way.
 		m_snapshots = TakeSnapshots();
 		m_selectedBeforeBuild = m_selected ? m_selected->GetGuid() : Guid();
+		m_prefabBeforeBuild = m_prefabPath;
 
+		// Ahead of the scenes, whose closing runs the queue that deletes it.
+		ClosePrefab();
 		CloseAllScenes();
 
 		m_scripts.Unload();
@@ -172,6 +175,9 @@ namespace Loom
 	{
 		RestoreSnapshots(m_snapshots);
 		m_snapshots.clear();
+
+		if (!m_prefabBeforeBuild.empty())
+			OpenPrefab(std::exchange(m_prefabBeforeBuild, { }));
 
 		if (GameObject* selected = LoomObject::GetByGuid<GameObject>(m_selectedBeforeBuild))
 			Select(selected);

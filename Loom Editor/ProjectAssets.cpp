@@ -1,6 +1,7 @@
 #include "ProjectAssets.h"
 
 #include "ComponentRegistry.h"
+#include "Prefab.h"
 #include "SceneSerializer.h"
 
 #include "Utilities/StateReference.h"
@@ -27,6 +28,7 @@ namespace Loom
 		constexpr std::string_view gameFileExtensions[] =
 		{
 			SceneSerializer::extension,
+			Prefab::extension,
 			ProjectAssets::shaderExtension,
 		};
 
@@ -626,6 +628,9 @@ void main()
 
 		if (extension == SceneSerializer::extension)
 			return Opener::Editor;
+
+		if (extension == Prefab::extension)
+			return Opener::Prefab;
 
 		if (extension == shaderExtension)
 			return Opener::Shaders;

@@ -34,14 +34,16 @@ namespace Loom
 		enum struct Opener
 		{
 			Editor,
+			Prefab,
 			Shaders,
 			Sprites,
 			VisualStudio,
 			Shell,
 		};
 
-		// Scenes open in the editor, shaders in its Shaders panel, textures in
-		// its Sprites panel, the scripts project's sources in Visual Studio,
+		// Scenes open in the editor, prefabs in its Prefab panel, shaders in its
+		// Shaders panel, textures in its Sprites panel, the scripts project's
+		// sources in Visual Studio,
 		// and anything else through the shell.
 		// scripts_folder is empty when there is no scripts project.
 		static Opener OpenerOf(const std::string& path, const std::string& scripts_folder);

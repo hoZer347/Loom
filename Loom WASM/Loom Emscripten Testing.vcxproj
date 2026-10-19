@@ -168,6 +168,7 @@
     <ClInclude Include="Engine.h" />
     <ClInclude Include="GameObject.h" />
     <ClInclude Include="Physics.h" />
+    <ClInclude Include="Prefab.h" />
     <ClInclude Include="RenderMath.h" />
     <ClInclude Include="Geo.h" />
     <ClInclude Include="Guid.h" />

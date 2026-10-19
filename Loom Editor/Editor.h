@@ -13,6 +13,7 @@
 #include "ShaderEditor.h"
 #include "SpriteEditor.h"
 #include "ModelPreview.h"
+#include "Prefabs.h"
 #include "SelectionOutline.h"
 #include "SceneHistory.h"
 #include "ScriptFolders.h"
@@ -25,6 +26,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -57,6 +59,7 @@ namespace Loom
 	{
 		Folder,
 		Scene,
+		Prefab,
 		Script,
 		State,
 		StateMachine,
@@ -94,10 +97,34 @@ namespace Loom
 		// closed from the Hierarchy; scenes created anywhere else still show up
 		// in it, they just cannot be closed from it.
 		Scene* CreateScene(const std::string& name = "New Scene");
-		// Without activate, the active scene and the selection stay as they are.
-		Scene* OpenScene(const std::string& path, bool activate = true);
+		Scene* OpenScene(const std::string& path);
 		bool SaveScene(Scene* scene, const std::string& path);
 		void CloseScene(Scene* scene);
+
+		// What the Hierarchy drags: a GameObject's guid rather than its address,
+		// so a drop resolves against what still exists when the mouse comes up.
+		static constexpr const char* object_payload = "LoomObject";
+
+		// What double-clicking a scene in the Project panel does: every open
+		// scene is saved and closed, so this one is all there is. Stops a run
+		// first. Nothing closes if something will not save.
+		Scene* OpenSceneAlone(const std::string& path);
+
+		// Writes the GameObject to a new .loomprefab in folder, named after it,
+		// and makes it an instance of that prefab. The path of the file, or
+		// empty when it could not be written.
+		std::string SaveAsPrefab(GameObject* gameObject, const std::string& folder);
+
+		// A new instance of the prefab at path, from the project folder, as
+		// the last child of parent.
+		GameObject* Instantiate(const std::string& path, GameObject& parent);
+
+		// Shows the prefab in the Prefab panel, in a scene of its own that
+		// only the panel draws, with a light the Hierarchy leaves out.
+		void OpenPrefab(const std::string& path);
+		void ClosePrefab();
+		const std::string& GetOpenPrefab() const { return m_prefabPath; };
+		GameObject* GetPrefabRoot() const;
 
 		// File > Save Scene and Ctrl+S: the active scene, to the file it was
 		// opened from, or, for one never saved, a new file named after it in
@@ -200,20 +227,6 @@ namespace Loom
 		// to the front.
 		void ShowInSceneView(Scene* scene);
 
-		// Ctrl+click on a scene file in the Project panel: drawn in the Scene
-		// view beside the active scene, opened first if it is not open, or
-		// closed again if it already was drawn there. The active scene itself
-		// cannot be taken out.
-		enum class SceneViewToggle
-		{
-			Add,
-			Remove,
-			Active
-		};
-
-		SceneViewToggle SceneViewToggleOf(const std::string& path) const;
-		void ToggleInSceneView(const std::string& path);
-
 		// Deselects any GameObject; the Inspector shows the model instead.
 		void SelectModel(const std::string& path);
 
@@ -280,10 +293,6 @@ namespace Loom
 		void DrawMainMenuBar();
 		void DrawProject();
 		void DrawAssetNode(const AssetNode& node, int depth);
-
-		// A plus or minus badge beside the mouse, or the not-allowed cursor,
-		// for what a Ctrl+click on this scene file would do.
-		void DrawSceneViewToggleCursor(const std::string& path) const;
 		void DrawAssetContextMenu(const AssetNode& node);
 		void DrawCreateMenu(const std::string& folder);
 		void DrawCreateAssetPrompt();
@@ -343,6 +352,7 @@ namespace Loom
 		void DrawFields(LoomObject& object, const std::vector<std::string>& labels, float column);
 		void DrawModelPreview();
 		void DrawScene();
+		void DrawPrefab();
 		void DrawGame();
 		void DrawDebug();
 
@@ -446,8 +456,9 @@ namespace Loom
 		void DragAsset(const AssetNode& node);
 
 		// Inside a drag and drop target, takes a file or folder dropped there
-		// into folder. The move waits for the end of the panel, since it
-		// rescans the tree being drawn.
+		// into folder, or a GameObject out of the Hierarchy, saved there as a
+		// prefab. Either waits for the end of the panel, since it rescans the
+		// tree being drawn.
 		void AcceptMove(const std::string& folder);
 		void MoveAsset(const std::string& path, const std::string& folder);
 
@@ -550,6 +561,49 @@ namespace Loom
 		SelectionOutline m_sceneOutline;
 		SelectionOutline m_debugOutline;
 
+		// The Prefab panel: the prefab open in it, by its path from the project
+		// folder, the scene it is shown in, whose first child is the prefab
+		// and second the light, and the prefab as the panel last agreed with
+		// its file.
+		EditorViewport m_prefabView;
+		EditorCamera m_prefabCamera;
+		SelectionOutline m_prefabOutline;
+		Scene* m_prefabScene = nullptr;
+		Guid m_prefabRoot{ };
+		std::string m_prefabPath{ };
+		std::string m_prefabShape{ };
+		int m_prefabFocusFrames = 0;
+
+		// The open prefab, while a build has its scene down.
+		std::string m_prefabBeforeBuild{ };
+
+		// Each prefab file read so far, by its path from the project folder.
+		std::map<std::string, Prefabs::ObjectNode> m_prefabs{ };
+
+		// The instances known to agree with their prefab, by the guid of the
+		// Prefab component linking them and the path it names. One not in here
+		// takes its prefab's content; one in here that differs from it has been
+		// edited, and its edit goes to the prefab and every other instance.
+		std::set<std::pair<std::string, std::string>> m_linkedInstances{ };
+
+		// The prefab as the file has it, read once. False when there is none.
+		bool LoadPrefab(const std::string& path, Prefabs::ObjectNode& prefab);
+		bool WritePrefab(const std::string& path, const Prefabs::ObjectNode& prefab);
+		std::filesystem::path PrefabFile(const std::string& path) const;
+
+		// Run with the history: carries an edit made in the Prefab panel or to
+		// an instance to the file and every instance, and brings instances
+		// that do not know their prefab yet into line with it.
+		void SyncPrefabs();
+
+		// With the Project panel's rescan: the files may have changed under the
+		// editor, so they are read again, every instance takes its prefab as
+		// the file has it, and the Prefab panel shows what the file now holds.
+		void ForgetPrefabs();
+
+		// The prefab tree drawn in the Hierarchy, under the open scenes.
+		void DrawPrefabNode();
+
 		// Shared: unlike an outline, it keeps nothing the size of a view.
 		ColliderGizmos m_colliderGizmos;
 
@@ -570,10 +624,6 @@ namespace Loom
 		// Where each open scene came from, so a scene can be put back after the
 		// script library it depends on is rebuilt.
 		std::map<Scene*, std::string> m_scenePaths{ };
-
-		// The scene files ToggleInSceneView added, by path so they outlast the
-		// scenes being rebuilt into new objects.
-		std::unordered_set<std::string> m_sceneViewAdditions{ };
 
 		std::string m_projectPath{ };
 		std::string m_projectFile{ };
@@ -600,6 +650,13 @@ namespace Loom
 		// A file or folder dropped on a folder, and that folder.
 		std::string m_assetToMove{ };
 		std::string m_assetMoveFolder{ };
+
+		// A GameObject dropped on a folder, to be saved in it as a prefab.
+		Guid m_objectToSave{ };
+
+		// A file double-clicked or picked Open on. Opened once the tree is
+		// drawn, since opening one can rescan the tree being drawn.
+		std::string m_assetToOpen{ };
 
 		// Where a script is written, and whether it has been compiled.
 		struct ScriptEntry
@@ -670,6 +727,7 @@ namespace Loom
 		bool m_showConsole = true;
 		bool m_showShaders = false;
 		bool m_showSprites = false;
+		bool m_showPrefab = false;
 		bool m_showStats = true;
 		bool m_showImGuiDemo = false;
 		bool m_showSettings = false;

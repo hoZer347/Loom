@@ -11,8 +11,10 @@
 #include "GameObject.h"
 #include "Input.h"
 #include "Jobs.h"
+#include "Light.h"
 #include "LoomObject.h"
 #include "Material.h"
+#include "Prefab.h"
 #include "Scene.h"
 #include "SceneSerializer.h"
 #include "Textures.h"
@@ -292,7 +294,10 @@ namespace Loom
 
 		// What is docked in the middle: the views, and the shader and sprite
 		// editors.
-		constexpr const char* centre_windows[] = { EditorPanels::SceneId, EditorPanels::Game, EditorPanels::Debug, EditorPanels::Shaders, EditorPanels::Sprites };
+		constexpr const char* centre_windows[] = { EditorPanels::SceneId, EditorPanels::Game, EditorPanels::Debug, EditorPanels::PrefabId, EditorPanels::Shaders, EditorPanels::Sprites };
+
+		// What lights the Prefab panel, which the Hierarchy leaves out.
+		constexpr const char* prefab_light = "Prefab Light";
 
 		// Panels docked as a tab beside another, each with the one it goes beside.
 		constexpr std::pair<const char*, const char*> side_windows[] = { { EditorPanels::Scripts, EditorPanels::Project } };
@@ -365,16 +370,12 @@ namespace Loom
 			ImGui::SameLine(left + column + ImGui::GetStyle().ItemInnerSpacing.x);
 		};
 
-		// Hierarchy nodes hand over their object's guid rather than its address,
-		// so a drop resolves against what still exists when the mouse comes up.
-		constexpr const char* object_payload = "LoomObject";
-
 		void DragSource(const LoomObject& object)
 		{
 			if (!ImGui::BeginDragDropSource())
 				return;
 
-			ImGui::SetDragDropPayload(object_payload, &object.GetGuid(), sizeof(Guid));
+			ImGui::SetDragDropPayload(Editor::object_payload, &object.GetGuid(), sizeof(Guid));
 			ImGui::TextUnformatted(object.NameAndID().c_str());
 
 			ImGui::EndDragDropSource();
@@ -387,7 +388,7 @@ namespace Loom
 		{
 			const ImGuiPayload* payload = ImGui::GetDragDropPayload();
 
-			if (payload == nullptr || !payload->IsDataType(object_payload))
+			if (payload == nullptr || !payload->IsDataType(Editor::object_payload))
 				return nullptr;
 
 			return field.ReferenceFor(LoomObject::GetByGuid(*(const Guid*)payload->Data));
@@ -425,7 +426,7 @@ namespace Loom
 			if (LoomObject* dropped = DraggedInto(field))
 				if (ImGui::BeginDragDropTarget())
 				{
-					if (ImGui::AcceptDragDropPayload(object_payload))
+					if (ImGui::AcceptDragDropPayload(Editor::object_payload))
 					{
 						field.SetReference(dropped);
 						changed = true;
@@ -790,7 +791,9 @@ namespace Loom
 		Audio::Unload();
 
 		CloseAllScenes();
-		m_sceneViewAdditions.clear();
+		ClosePrefab();
+		m_prefabs.clear();
+		m_linkedInstances.clear();
 
 		m_projectPath = resolved;
 
@@ -831,7 +834,7 @@ namespace Loom
 		return scene;
 	};
 
-	Scene* Editor::OpenScene(const std::string& path, bool activate)
+	Scene* Editor::OpenScene(const std::string& path)
 	{
 		std::string error;
 
@@ -852,20 +855,52 @@ namespace Loom
 		m_historyDirty = true;
 		m_scenePaths[scene] = std::filesystem::path(path).lexically_normal().string();
 
-		if (activate)
-		{
-			SetActiveScene(scene);
+		SetActiveScene(scene);
 
-			// A model being previewed stays in the Inspector.
-			if (m_selectedModel.empty())
-				Select(&scene->GetRoot());
-		};
+		// A model being previewed stays in the Inspector.
+		if (m_selectedModel.empty())
+			Select(&scene->GetRoot());
 
 		std::cout
 			<< "Opened '" << path << "' as "
 			<< scene->GetName() << '(' << scene->GetGuid().ToString() << ')' << std::endl;
 
 		return scene;
+	};
+
+	Scene* Editor::OpenSceneAlone(const std::string& path)
+	{
+		if (!m_scripts.IsIdle())
+		{
+			std::cerr << "The scenes are down while the scripts build; open it once they are back." << std::endl;
+			return nullptr;
+		};
+
+		Stop();
+
+		const std::string normal = std::filesystem::path(path).lexically_normal().string();
+
+		if (m_ownedScenes.size() == 1 && ScenePathOf(m_ownedScenes.front()) == normal)
+		{
+			SetActiveScene(m_ownedScenes.front());
+			return m_ownedScenes.front();
+		};
+
+		for (Scene* scene : m_ownedScenes)
+			if (!SaveToProject(scene))
+			{
+				std::cerr << "'" << scene->GetName() << "' did not save, so it stays open." << std::endl;
+				return nullptr;
+			};
+
+		const std::vector<Scene*> closing = m_ownedScenes;
+
+		for (Scene* scene : closing)
+			CloseScene(scene);
+
+		RefreshProjectAssets();
+
+		return OpenScene(normal);
 	};
 
 	bool Editor::SaveScene(Scene* scene, const std::string& path)
@@ -1022,18 +1057,12 @@ namespace Loom
 		if (m_selected && IsInHierarchy(scene->GetRoot(), m_selected))
 			Select(nullptr);
 
-		const std::string path = ScenePathOf(scene);
-
-		m_scenePaths.erase(scene);
-		m_history.Forget(scene->GetGuid());
-
-		if (std::none_of(m_scenePaths.begin(), m_scenePaths.end(),
-			[&](const auto& open) { return open.second == path; }))
-			m_sceneViewAdditions.erase(path);
-
 		// Deleting a scene mid-GUI would leave the rest of the frame walking a
 		// dangling pointer; deferring puts the delete (and the unregistering it
 		// queues in turn) at the top of the next frame instead.
+		m_scenePaths.erase(scene);
+		m_history.Forget(scene->GetGuid());
+
 		Engine::QueueTask([scene]() { delete scene; });
 	};
 
@@ -1062,58 +1091,68 @@ namespace Loom
 		m_sceneFocusFrames = scene_focus_frames;
 	};
 
-	Editor::SceneViewToggle Editor::SceneViewToggleOf(const std::string& path) const
+	void Editor::OpenPrefab(const std::string& path)
 	{
-		const std::string normal = std::filesystem::path(path).lexically_normal().string();
+		// Closing the one open clears the path this may have been handed.
+		const std::string opening = path;
 
-		if (m_activeScene != nullptr && ScenePathOf(m_activeScene) == normal)
-			return SceneViewToggle::Active;
+		Prefabs::ObjectNode prefab;
 
-		return m_sceneViewAdditions.count(normal) ? SceneViewToggle::Remove : SceneViewToggle::Add;
+		if (!LoadPrefab(opening, prefab))
+		{
+			std::cerr << "There is no prefab at " << opening << std::endl;
+			return;
+		};
+
+		ClosePrefab();
+
+		m_prefabScene = new Scene(std::filesystem::path(opening).stem().string());
+		Scene::Unlist(m_prefabScene);
+
+		std::string error;
+		GameObject* root = SceneSerializer::Deserialize(Prefabs::Write(prefab), m_prefabScene->GetRoot(), &error);
+
+		if (root == nullptr)
+		{
+			std::cerr << "Could not open prefab " << opening << ": " << error << std::endl;
+			ClosePrefab();
+			return;
+		};
+
+		m_prefabScene->AddChild(prefab_light)->Attach<Light>();
+
+		m_prefabRoot = root->GetGuid();
+		m_prefabPath = opening;
+		m_prefabShape = Prefabs::Shape(prefab, Prefabs::TransformKeys(*root), Prefabs::Part::Whole);
+
+		m_showPrefab = true;
+		m_prefabFocusFrames = scene_focus_frames;
+
+		Select(root);
 	};
 
-	void Editor::ToggleInSceneView(const std::string& path)
+	void Editor::ClosePrefab()
 	{
-		const std::string normal = std::filesystem::path(path).lexically_normal().string();
+		if (m_prefabScene == nullptr)
+			return;
 
-		switch (SceneViewToggleOf(normal))
-		{
-		case SceneViewToggle::Active:
-			break;
+		if (m_selected && IsInHierarchy(m_prefabScene->GetRoot(), m_selected))
+			Select(nullptr);
 
-		case SceneViewToggle::Remove:
-		{
-			std::vector<Scene*> closing{ };
+		// Deferred, as CloseScene's is, past whatever the frame still draws.
+		Scene* scene = std::exchange(m_prefabScene, nullptr);
+		Engine::QueueTask([scene]() { delete scene; });
 
-			for (const auto& [scene, open] : m_scenePaths)
-				if (open == normal)
-					closing.push_back(scene);
+		m_prefabRoot = Guid();
+		m_prefabPath.clear();
+		m_prefabShape.clear();
+	};
 
-			for (Scene* scene : closing)
-				CloseScene(scene);
+	GameObject* Editor::GetPrefabRoot() const
+	{
+		GameObject* root = m_prefabScene ? LoomObject::GetByGuid<GameObject>(m_prefabRoot) : nullptr;
 
-			m_sceneViewAdditions.erase(normal);
-			break;
-		};
-
-		case SceneViewToggle::Add:
-		{
-			// With nothing to draw it beside, it is simply opened.
-			if (m_activeScene == nullptr)
-			{
-				OpenScene(normal);
-				break;
-			};
-
-			const bool open = std::any_of(m_scenePaths.begin(), m_scenePaths.end(),
-				[&](const auto& entry) { return entry.second == normal; });
-
-			if (open || OpenScene(normal, false) != nullptr)
-				m_sceneViewAdditions.insert(normal);
-
-			break;
-		};
-		};
+		return root && IsInHierarchy(m_prefabScene->GetRoot(), root) ? root : nullptr;
 	};
 
 	void Editor::Select(GameObject* gameObject)
@@ -1206,6 +1245,7 @@ namespace Loom
 			return;
 
 		SyncSceneCopies();
+		SyncPrefabs();
 		m_history.Record(m_ownedScenes);
 	};
 
@@ -1385,6 +1425,9 @@ namespace Loom
 			if (IsInHierarchy(scene->GetRoot(), m_selected))
 				return;
 
+		if (m_prefabScene && IsInHierarchy(m_prefabScene->GetRoot(), m_selected))
+			return;
+
 		Select(nullptr);
 	};
 
@@ -1510,6 +1553,7 @@ namespace Loom
 		if (m_showHierarchy)	DrawHierarchy();
 		if (m_showInspector)	DrawInspector();
 		if (m_showScene)		DrawScene();
+		DrawPrefab();
 		if (m_showGame)			DrawGame();
 		if (m_showDebug)		DrawDebug();
 		if (m_showSceneData)	DrawSceneData();
@@ -1614,6 +1658,7 @@ namespace Loom
 			{ EditorPanels::Console, &m_showConsole, true },
 			{ EditorPanels::Shaders, &m_showShaders, false },
 			{ EditorPanels::Sprites, &m_showSprites, false },
+			{ EditorPanels::Prefab, &m_showPrefab, false },
 			{ EditorPanels::Stats, &m_showStats, true } };
 	};
 
@@ -2061,6 +2106,8 @@ namespace Loom
 				DrawSceneNode(scene);
 				ImGui::PopID();
 			};
+
+			DrawPrefabNode();
 		};
 
 		ImGui::End();
@@ -2208,6 +2255,9 @@ namespace Loom
 
 			if (ImGui::MenuItem("Add Child"))
 				Select(gameObject->AddChild());
+
+			if (ImGui::MenuItem("Save as Prefab", nullptr, false, !m_projectPath.empty() && gameObject != GetPrefabRoot()))
+				SaveAsPrefab(gameObject, "");
 
 			if (ImGui::MenuItem("Delete", nullptr, false, EditCommands::CanTake(m_selected)))
 				DeleteSelected();
@@ -2435,8 +2485,22 @@ namespace Loom
 
 		const std::string path = (const char*)dragged->Data;
 
+		const std::filesystem::path extension = std::filesystem::path(path).extension();
+
+		// A prefab inside itself would take in its own every edit.
+		if (extension == Prefab::extension)
+		{
+			const bool inside_itself =
+				path == m_prefabPath && m_prefabScene && IsInHierarchy(m_prefabScene->GetRoot(), gameObject);
+
+			if (!inside_itself && ImGui::AcceptDragDropPayload(ASSET_PAYLOAD))
+				Instantiate(path, *gameObject);
+
+			return true;
+		};
+
 		// Anything else dragged out of the Project panel has no place here.
-		if (std::filesystem::path(path).extension() != ProjectAssets::shaderExtension)
+		if (extension != ProjectAssets::shaderExtension)
 			return true;
 
 		if (ImGui::AcceptDragDropPayload(ASSET_PAYLOAD))
@@ -2945,30 +3009,9 @@ namespace Loom
 
 	void Editor::DrawScene()
 	{
-		std::vector<Scene*> drawn{ };
-
-		if (m_activeScene != nullptr)
-		{
-			drawn.push_back(m_activeScene);
-
-			const std::string active_path = ScenePathOf(m_activeScene);
-
-			for (Scene* scene : m_ownedScenes)
-			{
-				const std::string path = ScenePathOf(scene);
-
-				if (scene != m_activeScene && path != active_path && m_sceneViewAdditions.count(path))
-					drawn.push_back(scene);
-			};
-		};
-
-		const size_t added = drawn.empty() ? 0 : drawn.size() - 1;
-
 		const std::string title =
 			std::string(EditorIcons::Scene) + " " +
-			(m_activeScene ? m_activeScene->GetName() : std::string("Scene")) +
-			(added > 0 ? " + " + std::to_string(added) : std::string()) +
-			EditorPanels::SceneId;
+			(m_activeScene ? m_activeScene->GetName() : std::string("Scene")) + EditorPanels::SceneId;
 
 		if (m_sceneFocusFrames > 0)
 		{
@@ -2982,12 +3025,53 @@ namespace Loom
 				ImGui::TextDisabled("No scene open. Pick one in the Project panel.");
 			else
 			{
-				DrawView(m_sceneView, drawn, &m_sceneCamera, &m_sceneOutline);
+				DrawView(m_sceneView, { m_activeScene }, &m_sceneCamera, &m_sceneOutline);
 				TakeImportTarget(&m_activeScene->GetRoot());
 			};
 		};
 
 		ImGui::End();
+	};
+
+	void Editor::DrawPrefab()
+	{
+		if (!m_showPrefab)
+		{
+			ClosePrefab();
+			return;
+		};
+
+		const std::string title =
+			std::string(EditorIcons::Prefab) + " " +
+			(m_prefabScene ? m_prefabScene->GetName() : std::string("Prefab")) + EditorPanels::PrefabId;
+
+		if (m_prefabFocusFrames > 0)
+		{
+			m_prefabFocusFrames--;
+			ImGui::SetNextWindowFocus();
+		};
+
+		if (ImGui::Begin(title.c_str(), &m_showPrefab, view_flags))
+		{
+			if (GetPrefabRoot() == nullptr)
+				ImGui::TextDisabled("No prefab open. Double-click one in the Project panel.");
+			else DrawView(m_prefabView, { m_prefabScene }, &m_prefabCamera, &m_prefabOutline);
+		};
+
+		ImGui::End();
+	};
+
+	void Editor::DrawPrefabNode()
+	{
+		GameObject* root = GetPrefabRoot();
+
+		if (root == nullptr)
+			return;
+
+		ImGui::Separator();
+		ImGui::TextDisabled("%s %s", EditorIcons::Prefab, m_prefabPath.c_str());
+
+		DrawGameObjectNode(root, false);
 	};
 
 	void Editor::DrawGame()

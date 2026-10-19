@@ -66,6 +66,12 @@ namespace Loom
 		// Deferred, so it lands after a new scene has registered itself.
 		static void MoveScene(Scene* scene, size_t index);
 
+		// Takes a scene out of GetScenes for good, so nothing that goes through
+		// the open scenes updates, draws or lights by it: a scene only its
+		// holder draws, such as the editor's prefab viewer. Deferred, so it
+		// lands after the scene has registered itself.
+		static void Unlist(Scene* scene);
+
 		static inline std::atomic<bool> is_engine_running = false;
 		
 

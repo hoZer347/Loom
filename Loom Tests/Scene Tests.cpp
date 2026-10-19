@@ -92,6 +92,17 @@ TEST_SUITE("Scene")
 		CHECK(Registered(&second));
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Unlist keeps a scene out of the registry for good")
+	{
+		Loom::Scene listed("Listed");
+		Loom::Scene unlisted("Unlisted");
+		Loom::Scene::Unlist(&unlisted);
+		Pump();
+
+		CHECK(Registered(&listed));
+		CHECK_FALSE(Registered(&unlisted));
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "MoveScene puts a scene at a position in the registry")
 	{
 		const std::vector<Loom::Scene*>& scenes = Loom::Scene::GetScenes();

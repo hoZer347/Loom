@@ -100,6 +100,12 @@
     <ClCompile Include="SceneHistory.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
+    <ClCompile Include="Prefabs.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorPrefabs.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
     <ClCompile Include="ColliderGizmos.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
@@ -193,6 +199,9 @@
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="SceneHistory.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Prefabs.h">
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="ColliderGizmos.h">

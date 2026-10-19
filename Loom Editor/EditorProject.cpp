@@ -4,6 +4,7 @@
 #include "EditorGui.h"
 #include "EditorIcons.h"
 #include "ModelImporter.h"
+#include "Prefab.h"
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
 
@@ -50,16 +51,6 @@ namespace Loom
 		// the user to sort out.
 		constexpr int maxDefaultNameSuffix = 1000;
 
-		const char* SceneViewToggleHint(Editor::SceneViewToggle toggle)
-		{
-			switch (toggle)
-			{
-			case Editor::SceneViewToggle::Add:		return "Ctrl+click: draw beside the active scene in the Scene view";
-			case Editor::SceneViewToggle::Remove:	return "Ctrl+click: take out of the Scene view and close";
-			default:								return "The active scene cannot be taken out of the Scene view";
-			};
-		};
-
 		struct AssetKindInfo
 		{
 			AssetKind kind;
@@ -77,6 +68,7 @@ namespace Loom
 		{
 			{ AssetKind::Folder, EditorIcons::Folder, "Folder", "New Folder" },
 			{ AssetKind::Scene, EditorIcons::Scene, "Scene", "New Scene" },
+			{ AssetKind::Prefab, EditorIcons::Prefab, "Prefab", "New Prefab" },
 			{ AssetKind::Script, EditorIcons::Script, "Script", "NewScript", ProjectAssets::ScriptKind::Component, "Add Component" },
 			{ AssetKind::State, EditorIcons::State, "State", "NewState", ProjectAssets::ScriptKind::State, "a state machine's Start and Current" },
 			{ AssetKind::StateMachine, EditorIcons::Script, "State Machine", "NewStateMachine", ProjectAssets::ScriptKind::StateMachine, "Add Component" },
@@ -497,6 +489,7 @@ namespace Loom
 			m_projectWatch.Watch(m_projectPath, false);
 
 		RefreshScripts();
+		ForgetPrefabs();
 
 		m_projectScenes.clear();
 		m_noThumbnail.clear();
@@ -590,6 +583,12 @@ namespace Loom
 
 				if (!m_assetToMove.empty())
 					MoveAsset(std::exchange(m_assetToMove, { }), m_assetMoveFolder);
+
+				if (GameObject* dropped = LoomObject::GetByGuid<GameObject>(std::exchange(m_objectToSave, Guid())))
+					SaveAsPrefab(dropped, m_assetMoveFolder);
+
+				if (!m_assetToOpen.empty())
+					OpenAsset(std::exchange(m_assetToOpen, { }));
 			};
 		};
 
@@ -631,19 +630,7 @@ namespace Loom
 		if (thumbnail != nullptr)
 			DrawThumbnail(*thumbnail);
 
-		const ImGuiIO& io = ImGui::GetIO();
-
-		const bool scene_toggle =
-			!node.folder &&
-			io.KeyCtrl &&
-			std::filesystem::path(node.path).extension() == SceneSerializer::extension;
-
-		if (scene_toggle && ImGui::IsItemHovered())
-			DrawSceneViewToggleCursor(node.path);
-
-		if (scene_toggle && ImGui::IsItemClicked(ImGuiMouseButton_Left))
-			ToggleInSceneView(node.path);
-		else if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen())
+		if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen())
 		{
 			m_selectedAsset = node.path;
 
@@ -654,12 +641,12 @@ namespace Loom
 		};
 
 		if (!node.folder &&
-			!scene_toggle &&
 			ImGui::IsItemHovered() &&
 			ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-			OpenAsset(node.path);
+			m_assetToOpen = node.path;
 
 		// On the release, so dragging one out to a field leaves the panel shut.
+		const ImGuiIO& io = ImGui::GetIO();
 		const float drag_threshold = io.MouseDragThreshold * io.MouseDragThreshold;
 
 		if (!node.folder &&
@@ -683,9 +670,7 @@ namespace Loom
 			ImGui::EndDragDropTarget();
 		};
 
-		if (scene_toggle)
-			ImGui::SetItemTooltip("%s", SceneViewToggleHint(SceneViewToggleOf(node.path)));
-		else ImGui::SetItemTooltip("%s", node.path.c_str());
+		ImGui::SetItemTooltip("%s", node.path.c_str());
 
 		DrawAssetContextMenu(node);
 
@@ -698,39 +683,6 @@ namespace Loom
 		};
 	};
 
-	void Editor::DrawSceneViewToggleCursor(const std::string& path) const
-	{
-		const SceneViewToggle toggle = SceneViewToggleOf(path);
-
-		if (toggle == SceneViewToggle::Active)
-		{
-			ImGui::SetMouseCursor(ImGuiMouseCursor_NotAllowed);
-			return;
-		};
-
-		// Below and right of the arrow's tip, clear of the arrow itself.
-		constexpr float badge_offset = 1.1f;
-		constexpr float badge_radius = 0.45f;
-		constexpr float bar_half_length = 0.5f;
-		constexpr float bar_thickness = 0.15f;
-
-		const float size = ImGui::GetFontSize();
-		const float radius = size * badge_radius;
-		const float half = radius * bar_half_length;
-		const float thickness = size * bar_thickness;
-		const ImVec2 mouse = ImGui::GetIO().MousePos;
-		const ImVec2 centre(mouse.x + size * badge_offset, mouse.y + size * badge_offset);
-		const ImU32 glyph = ImGui::GetColorU32(ImGuiCol_Text);
-
-		ImDrawList* draw = ImGui::GetForegroundDrawList();
-
-		draw->AddCircleFilled(centre, radius, ImGui::GetColorU32(ImGuiCol_ButtonActive));
-		draw->AddLine(ImVec2(centre.x - half, centre.y), ImVec2(centre.x + half, centre.y), glyph, thickness);
-
-		if (toggle == SceneViewToggle::Add)
-			draw->AddLine(ImVec2(centre.x, centre.y - half), ImVec2(centre.x, centre.y + half), glyph, thickness);
-	};
-
 	void Editor::DrawAssetContextMenu(const AssetNode& node)
 	{
 		if (!ImGui::BeginPopupContextItem())
@@ -739,7 +691,7 @@ namespace Loom
 		m_selectedAsset = node.path;
 
 		if (!node.folder && ImGui::MenuItem("Open"))
-			OpenAsset(node.path);
+			m_assetToOpen = node.path;
 
 		if (ImGui::MenuItem("Show in Explorer"))
 			ShowInExplorer(node.path);
@@ -851,6 +803,7 @@ namespace Loom
 		switch (m_newAssetKind)
 		{
 		case AssetKind::Scene:		return (folder / (name + SceneSerializer::extension)).string();
+		case AssetKind::Prefab:		return (folder / (name + Prefab::extension)).string();
 		case AssetKind::Shader:		return (folder / (name + ProjectAssets::shaderExtension)).string();
 		case AssetKind::Texture:	return (folder / (name + ProjectAssets::textureExtension)).string();
 		default:					return (folder / name).string();
@@ -906,6 +859,14 @@ namespace Loom
 				CloseScene(scene);
 				error = "the scene could not be saved";
 			};
+			break;
+
+		case AssetKind::Prefab:
+			if (WritePrefab(
+				std::filesystem::path(NewAssetPath()).lexically_normal().lexically_relative(m_projectPath).generic_string(),
+				Prefabs::ObjectNode{ name, Guid::New().ToString() }))
+				path = NewAssetPath();
+			else error = "the prefab could not be written";
 			break;
 
 		case AssetKind::Script:
@@ -1010,7 +971,13 @@ namespace Loom
 		switch (ProjectAssets::OpenerOf(path, scripts_folder))
 		{
 		case ProjectAssets::Opener::Editor:
-			OpenScene(path);
+			OpenSceneAlone(path);
+			break;
+
+		case ProjectAssets::Opener::Prefab:
+			OpenPrefab(std::filesystem::path(path).is_absolute()
+				? std::filesystem::path(path).lexically_normal().lexically_relative(m_projectPath).generic_string()
+				: std::filesystem::path(path).generic_string());
 			break;
 
 		case ProjectAssets::Opener::Shaders:
@@ -1095,6 +1062,17 @@ namespace Loom
 	void Editor::AcceptMove(const std::string& folder)
 	{
 		const ImGuiPayload* dragged = ImGui::GetDragDropPayload();
+
+		if (dragged && dragged->IsDataType(object_payload))
+		{
+			if (ImGui::AcceptDragDropPayload(object_payload))
+			{
+				m_objectToSave = *(const Guid*)dragged->Data;
+				m_assetMoveFolder = std::filesystem::path(folder).lexically_normal().string();
+			};
+
+			return;
+		};
 
 		if (dragged == nullptr || (!dragged->IsDataType(ASSET_PAYLOAD) && !dragged->IsDataType(FOLDER_PAYLOAD)))
 			return;
