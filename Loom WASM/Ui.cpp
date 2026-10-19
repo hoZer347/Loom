@@ -267,10 +267,12 @@ void main()
 		std::vector<const ComponentBase*> queued;
 
 		// The rects that block the pointer the last overlay drew, in the order
-		// drawn, by their IDs, which are never handed out again.
+		// drawn, and the buttons they press, by their IDs, which are never
+		// handed out again.
 		struct Hit
 		{
 			uint64_t rect;
+			std::optional<uint64_t> button;
 			Ui::Rect where;
 		};
 
@@ -278,19 +280,19 @@ void main()
 		unsigned long long hitsFrame = 0;
 		bool hitsDrawn = false;
 
-		// The ID of the rect the cursor is on, or none.
-		std::optional<uint64_t> Pointed()
+		// The hit the cursor is on, or null.
+		const Hit* Pointed()
 		{
 			if (!hitsDrawn || hitsFrame + 1 < Time::FrameCount())
-				return std::nullopt;
+				return nullptr;
 
 			const glm::vec2 pointer = Ui::Pointer();
 
 			for (auto hit = hits.rbegin(); hit != hits.rend(); hit++)
 				if (hit->where.Contains(pointer))
-					return hit->rect;
+					return &*hit;
 
-			return std::nullopt;
+			return nullptr;
 		};
 
 		void DrawText(uint32_t program, const UiText& text, std::vector<float>& vertices)
@@ -335,12 +337,14 @@ void main()
 
 	bool Ui::IsPointerOver()
 	{
-		return Pointed().has_value();
+		return Pointed() != nullptr;
 	};
 
 	bool Ui::IsPointedAt(const UiRect& rect)
 	{
-		return Pointed() == rect.m_ID;
+		const Hit* hit = Pointed();
+
+		return hit != nullptr && hit->rect == rect.m_ID;
 	};
 
 	void Ui::BeginOverlay()
@@ -359,9 +363,9 @@ void main()
 	{
 		overlay = false;
 
-		hits.clear();
-		hitsFrame = Time::FrameCount();
-		hitsDrawn = true;
+		// Laid aside until everything is drawn, as buttons are tinted from the
+		// last overlay's.
+		std::vector<Hit> drawn;
 
 		const Rect screen = Screen();
 		Renderer* renderer = Renderer::Get();
@@ -385,7 +389,11 @@ void main()
 					const glm::vec4 fill = rect->Fill();
 
 					if (rect->blocksPointer)
-						hits.push_back({ rect->m_ID, where });
+					{
+						const UiButton* button = rect->Button();
+
+						drawn.push_back({ rect->m_ID, button ? std::optional<uint64_t>(button->m_ID) : std::nullopt, where });
+					};
 
 					if (fill.a <= 0.0f)
 						continue;
@@ -399,6 +407,10 @@ void main()
 
 			renderer->SetDepthTestEqual(false);
 		};
+
+		hits = std::move(drawn);
+		hitsFrame = Time::FrameCount();
+		hitsDrawn = true;
 
 		queued.clear();
 
@@ -419,6 +431,15 @@ void main()
 		const UiRect* outer = parent ? parent->GetComponent<UiRect>() : nullptr;
 
 		return LayOut(outer ? outer->ScreenRect() : Ui::Screen());
+	};
+
+	const UiButton* UiRect::Button() const
+	{
+		for (GameObject* object = m_gameObject; object != nullptr; object = object->GetParent())
+			if (const UiButton* button = object->GetComponent<UiButton>())
+				return button;
+
+		return nullptr;
 	};
 
 	glm::vec4 UiRect::Fill() const
@@ -459,9 +480,9 @@ void main()
 
 	bool UiButton::IsHovered() const
 	{
-		const UiRect* rect = m_gameObject->GetComponent<UiRect>();
+		const Hit* hit = Pointed();
 
-		return rect != nullptr && Ui::IsPointedAt(*rect);
+		return hit != nullptr && hit->button == m_ID;
 	};
 
 	bool UiButton::WasClicked() const

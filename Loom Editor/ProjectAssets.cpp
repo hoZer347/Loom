@@ -38,6 +38,9 @@ namespace Loom
 		// Whatever Audio.cpp has miniaudio decode.
 		constexpr std::string_view soundExtensions[] = { ".wav", ".mp3", ".flac" };
 
+		// What a UiText bakes its text from.
+		constexpr std::string_view fontExtensions[] = { ".ttf", ".otf", ".ttc" };
+
 		template <size_t count>
 		bool HasExtension(const std::string& name, const std::string_view (&extensions)[count])
 		{
@@ -653,7 +656,7 @@ void main()
 
 	bool ProjectAssets::IsGameFile(const std::string& name)
 	{
-		return HasExtension(name, gameFileExtensions) || IsTextureFile(name) || IsSoundFile(name);
+		return HasExtension(name, gameFileExtensions) || IsTextureFile(name) || IsSoundFile(name) || IsFontFile(name);
 	};
 
 	bool ProjectAssets::IsScriptFile(const std::string& name)
@@ -669,5 +672,10 @@ void main()
 	bool ProjectAssets::IsSoundFile(const std::string& name)
 	{
 		return HasExtension(name, soundExtensions);
+	};
+
+	bool ProjectAssets::IsFontFile(const std::string& name)
+	{
+		return HasExtension(name, fontExtensions);
 	};
 };

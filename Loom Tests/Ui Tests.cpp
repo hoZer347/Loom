@@ -39,7 +39,7 @@ namespace
 	constexpr glm::vec4 FIRST_COLOR = { 1.0f, 0.0f, 0.0f, 1.0f };
 	constexpr glm::vec4 SECOND_COLOR = { 0.0f, 0.0f, 1.0f, 1.0f };
 
-	// The game drawn in the whole of a window this size, with the cursor at.
+	// The game drawn in the whole of a window this size, with the cursor on the given point.
 	void PointAt(const glm::vec2& at)
 	{
 		Loom::Input::ClearView();
@@ -407,17 +407,56 @@ TEST_SUITE("Ui")
 		Overlay({ &scene });
 
 		REQUIRE(renderer.drawnColors.size() == 1);
-		CHECK(renderer.drawnColors[0] == *button->normalColor);
+		CHECK(renderer.drawnColors.back() == *button->normalColor);
 		CHECK(rect->Fill() == *button->normalColor);
 
+		// Each overlay tints from the one before, which is where the cursor
+		// was found to be on the button.
 		PointAt(Middle(rect->ScreenRect()));
+		Overlay({ &scene });
 
+		CHECK(renderer.drawnColors.back() == *button->hoverColor);
 		CHECK(rect->Fill() == *button->hoverColor);
 
 		Loom::Input::OnMouseButton(LEFT_BUTTON, true);
 		Loom::Input::Tick();
+		Overlay({ &scene });
 
+		CHECK(renderer.drawnColors.back() == *button->pressedColor);
 		CHECK(rect->Fill() == *button->pressedColor);
+
+		Settle();
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the cursor on a button's label is on the button, which the click goes to")
+	{
+		Settle();
+
+		LoomTests::RecordingRenderer renderer;
+		PointAt(glm::vec2(0.0f));
+
+		Loom::Scene scene("ui label");
+		Loom::GameObject* object = scene.AddChild("Button");
+		Pump();
+		Loom::GameObject* label = object->AddChild("Label");
+		Pump();
+
+		Loom::UiRect* rect = object->Attach<Loom::UiRect>();
+		Loom::UiButton* button = object->Attach<Loom::UiButton>();
+		Loom::UiRect* labelRect = label->Attach<Loom::UiRect>();
+		label->Attach<Loom::UiText>();
+		Pump();
+
+		// The label covers the whole button, so the cursor is on the label.
+		labelRect->size = *rect->size;
+
+		Overlay({ &scene });
+		PointAt(Middle(rect->ScreenRect()));
+		Click();
+
+		CHECK(Loom::Ui::IsPointedAt(*labelRect));
+		CHECK(button->IsHovered());
+		CHECK(button->WasClicked());
 
 		Settle();
 	};

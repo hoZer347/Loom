@@ -113,6 +113,7 @@ namespace Loom
 		static bool IsScriptFile(const std::string& name);
 		static bool IsTextureFile(const std::string& name);
 		static bool IsSoundFile(const std::string& name);
+		static bool IsFontFile(const std::string& name);
 
 		// Whether path is folder or somewhere inside it.
 		static bool IsUnder(const std::string& path, const std::string& folder);

@@ -44,6 +44,9 @@ namespace Loom
 		if (ProjectAssets::IsSoundFile(path))
 			return Sound;
 
+		if (ProjectAssets::IsFontFile(path))
+			return Font;
+
 		return File;
 	};
 };

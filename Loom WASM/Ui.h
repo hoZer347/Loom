@@ -13,6 +13,7 @@
 
 namespace Loom
 {
+	struct UiButton;
 	struct UiRect;
 
 	/**
@@ -75,7 +76,8 @@ namespace Loom
 	*   that offset is measured from, and pivot the point in the rectangle
 	*   (0 to 1 across) that lands there
 	* - Filled with color, or a UiButton's tint when there is one beside it;
-	*   one with no alpha is not drawn, and only lays out its children
+	*   one with no alpha is not drawn, though it still lays out its children
+	*   and, if it blocks the pointer, holds the cursor
 	* - The UiText on its GameObject is drawn over it, and its children over
 	*   both
 	* - With blocksPointer, the cursor on it is on the UI rather than the
@@ -101,6 +103,13 @@ namespace Loom
 		Serial<glm::vec2> size = glm::vec2(160.0f, 40.0f);
 		Serial<glm::vec4> color = glm::vec4(0.0f, 0.0f, 0.0f, 0.6f);
 		Serial<bool> blocksPointer = true;
+
+	private:
+		friend struct Ui;
+
+		// The button the cursor on it presses: the UiButton on its GameObject,
+		// or on the nearest one above it, or null.
+		const UiButton* Button() const;
 	};
 
 	/**
@@ -139,7 +148,9 @@ namespace Loom
 	/**
 	* Loom::UiButton
 	* - Makes the UiRect on its GameObject a button: hovered while the cursor
-	*   is on that rect, tinted for it, and clicked by a left click there
+	*   is on that rect or one under the button's GameObject, such as a
+	*   label's, tinted for it, and clicked by a left click there. Of buttons
+	*   inside one another, the innermost takes it
 	* - onClick runs on the frame it is clicked, and WasClicked says so all
 	*   that frame to anything that would rather ask
 	*/

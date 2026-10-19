@@ -1,5 +1,5 @@
-// Raycasts demo shader: the Material's colour, which the engine shades and
-// shadows because the settings say so.
+// UI demo shader: the Material's colour, which the engine shades and shadows
+// because the settings say so.
 
 // ===SETTINGS===
 

@@ -22,6 +22,8 @@ TEST_SUITE("EditorIcons")
 		CHECK(EditorIcons::Of("Assets/Tree.JPEG") == EditorIcons::Texture);
 		CHECK(EditorIcons::Of("Assets/Bell.wav") == EditorIcons::Sound);
 		CHECK(EditorIcons::Of("Assets/Theme.MP3") == EditorIcons::Sound);
+		CHECK(EditorIcons::Of("Assets/Fonts/Roboto.ttf") == EditorIcons::Font);
+		CHECK(EditorIcons::Of("Assets/Fonts/Inter.OTF") == EditorIcons::Font);
 		CHECK(EditorIcons::Of("README.txt") == EditorIcons::File);
 		CHECK(EditorIcons::Of("Makefile") == EditorIcons::File);
 	};
@@ -46,5 +48,18 @@ TEST_SUITE("EditorIcons")
 			CHECK_FALSE(ProjectAssets::IsTextureFile(name));
 
 		CHECK(ProjectAssets::IsGameFile("a.png"));
+	};
+
+	TEST_CASE("a font is a TrueType or OpenType file or collection, whatever the extension's case")
+	{
+		using Loom::ProjectAssets;
+
+		for (const char* name : { "a.ttf", "a.otf", "a.ttc", "a.TTF", "a.Otf" })
+			CHECK(ProjectAssets::IsFontFile(name));
+
+		for (const char* name : { "a.woff2", "a.png", "a.fnt", "ttf" })
+			CHECK_FALSE(ProjectAssets::IsFontFile(name));
+
+		CHECK(ProjectAssets::IsGameFile("Assets/Fonts/Roboto-Medium.ttf"));
 	};
 };
