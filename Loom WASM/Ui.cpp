@@ -29,9 +29,10 @@ namespace Loom
 		constexpr uint32_t STREAM_DRAW = 0x88E0;	// GL_STREAM_DRAW
 		constexpr int LEFT_BUTTON = 0;
 
-		// Clip space's nearest depth, and how much nearer each item drawn over
-		// the last one is: in front of the whole scene, in the order queued.
-		constexpr float NEAREST = -1.0f;
+		// In front of the whole scene, but behind clip space's near plane at
+		// -1, which clips a quad lying on it; and how much nearer each item
+		// drawn over the last one is, so they stack in the order queued.
+		constexpr float FRONT = -0.99f;
 		constexpr float DEPTH_STEP = 1e-5f;
 
 		constexpr int FIRST_CHARACTER = 32;
@@ -267,7 +268,7 @@ void main()
 
 		Renderer::Get()->SetUniform(program, "u_screen", glm::vec4(screen.size, 0.0f, 0.0f));
 
-		float depth = NEAREST + DEPTH_STEP * (float)queued.size();
+		float depth = FRONT + DEPTH_STEP * (float)(queued.size() + 1);
 
 		for (const ComponentBase* component : queued)
 		{

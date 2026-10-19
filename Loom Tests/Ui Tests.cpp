@@ -232,10 +232,12 @@ TEST_SUITE("Ui")
 		REQUIRE(renderer.drawn.size() == 1);
 		REQUIRE(!renderer.lastVertices.empty());
 
-		// x, y, z, u, v: the first corner is the rect's top left, nearer than the scene.
+		// x, y, z, u, v: the first corner is the rect's top left, nearer than
+		// the scene but not on the near plane, which would clip it.
 		CHECK(renderer.lastVertices[0] == doctest::Approx(SCREEN_WIDTH / 2.0f - 80.0f));
 		CHECK(renderer.lastVertices[1] == doctest::Approx(SCREEN_HEIGHT / 2.0f - 20.0f));
-		CHECK(renderer.lastVertices[2] < -0.99f);
+		CHECK(renderer.lastVertices[2] < -0.9f);
+		CHECK(renderer.lastVertices[2] > -1.0f);
 	};
 
 #ifndef __EMSCRIPTEN__
