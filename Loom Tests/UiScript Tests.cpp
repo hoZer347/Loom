@@ -297,12 +297,58 @@ TEST_SUITE("UiScript")
 	{
 		CapturedErrors errors;
 
-		for (const char* text : { "fly away\n", "key ctrl+nothing\n", "click \"Panel\"\n", "wait\n", "\"\" \"Cube\"\n" })
+		for (const char* text : { "fly away\n", "key ctrl+nothing\n", "click \"Panel\"\n", "wait\n", "\"\" \"Cube\"\n", "hold\n", "release\n" })
 		{
 			ScriptedUi ui(text);
 			ui.Run([]() { });
 
 			CHECK(ui.script->Failed());
+		};
+	};
+
+	TEST_CASE("hold keeps ctrl down through a click until release")
+	{
+		ScriptedUi ui("hold ctrl\nclick \"Panel\" \"Press me\"\nrelease ctrl\nwait 1\n");
+		bool ctrl_at_press = false;
+		bool ctrl_after = true;
+		int presses = 0;
+
+		ui.Run(
+			[&]()
+			{
+				Panel(
+					[&]()
+					{
+						if (ImGui::Button("Press me"))
+						{
+							presses++;
+							ctrl_at_press = ImGui::GetIO().KeyCtrl;
+						};
+					});
+
+				ctrl_after = ImGui::GetIO().KeyCtrl;
+			});
+
+		CHECK_FALSE(ui.script->Failed());
+		CHECK(presses == 1);
+		CHECK(ctrl_at_press);
+		CHECK_FALSE(ctrl_after);
+	};
+
+	TEST_CASE("a held key is let go of when the script ends, quits or fails")
+	{
+		CapturedErrors errors;
+
+		for (const char* text : { "hold ctrl\nwait 1\n", "hold ctrl\nwait 1\nquit\n", "hold ctrl\nwait 1\nclick \"Panel\" \"Missing\"\n" })
+		{
+			ScriptedUi ui(text);
+			ui.Run([]() { Panel([]() { }); });
+
+			// The key-up lands on the frame after the script stops.
+			ImGui::NewFrame();
+			ImGui::Render();
+
+			CHECK_FALSE(ImGui::GetIO().KeyCtrl);
 		};
 	};
 

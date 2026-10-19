@@ -2,6 +2,7 @@
 
 #include "Engine.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -145,6 +146,8 @@ namespace Loom
 
 	void UiScript::Run(const std::string& text)
 	{
+		ReleaseHeld();
+
 		m_next = m_lines.size();
 		m_actions.clear();
 		m_wait = 0;
@@ -190,6 +193,7 @@ namespace Loom
 		{
 			if (m_next >= m_lines.size())
 			{
+				ReleaseHeld();
 				m_finished = true;
 				return;
 			};
@@ -376,20 +380,26 @@ namespace Loom
 
 			if (verb != "release")
 				m_actions.push_back(
-					[&io, held]()
+					[this, &io, held]()
 					{
 						for (ImGuiKey key : held)
+						{
 							io.AddKeyEvent(key, true);
+							m_held.push_back(key);
+						};
 
 						return Result::Done;
 					});
 
 			if (verb != "hold")
 				m_actions.push_back(
-					[&io, held]()
+					[this, &io, held]()
 					{
 						for (auto key = held.rbegin(); key != held.rend(); key++)
+						{
 							io.AddKeyEvent(*key, false);
+							m_held.erase(std::remove(m_held.begin(), m_held.end(), *key), m_held.end());
+						};
 
 						return Result::Done;
 					});
@@ -447,6 +457,7 @@ namespace Loom
 			m_actions.push_back(
 				[this]()
 				{
+					ReleaseHeld();
 					m_finished = true;
 					return Result::Done;
 				});
@@ -560,11 +571,21 @@ namespace Loom
 		out.flush();
 	};
 
+	void UiScript::ReleaseHeld()
+	{
+		for (auto key = m_held.rbegin(); key != m_held.rend(); key++)
+			m_context->IO.AddKeyEvent(*key, false);
+
+		m_held.clear();
+	};
+
 	void UiScript::Fail(const std::string& why)
 	{
 		std::cerr
 			<< "UI script line " << m_line + 1 << ", " << m_lines[m_line] << ": "
 			<< why << std::endl;
+
+		ReleaseHeld();
 
 		m_actions.clear();
 		m_finished = true;

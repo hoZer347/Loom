@@ -26,8 +26,8 @@ namespace Loom
 	*     click <target>, rightclick <target>, doubleclick <target>
 	*     drag <target> to <target>
 	*     key <chord>          ImGui's key names joined by +: ctrl+z, enter, f2
-	*     hold <chord>, release <chord>   the key half of it, so ctrl can be
-	*                          held through a click
+	*     hold <chord>         presses it and leaves it down, for a click with ctrl
+	*     release <chord>      lets go of a held chord
 	*     type <text>          the rest of the line
 	*     screenshot <file>    the whole window, as a bitmap
 	*     items [file]         every labelled item drawn last frame, to the file
@@ -105,6 +105,10 @@ namespace Loom
 		const Item* Find(const std::string& window, const std::string& label) const;
 		void Fail(const std::string& why);
 
+		// Lets go of whatever hold left down, so a script that stops early
+		// leaves no key stuck for the person at the keyboard.
+		void ReleaseHeld();
+
 		ImGuiContext* m_context = nullptr;
 		std::filesystem::path m_folder{ };
 
@@ -115,6 +119,8 @@ namespace Loom
 		std::deque<Action> m_actions{ };
 		int m_wait = 0;
 		int m_retries = 0;
+
+		std::vector<ImGuiKey> m_held{ };
 
 		ImVec2 m_mouse{ };
 		bool m_mouseSet = false;

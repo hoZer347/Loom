@@ -1022,9 +1022,6 @@ namespace Loom
 		if (m_selected && IsInHierarchy(scene->GetRoot(), m_selected))
 			Select(nullptr);
 
-		// Deleting a scene mid-GUI would leave the rest of the frame walking a
-		// dangling pointer; deferring puts the delete (and the unregistering it
-		// queues in turn) at the top of the next frame instead.
 		const std::string path = ScenePathOf(scene);
 
 		m_scenePaths.erase(scene);
@@ -1034,6 +1031,9 @@ namespace Loom
 			[&](const auto& open) { return open.second == path; }))
 			m_sceneViewAdditions.erase(path);
 
+		// Deleting a scene mid-GUI would leave the rest of the frame walking a
+		// dangling pointer; deferring puts the delete (and the unregistering it
+		// queues in turn) at the top of the next frame instead.
 		Engine::QueueTask([scene]() { delete scene; });
 	};
 
@@ -2945,18 +2945,24 @@ namespace Loom
 
 	void Editor::DrawScene()
 	{
-		std::vector<Scene*> drawn{ m_activeScene };
-		const std::string active_path = ScenePathOf(m_activeScene);
+		std::vector<Scene*> drawn{ };
 
-		for (Scene* scene : m_ownedScenes)
+		if (m_activeScene != nullptr)
 		{
-			const std::string path = ScenePathOf(scene);
+			drawn.push_back(m_activeScene);
 
-			if (scene != m_activeScene && path != active_path && m_sceneViewAdditions.count(path))
-				drawn.push_back(scene);
+			const std::string active_path = ScenePathOf(m_activeScene);
+
+			for (Scene* scene : m_ownedScenes)
+			{
+				const std::string path = ScenePathOf(scene);
+
+				if (scene != m_activeScene && path != active_path && m_sceneViewAdditions.count(path))
+					drawn.push_back(scene);
+			};
 		};
 
-		const size_t added = drawn.size() - 1;
+		const size_t added = drawn.empty() ? 0 : drawn.size() - 1;
 
 		const std::string title =
 			std::string(EditorIcons::Scene) + " " +
