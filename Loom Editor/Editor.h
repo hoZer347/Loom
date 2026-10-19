@@ -601,6 +601,10 @@ namespace Loom
 		std::string m_assetToMove{ };
 		std::string m_assetMoveFolder{ };
 
+		// A file double-clicked or picked Open on. Opened once the tree is
+		// drawn, since opening one can rescan the tree being drawn.
+		std::string m_assetToOpen{ };
+
 		// Where a script is written, and whether it has been compiled.
 		struct ScriptEntry
 		{

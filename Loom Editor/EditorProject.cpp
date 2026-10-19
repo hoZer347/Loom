@@ -590,6 +590,9 @@ namespace Loom
 
 				if (!m_assetToMove.empty())
 					MoveAsset(std::exchange(m_assetToMove, { }), m_assetMoveFolder);
+
+				if (!m_assetToOpen.empty())
+					OpenAsset(std::exchange(m_assetToOpen, { }));
 			};
 		};
 
@@ -657,7 +660,7 @@ namespace Loom
 			!scene_toggle &&
 			ImGui::IsItemHovered() &&
 			ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-			OpenAsset(node.path);
+			m_assetToOpen = node.path;
 
 		// On the release, so dragging one out to a field leaves the panel shut.
 		const float drag_threshold = io.MouseDragThreshold * io.MouseDragThreshold;
@@ -739,7 +742,7 @@ namespace Loom
 		m_selectedAsset = node.path;
 
 		if (!node.folder && ImGui::MenuItem("Open"))
-			OpenAsset(node.path);
+			m_assetToOpen = node.path;
 
 		if (ImGui::MenuItem("Show in Explorer"))
 			ShowInExplorer(node.path);
