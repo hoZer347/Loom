@@ -1960,7 +1960,7 @@ namespace Loom
 			ImGui::EndMenu();
 		};
 
-		// Play control, mirrored in the Game window's toolbar.
+		// Play control, mirrored in the Game and Debug windows' toolbars.
 		ImGui::Separator();
 
 		if (ImGui::MenuItem(Engine::updateScenes ? "Pause" : "Play"))
@@ -3096,54 +3096,7 @@ namespace Loom
 	{
 		if (ImGui::Begin(EditorPanels::Game, &m_showGame, view_flags))
 		{
-			constexpr const char* play_label = "Play";
-			constexpr const char* pause_label = "Pause";
-			constexpr const char* stop_label = "Stop";
-			constexpr const char* step_label = "Step";
-			constexpr const char* play_labels[] = { play_label, pause_label, stop_label, step_label };
-			constexpr float frame_sides = 2.0f;
-
-			float label_width = 0.0f;
-
-			for (const char* label : play_labels)
-				label_width = (std::max)(label_width, ImGui::CalcTextSize(label).x);
-
-			const ImVec2 play_button_size(label_width + ImGui::GetStyle().FramePadding.x * frame_sides, 0.0f);
-
-			ImGui::BeginDisabled(Engine::updateScenes || m_playAfterCompile);
-
-			if (ImGui::Button(play_label, play_button_size))
-				TogglePlay();
-
-			ImGui::EndDisabled();
-			ImGui::SameLine();
-			ImGui::BeginDisabled(!Engine::updateScenes);
-
-			if (ImGui::Button(pause_label, play_button_size))
-				TogglePlay();
-
-			ImGui::EndDisabled();
-			ImGui::SameLine();
-			ImGui::BeginDisabled(!IsPlaying());
-
-			if (ImGui::Button(stop_label, play_button_size))
-				Stop();
-
-			ImGui::EndDisabled();
-			ImGui::SameLine();
-
-			// A build has the scenes down, so there is nothing to step, and a
-			// running scene has no single frame to step to.
-			ImGui::BeginDisabled(m_scripts.IsBuilding() || Engine::updateScenes);
-
-			if (ImGui::Button(step_label, play_button_size))
-			{
-				BeginPlay();
-				m_steppedLastFrame = true;
-			};
-
-			ImGui::EndDisabled();
-
+			DrawPlayControls();
 			ImGui::SameLine();
 			ImGui::ColorEdit4(
 				"Background",
@@ -3177,6 +3130,9 @@ namespace Loom
 	{
 		if (ImGui::Begin(EditorPanels::Debug, &m_showDebug, view_flags))
 		{
+			DrawPlayControls();
+			ImGui::Separator();
+
 			if (Scene::GetScenes().empty())
 				ImGui::TextDisabled("Nothing loaded.");
 			else
@@ -3189,6 +3145,57 @@ namespace Loom
 		};
 
 		ImGui::End();
+	};
+
+	void Editor::DrawPlayControls()
+	{
+		constexpr const char* play_label = "Play";
+		constexpr const char* pause_label = "Pause";
+		constexpr const char* stop_label = "Stop";
+		constexpr const char* step_label = "Step";
+		constexpr const char* play_labels[] = { play_label, pause_label, stop_label, step_label };
+		constexpr float frame_sides = 2.0f;
+
+		float label_width = 0.0f;
+
+		for (const char* label : play_labels)
+			label_width = (std::max)(label_width, ImGui::CalcTextSize(label).x);
+
+		const ImVec2 play_button_size(label_width + ImGui::GetStyle().FramePadding.x * frame_sides, 0.0f);
+
+		ImGui::BeginDisabled(Engine::updateScenes || m_playAfterCompile);
+
+		if (ImGui::Button(play_label, play_button_size))
+			TogglePlay();
+
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		ImGui::BeginDisabled(!Engine::updateScenes);
+
+		if (ImGui::Button(pause_label, play_button_size))
+			TogglePlay();
+
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		ImGui::BeginDisabled(!IsPlaying());
+
+		if (ImGui::Button(stop_label, play_button_size))
+			Stop();
+
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+
+		// A build has the scenes down, so there is nothing to step, and a
+		// running scene has no single frame to step to.
+		ImGui::BeginDisabled(m_scripts.IsBuilding() || Engine::updateScenes);
+
+		if (ImGui::Button(step_label, play_button_size))
+		{
+			BeginPlay();
+			m_steppedLastFrame = true;
+		};
+
+		ImGui::EndDisabled();
 	};
 
 	void Editor::DrawView(EditorViewport& view, const std::vector<Scene*>& scenes, EditorCamera* camera, SelectionOutline* outline)

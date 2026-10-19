@@ -360,6 +360,7 @@ namespace Loom
 		void DrawPrefab();
 		void DrawGame();
 		void DrawDebug();
+		void DrawPlayControls();
 
 		// Fills the rest of the panel with the scenes, seen through camera, or
 		// through each scene's own when there is none. Only a view with a
