@@ -1438,6 +1438,9 @@ namespace Loom
 			SetCurrentLayout("");
 		};
 
+		// Nowhere the cursor can be, unless the Game panel draws the game below.
+		Input::SetView(0, 0, 0, 0);
+
 		if (m_showProject)		DrawProject();
 		if (m_showScripts)		DrawScripts();
 		if (m_showHierarchy)	DrawHierarchy();

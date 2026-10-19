@@ -104,6 +104,12 @@ namespace Loom
 		Place();
 	};
 
+	void Input::ClearView()
+	{
+		view.reset();
+		Place();
+	};
+
 	void Input::Tick()
 	{
 		down_this_frame = went_down;

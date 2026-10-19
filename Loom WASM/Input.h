@@ -30,9 +30,11 @@ namespace Loom
 
 		// Where the game is drawn in the window, in the window's pixels, which
 		// mouse_x, mouse_y, screen_width and screen_height then measure: an
-		// editor's Game view, a part of the editor's window. Until it is set
-		// they measure the whole window.
+		// editor's Game view, a part of the editor's window, or no size at all
+		// while it is hidden. Until it is set, or once it is cleared, they
+		// measure the whole window.
 		static void SetView(int x, int y, int width, int height);
+		static void ClearView();
 
 		// Hands what OnMouseButton heard since the last call to this frame's
 		// questions. Engine calls it once a frame, after polling for events.

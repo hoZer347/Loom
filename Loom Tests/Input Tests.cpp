@@ -162,6 +162,26 @@ TEST_SUITE("Input")
 		CHECK(Loom::Input::mouse_y == 0);
 		CHECK(Loom::Input::screen_width == view_width);
 
-		Loom::Input::SetView(0, 0, window_width, window_height);
+		Loom::Input::ClearView();
+
+		CHECK(Loom::Input::mouse_x == view_x);
+		CHECK(Loom::Input::screen_width == window_width);
+		CHECK(Loom::Input::screen_height == window_height);
+	};
+
+	TEST_CASE("a view of no size has the cursor outside it")
+	{
+		constexpr int window_width = 1280;
+		constexpr int window_height = 720;
+		constexpr int cursor_x = 300;
+		constexpr int cursor_y = 200;
+
+		Loom::Input::OnMouseMove(cursor_x, cursor_y, window_width, window_height);
+		Loom::Input::SetView(0, 0, 0, 0);
+
+		CHECK(Loom::Input::mouse_x >= Loom::Input::screen_width);
+		CHECK(Loom::Input::mouse_y >= Loom::Input::screen_height);
+
+		Loom::Input::ClearView();
 	};
 };
