@@ -293,6 +293,13 @@ namespace Loom
 		return keys;
 	};
 
+	Prefab* Prefabs::LinkOf(const GameObject& gameObject)
+	{
+		Prefab* link = const_cast<GameObject&>(gameObject).GetComponent<Prefab>();
+
+		return link && !link->path->empty() ? link : nullptr;
+	};
+
 	const std::string& Prefabs::PrefabType()
 	{
 		static const std::string name = PrettyTypeName(typeid(Prefab).name());

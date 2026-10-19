@@ -8,6 +8,7 @@
 namespace Loom
 {
 	struct GameObject;
+	struct Prefab;
 
 	/**
 	* Loom::Prefabs
@@ -77,6 +78,10 @@ namespace Loom
 
 		// The registered name the Prefab component is written under.
 		const std::string& PrefabType();
+
+		// The Prefab component linking a GameObject to its prefab, or null when
+		// it has none or one naming no file.
+		Prefab* LinkOf(const GameObject& gameObject);
 
 		// What SceneSerializer::Serialize(GameObject&) writes, and back. Parse
 		// is false, with why in error, for text that is not one GameObject.

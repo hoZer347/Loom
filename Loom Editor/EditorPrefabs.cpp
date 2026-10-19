@@ -24,13 +24,6 @@ namespace Loom
 		// Named after a GameObject whose name is no file name.
 		constexpr const char* unnamed_prefab = "Prefab";
 
-		Prefab* LinkOf(const GameObject& gameObject)
-		{
-			Prefab* link = const_cast<GameObject&>(gameObject).GetComponent<Prefab>();
-
-			return link && !link->path->empty() ? link : nullptr;
-		};
-
 		struct Found
 		{
 			Scene* scene;
@@ -43,7 +36,7 @@ namespace Loom
 		// that one's content.
 		void FindInstances(Scene& scene, GameObject& gameObject, std::vector<Found>& instances)
 		{
-			if (Prefab* link = LinkOf(gameObject))
+			if (Prefab* link = Prefabs::LinkOf(gameObject))
 			{
 				Found found{ &scene, &gameObject, { link->GetGuid().ToString(), *link->path } };
 
@@ -132,7 +125,7 @@ namespace Loom
 			return true;
 
 		for (const GameObject* at = gameObject; at; at = at->GetParent())
-			if (const Prefab* link = LinkOf(*at); link && *link->path == path)
+			if (const Prefab* link = Prefabs::LinkOf(*at); link && *link->path == path)
 				return true;
 
 		return false;

@@ -2215,7 +2215,7 @@ namespace Loom
 
 		const bool renaming = m_renaming && m_selected == gameObject;
 		const bool disabled = parent_disabled || gameObject->IsDisabled();
-		const bool instance = gameObject->GetComponent<Prefab>() != nullptr;
+		const bool instance = Prefabs::LinkOf(*gameObject) != nullptr;
 		const bool in_prefab = parent_in_prefab || instance;
 
 		const std::string label = renaming
