@@ -135,4 +135,33 @@ TEST_SUITE("Input")
 		Loom::Input::mouse_x       = mouseX;
 		Loom::Input::mouse_y       = mouseY;
 	};
+
+	TEST_CASE("the mouse is measured in the view the game is drawn in")
+	{
+		constexpr int window_width = 1280;
+		constexpr int window_height = 720;
+		constexpr int view_x = 100;
+		constexpr int view_y = 50;
+		constexpr int view_width = 640;
+		constexpr int view_height = 360;
+		constexpr int cursor_x = 300;
+		constexpr int cursor_y = 200;
+
+		Loom::Input::OnMouseMove(cursor_x, cursor_y, window_width, window_height);
+		Loom::Input::SetView(view_x, view_y, view_width, view_height);
+
+		CHECK(Loom::Input::mouse_x == cursor_x - view_x);
+		CHECK(Loom::Input::mouse_y == cursor_y - view_y);
+		CHECK(Loom::Input::screen_width == view_width);
+		CHECK(Loom::Input::screen_height == view_height);
+
+		// A move keeps to the view rather than the whole window.
+		Loom::Input::OnMouseMove(view_x, view_y, window_width, window_height);
+
+		CHECK(Loom::Input::mouse_x == 0);
+		CHECK(Loom::Input::mouse_y == 0);
+		CHECK(Loom::Input::screen_width == view_width);
+
+		Loom::Input::SetView(0, 0, window_width, window_height);
+	};
 };

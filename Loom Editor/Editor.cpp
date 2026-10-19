@@ -9,6 +9,7 @@
 #include "EditorGui.h"
 #include "Engine.h"
 #include "GameObject.h"
+#include "Input.h"
 #include "Jobs.h"
 #include "LoomObject.h"
 #include "Material.h"
@@ -2965,6 +2966,13 @@ namespace Loom
 				ImGui::TextDisabled("No scene open. Pick one in the Project panel.");
 			else
 			{
+				// GLFW reports the cursor from the main window's corner, which
+				// ImGui's screen space only starts at without multi-viewports.
+				const ImVec2 origin = ImGui::GetMainViewport()->Pos;
+				const ImVec2 corner = ImGui::GetCursorScreenPos();
+				const ImVec2 available = ImGui::GetContentRegionAvail();
+
+				Input::SetView((int)(corner.x - origin.x), (int)(corner.y - origin.y), (int)available.x, (int)available.y);
 				DrawView(m_gameView, Scene::GetScenes(), nullptr);
 
 				if (m_activeScene)

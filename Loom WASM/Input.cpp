@@ -6,6 +6,7 @@
 
 #include <array>
 #include <iostream>
+#include <optional>
 
 
 namespace Loom
@@ -24,6 +25,31 @@ namespace Loom
 		Buttons went_up{ };
 		Buttons down_this_frame{ };
 		Buttons up_this_frame{ };
+
+		struct Rect
+		{
+			int x = 0;
+			int y = 0;
+			int width = 0;
+			int height = 0;
+		};
+
+		// In the window's pixels, as the callbacks last said.
+		int cursor_x = 0;
+		int cursor_y = 0;
+		Rect whole_window;
+
+		std::optional<Rect> view;
+
+		void Place()
+		{
+			const Rect& seen = view ? *view : whole_window;
+
+			Input::mouse_x = cursor_x - seen.x;
+			Input::mouse_y = cursor_y - seen.y;
+			Input::screen_width = seen.width;
+			Input::screen_height = seen.height;
+		};
 
 		bool IsButton(int button)
 		{
@@ -64,6 +90,20 @@ namespace Loom
 			went_up[button] = true;
 	};
 
+	void Input::OnMouseMove(int x, int y, int window_width, int window_height)
+	{
+		cursor_x = x;
+		cursor_y = y;
+		whole_window = { 0, 0, window_width, window_height };
+		Place();
+	};
+
+	void Input::SetView(int x, int y, int width, int height)
+	{
+		view = { x, y, width, height };
+		Place();
+	};
+
 	void Input::Tick()
 	{
 		down_this_frame = went_down;
@@ -92,11 +132,7 @@ namespace Loom
 				return EM_FALSE;
 			};
 
-			Input::screen_width = windowWidth;
-			Input::screen_height = windowHeight;
-
-			Input::mouse_x = e->clientX;
-			Input::mouse_y = e->clientY;
+			Input::OnMouseMove(e->clientX, e->clientY, (int)windowWidth, (int)windowHeight);
 		};
 
 		return EM_TRUE;
@@ -110,11 +146,7 @@ namespace Loom
 		int width, height;
 		glfwGetWindowSize(window, &width, &height);
 
-		Input::screen_width = width;
-		Input::screen_height = height;
-
-		Input::mouse_x = (int)xpos;
-		Input::mouse_y = (int)ypos;
+		Input::OnMouseMove((int)xpos, (int)ypos, width, height);
 	};
 #endif
 
