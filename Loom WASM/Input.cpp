@@ -26,6 +26,11 @@ namespace Loom
 		Buttons down_this_frame{ };
 		Buttons up_this_frame{ };
 
+		// Held when focus went, which the frame it went in hears come up.
+		Buttons lost_this_frame{ };
+
+		bool has_focus = true;
+
 		struct Rect
 		{
 			int x = 0;
@@ -64,17 +69,17 @@ namespace Loom
 
 	bool Input::GetMouseButtonDown(int button)
 	{
-		return IsButton(button) && down_this_frame[button];
+		return has_focus && IsButton(button) && down_this_frame[button];
 	};
 
 	bool Input::GetMouseButton(int button)
 	{
-		return IsButton(button) && (held[button] || down_this_frame[button]);
+		return has_focus && IsButton(button) && (held[button] || down_this_frame[button]);
 	};
 
 	bool Input::GetMouseButtonUp(int button)
 	{
-		return IsButton(button) && up_this_frame[button];
+		return IsButton(button) && (has_focus ? up_this_frame[button] : lost_this_frame[button]);
 	};
 
 	void Input::OnMouseButton(int button, bool pressed)
@@ -110,6 +115,20 @@ namespace Loom
 		Place();
 	};
 
+	void Input::SetFocused(bool focused)
+	{
+		if (has_focus && !focused)
+			for (int button = 0; button < mouse_buttons; button++)
+				lost_this_frame[button] = GetMouseButton(button);
+
+		has_focus = focused;
+	};
+
+	bool Input::IsFocused()
+	{
+		return has_focus;
+	};
+
 	void Input::Tick()
 	{
 		down_this_frame = went_down;
@@ -117,6 +136,7 @@ namespace Loom
 
 		went_down.fill(false);
 		went_up.fill(false);
+		lost_this_frame.fill(false);
 	};
 
 #if __EMSCRIPTEN__

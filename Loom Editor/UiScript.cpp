@@ -1,6 +1,7 @@
 #include "UiScript.h"
 
 #include "Engine.h"
+#include "Input.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -251,7 +252,9 @@ namespace Loom
 				m_actions.push_back(
 					[&io, button, down]()
 					{
+						// The game hears it too, as it would a real one.
 						io.AddMouseButtonEvent(button, down);
+						Input::OnMouseButton(button, down);
 						return Result::Done;
 					});
 			};

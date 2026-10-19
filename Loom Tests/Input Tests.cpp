@@ -111,6 +111,51 @@ TEST_SUITE("Input")
 		ReleaseAll();
 	};
 
+	// An editor's other panels take clicks the game must not see.
+	TEST_CASE("without focus nothing is down or held, and a held button comes up once")
+	{
+		ReleaseAll();
+
+		Loom::Input::OnMouseButton(left_button, true);
+		Loom::Input::Tick();
+		Loom::Input::SetFocused(false);
+
+		CHECK_FALSE(Loom::Input::IsFocused());
+		CHECK_FALSE(Loom::Input::GetMouseButtonDown(left_button));
+		CHECK_FALSE(Loom::Input::GetMouseButton(left_button));
+		CHECK(Loom::Input::GetMouseButtonUp(left_button));
+
+		Loom::Input::Tick();
+
+		CHECK_FALSE(Loom::Input::GetMouseButtonUp(left_button));
+
+		// A click made elsewhere is neither down nor up for the game.
+		Loom::Input::OnMouseButton(right_button, true);
+		Loom::Input::OnMouseButton(right_button, false);
+		Loom::Input::Tick();
+
+		CHECK_FALSE(Loom::Input::GetMouseButtonDown(right_button));
+		CHECK_FALSE(Loom::Input::GetMouseButtonUp(right_button));
+
+		Loom::Input::SetFocused(true);
+		ReleaseAll();
+	};
+
+	TEST_CASE("focus coming back hears the press that brought it")
+	{
+		ReleaseAll();
+		Loom::Input::SetFocused(false);
+
+		Loom::Input::OnMouseButton(left_button, true);
+		Loom::Input::Tick();
+		Loom::Input::SetFocused(true);
+
+		CHECK(Loom::Input::GetMouseButtonDown(left_button));
+		CHECK(Loom::Input::GetMouseButton(left_button));
+
+		ReleaseAll();
+	};
+
 	// The cursor callback writes these; Engine and any scene reads them. They
 	// have to be plain settable ints for the callback to be able to.
 	TEST_CASE("the cursor and screen fields round-trip")

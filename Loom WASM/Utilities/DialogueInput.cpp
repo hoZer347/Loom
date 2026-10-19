@@ -1,6 +1,7 @@
 #include "DialogueInput.h"
 
 #include "Engine.h"
+#include "Input.h"
 
 #include "OpenGL.h"
 
@@ -53,7 +54,9 @@ namespace Loom
 		s_pad = false;
 		s_mouse = false;
 
-		if (window != nullptr)
+		const bool focused = Input::IsFocused();
+
+		if (focused && window != nullptr)
 		{
 			for (const int key : s_keys)
 				if (glfwGetKey(window, key) == GLFW_PRESS)
@@ -70,7 +73,7 @@ namespace Loom
 		// The four lettered face buttons, by position, on the first pad that is one.
 		// Guarded off under Emscripten, whose GLFW port has no gamepad mapping at all --
 		// the browser reads pads through its own API, which is a separate job.
-		for (int pad = GLFW_JOYSTICK_1; pad <= GLFW_JOYSTICK_LAST && !s_pad; pad++)
+		for (int pad = GLFW_JOYSTICK_1; focused && pad <= GLFW_JOYSTICK_LAST && !s_pad; pad++)
 		{
 			if (!glfwJoystickPresent(pad) || !glfwJoystickIsGamepad(pad))
 				continue;

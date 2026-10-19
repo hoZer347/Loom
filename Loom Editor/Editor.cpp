@@ -1553,8 +1553,10 @@ namespace Loom
 			SetCurrentLayout("");
 		};
 
-		// Nowhere the cursor can be, unless the Game panel draws the game below.
+		// Nowhere the cursor can be, and nothing heard, unless the Game panel
+		// draws the game below and has focus.
 		Input::SetView(0, 0, 0, 0);
+		m_gameFocused = false;
 
 		if (m_showProject)		DrawProject();
 		if (m_showScripts)		DrawScripts();
@@ -1564,6 +1566,7 @@ namespace Loom
 		DrawPrefab();
 		if (m_showGame)			DrawGame();
 		if (m_showDebug)		DrawDebug();
+		Input::SetFocused(m_gameFocused);
 		if (m_showSceneData)	DrawSceneData();
 		if (m_showConsole)		m_console.Draw(&m_showConsole);
 		if (m_showShaders)		m_shaders.Draw(&m_showShaders);
@@ -3096,14 +3099,12 @@ namespace Loom
 	{
 		if (ImGui::Begin(EditorPanels::Game, &m_showGame, view_flags))
 		{
-			DrawPlayControls();
-			ImGui::SameLine();
-			ImGui::ColorEdit4(
-				"Background",
-				Engine::clearColor,
-				ImGuiColorEditFlags_NoInputs);
+			// ImGui only moves focus at the end of the frame, so the click that
+			// gives it would be lost to the game without the second test.
+			m_gameFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)
+				|| (ImGui::IsWindowHovered() && ImGui::IsAnyMouseDown());
 
-			ImGui::Separator();
+			DrawToolbar();
 
 			if (Scene::GetScenes().empty())
 				ImGui::TextDisabled("No scene open. Pick one in the Project panel.");
@@ -3130,8 +3131,7 @@ namespace Loom
 	{
 		if (ImGui::Begin(EditorPanels::Debug, &m_showDebug, view_flags))
 		{
-			DrawPlayControls();
-			ImGui::Separator();
+			DrawToolbar();
 
 			if (Scene::GetScenes().empty())
 				ImGui::TextDisabled("Nothing loaded.");
@@ -3147,7 +3147,7 @@ namespace Loom
 		ImGui::End();
 	};
 
-	void Editor::DrawPlayControls()
+	void Editor::DrawToolbar()
 	{
 		constexpr const char* play_label = "Play";
 		constexpr const char* pause_label = "Pause";
@@ -3196,6 +3196,14 @@ namespace Loom
 		};
 
 		ImGui::EndDisabled();
+
+		ImGui::SameLine();
+		ImGui::ColorEdit4(
+			"Background",
+			Engine::clearColor,
+			ImGuiColorEditFlags_NoInputs);
+
+		ImGui::Separator();
 	};
 
 	void Editor::DrawView(EditorViewport& view, const std::vector<Scene*>& scenes, EditorCamera* camera, SelectionOutline* outline)

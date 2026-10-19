@@ -360,7 +360,8 @@ namespace Loom
 		void DrawPrefab();
 		void DrawGame();
 		void DrawDebug();
-		void DrawPlayControls();
+		// The bar along the top of the Game and Debug panels.
+		void DrawToolbar();
 
 		// Fills the rest of the panel with the scenes, seen through camera, or
 		// through each scene's own when there is none. Only a view with a
@@ -746,6 +747,7 @@ namespace Loom
 		bool m_showScene = true;
 		bool m_showGame = true;
 		bool m_showDebug = true;
+		bool m_gameFocused = false;
 		bool m_showSceneData = true;
 		bool m_showConsole = true;
 		bool m_showShaders = false;
