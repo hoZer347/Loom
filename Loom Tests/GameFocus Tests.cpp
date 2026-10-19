@@ -53,6 +53,25 @@ TEST_SUITE("GameFocus")
 		CHECK(Run(focus, { .panel_focused = true, .button_held = true }));
 	};
 
+	// The release frame passes the button as held, which keeps the press's
+	// decision for the Up that ends it.
+	TEST_CASE("the release of a press elsewhere is not heard, though Game is focused")
+	{
+		Loom::GameFocus focus;
+
+		CHECK_FALSE(Run(focus, { .panel_focused = true, .button_went_down = true, .button_held = true }));
+		CHECK_FALSE(Run(focus, { .panel_focused = true, .button_held = true }));
+	};
+
+	TEST_CASE("the release of a press on an unfocused Game is heard")
+	{
+		Loom::GameFocus focus;
+
+		CHECK(Run(focus, { .panel_hovered = true, .button_went_down = true, .button_held = true }));
+		CHECK(Run(focus, { .button_held = true }));
+		CHECK_FALSE(Run(focus, { }));
+	};
+
 	TEST_CASE("a hidden panel hears nothing")
 	{
 		Loom::GameFocus focus;

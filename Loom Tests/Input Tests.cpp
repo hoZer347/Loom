@@ -118,6 +118,7 @@ TEST_SUITE("Input")
 
 		Loom::Input::OnMouseButton(left_button, true);
 		Loom::Input::Tick();
+		Loom::Input::Tick();
 		Loom::Input::SetFocused(false);
 
 		CHECK_FALSE(Loom::Input::IsFocused());
@@ -136,6 +137,20 @@ TEST_SUITE("Input")
 
 		CHECK_FALSE(Loom::Input::GetMouseButtonDown(right_button));
 		CHECK_FALSE(Loom::Input::GetMouseButtonUp(right_button));
+
+		Loom::Input::SetFocused(true);
+		ReleaseAll();
+	};
+
+	TEST_CASE("the press that takes focus away is not heard to come up")
+	{
+		ReleaseAll();
+
+		Loom::Input::OnMouseButton(left_button, true);
+		Loom::Input::Tick();
+		Loom::Input::SetFocused(false);
+
+		CHECK_FALSE(Loom::Input::GetMouseButtonUp(left_button));
 
 		Loom::Input::SetFocused(true);
 		ReleaseAll();

@@ -13,7 +13,9 @@ namespace Loom
 	*/
 	struct GameFocus final
 	{
-		// Once a frame. The panel's two are false while it is not drawn.
+		// Once a frame. The panel's two are false while it is not drawn, and a
+		// button is held through the frame it comes up in, so the press's
+		// panel hears the release too.
 		bool Update(bool panel_focused, bool panel_hovered, bool button_went_down, bool button_held);
 
 	private:

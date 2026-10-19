@@ -26,7 +26,8 @@ namespace Loom
 		Buttons down_this_frame{ };
 		Buttons up_this_frame{ };
 
-		// Held when focus went, which the frame it went in hears come up.
+		// Held when focus went, which the frame it went in hears come up. A
+		// press in that frame took focus away, so the game never had it.
 		Buttons lost_this_frame{ };
 
 		bool has_focus = true;
@@ -132,7 +133,7 @@ namespace Loom
 	{
 		if (has_focus && !focused)
 			for (int button = 0; button < mouse_buttons; button++)
-				lost_this_frame[button] = GetMouseButton(button);
+				lost_this_frame[button] = GetMouseButton(button) && !down_this_frame[button];
 
 		has_focus = focused;
 	};
