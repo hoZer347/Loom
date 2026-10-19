@@ -8,6 +8,7 @@
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
 
+#include "Engine.h"
 #include "Renderer.h"
 #include "Scene.h"
 #include "SceneSerializer.h"
@@ -864,13 +865,17 @@ namespace Loom
 		case AssetKind::Prefab:
 		{
 			// A GameObject of its own, so the file has every field one writes.
-			Scene blank(name);
-			Scene::Unlist(&blank);
-			blank.GetRoot().SetName(name);
+			// Deleted once the queue has registered it, as a closed scene is.
+			Scene* blank = new Scene(name);
+			Scene::Unlist(blank);
+			blank->GetRoot().SetName(name);
 
 			Prefabs::ObjectNode prefab;
+			const bool parsed = Prefabs::Parse(SceneSerializer::Serialize(blank->GetRoot()), prefab);
 
-			if (Prefabs::Parse(SceneSerializer::Serialize(blank.GetRoot()), prefab) &&
+			Engine::QueueTask([blank]() { delete blank; });
+
+			if (parsed &&
 				WritePrefab(
 					std::filesystem::path(NewAssetPath()).lexically_normal().lexically_relative(m_projectPath).generic_string(),
 					prefab))
