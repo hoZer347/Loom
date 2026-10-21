@@ -135,6 +135,22 @@ namespace Loom
 		owner->m_fields.push_back(field);
 	};
 
+	void RegisterFieldHeader(const char* label)
+	{
+		LoomObject* owner = constructing;
+
+		if (owner == nullptr)
+		{
+			std::cerr
+				<< "A Header has no LoomObject under construction on this"
+				   " thread to belong to" << std::endl;
+
+			return;
+		};
+
+		owner->m_headers.push_back({ owner->m_fields.size(), label });
+	};
+
 	LoomObject* LoomObject::_GetByID(const uint64_t& ID)
 	{
 		std::lock_guard lock{ mutex };

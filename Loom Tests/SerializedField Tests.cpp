@@ -104,6 +104,17 @@ namespace
 		Loom::Serial<int> m_plain;
 	};
 
+	// A field before any heading, then two headed groups of them.
+	struct Headed final : Loom::LoomObject
+	{
+		Loom::Serial<int> loose = 1;
+		Loom::Header m_size{ "Size" };
+		Loom::Serial<float> width = 2.0f;
+		Loom::Serial<float> height = 3.0f;
+		Loom::Header m_colour{ "Colour" };
+		Loom::Serial<glm::vec3> tint;
+	};
+
 	// Fields are numbered by declaration order; these are EveryField's.
 	enum Every { Flag, Count, UnsignedCount, Big, UnsignedBig, Ratio, Precise, Label, Pair, Triple, Quad, Numbers };
 
@@ -139,6 +150,14 @@ TEST_SUITE("SerializedField")
 		CHECK(labels[Flag] == "Flag");
 		CHECK(labels[UnsignedCount] == "Unsigned Count");
 		CHECK(labels[Numbers] == "Numbers");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a Header between fields leaves their labels as they were")
+	{
+		Headed object;
+		Pump();
+
+		CHECK(Loom::FieldNames::Of(object) == std::vector<std::string>{ "Loose", "Width", "Height", "Tint" });
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a field declared in a base class is labelled after its member")
@@ -246,6 +265,42 @@ TEST_SUITE("SerializedField")
 		CHECK(Field(object, Flag).type == Loom::FieldType::Bool);
 		CHECK(Field(object, Ratio).type == Loom::FieldType::Float);
 		CHECK(Field(object, Numbers).type == Loom::FieldType::FloatArray);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a Header heads the fields declared after it")
+	{
+		Headed object;
+		Pump();
+
+		const std::vector<Loom::LoomObject::FieldHeader>& headers = object.GetHeaders();
+
+		REQUIRE(headers.size() == 2);
+
+		CHECK(headers[0].label == "Size");
+		CHECK(headers[0].first == 1);
+		CHECK(headers[1].label == "Colour");
+		CHECK(headers[1].first == 3);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a Header is not a field, so the fields after it keep their places")
+	{
+		Headed object;
+		Pump();
+
+		REQUIRE(object.GetFields().size() == 4);
+
+		CHECK(Field(object, 0).Write() == "1");
+		CHECK(Field(object, 1).Write() == "2");
+		CHECK(Field(object, 2).Write() == "3");
+		CHECK(Field(object, 3).type == Loom::FieldType::Vec3);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an object with no Header has no headings")
+	{
+		EveryField object;
+		Pump();
+
+		CHECK(object.GetHeaders().empty());
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a base class and the type deriving from it declare onto the same object")

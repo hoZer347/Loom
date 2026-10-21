@@ -30,6 +30,28 @@ namespace Loom
 		void (*set_reference)(void*, LoomObject*),
 		bool (*accepts_reference)(LoomObject*));
 
+	// Hands a heading to the same object, over the fields it declares next.
+	LOOM_API void RegisterFieldHeader(const char* label);
+
+	/**
+	* Loom::Header
+	* - A heading the inspector groups the Serial members declared after it
+	*   under, up to the next Header, each group folding open and shut:
+	*   Header m_terrain{ "Terrain" }
+	* - Not a field: the scene format never sees it, so adding, moving or
+	*   taking one away leaves the values in scenes already saved where they
+	*   were
+	* - A member of the LoomObject being built around it, as a Serial is, and
+	*   only that
+	*/
+	struct Header final
+	{
+		explicit Header(const char* label) { RegisterFieldHeader(label); };
+
+		Header(const Header&) = delete;
+		Header& operator=(const Header&) = delete;
+	};
+
 	// Every type the scene format can write, named by the member's own type.
 	// Anything else is a compile error rather than a field that quietly writes
 	// the wrong bytes. An enum is written as its underlying integer, and the

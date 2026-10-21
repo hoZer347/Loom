@@ -3081,12 +3081,24 @@ namespace Loom
 		ImGui::PushItemWidth(-FLT_MIN);
 
 		const std::vector<const std::vector<FieldNames::Enumerator>*> enumerators = FieldNames::EnumeratorsOf(object);
+		const std::vector<LoomObject::FieldHeader>& headers = object.GetHeaders();
+
+		// Each Header's group folds shut on its own, with its fields under it.
+		size_t header = 0;
+		bool shown = true;
 
 		for (size_t i = 0; i < object.GetFields().size(); i++)
 		{
+			for (; header < headers.size() && headers[header].first == i; header++)
+			{
+				ImGui::PushID((int)header);
+				shown = ImGui::TreeNodeEx(headers[header].label.c_str(), ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanAvailWidth);
+				ImGui::PopID();
+			};
+
 			const SerializedField& field = object.GetFields()[i];
 
-			if (field.type == FieldType::Uniforms)
+			if (!shown || field.type == FieldType::Uniforms)
 				continue;
 
 			ImGui::PushID(&field);
