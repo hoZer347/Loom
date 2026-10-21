@@ -45,7 +45,7 @@ namespace Loom
 		static const std::vector<Action>& All();
 		static void Set(std::vector<Action> actions);
 
-		// The action by that name, or null.
+		// The action by that name, or null; good until the next Set or Load.
 		static const Action* Find(std::string_view name);
 
 		// A name as an action can take it: trimmed, or empty when that leaves

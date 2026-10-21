@@ -156,12 +156,13 @@ TEST_SUITE("KeyBindings")
 		CHECK(Loom::InputActions::All().empty());
 	};
 
-	// So Add Action is not there to click.
 	TEST_CASE("with no project open there is nothing to change")
 	{
 		Driven driven(std::string(drawn) + "click \"Key Bindings\" \"Add Action\"\n", slowdown);
 
 		CHECK(driven.Run(false) == 0);
+
+		// Add Action was not there to click.
 		CHECK(driven.script->Failed());
 		CHECK(Loom::InputActions::All() == slowdown);
 	};
