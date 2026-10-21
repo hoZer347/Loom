@@ -82,14 +82,14 @@ namespace
 		Loom::KeyBindings panel;
 	};
 
-	const std::vector<Action> slowdown = { { "Slowdown", Loom::Key::Space, Loom::Key::None } };
+	const std::vector<Action> slowdown = { { "Slowdown", { Loom::Key::Space } } };
 
 	// The panel is drawn before anything in it can be aimed at.
 	constexpr const char* drawn = "wait 2\n";
 
-	// A UiScript finds no combo by its label, so the first row's is aimed at
-	// down from its column's header.
-	constexpr const char* first_alt = "click \"Key Bindings\" \"Alt\" 0 20\n";
+	// A UiScript finds no combo by its label, so the first row's first key is
+	// aimed at down from the Input column's header, inside its left edge.
+	constexpr const char* first_key = "click \"Key Bindings\" \"Input\" left 20 20\n";
 
 	// What a folder's row shows, for a UiScript to aim at.
 	std::string FolderRow(const std::string& name)
@@ -103,7 +103,7 @@ TEST_SUITE("KeyBindings")
 {
 	TEST_CASE("Add Action adds one by a name no other has")
 	{
-		Driven driven(std::string(drawn) + "click \"Key Bindings\" \"Add Action\"\n" + drawn + "click \"Key Bindings\" \"Add Action\"\n", { { "Action", Loom::Key::None, Loom::Key::None } });
+		Driven driven(std::string(drawn) + "click \"Key Bindings\" \"Add Action\"\n" + drawn + "click \"Key Bindings\" \"Add Action\"\n", { { "Action", { } } });
 
 		CHECK(driven.Run() == 2);
 		CHECK_FALSE(driven.script->Failed());
@@ -117,12 +117,20 @@ TEST_SUITE("KeyBindings")
 
 	TEST_CASE("a key picked from an action's list binds it")
 	{
-		Driven driven(std::string(drawn) + first_alt + "click \"\" \"Comma\"\n", slowdown);
+		Driven driven(std::string(drawn) + first_key + "click \"\" \"Comma\"\n", slowdown);
 
 		CHECK(driven.Run() == 1);
 		CHECK_FALSE(driven.script->Failed());
-		CHECK(Loom::InputActions::All()[0].alt == Loom::Key::Comma);
-		CHECK(Loom::InputActions::All()[0].key == Loom::Key::Space);
+		CHECK(Loom::InputActions::All()[0].keys == std::vector<Loom::Key>{ Loom::Key::Comma });
+	};
+
+	TEST_CASE("+ adds a key to be held with the others")
+	{
+		Driven driven(std::string(drawn) + "click \"Key Bindings\" \"+\"\n", slowdown);
+
+		CHECK(driven.Run() == 1);
+		CHECK_FALSE(driven.script->Failed());
+		CHECK(Loom::InputActions::All()[0].keys == std::vector<Loom::Key>{ Loom::Key::Space, Loom::Key::None });
 	};
 
 	TEST_CASE("a name is taken once its box is let go of, and a blank one is not")
@@ -140,18 +148,26 @@ TEST_SUITE("KeyBindings")
 		CHECK(Loom::InputActions::All()[0].name == "Slowdown");
 	};
 
-	TEST_CASE("a name another action has, or one a file could not keep, is not taken")
+	TEST_CASE("a name another action has is taken, as another way to do it")
 	{
-		const std::vector<Action> two = { slowdown[0], { "Pan Up", Loom::Key::W, Loom::Key::None } };
+		// Listed by name, so Slowdown's box is the first.
+		const std::vector<Action> two = { slowdown[0], { "Zoom", { Loom::Key::W } } };
 
-		for (const char* name : { "Pan Up", "Slowdown=1" })
-		{
-			Driven driven(std::string(drawn) + "click \"Key Bindings\" \"##Name\"\nkey ctrl+a\ntype " + name + "\nkey enter\n", two);
+		Driven driven(std::string(drawn) + "click \"Key Bindings\" \"##Name\"\nkey ctrl+a\ntype Zoom\nkey enter\n", two);
 
-			CHECK(driven.Run() == 0);
-			CHECK_FALSE(driven.script->Failed());
-			CHECK(Loom::InputActions::All() == two);
-		};
+		CHECK(driven.Run() == 1);
+		CHECK_FALSE(driven.script->Failed());
+		CHECK(Loom::InputActions::All()[0].name == "Zoom");
+		CHECK(Loom::InputActions::All()[1].name == "Zoom");
+	};
+
+	TEST_CASE("a name a file could not keep is not taken")
+	{
+		Driven driven(std::string(drawn) + "click \"Key Bindings\" \"##Name\"\nkey ctrl+a\ntype Slowdown=1\nkey enter\n", slowdown);
+
+		CHECK(driven.Run() == 0);
+		CHECK_FALSE(driven.script->Failed());
+		CHECK(Loom::InputActions::All() == slowdown);
 	};
 
 	TEST_CASE("Remove takes the action out")
@@ -197,7 +213,7 @@ TEST_SUITE("KeyBindings")
 
 	TEST_CASE("Remove Folder leaves what it held a level up")
 	{
-		Driven driven(std::string(drawn) + "rightclick \"Key Bindings\" \"" + FolderRow("Camera") + "\"\nclick \"\" \"Remove Folder\"\n", { { "Pan Up", Loom::Key::W, Loom::Key::Up, "Camera" } }, { "Camera" });
+		Driven driven(std::string(drawn) + "rightclick \"Key Bindings\" \"" + FolderRow("Camera") + "\"\nclick \"\" \"Remove Folder\"\n", { { "Pan Up", { Loom::Key::W }, "Camera" } }, { "Camera" });
 
 		CHECK(driven.Run() == 1);
 		CHECK_FALSE(driven.script->Failed());

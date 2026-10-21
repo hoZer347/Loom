@@ -10,18 +10,15 @@ namespace Loom
 	namespace
 	{
 		constexpr char name_end = '=';
+		constexpr char key_join = '+';
 		constexpr char folder_start = '[';
 		constexpr char folder_end = ']';
 
+		// What split a key from its alternate in a file before actions shared names.
+		constexpr char older_alternate = ',';
+
 		std::vector<InputActions::Action> actions{ };
 		std::vector<std::string> folders{ };
-
-		bool Either(std::string_view name, bool (*asked)(Key))
-		{
-			const InputActions::Action* action = InputActions::Find(name);
-
-			return action != nullptr && (asked(action->key) || asked(action->alt));
-		};
 
 		std::string_view Trimmed(std::string_view text)
 		{
@@ -36,21 +33,74 @@ namespace Loom
 		{
 			return std::find(folders_in.begin(), folders_in.end(), folder) != folders_in.end();
 		};
+
+		bool IsSet(Key key)
+		{
+			return key != Key::None;
+		};
+
+		// Whether the keys chosen are all held, and some of them made this
+		// frame's edge: went down for Down, came up for Up.
+		bool Together(const std::vector<Key>& keys, bool (*edge)(Key))
+		{
+			bool any = false;
+			bool made = edge == nullptr;
+
+			for (const Key key : keys)
+			{
+				if (!IsSet(key))
+					continue;
+
+				any = true;
+
+				const bool edged = edge != nullptr && edge(key);
+
+				if (!edged && !Input::GetKey(key))
+					return false;
+
+				made = made || edged;
+			};
+
+			return any && made;
+		};
+
+		bool Done(std::string_view name, bool (*edge)(Key))
+		{
+			return std::any_of(actions.begin(), actions.end(), [name, edge](const InputActions::Action& action) { return action.name == name && Together(action.keys, edge); });
+		};
+
+		// The keys of a part of a line, Key+Key, those that are no key left out.
+		std::vector<Key> KeysIn(std::string_view part)
+		{
+			std::vector<Key> keys;
+
+			while (!part.empty())
+			{
+				const size_t join = part.find(key_join);
+
+				if (const Key key = KeyNamed(Trimmed(part.substr(0, join))); IsSet(key))
+					keys.push_back(key);
+
+				part = join == std::string_view::npos ? std::string_view{ } : part.substr(join + 1);
+			};
+
+			return keys;
+		};
 	};
 
 	bool InputActions::Down(std::string_view name)
 	{
-		return Either(name, &Input::GetKeyDown);
+		return Done(name, &Input::GetKeyDown);
 	};
 
 	bool InputActions::Held(std::string_view name)
 	{
-		return Either(name, &Input::GetKey);
+		return Done(name, nullptr);
 	};
 
 	bool InputActions::Up(std::string_view name)
 	{
-		return Either(name, &Input::GetKeyUp);
+		return Done(name, &Input::GetKeyUp);
 	};
 
 	const std::vector<InputActions::Action>& InputActions::All()
@@ -67,13 +117,6 @@ namespace Loom
 	{
 		actions = std::move(to);
 		folders = std::move(in);
-	};
-
-	const InputActions::Action* InputActions::Find(std::string_view name)
-	{
-		const auto found = std::find_if(actions.begin(), actions.end(), [name](const Action& action) { return action.name == name; });
-
-		return found != actions.end() ? &*found : nullptr;
 	};
 
 	std::string InputActions::Tidy(std::string_view name)
@@ -126,19 +169,28 @@ namespace Loom
 				continue;
 
 			const std::string name = Tidy(text.substr(0, equals));
-			const std::string_view keys = text.substr(equals + 1);
-			const size_t comma = keys.find(',');
 
-			const bool taken = std::any_of(read.actions.begin(), read.actions.end(), [&name](const Action& action) { return action.name == name; });
-
-			if (name.empty() || taken)
+			if (name.empty())
 				continue;
 
-			read.actions.push_back({
-				name,
-				KeyNamed(Trimmed(keys.substr(0, comma))),
-				comma == std::string_view::npos ? Key::None : KeyNamed(Trimmed(keys.substr(comma + 1))),
-				folder });
+			std::string_view rest = text.substr(equals + 1);
+			bool read_any = false;
+
+			while (!rest.empty())
+			{
+				const size_t comma = rest.find(older_alternate);
+
+				if (std::vector<Key> keys = KeysIn(rest.substr(0, comma)); !keys.empty())
+				{
+					read.actions.push_back({ name, std::move(keys), folder });
+					read_any = true;
+				};
+
+				rest = comma == std::string_view::npos ? std::string_view{ } : rest.substr(comma + 1);
+			};
+
+			if (!read_any)
+				read.actions.push_back({ name, { }, folder });
 		};
 
 		return read;
@@ -157,8 +209,23 @@ namespace Loom
 		const auto write = [&](const std::string& folder)
 		{
 			for (const Action& action : file.actions)
-				if (action.folder == folder)
-					out << action.name << name_end << NameOf(action.key) << ',' << NameOf(action.alt) << '\n';
+			{
+				if (action.folder != folder)
+					continue;
+
+				out << action.name << name_end;
+
+				bool first = true;
+
+				for (const Key key : action.keys)
+					if (IsSet(key))
+					{
+						out << (first ? "" : std::string(1, key_join)) << NameOf(key);
+						first = false;
+					};
+
+				out << (first ? NameOf(Key::None) : "") << '\n';
+			};
 		};
 
 		write("");

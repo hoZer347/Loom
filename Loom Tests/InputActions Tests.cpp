@@ -13,6 +13,7 @@
 TEST_SUITE("InputActions")
 {
 	using Action = Loom::InputActions::Action;
+	using Loom::Key;
 
 	// Nothing held and no edges pending, and the actions as given.
 	struct Fresh
@@ -31,6 +32,12 @@ TEST_SUITE("InputActions")
 		{
 			Loom::InputActions::Set({ });
 		};
+
+		static void Press(Key key, bool down)
+		{
+			Loom::Input::OnKey((int)key, down);
+			Loom::Input::Tick();
+		};
 	};
 
 	TEST_CASE("every key's name is the key")
@@ -38,34 +45,47 @@ TEST_SUITE("InputActions")
 		const auto keys = Loom::AllKeys();
 
 		REQUIRE(!keys.empty());
-		CHECK(keys.front() == Loom::Key::None);
+		CHECK(keys.front() == Key::None);
 		CHECK(std::is_sorted(keys.begin(), keys.end()));
 		CHECK(std::adjacent_find(keys.begin(), keys.end()) == keys.end());
 
-		for (const Loom::Key key : keys)
+		for (const Key key : keys)
 			CHECK(Loom::KeyNamed(Loom::NameOf(key)) == key);
 
-		CHECK(Loom::NameOf(Loom::Key::LeftControl) == "LeftControl");
-		CHECK(Loom::KeyNamed("Space") == Loom::Key::Space);
-		CHECK(Loom::KeyNamed("No Such Key") == Loom::Key::None);
+		CHECK(Loom::NameOf(Key::LeftControl) == "LeftControl");
+		CHECK(Loom::KeyNamed("Space") == Key::Space);
+		CHECK(Loom::KeyNamed("No Such Key") == Key::None);
 	};
 
-	TEST_CASE("a file reads as its actions, keys by name")
+	TEST_CASE("a file reads as its actions, keys by name and held together by +")
 	{
 		std::istringstream in(
-			"Slowdown=Space,None\r\n"
-			" Pan Up = W , Up \n"
-			"=A,B\n"
+			"Slowdown=Space\r\n"
+			" Zoom In = LeftControl + Equal \n"
+			"=A\n"
 			"no equals here\n"
-			"Slowdown=P,None\n"
+			"Slowdown=P\n"
 			"Odd=Nonsense\n");
 
 		const std::vector<Action> read = Loom::InputActions::Read(in).actions;
 
+		REQUIRE(read.size() == 4);
+		CHECK(read[0] == Action{ "Slowdown", { Key::Space } });
+		CHECK(read[1] == Action{ "Zoom In", { Key::LeftControl, Key::Equal } });
+		CHECK(read[2] == Action{ "Slowdown", { Key::P } });
+		CHECK(read[3] == Action{ "Odd", { } });
+	};
+
+	TEST_CASE("an older file's key and alternate read as two actions by one name")
+	{
+		std::istringstream in("Pan Up=W,Up\nSlowdown=Space,None\n");
+
+		const std::vector<Action> read = Loom::InputActions::Read(in).actions;
+
 		REQUIRE(read.size() == 3);
-		CHECK(read[0] == Action{ "Slowdown", Loom::Key::Space, Loom::Key::None });
-		CHECK(read[1] == Action{ "Pan Up", Loom::Key::W, Loom::Key::Up });
-		CHECK(read[2] == Action{ "Odd", Loom::Key::None, Loom::Key::None });
+		CHECK(read[0] == Action{ "Pan Up", { Key::W } });
+		CHECK(read[1] == Action{ "Pan Up", { Key::Up } });
+		CHECK(read[2] == Action{ "Slowdown", { Key::Space } });
 	};
 
 	TEST_CASE("a name is trimmed, and one blank or holding '=' is none")
@@ -79,10 +99,10 @@ TEST_SUITE("InputActions")
 	{
 		const Loom::InputActions::File file = {
 			{
-				{ "Slowdown", Loom::Key::Space, Loom::Key::None },
-				{ "Pan Up", Loom::Key::W, Loom::Key::Up, "Camera" },
-				{ "Zoom In", Loom::Key::Equal, Loom::Key::None, "Camera/Zoom" },
-				{ "Add To Selection", Loom::Key::LeftControl, Loom::Key::RightControl } },
+				{ "Slowdown", { Key::Space } },
+				{ "Pan Up", { Key::W }, "Camera" },
+				{ "Zoom In", { Key::LeftControl, Key::Equal }, "Camera/Zoom" },
+				{ "Unbound", { } } },
 			{ "Camera", "Camera/Zoom", "Empty" } };
 
 		std::ostringstream out;
@@ -106,9 +126,9 @@ TEST_SUITE("InputActions")
 		Fresh fresh;
 
 		std::istringstream in(
-			"Slowdown=Space,None\n"
+			"Slowdown=Space\n"
 			"[ Camera ]\n"
-			"Pan Up=W,Up\n");
+			"Pan Up=W\n");
 
 		const Loom::InputActions::File read = Loom::InputActions::Read(in);
 
@@ -118,34 +138,64 @@ TEST_SUITE("InputActions")
 		CHECK(read.folders == std::vector<std::string>{ "Camera" });
 
 		Loom::InputActions::Set(read.actions, read.folders);
-		Loom::Input::OnKey((int)Loom::Key::W, true);
-		Loom::Input::Tick();
+		Fresh::Press(Key::W, true);
 
 		CHECK(Loom::InputActions::Down("Pan Up"));
 	};
 
-	TEST_CASE("an action is done by either of its keys, and an unknown one never")
+	TEST_CASE("any action by a name does it, and an unknown name never")
 	{
-		Fresh fresh({ { "Slowdown", Loom::Key::Space, Loom::Key::P } });
+		Fresh fresh({ { "Pan Up", { Key::W } }, { "Pan Up", { Key::Up } } });
 
-		Loom::Input::OnKey((int)Loom::Key::P, true);
-		Loom::Input::Tick();
+		Fresh::Press(Key::Up, true);
 
-		CHECK(Loom::InputActions::Down("Slowdown"));
-		CHECK(Loom::InputActions::Held("Slowdown"));
-		CHECK_FALSE(Loom::InputActions::Up("Slowdown"));
-		CHECK_FALSE(Loom::InputActions::Held("Pause"));
+		CHECK(Loom::InputActions::Down("Pan Up"));
+		CHECK(Loom::InputActions::Held("Pan Up"));
+		CHECK_FALSE(Loom::InputActions::Held("Pan Down"));
 
-		Loom::Input::OnKey((int)Loom::Key::P, false);
-		Loom::Input::Tick();
+		Fresh::Press(Key::Up, false);
 
-		CHECK(Loom::InputActions::Up("Slowdown"));
-		CHECK_FALSE(Loom::InputActions::Held("Slowdown"));
+		CHECK(Loom::InputActions::Up("Pan Up"));
+		CHECK_FALSE(Loom::InputActions::Held("Pan Up"));
+	};
+
+	TEST_CASE("keys held together go down when the last of them does")
+	{
+		Fresh fresh({ { "Zoom In", { Key::LeftControl, Key::Equal } } });
+
+		Fresh::Press(Key::Equal, true);
+
+		CHECK_FALSE(Loom::InputActions::Down("Zoom In"));
+
+		Fresh::Press(Key::Equal, false);
+		Fresh::Press(Key::LeftControl, true);
+
+		CHECK_FALSE(Loom::InputActions::Down("Zoom In"));
+
+		Fresh::Press(Key::Equal, true);
+
+		CHECK(Loom::InputActions::Down("Zoom In"));
+		CHECK(Loom::InputActions::Held("Zoom In"));
+
+		Fresh::Press(Key::LeftControl, false);
+
+		CHECK(Loom::InputActions::Up("Zoom In"));
+		CHECK_FALSE(Loom::InputActions::Held("Zoom In"));
+	};
+
+	TEST_CASE("an action with no key chosen is never done")
+	{
+		Fresh fresh({ { "Unbound", { Key::None } } });
+
+		Fresh::Press(Key::Space, true);
+
+		CHECK_FALSE(Loom::InputActions::Down("Unbound"));
+		CHECK_FALSE(Loom::InputActions::Held("Unbound"));
 	};
 
 	TEST_CASE("saved actions load back, and a missing file loads none")
 	{
-		Fresh fresh({ { "Slowdown", Loom::Key::Space, Loom::Key::None } });
+		Fresh fresh({ { "Slowdown", { Key::Space } } });
 
 		const std::filesystem::path folder = std::filesystem::temp_directory_path() / "Loom InputActions Tests";
 		const std::string file = (folder / "Project.loominput").string();
@@ -158,7 +208,7 @@ TEST_SUITE("InputActions")
 		Loom::InputActions::Load(file);
 
 		REQUIRE(Loom::InputActions::All().size() == 1);
-		CHECK(Loom::InputActions::All()[0].key == Loom::Key::Space);
+		CHECK(Loom::InputActions::All()[0].keys == std::vector<Key>{ Key::Space });
 
 		std::filesystem::remove_all(folder);
 		Loom::InputActions::Load(file);
