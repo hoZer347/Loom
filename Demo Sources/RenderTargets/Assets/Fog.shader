@@ -43,7 +43,7 @@ out vec4 FragColor;
 void main()
 {
 	// Where this point is on the targets, as RenderTarget::Overhead lays them.
-	vec2 texel = (v_world.xz - u_area.xy) / (u_area.zw - u_area.xy);
+	vec2 texel = vec2(v_world.x - u_area.x, u_area.w - v_world.z) / (u_area.zw - u_area.xy);
 
 	float visible = texture(u_visible, texel).r;
 	float explored = texture(u_explored, texel).r;

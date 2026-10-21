@@ -384,7 +384,7 @@ TEST_SUITE("RenderTarget")
 		CHECK(target->Texture() == 0);
 	};
 
-	TEST_CASE("the overhead view lays world XZ over the target, the higher in front")
+	TEST_CASE("the overhead view lays world XZ over the target from above, the higher in front")
 	{
 		const glm::vec2 min(-10.0f, 20.0f);
 		const glm::vec2 max(30.0f, 60.0f);
@@ -392,9 +392,23 @@ TEST_SUITE("RenderTarget")
 
 		const auto clip = [&overhead](float x, float y, float z) { return overhead * glm::vec4(x, y, z, 1.0f); };
 
-		CHECK(Near(clip(min.x, 0.0f, min.y), glm::vec4(-1.0f, -1.0f, 0.0f, 1.0f)));
-		CHECK(Near(clip(max.x, 0.0f, max.y), glm::vec4(1.0f, 1.0f, 0.0f, 1.0f)));
+		// The far corner, the way a camera faces, is at the top left.
+		CHECK(Near(clip(min.x, 0.0f, min.y), glm::vec4(-1.0f, 1.0f, 0.0f, 1.0f)));
+		CHECK(Near(clip(max.x, 0.0f, max.y), glm::vec4(1.0f, -1.0f, 0.0f, 1.0f)));
 		CHECK(Near(clip(10.0f, 0.0f, 40.0f), glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)));
+
+		// Where the texel a shader works out for a world position is.
+		const glm::vec2 world(-4.0f, 35.0f);
+		const glm::vec2 texel = glm::vec2(world.x - min.x, max.y - world.y) / (max - min);
+		const glm::vec4 at = clip(world.x, 0.0f, world.y);
+		CHECK(Near(glm::vec4((glm::vec2(at) + 1.0f) / 2.0f, 0.0f, 0.0f), glm::vec4(texel, 0.0f, 0.0f)));
+
+		// Seen from above it is turned, not mirrored: a triangle that winds
+		// counter-clockwise from above still does.
+		const glm::vec2 a(clip(0.0f, 0.0f, 0.0f));
+		const glm::vec2 b(clip(1.0f, 0.0f, 0.0f));
+		const glm::vec2 c(clip(0.0f, 0.0f, -1.0f));
+		CHECK((b - a).x * (c - a).y - (b - a).y * (c - a).x > 0.0f);
 
 		// Its whole height is in view, the top nearest.
 		CHECK(std::abs(clip(10.0f, Loom::RenderTarget::overheadHeight, 40.0f).z + 1.0f) < EPSILON);

@@ -73,10 +73,10 @@ namespace Loom
 		// The target on the GameObject called name, or null.
 		static RenderTarget* Named(const std::string& name);
 
-		// The world seen from straight above with its XZ plane laid over a
-		// target, min on the first texel and max on the last, x along the rows
-		// and z up them, so a shader finds a world position's texel at
-		//   (world.xz - min) / (max - min)
+		// The world seen from straight above, X to the right and -Z, the way a
+		// Camera faces, up, with min to max of its X and Z filling the target.
+		// A shader finds a world position's texel at
+		//   vec2(world.x - min.x, max.y - world.z) / (max - min)
 		static glm::mat4 Overhead(const glm::vec2& min, const glm::vec2& max);
 
 		Serial<int> width = 256;

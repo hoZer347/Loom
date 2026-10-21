@@ -136,14 +136,11 @@ namespace Loom
 
 	glm::mat4 RenderTarget::Overhead(const glm::vec2& min, const glm::vec2& max)
 	{
-		// World x stays across, z goes up the rows, and y comes toward the eye.
-		const glm::mat4 fromAbove(
-			glm::vec4(X_AXIS, 0.0f),
-			glm::vec4(Z_AXIS, 0.0f),
-			glm::vec4(Y_AXIS, 0.0f),
-			glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+		// Looking down, with -Z up the view: a turn, not a mirror, so faces
+		// keep the winding they have seen from above.
+		const glm::mat4 fromAbove = glm::lookAt(glm::vec3(0.0f), -Y_AXIS, -Z_AXIS);
 
-		return glm::ortho(min.x, max.x, min.y, max.y, -overheadHeight, overheadHeight) * fromAbove;
+		return glm::ortho(min.x, max.x, -max.y, -min.y, -overheadHeight, overheadHeight) * fromAbove;
 	};
 
 	bool RenderTarget::Allocate()
