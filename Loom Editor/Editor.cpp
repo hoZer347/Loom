@@ -69,9 +69,9 @@ namespace Loom
 		constexpr ImGuiTreeNodeFlags header_flags =
 			ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap;
 
-		// A category of a component's fields, inside that component's own header.
-		constexpr ImGuiTreeNodeFlags field_group_flags =
-			ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth;
+		// A category of a component's fields, inside that component's own
+		// header, folded until it is opened.
+		constexpr ImGuiTreeNodeFlags field_group_flags = ImGuiTreeNodeFlags_SpanAvailWidth;
 
 		// One thing an object's inspector draws: a field or a Button, by where
 		// it is in their list, or a group of them, by where it is in its
