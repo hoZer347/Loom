@@ -311,8 +311,12 @@ namespace Loom
 		renderer->SetUniform(program, "u_color", *color);
 		renderer->SetUniform(program, "u_shadowsOff", shadows ? 0.0f : 1.0f);
 
-		if (shader)
-			ApplyShaderVariables(program, shader->variables, variables, instance);
+		if (!shader)
+			return;
+
+		// Set for each draw, as materials sharing a program may sample apart.
+		renderer->SetPixelated(program, sampling == AsShader ? shader->settings.pixelated : sampling == Nearest);
+		ApplyShaderVariables(program, shader->variables, variables, instance);
 	};
 
 	void Material::ReloadChangedShaders()

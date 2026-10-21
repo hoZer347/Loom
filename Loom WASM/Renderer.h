@@ -109,8 +109,9 @@ namespace Loom
 			VertexFormat format = VertexFormat::Position) = 0;
 
 		// Whether the program samples its colour textures nearest, so each texel
-		// draws as a hard-edged square, rather than blending between them. Off
-		// until it is set.
+		// draws as a hard-edged square, rather than blending between them, from
+		// the textures it is next handed and the next draw on. Off until it is
+		// set.
 		virtual void SetPixelated(uint32_t program, bool pixelated) = 0;
 
 		// Eight bit RGBA, bottom row first.

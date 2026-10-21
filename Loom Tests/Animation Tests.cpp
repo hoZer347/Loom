@@ -3,6 +3,7 @@
 #include "Test Support.h"
 
 #include "Animator.h"
+#include "Material.h"
 #include "Mesh.h"
 #include "Scene.h"
 #include "Shaders.h"
@@ -566,6 +567,41 @@ TEST_SUITE("Textured meshes")
 		CHECK(nearest.settings.pixelated);
 		CHECK(renderer.pixelatedPrograms.contains(nearest.id));
 		CHECK_FALSE(renderer.pixelatedPrograms.contains(blended.id));
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a material's sampling picks blended or nearest over its shader's for each draw")
+	{
+		RecordingRenderer renderer;
+
+		const std::string stages =
+			"// ===VERTEX===\nuniform mat4 u_model;\nvoid main() { }\n"
+			"// ===FRAGMENT===\nvoid main() { }\n";
+
+		std::istringstream pixelated("// ===SETTINGS===\npixelated = on\n" + stages);
+		Loom::Shader nearest("pixelated program", pixelated);
+
+		std::istringstream smooth(stages);
+		Loom::Shader blended("smooth program", smooth);
+
+		Loom::Material material;
+		Pump();
+
+		material.shader = &nearest;
+		material.sampling = Loom::Material::Blended;
+		material.Apply(nearest.id);
+		CHECK_FALSE(renderer.pixelatedPrograms.contains(nearest.id));
+
+		material.sampling = Loom::Material::AsShader;
+		material.Apply(nearest.id);
+		CHECK(renderer.pixelatedPrograms.contains(nearest.id));
+
+		material.shader = &blended;
+		material.Apply(blended.id);
+		CHECK_FALSE(renderer.pixelatedPrograms.contains(blended.id));
+
+		material.sampling = Loom::Material::Nearest;
+		material.Apply(blended.id);
+		CHECK(renderer.pixelatedPrograms.contains(blended.id));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a rotation turned into Transform's Euler angles turns the same way")

@@ -17,10 +17,10 @@ using LoomTests::Pump;
 
 namespace
 {
-	// Path, colour, shadows, variables.
-	constexpr size_t FIELDS = 4;
+	// Path, colour, shadows, variables, sampling.
+	constexpr size_t FIELDS = 5;
 
-	enum { PATH, COLOR, SHADOWS, VARIABLES };
+	enum { PATH, COLOR, SHADOWS, VARIABLES, SAMPLING };
 };
 
 
@@ -129,6 +129,23 @@ TEST_SUITE("Material")
 
 		REQUIRE(read.GetFields()[VARIABLES].Read(field.Write()));
 		CHECK(read.variables->Write() == material.variables->Write());
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a material samples as its shader says until told otherwise, and saves that last")
+	{
+		Loom::Material material;
+		Pump();
+
+		CHECK(material.sampling == Loom::Material::AsShader);
+
+		material.sampling = Loom::Material::Nearest;
+		const std::string written = material.GetFields()[SAMPLING].Write();
+
+		Loom::Material read;
+		Pump();
+
+		REQUIRE(read.GetFields()[SAMPLING].Read(written));
+		CHECK(read.sampling == Loom::Material::Nearest);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a material with no shader named compiles nothing")

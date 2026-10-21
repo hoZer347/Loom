@@ -46,8 +46,8 @@ namespace Loom
 		void OnFieldChanged(const SerializedField& field) override;
 
 		// Hands the material's values to its program: u_color, whether it is
-		// shadowed, and the shader's variables, the per-instance ones from
-		// instance.
+		// shadowed, how its textures are sampled, and the shader's variables,
+		// the per-instance ones from instance.
 		void Apply(uint32_t program, const UniformValues* instance = nullptr) const;
 
 		// Recompiles every material's shader whose file has been written since,
@@ -71,6 +71,19 @@ namespace Loom
 
 		// The per-material variables' values.
 		Serial<UniformValues> variables;
+
+		// How its textures are sampled: as its shader's Pixelated setting says,
+		// blended between texels, or nearest, each texel a hard-edged square.
+		enum Sampling : uint32_t
+		{
+			AsShader,
+			Blended,
+			Nearest,
+		};
+
+		// Last, so the fields before it keep their places in scenes saved
+		// without it.
+		Serial<Sampling> sampling = AsShader;
 
 	private:
 		void DrawSettings();
