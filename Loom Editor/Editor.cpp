@@ -118,15 +118,15 @@ namespace Loom
 		// A group's own fields, then each group in it under a heading that
 		// folds it open and shut.
 		template <typename DrawField>
-		void DrawFieldGroup(const FieldGroup& group, const DrawField& drawField)
+		void DrawFieldGroup(const FieldGroup& group, const DrawField& draw_field)
 		{
 			for (size_t field : group.fields)
-				drawField(field);
+				draw_field(field);
 
 			for (const FieldGroup& inner : group.groups)
 				if (ImGui::TreeNodeEx(inner.label.c_str(), field_group_flags))
 				{
-					DrawFieldGroup(inner, drawField);
+					DrawFieldGroup(inner, draw_field);
 					ImGui::TreePop();
 				};
 		};
@@ -3144,7 +3144,11 @@ namespace Loom
 
 		const std::vector<const std::vector<FieldNames::Enumerator>*> enumerators = FieldNames::EnumeratorsOf(object);
 
-		const auto drawField = [&](size_t i)
+		// Where the fields outside any category start, so those nested deeper
+		// give their labels the indent and keep their values in one column.
+		const float left = ImGui::GetCursorPosX();
+
+		const auto draw_field = [&](size_t i)
 		{
 			const SerializedField& field = object.GetFields()[i];
 
@@ -3153,7 +3157,7 @@ namespace Loom
 
 			ImGui::PushID(&field);
 
-			Label(labels[i], column);
+			Label(labels[i], column - (ImGui::GetCursorPosX() - left));
 
 			const char* label = "##value";
 			bool changed = false;
@@ -3250,7 +3254,7 @@ namespace Loom
 			ImGui::PopID();
 		};
 
-		DrawFieldGroup(GroupFields(object.GetFields()), drawField);
+		DrawFieldGroup(GroupFields(object.GetFields()), draw_field);
 
 		ImGui::PopItemWidth();
 	};

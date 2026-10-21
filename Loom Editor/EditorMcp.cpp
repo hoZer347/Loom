@@ -185,6 +185,13 @@ namespace Loom
 				WriteTree(out, *child, depth + 1);
 		};
 
+		// A field's label with the categories its Serial was named under in
+		// front, which tells apart two of a name in different categories.
+		std::string CategorisedLabel(const SerializedField& field, const std::string& label)
+		{
+			return field.Category().empty() ? label : std::string(field.Category()) + '/' + label;
+		};
+
 		void WriteFields(std::ostream& out, LoomObject& object)
 		{
 			const std::vector<std::string> labels = FieldNames::Of(object);
@@ -197,7 +204,7 @@ namespace Loom
 				if (field.type == FieldType::Uniforms)
 					continue;
 
-				out << '\t' << labels[i] << " = " << field.Write();
+				out << '\t' << CategorisedLabel(field, labels[i]) << " = " << field.Write();
 
 				if (enumerators[i])
 				{
@@ -400,34 +407,55 @@ namespace Loom
 
 			const std::vector<std::string> labels = FieldNames::Of(object);
 			const auto enumerators = FieldNames::EnumeratorsOf(object);
+			const std::vector<SerializedField>& fields = object.GetFields();
 
-			for (size_t i = 0; i < labels.size(); i++)
+			// The field inspect writes as that label, or the one field with that
+			// label after its categories.
+			std::vector<size_t> matches;
+
+			for (size_t i = 0; i < labels.size() && matches.empty(); i++)
+				if (SameText(CategorisedLabel(fields[i], labels[i]), label))
+					matches.push_back(i);
+
+			if (matches.empty())
+				for (size_t i = 0; i < labels.size(); i++)
+					if (SameText(labels[i], label))
+						matches.push_back(i);
+
+			if (matches.empty())
+				throw ToolError((component ? Named(*component) : Named(gameObject)) + " has no field " + label);
+
+			if (matches.size() > 1)
 			{
-				if (!SameText(labels[i], label))
-					continue;
+				std::string named;
 
-				const SerializedField& field = object.GetFields()[i];
+				for (size_t i : matches)
+					named += (named.empty() ? "" : ", ") + CategorisedLabel(fields[i], labels[i]);
 
-				if (field.type == FieldType::Uniforms)
-					throw ToolError(label + " is a shader's variables, which only its component edits");
-
-				std::string text = value;
-
-				if (enumerators[i])
-					for (const FieldNames::Enumerator& enumerator : *enumerators[i])
-						if (SameText(enumerator.label, value))
-							text = std::to_string(enumerator.value);
-
-				if (!field.Read(text))
-					throw ToolError(value + " is not a value " + labels[i] + " can hold, which inspect shows the form of");
-
-				object.OnFieldChanged(field);
-				context.editor.MarkEdited();
-
-				return Text(labels[i] + " = " + field.Write());
+				throw ToolError(label + " names more than one field, so give its categories too: " + named);
 			};
 
-			throw ToolError((component ? Named(*component) : Named(gameObject)) + " has no field " + label);
+			const size_t i = matches.front();
+			const SerializedField& field = fields[i];
+			const std::string shown = CategorisedLabel(field, labels[i]);
+
+			if (field.type == FieldType::Uniforms)
+				throw ToolError(label + " is a shader's variables, which only its component edits");
+
+			std::string text = value;
+
+			if (enumerators[i])
+				for (const FieldNames::Enumerator& enumerator : *enumerators[i])
+					if (SameText(enumerator.label, value))
+						text = std::to_string(enumerator.value);
+
+			if (!field.Read(text))
+				throw ToolError(value + " is not a value " + shown + " can hold, which inspect shows the form of");
+
+			object.OnFieldChanged(field);
+			context.editor.MarkEdited();
+
+			return Text(shown + " = " + field.Write());
 		};
 
 		json Select(Context& context, const json& arguments)
@@ -699,7 +727,7 @@ namespace Loom
 					"properties": {
 						"object": { "type": "string", "description": "A GameObject's guid or name" },
 						"component": { "type": "string", "description": "A component's type or guid; the GameObject itself, Name and Transform included, when left out" },
-						"field": { "type": "string", "description": "The field's label, as inspect shows it" },
+						"field": { "type": "string", "description": "The field's label, as inspect shows it, its categories in front for a field named under some; without them, if no other field has that label" },
 						"value": { "type": "string" } },
 					"required": [ "object", "field", "value" ] })",
 				SetField,
