@@ -53,13 +53,19 @@ vec4 LoomLightSpace(vec4 world)
 	return u_lightViewProjection * world;
 }
 
-// The same, read from out along a world space normal; one of zeros reads
-// from the surface itself.
+// The same, read from out along a world space normal on the side facing the
+// light, so a sheet lit from behind reads from in front of it all the same;
+// a normal of zeros reads from the surface itself.
 vec4 LoomLightSpace(vec4 world, vec3 normal)
 {
-	vec3 away = dot(normal, normal) > 0.0 ? normalize(normal) * u_shadowTexel * LOOM_NORMAL_OFFSET_TEXELS : vec3(0.0);
+	if (dot(normal, normal) == 0.0)
+		return LoomLightSpace(world);
 
-	return u_lightViewProjection * (world + vec4(away, 0.0));
+	// Depth in the shadow map grows away from the light along this.
+	vec3 fromLight = vec3(u_lightViewProjection[0][2], u_lightViewProjection[1][2], u_lightViewProjection[2][2]);
+	vec3 toLight = dot(normal, fromLight) > 0.0 ? -normal : normal;
+
+	return u_lightViewProjection * (world + vec4(normalize(toLight) * u_shadowTexel * LOOM_NORMAL_OFFSET_TEXELS, 0.0));
 }
 )";
 
