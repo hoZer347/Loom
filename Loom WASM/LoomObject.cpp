@@ -153,20 +153,22 @@ namespace Loom
 		owner->m_buttons.push_back({ owner->TakeName(name), press, owner->m_fields.size() });
 	};
 
-	std::string LoomObject::TakeName(const char* given)
+	std::string LoomObject::TakeName(const char* given) const
 	{
 		std::string name = given;
 
-		if (name.starts_with(previous_category))
-		{
-			const std::string display = name.substr(previous_category.size());
+		if (!name.starts_with(previous_category))
+			return name;
 
-			name = m_lastCategory.empty() ? display : m_lastCategory + '/' + display;
-		};
+		// The last Button, if no field was declared after it, or else the last field.
+		const bool afterButton = !m_buttons.empty() && m_buttons.back().fieldsBefore == m_fields.size();
+		const std::string_view category =
+			afterButton ? NameCategory(m_buttons.back().name) :
+			m_fields.empty() ? std::string_view() :
+			m_fields.back().Category();
+		const std::string display = name.substr(previous_category.size());
 
-		m_lastCategory = NameCategory(name);
-
-		return name;
+		return category.empty() ? display : std::string(category) + '/' + display;
 	};
 
 	LoomObject* LoomObject::_GetByID(const uint64_t& ID)

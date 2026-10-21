@@ -126,11 +126,8 @@ namespace Loom
 
 	private:
 		// A name as a Serial or Button was declared with, a ".../" in front put
-		// back to the category of the one declared before it, which this then
-		// moves on to the name's own.
-		std::string TakeName(const char* given);
-
-		std::string m_lastCategory;
+		// back to the category of the one declared before it.
+		std::string TakeName(const char* given) const;
 
 		static LoomObject* _GetByID(const uint64_t& ID);
 		static LoomObject* _GetByName(const std::string& name);
