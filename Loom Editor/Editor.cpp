@@ -1675,9 +1675,15 @@ namespace Loom
 
 	void Editor::DrawFullscreen()
 	{
-		// How long the way back out shows for once the view fills the monitor.
+		// How long the way back out shows for once the view fills the monitor,
+		// and how it shows: large, over a dark plate, both a little see-through.
 		constexpr double hint_seconds = 3.0;
-		constexpr float hint_margin = 12.0f;
+		constexpr double hint_fade_seconds = 0.5;
+		constexpr float hint_scale = 2.5f;
+		constexpr ImVec2 hint_padding = { 32.0f, 20.0f };
+		constexpr float hint_rounding = 12.0f;
+		constexpr float hint_backing_alpha = 0.55f;
+		constexpr float hint_text_alpha = 0.85f;
 		constexpr float centred = 0.5f;
 		constexpr int pushed_styles = 3;
 		constexpr const char* hint_playing = "F11 to leave fullscreen";
@@ -1714,15 +1720,26 @@ namespace Loom
 			case View::Debug:	DrawDebugView();	break;
 			};
 
-			if (ImGui::GetTime() - m_fullscreenSince < hint_seconds)
-			{
-				const char* hint = IsPlaying() ? hint_playing : hint_stopped;
-				const ImVec2 size = ImGui::CalcTextSize(hint);
+			const double shown = ImGui::GetTime() - m_fullscreenSince;
 
-				ImGui::GetForegroundDrawList()->AddText(
-					ImVec2(viewport->Pos.x + (viewport->Size.x - size.x) * centred, viewport->Pos.y + hint_margin),
-					ImGui::GetColorU32(ImGuiCol_Text),
-					hint);
+			if (shown < hint_seconds)
+			{
+				// Fading out over the last of its time.
+				const float fade = (float)(std::min)(1.0, (hint_seconds - shown) / hint_fade_seconds);
+				const char* hint = IsPlaying() ? hint_playing : hint_stopped;
+				ImFont* font = ImGui::GetFont();
+				const float font_size = ImGui::GetFontSize() * hint_scale;
+				const ImVec2 text = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, hint);
+				const ImVec2 middle(viewport->Pos.x + viewport->Size.x * centred, viewport->Pos.y + viewport->Size.y * centred);
+				const ImVec2 corner(middle.x - text.x * centred, middle.y - text.y * centred);
+				ImDrawList* draw = ImGui::GetForegroundDrawList();
+
+				draw->AddRectFilled(
+					ImVec2(corner.x - hint_padding.x, corner.y - hint_padding.y),
+					ImVec2(corner.x + text.x + hint_padding.x, corner.y + text.y + hint_padding.y),
+					ImGui::GetColorU32(ImVec4(0.0f, 0.0f, 0.0f, hint_backing_alpha * fade)),
+					hint_rounding);
+				draw->AddText(font, font_size, corner, ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, hint_text_alpha * fade)), hint);
 			};
 		};
 
