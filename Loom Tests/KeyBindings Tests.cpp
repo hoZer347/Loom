@@ -135,7 +135,7 @@ TEST_SUITE("KeyBindings")
 		CHECK_FALSE(unchosen.script->Failed());
 		CHECK(Loom::InputActions::All()[0].keys == std::vector<Loom::Key>{ Loom::Key::Space });
 
-		Driven chosen(std::string(drawn) + first_key + drawn + "click \"\" \"None\"\n",{ { "Zoom In", { Loom::Key::LeftControl, Loom::Key::Equal } } });
+		Driven chosen(std::string(drawn) + first_key + drawn + "click \"\" \"None\"\n", { { "Zoom In", { Loom::Key::LeftControl, Loom::Key::Equal } } });
 
 		CHECK(chosen.Run() == 1);
 		CHECK_FALSE(chosen.script->Failed());
