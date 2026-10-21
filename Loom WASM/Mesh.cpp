@@ -40,7 +40,7 @@ namespace Loom
 
 	bool Mesh::IsSaved(const SerializedField& field) const
 	{
-		if (!*m_generated)
+		if (!m_generated)
 			return true;
 
 		return field.data != &*m_vertices && field.data != &*m_textureCoordinates && field.data != &*m_normals;

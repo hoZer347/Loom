@@ -76,10 +76,10 @@ TEST_SUITE("Mesh")
 		const std::string text = Loom::SceneSerializer::Serialize(*holder);
 
 		CHECK(text.find("7.25") == std::string::npos);
-		CHECK(text.find("7 = true") != std::string::npos);
+		CHECK(text.find("2 = ") != std::string::npos);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a generated mesh read back has no geometry until its script makes it")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a generated mesh read back has no geometry until its script makes it again")
 	{
 		Loom::Scene scene("generated");
 		Pump();
@@ -97,11 +97,17 @@ TEST_SUITE("Mesh")
 
 		REQUIRE(copy != nullptr);
 
-		const Loom::Mesh* read = copy->GetComponent<Loom::Mesh>();
+		Loom::Mesh* read = copy->GetComponent<Loom::Mesh>();
 
 		REQUIRE(read != nullptr);
-		CHECK(*read->m_generated);
 		CHECK(read->m_vertices->empty());
+
+		// Its script marks it again as it makes the geometry again, which then
+		// stays out of the next write too.
+		read->m_generated = true;
+		read->m_vertices = std::vector<float>(9, GENERATED_VALUE);
+
+		CHECK(Loom::SceneSerializer::Serialize(*copy).find("7.25") == std::string::npos);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the draw type is settable to any GL usage hint")
