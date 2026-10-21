@@ -1,5 +1,5 @@
-// UI demo shader: the Material's colour, which the engine shades and shadows
-// because the settings say so.
+// Render target demo shader for the scouts: the Material's colour, which the
+// engine shades and shadows because the settings say so.
 
 // ===SETTINGS===
 
