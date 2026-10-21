@@ -99,7 +99,8 @@ namespace Loom
 		void* data,
 		LoomObject* (*get_reference)(void*),
 		void (*set_reference)(void*, LoomObject*),
-		bool (*accepts_reference)(LoomObject*))
+		bool (*accepts_reference)(LoomObject*),
+		const char* name)
 	{
 		LoomObject* owner = constructing;
 
@@ -123,6 +124,7 @@ namespace Loom
 		field.get_reference = get_reference;
 		field.set_reference = set_reference;
 		field.accepts_reference = accepts_reference;
+		field.name = name;
 
 		// Listed once, however many reference fields the object goes on to declare.
 		if (type == FieldType::Reference && !owner->m_references)
@@ -133,22 +135,6 @@ namespace Loom
 		};
 
 		owner->m_fields.push_back(field);
-	};
-
-	void RegisterFieldHeader(const char* label)
-	{
-		LoomObject* owner = constructing;
-
-		if (owner == nullptr)
-		{
-			std::cerr
-				<< "A Header has no LoomObject under construction on this"
-				   " thread to belong to" << std::endl;
-
-			return;
-		};
-
-		owner->m_headers.push_back({ owner->m_fields.size(), label });
 	};
 
 	LoomObject* LoomObject::_GetByID(const uint64_t& ID)

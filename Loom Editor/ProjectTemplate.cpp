@@ -338,9 +338,10 @@ Members declared as Loom::Serial<type> name = default; appear in the inspector
 under their own name (m_speed shows as "Speed") and are written into the scene
 file, in the order they were declared - which is also how the file names them,
 so inserting one in the middle shifts the values already saved.
-A Loom::Header m_terrain{ "Terrain" }; member puts a folding heading over the
-Serial members declared after it, up to the next one. It is not written to the
-scene, so adding or moving one leaves the values already saved where they were.
+Loom::Serial<float, "Movement/Top Speed"> m_speed; reads "Top Speed" instead,
+under a folding "Movement" heading with the other fields of that category, '/'
+between nested ones. The name is not written to the scene, so naming a field
+leaves the values already saved where they were.
 SpinningTriangle is there as a worked example.
 )";
 

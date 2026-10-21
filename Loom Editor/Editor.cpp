@@ -69,9 +69,67 @@ namespace Loom
 		constexpr ImGuiTreeNodeFlags header_flags =
 			ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap;
 
-		// A Header over a component's fields, inside that component's own.
-		constexpr ImGuiTreeNodeFlags field_header_flags =
-			ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanAvailWidth;
+		// A category of a component's fields, inside that component's own header.
+		constexpr ImGuiTreeNodeFlags field_group_flags =
+			ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth;
+
+		// Fields by the category their Serial was named under: the fields
+		// with none, then each category, in the order their first field was
+		// declared, with the categories nested in it.
+		struct FieldGroup
+		{
+			std::string label;
+			std::vector<size_t> fields;
+			std::vector<FieldGroup> groups;
+		};
+
+		FieldGroup GroupFields(const std::vector<SerializedField>& fields)
+		{
+			FieldGroup top;
+
+			for (size_t i = 0; i < fields.size(); i++)
+			{
+				FieldGroup* group = &top;
+				std::string_view path = fields[i].Category();
+
+				while (!path.empty())
+				{
+					const size_t slash = path.find('/');
+					const std::string_view part = path.substr(0, slash);
+
+					auto found = std::find_if(group->groups.begin(), group->groups.end(), [part](const FieldGroup& inner) { return inner.label == part; });
+
+					if (found == group->groups.end())
+					{
+						group->groups.push_back({ std::string(part) });
+						found = std::prev(group->groups.end());
+					};
+
+					group = &*found;
+					path = slash == std::string_view::npos ? std::string_view() : path.substr(slash + 1);
+				};
+
+				group->fields.push_back(i);
+			};
+
+			return top;
+		};
+
+		// A group's own fields, then each group in it under a heading that
+		// folds it open and shut.
+		template <typename DrawField>
+		void DrawFieldGroup(const FieldGroup& group, const DrawField& drawField)
+		{
+			for (size_t field : group.fields)
+				drawField(field);
+
+			for (const FieldGroup& inner : group.groups)
+				if (ImGui::TreeNodeEx(inner.label.c_str(), field_group_flags))
+				{
+					DrawFieldGroup(inner, drawField);
+					ImGui::TreePop();
+				};
+		};
 
 		bool AnyMouseClicked()
 		{
@@ -3085,25 +3143,13 @@ namespace Loom
 		ImGui::PushItemWidth(-FLT_MIN);
 
 		const std::vector<const std::vector<FieldNames::Enumerator>*> enumerators = FieldNames::EnumeratorsOf(object);
-		const std::vector<LoomObject::FieldHeader>& headers = object.GetHeaders();
 
-		// Each Header's group folds shut on its own, with its fields under it.
-		size_t header = 0;
-		bool shown = true;
-
-		for (size_t i = 0; i < object.GetFields().size(); i++)
+		const auto drawField = [&](size_t i)
 		{
-			for (; header < headers.size() && headers[header].first == i; header++)
-			{
-				ImGui::PushID((int)header);
-				shown = ImGui::TreeNodeEx(headers[header].label.c_str(), field_header_flags);
-				ImGui::PopID();
-			};
-
 			const SerializedField& field = object.GetFields()[i];
 
-			if (!shown || field.type == FieldType::Uniforms)
-				continue;
+			if (field.type == FieldType::Uniforms)
+				return;
 
 			ImGui::PushID(&field);
 
@@ -3203,6 +3249,8 @@ namespace Loom
 
 			ImGui::PopID();
 		};
+
+		DrawFieldGroup(GroupFields(object.GetFields()), drawField);
 
 		ImGui::PopItemWidth();
 	};

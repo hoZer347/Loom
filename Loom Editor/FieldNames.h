@@ -10,9 +10,10 @@ namespace Loom
 {
 	/**
 	* Loom::FieldNames
-	* - What the inspector calls each of an object's Serial members: the
-	*   member's own identifier, read out of the debug symbols of the module
-	*   that defined the type, so m_speed reads "Speed"
+	* - What the inspector calls each of an object's Serial members: the name
+	*   the Serial was given, after its categories, or else the member's own
+	*   identifier, read out of the debug symbols of the module that defined
+	*   the type, so m_speed reads "Speed"
 	* - A field nothing in the symbols matches, or a module built without them,
 	*   reads "Field <n>" instead
 	* - A Serial of an enum type also gets that enum's enumerators, labelled the

@@ -325,11 +325,17 @@ namespace Loom
 	std::vector<std::string> FieldNames::Of(const LoomObject& object)
 	{
 		std::vector<std::string> names;
+		const std::vector<SerializedField>& fields = object.GetFields();
 
 		for (const Member* member : Lookup(object))
-			names.push_back(member
-				? member->label
-				: "Field " + std::to_string(names.size()));
+		{
+			const std::string_view display = fields[names.size()].Display();
+
+			names.push_back(
+				!display.empty() ? std::string(display) :
+				member ? member->label :
+				"Field " + std::to_string(names.size()));
+		};
 
 		return names;
 	};

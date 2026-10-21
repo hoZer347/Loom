@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Loom API.h"
+#include "Macro Helpers.h"
 
 #include "SerializedField.h"
 
@@ -28,29 +29,8 @@ namespace Loom
 		void* data,
 		LoomObject* (*get_reference)(void*),
 		void (*set_reference)(void*, LoomObject*),
-		bool (*accepts_reference)(LoomObject*));
-
-	// Hands a heading to the same object, over the fields it declares next.
-	LOOM_API void RegisterFieldHeader(const char* label);
-
-	/**
-	* Loom::Header
-	* - A heading the inspector groups the Serial members declared after it
-	*   under, up to the next Header, each group folding open and shut:
-	*   Header m_terrain{ "Terrain" }
-	* - Not a field: the scene format never sees it, so adding, moving or
-	*   taking one away leaves the values in scenes already saved where they
-	*   were
-	* - A member of the LoomObject being built around it, as a Serial is, and
-	*   only that
-	*/
-	struct Header final
-	{
-		explicit Header(const char* label) { RegisterFieldHeader(label); };
-
-		Header(const Header&) = delete;
-		Header& operator=(const Header&) = delete;
-	};
+		bool (*accepts_reference)(LoomObject*),
+		const char* name);
 
 	// Every type the scene format can write, named by the member's own type.
 	// Anything else is a compile error rather than a field that quietly writes
@@ -86,7 +66,11 @@ namespace Loom
 	*   object under construction on this thread and behaves as a T from then on,
 	*   through an implicit conversion for the value and -> for its members
 	* - The editor labels it after the member: Serial<float> m_speed reads
-	*   "Speed" in the inspector
+	*   "Speed" in the inspector. Given a name, it reads that instead, and a
+	*   category before the name, with '/' between nested ones, groups it with
+	*   the others of that category, folding open and shut:
+	*   Serial<float, "Movement/Top Speed"> m_speed. The name is not written to
+	*   the scene, so naming a field leaves the values already saved as they were
 	* - A field is identified by where it was declared, so the scene format keys
 	*   it by position: reordering the Serial members of a type reassigns the
 	*   values in scenes already saved, and inserting one in the middle shifts
@@ -98,7 +82,7 @@ namespace Loom
 	*   memory behind, and a LoomObject constructed inside another one's member
 	*   initialisers takes the fields declared after it with it
 	*/
-	template <typename T>
+	template <typename T, Str name = "">
 	struct Serial final
 	{
 		// Declared bare, or with the default the member would have had anyway:
@@ -187,9 +171,10 @@ namespace Loom
 					[](LoomObject* object)
 					{
 						return dynamic_cast<T>(object) != nullptr;
-					});
+					},
+					name.value);
 			}
-			else RegisterSerialField(FieldTypeOf<T>(), Data(), nullptr, nullptr, nullptr);
+			else RegisterSerialField(FieldTypeOf<T>(), Data(), nullptr, nullptr, nullptr, name.value);
 		};
 
 		// The vector types are written out of their components, so the field

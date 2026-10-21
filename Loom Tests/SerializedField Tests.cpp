@@ -104,15 +104,14 @@ namespace
 		Loom::Serial<int> m_plain;
 	};
 
-	// A field before any heading, then two headed groups of them.
-	struct Headed final : Loom::LoomObject
+	// A field with no name, one named, and two named under categories, one
+	// of them nested in the other.
+	struct Named final : Loom::LoomObject
 	{
 		Loom::Serial<int> loose = 1;
-		Loom::Header m_size{ "Size" };
-		Loom::Serial<float> width = 2.0f;
-		Loom::Serial<float> height = 3.0f;
-		Loom::Header m_colour{ "Colour" };
-		Loom::Serial<glm::vec3> tint;
+		Loom::Serial<float, "Wide"> width = 2.0f;
+		Loom::Serial<float, "Size/Tall"> height = 3.0f;
+		Loom::Serial<glm::vec3, "Size/Colour/Tint"> tint;
 	};
 
 	// Fields are numbered by declaration order; these are EveryField's.
@@ -152,12 +151,12 @@ TEST_SUITE("SerializedField")
 		CHECK(labels[Numbers] == "Numbers");
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a Header between fields leaves their labels as they were")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a named field is labelled by its name, and the rest by their members")
 	{
-		Headed object;
+		Named object;
 		Pump();
 
-		CHECK(Loom::FieldNames::Of(object) == std::vector<std::string>{ "Loose", "Width", "Height", "Tint" });
+		CHECK(Loom::FieldNames::Of(object) == std::vector<std::string>{ "Loose", "Wide", "Tall", "Tint" });
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a field declared in a base class is labelled after its member")
@@ -267,40 +266,43 @@ TEST_SUITE("SerializedField")
 		CHECK(Field(object, Numbers).type == Loom::FieldType::FloatArray);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a Header heads the fields declared after it")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a field keeps the name its Serial was given")
 	{
-		Headed object;
-		Pump();
-
-		const std::vector<Loom::LoomObject::FieldHeader>& headers = object.GetHeaders();
-
-		REQUIRE(headers.size() == 2);
-
-		CHECK(headers[0].label == "Size");
-		CHECK(headers[0].first == 1);
-		CHECK(headers[1].label == "Colour");
-		CHECK(headers[1].first == 3);
-	};
-
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a Header is not a field, so the fields after it keep their places")
-	{
-		Headed object;
+		Named object;
 		Pump();
 
 		REQUIRE(object.GetFields().size() == 4);
+
+		CHECK(Field(object, 0).name.empty());
+		CHECK(Field(object, 1).name == "Wide");
+		CHECK(Field(object, 2).name == "Size/Tall");
+		CHECK(Field(object, 3).name == "Size/Colour/Tint");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a name is displayed after its categories")
+	{
+		Named object;
+		Pump();
+
+		CHECK(Field(object, 0).Display().empty());
+		CHECK(Field(object, 0).Category().empty());
+		CHECK(Field(object, 1).Display() == "Wide");
+		CHECK(Field(object, 1).Category().empty());
+		CHECK(Field(object, 2).Display() == "Tall");
+		CHECK(Field(object, 2).Category() == "Size");
+		CHECK(Field(object, 3).Display() == "Tint");
+		CHECK(Field(object, 3).Category() == "Size/Colour");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a named field keeps its place and value as an unnamed one would")
+	{
+		Named object;
+		Pump();
 
 		CHECK(Field(object, 0).Write() == "1");
 		CHECK(Field(object, 1).Write() == "2");
 		CHECK(Field(object, 2).Write() == "3");
 		CHECK(Field(object, 3).type == Loom::FieldType::Vec3);
-	};
-
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an object with no Header has no headings")
-	{
-		EveryField object;
-		Pump();
-
-		CHECK(object.GetHeaders().empty());
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a base class and the type deriving from it declare onto the same object")

@@ -5,6 +5,7 @@
 #include "Guid.h"
 
 #include <string>
+#include <string_view>
 
 
 namespace Loom
@@ -59,6 +60,17 @@ namespace Loom
 		LoomObject* (*get_reference)(void*) = nullptr;
 		void (*set_reference)(void*, LoomObject*) = nullptr;
 		bool (*accepts_reference)(LoomObject*) = nullptr;
+
+		// The name the Serial was given, if any: "Display", or "Category/Display"
+		// with '/' between nested categories. Copied, so it outlives the module
+		// that declared it.
+		std::string name;
+
+		// The part of the name after its categories, which the editor labels
+		// the field with, and the categories before it, which it groups the
+		// field under. Either is empty when the name has none.
+		std::string_view Display() const;
+		std::string_view Category() const;
 
 		// The scene-file text for the current value, and the reverse. Reading a
 		// reference resolves the guid against the objects that exist right now

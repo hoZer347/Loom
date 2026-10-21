@@ -69,17 +69,6 @@ namespace Loom
 		// writes them by position, and the editor's inspector draws them.
 		const std::vector<SerializedField>& GetFields() const { return m_fields; };
 
-		// A heading over the fields from first on, as a Header declares it.
-		struct FieldHeader
-		{
-			size_t first = 0;
-			std::string label;
-		};
-
-		// The Headers this object declared, in the order they were declared,
-		// each before the first field it heads.
-		const std::vector<FieldHeader>& GetHeaders() const { return m_headers; };
-
 		// After the editor writes one of those fields, for an object whose other
 		// state has to follow it.
 		virtual void OnFieldChanged(const SerializedField& field) { };
@@ -108,14 +97,10 @@ namespace Loom
 			void* data,
 			LoomObject* (*get_reference)(void*),
 			void (*set_reference)(void*, LoomObject*),
-			bool (*accepts_reference)(LoomObject*));
+			bool (*accepts_reference)(LoomObject*),
+			const char* name);
 
 		std::vector<SerializedField> m_fields{ };
-
-		// Declaring a Header member is what fills this in.
-		friend LOOM_API void RegisterFieldHeader(const char* label);
-
-		std::vector<FieldHeader> m_headers{ };
 
 		// Whether any of them is a Reference, which is what puts this object in
 		// the referencing list and what a destructor has to undo.
