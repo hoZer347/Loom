@@ -39,18 +39,19 @@ namespace Loom
 		State,
 	};
 
+	// In front of a Serial's name, the category of the field declared before it.
+	inline constexpr std::string_view previous_category = ".../";
+
 	/**
 	* Loom::SerializedField
 	* - One member of a LoomObject that the scene format knows about
 	* - Holds what type it is and where it lives; the pointer is into the object
 	*   that registered the field, so a field never outlives its owner
-	* - It has no name of its own: a field is identified by where it sits in the
-	*   list, which is the order the Serial members were declared in. The
+	* - A field is identified by where it sits in the list, which is the order
+	*   the Serial members were declared in. Its name, when its Serial was given
+	*   one, is only what the editor labels and groups it by; otherwise the
 	*   editor labels it after the member that holds it
 	*/
-	// In front of a Serial's name, the category of the field declared before it.
-	inline constexpr std::string_view previous_category = ".../";
-
 	struct LOOM_API SerializedField final
 	{
 		FieldType type = FieldType::Int;
