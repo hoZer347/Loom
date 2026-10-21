@@ -110,10 +110,10 @@ namespace Loom
 		// was made from, and whether the Skin bent them and for which frame.
 		struct Handed
 		{
-			unsigned int vertices = 0;
-			unsigned int textureCoordinates = 0;
-			unsigned int normals = 0;
-			unsigned int drawType = 0;
+			unsigned long long vertices = 0;
+			unsigned long long textureCoordinates = 0;
+			unsigned long long normals = 0;
+			unsigned long long drawType = 0;
 			bool deformed = false;
 			unsigned long long deformedFrame = 0;
 

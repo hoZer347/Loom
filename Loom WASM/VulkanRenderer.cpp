@@ -342,6 +342,8 @@ namespace Loom
 
 		void BeginFrame() override
 		{
+			m_framesBegun++;
+
 			Frame& frame = m_frames[m_frameIndex];
 
 			vkWaitForFences(m_device, 1, &frame.fence, VK_TRUE, UINT64_MAX);
@@ -616,41 +618,9 @@ namespace Loom
 
 			kept.count = count;
 			kept.format = format;
-
-			// Anything not set once and left is handed over afresh with each
-			// draw, as Draw's vertices are.
-			if (usage != GL_STATIC_DRAW_ || count == 0)
-			{
-				kept.streamed.assign(data, data + count * FloatsPerVertex(format));
-				return;
-			};
-
-			// With the first vertex once more after the last, which a loop
-			// closes on.
-			const VkDeviceSize stride = FloatsPerVertex(format) * sizeof(float);
-			const VkDeviceSize size = (count + 1) * stride;
-
-			VkBuffer staging = VK_NULL_HANDLE;
-			VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
-			void* mapped = nullptr;
-
-			if (!CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, staging, stagingMemory, &mapped))
-				return;
-
-			memcpy(mapped, data, count * stride);
-			memcpy((uint8_t*)mapped + count * stride, data, stride);
-
-			if (CreateBuffer(size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-				kept.buffer, kept.memory, nullptr, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
-			{
-				Immediately([&](VkCommandBuffer command)
-				{
-					const VkBufferCopy copy{ 0, 0, size };
-					vkCmdCopyBuffer(command, staging, kept.buffer, 1, &copy);
-				});
-			};
-
-			DestroyBuffer(staging, stagingMemory);
+			kept.streamed.assign(data, data + count * FloatsPerVertex(format));
+			kept.settles = usage == GL_STATIC_DRAW_ && count > 0;
+			kept.setOn = m_framesBegun;
 		};
 
 		void DrawVertices(uint32_t program, uint32_t primitive, uint32_t handle) override
@@ -660,7 +630,13 @@ namespace Loom
 			if (found == m_kept.end())
 				return;
 
-			const Kept& kept = found->second;
+			Kept& kept = found->second;
+
+			// Moving them costs a wait on the GPU, so only vertices set to stay
+			// that have also stayed a whole frame are moved, and any still
+			// changing are handed over afresh with each draw, as Draw's are.
+			if (!kept.buffer && kept.settles && kept.setOn != m_framesBegun)
+				Settle(kept);
 
 			if (!kept.buffer)
 			{
@@ -1074,8 +1050,9 @@ namespace Loom
 			VkDeviceSize used = 0;
 		};
 
-		// What CreateVertices handed out: vertices set once, in a buffer of
-		// their own on the GPU, or any others as they were handed over.
+		// What CreateVertices handed out: vertices in a buffer of their own on
+		// the GPU, or as they were handed over until then. settles says they
+		// were set to stay, and setOn is the frame they were set in.
 		struct Kept
 		{
 			VkBuffer buffer = VK_NULL_HANDLE;
@@ -1083,6 +1060,8 @@ namespace Loom
 			std::vector<float> streamed;
 			size_t count = 0;
 			VertexFormat format = VertexFormat::Position;
+			bool settles = false;
+			unsigned long long setOn = 0;
 		};
 
 		struct Allocation
@@ -2118,6 +2097,52 @@ namespace Loom
 			vkDestroyDescriptorSetLayout(m_device, program.setLayout, nullptr);
 		};
 
+		// Moves kept's vertices into a buffer of their own on the GPU, with the
+		// first vertex once more after the last, which a loop closes on. Left
+		// streamed if there is no room for them there.
+		void Settle(Kept& kept)
+		{
+			kept.settles = false;
+
+			const VkDeviceSize stride = FloatsPerVertex(kept.format) * sizeof(float);
+			const VkDeviceSize size = (kept.count + 1) * stride;
+
+			VkBuffer staging = VK_NULL_HANDLE;
+			VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
+			void* mapped = nullptr;
+
+			if (!CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, staging, stagingMemory, &mapped))
+				return;
+
+			memcpy(mapped, kept.streamed.data(), kept.count * stride);
+			memcpy((uint8_t*)mapped + kept.count * stride, kept.streamed.data(), stride);
+
+			if (CreateBuffer(size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+				kept.buffer, kept.memory, nullptr, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+			{
+				Immediately([&](VkCommandBuffer command)
+				{
+					const VkBufferCopy copy{ 0, 0, size };
+					vkCmdCopyBuffer(command, staging, kept.buffer, 1, &copy);
+
+					VkBufferMemoryBarrier copied{ VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
+					copied.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+					copied.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+					copied.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+					copied.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+					copied.buffer = kept.buffer;
+					copied.size = VK_WHOLE_SIZE;
+
+					vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, nullptr, 1, &copied, 0, nullptr);
+				});
+
+				kept.streamed.clear();
+				kept.streamed.shrink_to_fit();
+			};
+
+			DestroyBuffer(staging, stagingMemory);
+		};
+
 		// Lets go of what kept holds once the frames that may still draw it are done.
 		void Release(Kept& kept)
 		{
@@ -2301,6 +2326,7 @@ namespace Loom
 		std::unordered_map<uint32_t, Texture> m_textures;
 		std::unordered_map<uint32_t, Kept> m_kept;
 		uint32_t m_nextKept = 1;
+		unsigned long long m_framesBegun = 0;
 		uint32_t m_fallbackColor = 0;
 		uint32_t m_fallbackDepth = 0;
 	};

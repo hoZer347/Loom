@@ -3,6 +3,7 @@
 #include "Engine.h"
 
 #include <algorithm>
+#include <atomic>
 #include <string>
 #include <iostream>
 
@@ -101,8 +102,15 @@ namespace Loom
 		void (*set_reference)(void*, LoomObject*),
 		bool (*accepts_reference)(LoomObject*),
 		const char* name,
-		unsigned int* version)
+		unsigned long long* version)
 	{
+		// Each field's count starts this far past the last one's, further than
+		// any field is ever changed.
+		constexpr int VERSIONS_EACH = 32;
+		static std::atomic<unsigned long long> fields{ 0 };
+
+		*version = fields.fetch_add(1) << VERSIONS_EACH;
+
 		LoomObject* owner = constructing;
 
 		if (owner == nullptr)

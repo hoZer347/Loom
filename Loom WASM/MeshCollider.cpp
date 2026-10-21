@@ -46,7 +46,7 @@ namespace Loom
 		const std::vector<float>& vertices = mesh ? *mesh->m_vertices : no_vertices;
 		const std::vector<uint32_t>& indices = mesh ? mesh->m_indices : no_indices;
 		const uint32_t primitive = mesh ? (uint32_t)*mesh->primitive_id : (uint32_t)Mesh::Triangles;
-		const unsigned int version = mesh ? mesh->m_vertices.Version() : 0;
+		const unsigned long long version = mesh ? mesh->m_vertices.Version() : 0;
 
 		if (primitive == m_primitive && indices == m_indices)
 		{

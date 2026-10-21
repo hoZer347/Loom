@@ -74,7 +74,7 @@ namespace Loom
 
 		// The Serial's count of changes, which Read and SetReference add to.
 		// Whatever else writes through data calls Changed after.
-		unsigned int* version = nullptr;
+		unsigned long long* version = nullptr;
 		void Changed() const;
 
 		// The name the Serial was given, if any: "Display", or "Category/Display"

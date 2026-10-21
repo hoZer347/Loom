@@ -89,7 +89,7 @@ namespace Loom
 		// mesh, the version of its vertices, and the vertices themselves, for
 		// when a new version holds the same ones.
 		mutable const Mesh* m_sourceMesh = nullptr;
-		mutable unsigned int m_sourceVersion = 0;
+		mutable unsigned long long m_sourceVersion = 0;
 		mutable std::vector<float> m_source{ };
 		mutable std::vector<uint32_t> m_indices{ };
 		mutable uint32_t m_primitive = 0;

@@ -671,7 +671,7 @@ TEST_SUITE("SerializedField")
 		Counted counted;
 		Pump();
 
-		const unsigned int fresh = counted.values.Version();
+		const unsigned long long fresh = counted.values.Version();
 
 		CHECK(std::as_const(counted.values)->empty());
 		CHECK(counted.values.Version() == fresh);
@@ -687,5 +687,24 @@ TEST_SUITE("SerializedField")
 
 		Field(counted, 0).Changed();
 		CHECK(counted.values.Version() == fresh + 4);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a field made where another was does not take up its count")
+	{
+		unsigned long long first = 0;
+
+		{
+			Counted counted;
+			Pump();
+
+			counted.values = { 1.0f };
+			first = counted.values.Version();
+		};
+
+		Counted again;
+		Pump();
+
+		again.values = { 1.0f };
+		CHECK(again.values.Version() != first);
 	};
 };

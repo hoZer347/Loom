@@ -32,7 +32,7 @@ namespace Loom
 		void (*set_reference)(void*, LoomObject*),
 		bool (*accepts_reference)(LoomObject*),
 		const char* name,
-		unsigned int* version);
+		unsigned long long* version);
 
 	// Hands a button to the same object, with its name and what pressing it runs.
 	LOOM_API void RegisterButton(const char* name, const std::function<void()>* press);
@@ -182,12 +182,13 @@ namespace Loom
 			else return &m_value;
 		};
 
-		// How many times the value has been changed: assigned, reached into
+		// Goes up each time the value is changed: assigned, reached into
 		// without const, or written through its SerializedField. While it holds
 		// still, so does the value, so whatever is made from it, such as a
-		// mesh's vertices on the GPU, need not be made again. Read through a
-		// const Serial to look without counting.
-		unsigned int Version() const { return m_version; };
+		// mesh's vertices on the GPU, need not be made again. It starts where
+		// no other field's has, so a field made where another one was never
+		// passes for it. Read through a const Serial to look without counting.
+		unsigned long long Version() const { return m_version; };
 
 	private:
 		void Register()
@@ -237,6 +238,6 @@ namespace Loom
 		};
 
 		T m_value;
-		unsigned int m_version = 0;
+		unsigned long long m_version = 0;
 	};
 };

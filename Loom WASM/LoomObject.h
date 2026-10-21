@@ -118,7 +118,7 @@ namespace Loom
 			void (*set_reference)(void*, LoomObject*),
 			bool (*accepts_reference)(LoomObject*),
 			const char* name,
-			unsigned int* version);
+			unsigned long long* version);
 
 		std::vector<SerializedField> m_fields{ };
 
