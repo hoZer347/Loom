@@ -5,6 +5,7 @@
 #include "Mesh.h"
 #include "Renderer.h"
 #include "Shaders.h"
+#include "Textures.h"
 #include "Utilities/Clock.h"
 
 #define STBTT_STATIC
@@ -19,6 +20,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <utility>
 #include <vector>
@@ -106,6 +108,25 @@ void main()
 		};
 
 		// What a rectangle samples, so it is drawn by the program text is.
+		// The image a rect is filled through: its own, or plain white when it
+		// names none or one that will not load, which is tried only once.
+		uint32_t ImageOf(const UiRect& rect)
+		{
+			static std::set<std::string> broken;
+
+			const std::string& path = rect.imagePath;
+
+			if (path.empty() || broken.contains(path))
+				return WhiteTexture();
+
+			if (const Texture* image = Texture::Shared(path))
+				return image->handle;
+
+			broken.insert(path);
+
+			return WhiteTexture();
+		};
+
 		uint32_t WhiteTexture()
 		{
 			static const uint32_t texture = []() -> uint32_t
@@ -398,8 +419,9 @@ void main()
 					if (fill.a <= 0.0f)
 						continue;
 
-					AddQuad(vertices, where.min, where.min + where.size, glm::vec2(0.0f), glm::vec2(1.0f));
-					Draw(program, WhiteTexture(), fill, vertices);
+					// Images are bottom row first, so the top samples the higher v.
+					AddQuad(vertices, where.min, where.min + where.size, glm::vec2(0.0f, 1.0f), glm::vec2(1.0f, 0.0f));
+					Draw(program, ImageOf(*rect), fill, vertices);
 				}
 				else if (const UiText* text = dynamic_cast<const UiText*>(component))
 					DrawText(program, *text, vertices);

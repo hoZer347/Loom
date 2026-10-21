@@ -171,9 +171,9 @@ if (Test-Stale $module $linkInputs)
 
 $page = Join-Path $output 'index.html'
 
-# Every font in the project but the builds, by its path under it, for the page
-# to preload where a UiText opens it.
-$fonts = @(Get-ChildItem -LiteralPath $Project -Recurse -File -Include '*.ttf', '*.otf', '*.ttc' |
+# Every font and image in the project but the builds, by its path under it, for
+# the page to preload where a UiText or UiRect opens it.
+$preloaded = @(Get-ChildItem -LiteralPath $Project -Recurse -File -Include '*.ttf', '*.otf', '*.ttc', '*.png', '*.jpg', '*.jpeg', '*.bmp', '*.tga' |
     Where-Object { -not $_.FullName.StartsWith((Join-Path $Project 'Build\'), [StringComparison]::OrdinalIgnoreCase) } |
     ForEach-Object { (Get-UrlPath $_.FullName).TrimStart('/') } |
     Sort-Object)
@@ -186,7 +186,7 @@ $bindingsUrl = if ($bindings -and (Test-Path -LiteralPath $bindings)) { Get-UrlP
     Replace('{TITLE}', (Split-Path -Leaf $Project)).
     Replace('{SCRIPT}', (Get-UrlPath $module)).
     Replace('{SCENE}', (Get-UrlPath $Scene)).
-    Replace('{FONTS}', (ConvertTo-Json -InputObject $fonts -Compress)).
+    Replace('{FILES}', (ConvertTo-Json -InputObject $preloaded -Compress)).
     Replace('{INPUT}', $bindingsUrl) |
     Set-Content -LiteralPath $page -Encoding UTF8 -NoNewline
 

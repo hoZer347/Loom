@@ -6,6 +6,7 @@
 #include "GameObject.h"
 #include "Input.h"
 #include "Scene.h"
+#include "Textures.h"
 #include "Ui.h"
 #include "Utilities/Clock.h"
 
@@ -426,6 +427,58 @@ TEST_SUITE("Ui")
 		CHECK(rect->Fill() == *button->pressedColor);
 
 		Settle();
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a rect with an image is filled through it, the right way up")
+	{
+		constexpr int SIDE = 2;
+		constexpr int RGBA = 4;
+		constexpr uint8_t FULL = 255;
+		const std::vector<uint8_t> pixels(SIDE * SIDE * RGBA, FULL);
+
+		LoomTests::RecordingRenderer renderer;
+		PointAt(glm::vec2(0.0f));
+
+		Loom::Scene scene("ui image");
+		Loom::UiRect& rect = *scene.Attach<Loom::UiRect>();
+		Pump();
+
+		rect.imagePath = LoomTests::WriteTga("ui rect image.tga", SIDE, SIDE, pixels);
+
+		Overlay({ &scene });
+
+		const Loom::Texture* image = Loom::Texture::Shared(rect.imagePath);
+
+		REQUIRE(image != nullptr);
+		CHECK(renderer.textures["u_texture"] == image->handle);
+
+		// Its first corner is its top left and its third its bottom right.
+		constexpr size_t BOTTOM_RIGHT = 2;
+		REQUIRE(!renderer.drawnVertices.empty());
+		const std::vector<float>& quad = renderer.drawnVertices.back();
+
+		CHECK(quad[V] > quad[BOTTOM_RIGHT * FLOATS_PER_CORNER + V]);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a rect whose image will not load is filled plainly")
+	{
+		LoomTests::RecordingRenderer renderer;
+		PointAt(glm::vec2(0.0f));
+
+		Loom::Scene scene("ui no image");
+		Loom::UiRect& plain = *scene.Attach<Loom::UiRect>();
+		Pump();
+
+		Overlay({ &scene });
+
+		REQUIRE(renderer.drawnColors.size() == 1);
+		const uint32_t white = renderer.textures["u_texture"];
+
+		plain.imagePath = std::string("no such ui image.tga");
+		Overlay({ &scene });
+
+		CHECK(renderer.drawnColors.size() == 2);
+		CHECK(renderer.textures["u_texture"] == white);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the cursor on a button's label is on the button, which the click goes to")

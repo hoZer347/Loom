@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   The page play-web.ps1 writes beside a Play Web build, with {TITLE}, {SCRIPT},
-  {SCENE} and {FONTS} filled in. It is served from the project folder, and the
+  {SCENE} and {FILES} filled in. It is served from the project folder, and the
   base URL is that folder, so the relative shader paths a scene stores resolve
   there.
 -->
@@ -38,9 +38,9 @@
       // The scene is fetched into the virtual file system before main runs,
       // so main never waits on the network. Waiting there makes it async, and
       // the unwind the main loop starts with escapes as an unhandled rejection.
-      // So are the project's fonts, at the paths under it a UiText names
-      // them by, which resolve from the root the program runs in, and its key
-      // bindings when it has any.
+      // So are the project's fonts and images, at the paths under it a UiText
+      // or UiRect names them by, which resolve from the root the program runs
+      // in, and its key bindings when it has any.
       var Module = {
         canvas: document.getElementById("canvas"),
         arguments: ["/scene.loomscene"],
@@ -51,11 +51,11 @@
             if ("{INPUT}")
               Module.FS.createPreloadedFile("/", "project.loominput", "{INPUT}", true, false);
 
-            for (const font of {FONTS}) {
-              const folder = "/" + font.substring(0, font.lastIndexOf("/") + 1);
+            for (const file of {FILES}) {
+              const folder = "/" + file.substring(0, file.lastIndexOf("/") + 1);
 
               Module.FS.mkdirTree(folder);
-              Module.FS.createPreloadedFile(folder, font.substring(font.lastIndexOf("/") + 1), "/" + font, true, false);
+              Module.FS.createPreloadedFile(folder, file.substring(file.lastIndexOf("/") + 1), "/" + file, true, false);
             }
           },
         ],

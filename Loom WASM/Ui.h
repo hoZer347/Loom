@@ -75,8 +75,10 @@ namespace Loom
 	* - anchor is the point in the parent (0 to 1 across, from the top left)
 	*   that offset is measured from, and pivot the point in the rectangle
 	*   (0 to 1 across) that lands there
-	* - Filled with color, or a UiButton's tint when there is one beside it;
-	*   one with no alpha is not drawn, though it still lays out its children
+	* - Filled with color, or a UiButton's tint when there is one beside it,
+	*   times the image at imagePath, stretched over it, when it names one
+	*   that loads; one with no alpha is not drawn, though it still lays out
+	*   its children
 	*   and, if it blocks the pointer, holds the cursor
 	* - The UiText on its GameObject is drawn over it, and its children over
 	*   both
@@ -103,6 +105,8 @@ namespace Loom
 		Serial<glm::vec2> size = glm::vec2(160.0f, 40.0f);
 		Serial<glm::vec4> color = glm::vec4(0.0f, 0.0f, 0.0f, 0.6f);
 		Serial<bool> blocksPointer = true;
+		// An image file, relative to the project folder, or none.
+		Serial<std::string> imagePath;
 
 	private:
 		friend struct Ui;
