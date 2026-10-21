@@ -1724,7 +1724,6 @@ namespace Loom
 
 			if (shown < hint_seconds)
 			{
-				// Fading out over the last of its time.
 				const float fade = (float)(std::min)(1.0, (hint_seconds - shown) / hint_fade_seconds);
 				const char* hint = IsPlaying() ? hint_playing : hint_stopped;
 				ImFont* font = ImGui::GetFont();
