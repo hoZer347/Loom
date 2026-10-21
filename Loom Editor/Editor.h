@@ -20,10 +20,12 @@
 #include "ScriptFolders.h"
 #include "ScriptLibrary.h"
 #include "WebPlayer.h"
+#include "WindowFullscreen.h"
 
 #include <filesystem>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -361,6 +363,36 @@ namespace Loom
 		void DrawPrefab();
 		void DrawGame();
 		void DrawDebug();
+
+		// The views that can fill the monitor, a double-click on the tab of
+		// their panel away.
+		enum class View
+		{
+			Scene,
+			Prefab,
+			Game,
+			Debug,
+		};
+
+		// What each view's panel holds under its toolbar, in whatever window
+		// is open: its panel, or the one over the whole monitor.
+		void DrawSceneView();
+		void DrawPrefabView();
+		void DrawGameView();
+		void DrawDebugView();
+
+		// Whether the tab of the panel just begun, or its title bar while it
+		// floats, was double-clicked this frame.
+		static bool TabDoubleClicked();
+
+		// The menu bar and the panels docked round the dock space.
+		void DrawWorkspace();
+
+		// One view over the whole monitor, in place of the workspace, until
+		// F11, or Escape while nothing plays, brings the workspace back.
+		void DrawFullscreen();
+		void EnterFullscreen(View view);
+		void LeaveFullscreen();
 		// The bar along the top of the Game and Debug panels.
 		void DrawToolbar();
 
@@ -751,6 +783,9 @@ namespace Loom
 		bool m_gamePanelFocused = false;
 		bool m_gamePanelHovered = false;
 		GameFocus m_gameFocus;
+		std::optional<View> m_fullscreen;
+		WindowFullscreen m_windowFullscreen;
+		double m_fullscreenSince = 0.0;
 		bool m_showSceneData = true;
 		bool m_showConsole = true;
 		bool m_showShaders = false;

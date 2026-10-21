@@ -1499,6 +1499,47 @@ namespace Loom
 			m_pendingLayout.clear();
 		};
 
+		if (m_fullscreen)
+			DrawFullscreen();
+		else
+			DrawWorkspace();
+
+		ImportQueued();
+		ClickQueued();
+		PollScripts();
+		PollRefresh();
+
+		// The renderer reads the window back once this frame has finished
+		// drawing, so the bitmap is the whole editor.
+		if (!m_screenshotPath.empty() && ++m_frame >= m_screenshotFrame)
+			CaptureFrame();
+
+		if (!m_layoutToSave.empty())
+		{
+			if (EditorLayouts::Save(LayoutsFolder(), m_layoutToSave))
+				SetCurrentLayout(m_layoutToSave);
+			else
+				std::cerr << "Could not write the layout '" << m_layoutToSave << "'" << std::endl;
+
+			m_layoutToSave.clear();
+		};
+
+		DrawFolderPrompt();
+		DrawNewProjectPrompt();
+		DrawSaveLayoutPrompt();
+		DrawCreateAssetPrompt();
+		DrawFileDialogs();
+
+		if (ImGui::IsAnyItemActive())
+			m_historyDirty = true;
+
+		for (int button = 0; button < ImGuiMouseButton_COUNT; button++)
+			if (ImGui::IsMouseReleased(button))
+				m_historyDirty = true;
+	};
+
+	void Editor::DrawWorkspace()
+	{
 		DrawMainMenuBar();
 
 		const ImGuiID dockspace_id =
@@ -1596,39 +1637,92 @@ namespace Loom
 
 		if (m_showSettings && m_settings.Draw(&m_showSettings))
 			SaveSettings();
+	};
 
-		ImportQueued();
-		ClickQueued();
-		PollScripts();
-		PollRefresh();
+	bool Editor::TabDoubleClicked()
+	{
+		const ImGuiWindow* window = ImGui::GetCurrentWindow();
+		const ImRect tab = window->DockIsActive ? window->DC.DockTabItemRect : window->TitleBarRect();
 
-		// The renderer reads the window back once this frame has finished
-		// drawing, so the bitmap is the whole editor.
-		if (!m_screenshotPath.empty() && ++m_frame >= m_screenshotFrame)
-			CaptureFrame();
+		return ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && tab.Contains(ImGui::GetIO().MousePos);
+	};
 
-		if (!m_layoutToSave.empty())
+	void Editor::DrawFullscreen()
+	{
+		// How long the way back out shows for once the view fills the monitor.
+		constexpr double hint_seconds = 3.0;
+		constexpr float hint_margin = 12.0f;
+		constexpr float centred = 0.5f;
+		constexpr int pushed_styles = 3;
+		constexpr const char* hint_playing = "F11 to leave fullscreen";
+		constexpr const char* hint_stopped = "F11 or Escape to leave fullscreen";
+
+		// Escape is the game's while it plays.
+		if (ImGui::IsKeyPressed(ImGuiKey_F11, false) || (!IsPlaying() && ImGui::IsKeyPressed(ImGuiKey_Escape, false)))
 		{
-			if (EditorLayouts::Save(LayoutsFolder(), m_layoutToSave))
-				SetCurrentLayout(m_layoutToSave);
-			else
-				std::cerr << "Could not write the layout '" << m_layoutToSave << "'" << std::endl;
-
-			m_layoutToSave.clear();
+			LeaveFullscreen();
+			DrawWorkspace();
+			return;
 		};
 
-		DrawFolderPrompt();
-		DrawNewProjectPrompt();
-		DrawSaveLayoutPrompt();
-		DrawCreateAssetPrompt();
-		DrawFileDialogs();
+		const ImGuiViewport* viewport = ImGui::GetMainViewport();
 
-		if (ImGui::IsAnyItemActive())
-			m_historyDirty = true;
+		ImGui::SetNextWindowPos(viewport->Pos);
+		ImGui::SetNextWindowSize(viewport->Size);
+		ImGui::SetNextWindowViewport(viewport->ID);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
 
-		for (int button = 0; button < ImGuiMouseButton_COUNT; button++)
-			if (ImGui::IsMouseReleased(button))
-				m_historyDirty = true;
+		const ImGuiWindowFlags flags =
+			view_flags | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoDocking |
+			ImGuiWindowFlags_NoSavedSettings | (m_playing ? ImGuiWindowFlags_NoNavInputs : ImGuiWindowFlags_None);
+
+		// Nowhere the cursor can be, and nothing heard, unless the Game view
+		// is the one filling the monitor and has focus.
+		Input::SetView(0, 0, 0, 0);
+		m_gamePanelFocused = false;
+		m_gamePanelHovered = false;
+
+		if (ImGui::Begin("##Fullscreen", nullptr, flags))
+		{
+			switch (*m_fullscreen)
+			{
+			case View::Scene:	DrawSceneView();	break;
+			case View::Prefab:	DrawPrefabView();	break;
+			case View::Game:	DrawGameView();		break;
+			case View::Debug:	DrawDebugView();	break;
+			};
+
+			if (ImGui::GetTime() - m_fullscreenSince < hint_seconds)
+			{
+				const char* hint = IsPlaying() ? hint_playing : hint_stopped;
+				const ImVec2 size = ImGui::CalcTextSize(hint);
+
+				ImGui::GetForegroundDrawList()->AddText(
+					ImVec2(viewport->Pos.x + (viewport->Size.x - size.x) * centred, viewport->Pos.y + hint_margin),
+					ImGui::GetColorU32(ImGuiCol_Text),
+					hint);
+			};
+		};
+
+		ImGui::End();
+		ImGui::PopStyleVar(pushed_styles);
+
+		Input::SetFocused(m_gameFocus.Update(m_gamePanelFocused, m_gamePanelHovered, AnyMouseClicked(), ImGui::IsAnyMouseDown() || AnyMouseReleased()));
+	};
+
+	void Editor::EnterFullscreen(View view)
+	{
+		m_fullscreen = view;
+		m_fullscreenSince = ImGui::GetTime();
+		m_windowFullscreen.Enter(Engine::window);
+	};
+
+	void Editor::LeaveFullscreen()
+	{
+		m_fullscreen.reset();
+		m_windowFullscreen.Leave(Engine::window);
 	};
 
 	void Editor::CaptureFrame()
@@ -3062,16 +3156,24 @@ namespace Loom
 
 		if (ImGui::Begin(title.c_str(), &m_showScene, view_flags))
 		{
-			if (m_activeScene == nullptr)
-				ImGui::TextDisabled("No scene open. Pick one in the Project panel.");
-			else
-			{
-				DrawView(m_sceneView, { m_activeScene }, &m_sceneCamera, &m_sceneOutline);
-				TakeImportTarget(&m_activeScene->GetRoot());
-			};
+			if (TabDoubleClicked())
+				EnterFullscreen(View::Scene);
+
+			DrawSceneView();
 		};
 
 		ImGui::End();
+	};
+
+	void Editor::DrawSceneView()
+	{
+		if (m_activeScene == nullptr)
+			ImGui::TextDisabled("No scene open. Pick one in the Project panel.");
+		else
+		{
+			DrawView(m_sceneView, { m_activeScene }, &m_sceneCamera, &m_sceneOutline);
+			TakeImportTarget(&m_activeScene->GetRoot());
+		};
 	};
 
 	void Editor::DrawPrefab()
@@ -3094,12 +3196,20 @@ namespace Loom
 
 		if (ImGui::Begin(title.c_str(), &m_showPrefab, view_flags))
 		{
-			if (GetPrefabRoot() == nullptr)
-				ImGui::TextDisabled("No prefab open. Double-click one in the Project panel.");
-			else DrawView(m_prefabView, { m_prefabScene }, &m_prefabCamera, &m_prefabOutline);
+			if (TabDoubleClicked())
+				EnterFullscreen(View::Prefab);
+
+			DrawPrefabView();
 		};
 
 		ImGui::End();
+	};
+
+	void Editor::DrawPrefabView()
+	{
+		if (GetPrefabRoot() == nullptr)
+			ImGui::TextDisabled("No prefab open. Double-click one in the Project panel.");
+		else DrawView(m_prefabView, { m_prefabScene }, &m_prefabCamera, &m_prefabOutline);
 	};
 
 	void Editor::DrawPrefabNode()
@@ -3120,50 +3230,64 @@ namespace Loom
 		// While it plays, the keys are the game's, not a way round the panel's buttons.
 		if (ImGui::Begin(EditorPanels::Game, &m_showGame, m_playing ? view_flags | ImGuiWindowFlags_NoNavInputs : view_flags))
 		{
-			m_gamePanelFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
-			m_gamePanelHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
+			if (TabDoubleClicked())
+				EnterFullscreen(View::Game);
 
 			DrawToolbar();
-
-			if (Scene::GetScenes().empty())
-				ImGui::TextDisabled("No scene open. Pick one in the Project panel.");
-			else
-			{
-				// GLFW reports the cursor from the main window's corner, which
-				// ImGui's screen space only starts at without multi-viewports.
-				const ImVec2 origin = ImGui::GetMainViewport()->Pos;
-				const ImVec2 corner = ImGui::GetCursorScreenPos();
-				const ImVec2 available = ImGui::GetContentRegionAvail();
-
-				Input::SetView((int)(corner.x - origin.x), (int)(corner.y - origin.y), (int)available.x, (int)available.y);
-				DrawView(m_gameView, Scene::GetScenes(), nullptr);
-
-				if (m_activeScene)
-					TakeImportTarget(&m_activeScene->GetRoot());
-			};
+			DrawGameView();
 		};
 
 		ImGui::End();
+	};
+
+	void Editor::DrawGameView()
+	{
+		m_gamePanelFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+		m_gamePanelHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
+
+		if (Scene::GetScenes().empty())
+			ImGui::TextDisabled("No scene open. Pick one in the Project panel.");
+		else
+		{
+			// GLFW reports the cursor from the main window's corner, which
+			// ImGui's screen space only starts at without multi-viewports.
+			const ImVec2 origin = ImGui::GetMainViewport()->Pos;
+			const ImVec2 corner = ImGui::GetCursorScreenPos();
+			const ImVec2 available = ImGui::GetContentRegionAvail();
+
+			Input::SetView((int)(corner.x - origin.x), (int)(corner.y - origin.y), (int)available.x, (int)available.y);
+			DrawView(m_gameView, Scene::GetScenes(), nullptr);
+
+			if (m_activeScene)
+				TakeImportTarget(&m_activeScene->GetRoot());
+		};
 	};
 
 	void Editor::DrawDebug()
 	{
 		if (ImGui::Begin(EditorPanels::Debug, &m_showDebug, view_flags))
 		{
+			if (TabDoubleClicked())
+				EnterFullscreen(View::Debug);
+
 			DrawToolbar();
-
-			if (Scene::GetScenes().empty())
-				ImGui::TextDisabled("Nothing loaded.");
-			else
-			{
-				DrawView(m_debugView, Scene::GetScenes(), &m_debugCamera, &m_debugOutline);
-
-				if (m_activeScene)
-					TakeImportTarget(&m_activeScene->GetRoot());
-			};
+			DrawDebugView();
 		};
 
 		ImGui::End();
+	};
+
+	void Editor::DrawDebugView()
+	{
+		if (Scene::GetScenes().empty())
+			ImGui::TextDisabled("Nothing loaded.");
+		else
+		{
+			DrawView(m_debugView, Scene::GetScenes(), &m_debugCamera, &m_debugOutline);
+
+			if (m_activeScene)
+				TakeImportTarget(&m_activeScene->GetRoot());
+		};
 	};
 
 	void Editor::DrawToolbar()

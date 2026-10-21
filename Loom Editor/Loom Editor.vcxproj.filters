@@ -100,6 +100,9 @@
     <ClCompile Include="GameFocus.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
+    <ClCompile Include="WindowFullscreen.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
     <ClCompile Include="SceneHistory.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
@@ -202,6 +205,9 @@
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="GameFocus.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="WindowFullscreen.h">
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="SceneHistory.h">

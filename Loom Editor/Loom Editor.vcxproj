@@ -127,6 +127,7 @@
     <ClCompile Include="ModelPreview.cpp" />
     <ClCompile Include="SelectionOutline.cpp" />
     <ClCompile Include="GameFocus.cpp" />
+    <ClCompile Include="WindowFullscreen.cpp" />
     <ClCompile Include="SceneHistory.cpp" />
     <ClCompile Include="Prefabs.cpp" />
     <ClCompile Include="EditorPrefabs.cpp" />
@@ -164,6 +165,7 @@
     <ClInclude Include="ModelPreview.h" />
     <ClInclude Include="SelectionOutline.h" />
     <ClInclude Include="GameFocus.h" />
+    <ClInclude Include="WindowFullscreen.h" />
     <ClInclude Include="SceneHistory.h" />
     <ClInclude Include="Prefabs.h" />
     <ClInclude Include="ColliderGizmos.h" />
