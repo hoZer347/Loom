@@ -44,6 +44,9 @@
       var Module = {
         canvas: document.getElementById("canvas"),
         arguments: ["/scene.loomscene"],
+        // stb_image decodes the images itself; the browser would only keep a
+        // decoded copy of each, and write none it could not decode.
+        noImageDecoding: true,
         preRun: [
           () => {
             Module.FS.createPreloadedFile("/", "scene.loomscene", "{SCENE}", true, false);

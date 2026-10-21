@@ -31,6 +31,14 @@ namespace Loom
 		// not remembered, so fixing the file is enough to have it load next time.
 		static Texture* Shared(const std::string& file_path);
 
+		// The renderer handle of the shared Texture of the file, or 0 while
+		// there is none to draw with: no path, no file behind it (one still
+		// being typed among them, which says nothing), a file that will not
+		// load, or no renderer. A file that would not load is tried again once
+		// it is written again, rather than every frame, which would say why
+		// every frame.
+		static uint32_t HandleOf(const std::string& file_path);
+
 		// Decodes the file again into every shared Texture of it, so whatever
 		// holds one draws the file as it now is. One that no longer decodes
 		// keeps what it had.

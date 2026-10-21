@@ -241,42 +241,11 @@ namespace Loom
 			return blank;
 		};
 
-		// An image that will not load is tried again once its file changes,
-		// rather than every frame, which would say why every frame. A path with
-		// no file behind it, one still being typed among them, says nothing.
 		uint32_t TextureFor(Renderer& renderer, const UniformValue* value)
 		{
-			if (value == nullptr || value->texture.empty())
-				return BlankTexture(renderer);
+			const uint32_t handle = value != nullptr ? Texture::HandleOf(value->texture) : 0;
 
-			// The disk is only asked about a path that has not loaded.
-			static std::unordered_map<std::string, uint32_t> loaded;
-			static std::unordered_map<std::string, std::filesystem::file_time_type> failed;
-
-			const auto found = loaded.find(value->texture);
-
-			if (found != loaded.end())
-				return found->second;
-
-			std::error_code code;
-			const std::filesystem::file_time_type written = std::filesystem::last_write_time(value->texture, code);
-
-			if (code)
-				return BlankTexture(renderer);
-
-			const auto tried = failed.find(value->texture);
-
-			if (tried != failed.end() && tried->second == written)
-				return BlankTexture(renderer);
-
-			const Texture* texture = Texture::Shared(value->texture);
-
-			if (texture && texture->handle)
-				return loaded[value->texture] = texture->handle;
-
-			failed[value->texture] = written;
-
-			return BlankTexture(renderer);
+			return handle != 0 ? handle : BlankTexture(renderer);
 		};
 
 		bool DrawNumbers(const UniformTypeInfo& info, UniformValue& value)

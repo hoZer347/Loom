@@ -481,6 +481,38 @@ TEST_SUITE("Ui")
 		CHECK(renderer.textures["u_texture"] == white);
 	};
 
+	// A path typed before its file is written, or while it is being typed.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a rect whose image file turns up later is filled through it then")
+	{
+		constexpr int SIDE = 2;
+		constexpr int RGBA = 4;
+		constexpr uint8_t FULL = 255;
+
+		LoomTests::RecordingRenderer renderer;
+		PointAt(glm::vec2(0.0f));
+
+		Loom::Scene scene("ui late image");
+		Loom::UiRect& rect = *scene.Attach<Loom::UiRect>();
+		Pump();
+
+		const std::filesystem::path path = std::filesystem::temp_directory_path() / "ui late image.tga";
+		std::filesystem::remove(path);
+		rect.imagePath = path.string();
+
+		Overlay({ &scene });
+		CHECK(Loom::Texture::HandleOf(rect.imagePath) == 0);
+		CHECK(renderer.drawnColors.size() == 1);
+
+		LoomTests::WriteTga("ui late image.tga", SIDE, SIDE, std::vector<uint8_t>(SIDE * SIDE * RGBA, FULL));
+		Overlay({ &scene });
+
+		const Loom::Texture* image = Loom::Texture::Shared(rect.imagePath);
+
+		REQUIRE(image != nullptr);
+		CHECK(image->handle != 0);
+		CHECK(renderer.textures["u_texture"] == image->handle);
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the cursor on a button's label is on the button, which the click goes to")
 	{
 		Settle();

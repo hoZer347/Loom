@@ -78,6 +78,41 @@ namespace Loom
 		};
 	};
 
+	uint32_t Texture::HandleOf(const std::string& file_path)
+	{
+		if (file_path.empty())
+			return 0;
+
+		// The disk is only asked about a path that has not loaded.
+		static std::unordered_map<std::string, uint32_t> loaded;
+		static std::unordered_map<std::string, std::filesystem::file_time_type> failed;
+
+		const auto found = loaded.find(file_path);
+
+		if (found != loaded.end())
+			return found->second;
+
+		std::error_code code;
+		const std::filesystem::file_time_type written = std::filesystem::last_write_time(file_path, code);
+
+		if (code)
+			return 0;
+
+		const auto tried = failed.find(file_path);
+
+		if (tried != failed.end() && tried->second == written)
+			return 0;
+
+		const Texture* texture = Shared(file_path);
+
+		if (texture && texture->handle)
+			return loaded[file_path] = texture->handle;
+
+		failed[file_path] = written;
+
+		return 0;
+	};
+
 	void Texture::ReloadShared(const std::string& file_path)
 	{
 		for (const auto& [path, texture] : shared)

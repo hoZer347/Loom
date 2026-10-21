@@ -20,7 +20,6 @@
 #include <map>
 #include <memory>
 #include <optional>
-#include <set>
 #include <sstream>
 #include <utility>
 #include <vector>
@@ -119,23 +118,13 @@ void main()
 			return texture;
 		};
 
-		// The image a rect is filled through: its own, or plain white when it
-		// names none or one that will not load, which is tried only once.
+		// The image a rect is filled through: its own, or plain white while
+		// it has none to draw with.
 		uint32_t ImageOf(const UiRect& rect)
 		{
-			static std::set<std::string> broken;
+			const uint32_t handle = Texture::HandleOf(rect.imagePath);
 
-			const std::string& path = rect.imagePath;
-
-			if (path.empty() || broken.contains(path))
-				return WhiteTexture();
-
-			if (const Texture* image = Texture::Shared(path))
-				return image->handle;
-
-			broken.insert(path);
-
-			return WhiteTexture();
+			return handle != 0 ? handle : WhiteTexture();
 		};
 
 		// The printable ASCII characters of one font at one size.
