@@ -340,6 +340,14 @@ namespace Loom
 		};
 
 		CloseAllScenes();
+
+		// What is left is what the game made for itself, which goes as it
+		// would outside the editor.
+		for (Scene* scene : std::vector<Scene*>(Scene::GetScenes()))
+			delete scene;
+
+		Engine::DoTasks();
+
 		OpenScene(std::filesystem::absolute(path).lexically_normal().string());
 	};
 

@@ -296,23 +296,22 @@ TEST_SUITE("Scene")
 		delete level;
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the last scene asked for before the frame is over is the one loaded")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "only the last scene asked for before the frame is over is loaded")
 	{
 		const SceneFile first("First");
 		const SceneFile last("Last");
 		Pump();
 
+		std::vector<std::string> loaded;
+
+		Loom::Scene::SetLoadFunction([&loaded](const std::string& path) { loaded.push_back(path); });
 		Loom::Scene::Load(first.path);
 		Loom::Scene::Load(last.path);
 		Loom::Engine::DoRequests();
-		Pump();
+		Loom::Engine::DoRequests();
+		Loom::Scene::SetLoadFunction(nullptr);
 
-		CHECK(Open("First") == nullptr);
-
-		Loom::Scene* loaded = Open("Last");
-		CHECK(loaded != nullptr);
-
-		delete loaded;
+		CHECK(loaded == std::vector<std::string>{ last.path });
 	};
 
 	// Restarting a level loads the file its scene came from while that scene
@@ -392,5 +391,25 @@ TEST_SUITE("Scene")
 		CHECK(owned != nullptr);
 
 		delete owned;
+	};
+
+	// The editor closes the scenes it plays before it opens the file, so
+	// one that is not there has to be caught before then.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a load function is never handed a scene that is not there")
+	{
+		bool handed = false;
+
+		std::ostringstream captured;
+		std::streambuf* previous = std::cerr.rdbuf(captured.rdbuf());
+
+		Loom::Scene::SetLoadFunction([&handed](const std::string&) { handed = true; });
+		Loom::Scene::Load(TempScene("Missing"));
+		Loom::Engine::DoRequests();
+		Loom::Scene::SetLoadFunction(nullptr);
+
+		std::cerr.rdbuf(previous);
+
+		CHECK_FALSE(handed);
+		CHECK(captured.str().find("Missing") != std::string::npos);
 	};
 };

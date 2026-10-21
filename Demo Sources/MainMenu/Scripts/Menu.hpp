@@ -29,11 +29,11 @@ namespace MainMenuScripts
 				m_quit->onClick = []() { Loom::Engine::Quit(); };
 		};
 
-		Loom::Serial<Loom::UiButton*> m_start;
-		Loom::Serial<Loom::UiButton*> m_quit;
-
 	private:
 		// How many seeds a new game picks among.
 		static constexpr unsigned int SEEDS = 1000000;
+
+		Loom::Serial<Loom::UiButton*> m_start;
+		Loom::Serial<Loom::UiButton*> m_quit;
 	};
 };

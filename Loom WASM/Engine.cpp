@@ -178,6 +178,10 @@ namespace Loom
 
 #if __EMSCRIPTEN__
 		// The browser runs the loop, and never asks the window whether to close.
+		// Nothing ticks once it has ended, so the sound is paused first, as it
+		// is whenever the scenes stop updating.
+		updateScenes = false;
+		Audio::Tick();
 		emscripten_cancel_main_loop();
 #endif
 	};

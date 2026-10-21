@@ -83,8 +83,9 @@ namespace Loom
 	*   builds into a library the editor loads
 	* - Reads and writes scenes through SceneSerializer, and shows the text form
 	*   of the open scene live in its Scene Data panel
-	* - Takes over Engine's GUI hook on construction and hands it back on
-	*   destruction, so nothing else has to know the editor exists
+	* - Takes over Engine's GUI and quit functions and Scene's load function on
+	*   construction and hands them back on destruction, so nothing else has
+	*   to know the editor exists
 	*/
 	struct Editor final
 	{
@@ -536,13 +537,15 @@ namespace Loom
 		// has something to go back to.
 		void BeginPlay();
 
-		// What Scene::Load does here: in a run, the scenes the editor owns go
-		// for the one at path, opened as its own, and Stop still brings back
+		// What Scene::Load does here: in a run, every open scene goes for the
+		// one at path, opened as the editor's own, and Stop still brings back
 		// those Play began with. Outside a run, the scenes are the user's.
 		void LoadIntoRun(const std::string& path);
 
-		// Deletes every open scene here and now, rather than on the task queue:
-		// the callers are about to unload the code those scenes are made of.
+		// Deletes every scene the editor owns here and now, rather than on the
+		// task queue: the callers need them gone before going on, to unload
+		// the code they are made of or to read a scene that may share their
+		// guids.
 		void CloseAllScenes();
 
 		// The chosen folder and the scene that was open in it, remembered beside

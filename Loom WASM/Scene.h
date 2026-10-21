@@ -74,11 +74,12 @@ namespace Loom
 		// lands after the scene has registered itself.
 		static void Unlist(Scene* scene);
 
-		// Swaps every open scene for the one saved at path, between frames: the
-		// frame that asks finishes as it is, and the next starts on the new
-		// scene. The last path asked for before then wins, and one that names
-		// no file is reported and changes nothing. Whatever a scene hands on
-		// to the next has to outlive it, as a static does.
+		// Swaps every open scene for the one saved at path, relative to the
+		// project folder, between frames: the frame that asks finishes as it
+		// is, and the next starts on the new scene. The last path asked for
+		// before then wins, and one that names no file is reported and changes
+		// nothing. Whatever a scene hands on to the next has to outlive it, as
+		// a static does.
 		static void Load(const std::string& path);
 
 		// What Load does with the path in place of the swap, for a host that

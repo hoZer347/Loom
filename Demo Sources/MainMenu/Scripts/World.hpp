@@ -37,6 +37,7 @@ namespace MainMenuScripts
 				m_back->onClick = []() { Loom::Scene::Load(MENU); };
 		};
 
+	private:
 		Loom::Serial<int> m_seed = 1;
 		Loom::Serial<Loom::UiText*> m_seedText;
 		Loom::Serial<Loom::UiButton*> m_back;
