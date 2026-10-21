@@ -15,6 +15,7 @@
 #include "GameObject.h"
 #include "Guid.h"
 #include "Input.h"
+#include "InputActions.h"
 #include "Jobs.h"
 #include "KeySet.h"
 #include "Light.h"

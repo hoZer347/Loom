@@ -2,6 +2,9 @@
 
 #include "Loom API.h"
 
+#include <span>
+#include <string_view>
+
 
 namespace Loom
 {
@@ -37,6 +40,14 @@ namespace Loom
 		RightShift, RightControl, RightAlt, RightSuper,
 		Menu,
 	};
+
+	// Every Key, None first and the rest in number order.
+	LOOM_API std::span<const Key> AllKeys();
+
+	// A Key by its enumerator's name, "Space" or "LeftControl", and back, as a
+	// file of bindings writes it. A name that is no Key is None.
+	LOOM_API std::string_view NameOf(Key key);
+	LOOM_API Key KeyNamed(std::string_view name);
 
 	struct LOOM_API Input
 	{

@@ -111,6 +111,8 @@
     <ClCompile Include="Script Exports Tests.cpp" />
     <ClCompile Include="EditorCamera Tests.cpp" />
     <ClCompile Include="EditorConsole Tests.cpp" />
+    <ClCompile Include="KeyBindings Tests.cpp" />
+    <ClCompile Include="InputActions Tests.cpp" />
     <ClCompile Include="ComponentMenu Tests.cpp" />
     <ClCompile Include="ScriptFolders Tests.cpp" />
     <ClCompile Include="EditorLayouts Tests.cpp" />
@@ -186,6 +188,7 @@
     <ClCompile Include="..\Loom Editor\ProjectTemplate.cpp" />
     <ClCompile Include="..\Loom Editor\EditorCamera.cpp" />
     <ClCompile Include="..\Loom Editor\EditorConsole.cpp" />
+    <ClCompile Include="..\Loom Editor\KeyBindings.cpp" />
     <ClCompile Include="..\Loom Editor\ComponentMenu.cpp" />
     <ClCompile Include="..\Loom Editor\ScriptFolders.cpp" />
     <ClCompile Include="..\Loom Editor\EditorLayouts.cpp" />

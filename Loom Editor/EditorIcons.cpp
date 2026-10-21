@@ -1,5 +1,6 @@
 #include "EditorIcons.h"
 
+#include "InputActions.h"
 #include "Prefab.h"
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
@@ -37,6 +38,9 @@ namespace Loom
 
 		if (extension == ScriptFolders::extension)
 			return Script;
+
+		if (extension == InputActions::extension)
+			return Bindings;
 
 		if (ProjectAssets::IsTextureFile(path))
 			return Texture;

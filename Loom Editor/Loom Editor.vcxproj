@@ -113,6 +113,7 @@
     <ClCompile Include="EditorMcp.cpp" />
     <ClCompile Include="McpProtocol.cpp" />
     <ClCompile Include="EditorConsole.cpp" />
+    <ClCompile Include="KeyBindings.cpp" />
     <ClCompile Include="ComponentMenu.cpp" />
     <ClCompile Include="EditorLayouts.cpp" />
     <ClCompile Include="ShaderEditor.cpp" />
@@ -151,6 +152,7 @@
     <ClInclude Include="EditorMcp.h" />
     <ClInclude Include="McpProtocol.h" />
     <ClInclude Include="EditorConsole.h" />
+    <ClInclude Include="KeyBindings.h" />
     <ClInclude Include="ComponentMenu.h" />
     <ClInclude Include="EditorLayouts.h" />
     <ClInclude Include="EditorRefresh.h" />

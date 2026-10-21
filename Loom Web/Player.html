@@ -39,13 +39,17 @@
       // so main never waits on the network. Waiting there makes it async, and
       // the unwind the main loop starts with escapes as an unhandled rejection.
       // So are the project's fonts, at the paths under it a UiText names
-      // them by, which resolve from the root the program runs in.
+      // them by, which resolve from the root the program runs in, and its key
+      // bindings when it has any.
       var Module = {
         canvas: document.getElementById("canvas"),
         arguments: ["/scene.loomscene"],
         preRun: [
           () => {
             Module.FS.createPreloadedFile("/", "scene.loomscene", "{SCENE}", true, false);
+
+            if ("{INPUT}")
+              Module.FS.createPreloadedFile("/", "project.loominput", "{INPUT}", true, false);
 
             for (const font of {FONTS}) {
               const folder = "/" + font.substring(0, font.lastIndexOf("/") + 1);

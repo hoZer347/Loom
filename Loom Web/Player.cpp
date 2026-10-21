@@ -2,9 +2,11 @@
 // ---------------
 // What the editor's Play Web builds: the engine and a project's scripts behind
 // an entry point that loads one scene file and runs it. The page preloads the
-// scene and names its path as the first argument.
+// scene and names its path as the first argument, and preloads the project's
+// key bindings, when it has any, at input_actions.
 
 #include "Engine.h"
+#include "InputActions.h"
 #include "SceneSerializer.h"
 
 #include <cstdlib>
@@ -12,6 +14,8 @@
 #include <string>
 
 using namespace Loom;
+
+static constexpr const char* input_actions = "/project.loominput";
 
 
 int main(int argc, char** argv)
@@ -24,6 +28,8 @@ int main(int argc, char** argv)
 
 	// Before the scene: its components reach for the GL context as they attach.
 	Engine engine;
+
+	InputActions::Load(input_actions);
 
 	std::string error;
 

@@ -319,7 +319,7 @@ namespace Loom
 		constexpr const char* prefab_light = "Prefab Light";
 
 		// Panels docked as a tab beside another, each with the one it goes beside.
-		constexpr std::pair<const char*, const char*> side_windows[] = { { EditorPanels::Scripts, EditorPanels::Project } };
+		constexpr std::pair<const char*, const char*> side_windows[] = { { EditorPanels::Scripts, EditorPanels::Project }, { EditorPanels::KeyBindings, EditorPanels::Console } };
 
 		// The ImGui settings entry that holds which panels are open.
 		constexpr const char* panel_settings = "LoomEditor";
@@ -730,6 +730,15 @@ namespace Loom
 
 			if (ProjectTemplate::EnsureScripts(path, &error).empty())
 				std::cerr << "No scripts project for " << path << ": " << error << std::endl;
+
+			return OpenProject(std::filesystem::absolute(path, code).parent_path().string(), open_scene);
+		};
+
+		// So does the Key Bindings panel's file, which shows the panel.
+		if (std::filesystem::path(path).extension() == InputActions::extension &&
+			std::filesystem::is_regular_file(path, code))
+		{
+			m_showKeyBindings = true;
 
 			return OpenProject(std::filesystem::absolute(path, code).parent_path().string(), open_scene);
 		};
@@ -1637,6 +1646,10 @@ namespace Loom
 		if (m_showShaders)		m_shaders.Draw(&m_showShaders);
 		if (m_showSprites)		m_sprites.Draw(&m_showSprites);
 		if (m_showStats)		DrawStats();
+
+		if (m_showKeyBindings && m_keyBindings.Draw(&m_showKeyBindings, !m_projectFile.empty()))
+			SaveInputActions();
+
 		if (m_showImGuiDemo)	ImGui::ShowDemoWindow(&m_showImGuiDemo);
 
 		if (m_showSettings && m_settings.Draw(&m_showSettings))
@@ -1796,6 +1809,7 @@ namespace Loom
 		ImGui::DockBuilderDockWindow(EditorPanels::Console, bottom);
 		ImGui::DockBuilderDockWindow(EditorPanels::SceneData, bottom);
 		ImGui::DockBuilderDockWindow(EditorPanels::Stats, bottom);
+		ImGui::DockBuilderDockWindow(EditorPanels::KeyBindings, bottom);
 
 		for (const char* window : centre_windows)
 			ImGui::DockBuilderDockWindow(window, centre);
@@ -1818,7 +1832,8 @@ namespace Loom
 			{ EditorPanels::Shaders, &m_showShaders, false },
 			{ EditorPanels::Sprites, &m_showSprites, false },
 			{ EditorPanels::Prefab, &m_showPrefab, false },
-			{ EditorPanels::Stats, &m_showStats, true } };
+			{ EditorPanels::Stats, &m_showStats, true },
+			{ EditorPanels::KeyBindings, &m_showKeyBindings, true } };
 	};
 
 	void Editor::AddPanelSettings()

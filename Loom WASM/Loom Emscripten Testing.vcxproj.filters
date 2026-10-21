@@ -94,6 +94,9 @@
     <ClCompile Include="Input.cpp">
       <Filter>Input</Filter>
     </ClCompile>
+    <ClCompile Include="InputActions.cpp">
+      <Filter>Input</Filter>
+    </ClCompile>
     <ClCompile Include="Collider.cpp">
       <Filter>Collider</Filter>
     </ClCompile>
@@ -335,6 +338,9 @@
     </ClInclude>
     <ClInclude Include="Macro Helpers.h" />
     <ClInclude Include="Input.h">
+      <Filter>Input</Filter>
+    </ClInclude>
+    <ClInclude Include="InputActions.h">
       <Filter>Input</Filter>
     </ClInclude>
     <ClInclude Include="Collider.h">

@@ -178,11 +178,16 @@ $fonts = @(Get-ChildItem -LiteralPath $Project -Recurse -File -Include '*.ttf', 
     ForEach-Object { (Get-UrlPath $_.FullName).TrimStart('/') } |
     Sort-Object)
 
+# The project's key bindings, beside its .loomproject, or none.
+$bindings = if ($projectFile) { [IO.Path]::ChangeExtension($projectFile.FullName, '.loominput') } else { $null }
+$bindingsUrl = if ($bindings -and (Test-Path -LiteralPath $bindings)) { Get-UrlPath $bindings } else { '' }
+
 (Get-Content -LiteralPath (Join-Path $root 'Loom Web\Player.html') -Raw).
     Replace('{TITLE}', (Split-Path -Leaf $Project)).
     Replace('{SCRIPT}', (Get-UrlPath $module)).
     Replace('{SCENE}', (Get-UrlPath $Scene)).
-    Replace('{FONTS}', (ConvertTo-Json -InputObject $fonts -Compress)) |
+    Replace('{FONTS}', (ConvertTo-Json -InputObject $fonts -Compress)).
+    Replace('{INPUT}', $bindingsUrl) |
     Set-Content -LiteralPath $page -Encoding UTF8 -NoNewline
 
 # --- Serving ----------------------------------------------------------------

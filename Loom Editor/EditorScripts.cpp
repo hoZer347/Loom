@@ -48,6 +48,7 @@ namespace Loom
 		m_projectFile.clear();
 		m_componentMenu.Clear();
 		m_scriptFolders.Clear();
+		InputActions::Set({ });
 
 		// Unless the project file names it otherwise.
 		m_projectName = std::filesystem::path(m_projectPath).filename().string();
@@ -69,6 +70,7 @@ namespace Loom
 			return;
 
 		m_scriptFolders.Load(ScriptFoldersFile());
+		InputActions::Load(InputActionsFile());
 
 		std::ifstream in(m_projectFile);
 		std::string line, project, library;

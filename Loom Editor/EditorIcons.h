@@ -25,6 +25,7 @@ namespace Loom
 		constexpr const char* Model = "🧊";
 		constexpr const char* Script = "🧩";
 		constexpr const char* State = "🚦";
+		constexpr const char* Bindings = "⌨";
 		constexpr const char* File = "📄";
 
 		// What the Project panel shows beside a file, models aside, which only
@@ -52,6 +53,7 @@ namespace Loom
 		constexpr const char* Sprites = "🖌 Sprites###Sprites";
 		constexpr const char* Stats = "📈 Stats###Stats";
 		constexpr const char* Settings = "⚙ Settings###Settings";
+		constexpr const char* KeyBindings = "⌨ Key Bindings###Key Bindings";
 
 		// The part of a title after ###.
 		constexpr std::string_view IdOf(std::string_view title)

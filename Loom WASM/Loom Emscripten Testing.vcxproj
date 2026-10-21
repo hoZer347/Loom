@@ -116,6 +116,7 @@
     <ClCompile Include="Geo.cpp" />
     <ClCompile Include="Guid.cpp" />
     <ClCompile Include="Input.cpp" />
+    <ClCompile Include="InputActions.cpp" />
     <ClCompile Include="Jobs.cpp" />
     <ClCompile Include="KeySet.cpp" />
     <ClCompile Include="Light.cpp" />
@@ -174,6 +175,7 @@
     <ClInclude Include="Geo.h" />
     <ClInclude Include="Guid.h" />
     <ClInclude Include="Input.h" />
+    <ClInclude Include="InputActions.h" />
     <ClInclude Include="Jobs.h" />
     <ClInclude Include="KeySet.h" />
     <ClInclude Include="Light.h" />

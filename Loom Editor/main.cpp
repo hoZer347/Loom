@@ -66,6 +66,7 @@ namespace
 		{ ProjectTemplate::extension, L"Loom.Project", L"Loom Project" },
 		{ SceneSerializer::extension, L"Loom.Scene", L"Loom Scene" },
 		{ ScriptFolders::extension, L"Loom.ScriptFolders", L"Loom Script Folders" },
+		{ InputActions::extension, L"Loom.InputActions", L"Loom Key Bindings" },
 	};
 
 	// --create-<kind> <name>, for each of these.

@@ -4,6 +4,7 @@
 #include "ComponentMenu.h"
 #include "EditorCamera.h"
 #include "EditorConsole.h"
+#include "KeyBindings.h"
 #include "EditorLayouts.h"
 #include "EditorRefresh.h"
 #include "EditorViewport.h"
@@ -319,6 +320,11 @@ namespace Loom
 		// Empty for a folder with no project file.
 		std::string ScriptFoldersFile() const;
 		void SaveScriptFolders();
+
+		// Where the project keeps its InputActions, beside its .loomproject in
+		// the same way. Empty for a folder with no project file.
+		std::string InputActionsFile() const;
+		void SaveInputActions();
 
 		// Rereads the scripts project's headers for the types they declare.
 		void RefreshScripts();
@@ -799,6 +805,7 @@ namespace Loom
 		bool m_showSprites = false;
 		bool m_showPrefab = false;
 		bool m_showStats = true;
+		bool m_showKeyBindings = true;
 		bool m_showImGuiDemo = false;
 		bool m_showSettings = false;
 
@@ -858,6 +865,7 @@ namespace Loom
 		std::string m_newAssetProblem{ };
 
 		EditorConsole m_console;
+		KeyBindings m_keyBindings;
 		ShaderEditor m_shaders;
 		SpriteEditor m_sprites;
 

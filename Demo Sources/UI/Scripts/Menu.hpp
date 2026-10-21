@@ -15,19 +15,19 @@
 namespace UIScripts
 {
 	// The demo's menu, on the root of its scene. Red, Green and Blue tint the
-	// Card, as R, G and B on the keyboard do, More opens the Popup over the
-	// menu, and the Popup's Close shuts it again. Clicks counts every click a
-	// button takes. The wheel turns the Card a step a notch, and Left and
-	// Right turn it while they are held.
+	// Card, as the project's Red, Green and Blue actions do, More opens the
+	// Popup over the menu, and the Popup's Close shuts it again. Clicks counts
+	// every click a button takes. The wheel turns the Card a step a notch, and
+	// the Turn Left and Turn Right actions turn it while their keys are held.
 	struct Menu : Loom::Component<Menu>
 	{
 		void OnUpdate() override
 		{
-			if (Clicked("Red") || Loom::Input::GetKeyDown(Loom::Key::R))
+			if (Chosen("Red"))
 				Tint(RED);
-			else if (Clicked("Green") || Loom::Input::GetKeyDown(Loom::Key::G))
+			else if (Chosen("Green"))
 				Tint(GREEN);
-			else if (Clicked("Blue") || Loom::Input::GetKeyDown(Loom::Key::B))
+			else if (Chosen("Blue"))
 				Tint(BLUE);
 			else if (Clicked("More"))
 				ShowPopup(true);
@@ -83,15 +83,21 @@ namespace UIScripts
 					material->color = color;
 		};
 
+		// Its button clicked, or a key for the action by the same name pressed.
+		bool Chosen(const char* name)
+		{
+			return Clicked(name) || Loom::InputActions::Down(name);
+		};
+
 		// About its upright.
 		void Turn()
 		{
 			float turn = Loom::Input::GetMouseWheel() * TURN_PER_NOTCH;
 
-			if (Loom::Input::GetKey(Loom::Key::Left))
+			if (Loom::InputActions::Held("Turn Left"))
 				turn -= TURN_PER_SECOND * Loom::Time::DeltaTime();
 
-			if (Loom::Input::GetKey(Loom::Key::Right))
+			if (Loom::InputActions::Held("Turn Right"))
 				turn += TURN_PER_SECOND * Loom::Time::DeltaTime();
 
 			if (turn != 0.0f)

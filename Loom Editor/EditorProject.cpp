@@ -1223,6 +1223,19 @@ namespace Loom
 			std::cerr << "Scripts: could not write the folders to " << file << std::endl;
 	};
 
+	std::string Editor::InputActionsFile() const
+	{
+		return m_projectFile.empty()
+			? ""
+			: std::filesystem::path(m_projectFile).replace_extension(InputActions::extension).string();
+	};
+
+	void Editor::SaveInputActions()
+	{
+		if (const std::string file = InputActionsFile(); !InputActions::Save(file))
+			std::cerr << "Key Bindings: could not write them to " << file << std::endl;
+	};
+
 	void Editor::RefreshScripts()
 	{
 		m_scriptEntries.clear();
