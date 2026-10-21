@@ -50,11 +50,7 @@ namespace Loom
 			};
 
 			if (ImGui::MenuItem("Rename"))
-			{
-				m_renaming = node.path;
-				snprintf(m_name, sizeof(m_name), "%s", node.name.c_str());
-				m_focus = true;
-			};
+				Rename(node.path);
 
 			// What is in it goes up a level rather than with it.
 			if (ImGui::MenuItem("Remove Folder"))
