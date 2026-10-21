@@ -23,6 +23,9 @@ namespace Loom
 
 	void EditorViewport::Resize(int width, int height)
 	{
+		constexpr bool DEPTH = true;
+		constexpr bool PIXELATED = false;
+
 		if (m_texture && width == m_width && height == m_height)
 			return;
 
@@ -30,9 +33,6 @@ namespace Loom
 
 		m_width = width;
 		m_height = height;
-		constexpr bool DEPTH = true;
-		constexpr bool PIXELATED = false;
-
 		m_texture = Renderer::Get()->CreateColorTarget(m_width, m_height, DEPTH, PIXELATED);
 	};
 
