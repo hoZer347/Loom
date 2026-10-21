@@ -3117,7 +3117,8 @@ namespace Loom
 
 	void Editor::DrawGame()
 	{
-		if (ImGui::Begin(EditorPanels::Game, &m_showGame, view_flags))
+		// While it plays, the keys are the game's, not a way round the panel's buttons.
+		if (ImGui::Begin(EditorPanels::Game, &m_showGame, m_playing ? view_flags | ImGuiWindowFlags_NoNavInputs : view_flags))
 		{
 			m_gamePanelFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 			m_gamePanelHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);

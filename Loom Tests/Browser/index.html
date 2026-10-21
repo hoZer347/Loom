@@ -32,9 +32,14 @@
         canvas: document.getElementById("canvas"),
         // Set by a case that wants input, cleared by run.mjs once it is sent.
         loomRequest: null,
+        // Every keydown the page has had, repeats among them, so a case can
+        // tell one has landed when it should change nothing.
+        loomKeydowns: 0,
         onExit: (code) => (window.loomExit = code),
         onAbort: () => (window.loomExit = "abort"),
       };
+
+      addEventListener("keydown", () => Module.loomKeydowns++, true);
     </script>
     <script async src="tests.js"></script>
   </body>

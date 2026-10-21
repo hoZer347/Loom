@@ -29,6 +29,7 @@ namespace
 	constexpr int left_button = 0;
 	constexpr int right_button = 1;
 	constexpr int middle_button = 2;
+	constexpr int w_key = 'W';
 
 	// Every case shares the page's one canvas, so the engine is made once.
 	void OpenPage()
@@ -63,6 +64,27 @@ namespace
 	bool KeyIs(int key, int state)
 	{
 		return glfwGetKey(Loom::Engine::window, key) == state;
+	};
+
+	// Every keydown the page has had, repeats among them.
+	int Keydowns()
+	{
+		return EM_ASM_INT({ return Module.loomKeydowns; });
+	};
+
+	// The wheel's notches over the frames until it turns, or none.
+	float Turned()
+	{
+		float turned = 0.0f;
+
+		Until(
+			[&]()
+			{
+				turned += Loom::Input::GetMouseWheel();
+				return turned != 0.0f;
+			});
+
+		return turned;
 	};
 };
 
@@ -140,5 +162,53 @@ TEST_SUITE("Browser")
 
 		Request("release:left");
 		CHECK(Until([]() { return !Loom::Input::GetMouseButton(left_button); }));
+	};
+
+	TEST_CASE("a key is down, held through its repeats, then up")
+	{
+		OpenPage();
+
+		Request("keydown:KeyW");
+
+		REQUIRE(Until([]() { return Loom::Input::GetKeyDown(w_key); }));
+		CHECK(Loom::Input::GetKey(w_key));
+
+		const int keydowns = Keydowns();
+		bool pressed = false;
+
+		Request("repeat:KeyW");
+
+		CHECK(Until(
+			[&]()
+			{
+				pressed = pressed || Loom::Input::GetKeyDown(w_key);
+				return Keydowns() > keydowns;
+			}));
+
+		CHECK_FALSE(pressed);
+		CHECK(Loom::Input::GetKey(w_key));
+
+		Request("keyup:KeyW");
+
+		CHECK(Until([]() { return Loom::Input::GetKeyUp(w_key); }));
+		CHECK_FALSE(Loom::Input::GetKey(w_key));
+	};
+
+	TEST_CASE("the wheel turns in notches of a hundred pixels, small turns and all")
+	{
+		constexpr float one_notch = 1.0f;
+		constexpr float tenth_of_a_notch = 0.1f;
+
+		OpenPage();
+
+		Request("move:" + std::to_string(pointer_x) + "," + std::to_string(pointer_y));
+		REQUIRE(Until([]() { return Loom::Input::mouse_x == pointer_x && Loom::Input::mouse_y == pointer_y; }));
+
+		// Up the page is away from the person.
+		Request("wheel:-100");
+		CHECK(Turned() == doctest::Approx(one_notch));
+
+		Request("wheel:10");
+		CHECK(Turned() == doctest::Approx(-tenth_of_a_notch));
 	};
 };

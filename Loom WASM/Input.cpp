@@ -151,11 +151,6 @@ namespace Loom
 			if (action != GLFW_REPEAT)
 				Input::OnKey(key, action == GLFW_PRESS);
 		};
-
-		void scroll_callback(GLFWwindow*, double, double notches)
-		{
-			Input::OnMouseWheel((float)notches);
-		};
 	};
 
 	bool Input::GetMouseButtonDown(int button)
@@ -297,6 +292,27 @@ namespace Loom
 
 		return EM_TRUE;
 	};
+
+	// The DOM's own wheel event: GLFW's port rounds every one up to a whole
+	// notch, which turns a touchpad's run of small ones into a spin.
+	EM_BOOL wheel_callback(int, const EmscriptenWheelEvent* e, void*)
+	{
+		// How far a notch goes in each of the DOM's units, as SDL and ImGui's
+		// GLFW backend count it.
+		constexpr double pixels_per_notch = 100.0;
+		constexpr double lines_per_notch = 3.0;
+		constexpr double notches_per_page = 80.0;
+
+		const double notches =
+			e->deltaMode == DOM_DELTA_PIXEL ? e->deltaY / pixels_per_notch :
+			e->deltaMode == DOM_DELTA_LINE ? e->deltaY / lines_per_notch :
+			e->deltaY * notches_per_page;
+
+		// The DOM's is positive towards the person.
+		Input::OnMouseWheel((float)-notches);
+
+		return EM_TRUE;
+	};
 #else
 	void mouse_move_callback(
 		GLFWwindow* window,
@@ -307,6 +323,11 @@ namespace Loom
 		glfwGetWindowSize(window, &width, &height);
 
 		Input::OnMouseMove((int)xpos, (int)ypos, width, height);
+	};
+
+	void scroll_callback(GLFWwindow*, double, double notches)
+	{
+		Input::OnMouseWheel((float)notches);
 	};
 #endif
 
@@ -321,10 +342,20 @@ namespace Loom
 			nullptr,
 			true,
 			mouse_move_callback);
+
+		emscripten_set_wheel_callback(
+			"#canvas",
+			nullptr,
+			false,
+			wheel_callback);
 #else
 		glfwSetCursorPosCallback(
 			Engine::window,
 			mouse_move_callback);
+
+		glfwSetScrollCallback(
+			Engine::window,
+			scroll_callback);
 #endif
 
 		// The engine's own GLFW port on the web: ImGui is told to leave GLFW's
@@ -336,9 +367,5 @@ namespace Loom
 		glfwSetKeyCallback(
 			Engine::window,
 			key_callback);
-
-		glfwSetScrollCallback(
-			Engine::window,
-			scroll_callback);
 	};
 };

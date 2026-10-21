@@ -53,17 +53,16 @@ namespace Loom
 		// is run over every GLFW key once.
 		int GameKey(ImGuiKey key)
 		{
-			static const std::unordered_map<ImGuiKey, int> numbers =
-				[]()
-				{
-					std::unordered_map<ImGuiKey, int> found{ };
+			static const std::unordered_map<ImGuiKey, int> numbers = []()
+			{
+				std::unordered_map<ImGuiKey, int> found{ };
 
-					for (int number = 0; number < Input::keys; number++)
-						if (const ImGuiKey named = ImGui_ImplGlfw_KeyToImGuiKey(number, 0); named != ImGuiKey_None)
-							found.try_emplace(named, number);
+				for (int number = 0; number < Input::keys; number++)
+					if (const ImGuiKey named = ImGui_ImplGlfw_KeyToImGuiKey(number, 0); named != ImGuiKey_None)
+						found.try_emplace(named, number);
 
-					return found;
-				}();
+				return found;
+			}();
 
 			for (const Modifier& modifier : modifiers)
 				if (key == modifier.flag)

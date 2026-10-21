@@ -5,8 +5,8 @@ namespace Loom
 {
 	/**
 	* Loom::GameFocus
-	* - Whether the game hears the mouse this frame, from what ImGui says of
-	*   the Game panel
+	* - Whether the game hears the mouse and the keyboard this frame, from
+	*   what ImGui says of the Game panel
 	* - ImGui moves focus only at the end of the frame a left click lands in,
 	*   and never for the other buttons, so a press belongs to the panel it
 	*   lands on until every button is up again

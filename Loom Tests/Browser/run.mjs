@@ -29,6 +29,7 @@ const BUTTONS = { left: "left", right: "right", middle: "middle" };
 
 const KEYS = {
   Space: { key: " ", code: "Space", keyCode: 32, text: " " },
+  KeyW: { key: "w", code: "KeyW", keyCode: 87, text: "w" },
 };
 
 const server = createServer(async (request, response) => {
@@ -134,16 +135,21 @@ async function perform(action) {
       clickCount: 1,
       ...pointer,
     });
-  } else if (verb === "keydown" || verb === "keyup") {
+  } else if (verb === "keydown" || verb === "repeat" || verb === "keyup") {
+    // A repeat is the keydown a key held long enough sends again.
     const key = KEYS[argument];
     await send("Input.dispatchKeyEvent", {
-      type: verb === "keydown" ? "keyDown" : "keyUp",
+      type: verb === "keyup" ? "keyUp" : "keyDown",
       key: key.key,
       code: key.code,
       windowsVirtualKeyCode: key.keyCode,
       nativeVirtualKeyCode: key.keyCode,
-      text: verb === "keydown" ? key.text : undefined,
+      text: verb === "keyup" ? undefined : key.text,
+      autoRepeat: verb === "repeat",
     });
+  } else if (verb === "wheel") {
+    // In CSS pixels down the page, as a wheel or touchpad scrolls it.
+    await send("Input.dispatchMouseEvent", { type: "mouseWheel", ...pointer, deltaX: 0, deltaY: Number(argument) });
   } else {
     console.error(`run.mjs: no such input as '${action}'`);
   }
