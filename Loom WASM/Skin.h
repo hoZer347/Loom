@@ -82,7 +82,8 @@ namespace Loom
 		Skin();
 
 		// Fills the mesh's m_deformed with its vertices moved by the shape keys
-		// and bent by the joints.
+		// and bent by the joints, and its m_deformedNormals with its normals
+		// turned by the joints. Shape keys leave the normals as they are.
 		void Deform(Mesh& mesh);
 
 		// 0 leaves a shape key's vertices where they are; 1 moves them all the

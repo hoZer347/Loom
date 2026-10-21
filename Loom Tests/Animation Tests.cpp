@@ -71,6 +71,13 @@ namespace
 
 			return glm::make_vec3(mesh->m_deformed.data() + vertex * POSITION_FLOATS);
 		};
+
+		glm::vec3 Turned(size_t vertex)
+		{
+			skin->Deform(*mesh);
+
+			return glm::make_vec3(mesh->m_deformedNormals.data() + vertex * POSITION_FLOATS);
+		};
 	};
 };
 
@@ -91,6 +98,34 @@ TEST_SUITE("Skin")
 		rig.bone->transform.position = glm::vec3(0.0f);
 		rig.bone->transform.rotation = glm::vec3(0.0f, 0.0f, QUARTER_TURN);
 		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(-1.0f, 0.0f, 0.0f), CLOSE)));
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a normal turns with the joint it is bound to, but is not moved by it")
+	{
+		Rig rig;
+		rig.mesh->m_vertices = { 0.0f, 1.0f, 0.0f };
+		rig.mesh->m_normals = { 1.0f, 0.0f, 0.0f };
+		rig.skin->m_influences = Bound({ 0.0f });
+
+		rig.bone->transform.position = glm::vec3(2.0f, 0.0f, 0.0f);
+		CHECK(glm::all(glm::epsilonEqual(rig.Turned(0), glm::vec3(1.0f, 0.0f, 0.0f), CLOSE)));
+
+		rig.bone->transform.rotation = glm::vec3(0.0f, 0.0f, QUARTER_TURN);
+		CHECK(glm::all(glm::epsilonEqual(rig.Turned(0), glm::vec3(0.0f, 1.0f, 0.0f), CLOSE)));
+
+		// The mesh's own normals are left as they were.
+		CHECK(*rig.mesh->m_normals == std::vector<float>{ 1.0f, 0.0f, 0.0f });
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a skinned mesh without a normal for every vertex has none turned")
+	{
+		Rig rig;
+		rig.mesh->m_vertices = { 0.0f, 1.0f, 0.0f };
+		rig.mesh->m_normals = { 1.0f, 0.0f };
+		rig.skin->m_influences = Bound({ 0.0f });
+		rig.skin->Deform(*rig.mesh);
+
+		CHECK(rig.mesh->m_deformedNormals.empty());
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a vertex split between joints moves by their weighted mix")
@@ -477,6 +512,36 @@ TEST_SUITE("Textured meshes")
 		CHECK(renderer.lastVertices == std::vector<float>{ 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1 });
 
 		mesh->m_textureCoordinates = { 0.0f, 0.0f };
+		mesh->Draw(1);
+
+		CHECK(renderer.lastFormat == Loom::VertexFormat::Position);
+		CHECK(renderer.lastVertices == *mesh->m_vertices);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh with a normal for every vertex draws them after its texture coordinates, or after none")
+	{
+		RecordingRenderer renderer;
+
+		Loom::Scene scene("normals");
+		Loom::Mesh* mesh = scene.Attach<Loom::Mesh>(Loom::Mesh::Triangles);
+		Pump();
+
+		mesh->m_vertices = { 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
+		mesh->m_textureCoordinates = { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f };
+		mesh->m_normals = { 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f };
+		mesh->Draw(1);
+
+		CHECK(renderer.lastFormat == Loom::VertexFormat::PositionUVNormal);
+		CHECK(renderer.lastVertices == std::vector<float>{ 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0 });
+
+		// Without texture coordinates their place is kept, at zeros.
+		mesh->m_textureCoordinates = std::vector<float>{ };
+		mesh->Draw(1);
+
+		CHECK(renderer.lastFormat == Loom::VertexFormat::PositionUVNormal);
+		CHECK(renderer.lastVertices == std::vector<float>{ 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0 });
+
+		mesh->m_normals = { 0.0f, 0.0f, 1.0f };
 		mesh->Draw(1);
 
 		CHECK(renderer.lastFormat == Loom::VertexFormat::Position);

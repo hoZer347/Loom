@@ -21,9 +21,10 @@ namespace Loom
 	enum class Backend { OpenGL, Vulkan };
 
 	// What each vertex handed to Renderer::Draw holds, its floats one after
-	// another: a position at location 0 (aPos), and with PositionUV a texture
-	// coordinate after it at location 1 (aUV).
-	enum class VertexFormat { Position, PositionUV };
+	// another: a position at location 0 (aPos), with PositionUV a texture
+	// coordinate after it at location 1 (aUV), and with PositionUVNormal a
+	// normal after that at location 2 (aNormal).
+	enum class VertexFormat { Position, PositionUV, PositionUVNormal };
 
 	LOOM_API size_t FloatsPerVertex(VertexFormat format);
 
@@ -97,7 +98,8 @@ namespace Loom
 		// Draws vertices laid out as format says as the GL primitive given
 		// (GL_TRIANGLES and the rest). usage is the GL buffer usage hint. A
 		// program that reads aUV from vertices without one reads the position's
-		// x and y.
+		// x and y, and one that reads aNormal from vertices without one reads
+		// none, all zeros.
 		virtual void Draw(
 			uint32_t program,
 			uint32_t primitive,

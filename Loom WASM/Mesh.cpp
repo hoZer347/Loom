@@ -104,6 +104,8 @@ namespace Loom
 
 		constexpr size_t POSITION_COMPONENTS = 3;
 		constexpr size_t UV_COMPONENTS = 2;
+		constexpr size_t NORMAL_COMPONENTS = 3;
+		constexpr float NO_UV[UV_COMPONENTS] = { };
 
 		if (Skin* skin = m_gameObject->GetComponent<Skin>())
 		{
@@ -113,29 +115,40 @@ namespace Loom
 				m_deformedFrame = Time::FrameCount();
 			};
 		}
-		else m_deformed.clear();
+		else
+		{
+			m_deformed.clear();
+			m_deformedNormals.clear();
+		};
 
 		const std::vector<float>& positions = m_deformed.size() == m_vertices->size() ? m_deformed : *m_vertices;
+		const std::vector<float>& normals = m_deformedNormals.size() == m_normals->size() ? m_deformedNormals : *m_normals;
 		const size_t count = positions.size() / POSITION_COMPONENTS;
+		const bool hasUVs = m_textureCoordinates->size() == count * UV_COMPONENTS;
+		const bool hasNormals = normals.size() == count * NORMAL_COMPONENTS;
 
 		renderer->SetUniform(program, "u_model", m_gameObject->WorldMatrix());
 
-		if (m_textureCoordinates->size() != count * UV_COMPONENTS)
+		if (!hasUVs && !hasNormals)
 		{
 			renderer->Draw(program, primitive_id, positions.data(), count, m_draw_type);
 			return;
 		};
 
-		m_interleaved.resize(count * FloatsPerVertex(VertexFormat::PositionUV));
+		const VertexFormat format = hasNormals ? VertexFormat::PositionUVNormal : VertexFormat::PositionUV;
+		m_interleaved.resize(count * FloatsPerVertex(format));
 		float* out = m_interleaved.data();
 
 		for (size_t i = 0; i < count; i++)
 		{
 			out = std::copy_n(positions.data() + i * POSITION_COMPONENTS, POSITION_COMPONENTS, out);
-			out = std::copy_n(m_textureCoordinates->data() + i * UV_COMPONENTS, UV_COMPONENTS, out);
+			out = std::copy_n(hasUVs ? m_textureCoordinates->data() + i * UV_COMPONENTS : NO_UV, UV_COMPONENTS, out);
+
+			if (hasNormals)
+				out = std::copy_n(normals.data() + i * NORMAL_COMPONENTS, NORMAL_COMPONENTS, out);
 		};
 
-		renderer->Draw(program, primitive_id, m_interleaved.data(), count, m_draw_type, VertexFormat::PositionUV);
+		renderer->Draw(program, primitive_id, m_interleaved.data(), count, m_draw_type, format);
 	};
 
 	void Mesh::DrawTransparent(const std::vector<Mesh*>& meshes)
@@ -181,6 +194,7 @@ namespace Loom
 		ImGui::Text("Vertices: %zu", m_vertices->size());
 		ImGui::Text("Indices:  %zu", m_indices.size());
 		ImGui::Text("UVs:      %zu", m_textureCoordinates->size());
+		ImGui::Text("Normals:  %zu", m_normals->size());
 
 		if (!IsDrawable())
 			return;

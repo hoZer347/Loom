@@ -54,8 +54,18 @@ namespace Loom
 
 		constexpr uint32_t POSITION_LOCATION = 0;
 		constexpr uint32_t UV_LOCATION = 1;
+		constexpr uint32_t NORMAL_LOCATION = 2;
 		constexpr uint32_t POSITION_COMPONENTS = 3;
+		constexpr uint32_t UV_COMPONENTS = 2;
+		constexpr uint32_t NORMAL_COMPONENTS = 3;
 		constexpr uint32_t UV_OFFSET = POSITION_COMPONENTS * sizeof(float);
+		constexpr uint32_t NORMAL_OFFSET = (POSITION_COMPONENTS + UV_COMPONENTS) * sizeof(float);
+		constexpr uint32_t NORMAL_SIZE = NORMAL_COMPONENTS * sizeof(float);
+
+		// The vertices' binding, and the one aNormal reads its zeros from when
+		// they have no normals.
+		constexpr uint32_t VERTEX_BINDING = 0;
+		constexpr uint32_t NO_NORMAL_BINDING = 1;
 
 		constexpr float FAR_DEPTH = 1.0f;
 		constexpr uint8_t WHITE = 0xFF;
@@ -599,7 +609,7 @@ namespace Loom
 			const size_t drawn = primitive == GL_LINE_LOOP_ ? count + 1 : count;
 			const size_t stride = FloatsPerVertex(format) * sizeof(float);
 
-			if (program.hasPosition || program.hasUV)
+			if (program.hasPosition || program.hasUV || program.hasNormal)
 			{
 				const Allocation vertexData = Allocate(drawn * stride, sizeof(float));
 				memcpy(vertexData.mapped, vertices, count * stride);
@@ -607,7 +617,15 @@ namespace Loom
 				if (drawn > count)
 					memcpy(vertexData.mapped + count * stride, vertices, stride);
 
-				vkCmdBindVertexBuffers(command, 0, 1, &vertexData.buffer, &vertexData.offset);
+				vkCmdBindVertexBuffers(command, VERTEX_BINDING, 1, &vertexData.buffer, &vertexData.offset);
+			};
+
+			if (program.hasNormal && format != VertexFormat::PositionUVNormal)
+			{
+				const Allocation noNormal = Allocate(NORMAL_SIZE, sizeof(float));
+				memset(noNormal.mapped, 0, NORMAL_SIZE);
+
+				vkCmdBindVertexBuffers(command, NO_NORMAL_BINDING, 1, &noNormal.buffer, &noNormal.offset);
 			};
 
 			// Members, so a draw allocates nothing; reserved, so the writes'
@@ -926,6 +944,7 @@ namespace Loom
 
 			bool hasPosition = false;
 			bool hasUV = false;
+			bool hasNormal = false;
 			bool pixelated = false;
 			uint32_t blockSize = 0;
 			std::vector<uint8_t> block;
@@ -1552,26 +1571,35 @@ namespace Loom
 			stages[1].pSpecializationInfo = &specialization;
 
 			const uint32_t stride = (uint32_t)(FloatsPerVertex(format) * sizeof(float));
-			const VkVertexInputBindingDescription binding = { 0, stride, VK_VERTEX_INPUT_RATE_VERTEX };
 
-			// Without texture coordinates, aUV reads the position's x and y, as
-			// it does under GL.
-			const uint32_t uvOffset = format == VertexFormat::PositionUV ? UV_OFFSET : 0;
+			// Without texture coordinates, aUV reads the position's x and y, and
+			// without normals, aNormal reads one normal of zeros for the whole
+			// draw, as they do under GL.
+			const uint32_t uvOffset = format != VertexFormat::Position ? UV_OFFSET : 0;
 
+			std::vector<VkVertexInputBindingDescription> bindings = { { VERTEX_BINDING, stride, VK_VERTEX_INPUT_RATE_VERTEX } };
 			std::vector<VkVertexInputAttributeDescription> attributes;
 
 			if (program.hasPosition)
-				attributes.push_back({ POSITION_LOCATION, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 });
+				attributes.push_back({ POSITION_LOCATION, VERTEX_BINDING, VK_FORMAT_R32G32B32_SFLOAT, 0 });
 
 			if (program.hasUV)
-				attributes.push_back({ UV_LOCATION, 0, VK_FORMAT_R32G32_SFLOAT, uvOffset });
+				attributes.push_back({ UV_LOCATION, VERTEX_BINDING, VK_FORMAT_R32G32_SFLOAT, uvOffset });
+
+			if (program.hasNormal && format == VertexFormat::PositionUVNormal)
+				attributes.push_back({ NORMAL_LOCATION, VERTEX_BINDING, VK_FORMAT_R32G32B32_SFLOAT, NORMAL_OFFSET });
+			else if (program.hasNormal)
+			{
+				bindings.push_back({ NO_NORMAL_BINDING, NORMAL_SIZE, VK_VERTEX_INPUT_RATE_INSTANCE });
+				attributes.push_back({ NORMAL_LOCATION, NO_NORMAL_BINDING, VK_FORMAT_R32G32B32_SFLOAT, 0 });
+			};
 
 			VkPipelineVertexInputStateCreateInfo input{ VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
 
 			if (!attributes.empty())
 			{
-				input.vertexBindingDescriptionCount = 1;
-				input.pVertexBindingDescriptions = &binding;
+				input.vertexBindingDescriptionCount = (uint32_t)bindings.size();
+				input.pVertexBindingDescriptions = bindings.data();
 				input.vertexAttributeDescriptionCount = (uint32_t)attributes.size();
 				input.pVertexAttributeDescriptions = attributes.data();
 			};
@@ -1711,6 +1739,7 @@ namespace Loom
 
 					program.hasPosition |= variable->location == POSITION_LOCATION;
 					program.hasUV |= variable->location == UV_LOCATION;
+					program.hasNormal |= variable->location == NORMAL_LOCATION;
 				};
 			};
 

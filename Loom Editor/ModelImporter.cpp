@@ -97,6 +97,9 @@ void main()
 		{
 			const aiMatrix4x4 transform = parent_transform * node.mTransformation;
 
+			// Keeps normals square to their faces however the node stretches them.
+			const aiMatrix3x3 turn = aiMatrix3x3(transform).Inverse().Transpose();
+
 			for (unsigned int n = 0; n < node.mNumMeshes; n++)
 			{
 				const aiMesh& mesh = *scene.mMeshes[node.mMeshes[n]];
@@ -115,6 +118,9 @@ void main()
 
 				part.vertices.reserve((size_t)mesh.mNumFaces * model_vertices_per_triangle * model_floats_per_vertex);
 
+				if (mesh.HasNormals())
+					part.normals.reserve(part.vertices.capacity());
+
 				for (unsigned int f = 0; f < mesh.mNumFaces; f++)
 				{
 					const aiFace& face = mesh.mFaces[f];
@@ -127,6 +133,13 @@ void main()
 						const aiVector3D vertex = transform * mesh.mVertices[face.mIndices[i]];
 
 						part.vertices.insert(part.vertices.end(), { vertex.x, vertex.y, vertex.z });
+
+						if (mesh.HasNormals())
+						{
+							const aiVector3D normal = (turn * mesh.mNormals[face.mIndices[i]]).Normalize();
+
+							part.normals.insert(part.normals.end(), { normal.x, normal.y, normal.z });
+						};
 					};
 				};
 			};
@@ -294,6 +307,7 @@ void main()
 		{
 			std::vector<float> vertices;
 			std::vector<float> uvs;
+			std::vector<float> normals;
 			std::vector<std::string> joints;
 			std::vector<float> inverseBinds;
 			std::vector<float> influences;
@@ -349,6 +363,9 @@ void main()
 
 				if (mesh.HasTextureCoords(0))
 					part.uvs.insert(part.uvs.end(), { mesh.mTextureCoords[0][index].x, mesh.mTextureCoords[0][index].y });
+
+				if (mesh.HasNormals())
+					part.normals.insert(part.normals.end(), { mesh.mNormals[index].x, mesh.mNormals[index].y, mesh.mNormals[index].z });
 
 				if (mesh.HasBones())
 					part.influences.insert(part.influences.end(), influences[index].begin(), influences[index].end());
@@ -407,6 +424,7 @@ void main()
 			Mesh* drawing = object.Attach<Mesh>(Mesh::Triangles);
 			drawing->m_vertices = std::move(part.vertices);
 			drawing->m_textureCoordinates = std::move(part.uvs);
+			drawing->m_normals = std::move(part.normals);
 
 			if (part.joints.empty() && part.shapes.empty())
 				return;
@@ -809,7 +827,10 @@ void main()
 			GameObject* target = parts.size() == 1 ? model : model->AddChild(part.name);
 
 			target->Attach<Material>()->SetShaderPath(ProjectTemplate::shader_path);
-			target->Attach<Mesh>(Mesh::Triangles)->m_vertices = std::move(part.vertices);
+
+			Mesh* drawing = target->Attach<Mesh>(Mesh::Triangles);
+			drawing->m_vertices = std::move(part.vertices);
+			drawing->m_normals = std::move(part.normals);
 		};
 
 		std::cout << "Imported " << path << " (" << parts.size() << " mesh(es))" << std::endl;

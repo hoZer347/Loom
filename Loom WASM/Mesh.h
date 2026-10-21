@@ -73,19 +73,27 @@ namespace Loom
 		// saved without it.
 		Serial<std::vector<float>> m_textureCoordinates;
 
+		// Three floats a vertex, drawn as aNormal, when there are three for
+		// every vertex; shading lights each face flat without them. After
+		// m_textureCoordinates for the same reason.
+		Serial<std::vector<float>> m_normals;
+
 		std::vector<uint32_t> m_indices;
 
 		// Drawn in place of m_vertices while it holds as many floats. What a
 		// Skin bends the vertices into; never saved.
 		std::vector<float> m_deformed;
 
+		// The same for m_normals.
+		std::vector<float> m_deformedNormals;
+
 	private:
 		// The frame m_deformed was bent for, so the passes after the first in
 		// a frame draw what it bent.
 		unsigned long long m_deformedFrame = 0;
 
-		// Positions and texture coordinates side by side, as the renderer takes
-		// them, rebuilt for every draw.
+		// Positions, texture coordinates and normals side by side, as the
+		// renderer takes them, rebuilt for every draw.
 		std::vector<float> m_interleaved;
 	};
 };

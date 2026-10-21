@@ -273,6 +273,10 @@ TEST_SUITE("Shader")
 		CHECK(stages.fragment.find("void loom_main() { FragColor") != std::string::npos);
 		CHECK(stages.fragment.find("FragColor.rgb *= LoomLight(loom_normal);") != std::string::npos);
 
+		// Lit by the mesh's normals when it has them, by each face's own when not.
+		CHECK(stages.vertex.find("loom_Normal = transpose(inverse(mat3(u_model))) * aNormal;") != std::string::npos);
+		CHECK(stages.fragment.find("dot(loom_Normal, loom_Normal) > 0.0 ? normalize(loom_Normal) : loom_face") != std::string::npos);
+
 		// Calling LoomLight brings the light's GLSL in.
 		CHECK(stages.fragment.find("uniform vec3 u_lightDirection;") != std::string::npos);
 
@@ -292,6 +296,7 @@ TEST_SUITE("Shader")
 			FRAGMENT);
 
 		CHECK(Count(stages.vertex, "layout(location = 0) in vec3 aPos;") == 1);
+		CHECK(Count(stages.vertex, "layout(location = 2) in vec3 aNormal;") == 1);
 		CHECK(Count(stages.vertex, "uniform mat4 u_model;") == 1);
 	};
 

@@ -123,6 +123,12 @@ namespace Loom
 		std::vector<float>& bent = mesh.m_deformed;
 		bent = *mesh.m_vertices;
 
+		std::vector<float>& turned = mesh.m_deformedNormals;
+
+		if (mesh.m_normals->size() == bent.size())
+			turned = *mesh.m_normals;
+		else turned.clear();
+
 		const std::vector<float>& offsets = *m_shapeOffsets;
 		const std::vector<size_t> starts = ShapeStarts();
 
@@ -180,6 +186,16 @@ namespace Loom
 			const glm::vec3 moved = glm::vec3(blended * glm::vec4(position[0], position[1], position[2], 1.0f)) / total;
 
 			std::copy_n(glm::value_ptr(moved), POSITION_COMPONENTS, position);
+
+			if (turned.empty())
+				continue;
+
+			// Joints turn and move but are not stretched, so the blend turns a
+			// normal as it does a position, and normalizing undoes the weights.
+			float* normal = turned.data() + v * POSITION_COMPONENTS;
+			const glm::vec3 facing = glm::normalize(glm::mat3(blended) * glm::make_vec3(normal));
+
+			std::copy_n(glm::value_ptr(facing), POSITION_COMPONENTS, normal);
 		};
 	};
 

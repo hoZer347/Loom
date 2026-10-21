@@ -95,6 +95,7 @@ bool LoomDitheredOut(float alpha)
 		constexpr ShadingInput SHADING_INPUTS[] =
 		{
 			{ "aPos", "layout(location = 0) in vec3 aPos;" },
+			{ "aNormal", "layout(location = 2) in vec3 aNormal;" },
 			{ "u_model", "uniform mat4 u_model;" },
 		};
 
@@ -140,16 +141,20 @@ bool LoomDitheredOut(float alpha)
 				if (!Declares(stage, input.name))
 					shaded += std::string(input.declaration) + '\n';
 
-			shaded += "out vec3 loom_World;\n";
+			shaded += "out vec3 loom_World;\nout vec3 loom_Normal;\n";
 
 			if (shadows)
 				shaded += "out vec4 loom_LightSpace;\n";
 
+			// The model's inverse transpose keeps a normal square to its face
+			// however the model is stretched. A mesh without normals gives
+			// zeros, which stay zeros.
 			shaded +=
 				"\nvoid main()\n{\n"
 				"\tloom_main();\n\n"
 				"\tvec4 loom_world = u_model * vec4(aPos, 1.0);\n"
-				"\tloom_World = loom_world.xyz;\n";
+				"\tloom_World = loom_world.xyz;\n"
+				"\tloom_Normal = transpose(inverse(mat3(u_model))) * aNormal;\n";
 
 			if (shadows)
 				shaded += "\tloom_LightSpace = LoomLightSpace(loom_world);\n";
@@ -164,17 +169,22 @@ bool LoomDitheredOut(float alpha)
 			if (!std::regex_search(stage, color, ColorPattern()))
 				throw std::runtime_error("Shading needs the fragment stage to write an out vec4 colour");
 
-			std::string shaded = WithMainRenamed(stage, "fragment") + '\n' + LineDirective(1, LIBRARY_SOURCE) + "in vec3 loom_World;\n";
+			std::string shaded = WithMainRenamed(stage, "fragment") + '\n' + LineDirective(1, LIBRARY_SOURCE) + "in vec3 loom_World;\nin vec3 loom_Normal;\n";
 
 			if (shadows)
 				shaded += "in vec4 loom_LightSpace;\n";
 
-			// Normals are not in the vertex format. The surface's slope across
-			// the screen gives one, exact for flat faces.
+			// The face's own normal comes from the surface's slope across the
+			// screen, and always faces the camera. A mesh with normals is lit by
+			// them instead, smoothly across its faces, turned to the camera's
+			// side so a sheet seen from behind is lit as its back. One without
+			// them gives zeros, and is lit flat face by face.
 			return shaded +
 				"\nvoid main()\n{\n"
 				"\tloom_main();\n\n"
-				"\tvec3 loom_normal = normalize(cross(dFdx(loom_World), dFdy(loom_World)));\n\n"
+				"\tvec3 loom_face = normalize(cross(dFdx(loom_World), dFdy(loom_World)));\n"
+				"\tvec3 loom_normal = dot(loom_Normal, loom_Normal) > 0.0 ? normalize(loom_Normal) : loom_face;\n"
+				"\tloom_normal = dot(loom_normal, loom_face) < 0.0 ? -loom_normal : loom_normal;\n\n"
 				"\t" + color[1].str() + ".rgb *= LoomLight(loom_normal" + (shadows ? ", loom_LightSpace" : "") + ");\n"
 				"}\n";
 		};

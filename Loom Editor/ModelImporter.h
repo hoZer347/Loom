@@ -26,11 +26,12 @@ namespace Loom
 	inline constexpr const char* model_texture_variable = "u_texture";
 
 	// One mesh of a model, unindexed (which is how Mesh draws), with its node's
-	// transform already applied.
+	// transform already applied, and its normals when the file has them.
 	struct ModelPart
 	{
 		std::string name;
 		std::vector<float> vertices;
+		std::vector<float> normals;
 	};
 
 	// Whether Assimp has an importer for the file's extension.

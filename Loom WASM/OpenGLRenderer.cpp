@@ -111,6 +111,9 @@ namespace Loom
 			if (m_vbo)
 				glDeleteBuffers(1, &m_vbo);
 
+			if (m_noNormal)
+				glDeleteBuffers(1, &m_noNormal);
+
 			if (m_nearest)
 				glDeleteSamplers(1, &m_nearest);
 
@@ -192,6 +195,12 @@ namespace Loom
 			std::cout << "GLSL Version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
 
 			glGenBuffers(1, &m_vbo);
+
+			constexpr float NO_NORMAL[3] = { };
+			glGenBuffers(1, &m_noNormal);
+			glBindBuffer(GL_ARRAY_BUFFER, m_noNormal);
+			glBufferData(GL_ARRAY_BUFFER, sizeof(NO_NORMAL), NO_NORMAL, GL_STATIC_DRAW);
+			glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 			glGenSamplers(1, &m_nearest);
 			SetNearestSampling(m_nearest);
@@ -452,8 +461,14 @@ namespace Loom
 		{
 			constexpr GLint POSITION_COMPONENTS = 3;
 			constexpr GLint UV_COMPONENTS = 2;
+			constexpr GLint NORMAL_COMPONENTS = 3;
 			constexpr GLuint POSITION_LOCATION = 0;
 			constexpr GLuint UV_LOCATION = 1;
+			constexpr GLuint NORMAL_LOCATION = 2;
+
+			// A divisor of 1 reads one value for the whole of a draw of one instance.
+			constexpr GLuint PER_VERTEX = 0;
+			constexpr GLuint PER_DRAW = 1;
 
 			const GLsizei stride = (GLsizei)(FloatsPerVertex(format) * sizeof(float));
 
@@ -462,15 +477,31 @@ namespace Loom
 			glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
 			glBufferData(GL_ARRAY_BUFFER, count * stride, vertices, usage);
 
-			// Both left enabled after the draw: toggling them per draw has the
+			// All left enabled after the draw: toggling them per draw has the
 			// driver recompile the vertex shader for each state. Without texture
-			// coordinates, aUV reads the position's x and y.
-			const GLsizeiptr uvOffset = format == VertexFormat::PositionUV ? POSITION_COMPONENTS * sizeof(float) : 0;
+			// coordinates, aUV reads the position's x and y, and without normals,
+			// aNormal reads m_noNormal's zeros for every vertex.
+			const GLsizeiptr uvOffset = format != VertexFormat::Position ? POSITION_COMPONENTS * sizeof(float) : 0;
+			const GLsizeiptr normalOffset = (POSITION_COMPONENTS + UV_COMPONENTS) * sizeof(float);
 
 			glVertexAttribPointer(POSITION_LOCATION, POSITION_COMPONENTS, GL_FLOAT, GL_FALSE, stride, (void*)0);
 			glEnableVertexAttribArray(POSITION_LOCATION);
 			glVertexAttribPointer(UV_LOCATION, UV_COMPONENTS, GL_FLOAT, GL_FALSE, stride, (void*)uvOffset);
 			glEnableVertexAttribArray(UV_LOCATION);
+
+			if (format == VertexFormat::PositionUVNormal)
+			{
+				glVertexAttribPointer(NORMAL_LOCATION, NORMAL_COMPONENTS, GL_FLOAT, GL_FALSE, stride, (void*)normalOffset);
+				glVertexAttribDivisor(NORMAL_LOCATION, PER_VERTEX);
+			}
+			else
+			{
+				glBindBuffer(GL_ARRAY_BUFFER, m_noNormal);
+				glVertexAttribPointer(NORMAL_LOCATION, NORMAL_COMPONENTS, GL_FLOAT, GL_FALSE, 0, (void*)0);
+				glVertexAttribDivisor(NORMAL_LOCATION, PER_DRAW);
+			};
+
+			glEnableVertexAttribArray(NORMAL_LOCATION);
 
 			glDrawArrays(primitive, 0, (GLsizei)count);
 
@@ -730,6 +761,9 @@ namespace Loom
 
 		GLuint m_vbo = 0;
 		GLuint m_vao = 0;
+
+		// A normal of zeros, what aNormal reads from vertices without normals.
+		GLuint m_noNormal = 0;
 
 		// What a pixelated program samples its colour textures through.
 		GLuint m_nearest = 0;

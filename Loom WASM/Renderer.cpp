@@ -7,8 +7,17 @@ namespace Loom
 	{
 		constexpr size_t POSITION = 3;
 		constexpr size_t UV = 2;
+		constexpr size_t NORMAL = 3;
 
-		return format == VertexFormat::PositionUV ? POSITION + UV : POSITION;
+		switch (format)
+		{
+		case VertexFormat::PositionUV:
+			return POSITION + UV;
+		case VertexFormat::PositionUVNormal:
+			return POSITION + UV + NORMAL;
+		default:
+			return POSITION;
+		};
 	};
 
 	std::unique_ptr<Renderer> CreateOpenGLRenderer();
