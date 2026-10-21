@@ -21,6 +21,7 @@ namespace Loom
 		A = 65, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
 		LeftBracket, Backslash, RightBracket,
 		GraveAccent = 96,
+		World1 = 161, World2,
 
 		Escape = 256, Enter, Tab, Backspace, Insert, Delete,
 		Right, Left, Down, Up,
