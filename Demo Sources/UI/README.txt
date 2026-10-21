@@ -18,3 +18,7 @@ whatever is beneath. Close shuts the popup again.
 
 The UI is drawn in the Game view, over every scene in it, and not in the
 Scene view.
+
+The keyboard and the wheel reach the script through Loom::Input once the Game
+view has focus. R, G and B tint the card as their buttons do, the wheel over
+the Game view turns it a step a notch, and Left and Right turn it while held.
