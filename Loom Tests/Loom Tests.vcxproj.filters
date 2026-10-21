@@ -139,6 +139,9 @@
     <ClCompile Include="Input Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="Clock Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="GameFocus Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
