@@ -221,6 +221,9 @@ namespace Loom
 
 				out << '\n';
 			};
+
+			for (const LoomObject::FieldButton& button : object.GetButtons())
+				out << '\t' << button.name << " (a button, press_button presses it)\n";
 		};
 
 		// The component set_field writes into, by type or guid. Null for the
@@ -456,6 +459,48 @@ namespace Loom
 			context.editor.MarkEdited();
 
 			return Text(shown + " = " + field.Write());
+		};
+
+		json PressButton(Context& context, const json& arguments)
+		{
+			GameObject& gameObject = FindObject(Argument(arguments, "object"));
+			ComponentBase* component = FindComponent(gameObject, OptionalArgument(arguments, "component"));
+			LoomObject& object = component ? *(LoomObject*)component : gameObject;
+			const std::string label = Argument(arguments, "button");
+			const std::vector<LoomObject::FieldButton>& buttons = object.GetButtons();
+
+			// The Button inspect writes as that name, or the one Button with
+			// that label after its categories.
+			std::vector<const LoomObject::FieldButton*> matches;
+
+			for (const LoomObject::FieldButton& button : buttons)
+				if (matches.empty() && SameText(button.name, label))
+					matches.push_back(&button);
+
+			if (matches.empty())
+				for (const LoomObject::FieldButton& button : buttons)
+					if (SameText(std::string(NameDisplay(button.name)), label))
+						matches.push_back(&button);
+
+			if (matches.empty())
+				throw ToolError((component ? Named(*component) : Named(gameObject)) + " has no button " + label);
+
+			if (matches.size() > 1)
+			{
+				std::string named;
+
+				for (const LoomObject::FieldButton* button : matches)
+					named += (named.empty() ? "" : ", ") + button->name;
+
+				throw ToolError(label + " names more than one button, so give its categories too: " + named);
+			};
+
+			if (matches.front()->press && *matches.front()->press)
+				(*matches.front()->press)();
+
+			context.editor.MarkEdited();
+
+			return Text("Pressed " + matches.front()->name);
 		};
 
 		json Select(Context& context, const json& arguments)
@@ -731,6 +776,18 @@ namespace Loom
 						"value": { "type": "string" } },
 					"required": [ "object", "field", "value" ] })",
 				SetField,
+			},
+			{
+				"press_button",
+				"Presses one of an object's buttons, by the name inspect shows, as clicking it in the Inspector would.",
+				R"({
+					"type": "object",
+					"properties": {
+						"object": { "type": "string", "description": "A GameObject's guid or name" },
+						"component": { "type": "string", "description": "A component's type or guid; the GameObject itself when left out" },
+						"button": { "type": "string", "description": "The button's name, as inspect shows it, its categories in front; without them, if no other button has that label" } },
+					"required": [ "object", "button" ] })",
+				PressButton,
 			},
 			{
 				"select",

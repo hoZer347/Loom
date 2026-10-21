@@ -6,6 +6,7 @@
 #include "Serial.h"
 #include "SerializedField.h"
 
+#include <functional>
 #include <unordered_map>
 #include <string>
 #include <mutex>
@@ -73,6 +74,18 @@ namespace Loom
 		// state has to follow it.
 		virtual void OnFieldChanged(const SerializedField& field) { };
 
+		// A Button this object declared: its name, as a Serial's, what pressing
+		// it runs, and how many fields were declared before it.
+		struct FieldButton
+		{
+			std::string name;
+			const std::function<void()>* press = nullptr;
+			size_t fieldsBefore = 0;
+		};
+
+		// The Buttons this object declared, in the order they were declared.
+		const std::vector<FieldButton>& GetButtons() const { return m_buttons; };
+
 		// For an integer field that indexes a list only the object knows, such
 		// as an Animator's clips, the names the editor offers in its place, as
 		// it does an enum's. Empty for a field that is just a number.
@@ -102,11 +115,23 @@ namespace Loom
 
 		std::vector<SerializedField> m_fields{ };
 
+		// Declaring a Button member is what fills this in.
+		friend LOOM_API void RegisterButton(const char* name, const std::function<void()>* press);
+
+		std::vector<FieldButton> m_buttons{ };
+
 		// Whether any of them is a Reference, which is what puts this object in
 		// the referencing list and what a destructor has to undo.
 		bool m_references = false;
 
 	private:
+		// A name as a Serial or Button was declared with, a ".../" in front put
+		// back to the category of the one declared before it, which this then
+		// moves on to the name's own.
+		std::string TakeName(const char* given);
+
+		std::string m_lastCategory;
+
 		static LoomObject* _GetByID(const uint64_t& ID);
 		static LoomObject* _GetByName(const std::string& name);
 		static LoomObject* _GetByGuid(const Guid& guid);

@@ -127,6 +127,16 @@ namespace
 		Loom::Serial<int, ".../After"> after;
 	};
 
+	// Buttons among fields, one taking the category before it and passing it
+	// on to the field after.
+	struct Pressing final : Loom::LoomObject
+	{
+		Loom::Serial<int, "Size/Wide"> width = 2;
+		Loom::Button<".../Grow"> grow{ [this] { width = width + 1; } };
+		Loom::Serial<int, ".../Tall"> height = 3;
+		Loom::Button<"Reset"> reset{ [this] { width = 0; } };
+	};
+
 	// Fields are numbered by declaration order; these are EveryField's.
 	enum Every { Flag, Count, UnsignedCount, Big, UnsignedBig, Ratio, Precise, Label, Pair, Triple, Quad, Numbers };
 
@@ -320,6 +330,41 @@ TEST_SUITE("SerializedField")
 		CHECK(Field(object, 3).name == "Size/Colour/Hue");
 		CHECK(Field(object, 4).name.empty());
 		CHECK(Field(object, 5).name == "After");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a Button is not a field, and passes its category on as a field would")
+	{
+		Pressing object;
+		Pump();
+
+		REQUIRE(object.GetFields().size() == 2);
+
+		CHECK(Field(object, 0).name == "Size/Wide");
+		CHECK(Field(object, 1).name == "Size/Tall");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a Button keeps its name, its place among the fields, and what it runs")
+	{
+		Pressing object;
+		Pump();
+
+		const std::vector<Loom::LoomObject::FieldButton>& buttons = object.GetButtons();
+
+		REQUIRE(buttons.size() == 2);
+
+		CHECK(buttons[0].name == "Size/Grow");
+		CHECK(buttons[0].fieldsBefore == 1);
+		CHECK(buttons[1].name == "Reset");
+		CHECK(buttons[1].fieldsBefore == 2);
+
+		REQUIRE(buttons[0].press != nullptr);
+		(*buttons[0].press)();
+
+		CHECK(Field(object, 0).Write() == "3");
+
+		(*buttons[1].press)();
+
+		CHECK(Field(object, 0).Write() == "0");
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a named field keeps its place and value as an unnamed one would")

@@ -73,24 +73,34 @@ namespace Loom
 		constexpr ImGuiTreeNodeFlags field_group_flags =
 			ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth;
 
-		// Fields by the category their Serial was named under: the fields
-		// with none, then each category, in the order their first field was
-		// declared, with the categories nested in it.
+		// One thing an object's inspector draws: a field or a Button, by where
+		// it is in their list.
+		struct FieldItem
+		{
+			bool button = false;
+			size_t index = 0;
+		};
+
+		// Fields and Buttons by the category they were named under: those with
+		// none, then each category, in the order the first of it was declared,
+		// with the categories nested in it.
 		struct FieldGroup
 		{
 			std::string label;
-			std::vector<size_t> fields;
+			std::vector<FieldItem> items;
 			std::vector<FieldGroup> groups;
 		};
 
-		FieldGroup GroupFields(const std::vector<SerializedField>& fields)
+		FieldGroup GroupFields(const LoomObject& object)
 		{
+			const std::vector<SerializedField>& fields = object.GetFields();
+			const std::vector<LoomObject::FieldButton>& buttons = object.GetButtons();
+
 			FieldGroup top;
 
-			for (size_t i = 0; i < fields.size(); i++)
+			const auto file = [&top](std::string_view path, FieldItem item)
 			{
 				FieldGroup* group = &top;
-				std::string_view path = fields[i].Category();
 
 				while (!path.empty())
 				{
@@ -109,24 +119,36 @@ namespace Loom
 					path = slash == std::string_view::npos ? std::string_view() : path.substr(slash + 1);
 				};
 
-				group->fields.push_back(i);
+				group->items.push_back(item);
+			};
+
+			// Each Button in its place among the fields: after those declared before it.
+			size_t button = 0;
+
+			for (size_t i = 0; i <= fields.size(); i++)
+			{
+				for (; button < buttons.size() && buttons[button].fieldsBefore == i; button++)
+					file(NameCategory(buttons[button].name), { true, button });
+
+				if (i < fields.size())
+					file(fields[i].Category(), { false, i });
 			};
 
 			return top;
 		};
 
-		// A group's own fields, then each group in it under a heading that
-		// folds it open and shut.
-		template <typename DrawField>
-		void DrawFieldGroup(const FieldGroup& group, const DrawField& draw_field)
+		// A group's own fields and Buttons, then each group in it under a
+		// heading that folds it open and shut.
+		template <typename DrawItem>
+		void DrawFieldGroup(const FieldGroup& group, const DrawItem& draw_item)
 		{
-			for (size_t field : group.fields)
-				draw_field(field);
+			for (const FieldItem& item : group.items)
+				draw_item(item);
 
 			for (const FieldGroup& inner : group.groups)
 				if (ImGui::TreeNodeEx(inner.label.c_str(), field_group_flags))
 				{
-					DrawFieldGroup(inner, draw_field);
+					DrawFieldGroup(inner, draw_item);
 					ImGui::TreePop();
 				};
 		};
@@ -3273,7 +3295,26 @@ namespace Loom
 			ImGui::PopID();
 		};
 
-		DrawFieldGroup(GroupFields(object.GetFields()), draw_field);
+		// A Button fills the row, pressed as a button anywhere else is.
+		const auto draw_item = [&](const FieldItem& item)
+		{
+			if (!item.button)
+			{
+				draw_field(item.index);
+				return;
+			};
+
+			const LoomObject::FieldButton& button = object.GetButtons()[item.index];
+
+			ImGui::PushID(&button);
+
+			if (ImGui::Button(std::string(NameDisplay(button.name)).c_str(), ImVec2(-FLT_MIN, 0.0f)) && button.press && *button.press)
+				(*button.press)();
+
+			ImGui::PopID();
+		};
+
+		DrawFieldGroup(GroupFields(object), draw_item);
 
 		ImGui::PopItemWidth();
 	};

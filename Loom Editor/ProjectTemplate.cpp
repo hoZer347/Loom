@@ -342,7 +342,9 @@ Loom::Serial<float, "Movement/Top Speed"> m_speed; reads "Top Speed" instead,
 under a folding "Movement" heading with the other fields of that category, '/'
 between nested ones, and a name starting ".../" takes the category of the field
 declared before it. The name is not written to the scene, so naming a field
-leaves the values already saved where they were.
+leaves the values already saved where they were. A Loom::Button<"Name"> m_name{
+[this] { ... } }; member, named the same way, is a button among them that runs
+its function when pressed.
 SpinningTriangle is there as a worked example.
 )";
 

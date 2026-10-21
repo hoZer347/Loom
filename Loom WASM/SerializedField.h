@@ -39,8 +39,15 @@ namespace Loom
 		State,
 	};
 
-	// In front of a Serial's name, the category of the field declared before it.
+	// In front of a Serial's or Button's name, the category of the one
+	// declared before it.
 	inline constexpr std::string_view previous_category = ".../";
+
+	// The part of a Serial's or Button's name after its categories, which the
+	// editor labels it with, and the categories before it, which it groups it
+	// under. Either is empty when the name has none.
+	LOOM_API std::string_view NameDisplay(std::string_view name);
+	LOOM_API std::string_view NameCategory(std::string_view name);
 
 	/**
 	* Loom::SerializedField

@@ -8,6 +8,7 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
+#include <functional>
 #include <initializer_list>
 #include <string>
 #include <type_traits>
@@ -31,6 +32,32 @@ namespace Loom
 		void (*set_reference)(void*, LoomObject*),
 		bool (*accepts_reference)(LoomObject*),
 		const char* name);
+
+	// Hands a button to the same object, with its name and what pressing it runs.
+	LOOM_API void RegisterButton(const char* name, const std::function<void()>* press);
+
+	/**
+	* Loom::Button
+	* - A button the inspector draws among a LoomObject's fields, running its
+	*   function when it is pressed:
+	*   Button<"Map/Regrow"> m_regrow{ [this] { Regrow(); } }
+	* - Named as a Serial is, categories and ".../" included, and drawn in its
+	*   category in the order it was declared among the fields
+	* - Not a field: the scene format never sees it
+	* - A member of the LoomObject being built around it, as a Serial is, and
+	*   only that
+	*/
+	template <Str name>
+	struct Button final
+	{
+		explicit Button(std::function<void()> press) : m_press(std::move(press)) { RegisterButton(name.value, &m_press); };
+
+		Button(const Button&) = delete;
+		Button& operator=(const Button&) = delete;
+
+	private:
+		std::function<void()> m_press;
+	};
 
 	// Every type the scene format can write, named by the member's own type.
 	// Anything else is a compile error rather than a field that quietly writes
@@ -70,7 +97,7 @@ namespace Loom
 	*   category before the name, with '/' between nested ones, groups it with
 	*   the others of that category, folding open and shut:
 	*   Serial<float, "Movement/Top Speed"> m_speed. ".../" in front of a name
-	*   stands for the category of the field declared before it, so
+	*   stands for the category of the field or Button declared before it, so
 	*   Serial<float, ".../Turn Speed"> after that one is "Movement/Turn Speed".
 	*   The name is not written to the scene, so naming a field leaves the
 	*   values already saved as they were

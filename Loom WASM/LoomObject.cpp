@@ -124,15 +124,7 @@ namespace Loom
 		field.get_reference = get_reference;
 		field.set_reference = set_reference;
 		field.accepts_reference = accepts_reference;
-		field.name = name;
-
-		if (field.name.starts_with(previous_category))
-		{
-			const std::string display = field.name.substr(previous_category.size());
-			const std::string_view category = owner->m_fields.empty() ? std::string_view() : owner->m_fields.back().Category();
-
-			field.name = category.empty() ? display : std::string(category) + '/' + display;
-		};
+		field.name = owner->TakeName(name);
 
 		// Listed once, however many reference fields the object goes on to declare.
 		if (type == FieldType::Reference && !owner->m_references)
@@ -143,6 +135,38 @@ namespace Loom
 		};
 
 		owner->m_fields.push_back(field);
+	};
+
+	void RegisterButton(const char* name, const std::function<void()>* press)
+	{
+		LoomObject* owner = constructing;
+
+		if (owner == nullptr)
+		{
+			std::cerr
+				<< "A Button has no LoomObject under construction on this"
+				   " thread to belong to" << std::endl;
+
+			return;
+		};
+
+		owner->m_buttons.push_back({ owner->TakeName(name), press, owner->m_fields.size() });
+	};
+
+	std::string LoomObject::TakeName(const char* given)
+	{
+		std::string name = given;
+
+		if (name.starts_with(previous_category))
+		{
+			const std::string display = name.substr(previous_category.size());
+
+			name = m_lastCategory.empty() ? display : m_lastCategory + '/' + display;
+		};
+
+		m_lastCategory = NameCategory(name);
+
+		return name;
 	};
 
 	LoomObject* LoomObject::_GetByID(const uint64_t& ID)

@@ -145,18 +145,28 @@ namespace Loom
 		return nullptr;
 	};
 
-	std::string_view SerializedField::Display() const
+	std::string_view NameDisplay(std::string_view name)
 	{
 		const size_t slash = name.rfind('/');
 
-		return slash == std::string::npos ? std::string_view(name) : std::string_view(name).substr(slash + 1);
+		return slash == std::string_view::npos ? name : name.substr(slash + 1);
+	};
+
+	std::string_view NameCategory(std::string_view name)
+	{
+		const size_t slash = name.rfind('/');
+
+		return slash == std::string_view::npos ? std::string_view() : name.substr(0, slash);
+	};
+
+	std::string_view SerializedField::Display() const
+	{
+		return NameDisplay(name);
 	};
 
 	std::string_view SerializedField::Category() const
 	{
-		const size_t slash = name.rfind('/');
-
-		return slash == std::string::npos ? std::string_view() : std::string_view(name).substr(0, slash);
+		return NameCategory(name);
 	};
 
 	std::string SerializedField::Write() const
