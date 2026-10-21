@@ -105,7 +105,6 @@ namespace Loom
 		constexpr size_t POSITION_COMPONENTS = 3;
 		constexpr size_t UV_COMPONENTS = 2;
 		constexpr size_t NORMAL_COMPONENTS = 3;
-		constexpr float NO_UV[UV_COMPONENTS] = { };
 
 		if (Skin* skin = m_gameObject->GetComponent<Skin>())
 		{
@@ -141,8 +140,10 @@ namespace Loom
 
 		for (size_t i = 0; i < count; i++)
 		{
+			// Without texture coordinates, aUV reads the position's x and y, as
+			// it does from vertices drawn without normals.
 			out = std::copy_n(positions.data() + i * POSITION_COMPONENTS, POSITION_COMPONENTS, out);
-			out = std::copy_n(hasUVs ? m_textureCoordinates->data() + i * UV_COMPONENTS : NO_UV, UV_COMPONENTS, out);
+			out = std::copy_n(hasUVs ? m_textureCoordinates->data() + i * UV_COMPONENTS : positions.data() + i * POSITION_COMPONENTS, UV_COMPONENTS, out);
 
 			if (hasNormals)
 				out = std::copy_n(normals.data() + i * NORMAL_COMPONENTS, NORMAL_COMPONENTS, out);

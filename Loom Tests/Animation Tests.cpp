@@ -526,20 +526,21 @@ TEST_SUITE("Textured meshes")
 		Loom::Mesh* mesh = scene.Attach<Loom::Mesh>(Loom::Mesh::Triangles);
 		Pump();
 
-		mesh->m_vertices = { 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
+		mesh->m_vertices = { 0.0f, 0.0f, 0.0f, 2.0f, 0.0f, 0.0f, 0.0f, 2.0f, 0.0f };
 		mesh->m_textureCoordinates = { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f };
 		mesh->m_normals = { 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f };
 		mesh->Draw(1);
 
 		CHECK(renderer.lastFormat == Loom::VertexFormat::PositionUVNormal);
-		CHECK(renderer.lastVertices == std::vector<float>{ 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0 });
+		CHECK(renderer.lastVertices == std::vector<float>{ 0, 0, 0, 0, 0, 0, 0, 1, 2, 0, 0, 1, 0, 0, 1, 0, 0, 2, 0, 0, 1, 1, 0, 0 });
 
-		// Without texture coordinates their place is kept, at zeros.
+		// Without texture coordinates their place is kept, holding the
+		// position's x and y as aUV reads from vertices without normals.
 		mesh->m_textureCoordinates = std::vector<float>{ };
 		mesh->Draw(1);
 
 		CHECK(renderer.lastFormat == Loom::VertexFormat::PositionUVNormal);
-		CHECK(renderer.lastVertices == std::vector<float>{ 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0 });
+		CHECK(renderer.lastVertices == std::vector<float>{ 0, 0, 0, 0, 0, 0, 0, 1, 2, 0, 0, 2, 0, 0, 1, 0, 0, 2, 0, 0, 2, 1, 0, 0 });
 
 		mesh->m_normals = { 0.0f, 0.0f, 1.0f };
 		mesh->Draw(1);

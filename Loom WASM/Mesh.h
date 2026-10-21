@@ -46,7 +46,8 @@ namespace Loom
 		// draws them with the given program, which is how a pass that is not the
 		// material's (the shadow pass) draws the same geometry. A shader that
 		// declares no u_model draws the vertices untransformed. A Skin on the
-		// GameObject bends them first, and m_textureCoordinates go with them as aUV.
+		// GameObject bends them first, and m_textureCoordinates go with them as
+		// aUV and m_normals as aNormal.
 		void Draw(uint32_t program);
 
 		// Draws the meshes farthest from Camera::current first, writing no

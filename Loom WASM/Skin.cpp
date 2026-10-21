@@ -190,8 +190,10 @@ namespace Loom
 			if (turned.empty())
 				continue;
 
-			// Joints turn and move but are not stretched, so the blend turns a
-			// normal as it does a position, and normalizing undoes the weights.
+			// Assumes the joints scale evenly, if at all, so the blend turns a
+			// normal as it does a position and normalizing undoes the weights
+			// and the scale. A joint stretched unevenly leaves its normals off
+			// square to the surface.
 			float* normal = turned.data() + v * POSITION_COMPONENTS;
 			const glm::vec3 facing = glm::normalize(glm::mat3(blended) * glm::make_vec3(normal));
 
