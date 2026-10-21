@@ -83,14 +83,15 @@ namespace Loom
 		if (file_path.empty())
 			return 0;
 
-		// The disk is only asked about a path that has not loaded.
-		static std::unordered_map<std::string, uint32_t> loaded;
+		// The disk is only asked about a path that has not loaded. What has
+		// is kept as its Texture, whose handle a reload replaces.
+		static std::unordered_map<std::string, const Texture*> loaded;
 		static std::unordered_map<std::string, std::filesystem::file_time_type> failed;
 
 		const auto found = loaded.find(file_path);
 
 		if (found != loaded.end())
-			return found->second;
+			return found->second->handle;
 
 		std::error_code code;
 		const std::filesystem::file_time_type written = std::filesystem::last_write_time(file_path, code);
@@ -106,7 +107,7 @@ namespace Loom
 		const Texture* texture = Shared(file_path);
 
 		if (texture && texture->handle)
-			return loaded[file_path] = texture->handle;
+			return (loaded[file_path] = texture)->handle;
 
 		failed[file_path] = written;
 

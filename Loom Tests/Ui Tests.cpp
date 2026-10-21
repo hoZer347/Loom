@@ -37,6 +37,11 @@ namespace
 	constexpr size_t Z = 2;
 	constexpr size_t V = 4;
 
+	// The side of a square test image, and how many bytes each of its pixels takes.
+	constexpr int IMAGE_SIDE = 2;
+	constexpr int RGBA = 4;
+	constexpr uint8_t FULL = 255;
+
 	constexpr glm::vec4 FIRST_COLOR = { 1.0f, 0.0f, 0.0f, 1.0f };
 	constexpr glm::vec4 SECOND_COLOR = { 0.0f, 0.0f, 1.0f, 1.0f };
 
@@ -431,10 +436,7 @@ TEST_SUITE("Ui")
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a rect with an image is filled through it, the right way up")
 	{
-		constexpr int SIDE = 2;
-		constexpr int RGBA = 4;
-		constexpr uint8_t FULL = 255;
-		const std::vector<uint8_t> pixels(SIDE * SIDE * RGBA, FULL);
+		const std::vector<uint8_t> pixels(IMAGE_SIDE * IMAGE_SIDE * RGBA, FULL);
 
 		LoomTests::RecordingRenderer renderer;
 		PointAt(glm::vec2(0.0f));
@@ -443,7 +445,7 @@ TEST_SUITE("Ui")
 		Loom::UiRect& rect = *scene.Attach<Loom::UiRect>();
 		Pump();
 
-		rect.imagePath = LoomTests::WriteTga("ui rect image.tga", SIDE, SIDE, pixels);
+		rect.imagePath = LoomTests::WriteTga("ui rect image.tga", IMAGE_SIDE, IMAGE_SIDE, pixels);
 
 		Overlay({ &scene });
 
@@ -481,13 +483,36 @@ TEST_SUITE("Ui")
 		CHECK(renderer.textures["u_texture"] == white);
 	};
 
+	// As saving the image from the Sprites panel does.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a rect's image reloaded is drawn as it now is")
+	{
+		LoomTests::RecordingRenderer renderer;
+		PointAt(glm::vec2(0.0f));
+
+		Loom::Scene scene("ui reloaded image");
+		Loom::UiRect& rect = *scene.Attach<Loom::UiRect>();
+		Pump();
+
+		const std::vector<uint8_t> pixels(IMAGE_SIDE * IMAGE_SIDE * RGBA, FULL);
+		rect.imagePath = LoomTests::WriteTga("ui reloaded image.tga", IMAGE_SIDE, IMAGE_SIDE, pixels);
+
+		Overlay({ &scene });
+		const uint32_t before = renderer.textures["u_texture"];
+
+		LoomTests::WriteTga("ui reloaded image.tga", IMAGE_SIDE, IMAGE_SIDE, pixels);
+		Loom::Texture::ReloadShared(rect.imagePath);
+		Overlay({ &scene });
+
+		const Loom::Texture* image = Loom::Texture::Shared(rect.imagePath);
+
+		REQUIRE(image != nullptr);
+		CHECK(renderer.textures["u_texture"] == image->handle);
+		CHECK(image->handle != before);
+	};
+
 	// A path typed before its file is written, or while it is being typed.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a rect whose image file turns up later is filled through it then")
 	{
-		constexpr int SIDE = 2;
-		constexpr int RGBA = 4;
-		constexpr uint8_t FULL = 255;
-
 		LoomTests::RecordingRenderer renderer;
 		PointAt(glm::vec2(0.0f));
 
@@ -503,7 +528,7 @@ TEST_SUITE("Ui")
 		CHECK(Loom::Texture::HandleOf(rect.imagePath) == 0);
 		CHECK(renderer.drawnColors.size() == 1);
 
-		LoomTests::WriteTga("ui late image.tga", SIDE, SIDE, std::vector<uint8_t>(SIDE * SIDE * RGBA, FULL));
+		LoomTests::WriteTga("ui late image.tga", IMAGE_SIDE, IMAGE_SIDE, std::vector<uint8_t>(IMAGE_SIDE * IMAGE_SIDE * RGBA, FULL));
 		Overlay({ &scene });
 
 		const Loom::Texture* image = Loom::Texture::Shared(rect.imagePath);
@@ -607,7 +632,6 @@ TEST_SUITE("Ui")
 		PointAt(glm::vec2(0.0f));
 
 		constexpr int PIXELS = 2;
-		constexpr int RGBA = 4;
 
 		Loom::Scene scene("ui not a font");
 		Loom::GameObject* object = scene.AddChild("Label");
