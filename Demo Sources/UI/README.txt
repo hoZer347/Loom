@@ -22,5 +22,6 @@ Scene view.
 The keyboard and the wheel reach the script through Loom::Input once the Game
 view has focus. The keys come by way of the project's actions, which the Key
 Bindings panel sets and UI.loominput keeps: R, G and B tint the card as their
-buttons do, and Left and Right, or A and D, turn it while held. The wheel over
+buttons do, and Left and Right, or A and D, turn it while held. The panel
+files the turns in a folder of their own. The wheel over
 the Game view turns it a step a notch.

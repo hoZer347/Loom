@@ -60,7 +60,7 @@ TEST_SUITE("InputActions")
 			"Slowdown=P,None\n"
 			"Odd=Nonsense\n");
 
-		const std::vector<Action> read = Loom::InputActions::Read(in);
+		const std::vector<Action> read = Loom::InputActions::Read(in).actions;
 
 		REQUIRE(read.size() == 3);
 		CHECK(read[0] == Action{ "Slowdown", Loom::Key::Space, Loom::Key::None });
@@ -75,18 +75,53 @@ TEST_SUITE("InputActions")
 		CHECK(Loom::InputActions::Tidy("Red=1").empty());
 	};
 
-	TEST_CASE("what is written reads back the same")
+	TEST_CASE("what is written reads back the same, folders and all")
 	{
-		const std::vector<Action> actions = {
-			{ "Slowdown", Loom::Key::Space, Loom::Key::None },
-			{ "Add To Selection", Loom::Key::LeftControl, Loom::Key::RightControl } };
+		const Loom::InputActions::File file = {
+			{
+				{ "Slowdown", Loom::Key::Space, Loom::Key::None },
+				{ "Pan Up", Loom::Key::W, Loom::Key::Up, "Camera" },
+				{ "Zoom In", Loom::Key::Equal, Loom::Key::None, "Camera/Zoom" },
+				{ "Add To Selection", Loom::Key::LeftControl, Loom::Key::RightControl } },
+			{ "Camera", "Camera/Zoom", "Empty" } };
 
 		std::ostringstream out;
-		Loom::InputActions::Write(out, actions);
+		Loom::InputActions::Write(out, file);
 
 		std::istringstream in(out.str());
+		const Loom::InputActions::File read = Loom::InputActions::Read(in);
 
-		CHECK(Loom::InputActions::Read(in) == actions);
+		CHECK(read.folders == file.folders);
+
+		// Written grouped by folder, the top's first.
+		REQUIRE(read.actions.size() == file.actions.size());
+		CHECK(read.actions[0] == file.actions[0]);
+		CHECK(read.actions[1] == file.actions[3]);
+		CHECK(read.actions[2] == file.actions[1]);
+		CHECK(read.actions[3] == file.actions[2]);
+	};
+
+	TEST_CASE("an action's folder is the heading above it, which play ignores")
+	{
+		Fresh fresh;
+
+		std::istringstream in(
+			"Slowdown=Space,None\n"
+			"[ Camera ]\n"
+			"Pan Up=W,Up\n");
+
+		const Loom::InputActions::File read = Loom::InputActions::Read(in);
+
+		REQUIRE(read.actions.size() == 2);
+		CHECK(read.actions[0].folder.empty());
+		CHECK(read.actions[1].folder == "Camera");
+		CHECK(read.folders == std::vector<std::string>{ "Camera" });
+
+		Loom::InputActions::Set(read.actions, read.folders);
+		Loom::Input::OnKey((int)Loom::Key::W, true);
+		Loom::Input::Tick();
+
+		CHECK(Loom::InputActions::Down("Pan Up"));
 	};
 
 	TEST_CASE("an action is done by either of its keys, and an unknown one never")

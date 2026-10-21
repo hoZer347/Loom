@@ -1,5 +1,6 @@
 #include "doctest.h"
 
+#include "EditorIcons.h"
 #include "InputActions.h"
 #include "KeyBindings.h"
 #include "UiScript.h"
@@ -19,7 +20,7 @@ namespace
 	// window and no renderer, driven by a UiScript.
 	struct Driven
 	{
-		Driven(const std::string& text, std::vector<Action> actions)
+		Driven(const std::string& text, std::vector<Action> actions, std::vector<std::string> folders = { })
 		{
 			constexpr float frame_time = 1.0f / 60.0f;
 
@@ -35,7 +36,7 @@ namespace
 			int atlas_height = 0;
 			io.Fonts->GetTexDataAsRGBA32(&pixels, &atlas_width, &atlas_height);
 
-			Loom::InputActions::Set(std::move(actions));
+			Loom::InputActions::Set(std::move(actions), std::move(folders));
 
 			script = std::make_unique<Loom::UiScript>(std::filesystem::path());
 			script->LoadText(text);
@@ -89,6 +90,12 @@ namespace
 	// A UiScript finds no combo by its label, so the first row's is aimed at
 	// down from its column's header.
 	constexpr const char* first_alt = "click \"Key Bindings\" \"Alt\" 0 20\n";
+
+	// What the panel labels a folder's row with, for a UiScript to aim at.
+	std::string FolderRow(const std::string& path)
+	{
+		return std::string(Loom::EditorIcons::Folder) + " " + path + "##folder:" + path;
+	};
 };
 
 
@@ -165,5 +172,36 @@ TEST_SUITE("KeyBindings")
 		// Add Action was not there to click.
 		CHECK(driven.script->Failed());
 		CHECK(Loom::InputActions::All() == slowdown);
+	};
+
+	TEST_CASE("Add Folder makes one and has it named")
+	{
+		Driven driven(std::string(drawn) + "click \"Key Bindings\" \"Add Folder\"\n" + drawn + "key ctrl+a\ntype Camera\nkey enter\n", slowdown);
+
+		CHECK(driven.Run() == 2);
+		CHECK_FALSE(driven.script->Failed());
+		CHECK(Loom::InputActions::Folders() == std::vector<std::string>{ "Camera" });
+		CHECK(Loom::InputActions::All() == slowdown);
+	};
+
+	TEST_CASE("an action dragged onto a folder is filed in it")
+	{
+		const std::string action = std::string(Loom::EditorIcons::Bindings) + "##action";
+
+		Driven driven(std::string(drawn) + "drag \"Key Bindings\" \"" + action + "\" to \"Key Bindings\" \"" + FolderRow("Camera") + "\"\n", slowdown, { "Camera" });
+
+		CHECK(driven.Run() == 1);
+		CHECK_FALSE(driven.script->Failed());
+		CHECK(Loom::InputActions::All()[0].folder == "Camera");
+	};
+
+	TEST_CASE("Remove Folder leaves what it held a level up")
+	{
+		Driven driven(std::string(drawn) + "rightclick \"Key Bindings\" \"" + FolderRow("Camera") + "\"\nclick \"\" \"Remove Folder\"\n", { { "Pan Up", Loom::Key::W, Loom::Key::Up, "Camera" } }, { "Camera" });
+
+		CHECK(driven.Run() == 1);
+		CHECK_FALSE(driven.script->Failed());
+		CHECK(Loom::InputActions::Folders().empty());
+		CHECK(Loom::InputActions::All()[0].folder.empty());
 	};
 };

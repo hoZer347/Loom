@@ -4,9 +4,12 @@
 #include "EditorIcons.h"
 
 #include "imgui.h"
+#include "imgui_internal.h"
 
+#include <algorithm>
 #include <cfloat>
-#include <vector>
+#include <iostream>
+#include <utility>
 
 
 namespace Loom
@@ -15,9 +18,28 @@ namespace Loom
 	{
 		constexpr int columns = 4;
 		constexpr const char* default_name = "Action";
+		constexpr const char* default_folder = "New Folder";
 
-		// What the second action given the default name is numbered.
+		// What the second action or folder given the default name is numbered.
 		constexpr int first_number = 2;
+
+		constexpr const char* action_payload = "LoomAction";
+		constexpr const char* folder_payload = "LoomActionFolder";
+
+		std::string Numbered(const char* name, int number)
+		{
+			return std::string(name) + " " + std::to_string(number);
+		};
+
+		bool IsAtOrUnder(const std::string& path, const std::string& folder)
+		{
+			return path == folder || path.rfind(folder + VirtualFolders::separator, 0) == 0;
+		};
+
+		bool HasAction(const std::vector<InputActions::Action>& actions, const std::string& name)
+		{
+			return std::any_of(actions.begin(), actions.end(), [&name](const InputActions::Action& action) { return action.name == name; });
+		};
 	};
 
 	bool KeyBindings::Draw(bool* open, bool project_open)
@@ -39,9 +61,22 @@ namespace Loom
 
 	bool KeyBindings::DrawActions()
 	{
-		std::vector<InputActions::Action> actions = InputActions::All();
-		std::optional<size_t> removed{ };
-		bool changed = false;
+		Edit edit{ InputActions::All() };
+
+		for (const std::string& folder : InputActions::Folders())
+			edit.folders.AddFolder(VirtualFolders::ParentOf(folder), VirtualFolders::NameOf(folder));
+
+		std::vector<std::string> names{ };
+
+		for (const InputActions::Action& action : edit.actions)
+		{
+			edit.folders.Move(action.name, action.folder);
+			names.push_back(action.name);
+		};
+
+		const VirtualFolders::Node root = edit.folders.Build(names);
+
+		DrawAddItems("", edit, false);
 
 		if (ImGui::BeginTable("Actions", columns, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchSame))
 		{
@@ -51,72 +86,280 @@ namespace Loom
 			ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
 			ImGui::TableHeadersRow();
 
-			for (size_t i = 0; i < actions.size(); i++)
-			{
-				InputActions::Action& action = actions[i];
+			for (const VirtualFolders::Node& folder : root.children)
+				DrawFolder(folder, edit);
 
-				ImGui::PushID((int)i);
-				ImGui::TableNextRow();
-
-				ImGui::TableNextColumn();
-				ImGui::SetNextItemWidth(-FLT_MIN);
-
-				std::string shown = action.name;
-				InputTextString("##Name", m_renaming == i ? m_name : shown);
-
-				if (ImGui::IsItemActivated())
-				{
-					m_renaming = i;
-					m_name = action.name;
-				};
-
-				if (ImGui::IsItemDeactivated() && m_renaming == i)
-				{
-					const std::string name = InputActions::Tidy(m_name);
-
-					if (!name.empty() && InputActions::Find(name) == nullptr)
-					{
-						action.name = name;
-						changed = true;
-					};
-
-					m_renaming.reset();
-				};
-
-				ImGui::TableNextColumn();
-				changed |= DrawKey("##Key", action.key);
-
-				ImGui::TableNextColumn();
-				changed |= DrawKey("##Alt", action.alt);
-
-				ImGui::TableNextColumn();
-
-				if (ImGui::SmallButton("Remove"))
-					removed = i;
-
-				ImGui::PopID();
-			};
+			for (const std::string& name : root.items)
+				for (InputActions::Action& action : edit.actions)
+					if (action.name == name)
+						DrawAction(action, edit);
 
 			ImGui::EndTable();
 		};
 
-		if (removed)
+		// Dropped anywhere else in the panel, it goes to the top.
+		if (ImGui::BeginDragDropTargetCustom(ImGui::GetCurrentWindow()->InnerRect, ImGui::GetID("##top")))
 		{
-			actions.erase(actions.begin() + (std::ptrdiff_t)*removed);
-			m_renaming.reset();
-			changed = true;
+			Drop("", edit);
+			ImGui::EndDragDropTarget();
 		};
 
-		if (ImGui::Button("Add Action"))
+		if (ImGui::BeginPopupContextWindow("##add", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
 		{
-			actions.push_back({ FreeName() });
-			changed = true;
+			DrawAddItems("", edit, true);
+			ImGui::EndPopup();
 		};
 
-		if (changed)
-			InputActions::Set(std::move(actions));
+		if (!edit.changed && !edit.refiled)
+			return false;
 
-		return changed;
+		std::erase_if(edit.actions, [&edit](const InputActions::Action& action) { return std::ranges::find(edit.removed, action.name) != edit.removed.end(); });
+
+		std::vector<std::string> folders{ };
+
+		if (edit.refiled)
+		{
+			for (InputActions::Action& action : edit.actions)
+				action.folder = edit.folders.FolderOf(action.name);
+
+			folders.assign(edit.folders.Folders().begin(), edit.folders.Folders().end());
+		}
+		else
+			folders = InputActions::Folders();
+
+		InputActions::Set(std::move(edit.actions), std::move(folders));
+
+		return true;
+	};
+
+	void KeyBindings::DrawFolder(const VirtualFolders::Node& node, Edit& edit)
+	{
+		const bool renaming = node.path == m_renamingFolder;
+
+		if (m_focusFolderName && IsAtOrUnder(VirtualFolders::ParentOf(m_renamingFolder), node.path))
+			ImGui::SetNextItemOpen(true);
+
+		ImGui::TableNextRow();
+		ImGui::TableNextColumn();
+
+		const bool open = ImGui::TreeNodeEx(
+			(std::string(EditorIcons::Folder) + " " + (renaming ? "" : node.name) + "##folder:" + node.path).c_str(),
+			ImGuiTreeNodeFlags_SpanAllColumns | ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick);
+
+		if (!renaming && ImGui::BeginDragDropSource())
+		{
+			ImGui::SetDragDropPayload(folder_payload, node.path.c_str(), node.path.size() + 1);
+			ImGui::Text("%s %s", EditorIcons::Folder, node.name.c_str());
+			ImGui::EndDragDropSource();
+		};
+
+		if (ImGui::BeginDragDropTarget())
+		{
+			Drop(node.path, edit);
+			ImGui::EndDragDropTarget();
+		};
+
+		if (ImGui::BeginPopupContextItem())
+		{
+			DrawAddItems(node.path, edit, true);
+
+			ImGui::Separator();
+
+			if (ImGui::MenuItem("Rename"))
+			{
+				m_renamingFolder = node.path;
+				m_folderName = node.name;
+				m_focusFolderName = true;
+			};
+
+			// Its actions and folders go up a level rather than with it.
+			if (ImGui::MenuItem("Remove Folder"))
+			{
+				edit.folders.RemoveFolder(node.path);
+				edit.refiled = true;
+			};
+
+			ImGui::EndPopup();
+		};
+
+		if (renaming)
+			DrawFolderRename(edit);
+
+		if (!open)
+			return;
+
+		for (const VirtualFolders::Node& child : node.children)
+			DrawFolder(child, edit);
+
+		for (const std::string& name : node.items)
+			for (InputActions::Action& action : edit.actions)
+				if (action.name == name)
+					DrawAction(action, edit);
+
+		ImGui::TreePop();
+	};
+
+	void KeyBindings::DrawAction(InputActions::Action& action, Edit& edit)
+	{
+		ImGui::PushID(action.name.c_str());
+		ImGui::TableNextRow();
+		ImGui::TableNextColumn();
+
+		// The handle it is dragged and right-clicked by.
+		ImGui::TreeNodeEx(
+			(std::string(EditorIcons::Bindings) + "##action").c_str(),
+			ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen);
+
+		if (ImGui::BeginDragDropSource())
+		{
+			ImGui::SetDragDropPayload(action_payload, action.name.c_str(), action.name.size() + 1);
+			ImGui::Text("%s %s", EditorIcons::Bindings, action.name.c_str());
+			ImGui::EndDragDropSource();
+		};
+
+		if (ImGui::BeginDragDropTarget())
+		{
+			Drop(edit.folders.FolderOf(action.name), edit);
+			ImGui::EndDragDropTarget();
+		};
+
+		if (ImGui::BeginPopupContextItem())
+		{
+			if (!edit.folders.FolderOf(action.name).empty() && ImGui::MenuItem("Move to Top"))
+			{
+				edit.folders.Move(action.name, "");
+				edit.refiled = true;
+			};
+
+			if (ImGui::MenuItem("Remove"))
+			{
+				edit.removed.push_back(action.name);
+				edit.changed = true;
+			};
+
+			ImGui::EndPopup();
+		};
+
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(-FLT_MIN);
+
+		std::string shown = action.name;
+		InputTextString("##Name", m_renaming == action.name ? m_name : shown);
+
+		if (ImGui::IsItemActivated())
+		{
+			m_renaming = action.name;
+			m_name = action.name;
+		};
+
+		if (ImGui::IsItemDeactivated() && m_renaming == action.name)
+		{
+			const std::string name = InputActions::Tidy(m_name);
+
+			if (!name.empty() && !HasAction(edit.actions, name))
+			{
+				edit.folders.Move(name, edit.folders.FolderOf(action.name));
+				action.name = name;
+				edit.changed = true;
+			};
+
+			m_renaming.clear();
+		};
+
+		ImGui::TableNextColumn();
+		edit.changed |= DrawKey("##Key", action.key);
+
+		ImGui::TableNextColumn();
+		edit.changed |= DrawKey("##Alt", action.alt);
+
+		ImGui::TableNextColumn();
+
+		if (ImGui::SmallButton("Remove"))
+		{
+			edit.removed.push_back(action.name);
+			edit.changed = true;
+		};
+
+		ImGui::PopID();
+	};
+
+	void KeyBindings::DrawFolderRename(Edit& edit)
+	{
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(-FLT_MIN);
+
+		if (m_focusFolderName)
+		{
+			ImGui::SetKeyboardFocusHere();
+			m_focusFolderName = false;
+		};
+
+		InputTextString("##rename_folder", m_folderName);
+
+		// Enter and clicking away both keep the new name.
+		if (!ImGui::IsItemDeactivated())
+			return;
+
+		const std::string folder = std::exchange(m_renamingFolder, "");
+
+		if (edit.folders.RenameFolder(folder, m_folderName).empty())
+			std::cerr << "Key Bindings: '" << m_folderName << "' is not a name, or there is already a folder called that there" << std::endl;
+		else
+			edit.refiled = true;
+	};
+
+	void KeyBindings::DrawAddItems(const std::string& folder, Edit& edit, bool menu)
+	{
+		if (menu ?ImGui::MenuItem("Add Action") : ImGui::Button("Add Action"))
+		{
+			const std::string name = FreeName(edit.actions);
+
+			edit.actions.push_back({ name, Key::None, Key::None, folder });
+			edit.folders.Move(name, folder);
+			edit.changed = true;
+		};
+
+		if (!menu)
+			ImGui::SameLine();
+
+		if (menu ? ImGui::MenuItem("Add Folder") : ImGui::Button("Add Folder"))
+		{
+			std::string path = edit.folders.AddFolder(folder, default_folder);
+
+			for (int number = first_number; path.empty(); number++)
+				path = edit.folders.AddFolder(folder, Numbered(default_folder, number));
+
+			edit.refiled = true;
+
+			m_renamingFolder = path;
+			m_folderName = VirtualFolders::NameOf(path);
+			m_focusFolderName = true;
+		};
+	};
+
+	void KeyBindings::Drop(const std::string& folder, Edit& edit)
+	{
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(action_payload))
+		{
+			edit.folders.Move((const char*)payload->Data, folder);
+			edit.refiled = true;
+		};
+
+		const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(folder_payload);
+
+		if (payload == nullptr)
+			return;
+
+		const std::string dragged = (const char*)payload->Data;
+
+		// Let go where it was picked up.
+		if (dragged == folder)
+			return;
+
+		if (edit.folders.MoveFolder(dragged, folder))
+			edit.refiled = true;
+		else
+			std::cerr << "Key Bindings: " << dragged << " cannot go inside itself, or beside a folder with its name" << std::endl;
 	};
 
 	bool KeyBindings::DrawKey(const char* label, Key& key)
@@ -140,12 +383,12 @@ namespace Loom
 		return changed;
 	};
 
-	std::string KeyBindings::FreeName()
+	std::string KeyBindings::FreeName(const std::vector<InputActions::Action>& actions)
 	{
 		std::string name = default_name;
 
-		for (int number = first_number; InputActions::Find(name) != nullptr; number++)
-			name = std::string(default_name) + " " + std::to_string(number);
+		for (int number = first_number; HasAction(actions, name); number++)
+			name = Numbered(default_name, number);
 
 		return name;
 	};

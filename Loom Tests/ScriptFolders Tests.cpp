@@ -29,7 +29,7 @@ namespace
 		const ScriptFolders::Node root = folders.Build(scripts);
 		const ScriptFolders::Node* node = Find(root, folder);
 
-		return node != nullptr ? node->scripts : std::vector<std::string>{ };
+		return node != nullptr ? node->items : std::vector<std::string>{ };
 	};
 };
 

@@ -1326,7 +1326,7 @@ namespace Loom
 
 			if (m_projectPath.empty())
 				ImGui::TextDisabled("No project open.");
-			else if (root.children.empty() && root.scripts.empty())
+			else if (root.children.empty() && root.items.empty())
 				ImGui::TextDisabled(m_scripts.HasProject()
 					? "No scripts yet. Right-click to create one."
 					: "No scripts project. Right-click to create a script.");
@@ -1334,7 +1334,7 @@ namespace Loom
 			for (const ScriptFolders::Node& folder : root.children)
 				DrawScriptFolder(folder);
 
-			for (const std::string& script : root.scripts)
+			for (const std::string& script : root.items)
 				DrawScriptEntry(script);
 
 			m_revealSelectedScript = false;
@@ -1421,7 +1421,7 @@ namespace Loom
 		for (const ScriptFolders::Node& child : node.children)
 			DrawScriptFolder(child);
 
-		for (const std::string& script : node.scripts)
+		for (const std::string& script : node.items)
 			DrawScriptEntry(script);
 
 		ImGui::TreePop();

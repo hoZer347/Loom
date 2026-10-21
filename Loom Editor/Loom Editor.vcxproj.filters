@@ -64,6 +64,9 @@
     <ClCompile Include="KeyBindings.cpp">
       <Filter>Panels</Filter>
     </ClCompile>
+    <ClCompile Include="VirtualFolders.cpp">
+      <Filter>Panels</Filter>
+    </ClCompile>
     <ClCompile Include="ComponentMenu.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
@@ -175,6 +178,9 @@
       <Filter>Panels</Filter>
     </ClInclude>
     <ClInclude Include="KeyBindings.h">
+      <Filter>Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="VirtualFolders.h">
       <Filter>Panels</Filter>
     </ClInclude>
     <ClInclude Include="ShaderEditor.h">
