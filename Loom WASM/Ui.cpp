@@ -108,6 +108,17 @@ void main()
 		};
 
 		// What a rectangle samples, so it is drawn by the program text is.
+		uint32_t WhiteTexture()
+		{
+			static const uint32_t texture = []() -> uint32_t
+			{
+				const uint8_t white[RGBA] = { OPAQUE, OPAQUE, OPAQUE, OPAQUE };
+				return Renderer::Get()->CreateTexture(1, 1, white);
+			}();
+
+			return texture;
+		};
+
 		// The image a rect is filled through: its own, or plain white when it
 		// names none or one that will not load, which is tried only once.
 		uint32_t ImageOf(const UiRect& rect)
@@ -125,17 +136,6 @@ void main()
 			broken.insert(path);
 
 			return WhiteTexture();
-		};
-
-		uint32_t WhiteTexture()
-		{
-			static const uint32_t texture = []() -> uint32_t
-			{
-				const uint8_t white[RGBA] = { OPAQUE, OPAQUE, OPAQUE, OPAQUE };
-				return Renderer::Get()->CreateTexture(1, 1, white);
-			}();
-
-			return texture;
 		};
 
 		// The printable ASCII characters of one font at one size.

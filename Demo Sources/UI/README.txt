@@ -7,9 +7,11 @@ A Loom project showing UiRect, UiText and UiButton over a scene. Press Play.
     Scripts/Menu.hpp          answers the menu's buttons
     Assets/Fonts/             the font the text is baked from, and its licence
     Assets/Lit.shader         what the floor and the card draw with
+    Assets/Images/Palette.png the picture beside the menu's title
 
 The menu on the left is a UiRect with a UiRect, a UiText and a UiButton on
-each of its children, laid out from the panel's top. Red, Green and Blue tint
+each of its children, laid out from the panel's top. The title's Palette is
+a UiRect showing an image, named by its Image Path. Red, Green and Blue tint
 the card, and the count at the top goes up with every click a button takes.
 
 More opens a popup drawn over part of the menu. Where the two overlap only the
