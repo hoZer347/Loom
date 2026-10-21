@@ -81,8 +81,9 @@ needs Chrome or Edge installed.
 | `Camera` | Registration, aiming down the transform or at a target, depth order and aspect, a camera looking straight down, toggling the target without turning the view |
 | `Mesh` | Geometry and draw-type defaults, and that rendering without a material or shader stops before it touches GL |
 | `Material` | Defaults, and being found by a `Mesh` on the same GameObject |
-| `Shader` | Source loading failures on the local build (the web build fetches over HTTP instead, so those cases are skipped there) |
+| `Shader` | Source loading failures on the local build (the web build fetches over HTTP instead, so those cases are skipped there); compiled for Vulkan, samplers bound apart from the loose uniforms' block and in one place across both stages |
 | `Texture` | The type exists; it has no state yet |
+| `RenderTarget` | Made on first use as its fields say and cleared to its colour, made again when they change, kept to the renderer's sizes, cleared only by `Clear`, meshes drawn into it where and as they are told with the blend asked for, a material reading it by its GameObject's name and reading white while it is drawn into, nothing made or drawn without a renderer or a shader, and `Overhead` laying world XZ over it |
 | `Collider` | Box and sphere colliders by name and through `GetComponent<Collider>`, where rays meet them under any transform, misses from inside or past `maxDistance`, bounds and wireframes |
 | `ColliderTree` | A scene's colliders found once a physics step syncs them and where it left them, resized ones from the next step, nearest hit and every hit, dropping out when disabled, detached, destroyed or moved to another scene, `Physics::Raycast` over every scene, and a tree of hundreds staying shallow and agreeing with testing every collider through moves, removals and reinsertions |
 | `MeshCollider` | Hitting a mesh's triangles from either side with the normal toward the ray, under any transform, from triangles, strips and fans but not points or lines, through a mesh's indices, nothing without a Mesh, catching up with edited vertices at the next step or at once when asked directly, and thousands of triangles agreeing with testing each one |
@@ -150,8 +151,10 @@ and letting that fire after the object has gone runs it against freed memory.
   `renderFrame`, shader compilation, `Mesh::OnRender` past its null guards,
   `Mesh::Draw`, `Light::RenderShadowMap`, `Apply` and `ApplyNone`,
   `Camera::Apply`, `Material::Apply`, `Engine::CaptureFrame`, `Scene::Render`
-  setting and clearing `Light::current` (a light renders its shadow map).
+  setting and clearing `Light::current` (a light renders its shadow map), and
+  what a `RenderTarget` holds once the backend has drawn into it.
   `Loom Editor.exe Demos/Shadows --screenshot <file>` is the check for those,
+  and `Demos/RenderTargets --play` for the targets, on `--vulkan` too,
   with the OpenGL debug output on stderr. A clean run prints one GL line,
   "Pixel transfer is synchronized with 3D rendering", which is the screenshot's
   own readback; anything else is a regression. The editor is a Windows program,

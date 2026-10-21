@@ -127,6 +127,7 @@
     <ClCompile Include="OpenGLRenderer.cpp" />
     <ClCompile Include="Physics.cpp" />
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="RenderTarget.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SerializedField.cpp" />
     <ClCompile Include="SceneSerializer.cpp" />
@@ -187,6 +188,7 @@
     <ClInclude Include="Animator.h" />
     <ClInclude Include="OpenGL.h" />
     <ClInclude Include="Renderer.h" />
+    <ClInclude Include="RenderTarget.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="Serial.h" />
     <ClInclude Include="SerializedField.h" />

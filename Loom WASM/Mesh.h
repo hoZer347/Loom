@@ -5,6 +5,8 @@
 #include "Component.h"
 #include "ShaderVariables.h"
 
+#include "glm/glm.hpp"
+
 #include <vector>
 
 namespace Loom
@@ -48,6 +50,10 @@ namespace Loom
 		// declares no u_model draws the vertices untransformed. A Skin on the
 		// GameObject bends them first, and m_textureCoordinates go with them as aUV.
 		void Draw(uint32_t program);
+
+		// The same, placed by model in the GameObject's place, as a RenderTarget
+		// draws one mesh in many places.
+		void Draw(uint32_t program, const glm::mat4& model);
 
 		// Draws the meshes farthest from Camera::current first, writing no
 		// depth, so each blends over everything behind it.

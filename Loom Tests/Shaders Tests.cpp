@@ -2,7 +2,14 @@
 
 #include "Shaders.h"
 
+#ifndef __EMSCRIPTEN__
+#include "GlslCompiler.h"
+
+#include "spirv_reflect.h"
+#endif
+
 #include <algorithm>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -31,6 +38,34 @@ namespace
 
 		return count;
 	};
+
+#ifndef __EMSCRIPTEN__
+	enum { VERTEX_STAGE, FRAGMENT_STAGE };
+
+	// Each sampler's binding in one stage's SPIR-V, by name.
+	std::map<std::string, uint32_t> Bindings(const std::vector<uint32_t>& code)
+	{
+		std::map<std::string, uint32_t> bindings;
+		SpvReflectShaderModule module;
+
+		if (spvReflectCreateShaderModule(code.size() * sizeof(uint32_t), code.data(), &module) != SPV_REFLECT_RESULT_SUCCESS)
+			return bindings;
+
+		uint32_t count = 0;
+		spvReflectEnumerateDescriptorBindings(&module, &count, nullptr);
+
+		std::vector<SpvReflectDescriptorBinding*> found(count);
+		spvReflectEnumerateDescriptorBindings(&module, &count, found.data());
+
+		for (const SpvReflectDescriptorBinding* binding : found)
+			if (binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+				bindings[binding->name] = binding->binding;
+
+		spvReflectDestroyShaderModule(&module);
+
+		return bindings;
+	};
+#endif
 };
 
 
@@ -219,6 +254,56 @@ TEST_SUITE("Shader")
 		REQUIRE(messages.size() == 1);
 		CHECK(messages[0].error);
 		CHECK(messages[0].line == 0);
+	};
+
+	// Every stage's loose uniforms are one block, at one binding, and every
+	// sampler has a binding of its own however many stages read it.
+	TEST_CASE("compiled for Vulkan, a sampler is never bound where the loose uniforms are")
+	{
+		// The fragment stage has no loose uniforms of its own to keep its sampler
+		// off the block's binding.
+		const Loom::Glsl::Program program = Loom::Glsl::Compile(
+			"layout(location = 0) in vec3 aPos;\n"
+			"uniform mat4 u_model;\n"
+			"void main() { gl_Position = u_model * vec4(aPos, 1.0); }\n",
+			"uniform sampler2D u_texture;\n"
+			"out vec4 FragColor;\n"
+			"void main() { FragColor = texture(u_texture, vec2(0.0)); }\n");
+
+		REQUIRE(program.compiled);
+
+		const std::map<std::string, uint32_t> fragment = Bindings(program.spirv[FRAGMENT_STAGE]);
+
+		REQUIRE(fragment.contains("u_texture"));
+		CHECK(fragment.at("u_texture") != Loom::Glsl::DEFAULT_BLOCK_BINDING);
+	};
+
+	TEST_CASE("compiled for Vulkan, a sampler both stages read is bound in one place")
+	{
+		const std::string common = "uniform sampler2D u_height;\nuniform sampler2D u_texture;\n";
+
+		const Loom::Glsl::Program program = Loom::Glsl::Compile(
+			common +
+			"layout(location = 0) in vec3 aPos;\n"
+			"void main() { gl_Position = vec4(aPos, texture(u_height, aPos.xy).r); }\n",
+			common +
+			"uniform vec4 u_tint;\n"
+			"out vec4 FragColor;\n"
+			"void main() { FragColor = texture(u_texture, vec2(0.0)) * texture(u_height, vec2(0.0)) * u_tint; }\n");
+
+		REQUIRE(program.compiled);
+
+		const std::map<std::string, uint32_t> vertex = Bindings(program.spirv[VERTEX_STAGE]);
+		const std::map<std::string, uint32_t> fragment = Bindings(program.spirv[FRAGMENT_STAGE]);
+
+		REQUIRE(vertex.contains("u_height"));
+		REQUIRE(fragment.contains("u_height"));
+		REQUIRE(fragment.contains("u_texture"));
+
+		CHECK(vertex.at("u_height") == fragment.at("u_height"));
+		CHECK(fragment.at("u_height") != fragment.at("u_texture"));
+		CHECK(fragment.at("u_texture") != Loom::Glsl::DEFAULT_BLOCK_BINDING);
+		CHECK(fragment.at("u_height") != Loom::Glsl::DEFAULT_BLOCK_BINDING);
 	};
 #endif
 

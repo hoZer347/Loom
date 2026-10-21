@@ -40,6 +40,9 @@
     <ClCompile Include="Light Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="RenderTarget Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="Audio Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

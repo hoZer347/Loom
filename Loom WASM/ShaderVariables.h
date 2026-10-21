@@ -110,7 +110,8 @@ namespace Loom
 		// int and unsigned int exactly.
 		std::array<double, MAX_UNIFORM_COMPONENTS> components{ };
 
-		// A sampler's image, relative to the project folder.
+		// A sampler's image, relative to the project folder, or the name of a
+		// GameObject with a RenderTarget, whose texture it reads instead.
 		std::string texture;
 
 		// Zero, or the identity for a matrix.

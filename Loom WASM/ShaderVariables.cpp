@@ -1,6 +1,7 @@
 #include "ShaderVariables.h"
 
 #include "EditorGui.h"
+#include "RenderTarget.h"
 #include "Renderer.h"
 #include "Textures.h"
 
@@ -241,13 +242,21 @@ namespace Loom
 			return blank;
 		};
 
-		// An image that will not load is tried again once its file changes,
-		// rather than every frame, which would say why every frame. A path with
-		// no file behind it, one still being typed among them, says nothing.
+		// A RenderTarget's GameObject's name names its texture. An image that
+		// will not load is tried again once its file changes, rather than every
+		// frame, which would say why every frame. A path with no file behind
+		// it, one still being typed among them, says nothing.
 		uint32_t TextureFor(Renderer& renderer, const UniformValue* value)
 		{
 			if (value == nullptr || value->texture.empty())
 				return BlankTexture(renderer);
+
+			if (RenderTarget* target = RenderTarget::Named(value->texture))
+			{
+				const uint32_t drawn = target->IsDrawnInto() ? 0 : target->Texture();
+
+				return drawn ? drawn : BlankTexture(renderer);
+			};
 
 			// The disk is only asked about a path that has not loaded.
 			static std::unordered_map<std::string, uint32_t> loaded;
@@ -361,7 +370,7 @@ namespace Loom
 
 			changed |= AcceptAssetDrop(value.texture);
 
-			ImGui::SetItemTooltip("An image in the project. Drag one in from the Project panel.");
+			ImGui::SetItemTooltip("An image in the project, which can be dragged in from the Project panel, or the name of a GameObject with a RenderTarget.");
 
 			return changed;
 		};

@@ -6,6 +6,10 @@
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/SPIRV/GlslangToSpv.h>
 
+#include "spirv_reflect.h"
+
+#include <map>
+
 
 namespace Loom::Glsl
 {
@@ -15,6 +19,9 @@ namespace Loom::Glsl
 
 		// The Vulkan GLSL semantics glslang compiles to (the VULKAN macro's value).
 		constexpr int VULKAN_INPUT_VERSION = 100;
+
+		// Samplers are bound from here up, past the loose uniforms' block.
+		constexpr uint32_t FIRST_SAMPLER_BINDING = DEFAULT_BLOCK_BINDING + 1;
 
 		const char* const VERSION_LINE = "#version 460 core\n";
 
@@ -34,6 +41,46 @@ namespace Loom::Glsl
 		{
 			Process() { glslang::InitializeProcess(); };
 			~Process() { glslang::FinalizeProcess(); };
+		};
+
+		// glslang binds each stage's samplers on its own, from the first
+		// binding that stage has free, so a stage with no loose uniforms puts
+		// one where the other stage's block is, and a sampler both stages read
+		// can land in two places. Each gets one binding of its own here, by
+		// name. False when the SPIR-V cannot be read.
+		bool BindSamplers(std::array<std::vector<uint32_t>, STAGES>& spirv)
+		{
+			std::map<std::string, uint32_t> bound;
+
+			for (std::vector<uint32_t>& code : spirv)
+			{
+				SpvReflectShaderModule module;
+
+				if (spvReflectCreateShaderModule(code.size() * sizeof(uint32_t), code.data(), &module) != SPV_REFLECT_RESULT_SUCCESS)
+					return false;
+
+				uint32_t count = 0;
+				spvReflectEnumerateDescriptorBindings(&module, &count, nullptr);
+
+				std::vector<SpvReflectDescriptorBinding*> bindings(count);
+				spvReflectEnumerateDescriptorBindings(&module, &count, bindings.data());
+
+				for (const SpvReflectDescriptorBinding* binding : bindings)
+					if (binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+					{
+						const uint32_t next = FIRST_SAMPLER_BINDING + (uint32_t)bound.size();
+						const uint32_t number = bound.emplace(binding->name, next).first->second;
+
+						spvReflectChangeDescriptorBindingNumbers(&module, binding, number, SPV_REFLECT_SET_NUMBER_DONT_CHANGE);
+					};
+
+				const uint32_t* changed = spvReflectGetCode(&module);
+				code.assign(changed, changed + spvReflectGetCodeSize(&module) / sizeof(uint32_t));
+
+				spvReflectDestroyShaderModule(&module);
+			};
+
+			return true;
 		};
 	};
 
@@ -93,6 +140,12 @@ namespace Loom::Glsl
 
 		for (size_t i = 0; i < STAGES; i++)
 			glslang::GlslangToSpv(*linked.getIntermediate(stages[i]), program.spirv[i]);
+
+		if (!BindSamplers(program.spirv))
+		{
+			program.log += "ERROR: the compiled SPIR-V could not be read back to bind its samplers\n";
+			return program;
+		};
 
 		program.compiled = true;
 

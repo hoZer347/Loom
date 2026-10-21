@@ -36,12 +36,13 @@ namespace Loom
 		// Where each part of a pipeline's key sits: the topology in the low
 		// byte, then the colour format, then whether there is depth, then
 		// whether the viewport is flipped, then whether colour is written, then
-		// the vertex format.
+		// the vertex format, then the blend.
 		constexpr int FORMAT_SHIFT = 8;
 		constexpr int DEPTH_SHIFT = 40;
 		constexpr int FLIP_SHIFT = 41;
 		constexpr int COLOR_WRITE_SHIFT = 42;
 		constexpr int VERTEX_FORMAT_SHIFT = 43;
+		constexpr int BLEND_SHIFT = 44;
 
 		constexpr VkFormat COLOR_TARGET_FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
 		constexpr VkFormat DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
@@ -638,7 +639,7 @@ namespace Loom
 			for (const auto& [name, sampler] : program.samplers)
 			{
 				const Texture& texture = SampledTexture(sampler);
-				const VkSampler sampling = program.pixelated && !sampler.shadow ? m_nearestSampler : texture.sampler;
+				const VkSampler sampling = program.pixelated && !texture.target ? m_nearestSampler : texture.sampler;
 				images.push_back({ sampling, texture.Sampled().view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
 
 				VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
@@ -709,6 +710,7 @@ namespace Loom
 			};
 
 			texture.sampler = CreateSampler(true);
+			texture.target = true;
 
 			// Starts at the far plane, so a map nothing has been drawn into yet
 			// puts nothing in shadow.
@@ -728,7 +730,7 @@ namespace Loom
 			return Add(std::move(texture));
 		};
 
-		uint32_t CreateColorTarget(int width, int height) override
+		uint32_t CreateColorTarget(int width, int height, bool depth, bool pixelated) override
 		{
 			Texture texture;
 			texture.width = width;
@@ -736,24 +738,29 @@ namespace Loom
 
 			if (!CreateAttachment(texture.color, COLOR_TARGET_FORMAT, width, height,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT)
-				|| !CreateAttachment(texture.depth, DEPTH_FORMAT, width, height,
-					VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_ASPECT_DEPTH_BIT))
+				|| (depth && !CreateAttachment(texture.depth, DEPTH_FORMAT, width, height,
+					VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_ASPECT_DEPTH_BIT)))
 			{
 				std::cerr << "A " << width << 'x' << height << " render target could not be allocated" << std::endl;
 				DestroyTextureNow(texture);
 				return 0;
 			};
 
-			texture.sampler = CreateSampler(false);
+			texture.sampler = CreateSampler(false, pixelated ? VK_FILTER_NEAREST : VK_FILTER_LINEAR);
+			texture.target = true;
 
 			Immediately([&](VkCommandBuffer command)
 			{
 				Transition(command, texture.color.image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-				Transition(command, texture.depth.image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
+				if (depth)
+					Transition(command, texture.depth.image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 			});
 
 			texture.color.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			texture.depth.layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+
+			if (depth)
+				texture.depth.layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
 
 			return Add(std::move(texture));
 		};
@@ -804,7 +811,9 @@ namespace Loom
 				std::copy(color, color + std::size(pending->rgba), pending->rgba);
 			};
 
-			pending->depth |= depth;
+			// A target with no depth would never take the clear, and have a pass
+			// begun to land it at every pop.
+			pending->depth |= depth && HasDepth(target);
 
 			// Mid-pass, the clear has to be drawn rather than loaded.
 			if (m_rendering && m_renderingTarget == target)
@@ -823,6 +832,11 @@ namespace Loom
 		void SetColorWrite(bool write) override
 		{
 			m_colorWrite = write;
+		};
+
+		void SetBlend(Blend blend) override
+		{
+			m_blend = blend;
 		};
 
 		void SetDepthTestEqual(bool equal) override
@@ -897,6 +911,10 @@ namespace Loom
 			int height = 0;
 			Pending pending;
 			VkDescriptorSet imgui = VK_NULL_HANDLE;
+
+			// Drawn into, and sampled as it was made, whatever the program's
+			// pixelated says.
+			bool target = false;
 
 			const Attachment& Sampled() const { return color.image ? color : depth; };
 		};
@@ -1324,9 +1342,15 @@ namespace Loom
 			return found == m_textures.end() ? nullptr : &found->second.pending;
 		};
 
+		bool HasDepth(uint32_t target) const
+		{
+			return target == WINDOW || m_textures.at(target).depth.image;
+		};
+
+		// Begun again over ImGui's pass, which leaves out the depth a target has.
 		void EnsureRendering(uint32_t target)
 		{
-			if (m_rendering && m_renderingTarget == target && m_renderingDepth)
+			if (m_rendering && m_renderingTarget == target && (m_renderingDepth || !HasDepth(target)))
 				return;
 
 			EndRendering();
@@ -1526,7 +1550,8 @@ namespace Loom
 				| ((uint64_t)m_renderingDepth << DEPTH_SHIFT)
 				| ((uint64_t)flipped << FLIP_SHIFT)
 				| ((uint64_t)m_colorWrite << COLOR_WRITE_SHIFT)
-				| ((uint64_t)format << VERTEX_FORMAT_SHIFT);
+				| ((uint64_t)format << VERTEX_FORMAT_SHIFT)
+				| ((uint64_t)m_blend << BLEND_SHIFT);
 
 			const auto found = program.pipelines.find(key);
 
@@ -1604,14 +1629,19 @@ namespace Loom
 			depth.depthWriteEnable = m_renderingDepth;
 			depth.depthCompareOp = VK_COMPARE_OP_LESS;
 
+			// Max ignores the factors, which only have to be valid ones.
+			const VkBlendFactor source = m_blend == Blend::Alpha ? VK_BLEND_FACTOR_SRC_ALPHA : VK_BLEND_FACTOR_ONE;
+			const VkBlendFactor destination = m_blend == Blend::Alpha ? VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA : VK_BLEND_FACTOR_ONE;
+			const VkBlendOp operation = m_blend == Blend::Max ? VK_BLEND_OP_MAX : VK_BLEND_OP_ADD;
+
 			VkPipelineColorBlendAttachmentState blendAttachment{ };
-			blendAttachment.blendEnable = VK_TRUE;
-			blendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-			blendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-			blendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-			blendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-			blendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-			blendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+			blendAttachment.blendEnable = m_blend != Blend::Replace;
+			blendAttachment.srcColorBlendFactor = source;
+			blendAttachment.dstColorBlendFactor = destination;
+			blendAttachment.colorBlendOp = operation;
+			blendAttachment.srcAlphaBlendFactor = source;
+			blendAttachment.dstAlphaBlendFactor = destination;
+			blendAttachment.alphaBlendOp = operation;
 			blendAttachment.colorWriteMask = m_colorWrite ? VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT : 0;
 
 			const bool hasColor = m_renderingFormat != VK_FORMAT_UNDEFINED;
@@ -2096,6 +2126,7 @@ namespace Loom
 		float m_biasSlope = 0.0f;
 		float m_biasConstant = 0.0f;
 		bool m_colorWrite = true;
+		Blend m_blend = Blend::Alpha;
 		VkCompareOp m_depthCompare = VK_COMPARE_OP_LESS;
 
 		CaptureHandler m_capture;

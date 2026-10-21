@@ -62,6 +62,29 @@ TEST_SUITE("Script Exports")
 			CHECK(GetProcAddress(executable, name) != nullptr);
 		};
 	};
+
+	TEST_CASE("the render target a script draws into is exported from the executable")
+	{
+		// Every out-of-line member a script calls, by its decorated name.
+		const char* const names[] =
+		{
+			"?Clear@RenderTarget@Loom@@QEAAXXZ",
+			"?Draw@RenderTarget@Loom@@QEAAXAEAUMesh@2@AEBU?$mat@$03$03M$0A@@glm@@W4Blend@2@@Z",
+			"?Draw@RenderTarget@Loom@@QEAAXAEAUMesh@2@AEBV?$vector@U?$mat@$03$03M$0A@@glm@@V?$allocator@U?$mat@$03$03M$0A@@glm@@@std@@@std@@AEBU?$mat@$03$03M$0A@@glm@@W4Blend@2@@Z",
+			"?Draw@RenderTarget@Loom@@QEAAXAEAUMesh@2@AEAUMaterial@2@AEBV?$vector@U?$mat@$03$03M$0A@@glm@@V?$allocator@U?$mat@$03$03M$0A@@glm@@@std@@@std@@AEBU?$mat@$03$03M$0A@@glm@@W4Blend@2@@Z",
+			"?Texture@RenderTarget@Loom@@QEAAIXZ",
+			"?Named@RenderTarget@Loom@@SAPEAU12@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z",
+			"?Overhead@RenderTarget@Loom@@SA?AU?$mat@$03$03M$0A@@glm@@AEBU?$vec@$01M$0A@@4@0@Z",
+		};
+
+		const HMODULE executable = GetModuleHandleA(nullptr);
+
+		for (const char* name : names)
+		{
+			CAPTURE(name);
+			CHECK(GetProcAddress(executable, name) != nullptr);
+		};
+	};
 };
 
 #endif

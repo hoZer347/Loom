@@ -1,0 +1,3 @@
+name=RenderTargets
+scripts=Scripts/RenderTargetsScripts.vcxproj
+library=Build/RenderTargetsScripts.dll

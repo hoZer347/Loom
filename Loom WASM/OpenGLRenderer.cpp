@@ -45,10 +45,10 @@ namespace Loom
 			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		};
 
-		void SetColorSampling()
+		void SetColorSampling(GLint filter = GL_LINEAR)
 		{
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		};
@@ -438,11 +438,10 @@ namespace Loom
 			glBindTexture(GL_TEXTURE_2D, texture);
 			glActiveTexture(GL_TEXTURE0);
 
-			// A sampler object overrides all of a texture's sampling, a shadow
-			// map's comparison included, so shadow maps keep their own.
-			const auto target = m_targets.find(texture);
-			const bool shadow = target != m_targets.end() && target->second.compare;
-			const bool nearest = m_pixelated.contains(program) && !shadow;
+			// A sampler object overrides all of a texture's sampling, so targets
+			// keep their own: a shadow map's comparison, and the filtering a
+			// colour target was made with.
+			const bool nearest = m_pixelated.contains(program) && !m_targets.contains(texture);
 			glBindSampler(found->second, nearest ? m_nearest : 0);
 
 			glUniform1i(glGetUniformLocation(program, name), found->second);
@@ -503,7 +502,6 @@ namespace Loom
 			const GLuint previous = BoundFramebuffer();
 			const GLuint bound = BoundTexture();
 			Target target;
-			target.compare = true;
 
 			glGenTextures(1, &target.texture);
 			glBindTexture(GL_TEXTURE_2D, target.texture);
@@ -524,7 +522,7 @@ namespace Loom
 			return Complete(target, size, size, previous);
 		};
 
-		uint32_t CreateColorTarget(int width, int height) override
+		uint32_t CreateColorTarget(int width, int height, bool depth, bool pixelated) override
 		{
 			const GLuint previous = BoundFramebuffer();
 			const GLuint bound = BoundTexture();
@@ -533,18 +531,21 @@ namespace Loom
 			glGenTextures(1, &target.texture);
 			glBindTexture(GL_TEXTURE_2D, target.texture);
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-			SetColorSampling();
+			SetColorSampling(pixelated ? GL_NEAREST : GL_LINEAR);
 			glBindTexture(GL_TEXTURE_2D, bound);
 
 			glGenFramebuffers(1, &target.framebuffer);
 			glBindFramebuffer(GL_FRAMEBUFFER, target.framebuffer);
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, target.texture, 0);
 
-			glGenRenderbuffers(1, &target.depth);
-			glBindRenderbuffer(GL_RENDERBUFFER, target.depth);
-			glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
-			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, target.depth);
-			glBindRenderbuffer(GL_RENDERBUFFER, 0);
+			if (depth)
+			{
+				glGenRenderbuffers(1, &target.depth);
+				glBindRenderbuffer(GL_RENDERBUFFER, target.depth);
+				glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
+				glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, target.depth);
+				glBindRenderbuffer(GL_RENDERBUFFER, 0);
+			};
 
 			return Complete(target, width, height, previous);
 		};
@@ -631,6 +632,22 @@ namespace Loom
 			glColorMask(mask, mask, mask, mask);
 		};
 
+		void SetBlend(Blend blend) override
+		{
+			if (blend == Blend::Replace)
+			{
+				glDisable(GL_BLEND);
+				return;
+			};
+
+			glEnable(GL_BLEND);
+			glBlendEquation(blend == Blend::Max ? GL_MAX : GL_FUNC_ADD);
+
+			if (blend == Blend::Add)
+				glBlendFunc(GL_ONE, GL_ONE);
+			else glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		};
+
 		void SetDepthTestEqual(bool equal) override
 		{
 			glDepthFunc(equal ? GL_LEQUAL : GL_LESS);
@@ -663,9 +680,6 @@ namespace Loom
 			GLuint texture = 0;
 			GLuint framebuffer = 0;
 			GLuint depth = 0;
-
-			// A shadow map, sampled by comparing.
-			bool compare = false;
 			GLsizei width = 0;
 			GLsizei height = 0;
 		};

@@ -30,7 +30,10 @@ namespace Loom
 
 		m_width = width;
 		m_height = height;
-		m_texture = Renderer::Get()->CreateColorTarget(m_width, m_height);
+		constexpr bool DEPTH = true;
+		constexpr bool PIXELATED = false;
+
+		m_texture = Renderer::Get()->CreateColorTarget(m_width, m_height, DEPTH, PIXELATED);
 	};
 
 	void EditorViewport::Render(int width, int height, const float* clear_colour, const std::function<void()>& draw)

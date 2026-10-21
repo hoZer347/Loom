@@ -138,7 +138,7 @@ namespace LoomTests
 				throw std::runtime_error("Shader compile error in " + name);
 
 			vertices[name] = vertex;
-			return programs[name] = ++m_handles;
+			return programs[name] = ++s_handles;
 		};
 
 		void DeleteProgram(uint32_t program) override { deleted.push_back(program); };
@@ -181,21 +181,31 @@ namespace LoomTests
 			else pixelatedPrograms.erase(program);
 		};
 
-		uint32_t CreateTexture(int, int, const uint8_t*) override { return ++m_handles; };
-		uint32_t CreateDepthTarget(int) override { return ++m_handles; };
-		uint32_t CreateColorTarget(int width, int height) override
+		uint32_t CreateTexture(int, int, const uint8_t*) override { return ++s_handles; };
+		uint32_t CreateDepthTarget(int) override { return ++s_handles; };
+		uint32_t CreateColorTarget(int width, int height, bool depth, bool pixelated) override
 		{
-			++m_handles;
-			targetSizes[m_handles] = glm::ivec2(width, height);
-			return m_handles;
+			++s_handles;
+			targetSizes[s_handles] = glm::ivec2(width, height);
+			targetDepths[s_handles] = depth;
+			targetsPixelated[s_handles] = pixelated;
+			return s_handles;
 		};
 		void DestroyTexture(uint32_t texture) override { destroyedTextures.push_back(texture); };
 
 		void PushTarget(uint32_t target) override { m_targets.push_back(target); };
 		void PopTarget() override { m_targets.pop_back(); };
-		void Clear(const float* color, bool depth) override { clears.push_back({ color != nullptr, depth }); };
+
+		void Clear(const float* color, bool depth) override
+		{
+			clears.push_back({ color != nullptr, depth });
+			clearedInto.push_back(m_targets.empty() ? WINDOW : m_targets.back());
+			clearColors.push_back(color ? glm::vec4(color[0], color[1], color[2], color[3]) : glm::vec4(0.0f));
+		};
+
 		void SetDepthBias(float, float) override { };
 		void SetColorWrite(bool write) override { colorWrites.push_back(write); };
+		void SetBlend(Loom::Blend blend) override { blends.push_back(blend); };
 		void SetDepthTestEqual(bool equal) override { depthTestsEqual.push_back(equal); };
 
 		glm::ivec2 TargetSize() const override
@@ -228,19 +238,31 @@ namespace LoomTests
 		std::vector<uint32_t> drawnTextures;
 		std::vector<std::vector<float>> drawnVertices;
 
-		// Each Clear: whether it was given a colour, and whether it cleared depth.
+		// Each Clear: whether it was given a colour, and whether it cleared depth;
+		// what it cleared, a target or WINDOW; and its colour, or zero.
 		std::vector<std::pair<bool, bool>> clears;
+		std::vector<uint32_t> clearedInto;
+		std::vector<glm::vec4> clearColors;
+
+		// Every SetBlend, in order.
+		std::vector<Loom::Blend> blends;
 
 		std::set<uint32_t> pixelatedPrograms;
 
 		std::map<std::string, uint32_t> programs;
 		std::map<std::string, std::string> vertices;
 		std::map<uint32_t, glm::ivec2> targetSizes;
+		std::map<uint32_t, bool> targetDepths;
+		std::map<uint32_t, bool> targetsPixelated;
 		glm::ivec2 windowSize = glm::ivec2(1);
 
 	private:
 		Renderer* m_previous;
-		uint32_t m_handles = 0;
+
+		// Counted on across renderers, so a texture an engine function keeps
+		// from an earlier test is never taken for one made in this one.
+		static inline uint32_t s_handles = 0;
+
 		std::vector<uint32_t> m_targets;
 	};
 

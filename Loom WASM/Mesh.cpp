@@ -82,6 +82,11 @@ namespace Loom
 
 	void Mesh::Draw(uint32_t program)
 	{
+		Draw(program, m_gameObject->WorldMatrix());
+	};
+
+	void Mesh::Draw(uint32_t program, const glm::mat4& model)
+	{
 		Renderer* renderer = Renderer::Get();
 
 		if (!renderer)
@@ -118,7 +123,7 @@ namespace Loom
 		const std::vector<float>& positions = m_deformed.size() == m_vertices->size() ? m_deformed : *m_vertices;
 		const size_t count = positions.size() / POSITION_COMPONENTS;
 
-		renderer->SetUniform(program, "u_model", m_gameObject->WorldMatrix());
+		renderer->SetUniform(program, "u_model", model);
 
 		if (m_textureCoordinates->size() != count * UV_COMPONENTS)
 		{

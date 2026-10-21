@@ -61,6 +61,9 @@
     <ClCompile Include="Renderer.cpp">
       <Filter>Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="RenderTarget.cpp">
+      <Filter>Renderer</Filter>
+    </ClCompile>
     <ClCompile Include="OpenGLRenderer.cpp">
       <Filter>Renderer</Filter>
     </ClCompile>
@@ -313,6 +316,9 @@
       <Filter>Mesh</Filter>
     </ClInclude>
     <ClInclude Include="Renderer.h">
+      <Filter>Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderTarget.h">
       <Filter>Renderer</Filter>
     </ClInclude>
     <ClInclude Include="Light.h">

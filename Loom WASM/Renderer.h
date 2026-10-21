@@ -25,6 +25,11 @@ namespace Loom
 	// coordinate after it at location 1 (aUV).
 	enum class VertexFormat { Position, PositionUV };
 
+	// How what is drawn lands on what is already there: over it by the alpha
+	// it is drawn with, added to it, the greater of the two in each channel,
+	// or in its place, alpha and all.
+	enum class Blend { Alpha, Add, Max, Replace };
+
 	LOOM_API size_t FloatsPerVertex(VertexFormat format);
 
 	/**
@@ -117,8 +122,11 @@ namespace Loom
 		// A depth texture a shader reads through a sampler2DShadow.
 		virtual uint32_t CreateDepthTarget(int size) = 0;
 
-		// An RGBA colour texture with a depth buffer behind it.
-		virtual uint32_t CreateColorTarget(int width, int height) = 0;
+		// An RGBA colour texture, with a depth buffer behind it when depth is
+		// asked for; without one, nothing drawn into it is depth tested. It is
+		// sampled nearest when pixelated, smooth otherwise, whatever the
+		// program sampling it says.
+		virtual uint32_t CreateColorTarget(int width, int height, bool depth, bool pixelated) = 0;
 
 		virtual void DestroyTexture(uint32_t texture) = 0;
 
@@ -136,6 +144,9 @@ namespace Loom
 
 		// Whether what is drawn next writes colour. Off, it only lays down depth.
 		virtual void SetColorWrite(bool write) = 0;
+
+		// How what is drawn next lands on what is there. Alpha until it is set.
+		virtual void SetBlend(Blend blend) = 0;
 
 		// Whether what is drawn next passes the depth test at exactly the depth
 		// already there as well as nearer, so a second draw of a mesh lands on
