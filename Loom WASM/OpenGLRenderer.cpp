@@ -196,6 +196,8 @@ namespace Loom
 			glGenSamplers(1, &m_nearest);
 			SetNearestSampling(m_nearest);
 
+			glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m_maxTextureSize);
+
 #ifndef __EMSCRIPTEN__
 			glGenVertexArrays(1, &m_vao);
 			glBindVertexArray(m_vao);
@@ -609,7 +611,16 @@ namespace Loom
 			glGetIntegerv(GL_CURRENT_PROGRAM, &program);
 			glUseProgram(0);
 
+			// A clear keeps to the colour mask, which a depth-only pass leaves shut.
+			const bool reopen = color && !m_colorWrite;
+
+			if (reopen)
+				glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+
 			glClear(mask);
+
+			if (reopen)
+				glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 
 			glUseProgram((GLuint)program);
 		};
@@ -628,6 +639,8 @@ namespace Loom
 
 		void SetColorWrite(bool write) override
 		{
+			m_colorWrite = write;
+
 			const GLboolean mask = write ? GL_TRUE : GL_FALSE;
 			glColorMask(mask, mask, mask, mask);
 		};
@@ -663,10 +676,7 @@ namespace Loom
 
 		int MaxTextureSize() const override
 		{
-			GLint size = 0;
-			glGetIntegerv(GL_MAX_TEXTURE_SIZE, &size);
-
-			return size;
+			return m_maxTextureSize;
 		};
 
 		void* ImGuiTexture(uint32_t texture) override
@@ -744,6 +754,12 @@ namespace Loom
 
 		GLuint m_vbo = 0;
 		GLuint m_vao = 0;
+
+		// Asked for once, since asking GL mid-frame stalls a threaded driver.
+		GLint m_maxTextureSize = 0;
+
+		// What SetColorWrite last said, which Clear opens the mask past.
+		bool m_colorWrite = true;
 
 		// What a pixelated program samples its colour textures through.
 		GLuint m_nearest = 0;

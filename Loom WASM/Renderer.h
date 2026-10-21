@@ -113,7 +113,7 @@ namespace Loom
 
 		// Whether the program samples its colour textures nearest, so each texel
 		// draws as a hard-edged square, rather than blending between them. Off
-		// until it is set.
+		// until it is set. A target keeps its own sampling either way.
 		virtual void SetPixelated(uint32_t program, bool pixelated) = 0;
 
 		// Eight bit RGBA, bottom row first.
@@ -135,7 +135,8 @@ namespace Loom
 		virtual void PushTarget(uint32_t target) = 0;
 		virtual void PopTarget() = 0;
 
-		// color is RGBA, or null to leave the colour alone.
+		// color is RGBA, or null to leave the colour alone. Clears the colour
+		// even while SetColorWrite has it off.
 		virtual void Clear(const float* color, bool depth) = 0;
 
 		// Pushes the depth of what is drawn next back by its slope, the way

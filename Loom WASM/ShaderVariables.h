@@ -49,7 +49,7 @@ namespace Loom
 
 		// Its colour textures are sampled nearest, so each texel draws as a
 		// hard-edged square however close it is, the way pixel art and
-		// PS1-era models want.
+		// PS1-era models want. A RenderTarget it reads keeps its own sampling.
 		bool pixelated = false;
 	};
 
@@ -66,10 +66,10 @@ namespace Loom
 
 	inline constexpr ShaderSymbol ENGINE_SHADER_SYMBOLS[] =
 	{
-		{ "u_model", "uniform mat4 u_model;", "The GameObject's world matrix, set by Mesh and Sprite.", true },
+		{ "u_model", "uniform mat4 u_model;", "The GameObject's world matrix, set by Mesh and Sprite, or where RenderTarget::Draw is told to put a mesh.", true },
 		{ "u_color", "uniform vec3 u_color;", "The Material's colour.", true },
 		{ "u_shadowsOff", "uniform float u_shadowsOff;", "Not zero on a Material whose shadows are off.", true },
-		{ "u_viewProjection", "uniform mat4 u_viewProjection;", "The Camera's view and projection together.", true },
+		{ "u_viewProjection", "uniform mat4 u_viewProjection;", "The Camera's view and projection together, or the one RenderTarget::Draw is given.", true },
 		{ "u_cameraPosition", "uniform vec3 u_cameraPosition;", "The Camera's position in world space.", true },
 		{ "u_lightViewProjection", "uniform mat4 u_lightViewProjection;", "The Light's view and projection, which its shadow map is drawn with.", true },
 		{ "u_lightDirection", "uniform vec3 u_lightDirection;", "The way the Light shines, in world space.", true },
