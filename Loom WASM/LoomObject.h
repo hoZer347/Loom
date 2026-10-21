@@ -86,6 +86,12 @@ namespace Loom
 		// The Buttons this object declared, in the order they were declared.
 		const std::vector<FieldButton>& GetButtons() const { return m_buttons; };
 
+		// Whether a field is written when the object is: to a scene, a prefab,
+		// the undo history, or anything else made from that text. One that is
+		// not is left as it is when the object is read back, for whatever made
+		// it to make again.
+		virtual bool IsSaved(const SerializedField& field) const { return true; };
+
 		// For an integer field that indexes a list only the object knows, such
 		// as an Animator's clips, the names the editor offers in its place, as
 		// it does an enum's. Empty for a field that is just a number.

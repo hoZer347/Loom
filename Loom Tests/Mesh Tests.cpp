@@ -5,6 +5,9 @@
 #include "Mesh.h"
 #include "Material.h"
 #include "Scene.h"
+#include "SceneSerializer.h"
+
+#include <string>
 
 using LoomTests::Pump;
 
@@ -48,6 +51,57 @@ TEST_SUITE("Mesh")
 		// divides by before handing a vertex count to glDrawArrays.
 		CHECK(mesh.m_vertices->size() % 3 == 0);
 		CHECK(mesh.m_vertices->size() / 3 == 3);
+	};
+
+	// A value no other field of a fresh mesh writes, to look for in the text.
+	constexpr float GENERATED_VALUE = 7.25f;
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a generated mesh's geometry is not written, and the rest of it is")
+	{
+		Loom::Scene scene("generated");
+		Pump();
+
+		Loom::GameObject* holder = scene.AddChild("Ground");
+		Loom::Mesh* mesh = holder->Attach<Loom::Mesh>(Loom::Mesh::Triangles);
+		Pump();
+
+		mesh->m_vertices = std::vector<float>(9, GENERATED_VALUE);
+		mesh->m_textureCoordinates = std::vector<float>(6, GENERATED_VALUE);
+		mesh->m_normals = std::vector<float>(9, GENERATED_VALUE);
+
+		CHECK(Loom::SceneSerializer::Serialize(*holder).find("7.25") != std::string::npos);
+
+		mesh->m_generated = true;
+
+		const std::string text = Loom::SceneSerializer::Serialize(*holder);
+
+		CHECK(text.find("7.25") == std::string::npos);
+		CHECK(text.find("7 = true") != std::string::npos);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a generated mesh read back has no geometry until its script makes it")
+	{
+		Loom::Scene scene("generated");
+		Pump();
+
+		Loom::GameObject* holder = scene.AddChild("Ground");
+		Loom::Mesh* mesh = holder->Attach<Loom::Mesh>(Loom::Mesh::Triangles);
+		Pump();
+
+		mesh->m_vertices = std::vector<float>(9, GENERATED_VALUE);
+		mesh->m_generated = true;
+
+		std::string error;
+		Loom::GameObject* copy = Loom::SceneSerializer::Deserialize(Loom::SceneSerializer::Serialize(*holder), scene.GetRoot(), &error);
+		Pump();
+
+		REQUIRE(copy != nullptr);
+
+		const Loom::Mesh* read = copy->GetComponent<Loom::Mesh>();
+
+		REQUIRE(read != nullptr);
+		CHECK(*read->m_generated);
+		CHECK(read->m_vertices->empty());
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the draw type is settable to any GL usage hint")

@@ -79,6 +79,16 @@ namespace Loom
 		// m_textureCoordinates for the same reason.
 		Serial<std::vector<float>> m_normals;
 
+		// On, the vertices, texture coordinates and normals are made by a
+		// script as it runs, such as ground grown from a seed: never written
+		// to a scene or prefab, so neither saved nor compared with a prefab's,
+		// and made again by that script once read back. Last, for the same
+		// reason as the two before it.
+		Serial<bool> m_generated;
+
+		// Leaves a generated mesh's geometry out of what is written.
+		bool IsSaved(const SerializedField& field) const override;
+
 		std::vector<uint32_t> m_indices;
 
 		// Drawn in place of m_vertices while it holds as many floats. What a

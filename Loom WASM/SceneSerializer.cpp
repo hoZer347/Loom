@@ -58,14 +58,16 @@ namespace Loom
 			return true;
 		};
 
-		// A field has no name: what identifies it is where its Serial member was
-		// declared, so that is what goes in the file.
+		// What identifies a field is where its Serial member was declared, so
+		// that is what goes in the file. One the object does not save is left
+		// out, and the rest keep their numbers.
 		void WriteFields(std::string& text, const LoomObject& object, int depth)
 		{
 			const std::vector<SerializedField>& fields = object.GetFields();
 
 			for (size_t i = 0; i < fields.size(); i++)
-				text += Indent(depth) + std::to_string(i) + " = " + fields[i].Write() + '\n';
+				if (object.IsSaved(fields[i]))
+					text += Indent(depth) + std::to_string(i) + " = " + fields[i].Write() + '\n';
 		};
 
 		void WriteGameObject(std::string& text, GameObject& gameObject, int depth)
