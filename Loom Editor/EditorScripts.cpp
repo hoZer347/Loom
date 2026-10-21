@@ -331,6 +331,18 @@ namespace Loom
 		Engine::updateScenes = true;
 	};
 
+	void Editor::LoadIntoRun(const std::string& path)
+	{
+		if (!m_playing)
+		{
+			std::cerr << "Only a run changes scene, so " << path << " is not loaded" << std::endl;
+			return;
+		};
+
+		CloseAllScenes();
+		OpenScene(std::filesystem::absolute(path).lexically_normal().string());
+	};
+
 	void Editor::Stop()
 	{
 		Engine::updateScenes = false;

@@ -15,6 +15,7 @@
 #include <atomic>
 #include <algorithm>
 #include <fstream>
+#include <utility>
 #include <vector>
 
 
@@ -174,7 +175,44 @@ namespace Loom
 	{
 		isRunning = false;
 		glfwSetWindowShouldClose(window, true);
-	}
+
+#if __EMSCRIPTEN__
+		// The browser runs the loop, and never asks the window whether to close.
+		emscripten_cancel_main_loop();
+#endif
+	};
+
+	void Engine::Quit()
+	{
+		std::lock_guard<std::recursive_mutex> lock(mutex);
+		quitRequested = true;
+	};
+
+	void Engine::SetQuitFunction(const Task& task)
+	{
+		std::lock_guard<std::recursive_mutex> lock(mutex);
+		onQuit = task;
+	};
+
+	void Engine::DoRequests()
+	{
+		Scene::LoadRequested();
+
+		Task quit;
+
+		{
+			std::lock_guard<std::recursive_mutex> lock(mutex);
+
+			if (!std::exchange(quitRequested, false))
+				return;
+
+			quit = onQuit;
+		};
+
+		if (quit)
+			quit();
+		else Stop();
+	};
 
 	void Engine::renderFrame()
 	{
@@ -190,6 +228,7 @@ namespace Loom
 		renderer->BeginFrame();
 		renderer->Clear(clearColor, true);
 
+		DoRequests();
 		DoTasks();
 
 		onUpdate();

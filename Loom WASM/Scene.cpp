@@ -5,9 +5,13 @@
 #include "Engine.h"
 #include "Light.h"
 #include "Mesh.h"
+#include "SceneSerializer.h"
 
 #include <algorithm>
+#include <filesystem>
+#include <iostream>
 #include <optional>
+#include <utility>
 #include <vector>
 #include <string>
 
@@ -124,6 +128,62 @@ namespace Loom
 	void Scene::Unlist(Scene* scene)
 	{
 		Engine::QueueTask([scene]() { std::erase(allScenes, scene); });
+	};
+
+	void Scene::Load(const std::string& path)
+	{
+		std::lock_guard<std::recursive_mutex> lock(mutex);
+		requested = path;
+	};
+
+	void Scene::SetLoadFunction(const std::function<void(const std::string&)>& load)
+	{
+		std::lock_guard<std::recursive_mutex> lock(mutex);
+		onLoad = load;
+	};
+
+	void Scene::LoadRequested()
+	{
+		std::string path;
+		std::function<void(const std::string&)> load;
+
+		{
+			std::lock_guard<std::recursive_mutex> lock(mutex);
+
+			if (!requested)
+				return;
+
+			path = *std::exchange(requested, std::nullopt);
+			load = onLoad;
+		};
+
+		std::error_code code;
+
+		if (!std::filesystem::is_regular_file(path, code))
+		{
+			std::cerr << "Could not load " << path << ": there is no such file" << std::endl;
+			return;
+		};
+
+		if (load)
+		{
+			load(path);
+			return;
+		};
+
+		// Work queued against the open scenes lands before they go, and they go
+		// before the new one is read, so that its guids are its own.
+		Engine::DoTasks();
+
+		for (Scene* scene : std::vector<Scene*>(allScenes))
+			delete scene;
+
+		Engine::DoTasks();
+
+		std::string error;
+
+		if (SceneSerializer::LoadFromFile(path, &error) == nullptr)
+			std::cerr << "Could not load " << path << ": " << error << std::endl;
 	};
 
 	void Scene::Physics()

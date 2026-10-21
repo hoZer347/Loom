@@ -536,6 +536,11 @@ namespace Loom
 		// has something to go back to.
 		void BeginPlay();
 
+		// What Scene::Load does here: in a run, the scenes the editor owns go
+		// for the one at path, opened as its own, and Stop still brings back
+		// those Play began with. Outside a run, the scenes are the user's.
+		void LoadIntoRun(const std::string& path);
+
 		// Deletes every open scene here and now, rather than on the task queue:
 		// the callers are about to unload the code those scenes are made of.
 		void CloseAllScenes();

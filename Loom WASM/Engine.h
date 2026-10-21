@@ -34,6 +34,17 @@ namespace Loom
 		// can still ask the loop to end; it only ever touches Engine statics.
 		static void Stop();
 
+		// Ends the game between frames, as Scene::Load changes scene: with Stop,
+		// or with the function SetQuitFunction gives, for a host that plays the
+		// game inside itself, as the editor does.
+		static void Quit();
+		static void SetQuitFunction(const Task& task);
+
+		// Carries out what Scene::Load and Quit have asked for since it last
+		// ran. renderFrame calls this at the top of every frame; it is public,
+		// as DoTasks is, so a host that drives the engine itself can.
+		static void DoRequests();
+
 		static void SetUpdateFunction(const Task& task);
 
 		// Replaces the built-in per-scene ImGui windows with a custom one. Called
@@ -103,6 +114,9 @@ namespace Loom
 		static inline Task onUpdate = []() { };
 		static inline Task onGui = nullptr;
 		static inline Task onImGuiInput = nullptr;
+		static inline Task onQuit = nullptr;
+
+		static inline bool quitRequested = false;
 
 		static inline std::recursive_mutex mutex;
 		static inline std::queue<Task> taskQueue;

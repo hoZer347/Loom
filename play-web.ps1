@@ -171,9 +171,10 @@ if (Test-Stale $module $linkInputs)
 
 $page = Join-Path $output 'index.html'
 
-# Every font in the project but the builds, by its path under it, for the page
-# to preload where a UiText opens it.
-$fonts = @(Get-ChildItem -LiteralPath $Project -Recurse -File -Include '*.ttf', '*.otf', '*.ttc' |
+# Every file in the project but the builds, by its path under it, for the page
+# to preload, so whatever the game opens by that path is there: a font a UiText
+# names, or a scene Scene::Load does.
+$files = @(Get-ChildItem -LiteralPath $Project -Recurse -File |
     Where-Object { -not $_.FullName.StartsWith((Join-Path $Project 'Build\'), [StringComparison]::OrdinalIgnoreCase) } |
     ForEach-Object { (Get-UrlPath $_.FullName).TrimStart('/') } |
     Sort-Object)
@@ -182,7 +183,7 @@ $fonts = @(Get-ChildItem -LiteralPath $Project -Recurse -File -Include '*.ttf', 
     Replace('{TITLE}', (Split-Path -Leaf $Project)).
     Replace('{SCRIPT}', (Get-UrlPath $module)).
     Replace('{SCENE}', (Get-UrlPath $Scene)).
-    Replace('{FONTS}', (ConvertTo-Json -InputObject $fonts -Compress)) |
+    Replace('{FILES}', (ConvertTo-Json -InputObject $files -Compress)) |
     Set-Content -LiteralPath $page -Encoding UTF8 -NoNewline
 
 # --- Serving ----------------------------------------------------------------

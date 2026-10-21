@@ -559,6 +559,10 @@ namespace Loom
 
 		Engine::SetGuiFunction([this]() { DrawGui(); });
 
+		// A game played here changes scene and ends inside its run.
+		Scene::SetLoadFunction([this](const std::string& path) { LoadIntoRun(path); });
+		Engine::SetQuitFunction([this]() { Stop(); });
+
 		// Set before the first frame, which is when ImGui reads it.
 		static const std::string layout = BesideExecutable("LoomEditor.layout.ini").string();
 		ImGui::GetIO().IniFilename = layout.c_str();
@@ -599,6 +603,8 @@ namespace Loom
 		drop_receiver = nullptr;
 
 		Engine::SetGuiFunction(Task{ });
+		Engine::SetQuitFunction(Task{ });
+		Scene::SetLoadFunction(nullptr);
 
 		Engine::renderScenes = true;
 		Engine::updateScenes = true;
@@ -1091,8 +1097,8 @@ namespace Loom
 		m_activeScene = scene;
 
 		// Closing scenes for a rebuild is not the user leaving a scene, so only
-		// arriving at one is worth remembering.
-		if (scene == nullptr || m_projectPath.empty())
+		// arriving at one is worth remembering, and not one a run has moved to.
+		if (scene == nullptr || m_projectPath.empty() || m_playing)
 			return;
 
 		const auto path = m_scenePaths.find(scene);

@@ -1,0 +1,90 @@
+World(262ba595-ea67-4d91-834f-b6695eaca096):
+	GameObject Root(982b4bc1-f907-4230-9992-961ba3b9f11d)
+		0 = 0
+		1 = false
+		Component World(af450b3f-eb1e-4867-ab2b-72b10f1bea0e)
+			0 = 1
+			1 = 628bbe7c-31f5-4261-ac7c-6f20f570741b
+			2 = 022f94ec-3a2d-4f6c-aa5d-2cbf76a4b9b1
+		GameObject Camera(a5f641f2-9107-46d4-9546-8ac52527353a)
+			0 = 0
+			1 = false
+			2 = (0, 2.5, 6)
+			Component Camera(95fcdcfc-82d3-468f-9339-643594221b42)
+				0 = true
+				1 = (0, 0.8, 0)
+				2 = 45
+				3 = 0.1
+				4 = 100
+		GameObject Sun(486aa52b-d2c5-4f2c-b33f-7331a7f78364)
+			0 = 0
+			1 = false
+			Component Light(97d7f48c-66d3-4e90-b841-e1435079e179)
+				0 = (-0.6, -1, -0.4)
+				1 = (1, 1, 1)
+				2 = 1
+				3 = 0.3
+				4 = true
+				5 = 2048
+				6 = (0, 0, 0)
+				7 = 9
+		GameObject Ground(d615ede8-2de4-4d55-8a62-1d5584ce18e6)
+			0 = 0
+			1 = false
+			Component Material(095d2228-651b-4353-a54c-48ddfe9780b6)
+				0 = "Assets/Lit.shader"
+				1 = (0.35, 0.55, 0.3)
+				2 = true
+				3 = ""
+			Component Mesh(96d74f4c-b827-479d-94cb-754d48e6d8c8)
+				0 = 095d2228-651b-4353-a54c-48ddfe9780b6
+				1 = 4
+				2 = 35044
+				3 = [-4, 0, -4, 4, 0, -4, 4, 0, 4, -4, 0, -4, 4, 0, 4, -4, 0, 4]
+				4 = ""
+				5 = []
+		GameObject Tower(7642b2af-e2bc-4e91-8cf5-b234dd2cca08)
+			0 = 0
+			1 = false
+			2 = (0, 0, -1)
+			Component Material(3cc966fd-03ef-40f5-bab2-f6670f8d15d8)
+				0 = "Assets/Lit.shader"
+				1 = (0.9, 0.55, 0.2)
+				2 = true
+				3 = ""
+			Component Mesh(b15bfb90-7b6a-47f7-a80b-f99b431ce353)
+				0 = 3cc966fd-03ef-40f5-bab2-f6670f8d15d8
+				1 = 4
+				2 = 35044
+				3 = [-0.6, 0, 0, 0.6, 0, 0, 0.6, 2.4, 0, -0.6, 0, 0, 0.6, 2.4, 0, -0.6, 2.4, 0]
+				4 = ""
+				5 = []
+		GameObject Seed(913c7858-f793-411f-9dbd-b641d47e47ef)
+			0 = 0
+			1 = false
+			Component UiRect(14c05764-4208-4090-af08-ccf9d165bbdb)
+				0 = (0.5, 0)
+				1 = (0.5, 0)
+				2 = (0, 24)
+				3 = (480, 48)
+				4 = (0, 0, 0, 0)
+				5 = false
+			Component UiText(628bbe7c-31f5-4261-ac7c-6f20f570741b)
+				0 = "Seed 1"
+				1 = "Assets/Fonts/Roboto-Medium.ttf"
+				2 = 32
+				3 = (1, 1, 1, 1)
+				4 = 1
+		GameObject Back to Menu(8d9c377b-20c5-4f4f-9b40-0179e6094a31)
+			0 = 0
+			1 = false
+			Component UiRect(ca6d44f0-98f0-4324-8a56-c9a270ad870d)
+				0 = (0.5, 1)
+				1 = (0.5, 1)
+				2 = (0, -32)
+				3 = (240, 52)
+			Component UiText(84e9d89b-17ea-41a4-8c53-104ad3f3f496)
+				0 = "Back to Menu"
+				1 = "Assets/Fonts/Roboto-Medium.ttf"
+				2 = 26
+			Component UiButton(022f94ec-3a2d-4f6c-aa5d-2cbf76a4b9b1)

@@ -1,0 +1,96 @@
+Menu(4129cb6d-0a37-4e36-899e-6e2f2cf7fa8d):
+	GameObject Root(fe7775a4-0064-4545-8825-101661ce3360)
+		0 = 0
+		1 = false
+		Component Menu(57b171e7-4084-437e-8539-5b1e83152763)
+			0 = 3e62b019-0ab5-4255-afd2-71dd39d9a9b8
+			1 = 635ff13d-8db5-4dfd-9514-1e5ce019c636
+		GameObject Camera(cf068e58-8424-4e0c-88f5-eaea7bd59e43)
+			0 = 0
+			1 = false
+			2 = (0, 2.5, 6)
+			Component Camera(2d287d75-10b8-4304-a54c-8acd2d26f64e)
+				0 = true
+				1 = (0, 0.8, 0)
+				2 = 45
+				3 = 0.1
+				4 = 100
+		GameObject Sun(b3f75e64-e178-439a-926d-bc39b6aa7b51)
+			0 = 0
+			1 = false
+			Component Light(2d6f9879-ba54-4892-8430-940acda0a778)
+				0 = (-0.6, -1, -0.4)
+				1 = (1, 1, 1)
+				2 = 1
+				3 = 0.3
+				4 = true
+				5 = 2048
+				6 = (0, 0, 0)
+				7 = 9
+		GameObject Floor(ebb05f42-ce4d-414b-af38-66f85bdca132)
+			0 = 0
+			1 = false
+			Component Material(cd689cb4-b6ba-45eb-8016-37022ab0f741)
+				0 = "Assets/Lit.shader"
+				1 = (0.82, 0.8, 0.76)
+				2 = true
+				3 = ""
+			Component Mesh(96dda67e-0ef2-4322-919a-37d232aa905c)
+				0 = cd689cb4-b6ba-45eb-8016-37022ab0f741
+				1 = 4
+				2 = 35044
+				3 = [-4, 0, -4, 4, 0, -4, 4, 0, 4, -4, 0, -4, 4, 0, 4, -4, 0, 4]
+				4 = ""
+				5 = []
+		GameObject Panel(d58bff75-458f-49dd-bf02-7474f3bc0b15)
+			0 = 0
+			1 = false
+			Component UiRect(c37ef5bc-fdef-447d-a48a-25b13a2efc33)
+				0 = (0.5, 0.5)
+				1 = (0.5, 0.5)
+				2 = (0, 0)
+				3 = (320, 270)
+				4 = (0.02, 0.03, 0.08, 1)
+				5 = true
+			GameObject Title(455ba417-bc3b-4e5d-bb21-f76f8b973f55)
+				0 = 0
+				1 = false
+				Component UiRect(a3e6c33b-bf16-4e04-ac58-f7264d4e084c)
+					0 = (0.5, 0)
+					1 = (0.5, 0)
+					2 = (0, 24)
+					3 = (300, 56)
+					4 = (0, 0, 0, 0)
+					5 = false
+				Component UiText(0ad66ed6-9183-4734-a556-6c192eeda717)
+					0 = "Main Menu"
+					1 = "Assets/Fonts/Roboto-Medium.ttf"
+					2 = 40
+					3 = (0.85, 0.9, 1, 1)
+					4 = 1
+			GameObject Start Game(213834b7-7514-4e05-8773-7ae38052b9f2)
+				0 = 0
+				1 = false
+				Component UiRect(ff7fd5cd-f094-4b9d-bb93-2f39d2d962ec)
+					0 = (0.5, 0)
+					1 = (0.5, 0)
+					2 = (0, 110)
+					3 = (240, 52)
+				Component UiText(2ee24132-681a-4efc-98ce-8fc4157f61a6)
+					0 = "Start Game"
+					1 = "Assets/Fonts/Roboto-Medium.ttf"
+					2 = 26
+				Component UiButton(3e62b019-0ab5-4255-afd2-71dd39d9a9b8)
+			GameObject Quit(8af76338-47d1-4707-ae9b-63e4ab526fed)
+				0 = 0
+				1 = false
+				Component UiRect(30974f64-a427-4e35-92af-20f4a46c9403)
+					0 = (0.5, 0)
+					1 = (0.5, 0)
+					2 = (0, 182)
+					3 = (240, 52)
+				Component UiText(81c89685-3aeb-42a7-9ad3-15d0fafc9178)
+					0 = "Quit"
+					1 = "Assets/Fonts/Roboto-Medium.ttf"
+					2 = 26
+				Component UiButton(635ff13d-8db5-4dfd-9514-1e5ce019c636)

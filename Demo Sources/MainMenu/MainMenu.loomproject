@@ -1,0 +1,3 @@
+name=MainMenu
+scripts=Scripts/MainMenuScripts.vcxproj
+library=Build/MainMenuScripts.dll

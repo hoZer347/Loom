@@ -179,4 +179,24 @@ TEST_SUITE("Engine")
 
 		CHECK_FALSE(called);
 	};
+
+	// The editor stops its run here, which deletes the scenes a script asking
+	// from its update is still being walked through.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Quit waits for the frame to be over, then runs the quit function once")
+	{
+		int quits = 0;
+
+		Loom::Engine::SetQuitFunction([&quits]() { quits++; });
+		Loom::Engine::Quit();
+		Pump();
+
+		CHECK(quits == 0);
+
+		Loom::Engine::DoRequests();
+		Loom::Engine::DoRequests();
+
+		CHECK(quits == 1);
+
+		Loom::Engine::SetQuitFunction(Loom::Task{ });
+	};
 };

@@ -3,9 +3,14 @@
 #include "Test Support.h"
 
 #include "Scene.h"
+#include "SceneSerializer.h"
 
 #include <algorithm>
+#include <filesystem>
+#include <iostream>
+#include <sstream>
 #include <string>
+#include <vector>
 
 using LoomTests::Pump;
 using LoomTests::Probe;
@@ -17,6 +22,50 @@ namespace
 		const std::vector<Loom::Scene*>& scenes = Loom::Scene::GetScenes();
 
 		return std::find(scenes.begin(), scenes.end(), scene) != scenes.end();
+	};
+
+	// The open scene called name, or null.
+	Loom::Scene* Open(const std::string& name)
+	{
+		for (Loom::Scene* scene : Loom::Scene::GetScenes())
+			if (scene->GetName() == name)
+				return scene;
+
+		return nullptr;
+	};
+
+	std::string TempScene(const std::string& name)
+	{
+		return (std::filesystem::temp_directory_path() / (name + Loom::SceneSerializer::extension)).string();
+	};
+
+	// A scene of that name with one child under its root, saved to the temp
+	// folder for as long as this lives.
+	struct SceneFile
+	{
+		explicit SceneFile(const std::string& name) :
+			path(TempScene(name))
+		{
+			Loom::Scene scene(name);
+			scene.AddChild("Child");
+			Pump();
+
+			Loom::SceneSerializer::SaveToFile(scene, path);
+		};
+
+		~SceneFile()
+		{
+			std::filesystem::remove(path);
+		};
+
+		const std::string path;
+	};
+
+	// Points at a GameObject, which a scene file writes after it when that is
+	// a child of the one it is on.
+	struct ForwardReference final : Loom::Component<ForwardReference>
+	{
+		Loom::Serial<Loom::GameObject*> target;
 	};
 };
 
@@ -217,5 +266,131 @@ TEST_SUITE("Scene")
 	TEST_CASE("a scene knows the engine is not running")
 	{
 		CHECK_FALSE(Loom::Scene::is_engine_running.load());
+	};
+
+	// A script asks from inside an update, which is walking the scenes Load
+	// is about to delete.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Load swaps every open scene for the file's once the frame is over")
+	{
+		const SceneFile file("Level");
+
+		new Loom::Scene("Menu");
+		new Loom::Scene("Overlay");
+		Pump();
+
+		Loom::Scene::Load(file.path);
+		Pump();
+
+		CHECK(Open("Menu") != nullptr);
+		CHECK(Open("Overlay") != nullptr);
+
+		Loom::Engine::DoRequests();
+		Pump();
+
+		REQUIRE(Loom::Scene::GetScenes().size() == 1);
+
+		Loom::Scene* level = Open("Level");
+		REQUIRE(level != nullptr);
+		CHECK(level->GetRoot().GetChildren().size() == 1);
+
+		delete level;
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the last scene asked for before the frame is over is the one loaded")
+	{
+		const SceneFile first("First");
+		const SceneFile last("Last");
+		Pump();
+
+		Loom::Scene::Load(first.path);
+		Loom::Scene::Load(last.path);
+		Loom::Engine::DoRequests();
+		Pump();
+
+		CHECK(Open("First") == nullptr);
+
+		Loom::Scene* loaded = Open("Last");
+		CHECK(loaded != nullptr);
+
+		delete loaded;
+	};
+
+	// Restarting a level loads the file its scene came from while that scene
+	// is open, and a reference read while the old objects still answered to
+	// their guids would point into them.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene loaded over itself keeps its references")
+	{
+		const std::string path = TempScene("Restarted");
+
+		Loom::Scene* scene = new Loom::Scene("Restarted");
+		Loom::GameObject* child = scene->AddChild("Child");
+		ForwardReference* reference = scene->Attach<ForwardReference>();
+		Pump();
+
+		reference->target = child;
+		Loom::SceneSerializer::SaveToFile(*scene, path);
+
+		Loom::Scene::Load(path);
+		Loom::Engine::DoRequests();
+		Pump();
+
+		Loom::Scene* restarted = Open("Restarted");
+		REQUIRE(restarted != nullptr);
+		REQUIRE(restarted->GetRoot().GetChildren().size() == 1);
+
+		const ForwardReference* loaded = restarted->GetRoot().GetComponent<ForwardReference>();
+		REQUIRE(loaded != nullptr);
+		CHECK(loaded->target == restarted->GetRoot().GetChildren().front());
+
+		delete restarted;
+		std::filesystem::remove(path);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene that is not there is reported and changes nothing")
+	{
+		new Loom::Scene("Kept");
+		Pump();
+
+		std::ostringstream captured;
+		std::streambuf* previous = std::cerr.rdbuf(captured.rdbuf());
+
+		Loom::Scene::Load(TempScene("Missing"));
+		Loom::Engine::DoRequests();
+
+		std::cerr.rdbuf(previous);
+		Pump();
+
+		CHECK(captured.str().find("Missing") != std::string::npos);
+
+		Loom::Scene* kept = Open("Kept");
+		CHECK(kept != nullptr);
+
+		delete kept;
+	};
+
+	// The editor plays a scene it owns, and puts the scenes Play began with
+	// back itself.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a load function carries out Load in place of the swap")
+	{
+		const SceneFile file("Handed Over");
+
+		new Loom::Scene("Owned");
+		Pump();
+
+		std::vector<std::string> asked;
+
+		Loom::Scene::SetLoadFunction([&asked](const std::string& path) { asked.push_back(path); });
+		Loom::Scene::Load(file.path);
+		Loom::Engine::DoRequests();
+		Loom::Scene::SetLoadFunction(nullptr);
+		Pump();
+
+		CHECK(asked == std::vector<std::string>{ file.path });
+		CHECK(Open("Handed Over") == nullptr);
+
+		Loom::Scene* owned = Open("Owned");
+		CHECK(owned != nullptr);
+
+		delete owned;
 	};
 };
