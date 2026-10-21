@@ -74,16 +74,19 @@ namespace Loom
 			ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth;
 
 		// One thing an object's inspector draws: a field or a Button, by where
-		// it is in their list.
+		// it is in their list, or a group of them, by where it is in its
+		// parent's.
 		struct FieldItem
 		{
-			bool button = false;
+			enum Kind { Field, Button, Group };
+
+			Kind kind = Field;
 			size_t index = 0;
 		};
 
-		// Fields and Buttons by the category they were named under: those with
-		// none, then each category, in the order the first of it was declared,
-		// with the categories nested in it.
+		// Fields and Buttons by the category they were named under, nested at
+		// each '/'. Everything a group holds, its own fields and Buttons and
+		// the groups in it, keeps the order the first of each was declared in.
 		struct FieldGroup
 		{
 			std::string label;
@@ -111,6 +114,7 @@ namespace Loom
 
 					if (found == group->groups.end())
 					{
+						group->items.push_back({ FieldItem::Group, group->groups.size() });
 						group->groups.push_back({ std::string(part) });
 						found = std::prev(group->groups.end());
 					};
@@ -128,29 +132,36 @@ namespace Loom
 			for (size_t i = 0; i <= fields.size(); i++)
 			{
 				for (; button < buttons.size() && buttons[button].fieldsBefore == i; button++)
-					file(NameCategory(buttons[button].name), { true, button });
+					file(NameCategory(buttons[button].name), { FieldItem::Button, button });
 
 				if (i < fields.size())
-					file(fields[i].Category(), { false, i });
+					file(fields[i].Category(), { FieldItem::Field, i });
 			};
 
 			return top;
 		};
 
-		// A group's own fields and Buttons, then each group in it under a
-		// heading that folds it open and shut.
+		// What a group holds in order, each group in it under a heading that
+		// folds it open and shut.
 		template <typename DrawItem>
 		void DrawFieldGroup(const FieldGroup& group, const DrawItem& draw_item)
 		{
 			for (const FieldItem& item : group.items)
-				draw_item(item);
+			{
+				if (item.kind != FieldItem::Group)
+				{
+					draw_item(item);
+					continue;
+				};
 
-			for (const FieldGroup& inner : group.groups)
+				const FieldGroup& inner = group.groups[item.index];
+
 				if (ImGui::TreeNodeEx(inner.label.c_str(), field_group_flags))
 				{
 					DrawFieldGroup(inner, draw_item);
 					ImGui::TreePop();
 				};
+			};
 		};
 
 		bool AnyMouseClicked()
@@ -3298,7 +3309,7 @@ namespace Loom
 		// A Button fills the row, pressed as a button anywhere else is.
 		const auto draw_item = [&](const FieldItem& item)
 		{
-			if (!item.button)
+			if (item.kind == FieldItem::Field)
 			{
 				draw_field(item.index);
 				return;
