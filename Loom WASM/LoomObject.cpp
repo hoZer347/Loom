@@ -126,6 +126,14 @@ namespace Loom
 		field.accepts_reference = accepts_reference;
 		field.name = name;
 
+		if (field.name.starts_with(previous_category))
+		{
+			const std::string display = field.name.substr(previous_category.size());
+			const std::string_view category = owner->m_fields.empty() ? std::string_view() : owner->m_fields.back().Category();
+
+			field.name = category.empty() ? display : std::string(category) + '/' + display;
+		};
+
 		// Listed once, however many reference fields the object goes on to declare.
 		if (type == FieldType::Reference && !owner->m_references)
 		{

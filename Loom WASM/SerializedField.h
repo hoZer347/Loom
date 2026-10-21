@@ -48,6 +48,9 @@ namespace Loom
 	*   list, which is the order the Serial members were declared in. The
 	*   editor labels it after the member that holds it
 	*/
+	// In front of a Serial's name, the category of the field declared before it.
+	inline constexpr std::string_view previous_category = ".../";
+
 	struct LOOM_API SerializedField final
 	{
 		FieldType type = FieldType::Int;
@@ -62,7 +65,8 @@ namespace Loom
 		bool (*accepts_reference)(LoomObject*) = nullptr;
 
 		// The name the Serial was given, if any: "Display", or "Category/Display"
-		// with '/' between nested categories. Copied, so it outlives the module
+		// with '/' between nested categories, a ".../" in front already put
+		// back to the category it stood for. Copied, so it outlives the module
 		// that declared it.
 		std::string name;
 

@@ -69,8 +69,11 @@ namespace Loom
 	*   "Speed" in the inspector. Given a name, it reads that instead, and a
 	*   category before the name, with '/' between nested ones, groups it with
 	*   the others of that category, folding open and shut:
-	*   Serial<float, "Movement/Top Speed"> m_speed. The name is not written to
-	*   the scene, so naming a field leaves the values already saved as they were
+	*   Serial<float, "Movement/Top Speed"> m_speed. ".../" in front of a name
+	*   stands for the category of the field declared before it, so
+	*   Serial<float, ".../Turn Speed"> after that one is "Movement/Turn Speed".
+	*   The name is not written to the scene, so naming a field leaves the
+	*   values already saved as they were
 	* - A field is identified by where it was declared, so the scene format keys
 	*   it by position: reordering the Serial members of a type reassigns the
 	*   values in scenes already saved, and inserting one in the middle shifts

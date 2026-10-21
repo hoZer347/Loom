@@ -114,6 +114,19 @@ namespace
 		Loom::Serial<glm::vec3, "Size/Colour/Tint"> tint;
 	};
 
+	// Names that take the category of the field before them: with none
+	// before, after a nested category, after one more of those, and after a
+	// field with no name.
+	struct Continued final : Loom::LoomObject
+	{
+		Loom::Serial<int, ".../First"> first;
+		Loom::Serial<int, "Size/Colour/Tint"> tint;
+		Loom::Serial<int, ".../Shade"> shade;
+		Loom::Serial<int, ".../Hue"> hue;
+		Loom::Serial<int> loose;
+		Loom::Serial<int, ".../After"> after;
+	};
+
 	// Fields are numbered by declaration order; these are EveryField's.
 	enum Every { Flag, Count, UnsignedCount, Big, UnsignedBig, Ratio, Precise, Label, Pair, Triple, Quad, Numbers };
 
@@ -292,6 +305,21 @@ TEST_SUITE("SerializedField")
 		CHECK(Field(object, 2).Category() == "Size");
 		CHECK(Field(object, 3).Display() == "Tint");
 		CHECK(Field(object, 3).Category() == "Size/Colour");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a name starting .../ takes the category of the field before it")
+	{
+		Continued object;
+		Pump();
+
+		REQUIRE(object.GetFields().size() == 6);
+
+		CHECK(Field(object, 0).name == "First");
+		CHECK(Field(object, 1).name == "Size/Colour/Tint");
+		CHECK(Field(object, 2).name == "Size/Colour/Shade");
+		CHECK(Field(object, 3).name == "Size/Colour/Hue");
+		CHECK(Field(object, 4).name.empty());
+		CHECK(Field(object, 5).name == "After");
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a named field keeps its place and value as an unnamed one would")
