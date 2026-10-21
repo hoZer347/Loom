@@ -436,6 +436,25 @@ namespace Loom
 			return (std::min)(longest, ImGui::GetContentRegionAvail().x * max_label_share);
 		};
 
+		// The label column for an object's fields: wide enough for each label as
+		// far in as its categories nest it.
+		float FieldLabelColumn(const LoomObject& object, const std::vector<std::string>& labels)
+		{
+			const std::vector<SerializedField>& fields = object.GetFields();
+			float longest = 0.0f;
+
+			for (size_t i = 0; i < labels.size(); i++)
+			{
+				const std::string_view category = fields[i].Category();
+				const float depth = category.empty() ? 0.0f : (float)(std::count(category.begin(), category.end(), '/') + 1);
+				const float width = ImGui::CalcTextSize(Shortened(labels[i], FLT_MAX).c_str()).x;
+
+				longest = (std::max)(longest, width + depth * ImGui::GetStyle().IndentSpacing);
+			};
+
+			return (std::min)(longest, ImGui::GetContentRegionAvail().x * max_label_share);
+		};
+
 		// Draws text in the label column and leaves the cursor where its widget goes.
 		void Label(const std::string& text, float column)
 		{
@@ -3110,7 +3129,7 @@ namespace Loom
 		// else it wants to draw for itself.
 		const std::vector<std::string> labels = FieldNames::Of(*component);
 
-		DrawFields(*component, labels, LabelColumn(labels, 0.0f));
+		DrawFields(*component, labels, FieldLabelColumn(*component, labels));
 
 		if (StateMachineBase* machine = dynamic_cast<StateMachineBase*>(component))
 		{
@@ -3157,7 +3176,7 @@ namespace Loom
 
 			ImGui::PushID(&field);
 
-			Label(labels[i], column - (ImGui::GetCursorPosX() - left));
+			Label(labels[i], (std::max)(column - (ImGui::GetCursorPosX() - left), 0.0f));
 
 			const char* label = "##value";
 			bool changed = false;
