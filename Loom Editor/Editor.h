@@ -385,11 +385,16 @@ namespace Loom
 		// floats, was double-clicked this frame.
 		static bool TabDoubleClicked();
 
+		// Inside the panel of view: notes it as the one F11 fills the monitor
+		// with when it has focus, and fills it on a double-click of its tab.
+		void Watch(View view);
+
 		// The menu bar and the panels docked round the dock space.
 		void DrawWorkspace();
 
 		// One view over the whole monitor, in place of the workspace, until
 		// F11, or Escape while nothing plays, brings the workspace back.
+		// F11 in the workspace fills it with the view focused last.
 		void DrawFullscreen();
 		void EnterFullscreen(View view);
 		void LeaveFullscreen();
@@ -785,6 +790,7 @@ namespace Loom
 		bool m_gamePanelHovered = false;
 		GameFocus m_gameFocus;
 		std::optional<View> m_fullscreen;
+		View m_lastView = View::Game;
 		WindowFullscreen m_windowFullscreen;
 		double m_fullscreenSince = 0.0;
 		bool m_showSceneData = true;

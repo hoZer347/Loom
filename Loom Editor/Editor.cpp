@@ -1505,6 +1505,9 @@ namespace Loom
 		m_gamePanelFocused = false;
 		m_gamePanelHovered = false;
 
+		if (ImGui::IsKeyPressed(ImGuiKey_F11, false))
+			m_fullscreen ? LeaveFullscreen() : EnterFullscreen(m_lastView);
+
 		if (m_fullscreen)
 			DrawFullscreen();
 		else
@@ -1643,18 +1646,31 @@ namespace Loom
 	bool Editor::TabDoubleClicked()
 	{
 		const ImGuiWindow* window = ImGui::GetCurrentWindow();
+		const ImGuiWindow* hovered = ImGui::GetCurrentContext()->HoveredWindow;
+		const ImVec2 mouse = ImGui::GetIO().MousePos;
 
-		if (!ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) ||
-			!ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows | ImGuiHoveredFlags_DockHierarchy))
+		if (!ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 			return false;
 
 		if (!window->DockIsActive)
-			return window->TitleBarRect().Contains(ImGui::GetIO().MousePos);
+			return hovered == window && window->TitleBarRect().Contains(mouse);
 
-		// A hidden tab bar keeps the rect it last had.
+		// The tab is drawn in the window that hosts its dock node, so that is
+		// the one the cursor is on, and a hidden tab bar keeps the rect it
+		// last had.
 		const ImGuiDockNode* node = window->DockNode;
 
-		return node != nullptr && !node->IsHiddenTabBar() && !node->IsNoTabBar() && window->DC.DockTabItemRect.Contains(ImGui::GetIO().MousePos);
+		return node != nullptr && !node->IsHiddenTabBar() && !node->IsNoTabBar() &&
+			hovered == node->HostWindow && window->DC.DockTabItemRect.Contains(mouse);
+	};
+
+	void Editor::Watch(View view)
+	{
+		if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
+			m_lastView = view;
+
+		if (TabDoubleClicked())
+			EnterFullscreen(view);
 	};
 
 	void Editor::DrawFullscreen()
@@ -1668,7 +1684,7 @@ namespace Loom
 		constexpr const char* hint_stopped = "F11 or Escape to leave fullscreen";
 
 		// Escape is the game's while it plays.
-		if (ImGui::IsKeyPressed(ImGuiKey_F11, false) || (!IsPlaying() && ImGui::IsKeyPressed(ImGuiKey_Escape, false)))
+		if (!IsPlaying() && ImGui::IsKeyPressed(ImGuiKey_Escape, false))
 		{
 			LeaveFullscreen();
 			DrawWorkspace();
@@ -3158,8 +3174,7 @@ namespace Loom
 
 		if (ImGui::Begin(title.c_str(), &m_showScene, view_flags))
 		{
-			if (TabDoubleClicked())
-				EnterFullscreen(View::Scene);
+			Watch(View::Scene);
 
 			DrawSceneView();
 		};
@@ -3198,8 +3213,7 @@ namespace Loom
 
 		if (ImGui::Begin(title.c_str(), &m_showPrefab, view_flags))
 		{
-			if (TabDoubleClicked())
-				EnterFullscreen(View::Prefab);
+			Watch(View::Prefab);
 
 			DrawPrefabView();
 		};
@@ -3232,8 +3246,7 @@ namespace Loom
 		// While it plays, the keys are the game's, not a way round the panel's buttons.
 		if (ImGui::Begin(EditorPanels::Game, &m_showGame, m_playing ? view_flags | ImGuiWindowFlags_NoNavInputs : view_flags))
 		{
-			if (TabDoubleClicked())
-				EnterFullscreen(View::Game);
+			Watch(View::Game);
 
 			DrawToolbar();
 			DrawGameView();
@@ -3269,8 +3282,7 @@ namespace Loom
 	{
 		if (ImGui::Begin(EditorPanels::Debug, &m_showDebug, view_flags))
 		{
-			if (TabDoubleClicked())
-				EnterFullscreen(View::Debug);
+			Watch(View::Debug);
 
 			DrawToolbar();
 			DrawDebugView();
