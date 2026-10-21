@@ -68,6 +68,13 @@ TEST_SUITE("InputActions")
 		CHECK(read[2] == Action{ "Odd", Loom::Key::None, Loom::Key::None });
 	};
 
+	TEST_CASE("a name is trimmed, and one blank or holding '=' is none")
+	{
+		CHECK(Loom::InputActions::Tidy("  Pan Up\t") == "Pan Up");
+		CHECK(Loom::InputActions::Tidy("   ").empty());
+		CHECK(Loom::InputActions::Tidy("Red=1").empty());
+	};
+
 	TEST_CASE("what is written reads back the same")
 	{
 		const std::vector<Action> actions = {

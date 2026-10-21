@@ -45,12 +45,19 @@ namespace Loom
 		static const std::vector<Action>& All();
 		static void Set(std::vector<Action> actions);
 
+		// The action by that name, or null.
+		static const Action* Find(std::string_view name);
+
+		// A name as an action can take it: trimmed, or empty when that leaves
+		// nothing or it holds the '=' a file ends a name at.
+		static std::string Tidy(std::string_view name);
+
 		// The actions in the file, or none when it is not there.
 		static void Load(const std::string& file);
 		static bool Save(const std::string& file);
 
-		// Lines with no name before an '=' are skipped, and a second action by
-		// a name already read.
+		// Lines with no name Tidy keeps before an '=' are skipped, and a second
+		// action by a name already read.
 		static std::vector<Action> Read(std::istream& in);
 		static void Write(std::ostream& out, const std::vector<Action>& actions);
 

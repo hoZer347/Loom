@@ -9,18 +9,13 @@ namespace Loom
 {
 	namespace
 	{
+		constexpr char name_end = '=';
+
 		std::vector<InputActions::Action> actions{ };
-
-		const InputActions::Action* Find(std::string_view name)
-		{
-			const auto found = std::find_if(actions.begin(), actions.end(), [name](const InputActions::Action& action) { return action.name == name; });
-
-			return found != actions.end() ? &*found : nullptr;
-		};
 
 		bool Either(std::string_view name, bool (*asked)(Key))
 		{
-			const InputActions::Action* action = Find(name);
+			const InputActions::Action* action = InputActions::Find(name);
 
 			return action != nullptr && (asked(action->key) || asked(action->alt));
 		};
@@ -60,6 +55,20 @@ namespace Loom
 		actions = std::move(to);
 	};
 
+	const InputActions::Action* InputActions::Find(std::string_view name)
+	{
+		const auto found = std::find_if(actions.begin(), actions.end(), [name](const Action& action) { return action.name == name; });
+
+		return found != actions.end() ? &*found : nullptr;
+	};
+
+	std::string InputActions::Tidy(std::string_view name)
+	{
+		const std::string_view trimmed = Trimmed(name);
+
+		return trimmed.find(name_end) == std::string_view::npos ? std::string(trimmed) : std::string{ };
+	};
+
 	void InputActions::Load(const std::string& file)
 	{
 		std::ifstream in(file);
@@ -84,12 +93,12 @@ namespace Loom
 		while (std::getline(in, line))
 		{
 			const std::string_view text = line;
-			const size_t equals = text.find('=');
+			const size_t equals = text.find(name_end);
 
 			if (equals == std::string_view::npos)
 				continue;
 
-			const std::string_view name = Trimmed(text.substr(0, equals));
+			const std::string name = Tidy(text.substr(0, equals));
 			const std::string_view keys = text.substr(equals + 1);
 			const size_t comma = keys.find(',');
 
@@ -99,7 +108,7 @@ namespace Loom
 				continue;
 
 			read.push_back({
-				std::string(name),
+				name,
 				KeyNamed(Trimmed(keys.substr(0, comma))),
 				comma == std::string_view::npos ? Key::None : KeyNamed(Trimmed(keys.substr(comma + 1))) });
 		};
@@ -110,6 +119,6 @@ namespace Loom
 	void InputActions::Write(std::ostream& out, const std::vector<Action>& to_write)
 	{
 		for (const Action& action : to_write)
-			out << action.name << '=' << NameOf(action.key) << ',' << NameOf(action.alt) << '\n';
+			out << action.name << name_end << NameOf(action.key) << ',' << NameOf(action.alt) << '\n';
 	};
 };

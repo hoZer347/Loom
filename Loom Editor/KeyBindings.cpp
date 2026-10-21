@@ -5,7 +5,6 @@
 
 #include "imgui.h"
 
-#include <algorithm>
 #include <cfloat>
 #include <vector>
 
@@ -19,20 +18,6 @@ namespace Loom
 
 		// What the second action given the default name is numbered.
 		constexpr int first_number = 2;
-
-		bool IsNamed(const std::vector<InputActions::Action>& actions, const std::string& name)
-		{
-			return std::any_of(actions.begin(), actions.end(), [&name](const InputActions::Action& action) { return action.name == name; });
-		};
-
-		std::string Trimmed(const std::string& text)
-		{
-			constexpr const char* blank = " \t";
-
-			const size_t first = text.find_first_not_of(blank);
-
-			return first == std::string::npos ? "" : text.substr(first, text.find_last_not_of(blank) - first + 1);
-		};
 	};
 
 	bool KeyBindings::Draw(bool* open, bool project_open)
@@ -87,9 +72,9 @@ namespace Loom
 
 				if (ImGui::IsItemDeactivated() && m_renaming == i)
 				{
-					const std::string name = Trimmed(m_name);
+					const std::string name = InputActions::Tidy(m_name);
 
-					if (!name.empty() && name != action.name && !IsNamed(actions, name))
+					if (!name.empty() && InputActions::Find(name) == nullptr)
 					{
 						action.name = name;
 						changed = true;
@@ -99,10 +84,10 @@ namespace Loom
 				};
 
 				ImGui::TableNextColumn();
-				changed |= DrawKey("##" + action.name + " key", action.key);
+				changed |= DrawKey("##Key", action.key);
 
 				ImGui::TableNextColumn();
-				changed |= DrawKey("##" + action.name + " alt", action.alt);
+				changed |= DrawKey("##Alt", action.alt);
 
 				ImGui::TableNextColumn();
 
@@ -134,13 +119,13 @@ namespace Loom
 		return changed;
 	};
 
-	bool KeyBindings::DrawKey(const std::string& label, Key& key)
+	bool KeyBindings::DrawKey(const char* label, Key& key)
 	{
 		bool changed = false;
 
 		ImGui::SetNextItemWidth(-FLT_MIN);
 
-		if (ImGui::BeginCombo(label.c_str(), NameOf(key).data(), ImGuiComboFlags_HeightLarge))
+		if (ImGui::BeginCombo(label, NameOf(key).data(), ImGuiComboFlags_HeightLarge))
 		{
 			for (const Key each : AllKeys())
 				if (ImGui::Selectable(NameOf(each).data(), each == key) && each != key)
@@ -157,11 +142,9 @@ namespace Loom
 
 	std::string KeyBindings::FreeName()
 	{
-		const std::vector<InputActions::Action>& actions = InputActions::All();
-
 		std::string name = default_name;
 
-		for (int number = first_number; IsNamed(actions, name); number++)
+		for (int number = first_number; InputActions::Find(name) != nullptr; number++)
 			name = std::string(default_name) + " " + std::to_string(number);
 
 		return name;

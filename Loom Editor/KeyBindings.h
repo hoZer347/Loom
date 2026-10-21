@@ -13,8 +13,8 @@ namespace Loom
 	* Loom::KeyBindings
 	* - The Key Bindings panel: the project's InputActions, each a name and two
 	*   keys picked from a list, added, renamed and taken out here
-	* - A name is taken when its box is let go of, and only when it is not
-	*   blank and no other action has it
+	* - A name is taken when its box is let go of, and only when
+	*   InputActions::Tidy keeps it and no other action has it
 	*/
 	struct KeyBindings final
 	{
@@ -26,7 +26,7 @@ namespace Loom
 		bool DrawActions();
 
 		// Whether key was set to another.
-		static bool DrawKey(const std::string& label, Key& key);
+		static bool DrawKey(const char* label, Key& key);
 
 		// "Action", or the first "Action 2", "Action 3" and on no action has.
 		static std::string FreeName();

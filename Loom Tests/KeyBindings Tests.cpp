@@ -1,6 +1,5 @@
 #include "doctest.h"
 
-#include "EditorIcons.h"
 #include "InputActions.h"
 #include "KeyBindings.h"
 #include "UiScript.h"
@@ -10,6 +9,7 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace
 {
@@ -123,12 +123,28 @@ TEST_SUITE("KeyBindings")
 		Driven renamed(std::string(drawn) + "click \"Key Bindings\" \"##Name\"\nkey ctrl+a\ntype Pause\nkey enter\n", slowdown);
 
 		CHECK(renamed.Run() == 1);
+		CHECK_FALSE(renamed.script->Failed());
 		CHECK(Loom::InputActions::All()[0].name == "Pause");
 
 		Driven blanked(std::string(drawn) + "click \"Key Bindings\" \"##Name\"\nkey ctrl+a\nkey delete\nkey enter\n", slowdown);
 
 		CHECK(blanked.Run() == 0);
+		CHECK_FALSE(blanked.script->Failed());
 		CHECK(Loom::InputActions::All()[0].name == "Slowdown");
+	};
+
+	TEST_CASE("a name another action has, or one a file could not keep, is not taken")
+	{
+		const std::vector<Action> two = { slowdown[0], { "Pan Up", Loom::Key::W, Loom::Key::None } };
+
+		for (const char* name : { "Pan Up", "Slowdown=1" })
+		{
+			Driven driven(std::string(drawn) + "click \"Key Bindings\" \"##Name\"\nkey ctrl+a\ntype " + name + "\nkey enter\n", two);
+
+			CHECK(driven.Run() == 0);
+			CHECK_FALSE(driven.script->Failed());
+			CHECK(Loom::InputActions::All() == two);
+		};
 	};
 
 	TEST_CASE("Remove takes the action out")
@@ -136,14 +152,17 @@ TEST_SUITE("KeyBindings")
 		Driven driven(std::string(drawn) + "click \"Key Bindings\" \"Remove\"\n", slowdown);
 
 		CHECK(driven.Run() == 1);
+		CHECK_FALSE(driven.script->Failed());
 		CHECK(Loom::InputActions::All().empty());
 	};
 
+	// So Add Action is not there to click.
 	TEST_CASE("with no project open there is nothing to change")
 	{
-		Driven driven(drawn, slowdown);
+		Driven driven(std::string(drawn) + "click \"Key Bindings\" \"Add Action\"\n", slowdown);
 
 		CHECK(driven.Run(false) == 0);
+		CHECK(driven.script->Failed());
 		CHECK(Loom::InputActions::All() == slowdown);
 	};
 };
