@@ -29,6 +29,9 @@ namespace Loom
 		// The light sits one extent back from the centre, so the box is two deep.
 		constexpr float DEPTH_EXTENTS = 2.0f;
 
+		// The box reaches an extent either side of its centre across too.
+		constexpr float ACROSS_EXTENTS = 2.0f;
+
 		constexpr int MIN_RESOLUTION = 1;
 
 		// With no light to shade by, a material shows its colour as it is.
@@ -37,9 +40,26 @@ namespace Loom
 		const char* const VERTEX_LIBRARY = R"(
 uniform mat4 u_lightViewProjection;
 
+// World units across one texel of the shadow map.
+uniform float u_shadowTexel;
+
+// How many shadow map texels out along its normal a surface reads its
+// shadow from, clear of the flat faces it is made of, which would otherwise
+// shadow the smooth surface their normals light.
+const float LOOM_NORMAL_OFFSET_TEXELS = 1.5;
+
 vec4 LoomLightSpace(vec4 world)
 {
 	return u_lightViewProjection * world;
+}
+
+// The same, read from out along a world space normal; one of zeros reads
+// from the surface itself.
+vec4 LoomLightSpace(vec4 world, vec3 normal)
+{
+	vec3 away = dot(normal, normal) > 0.0 ? normalize(normal) * u_shadowTexel * LOOM_NORMAL_OFFSET_TEXELS : vec3(0.0);
+
+	return u_lightViewProjection * (world + vec4(away, 0.0));
 }
 )";
 
@@ -233,6 +253,7 @@ vec3 LoomLight(vec3 normal)
 		renderer->SetUniform(program, "u_lightColor", *color * (float)intensity);
 		renderer->SetUniform(program, "u_ambient", (float)ambient);
 		renderer->SetUniform(program, "u_lightViewProjection", m_view_projection);
+		renderer->SetUniform(program, "u_shadowTexel", m_allocated_resolution > 0 ? ACROSS_EXTENTS * shadowExtent / m_allocated_resolution : 0.0f);
 	};
 
 	void Light::ApplyNone(uint32_t program)

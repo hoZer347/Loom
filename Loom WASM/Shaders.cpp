@@ -157,7 +157,7 @@ bool LoomDitheredOut(float alpha)
 				"\tloom_Normal = transpose(inverse(mat3(u_model))) * aNormal;\n";
 
 			if (shadows)
-				shaded += "\tloom_LightSpace = LoomLightSpace(loom_world);\n";
+				shaded += "\tloom_LightSpace = LoomLightSpace(loom_world, loom_Normal);\n";
 
 			return shaded + "}\n";
 		};

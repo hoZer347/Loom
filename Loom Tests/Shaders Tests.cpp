@@ -304,7 +304,7 @@ TEST_SUITE("Shader")
 	{
 		const Loom::Shader::Stages stages = Loom::Shader::Assemble("// ===SETTINGS===\nshading = on\nshadows = on\n" + FRAGMENT);
 
-		CHECK(stages.vertex.find("loom_LightSpace = LoomLightSpace(loom_world);") != std::string::npos);
+		CHECK(stages.vertex.find("loom_LightSpace = LoomLightSpace(loom_world, loom_Normal);") != std::string::npos);
 		CHECK(stages.vertex.find("uniform mat4 u_lightViewProjection;") != std::string::npos);
 		CHECK(stages.fragment.find("FragColor.rgb *= LoomLight(loom_normal, loom_LightSpace);") != std::string::npos);
 
