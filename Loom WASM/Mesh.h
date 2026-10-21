@@ -10,6 +10,7 @@
 namespace Loom
 {
 	struct Material;
+	struct Renderer;
 
 	struct LOOM_API Mesh : Component<Mesh, "Rendering">
 	{
@@ -42,12 +43,14 @@ namespace Loom
 
 		void OnRender() override;
 
-		// Uploads the vertices and the GameObject's world matrix (as u_model) and
-		// draws them with the given program, which is how a pass that is not the
+		// Draws the vertices with the given program, under the GameObject's
+		// world matrix (as u_model), which is how a pass that is not the
 		// material's (the shadow pass) draws the same geometry. A shader that
 		// declares no u_model draws the vertices untransformed. A Skin on the
 		// GameObject bends them first, and m_textureCoordinates go with them as
-		// aUV and m_normals as aNormal.
+		// aUV and m_normals as aNormal. The renderer keeps them between draws,
+		// and they are handed over again only once one of those fields has
+		// changed, or the Skin has bent them again.
 		void Draw(uint32_t program);
 
 		// Draws the meshes farthest from Camera::current first, writing no
@@ -103,8 +106,24 @@ namespace Loom
 		// a frame draw what it bent.
 		unsigned long long m_deformedFrame = 0;
 
-		// Positions, texture coordinates and normals side by side, as the
-		// renderer takes them, rebuilt for every draw.
-		std::vector<float> m_interleaved;
+		// What the renderer was last handed, by the versions of the fields it
+		// was made from, and whether the Skin bent them and for which frame.
+		struct Handed
+		{
+			unsigned int vertices = 0;
+			unsigned int textureCoordinates = 0;
+			unsigned int normals = 0;
+			unsigned int drawType = 0;
+			bool deformed = false;
+			unsigned long long deformedFrame = 0;
+
+			bool operator==(const Handed&) const = default;
+		};
+
+		// The vertices as the renderer keeps them, which renderer that is, and
+		// what it was handed.
+		uint32_t m_kept = 0;
+		Renderer* m_keeper = nullptr;
+		Handed m_handed;
 	};
 };

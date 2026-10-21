@@ -1,5 +1,6 @@
 #ifndef __EMSCRIPTEN__
 
+#include "Engine.h"
 #include "GlslCompiler.h"
 #include "Renderer.h"
 
@@ -81,6 +82,9 @@ namespace Loom
 			GL_TRIANGLE_STRIP_ = 0x0005,
 			GL_TRIANGLE_FAN_ = 0x0006,
 		};
+
+		// The GL usage hint for vertices set once and drawn many times.
+		constexpr uint32_t GL_STATIC_DRAW_ = 0x88E4;
 
 		// Looked up by the const char* a caller has, without building a string.
 		struct NameHash
@@ -186,6 +190,9 @@ namespace Loom
 
 				for (auto& [handle, texture] : m_textures)
 					DestroyTextureNow(texture);
+
+				for (auto& [handle, kept] : m_kept)
+					DestroyBuffer(kept.buffer, kept.memory);
 
 				for (Frame& frame : m_frames)
 				{
@@ -576,6 +583,116 @@ namespace Loom
 
 		void Draw(uint32_t handle, uint32_t primitive, const float* vertices, size_t count, uint32_t, VertexFormat format) override
 		{
+			DrawWith(handle, primitive, count, format,
+				[&](VkCommandBuffer command, size_t drawn, size_t stride)
+				{
+					const Allocation vertexData = Allocate(drawn * stride, sizeof(float));
+					memcpy(vertexData.mapped, vertices, count * stride);
+
+					if (drawn > count)
+						memcpy(vertexData.mapped + count * stride, vertices, stride);
+
+					vkCmdBindVertexBuffers(command, VERTEX_BINDING, 1, &vertexData.buffer, &vertexData.offset);
+				});
+		};
+
+		uint32_t CreateVertices() override
+		{
+			const uint32_t handle = m_nextKept++;
+			m_kept[handle] = { };
+
+			return handle;
+		};
+
+		void SetVertices(uint32_t handle, const float* data, size_t count, uint32_t usage, VertexFormat format) override
+		{
+			const auto found = m_kept.find(handle);
+
+			if (found == m_kept.end())
+				return;
+
+			Kept& kept = found->second;
+			Release(kept);
+
+			kept.count = count;
+			kept.format = format;
+
+			// Anything not set once and left is handed over afresh with each
+			// draw, as Draw's vertices are.
+			if (usage != GL_STATIC_DRAW_ || count == 0)
+			{
+				kept.streamed.assign(data, data + count * FloatsPerVertex(format));
+				return;
+			};
+
+			// With the first vertex once more after the last, which a loop
+			// closes on.
+			const VkDeviceSize stride = FloatsPerVertex(format) * sizeof(float);
+			const VkDeviceSize size = (count + 1) * stride;
+
+			VkBuffer staging = VK_NULL_HANDLE;
+			VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
+			void* mapped = nullptr;
+
+			if (!CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, staging, stagingMemory, &mapped))
+				return;
+
+			memcpy(mapped, data, count * stride);
+			memcpy((uint8_t*)mapped + count * stride, data, stride);
+
+			if (CreateBuffer(size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+				kept.buffer, kept.memory, nullptr, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+			{
+				Immediately([&](VkCommandBuffer command)
+				{
+					const VkBufferCopy copy{ 0, 0, size };
+					vkCmdCopyBuffer(command, staging, kept.buffer, 1, &copy);
+				});
+			};
+
+			DestroyBuffer(staging, stagingMemory);
+		};
+
+		void DrawVertices(uint32_t program, uint32_t primitive, uint32_t handle) override
+		{
+			const auto found = m_kept.find(handle);
+
+			if (found == m_kept.end())
+				return;
+
+			const Kept& kept = found->second;
+
+			if (!kept.buffer)
+			{
+				Draw(program, primitive, kept.streamed.data(), kept.count, 0, kept.format);
+				return;
+			};
+
+			DrawWith(program, primitive, kept.count, kept.format,
+				[&](VkCommandBuffer command, size_t, size_t)
+				{
+					const VkDeviceSize offset = 0;
+					vkCmdBindVertexBuffers(command, VERTEX_BINDING, 1, &kept.buffer, &offset);
+				});
+		};
+
+		void DestroyVertices(uint32_t handle) override
+		{
+			const auto found = m_kept.find(handle);
+
+			if (found == m_kept.end())
+				return;
+
+			Release(found->second);
+			m_kept.erase(found);
+		};
+
+		// Draws count vertices laid out as format says, which bind puts in
+		// VERTEX_BINDING, given the command, how many are drawn (one more than
+		// count for a loop, closed on its first) and their stride.
+		template<typename Bind>
+		void DrawWith(uint32_t handle, uint32_t primitive, size_t count, VertexFormat format, const Bind& bind)
+		{
 			if (!m_recording || count == 0)
 				return;
 
@@ -610,15 +727,7 @@ namespace Loom
 			const size_t stride = FloatsPerVertex(format) * sizeof(float);
 
 			if (program.hasPosition || program.hasUV || program.hasNormal)
-			{
-				const Allocation vertexData = Allocate(drawn * stride, sizeof(float));
-				memcpy(vertexData.mapped, vertices, count * stride);
-
-				if (drawn > count)
-					memcpy(vertexData.mapped + count * stride, vertices, stride);
-
-				vkCmdBindVertexBuffers(command, VERTEX_BINDING, 1, &vertexData.buffer, &vertexData.offset);
-			};
+				bind(command, drawn, stride);
 
 			if (program.hasNormal && format != VertexFormat::PositionUVNormal)
 			{
@@ -965,6 +1074,17 @@ namespace Loom
 			VkDeviceSize used = 0;
 		};
 
+		// What CreateVertices handed out: vertices set once, in a buffer of
+		// their own on the GPU, or any others as they were handed over.
+		struct Kept
+		{
+			VkBuffer buffer = VK_NULL_HANDLE;
+			VkDeviceMemory memory = VK_NULL_HANDLE;
+			std::vector<float> streamed;
+			size_t count = 0;
+			VertexFormat format = VertexFormat::Position;
+		};
+
 		struct Allocation
 		{
 			VkBuffer buffer;
@@ -1231,7 +1351,7 @@ namespace Loom
 			info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 			info.preTransform = capabilities.currentTransform;
 			info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-			info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+			info.presentMode = PresentMode();
 			info.clipped = VK_TRUE;
 			info.oldSwapchain = m_swapchain;
 
@@ -1279,6 +1399,26 @@ namespace Loom
 						return wanted;
 
 			return formats.empty() ? VK_FORMAT_B8G8R8A8_UNORM : formats.front().format;
+		};
+
+		// FIFO waits for the display, which every surface has. Without vsync, a
+		// mode that does not wait, tearing-free first.
+		VkPresentModeKHR PresentMode() const
+		{
+			if (Engine::vsync)
+				return VK_PRESENT_MODE_FIFO_KHR;
+
+			uint32_t count = 0;
+			vkGetPhysicalDeviceSurfacePresentModesKHR(m_physicalDevice, m_surface, &count, nullptr);
+
+			std::vector<VkPresentModeKHR> modes(count);
+			vkGetPhysicalDeviceSurfacePresentModesKHR(m_physicalDevice, m_surface, &count, modes.data());
+
+			for (const VkPresentModeKHR wanted : { VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR })
+				if (std::find(modes.begin(), modes.end(), wanted) != modes.end())
+					return wanted;
+
+			return VK_PRESENT_MODE_FIFO_KHR;
 		};
 
 		void DestroySwapchain()
@@ -1824,7 +1964,15 @@ namespace Loom
 			return UINT32_MAX;
 		};
 
-		bool CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkBuffer& buffer, VkDeviceMemory& memory, void** mapped)
+		// Host visible and mapped into mapped, unless properties says otherwise
+		// and mapped is null.
+		bool CreateBuffer(
+			VkDeviceSize size,
+			VkBufferUsageFlags usage,
+			VkBuffer& buffer,
+			VkDeviceMemory& memory,
+			void** mapped,
+			VkMemoryPropertyFlags properties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
 		{
 			VkBufferCreateInfo info{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
 			info.size = size;
@@ -1839,7 +1987,7 @@ namespace Loom
 
 			VkMemoryAllocateInfo allocate{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
 			allocate.allocationSize = requirements.size;
-			allocate.memoryTypeIndex = MemoryType(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			allocate.memoryTypeIndex = MemoryType(requirements.memoryTypeBits, properties);
 
 			if (!Succeeded(vkAllocateMemory(m_device, &allocate, nullptr, &memory), "allocating buffer memory"))
 			{
@@ -1849,7 +1997,9 @@ namespace Loom
 			};
 
 			vkBindBufferMemory(m_device, buffer, memory, 0);
-			vkMapMemory(m_device, memory, 0, VK_WHOLE_SIZE, 0, mapped);
+
+			if (mapped)
+				vkMapMemory(m_device, memory, 0, VK_WHOLE_SIZE, 0, mapped);
 
 			return true;
 		};
@@ -1966,6 +2116,17 @@ namespace Loom
 
 			vkDestroyPipelineLayout(m_device, program.layout, nullptr);
 			vkDestroyDescriptorSetLayout(m_device, program.setLayout, nullptr);
+		};
+
+		// Lets go of what kept holds once the frames that may still draw it are done.
+		void Release(Kept& kept)
+		{
+			if (kept.buffer)
+				Defer([this, buffer = kept.buffer, memory = kept.memory]() { DestroyBuffer(buffer, memory); });
+
+			kept.buffer = VK_NULL_HANDLE;
+			kept.memory = VK_NULL_HANDLE;
+			kept.streamed.clear();
 		};
 
 		// Destroys something once the frames that may still be using it are done.
@@ -2138,6 +2299,8 @@ namespace Loom
 		// What a pixelated program samples its colour textures through.
 		VkSampler m_nearestSampler = VK_NULL_HANDLE;
 		std::unordered_map<uint32_t, Texture> m_textures;
+		std::unordered_map<uint32_t, Kept> m_kept;
+		uint32_t m_nextKept = 1;
 		uint32_t m_fallbackColor = 0;
 		uint32_t m_fallbackDepth = 0;
 	};

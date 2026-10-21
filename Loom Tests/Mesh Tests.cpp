@@ -10,6 +10,7 @@
 #include <string>
 
 using LoomTests::Pump;
+using LoomTests::RecordingRenderer;
 
 
 TEST_SUITE("Mesh")
@@ -113,6 +114,32 @@ TEST_SUITE("Mesh")
 		read->m_vertices = std::vector<float>(9, GENERATED_VALUE);
 
 		CHECK(Loom::SceneSerializer::Serialize(*copy).find("7.25") == std::string::npos);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh hands its vertices over once, and again only once they change")
+	{
+		RecordingRenderer renderer;
+
+		Loom::Scene scene("kept");
+		Pump();
+
+		Loom::GameObject* holder = scene.AddChild("Ground");
+		Loom::Mesh* mesh = holder->Attach<Loom::Mesh>(Loom::Mesh::Triangles);
+		Pump();
+
+		mesh->m_vertices = std::vector<float>(9, 1.0f);
+
+		mesh->Draw(1);
+		mesh->Draw(1);
+
+		CHECK(renderer.handed == 1);
+		CHECK(renderer.drawn.size() == 2);
+
+		mesh->m_vertices = std::vector<float>(9, 2.0f);
+		mesh->Draw(1);
+
+		CHECK(renderer.handed == 2);
+		CHECK(renderer.lastVertices == std::vector<float>(9, 2.0f));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the draw type is settable to any GL usage hint")

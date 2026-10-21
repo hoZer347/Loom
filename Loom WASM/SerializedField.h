@@ -72,6 +72,11 @@ namespace Loom
 		void (*set_reference)(void*, LoomObject*) = nullptr;
 		bool (*accepts_reference)(LoomObject*) = nullptr;
 
+		// The Serial's count of changes, which Read and SetReference add to.
+		// Whatever else writes through data calls Changed after.
+		unsigned int* version = nullptr;
+		void Changed() const;
+
 		// The name the Serial was given, if any: "Display", or "Category/Display"
 		// with '/' between nested categories, a ".../" in front already put
 		// back to the category it stood for. Copied, so it outlives the module
@@ -90,6 +95,11 @@ namespace Loom
 		// loader's cue to come back to it.
 		std::string Write() const;
 		bool Read(const std::string& text) const;
+
+	private:
+		bool ReadValue(const std::string& text) const;
+
+	public:
 
 		LoomObject* GetReference() const;
 		void SetReference(LoomObject* object) const;

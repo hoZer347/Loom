@@ -31,7 +31,8 @@ namespace Loom
 		LoomObject* (*get_reference)(void*),
 		void (*set_reference)(void*, LoomObject*),
 		bool (*accepts_reference)(LoomObject*),
-		const char* name);
+		const char* name,
+		unsigned int* version);
 
 	// Hands a button to the same object, with its name and what pressing it runs.
 	LOOM_API void RegisterButton(const char* name, const std::function<void()>* press);
@@ -140,23 +141,25 @@ namespace Loom
 			requires (
 				!std::is_same_v<std::remove_cvref_t<U>, Serial> &&
 				std::is_assignable_v<T&, U&&>)
-		Serial& operator=(U&& value) { m_value = std::forward<U>(value); return *this; };
+		Serial& operator=(U&& value) { m_value = std::forward<U>(value); m_version++; return *this; };
 
 		// A braced list deduces nothing above, and choosing between building a T
 		// out of it and building a Serial out of it is a tie the compiler will
 		// not break; taking the list itself is neither.
 		template <typename U>
 			requires std::is_assignable_v<T&, std::initializer_list<U>>
-		Serial& operator=(std::initializer_list<U> values) { m_value = values; return *this; };
+		Serial& operator=(std::initializer_list<U> values) { m_value = values; m_version++; return *this; };
 
 		// And what is left: = { } and a braced list for an aggregate, neither of
 		// which deduces a U at all.
-		Serial& operator=(T value) { m_value = std::move(value); return *this; };
+		Serial& operator=(T value) { m_value = std::move(value); m_version++; return *this; };
 
-		operator T& () { return m_value; };
+		// Reaching into the value without const counts as changing it, since
+		// nothing says what is done with it after.
+		operator T& () { m_version++; return m_value; };
 		operator const T& () const { return m_value; };
 
-		T& operator*() { return m_value; };
+		T& operator*() { m_version++; return m_value; };
 		const T& operator*() const { return m_value; };
 
 		// A Serial holding a pointer hands the pointer over, so a reference
@@ -165,7 +168,11 @@ namespace Loom
 		{
 			if constexpr (std::is_pointer_v<T>)
 				return m_value;
-			else return &m_value;
+			else
+			{
+				m_version++;
+				return &m_value;
+			};
 		};
 
 		auto operator->() const
@@ -174,6 +181,13 @@ namespace Loom
 				return m_value;
 			else return &m_value;
 		};
+
+		// How many times the value has been changed: assigned, reached into
+		// without const, or written through its SerializedField. While it holds
+		// still, so does the value, so whatever is made from it, such as a
+		// mesh's vertices on the GPU, need not be made again. Read through a
+		// const Serial to look without counting.
+		unsigned int Version() const { return m_version; };
 
 	private:
 		void Register()
@@ -202,9 +216,10 @@ namespace Loom
 					{
 						return dynamic_cast<T>(object) != nullptr;
 					},
-					name.value);
+					name.value,
+					&m_version);
 			}
-			else RegisterSerialField(FieldTypeOf<T>(), Data(), nullptr, nullptr, nullptr, name.value);
+			else RegisterSerialField(FieldTypeOf<T>(), Data(), nullptr, nullptr, nullptr, name.value, &m_version);
 		};
 
 		// The vector types are written out of their components, so the field
@@ -222,5 +237,6 @@ namespace Loom
 		};
 
 		T m_value;
+		unsigned int m_version = 0;
 	};
 };

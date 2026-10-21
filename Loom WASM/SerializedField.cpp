@@ -117,6 +117,8 @@ namespace Loom
 	{
 		if (set_reference)
 			set_reference(data, object);
+
+		Changed();
 	};
 
 	LoomObject* SerializedField::ReferenceFor(LoomObject* object) const
@@ -224,7 +226,23 @@ namespace Loom
 		return "null";
 	};
 
+	void SerializedField::Changed() const
+	{
+		if (version != nullptr)
+			(*version)++;
+	};
+
 	bool SerializedField::Read(const std::string& text) const
+	{
+		const bool read = ReadValue(text);
+
+		if (read)
+			Changed();
+
+		return read;
+	};
+
+	bool SerializedField::ReadValue(const std::string& text) const
 	{
 		if (data == nullptr)
 			return false;

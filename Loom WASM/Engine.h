@@ -73,6 +73,11 @@ namespace Loom
 		// this says which one it ended up on.
 		static inline Backend backend = Backend::OpenGL;
 
+		// Whether a frame waits for the display to be ready for it, holding the
+		// frame rate to the display's. Set before the Engine is constructed. An
+		// editor turns it off, so what it shows is what a frame costs.
+		static inline bool vsync = true;
+
 		static const size_t GetUniqueID();
 
 		// The colour the frame is cleared to, as RGBA. Settable so a scene can

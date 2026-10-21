@@ -100,7 +100,8 @@ namespace Loom
 		LoomObject* (*get_reference)(void*),
 		void (*set_reference)(void*, LoomObject*),
 		bool (*accepts_reference)(LoomObject*),
-		const char* name)
+		const char* name,
+		unsigned int* version)
 	{
 		LoomObject* owner = constructing;
 
@@ -124,6 +125,7 @@ namespace Loom
 		field.get_reference = get_reference;
 		field.set_reference = set_reference;
 		field.accepts_reference = accepts_reference;
+		field.version = version;
 		field.name = owner->TakeName(name);
 
 		// Listed once, however many reference fields the object goes on to declare.

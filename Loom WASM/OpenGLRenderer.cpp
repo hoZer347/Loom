@@ -114,6 +114,9 @@ namespace Loom
 			if (m_noNormal)
 				glDeleteBuffers(1, &m_noNormal);
 
+			for (const auto& [buffer, kept] : m_kept)
+				glDeleteBuffers(1, &buffer);
+
 			if (m_nearest)
 				glDeleteSamplers(1, &m_nearest);
 
@@ -144,6 +147,8 @@ namespace Loom
 				std::cerr << "Glew failed to init" << std::endl;
 				return false;
 			};
+
+			glfwSwapInterval(Engine::vsync ? 1 : 0);
 
 			glfwSetFramebufferSizeCallback(
 				window,
@@ -459,6 +464,53 @@ namespace Loom
 
 		void Draw(uint32_t program, uint32_t primitive, const float* vertices, size_t count, uint32_t usage, VertexFormat format) override
 		{
+			glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
+			glBufferData(GL_ARRAY_BUFFER, count * FloatsPerVertex(format) * sizeof(float), vertices, usage);
+
+			DrawBuffer(program, primitive, m_vbo, count, format);
+		};
+
+		uint32_t CreateVertices() override
+		{
+			GLuint buffer = 0;
+			glGenBuffers(1, &buffer);
+
+			m_kept[buffer] = { };
+
+			return buffer;
+		};
+
+		void SetVertices(uint32_t vertices, const float* data, size_t count, uint32_t usage, VertexFormat format) override
+		{
+			const auto found = m_kept.find(vertices);
+
+			if (found == m_kept.end())
+				return;
+
+			found->second = { count, format };
+
+			glBindBuffer(GL_ARRAY_BUFFER, vertices);
+			glBufferData(GL_ARRAY_BUFFER, count * FloatsPerVertex(format) * sizeof(float), data, usage);
+			glBindBuffer(GL_ARRAY_BUFFER, 0);
+		};
+
+		void DrawVertices(uint32_t program, uint32_t primitive, uint32_t vertices) override
+		{
+			const auto found = m_kept.find(vertices);
+
+			if (found != m_kept.end())
+				DrawBuffer(program, primitive, vertices, found->second.count, found->second.format);
+		};
+
+		void DestroyVertices(uint32_t vertices) override
+		{
+			if (m_kept.erase(vertices))
+				glDeleteBuffers(1, &vertices);
+		};
+
+		// Draws count vertices laid out as format says from buffer, which holds them already.
+		void DrawBuffer(uint32_t program, uint32_t primitive, GLuint buffer, size_t count, VertexFormat format)
+		{
 			constexpr GLint POSITION_COMPONENTS = 3;
 			constexpr GLint UV_COMPONENTS = 2;
 			constexpr GLint NORMAL_COMPONENTS = 3;
@@ -474,8 +526,7 @@ namespace Loom
 
 			glUseProgram(program);
 
-			glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-			glBufferData(GL_ARRAY_BUFFER, count * stride, vertices, usage);
+			glBindBuffer(GL_ARRAY_BUFFER, buffer);
 
 			// All left enabled after the draw: toggling them per draw has the
 			// driver recompile the vertex shader for each state. Without texture
@@ -761,6 +812,16 @@ namespace Loom
 
 		GLuint m_vbo = 0;
 		GLuint m_vao = 0;
+
+		// What CreateVertices handed out, by GL name: how many vertices each
+		// holds and how they are laid out.
+		struct Kept
+		{
+			size_t count = 0;
+			VertexFormat format = VertexFormat::Position;
+		};
+
+		std::unordered_map<GLuint, Kept> m_kept;
 
 		// A normal of zeros, what aNormal reads from vertices without normals.
 		GLuint m_noNormal = 0;

@@ -317,6 +317,7 @@ int main(int argc, char** argv)
 	std::string desktop;
 
 	Engine::backend = Editor::SavedBackend();
+	Engine::vsync = false;
 
 	for (int i = 1; i < argc; i++)
 	{

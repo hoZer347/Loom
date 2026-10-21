@@ -40,15 +40,28 @@ namespace Loom
 		static const std::vector<float> no_vertices{ };
 		static const std::vector<uint32_t> no_indices{ };
 
-		Mesh* mesh = m_gameObject ? m_gameObject->GetComponent<Mesh>() : nullptr;
+		// Read through const, so looking does not count as changing them.
+		const Mesh* mesh = m_gameObject ? m_gameObject->GetComponent<Mesh>() : nullptr;
 
 		const std::vector<float>& vertices = mesh ? *mesh->m_vertices : no_vertices;
 		const std::vector<uint32_t>& indices = mesh ? mesh->m_indices : no_indices;
 		const uint32_t primitive = mesh ? (uint32_t)*mesh->primitive_id : (uint32_t)Mesh::Triangles;
+		const unsigned int version = mesh ? mesh->m_vertices.Version() : 0;
 
-		if (primitive == m_primitive && vertices == m_source && indices == m_indices)
-			return false;
+		if (primitive == m_primitive && indices == m_indices)
+		{
+			if (mesh == m_sourceMesh && version == m_sourceVersion)
+				return false;
 
+			m_sourceMesh = mesh;
+			m_sourceVersion = version;
+
+			if (vertices == m_source)
+				return false;
+		};
+
+		m_sourceMesh = mesh;
+		m_sourceVersion = version;
 		m_source = vertices;
 		m_indices = indices;
 		m_primitive = primitive;

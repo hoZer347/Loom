@@ -12,6 +12,8 @@
 
 namespace Loom
 {
+	struct Mesh;
+
 	/**
 	* Loom::MeshCollider
 	* - The triangles of the Mesh on the same GameObject, drawn as triangles,
@@ -83,7 +85,11 @@ namespace Loom
 		bool Nearest(const std::vector<Triangle>& triangles, const BoxOf& boxOf, const Ray& ray, float& nearest, glm::vec3& normal) const;
 		void Build(uint32_t first, uint32_t count) const;
 
-		// What the tree was built from, to tell when the mesh has changed.
+		// What the tree was built from, to tell when the mesh has changed: the
+		// mesh, the version of its vertices, and the vertices themselves, for
+		// when a new version holds the same ones.
+		mutable const Mesh* m_sourceMesh = nullptr;
+		mutable unsigned int m_sourceVersion = 0;
 		mutable std::vector<float> m_source{ };
 		mutable std::vector<uint32_t> m_indices{ };
 		mutable uint32_t m_primitive = 0;

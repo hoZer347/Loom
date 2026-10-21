@@ -174,6 +174,27 @@ namespace LoomTests
 			drawnVertices.push_back(lastVertices);
 		};
 
+		// Kept vertices are recorded as they are set, and drawn as Draw would draw them.
+		uint32_t CreateVertices() override
+		{
+			kept[++m_handles] = { };
+			return m_handles;
+		};
+
+		void SetVertices(uint32_t vertices, const float* data, size_t count, uint32_t, Loom::VertexFormat format) override
+		{
+			kept[vertices] = { std::vector<float>(data, data + count * Loom::FloatsPerVertex(format)), format };
+			handed++;
+		};
+
+		void DrawVertices(uint32_t program, uint32_t primitive, uint32_t vertices) override
+		{
+			const Kept& drawing = kept.at(vertices);
+			Draw(program, primitive, drawing.vertices.data(), drawing.vertices.size() / Loom::FloatsPerVertex(drawing.format), 0, drawing.format);
+		};
+
+		void DestroyVertices(uint32_t vertices) override { kept.erase(vertices); };
+
 		void SetPixelated(uint32_t program, bool pixelated) override
 		{
 			if (pixelated)
@@ -232,6 +253,17 @@ namespace LoomTests
 		std::vector<std::pair<bool, bool>> clears;
 
 		std::set<uint32_t> pixelatedPrograms;
+
+		struct Kept
+		{
+			std::vector<float> vertices;
+			Loom::VertexFormat format = Loom::VertexFormat::Position;
+		};
+
+		// What CreateVertices handed out and SetVertices filled, and how many
+		// times SetVertices has been called.
+		std::map<uint32_t, Kept> kept;
+		size_t handed = 0;
 
 		std::map<std::string, uint32_t> programs;
 		std::map<std::string, std::string> vertices;

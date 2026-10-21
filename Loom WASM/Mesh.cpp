@@ -36,7 +36,11 @@ namespace Loom
 	};
 
 	Mesh::~Mesh()
-	{ };
+	{
+		// A renderer gone took what it kept with it.
+		if (m_kept && m_keeper == Renderer::Get())
+			m_keeper->DestroyVertices(m_kept);
+	};
 
 	bool Mesh::IsSaved(const SerializedField& field) const
 	{
@@ -116,7 +120,7 @@ namespace Loom
 
 		if (Skin* skin = m_gameObject->GetComponent<Skin>())
 		{
-			if (m_deformed.size() != m_vertices->size() || m_deformedFrame != Time::FrameCount())
+			if (m_deformed.size() != std::as_const(m_vertices)->size() || m_deformedFrame != Time::FrameCount())
 			{
 				skin->Deform(*this);
 				m_deformedFrame = Time::FrameCount();
@@ -128,36 +132,65 @@ namespace Loom
 			m_deformedNormals.clear();
 		};
 
-		const std::vector<float>& positions = m_deformed.size() == m_vertices->size() ? m_deformed : *m_vertices;
-		const std::vector<float>& normals = m_deformedNormals.size() == m_normals->size() ? m_deformedNormals : *m_normals;
-		const size_t count = positions.size() / POSITION_COMPONENTS;
-		const bool hasUVs = m_textureCoordinates->size() == count * UV_COMPONENTS;
-		const bool hasNormals = normals.size() == count * NORMAL_COMPONENTS;
+		// Read through const, so looking does not count as changing them.
+		const std::vector<float>& vertices = *std::as_const(m_vertices);
+		const std::vector<float>& textureCoordinates = *std::as_const(m_textureCoordinates);
+		const std::vector<float>& declaredNormals = *std::as_const(m_normals);
+
+		const bool deformed = m_deformed.size() == vertices.size();
+
+		const Handed handed{
+			m_vertices.Version(),
+			m_textureCoordinates.Version(),
+			m_normals.Version(),
+			m_draw_type.Version(),
+			deformed,
+			deformed ? m_deformedFrame : 0 };
+
+		if (m_keeper != renderer)
+		{
+			m_keeper = renderer;
+			m_kept = 0;
+		};
+
+		if (m_kept == 0 || handed != m_handed)
+		{
+			if (m_kept == 0)
+				m_kept = renderer->CreateVertices();
+
+			m_handed = handed;
+
+			const std::vector<float>& positions = deformed ? m_deformed : vertices;
+			const std::vector<float>& normals = m_deformedNormals.size() == declaredNormals.size() ? m_deformedNormals : declaredNormals;
+			const size_t count = positions.size() / POSITION_COMPONENTS;
+			const bool hasUVs = textureCoordinates.size() == count * UV_COMPONENTS;
+			const bool hasNormals = normals.size() == count * NORMAL_COMPONENTS;
+
+			if (!hasUVs && !hasNormals)
+				renderer->SetVertices(m_kept, positions.data(), count, *std::as_const(m_draw_type), VertexFormat::Position);
+			else
+			{
+				const VertexFormat format = hasNormals ? VertexFormat::PositionUVNormal : VertexFormat::PositionUV;
+				std::vector<float> interleaved(count * FloatsPerVertex(format));
+				float* out = interleaved.data();
+
+				for (size_t i = 0; i < count; i++)
+				{
+					// Without texture coordinates, aUV reads the position's x and y,
+					// as it does from vertices drawn without normals.
+					out = std::copy_n(positions.data() + i * POSITION_COMPONENTS, POSITION_COMPONENTS, out);
+					out = std::copy_n(hasUVs ? textureCoordinates.data() + i * UV_COMPONENTS : positions.data() + i * POSITION_COMPONENTS, UV_COMPONENTS, out);
+
+					if (hasNormals)
+						out = std::copy_n(normals.data() + i * NORMAL_COMPONENTS, NORMAL_COMPONENTS, out);
+				};
+
+				renderer->SetVertices(m_kept, interleaved.data(), count, *std::as_const(m_draw_type), format);
+			};
+		};
 
 		renderer->SetUniform(program, "u_model", m_gameObject->WorldMatrix());
-
-		if (!hasUVs && !hasNormals)
-		{
-			renderer->Draw(program, primitive_id, positions.data(), count, m_draw_type);
-			return;
-		};
-
-		const VertexFormat format = hasNormals ? VertexFormat::PositionUVNormal : VertexFormat::PositionUV;
-		m_interleaved.resize(count * FloatsPerVertex(format));
-		float* out = m_interleaved.data();
-
-		for (size_t i = 0; i < count; i++)
-		{
-			// Without texture coordinates, aUV reads the position's x and y, as
-			// it does from vertices drawn without normals.
-			out = std::copy_n(positions.data() + i * POSITION_COMPONENTS, POSITION_COMPONENTS, out);
-			out = std::copy_n(hasUVs ? m_textureCoordinates->data() + i * UV_COMPONENTS : positions.data() + i * POSITION_COMPONENTS, UV_COMPONENTS, out);
-
-			if (hasNormals)
-				out = std::copy_n(normals.data() + i * NORMAL_COMPONENTS, NORMAL_COMPONENTS, out);
-		};
-
-		renderer->Draw(program, primitive_id, m_interleaved.data(), count, m_draw_type, format);
+		renderer->DrawVertices(program, *std::as_const(primitive_id), m_kept);
 	};
 
 	void Mesh::DrawTransparent(const std::vector<Mesh*>& meshes)
@@ -200,10 +233,10 @@ namespace Loom
 
 	void Mesh::OnGui()
 	{
-		ImGui::Text("Vertices: %zu", m_vertices->size());
+		ImGui::Text("Vertices: %zu", std::as_const(m_vertices)->size());
 		ImGui::Text("Indices:  %zu", m_indices.size());
-		ImGui::Text("UVs:      %zu", m_textureCoordinates->size());
-		ImGui::Text("Normals:  %zu", m_normals->size());
+		ImGui::Text("UVs:      %zu", std::as_const(m_textureCoordinates)->size());
+		ImGui::Text("Normals:  %zu", std::as_const(m_normals)->size());
 
 		if (m_generated)
 			ImGui::TextDisabled("Generated by a script: not saved");

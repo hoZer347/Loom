@@ -108,6 +108,15 @@ namespace Loom
 			uint32_t usage,
 			VertexFormat format = VertexFormat::Position) = 0;
 
+		// Vertices the renderer keeps between draws, for geometry drawn far
+		// more often than it changes. SetVertices hands them over, laid out as
+		// format says, with usage the GL buffer usage hint, and DrawVertices
+		// draws them as Draw would without handing them over again. 0 is none.
+		virtual uint32_t CreateVertices() = 0;
+		virtual void SetVertices(uint32_t vertices, const float* data, size_t count, uint32_t usage, VertexFormat format) = 0;
+		virtual void DrawVertices(uint32_t program, uint32_t primitive, uint32_t vertices) = 0;
+		virtual void DestroyVertices(uint32_t vertices) = 0;
+
 		// Whether the program samples its colour textures nearest, so each texel
 		// draws as a hard-edged square, rather than blending between them, from
 		// the textures it is next handed and the next draw on. Off until it is

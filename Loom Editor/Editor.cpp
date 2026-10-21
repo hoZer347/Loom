@@ -3301,7 +3301,10 @@ namespace Loom
 			};
 
 			if (changed)
+			{
+				field.Changed();
 				object.OnFieldChanged(field);
+			};
 
 			ImGui::PopID();
 		};

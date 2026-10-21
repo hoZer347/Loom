@@ -14,6 +14,7 @@
 #include "SerializedField.h"
 
 #include <string>
+#include <utility>
 #include <vector>
 
 using LoomTests::Pump;
@@ -135,6 +136,11 @@ namespace
 		Loom::Button<".../Grow"> grow{ [this] { width = width + 1; } };
 		Loom::Serial<int, ".../Tall"> height = 3;
 		Loom::Button<"Reset"> reset{ [this] { width = 0; } };
+	};
+
+	struct Counted final : Loom::LoomObject
+	{
+		Loom::Serial<std::vector<float>> values;
 	};
 
 	// Fields are numbered by declaration order; these are EveryField's.
@@ -658,5 +664,28 @@ TEST_SUITE("SerializedField")
 		Pump();
 
 		CHECK(Field(values, Count).ReferenceFor(plain) == nullptr);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a field counts its changes, and looking at it through const is not one")
+	{
+		Counted counted;
+		Pump();
+
+		const unsigned int fresh = counted.values.Version();
+
+		CHECK(std::as_const(counted.values)->empty());
+		CHECK(counted.values.Version() == fresh);
+
+		counted.values = { 1.0f };
+		CHECK(counted.values.Version() == fresh + 1);
+
+		counted.values->push_back(2.0f);
+		CHECK(counted.values.Version() == fresh + 2);
+
+		CHECK(Field(counted, 0).Read("[3]"));
+		CHECK(counted.values.Version() == fresh + 3);
+
+		Field(counted, 0).Changed();
+		CHECK(counted.values.Version() == fresh + 4);
 	};
 };
