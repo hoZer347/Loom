@@ -242,10 +242,10 @@ namespace Loom
 			return blank;
 		};
 
-		// A RenderTarget's GameObject's name names its texture. An image that
-		// will not load is tried again once its file changes, rather than every
-		// frame, which would say why every frame. A path with no file behind
-		// it, one still being typed among them, says nothing.
+		// A value naming a GameObject with a RenderTarget reads the target. An
+		// image that will not load is tried again once its file changes, rather
+		// than every frame, which would say why every frame. A path with no
+		// file behind it, one still being typed among them, says nothing.
 		uint32_t TextureFor(Renderer& renderer, const UniformValue* value)
 		{
 			if (value == nullptr || value->texture.empty())

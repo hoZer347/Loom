@@ -26,10 +26,10 @@ namespace Loom
 	*   name of the target's GameObject, where an image's path would go. While
 	*   something is being drawn into it, it reads as white instead, since a
 	*   texture cannot be drawn into and read at once
-	* - Holds what is drawn into it until Clear, which nothing calls but a
-	*   script. The script draws into it when it chooses: every frame, only
-	*   when something changes, or adding to what is there, which with Max
-	*   keeps the brightest of everything ever drawn
+	* - Keeps what is drawn into it until Clear, which only a script calls. The
+	*   script draws into it when it chooses: every frame, only when something
+	*   changes, or adding to what is there, which with Max keeps the brightest
+	*   of everything ever drawn
 	* - Made the first time it is used and cleared to clearColor, and made and
 	*   cleared again once its size, depth or pixelated change
 	* - Sampled smooth, or nearest when pixelated, whatever the shader reading
