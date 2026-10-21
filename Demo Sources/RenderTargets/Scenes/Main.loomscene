@@ -2,19 +2,30 @@ Main(79272d08-523c-41c1-82d1-c485caa08991):
 	GameObject Root(0ab8d21b-9276-44b6-83f2-e2cd4fd93d8c)
 		0 = 0
 		1 = false
+		2 = (0, 0, 0)
+		3 = (0, 0, 0)
+		4 = (1, 1, 1)
+		5 = false
 		GameObject Camera(a65ded43-ef11-4ade-bf2e-99020aa4c99a)
 			0 = 0
 			1 = false
 			2 = (0, 16, 20)
+			3 = (0, 0, 0)
+			4 = (1, 1, 1)
+			5 = false
 			Component Camera(54f6c632-96fb-41d6-bc6c-712774d7827c)
 				0 = true
 				1 = (0, 1, -1.5)
 				2 = 45
-				3 = 0.1
+				3 = 0.100000001
 				4 = 100
 		GameObject Sun(72749663-fa24-4202-b9a9-404b77f413ce)
 			0 = 0
 			1 = false
+			2 = (0, 0, 0)
+			3 = (0, 0, 0)
+			4 = (1, 1, 1)
+			5 = false
 			Component Light(837f9865-3308-4f97-bac3-557445aea9b7)
 				0 = (-0.5, -1, -0.625)
 				1 = (1, 1, 1)
@@ -27,6 +38,10 @@ Main(79272d08-523c-41c1-82d1-c485caa08991):
 		GameObject Visible(067add78-0c1d-4502-8b3b-3a80cb816113)
 			0 = 0
 			1 = false
+			2 = (0, 0, 0)
+			3 = (0, 0, 0)
+			4 = (1, 1, 1)
+			5 = false
 			Component RenderTarget(36fc1a0f-690b-485b-84a2-50a7aa842353)
 				0 = 256
 				1 = 256
@@ -36,6 +51,10 @@ Main(79272d08-523c-41c1-82d1-c485caa08991):
 		GameObject Explored(32720584-38bf-42b8-a3c1-d45edbf627d1)
 			0 = 0
 			1 = false
+			2 = (0, 0, 0)
+			3 = (0, 0, 0)
+			4 = (1, 1, 1)
+			5 = false
 			Component RenderTarget(498acb19-206d-4c8b-9eb5-b725978838e5)
 				0 = 256
 				1 = 256
@@ -45,6 +64,9 @@ Main(79272d08-523c-41c1-82d1-c485caa08991):
 		GameObject Sight(0a1d00bf-396f-43ab-9bdc-49474a6103b9)
 			0 = 0
 			1 = false
+			2 = (0, 0, 0)
+			3 = (0, 0, 0)
+			4 = (1, 1, 1)
 			5 = true
 			Component Material(2e9030e8-22a5-4b69-803a-4d06e0f05f44)
 				0 = "Assets/Sight.shader"
@@ -61,6 +83,10 @@ Main(79272d08-523c-41c1-82d1-c485caa08991):
 		GameObject Ground(462f63aa-e47d-4bab-809a-ef430ddd12d4)
 			0 = 0
 			1 = false
+			2 = (0, 0, 0)
+			3 = (0, 0, 0)
+			4 = (1, 1, 1)
+			5 = false
 			Component Material(aad273c5-6429-4c38-87ac-a9f065361a05)
 				0 = "Assets/Fog.shader"
 				1 = (0.5, 0.625, 0.375)
@@ -76,6 +102,10 @@ Main(79272d08-523c-41c1-82d1-c485caa08991):
 		GameObject Scouts(2aa350d3-7e6e-405b-9316-b1704210d884)
 			0 = 0
 			1 = false
+			2 = (0, 0, 0)
+			3 = (0, 0, 0)
+			4 = (1, 1, 1)
+			5 = false
 			Component Scouts(ca130ba9-1c79-4c20-879e-d478c643f9f0)
 				0 = 36fc1a0f-690b-485b-84a2-50a7aa842353
 				1 = 498acb19-206d-4c8b-9eb5-b725978838e5
@@ -87,6 +117,9 @@ Main(79272d08-523c-41c1-82d1-c485caa08991):
 				0 = 0
 				1 = false
 				2 = (-4, 0.375, -4)
+				3 = (0, 0, 0)
+				4 = (1, 1, 1)
+				5 = false
 				Component Material(980d07cc-f488-4aba-bddd-5aa652cbaece)
 					0 = "Assets/Lit.shader"
 					1 = (0.875, 0.25, 0.25)
@@ -103,6 +136,9 @@ Main(79272d08-523c-41c1-82d1-c485caa08991):
 				0 = 0
 				1 = false
 				2 = (4, 0.375, -3)
+				3 = (0, 0, 0)
+				4 = (1, 1, 1)
+				5 = false
 				Component Material(13926ceb-e3f5-428c-a93e-5aaa7562b4a4)
 					0 = "Assets/Lit.shader"
 					1 = (0.25, 0.5, 0.875)
@@ -119,6 +155,9 @@ Main(79272d08-523c-41c1-82d1-c485caa08991):
 				0 = 0
 				1 = false
 				2 = (0, 0.375, 4)
+				3 = (0, 0, 0)
+				4 = (1, 1, 1)
+				5 = false
 				Component Material(4c661824-d422-4354-a9a5-d27421e54780)
 					0 = "Assets/Lit.shader"
 					1 = (0.875, 0.75, 0.25)
@@ -135,7 +174,9 @@ Main(79272d08-523c-41c1-82d1-c485caa08991):
 			0 = 0
 			1 = false
 			2 = (-4.25, 4.25, -10)
+			3 = (0, 0, 0)
 			4 = (3.5, 3.5, 1)
+			5 = false
 			Component Material(10b35cdb-602b-447a-ad05-76c0c009688e)
 				0 = "Assets/Panel.shader"
 				1 = (1, 1, 1)
@@ -152,7 +193,9 @@ Main(79272d08-523c-41c1-82d1-c485caa08991):
 			0 = 0
 			1 = false
 			2 = (4.25, 4.25, -10)
+			3 = (0, 0, 0)
 			4 = (3.5, 3.5, 1)
+			5 = false
 			Component Material(64aa81c2-8244-47a9-b489-e46dc8239627)
 				0 = "Assets/Panel.shader"
 				1 = (1, 1, 1)
