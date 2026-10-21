@@ -76,7 +76,12 @@ TEST_SUITE("Mesh")
 		const std::string text = Loom::SceneSerializer::Serialize(*holder);
 
 		CHECK(text.find("7.25") == std::string::npos);
-		CHECK(text.find("2 = ") != std::string::npos);
+
+		// The rest of the mesh is still written: its draw type, for one.
+		const size_t mesh_at = text.find("Component Mesh");
+
+		REQUIRE(mesh_at != std::string::npos);
+		CHECK(text.find("2 = ", mesh_at) != std::string::npos);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a generated mesh read back has no geometry until its script makes it again")
