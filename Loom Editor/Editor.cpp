@@ -69,6 +69,10 @@ namespace Loom
 		constexpr ImGuiTreeNodeFlags header_flags =
 			ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap;
 
+		// A Header over a component's fields, inside that component's own.
+		constexpr ImGuiTreeNodeFlags field_header_flags =
+			ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanAvailWidth;
+
 		bool AnyMouseClicked()
 		{
 			for (int button = 0; button < ImGuiMouseButton_COUNT; button++)
@@ -3092,7 +3096,7 @@ namespace Loom
 			for (; header < headers.size() && headers[header].first == i; header++)
 			{
 				ImGui::PushID((int)header);
-				shown = ImGui::TreeNodeEx(headers[header].label.c_str(), ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanAvailWidth);
+				shown = ImGui::TreeNodeEx(headers[header].label.c_str(), field_header_flags);
 				ImGui::PopID();
 			};
 
