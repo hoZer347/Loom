@@ -189,15 +189,6 @@ namespace Loom
 			return scripts;
 		};
 
-		// Whether path is the script folder or one inside it, the top holding
-		// every folder.
-		bool InScriptFolder(const std::string& path, const std::string& folder)
-		{
-			return folder.empty() ||
-				path == folder ||
-				path.rfind(folder + ScriptFolders::separator, 0) == 0;
-		};
-
 		void Shell(const char* file, const std::string& parameters)
 		{
 			const HINSTANCE result = ShellExecuteA(
@@ -736,9 +727,7 @@ namespace Loom
 
 			SaveScriptFolders();
 
-			m_renamingFolder = path;
-			snprintf(m_folderName, sizeof(m_folderName), "%s", ScriptFolders::NameOf(path).c_str());
-			m_focusFolderName = true;
+			m_scriptFolderTree.Rename(path);
 		};
 
 		for (const AssetKindInfo& info : assetKinds)
@@ -1331,8 +1320,10 @@ namespace Loom
 					? "No scripts yet. Right-click to create one."
 					: "No scripts project. Right-click to create a script.");
 
+			const FolderTree::Hooks hooks = ScriptFolderHooks();
+
 			for (const ScriptFolders::Node& folder : root.children)
-				DrawScriptFolder(folder);
+				m_scriptFolderTree.Draw(m_scriptFolders, folder, hooks);
 
 			for (const std::string& script : root.items)
 				DrawScriptEntry(script);
@@ -1342,7 +1333,7 @@ namespace Loom
 			// Dropped anywhere else in the list, it goes to the top.
 			if (ImGui::BeginDragDropTargetCustom(ImGui::GetCurrentWindow()->InnerRect, ImGui::GetID("##scripts_top")))
 			{
-				DropIntoScriptFolder("");
+				FolderTree::Drop(m_scriptFolders, "", hooks);
 				ImGui::EndDragDropTarget();
 			};
 
@@ -1359,98 +1350,6 @@ namespace Loom
 		};
 
 		ImGui::End();
-	};
-
-	void Editor::DrawScriptFolder(const ScriptFolders::Node& node)
-	{
-		const bool renaming = node.path == m_renamingFolder;
-
-		if ((m_revealSelectedScript && InScriptFolder(m_scriptFolders.FolderOf(m_selectedScript), node.path)) ||
-			(m_focusFolderName && InScriptFolder(ScriptFolders::ParentOf(m_renamingFolder), node.path)))
-			ImGui::SetNextItemOpen(true);
-
-		const bool open = ImGui::TreeNodeEx(
-			("folder:" + node.path).c_str(),
-			ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick,
-			"%s %s",
-			EditorIcons::Folder,
-			renaming ? "" : node.name.c_str());
-
-		if (!renaming && ImGui::BeginDragDropSource())
-		{
-			ImGui::SetDragDropPayload(script_folder_payload, node.path.c_str(), node.path.size() + 1);
-			ImGui::Text("%s %s", EditorIcons::Folder, node.name.c_str());
-			ImGui::EndDragDropSource();
-		};
-
-		if (ImGui::BeginDragDropTarget())
-		{
-			DropIntoScriptFolder(node.path);
-			ImGui::EndDragDropTarget();
-		};
-
-		if (ImGui::BeginPopupContextItem())
-		{
-			DrawScriptsCreateMenu(node.path);
-
-			ImGui::Separator();
-
-			if (ImGui::MenuItem("Rename"))
-			{
-				m_renamingFolder = node.path;
-				snprintf(m_folderName, sizeof(m_folderName), "%s", node.name.c_str());
-				m_focusFolderName = true;
-			};
-
-			// Its scripts and folders go up a level rather than with it.
-			if (ImGui::MenuItem("Remove Folder"))
-			{
-				m_scriptFolders.RemoveFolder(node.path);
-				SaveScriptFolders();
-			};
-
-			ImGui::EndPopup();
-		};
-
-		if (renaming)
-			DrawScriptFolderRename();
-
-		if (!open)
-			return;
-
-		for (const ScriptFolders::Node& child : node.children)
-			DrawScriptFolder(child);
-
-		for (const std::string& script : node.items)
-			DrawScriptEntry(script);
-
-		ImGui::TreePop();
-	};
-
-	void Editor::DrawScriptFolderRename()
-	{
-		ImGui::SameLine();
-		ImGui::SetNextItemWidth(-FLT_MIN);
-
-		if (m_focusFolderName)
-		{
-			ImGui::SetKeyboardFocusHere();
-			m_focusFolderName = false;
-		};
-
-		ImGui::InputText("##rename_folder", m_folderName, sizeof(m_folderName), ImGuiInputTextFlags_AutoSelectAll);
-
-		// Enter and clicking away both keep the new name; Escape has already put
-		// the old one back by the time the field lets go.
-		if (!ImGui::IsItemDeactivated())
-			return;
-
-		const std::string folder = std::exchange(m_renamingFolder, "");
-
-		if (m_scriptFolders.RenameFolder(folder, m_folderName).empty())
-			std::cerr << "Scripts: '" << m_folderName << "' is not a name, or there is already a folder called that there" << std::endl;
-		else
-			SaveScriptFolders();
 	};
 
 	void Editor::DrawScriptEntry(const std::string& name)
@@ -1518,28 +1417,17 @@ namespace Loom
 		ImGui::EndPopup();
 	};
 
-	void Editor::DropIntoScriptFolder(const std::string& folder)
+	FolderTree::Hooks Editor::ScriptFolderHooks()
 	{
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(script_payload))
-		{
-			m_scriptFolders.Move((const char*)payload->Data, folder);
-			SaveScriptFolders();
-		};
+		FolderTree::Hooks hooks;
+		hooks.item_payload = script_payload;
+		hooks.folder_payload = script_folder_payload;
+		hooks.panel = "Scripts";
+		hooks.reveal = [this](const std::string& folder) { return m_revealSelectedScript && VirtualFolders::IsAtOrUnder(m_scriptFolders.FolderOf(m_selectedScript), folder); };
+		hooks.create = [this](const std::string& folder) { DrawScriptsCreateMenu(folder); };
+		hooks.item = [this](const std::string& script) { DrawScriptEntry(script); };
+		hooks.changed = [this]() { SaveScriptFolders(); };
 
-		const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(script_folder_payload);
-
-		if (payload == nullptr)
-			return;
-
-		const std::string dragged = (const char*)payload->Data;
-
-		// Let go where it was picked up.
-		if (dragged == folder)
-			return;
-
-		if (m_scriptFolders.MoveFolder(dragged, folder))
-			SaveScriptFolders();
-		else
-			std::cerr << "Scripts: " << dragged << " cannot go inside itself, or beside a folder with its name" << std::endl;
+		return hooks;
 	};
 };

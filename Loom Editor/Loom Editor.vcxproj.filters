@@ -67,6 +67,9 @@
     <ClCompile Include="VirtualFolders.cpp">
       <Filter>Panels</Filter>
     </ClCompile>
+    <ClCompile Include="FolderTree.cpp">
+      <Filter>Panels</Filter>
+    </ClCompile>
     <ClCompile Include="ComponentMenu.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
@@ -181,6 +184,9 @@
       <Filter>Panels</Filter>
     </ClInclude>
     <ClInclude Include="VirtualFolders.h">
+      <Filter>Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="FolderTree.h">
       <Filter>Panels</Filter>
     </ClInclude>
     <ClInclude Include="ShaderEditor.h">

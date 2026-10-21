@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FolderTree.h"
 #include "InputActions.h"
 #include "VirtualFolders.h"
 
@@ -38,15 +39,14 @@ namespace Loom
 		};
 
 		bool DrawActions();
-		void DrawFolder(const VirtualFolders::Node& node, Edit& edit);
-		void DrawAction(InputActions::Action& action, Edit& edit);
-		void DrawFolderRename(Edit& edit);
+
+		// How the FolderTree draws and files this frame's actions.
+		FolderTree::Hooks Hooks(Edit& edit);
+
+		void DrawAction(InputActions::Action& action, Edit& edit, const FolderTree::Hooks& hooks);
 
 		// Add Action and Add Folder into folder, as buttons or menu items.
 		void DrawAddItems(const std::string& folder, Edit& edit, bool menu);
-
-		// Takes an action or a folder dropped on the target begun last, into folder.
-		static void Drop(const std::string& folder, Edit& edit);
 
 		// Whether key was set to another.
 		static bool DrawKey(const char* label, Key& key);
@@ -58,10 +58,6 @@ namespace Loom
 		std::string m_renaming{ };
 		std::string m_name{ };
 
-		// The folder whose name is being typed, what it reads so far, and
-		// whether the box wants the keyboard next frame.
-		std::string m_renamingFolder{ };
-		std::string m_folderName{ };
-		bool m_focusFolderName = false;
+		FolderTree m_tree;
 	};
 };

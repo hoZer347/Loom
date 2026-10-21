@@ -63,6 +63,9 @@ namespace Loom
 		// there even when the folders left it out.
 		Node Build(const std::vector<std::string>& items) const;
 
+		// Whether path is folder or a folder inside it.
+		static bool IsAtOrUnder(const std::string& path, const std::string& folder);
+
 		// The folder path up to its last separator, or empty at the top.
 		static std::string ParentOf(const std::string& folder);
 		static std::string NameOf(const std::string& folder);

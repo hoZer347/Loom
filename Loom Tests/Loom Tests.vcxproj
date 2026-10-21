@@ -192,6 +192,7 @@
     <ClCompile Include="..\Loom Editor\ComponentMenu.cpp" />
     <ClCompile Include="..\Loom Editor\ScriptFolders.cpp" />
     <ClCompile Include="..\Loom Editor\VirtualFolders.cpp" />
+    <ClCompile Include="..\Loom Editor\FolderTree.cpp" />
     <ClCompile Include="..\Loom Editor\EditorLayouts.cpp" />
     <ClCompile Include="..\Loom Editor\ShaderEditor.cpp" />
     <ClCompile Include="..\Loom Editor\SpriteEditor.cpp" />

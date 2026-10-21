@@ -8,14 +8,6 @@ namespace Loom
 {
 	namespace
 	{
-		bool IsAtOrUnder(const std::string& path, const std::string& folder)
-		{
-			return path == folder ||
-				(path.size() > folder.size() &&
-				path.compare(0, folder.size(), folder) == 0 &&
-				path[folder.size()] == VirtualFolders::separator);
-		};
-
 		bool Alphabetical(const std::string& a, const std::string& b)
 		{
 			return std::ranges::lexicographical_compare(
@@ -186,6 +178,14 @@ namespace Loom
 		Sort(root);
 
 		return root;
+	};
+
+	bool VirtualFolders::IsAtOrUnder(const std::string& path, const std::string& folder)
+	{
+		return path == folder ||
+			(path.size() > folder.size() &&
+			path.compare(0, folder.size(), folder) == 0 &&
+			path[folder.size()] == separator);
 	};
 
 	std::string VirtualFolders::ParentOf(const std::string& folder)

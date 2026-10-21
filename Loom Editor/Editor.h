@@ -18,6 +18,7 @@
 #include "Prefabs.h"
 #include "SelectionOutline.h"
 #include "SceneHistory.h"
+#include "FolderTree.h"
 #include "ScriptFolders.h"
 #include "ScriptLibrary.h"
 #include "WebPlayer.h"
@@ -307,14 +308,11 @@ namespace Loom
 		// The project's script types, filed in folders of the Scripts panel's
 		// own that move no files.
 		void DrawScripts();
-		void DrawScriptFolder(const ScriptFolders::Node& node);
 		void DrawScriptEntry(const std::string& name);
 		void DrawScriptsCreateMenu(const std::string& folder);
-		void DrawScriptFolderRename();
 
-		// Takes a script or a folder dropped on the drag and drop target begun
-		// last, into folder.
-		void DropIntoScriptFolder(const std::string& folder);
+		// How the Scripts panel's FolderTree draws and files its scripts.
+		FolderTree::Hooks ScriptFolderHooks();
 
 		// Where the project keeps them: beside its .loomproject, named the same.
 		// Empty for a folder with no project file.
@@ -744,11 +742,7 @@ namespace Loom
 		FolderWatch m_scriptWatch;
 		std::string m_selectedScript{ };
 		bool m_revealSelectedScript = false;
-
-		// The folder being renamed in place, and the name it is being given.
-		std::string m_renamingFolder{ };
-		char m_folderName[128]{ };
-		bool m_focusFolderName = false;
+		FolderTree m_scriptFolderTree;
 
 		// Where the Create prompt's script is filed once it is written.
 		std::string m_newScriptFolder{ };

@@ -91,10 +91,10 @@ namespace
 	// down from its column's header.
 	constexpr const char* first_alt = "click \"Key Bindings\" \"Alt\" 0 20\n";
 
-	// What the panel labels a folder's row with, for a UiScript to aim at.
-	std::string FolderRow(const std::string& path)
+	// What a folder's row shows, for a UiScript to aim at.
+	std::string FolderRow(const std::string& name)
 	{
-		return std::string(Loom::EditorIcons::Folder) + " " + path + "##folder:" + path;
+		return std::string(Loom::EditorIcons::Folder) + " " + name;
 	};
 };
 
