@@ -10,6 +10,7 @@
 namespace Loom
 {
 	static float s_deltaTime = 0.0f;
+	static float s_unscaledDeltaTime = 0.0f;
 	static float s_sinceStart = 0.0f;
 	static float s_scale = 1.0f;
 	static float s_maxDelta = 0.1f;
@@ -18,6 +19,8 @@ namespace Loom
 	static unsigned long long s_frames = 0;
 
 	float Time::DeltaTime() { return s_deltaTime; };
+
+	float Time::UnscaledDeltaTime() { return s_unscaledDeltaTime; };
 
 	float Time::SinceStart() { return s_sinceStart; };
 
@@ -38,6 +41,7 @@ namespace Loom
 			s_started = true;
 			s_last = now;
 			s_deltaTime = 0.0f;
+			s_unscaledDeltaTime = 0.0f;
 
 			return;
 		};
@@ -50,6 +54,7 @@ namespace Loom
 		if (raw > s_maxDelta)
 			raw = s_maxDelta;
 
+		s_unscaledDeltaTime = raw;
 		s_deltaTime = raw * s_scale;
 		s_sinceStart += s_deltaTime;
 

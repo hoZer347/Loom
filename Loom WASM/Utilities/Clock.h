@@ -16,6 +16,10 @@ namespace Loom
 		/// teleport everything that integrates against it.
 		static float DeltaTime();
 
+		/// The same, but not scaled: for what keeps moving while the game is slowed or
+		/// stopped, such as a camera or a menu.
+		static float UnscaledDeltaTime();
+
 		/// Seconds since the first tick -- the clock the state history is stamped against
 		/// and the one a sprite's animation is played from.
 		static float SinceStart();

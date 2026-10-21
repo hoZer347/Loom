@@ -10,6 +10,8 @@
 #include "Scene.h"
 #include "SceneSerializer.h"
 
+#include "Utilities/Clock.h"
+
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -341,6 +343,9 @@ namespace Loom
 			return;
 
 		m_playing = false;
+
+		// A script that slowed or stopped the clock does not hold the next run to it.
+		Time::SetScale(1.0f);
 
 		Audio::Unload();
 
