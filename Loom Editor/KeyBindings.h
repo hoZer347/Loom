@@ -59,8 +59,8 @@ namespace Loom
 		// keys changed.
 		static bool DrawInput(std::vector<Key>& keys, float key_width);
 
-		// Whether key was set to another.
-		static bool DrawKey(const char* label, Key& key);
+		// The key picked from the list this frame, the one key is included, or none.
+		static std::optional<Key> DrawKey(const char* label, Key key);
 
 		// "Action", or the first "Action 2", "Action 3" and on no action has.
 		static std::string FreeName(const std::vector<InputActions::Action>& actions);

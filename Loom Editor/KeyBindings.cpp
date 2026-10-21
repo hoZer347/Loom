@@ -300,13 +300,20 @@ namespace Loom
 
 			ImGui::SetNextItemWidth(key_width);
 
-			if (DrawKey("##Key", shown[i]))
+			if (const std::optional<Key> picked = DrawKey("##Key", shown[i]))
 			{
-				changed = true;
-
-				// None takes a key out of a combination, though not its last.
-				if (shown[i] == Key::None && shown.size() > 1)
+				// None takes a key out of a combination, though not its last,
+				// even one not chosen yet.
+				if (*picked == Key::None && shown.size() > 1)
+				{
 					unset = i;
+					changed = true;
+				}
+				else if (*picked != shown[i])
+				{
+					shown[i] = *picked;
+					changed = true;
+				};
 			};
 
 			ImGui::PopID();
@@ -331,23 +338,20 @@ namespace Loom
 		return changed;
 	};
 
-	bool KeyBindings::DrawKey(const char* label, Key& key)
+	std::optional<Key> KeyBindings::DrawKey(const char* label, Key key)
 	{
-		bool changed = false;
+		std::optional<Key> picked{ };
 
 		if (ImGui::BeginCombo(label, NameOf(key).data(), ImGuiComboFlags_HeightLarge))
 		{
 			for (const Key each : AllKeys())
-				if (ImGui::Selectable(NameOf(each).data(), each == key) && each != key)
-				{
-					key = each;
-					changed = true;
-				};
+				if (ImGui::Selectable(NameOf(each).data(), each == key))
+					picked = each;
 
 			ImGui::EndCombo();
 		};
 
-		return changed;
+		return picked;
 	};
 
 	std::string KeyBindings::FreeName(const std::vector<InputActions::Action>& actions)

@@ -124,6 +124,24 @@ TEST_SUITE("KeyBindings")
 		CHECK(Loom::InputActions::All()[0].keys == std::vector<Loom::Key>{ Loom::Key::Comma });
 	};
 
+	TEST_CASE("None takes a key out of a combination, one not chosen yet too")
+	{
+		// The second slot's list sits right of the first's and its +.
+		constexpr const char* second_key = "click \"Key Bindings\" \"Input\" left 250 20\n";
+
+		Driven unchosen(std::string(drawn) + "click \"Key Bindings\" \"+\"\n" + drawn + second_key + drawn + "click \"\" \"None\"\n", slowdown);
+
+		CHECK(unchosen.Run() == 2);
+		CHECK_FALSE(unchosen.script->Failed());
+		CHECK(Loom::InputActions::All()[0].keys == std::vector<Loom::Key>{ Loom::Key::Space });
+
+		Driven chosen(std::string(drawn) + first_key + drawn + "click \"\" \"None\"\n",{ { "Zoom In", { Loom::Key::LeftControl, Loom::Key::Equal } } });
+
+		CHECK(chosen.Run() == 1);
+		CHECK_FALSE(chosen.script->Failed());
+		CHECK(Loom::InputActions::All()[0].keys == std::vector<Loom::Key>{ Loom::Key::Equal });
+	};
+
 	TEST_CASE("+ adds a key to be held with the others")
 	{
 		Driven driven(std::string(drawn) + "click \"Key Bindings\" \"+\"\n", slowdown);

@@ -220,11 +220,17 @@ namespace Loom
 				for (const Key key : action.keys)
 					if (IsSet(key))
 					{
-						out << (first ? "" : std::string(1, key_join)) << NameOf(key);
+						if (!first)
+							out << key_join;
+
+						out << NameOf(key);
 						first = false;
 					};
 
-				out << (first ? NameOf(Key::None) : "") << '\n';
+				if (first)
+					out << NameOf(Key::None);
+
+				out << '\n';
 			};
 		};
 
