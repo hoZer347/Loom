@@ -11,6 +11,8 @@ TEST_SUITE("Input")
 	constexpr int left_button = 0;
 	constexpr int right_button = 1;
 	constexpr int middle_button = 2;
+	constexpr int w_key = 'W';
+	constexpr int left_shift = 340;
 
 	// Input is a namespace-with-state, not something a scene owns: Engine wires
 	// the platform callbacks up once and everything reads the statics.
@@ -20,15 +22,30 @@ TEST_SUITE("Input")
 		CHECK_FALSE(std::is_destructible_v<Loom::Input>);
 	};
 
-	// Lets go of every button and runs the frame out, so a case starts from
-	// nothing held and no edges pending.
+	// Lets go of every button and key and runs the frame out, so a case
+	// starts from nothing held, no edges pending and the wheel still.
 	void ReleaseAll()
 	{
 		for (int button = 0; button < Loom::Input::mouse_buttons; button++)
 			Loom::Input::OnMouseButton(button, false);
 
+		for (int key = 0; key < Loom::Input::keys; key++)
+			Loom::Input::OnKey(key, false);
+
 		Loom::Input::Tick();
 		Loom::Input::Tick();
+	};
+
+	// The cursor on the whole of a window, which is the view.
+	void CursorInWindow()
+	{
+		constexpr int window_width = 1280;
+		constexpr int window_height = 720;
+		constexpr int cursor_x = 300;
+		constexpr int cursor_y = 200;
+
+		Loom::Input::ClearView();
+		Loom::Input::OnMouseMove(cursor_x, cursor_y, window_width, window_height);
 	};
 
 	TEST_CASE("a press is down for the frame it lands in, then held")
@@ -190,6 +207,153 @@ TEST_SUITE("Input")
 		CHECK(Loom::Input::GetMouseButtonUp(left_button));
 		CHECK_FALSE(Loom::Input::GetMouseButton(left_button));
 
+		ReleaseAll();
+	};
+
+	TEST_CASE("a key is down for the frame it lands in, then held, then up for one frame")
+	{
+		ReleaseAll();
+
+		Loom::Input::OnKey(w_key, true);
+		Loom::Input::Tick();
+
+		CHECK(Loom::Input::GetKeyDown(w_key));
+		CHECK(Loom::Input::GetKey(w_key));
+		CHECK_FALSE(Loom::Input::GetKey(left_shift));
+
+		Loom::Input::Tick();
+
+		CHECK_FALSE(Loom::Input::GetKeyDown(w_key));
+		CHECK(Loom::Input::GetKey(w_key));
+
+		Loom::Input::OnKey(w_key, false);
+		Loom::Input::Tick();
+
+		CHECK(Loom::Input::GetKeyUp(w_key));
+		CHECK_FALSE(Loom::Input::GetKey(w_key));
+
+		Loom::Input::Tick();
+
+		CHECK_FALSE(Loom::Input::GetKeyUp(w_key));
+	};
+
+	TEST_CASE("keys GLFW does not have are never pressed, and a button is not a key")
+	{
+		ReleaseAll();
+
+		Loom::Input::OnKey(-1, true);
+		Loom::Input::OnKey(Loom::Input::keys, true);
+		Loom::Input::OnMouseButton(left_button, true);
+		Loom::Input::Tick();
+
+		CHECK_FALSE(Loom::Input::GetKey(-1));
+		CHECK_FALSE(Loom::Input::GetKeyDown(Loom::Input::keys));
+		CHECK_FALSE(Loom::Input::GetKey(left_button));
+
+		ReleaseAll();
+	};
+
+	TEST_CASE("without focus no key is heard, and a held key comes up once")
+	{
+		ReleaseAll();
+
+		Loom::Input::OnKey(left_shift, true);
+		Loom::Input::Tick();
+		Loom::Input::Tick();
+		Loom::Input::SetFocused(false);
+
+		CHECK_FALSE(Loom::Input::GetKey(left_shift));
+		CHECK(Loom::Input::GetKeyUp(left_shift));
+
+		Loom::Input::OnKey(w_key, true);
+		Loom::Input::Tick();
+
+		CHECK_FALSE(Loom::Input::GetKeyUp(left_shift));
+		CHECK_FALSE(Loom::Input::GetKeyDown(w_key));
+
+		Loom::Input::SetFocused(true);
+		ReleaseAll();
+	};
+
+	TEST_CASE("a key pressed after Tick is heard in the frame it is pressed")
+	{
+		ReleaseAll();
+
+		Loom::Input::OnKeyThisFrame(w_key, true);
+
+		CHECK(Loom::Input::GetKeyDown(w_key));
+		CHECK(Loom::Input::GetKey(w_key));
+
+		Loom::Input::Tick();
+		Loom::Input::OnKeyThisFrame(w_key, false);
+
+		CHECK(Loom::Input::GetKeyUp(w_key));
+		CHECK_FALSE(Loom::Input::GetKey(w_key));
+
+		ReleaseAll();
+	};
+
+	TEST_CASE("the wheel's notches add up over a frame and are heard for that frame alone")
+	{
+		constexpr float first = 1.0f;
+		constexpr float second = 0.5f;
+
+		ReleaseAll();
+		CursorInWindow();
+
+		Loom::Input::OnMouseWheel(first);
+
+		CHECK(Loom::Input::GetMouseWheel() == 0.0f);
+
+		Loom::Input::OnMouseWheel(second);
+		Loom::Input::Tick();
+
+		CHECK(Loom::Input::GetMouseWheel() == first + second);
+
+		Loom::Input::Tick();
+
+		CHECK(Loom::Input::GetMouseWheel() == 0.0f);
+
+		Loom::Input::OnMouseWheelThisFrame(-first);
+
+		CHECK(Loom::Input::GetMouseWheel() == -first);
+
+		ReleaseAll();
+	};
+
+	// An editor's other panels scroll with it.
+	TEST_CASE("the wheel turns nothing without focus or with the cursor off the view")
+	{
+		constexpr float notches = 1.0f;
+
+		ReleaseAll();
+		CursorInWindow();
+
+		Loom::Input::OnMouseWheel(notches);
+		Loom::Input::Tick();
+
+		CHECK(Loom::Input::GetMouseWheel() == notches);
+
+		Loom::Input::SetFocused(false);
+
+		CHECK(Loom::Input::GetMouseWheel() == 0.0f);
+
+		Loom::Input::SetFocused(true);
+
+		// Just past the window's far corner.
+		const int width = Loom::Input::screen_width;
+		const int height = Loom::Input::screen_height;
+		Loom::Input::OnMouseMove(width, height, width, height);
+
+		CHECK(Loom::Input::GetMouseWheel() == 0.0f);
+
+		// A Game view that is not drawn.
+		CursorInWindow();
+		Loom::Input::SetView(0, 0, 0, 0);
+
+		CHECK(Loom::Input::GetMouseWheel() == 0.0f);
+
+		Loom::Input::ClearView();
 		ReleaseAll();
 	};
 

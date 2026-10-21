@@ -318,7 +318,7 @@ TEST_SUITE("UiScript")
 	{
 		CapturedErrors errors;
 
-		for (const char* text : { "fly away\n", "key ctrl+nothing\n", "click \"Panel\"\n", "wait\n", "\"\" \"Cube\"\n", "hold\n", "release\n" })
+		for (const char* text : { "fly away\n", "key ctrl+nothing\n", "click \"Panel\"\n", "wait\n", "\"\" \"Cube\"\n", "hold\n", "release\n", "scroll\n", "scroll up\n" })
 		{
 			ScriptedUi ui(text);
 			ui.Run([]() { });
@@ -358,6 +358,9 @@ TEST_SUITE("UiScript")
 
 	TEST_CASE("a held key is let go of when the script ends, quits or fails")
 	{
+		// GLFW's numbering, which the game hears keys by.
+		constexpr int left_ctrl = 341;
+
 		CapturedErrors errors;
 
 		for (const char* text : { "hold ctrl\nwait 1\n", "hold ctrl\nwait 1\nquit\n", "hold ctrl\nwait 1\nclick \"Panel\" \"Missing\"\n" })
@@ -368,9 +371,67 @@ TEST_SUITE("UiScript")
 			// The key-up lands on the frame after the script stops.
 			ImGui::NewFrame();
 			ImGui::Render();
+			Loom::Input::Tick();
 
 			CHECK_FALSE(ImGui::GetIO().KeyCtrl);
+			CHECK_FALSE(Loom::Input::GetKey(left_ctrl));
 		};
+	};
+
+	TEST_CASE("the game hears a chord's keys, a modifier as its left one")
+	{
+		// GLFW's numbering, which the game hears keys by.
+		constexpr int w_key = 'W';
+		constexpr int left_shift = 340;
+
+		ScriptedUi ui("hold shift\nkey w\nwait 1\nrelease shift\nwait 1\n");
+		int presses = 0;
+		bool shift_at_press = false;
+		bool shift_after = true;
+
+		ui.Run(
+			[&]()
+			{
+				if (Loom::Input::GetKeyDown(w_key))
+				{
+					presses++;
+					shift_at_press = Loom::Input::GetKey(left_shift);
+				};
+
+				shift_after = Loom::Input::GetKey(left_shift);
+
+				// As the engine does, once a frame.
+				Loom::Input::Tick();
+			});
+
+		CHECK_FALSE(ui.script->Failed());
+		CHECK(presses == 1);
+		CHECK(shift_at_press);
+		CHECK_FALSE(shift_after);
+	};
+
+	TEST_CASE("scroll turns the wheel where the mouse is, for ImGui and the game")
+	{
+		constexpr float notches = -2.0f;
+
+		Loom::Input::ClearView();
+
+		ScriptedUi ui("move 100 100\nscroll -2\nwait 2\n");
+		float panels_heard = 0.0f;
+		float game_heard = 0.0f;
+
+		ui.Run(
+			[&]()
+			{
+				panels_heard += ImGui::GetIO().MouseWheel;
+				game_heard += Loom::Input::GetMouseWheel();
+
+				Loom::Input::Tick();
+			});
+
+		CHECK_FALSE(ui.script->Failed());
+		CHECK(panels_heard == notches);
+		CHECK(game_heard == notches);
 	};
 
 	TEST_CASE("blank lines and comments are skipped, and quit ends early")

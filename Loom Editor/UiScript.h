@@ -19,7 +19,8 @@ namespace Loom
 	* Loom::UiScript
 	* - Drives ImGui from a text file, a command a line, by queueing input
 	*   events in-process. The real mouse and keyboard are never touched, so it
-	*   runs on a hidden window
+	*   runs on a hidden window. The game hears the mouse, the keys and the
+	*   wheel too, as it would the platform's
 	* - Commands, with a line starting # a comment:
 	*     wait <frames>
 	*     move <target>
@@ -28,6 +29,8 @@ namespace Loom
 	*     key <chord>          ImGui's key names joined by +: ctrl+z, enter, f2
 	*     hold <chord>         presses it and leaves it down, for a click with ctrl
 	*     release <chord>      lets go of a held chord
+	*     scroll <notches>     turns the wheel where the mouse is, away from you
+	*                          positive
 	*     type <text>          the rest of the line
 	*     screenshot <file>    the whole window, as a bitmap
 	*     items [file]         every labelled item drawn last frame, to the file

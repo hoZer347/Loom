@@ -9,6 +9,12 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <unordered_map>
+
+
+// How ImGui's GLFW backend turns GLFW's keys into its own, which it leaves
+// out of its header.
+ImGuiKey ImGui_ImplGlfw_KeyToImGuiKey(int keycode, int scancode);
 
 
 namespace Loom
@@ -25,12 +31,47 @@ namespace Loom
 		// the drop: past ImGui's drag threshold, so the drag has started.
 		constexpr float drag_nudge = 10.0f;
 
-		const std::pair<const char*, ImGuiKey> modifiers[] =
+		// What a chord names, what ImGui is told of it, and the key the game
+		// hears for it.
+		struct Modifier
 		{
-			{ "ctrl", ImGuiMod_Ctrl },
-			{ "shift", ImGuiMod_Shift },
-			{ "alt", ImGuiMod_Alt },
-			{ "super", ImGuiMod_Super },
+			const char* name;
+			ImGuiKey flag;
+			ImGuiKey key;
+		};
+
+		const Modifier modifiers[] =
+		{
+			{ "ctrl", ImGuiMod_Ctrl, ImGuiKey_LeftCtrl },
+			{ "shift", ImGuiMod_Shift, ImGuiKey_LeftShift },
+			{ "alt", ImGuiMod_Alt, ImGuiKey_LeftAlt },
+			{ "super", ImGuiMod_Super, ImGuiKey_LeftSuper },
+		};
+
+		// The key the game hears for one ImGui is told of, as GLFW numbers
+		// it, or -1 for none. The backend's mapping goes the other way, so it
+		// is run over every GLFW key once.
+		int GameKey(ImGuiKey key)
+		{
+			static const std::unordered_map<ImGuiKey, int> numbers =
+				[]()
+				{
+					std::unordered_map<ImGuiKey, int> found{ };
+
+					for (int number = 0; number < Input::keys; number++)
+						if (const ImGuiKey named = ImGui_ImplGlfw_KeyToImGuiKey(number, 0); named != ImGuiKey_None)
+							found.try_emplace(named, number);
+
+					return found;
+				}();
+
+			for (const Modifier& modifier : modifiers)
+				if (key == modifier.flag)
+					key = modifier.key;
+
+			const auto found = numbers.find(key);
+
+			return found == numbers.end() ? -1 : found->second;
 		};
 
 		// Words and "quoted strings", the quotes taken off.
@@ -365,9 +406,9 @@ namespace Loom
 			{
 				ImGuiKey key = ImGuiKey_None;
 
-				for (const auto& [name, modifier] : modifiers)
-					if (ImStricmp(name, part.c_str()) == 0)
-						key = modifier;
+				for (const Modifier& modifier : modifiers)
+					if (ImStricmp(modifier.name, part.c_str()) == 0)
+						key = modifier.flag;
 
 				if (key == ImGuiKey_None)
 					key = KeyNamed(part);
@@ -381,6 +422,7 @@ namespace Loom
 				held.push_back(key);
 			};
 
+			// The game hears them too, as it would real ones.
 			if (verb != "release")
 				m_actions.push_back(
 					[this, &io, held]()
@@ -388,6 +430,7 @@ namespace Loom
 						for (ImGuiKey key : held)
 						{
 							io.AddKeyEvent(key, true);
+							Input::OnKeyThisFrame(GameKey(key), true);
 							m_held.push_back(key);
 						};
 
@@ -401,11 +444,30 @@ namespace Loom
 						for (auto key = held.rbegin(); key != held.rend(); key++)
 						{
 							io.AddKeyEvent(*key, false);
+							Input::OnKeyThisFrame(GameKey(*key), false);
 							m_held.erase(std::remove(m_held.begin(), m_held.end(), *key), m_held.end());
 						};
 
 						return Result::Done;
 					});
+		}
+		else if (verb == "scroll")
+		{
+			float notches = 0.0f;
+
+			if (tokens.size() != 2 || !Number(tokens[1], &notches))
+			{
+				Fail("scroll takes a number of notches, away from you positive");
+				return false;
+			};
+
+			m_actions.push_back(
+				[&io, notches]()
+				{
+					io.AddMouseWheelEvent(0.0f, notches);
+					Input::OnMouseWheelThisFrame(notches);
+					return Result::Done;
+				});
 		}
 		else if (verb == "type")
 		{
@@ -587,7 +649,10 @@ namespace Loom
 	void UiScript::ReleaseHeld()
 	{
 		for (auto key = m_held.rbegin(); key != m_held.rend(); key++)
+		{
 			m_context->IO.AddKeyEvent(*key, false);
+			Input::OnKeyThisFrame(GameKey(*key), false);
+		};
 
 		m_held.clear();
 	};

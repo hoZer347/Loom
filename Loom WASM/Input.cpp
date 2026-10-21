@@ -7,6 +7,7 @@
 #include <array>
 #include <iostream>
 #include <optional>
+#include <utility>
 
 
 namespace Loom
@@ -14,23 +15,100 @@ namespace Loom
 	namespace
 	{
 		static_assert(Input::mouse_buttons == GLFW_MOUSE_BUTTON_LAST + 1);
-
-		using Buttons = std::array<bool, Input::mouse_buttons>;
-
-		// Held, as the callbacks last said.
-		Buttons held{ };
-
-		// Edges heard since the last Tick, and the ones this frame answers with.
-		Buttons went_down{ };
-		Buttons went_up{ };
-		Buttons down_this_frame{ };
-		Buttons up_this_frame{ };
-
-		// Held when focus went, which the frame it went in hears come up. A
-		// press in that frame took focus away, so the game never had it.
-		Buttons lost_this_frame{ };
+		static_assert(Input::keys == GLFW_KEY_LAST + 1);
 
 		bool has_focus = true;
+
+		// The mouse's buttons or the keyboard's keys, numbered from 0: what
+		// the callbacks said of each, and what this frame answers for it.
+		template <int count>
+		struct Switches
+		{
+			using Flags = std::array<bool, count>;
+
+			static bool Exists(int which)
+			{
+				return which >= 0 && which < count;
+			};
+
+			bool Down(int which) const
+			{
+				return has_focus && Exists(which) && down_this_frame[which];
+			};
+
+			bool Held(int which) const
+			{
+				return has_focus && Exists(which) && (held[which] || down_this_frame[which]);
+			};
+
+			bool Up(int which) const
+			{
+				return Exists(which) && (has_focus ? up_this_frame[which] : lost_this_frame[which]);
+			};
+
+			void Heard(int which, bool pressed)
+			{
+				if (!Exists(which))
+					return;
+
+				held[which] = pressed;
+
+				if (pressed)
+					went_down[which] = true;
+				else
+					went_up[which] = true;
+			};
+
+			void HeardThisFrame(int which, bool pressed)
+			{
+				if (!Exists(which))
+					return;
+
+				held[which] = pressed;
+
+				if (pressed)
+					down_this_frame[which] = true;
+				else
+					up_this_frame[which] = true;
+			};
+
+			// While focus is still had, as it goes.
+			void LoseFocus()
+			{
+				for (int which = 0; which < count; which++)
+					lost_this_frame[which] = Held(which) && !down_this_frame[which];
+			};
+
+			void Tick()
+			{
+				down_this_frame = went_down;
+				up_this_frame = went_up;
+
+				went_down.fill(false);
+				went_up.fill(false);
+				lost_this_frame.fill(false);
+			};
+
+			// Held, as the callbacks last said.
+			Flags held{ };
+
+			// Edges heard since the last Tick, and the ones this frame answers with.
+			Flags went_down{ };
+			Flags went_up{ };
+			Flags down_this_frame{ };
+			Flags up_this_frame{ };
+
+			// Held when focus went, which the frame it went in hears come up. A
+			// press in that frame took focus away, so the game never had it.
+			Flags lost_this_frame{ };
+		};
+
+		Switches<Input::mouse_buttons> buttons;
+		Switches<Input::keys> keyboard;
+
+		// Notches heard since the last Tick, and the ones this frame answers with.
+		float wheel_turned = 0.0f;
+		float wheel_this_frame = 0.0f;
 
 		struct Rect
 		{
@@ -57,56 +135,92 @@ namespace Loom
 			Input::screen_height = seen.height;
 		};
 
-		bool IsButton(int button)
+		bool IsCursorInView()
 		{
-			return button >= 0 && button < Input::mouse_buttons;
+			return Input::mouse_x >= 0 && Input::mouse_y >= 0 && Input::mouse_x < Input::screen_width && Input::mouse_y < Input::screen_height;
 		};
 
 		void mouse_button_callback(GLFWwindow*, int button, int action, int)
 		{
 			Input::OnMouseButton(button, action == GLFW_PRESS);
 		};
+
+		void key_callback(GLFWwindow*, int key, int, int action, int)
+		{
+			// A key held long enough repeats, which is no new press.
+			if (action != GLFW_REPEAT)
+				Input::OnKey(key, action == GLFW_PRESS);
+		};
+
+		void scroll_callback(GLFWwindow*, double, double notches)
+		{
+			Input::OnMouseWheel((float)notches);
+		};
 	};
 
 	bool Input::GetMouseButtonDown(int button)
 	{
-		return has_focus && IsButton(button) && down_this_frame[button];
+		return buttons.Down(button);
 	};
 
 	bool Input::GetMouseButton(int button)
 	{
-		return has_focus && IsButton(button) && (held[button] || down_this_frame[button]);
+		return buttons.Held(button);
 	};
 
 	bool Input::GetMouseButtonUp(int button)
 	{
-		return IsButton(button) && (has_focus ? up_this_frame[button] : lost_this_frame[button]);
+		return buttons.Up(button);
 	};
 
 	void Input::OnMouseButton(int button, bool pressed)
 	{
-		if (!IsButton(button))
-			return;
-
-		held[button] = pressed;
-
-		if (pressed)
-			went_down[button] = true;
-		else
-			went_up[button] = true;
+		buttons.Heard(button, pressed);
 	};
 
 	void Input::OnMouseButtonThisFrame(int button, bool pressed)
 	{
-		if (!IsButton(button))
-			return;
+		buttons.HeardThisFrame(button, pressed);
+	};
 
-		held[button] = pressed;
+	bool Input::GetKeyDown(int key)
+	{
+		return keyboard.Down(key);
+	};
 
-		if (pressed)
-			down_this_frame[button] = true;
-		else
-			up_this_frame[button] = true;
+	bool Input::GetKey(int key)
+	{
+		return keyboard.Held(key);
+	};
+
+	bool Input::GetKeyUp(int key)
+	{
+		return keyboard.Up(key);
+	};
+
+	void Input::OnKey(int key, bool pressed)
+	{
+		keyboard.Heard(key, pressed);
+	};
+
+	void Input::OnKeyThisFrame(int key, bool pressed)
+	{
+		keyboard.HeardThisFrame(key, pressed);
+	};
+
+	float Input::GetMouseWheel()
+	{
+		return has_focus && IsCursorInView() ? wheel_this_frame : 0.0f;
+	};
+
+	void Input::OnMouseWheel(float notches)
+	{
+		wheel_turned += notches;
+	};
+
+	void Input::OnMouseWheelThisFrame(float notches)
+	{
+		wheel_this_frame += notches;
 	};
 
 	void Input::OnMouseMove(int x, int y, int window_width, int window_height)
@@ -137,8 +251,10 @@ namespace Loom
 	void Input::SetFocused(bool focused)
 	{
 		if (has_focus && !focused)
-			for (int button = 0; button < mouse_buttons; button++)
-				lost_this_frame[button] = GetMouseButton(button) && !down_this_frame[button];
+		{
+			buttons.LoseFocus();
+			keyboard.LoseFocus();
+		};
 
 		has_focus = focused;
 	};
@@ -150,12 +266,10 @@ namespace Loom
 
 	void Input::Tick()
 	{
-		down_this_frame = went_down;
-		up_this_frame = went_up;
+		buttons.Tick();
+		keyboard.Tick();
 
-		went_down.fill(false);
-		went_up.fill(false);
-		lost_this_frame.fill(false);
+		wheel_this_frame = std::exchange(wheel_turned, 0.0f);
 	};
 
 #if __EMSCRIPTEN__
@@ -214,9 +328,17 @@ namespace Loom
 #endif
 
 		// The engine's own GLFW port on the web: ImGui is told to leave GLFW's
-		// callbacks alone there, and on the desktop it chains to this one.
+		// callbacks alone there, and on the desktop it chains to these.
 		glfwSetMouseButtonCallback(
 			Engine::window,
 			mouse_button_callback);
+
+		glfwSetKeyCallback(
+			Engine::window,
+			key_callback);
+
+		glfwSetScrollCallback(
+			Engine::window,
+			scroll_callback);
 	};
 };

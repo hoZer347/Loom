@@ -43,14 +43,40 @@ namespace Loom
 		// which this frame hears as though it had been polled with the rest.
 		static void OnMouseButtonThisFrame(int button, bool pressed);
 
-		// Whether the game hears the mouse buttons, which DialogueInput also
-		// asks before it reports keys and pads: always on its own, and in an
-		// editor only while its Game view has focus. Without it nothing is
-		// down or held, and what was held as it went comes up.
+		// Keys are numbered as GLFW numbers them: a letter or a digit by its
+		// character, 'W' or '1', and the rest as GLFW_KEY_ names them, up to
+		// GLFW_KEY_LAST. Anything outside that is never pressed.
+		static constexpr int keys = 349;
+
+		// The same three questions of a key as of a mouse button.
+		static bool GetKeyDown(int key);
+		static bool GetKey(int key);
+		static bool GetKeyUp(int key);
+
+		// What the platform's key callback reports, as it happens, and a press
+		// made up after Tick, as for a mouse button.
+		static void OnKey(int key, bool pressed);
+		static void OnKeyThisFrame(int key, bool pressed);
+
+		// How far the mouse wheel turned since the frame before, in notches,
+		// away from the person positive. Heard only while the cursor is on
+		// the view, as the wheel turns whatever is under it.
+		static float GetMouseWheel();
+
+		// What the platform's scroll callback reports, as it happens, and a
+		// turn made up after Tick, as for a mouse button.
+		static void OnMouseWheel(float notches);
+		static void OnMouseWheelThisFrame(float notches);
+
+		// Whether the game hears the mouse and the keyboard, which
+		// DialogueInput also asks before it reports keys and pads: always on
+		// its own, and in an editor only while its Game view has focus.
+		// Without it nothing is down or held, what was held as it went comes
+		// up, and the wheel turns nothing.
 		static void SetFocused(bool focused);
 		static bool IsFocused();
 
-		// Hands what OnMouseButton heard since the last call to this frame's
+		// Hands what the callbacks heard since the last call to this frame's
 		// questions. Engine calls it once a frame, after polling for events.
 		static void Tick();
 
