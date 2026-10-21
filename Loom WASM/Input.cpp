@@ -17,6 +17,21 @@ namespace Loom
 		static_assert(Input::mouse_buttons == GLFW_MOUSE_BUTTON_LAST + 1);
 		static_assert(Input::keys == GLFW_KEY_LAST + 1);
 
+		// Key follows GLFW's numbering through each run of it.
+		static_assert((int)Key::None == GLFW_KEY_UNKNOWN);
+		static_assert((int)Key::Space == GLFW_KEY_SPACE);
+		static_assert((int)Key::Digit9 == GLFW_KEY_9);
+		static_assert((int)Key::Semicolon == GLFW_KEY_SEMICOLON);
+		static_assert((int)Key::Equal == GLFW_KEY_EQUAL);
+		static_assert((int)Key::Z == GLFW_KEY_Z);
+		static_assert((int)Key::RightBracket == GLFW_KEY_RIGHT_BRACKET);
+		static_assert((int)Key::GraveAccent == GLFW_KEY_GRAVE_ACCENT);
+		static_assert((int)Key::End == GLFW_KEY_END);
+		static_assert((int)Key::Pause == GLFW_KEY_PAUSE);
+		static_assert((int)Key::F25 == GLFW_KEY_F25);
+		static_assert((int)Key::KeypadEqual == GLFW_KEY_KP_EQUAL);
+		static_assert((int)Key::Menu == GLFW_KEY_MENU);
+
 		bool has_focus = true;
 
 		// The mouse's buttons or the keyboard's keys, numbered from 0: what

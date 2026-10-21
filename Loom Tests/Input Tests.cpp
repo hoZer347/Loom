@@ -11,8 +11,8 @@ TEST_SUITE("Input")
 	constexpr int left_button = 0;
 	constexpr int right_button = 1;
 	constexpr int middle_button = 2;
-	constexpr int w_key = 'W';
-	constexpr int left_shift = 340;
+	constexpr int w_key = (int)Loom::Key::W;
+	constexpr int left_shift = (int)Loom::Key::LeftShift;
 
 	// Input is a namespace-with-state, not something a scene owns: Engine wires
 	// the platform callbacks up once and everything reads the statics.
@@ -354,6 +354,25 @@ TEST_SUITE("Input")
 		CHECK(Loom::Input::GetMouseWheel() == 0.0f);
 
 		Loom::Input::ClearView();
+		ReleaseAll();
+	};
+
+	TEST_CASE("a key asked by name is the key asked by number")
+	{
+		ReleaseAll();
+
+		Loom::Input::OnKey(w_key, true);
+		Loom::Input::Tick();
+
+		CHECK(Loom::Input::GetKeyDown(Loom::Key::W));
+		CHECK(Loom::Input::GetKey(Loom::Key::W));
+		CHECK_FALSE(Loom::Input::GetKey(Loom::Key::None));
+
+		Loom::Input::OnKey(w_key, false);
+		Loom::Input::Tick();
+
+		CHECK(Loom::Input::GetKeyUp(Loom::Key::W));
+
 		ReleaseAll();
 	};
 

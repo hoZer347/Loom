@@ -5,6 +5,38 @@
 
 namespace Loom
 {
+	// The keys by name, numbered as GLFW numbers them, so either can be asked
+	// of Input. A Serial<Key> is offered in the inspector as a list of them,
+	// None for a key that is not set.
+	enum struct Key : int
+	{
+		None = -1,
+
+		Space = 32,
+		Apostrophe = 39,
+		Comma = 44, Minus, Period, Slash,
+		Digit0, Digit1, Digit2, Digit3, Digit4, Digit5, Digit6, Digit7, Digit8, Digit9,
+		Semicolon = 59,
+		Equal = 61,
+		A = 65, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
+		LeftBracket, Backslash, RightBracket,
+		GraveAccent = 96,
+
+		Escape = 256, Enter, Tab, Backspace, Insert, Delete,
+		Right, Left, Down, Up,
+		PageUp, PageDown, Home, End,
+		CapsLock = 280, ScrollLock, NumLock, PrintScreen, Pause,
+		F1 = 290, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, F13,
+		F14, F15, F16, F17, F18, F19, F20, F21, F22, F23, F24, F25,
+
+		Keypad0 = 320, Keypad1, Keypad2, Keypad3, Keypad4, Keypad5, Keypad6, Keypad7, Keypad8, Keypad9,
+		KeypadDecimal, KeypadDivide, KeypadMultiply, KeypadSubtract, KeypadAdd, KeypadEnter, KeypadEqual,
+
+		LeftShift = 340, LeftControl, LeftAlt, LeftSuper,
+		RightShift, RightControl, RightAlt, RightSuper,
+		Menu,
+	};
+
 	struct LOOM_API Input
 	{
 		// Buttons are numbered as GLFW numbers them: 0 left, 1 right, 2 middle,
@@ -43,15 +75,20 @@ namespace Loom
 		// which this frame hears as though it had been polled with the rest.
 		static void OnMouseButtonThisFrame(int button, bool pressed);
 
-		// Keys are numbered as GLFW numbers them: a letter or a digit by its
-		// character, 'W' or '1', and the rest as GLFW_KEY_ names them, up to
-		// GLFW_KEY_LAST. Anything outside that is never pressed.
-		static constexpr int keys = 349;
+		// Keys are numbered as GLFW numbers them, and as Key names them: a
+		// letter or a digit by its character, 'W' or '1', and the rest as
+		// GLFW_KEY_ names them, up to GLFW_KEY_LAST. Anything outside that is
+		// never pressed.
+		static constexpr int keys = (int)Key::Menu + 1;
 
 		// The same three questions of a key as of a mouse button.
 		static bool GetKeyDown(int key);
 		static bool GetKey(int key);
 		static bool GetKeyUp(int key);
+
+		static bool GetKeyDown(Key key) { return GetKeyDown((int)key); };
+		static bool GetKey(Key key) { return GetKey((int)key); };
+		static bool GetKeyUp(Key key) { return GetKeyUp((int)key); };
 
 		// What the platform's key callback reports, as it happens, and a press
 		// made up after Tick, as for a mouse button.

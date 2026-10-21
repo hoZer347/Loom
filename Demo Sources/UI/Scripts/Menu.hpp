@@ -23,11 +23,11 @@ namespace UIScripts
 	{
 		void OnUpdate() override
 		{
-			if (Clicked("Red") || Loom::Input::GetKeyDown('R'))
+			if (Clicked("Red") || Loom::Input::GetKeyDown(Loom::Key::R))
 				Tint(RED);
-			else if (Clicked("Green") || Loom::Input::GetKeyDown('G'))
+			else if (Clicked("Green") || Loom::Input::GetKeyDown(Loom::Key::G))
 				Tint(GREEN);
-			else if (Clicked("Blue") || Loom::Input::GetKeyDown('B'))
+			else if (Clicked("Blue") || Loom::Input::GetKeyDown(Loom::Key::B))
 				Tint(BLUE);
 			else if (Clicked("More"))
 				ShowPopup(true);
@@ -41,10 +41,6 @@ namespace UIScripts
 		static constexpr glm::vec3 RED = { 0.9f, 0.25f, 0.2f };
 		static constexpr glm::vec3 GREEN = { 0.3f, 0.75f, 0.35f };
 		static constexpr glm::vec3 BLUE = { 0.25f, 0.45f, 0.95f };
-
-		// GLFW's numbering, which Input keeps.
-		static constexpr int RIGHT_KEY = 262;
-		static constexpr int LEFT_KEY = 263;
 
 		// Degrees.
 		static constexpr float TURN_PER_NOTCH = 15.0f;
@@ -92,10 +88,10 @@ namespace UIScripts
 		{
 			float turn = Loom::Input::GetMouseWheel() * TURN_PER_NOTCH;
 
-			if (Loom::Input::GetKey(LEFT_KEY))
+			if (Loom::Input::GetKey(Loom::Key::Left))
 				turn -= TURN_PER_SECOND * Loom::Time::DeltaTime();
 
-			if (Loom::Input::GetKey(RIGHT_KEY))
+			if (Loom::Input::GetKey(Loom::Key::Right))
 				turn += TURN_PER_SECOND * Loom::Time::DeltaTime();
 
 			if (turn != 0.0f)
