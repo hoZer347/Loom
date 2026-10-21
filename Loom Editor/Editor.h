@@ -374,8 +374,8 @@ namespace Loom
 			Debug,
 		};
 
-		// What each view's panel holds under its toolbar, in whatever window
-		// is open: its panel, or the one over the whole monitor.
+		// What each view's panel holds, in whatever window is open: its
+		// panel, or the one over the whole monitor.
 		void DrawSceneView();
 		void DrawPrefabView();
 		void DrawGameView();
@@ -393,6 +393,7 @@ namespace Loom
 		void DrawFullscreen();
 		void EnterFullscreen(View view);
 		void LeaveFullscreen();
+
 		// The bar along the top of the Game and Debug panels.
 		void DrawToolbar();
 

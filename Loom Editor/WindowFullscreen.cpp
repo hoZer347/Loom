@@ -54,6 +54,11 @@ namespace Loom
 			rects.push_back(rect);
 		};
 
+		m_maximized = glfwGetWindowAttrib(window, GLFW_MAXIMIZED);
+
+		if (m_maximized)
+			glfwRestoreWindow(window);
+
 		glfwGetWindowPos(window, &m_windowed.x, &m_windowed.y);
 		glfwGetWindowSize(window, &m_windowed.width, &m_windowed.height);
 
@@ -61,9 +66,15 @@ namespace Loom
 		const GLFWvidmode* mode = under >= 0 ? glfwGetVideoMode(monitors[under]) : nullptr;
 
 		if (mode == nullptr)
-			return;
+		{
+			if (m_maximized)
+				glfwMaximizeWindow(window);
 
-		m_maximized = glfwGetWindowAttrib(window, GLFW_MAXIMIZED);
+			return;
+		};
+
+		// A click on another monitor would otherwise minimise it.
+		glfwSetWindowAttrib(window, GLFW_AUTO_ICONIFY, GLFW_FALSE);
 		glfwSetWindowMonitor(window, monitors[under], 0, 0, mode->width, mode->height, mode->refreshRate);
 		m_moved = true;
 	};

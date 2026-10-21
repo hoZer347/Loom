@@ -324,7 +324,7 @@ namespace Loom
 		// The ImGui settings entry that holds which panels are open.
 		constexpr const char* panel_settings = "LoomEditor";
 
-		constexpr ImGuiWindowFlags view_flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+		constexpr ImGuiWindowFlags view_flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoCollapse;
 
 		constexpr const char* camera_controls =
 			"Right mouse: look, with WASD and QE to fly (Shift for faster)\n"
@@ -1499,10 +1499,18 @@ namespace Loom
 			m_pendingLayout.clear();
 		};
 
+		// Nowhere the cursor can be, and nothing heard, unless the Game view
+		// draws the game below and has focus.
+		Input::SetView(0, 0, 0, 0);
+		m_gamePanelFocused = false;
+		m_gamePanelHovered = false;
+
 		if (m_fullscreen)
 			DrawFullscreen();
 		else
 			DrawWorkspace();
+
+		Input::SetFocused(m_gameFocus.Update(m_gamePanelFocused, m_gamePanelHovered, AnyMouseClicked(), ImGui::IsAnyMouseDown() || AnyMouseReleased()));
 
 		ImportQueued();
 		ClickQueued();
@@ -1613,12 +1621,6 @@ namespace Loom
 			SetCurrentLayout("");
 		};
 
-		// Nowhere the cursor can be, and nothing heard, unless the Game panel
-		// draws the game below and has focus.
-		Input::SetView(0, 0, 0, 0);
-		m_gamePanelFocused = false;
-		m_gamePanelHovered = false;
-
 		if (m_showProject)		DrawProject();
 		if (m_showScripts)		DrawScripts();
 		if (m_showHierarchy)	DrawHierarchy();
@@ -1627,7 +1629,6 @@ namespace Loom
 		DrawPrefab();
 		if (m_showGame)			DrawGame();
 		if (m_showDebug)		DrawDebug();
-		Input::SetFocused(m_gameFocus.Update(m_gamePanelFocused, m_gamePanelHovered, AnyMouseClicked(), ImGui::IsAnyMouseDown() || AnyMouseReleased()));
 		if (m_showSceneData)	DrawSceneData();
 		if (m_showConsole)		m_console.Draw(&m_showConsole);
 		if (m_showShaders)		m_shaders.Draw(&m_showShaders);
@@ -1642,9 +1643,18 @@ namespace Loom
 	bool Editor::TabDoubleClicked()
 	{
 		const ImGuiWindow* window = ImGui::GetCurrentWindow();
-		const ImRect tab = window->DockIsActive ? window->DC.DockTabItemRect : window->TitleBarRect();
 
-		return ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && tab.Contains(ImGui::GetIO().MousePos);
+		if (!ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) ||
+			!ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows | ImGuiHoveredFlags_DockHierarchy))
+			return false;
+
+		if (!window->DockIsActive)
+			return window->TitleBarRect().Contains(ImGui::GetIO().MousePos);
+
+		// A hidden tab bar keeps the rect it last had.
+		const ImGuiDockNode* node = window->DockNode;
+
+		return node != nullptr && !node->IsHiddenTabBar() && !node->IsNoTabBar() && window->DC.DockTabItemRect.Contains(ImGui::GetIO().MousePos);
 	};
 
 	void Editor::DrawFullscreen()
@@ -1678,12 +1688,6 @@ namespace Loom
 			view_flags | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoDocking |
 			ImGuiWindowFlags_NoSavedSettings | (m_playing ? ImGuiWindowFlags_NoNavInputs : ImGuiWindowFlags_None);
 
-		// Nowhere the cursor can be, and nothing heard, unless the Game view
-		// is the one filling the monitor and has focus.
-		Input::SetView(0, 0, 0, 0);
-		m_gamePanelFocused = false;
-		m_gamePanelHovered = false;
-
 		if (ImGui::Begin("##Fullscreen", nullptr, flags))
 		{
 			switch (*m_fullscreen)
@@ -1708,8 +1712,6 @@ namespace Loom
 
 		ImGui::End();
 		ImGui::PopStyleVar(pushed_styles);
-
-		Input::SetFocused(m_gameFocus.Update(m_gamePanelFocused, m_gamePanelHovered, AnyMouseClicked(), ImGui::IsAnyMouseDown() || AnyMouseReleased()));
 	};
 
 	void Editor::EnterFullscreen(View view)
