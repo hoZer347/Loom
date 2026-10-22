@@ -938,6 +938,7 @@ namespace Loom
 
 		m_opening.reset();
 		m_openingPath.clear();
+		m_projectLoad.reset();
 
 		CloseAllScenes();
 		ClosePrefab();
@@ -964,9 +965,15 @@ namespace Loom
 		// Nothing open yet and something to open: start on the scene the last
 		// session was on. Not while a build is running, though: PollScripts
 		// opens it once the component types the scene names actually exist.
-		if (open_scene && !m_scripts.IsBuilding() && m_ownedScenes.empty())
-			if (const std::string scene = StartupScene(); !scene.empty())
-				BeginOpeningScene(scene);
+		const std::string scene = open_scene && m_ownedScenes.empty()
+			? StartupScene()
+			: "";
+
+		if (!scene.empty() && !m_scripts.IsBuilding())
+			BeginOpeningScene(scene);
+
+		if (!m_scripts.IsIdle() || m_opening)
+			m_projectLoad = ProjectLoad{ !m_scripts.IsIdle(), !scene.empty() };
 
 		return true;
 	};

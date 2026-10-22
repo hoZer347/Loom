@@ -171,6 +171,10 @@ namespace Loom
 		// a library that has gone.
 		FinishOpening();
 
+		// Asked for partway through loading a project, the build is its own
+		// rather than that load's.
+		m_projectLoad.reset();
+
 		// The components in the open scenes are about to have the code behind
 		// them unloaded, so the scenes go out as text and come back the same way.
 		m_snapshots = TakeSnapshots();

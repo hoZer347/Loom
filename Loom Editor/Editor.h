@@ -700,9 +700,9 @@ namespace Loom
 		// active one.
 		void AdoptScene(Scene* scene, const std::string& path);
 
-		// What a view holds with no scene in it: how far the scene on its way,
-		// or the scripts it waits for, have got, or else the project's scenes
-		// to pick from.
+		// What a view holds with no scene in it: how far the project, the scene
+		// on its way or the scripts it waits for have got, or else the
+		// project's scenes to pick from.
 		void DrawNoScene();
 
 		// Selection and the active scene are raw pointers into a hierarchy that
@@ -835,6 +835,16 @@ namespace Loom
 		// The scene being opened a slice a frame, and the file it is read from.
 		std::unique_ptr<SceneSerializer::Loading> m_opening{ };
 		std::string m_openingPath{ };
+
+		// A project on its way in, under one bar: its scripts building, then the
+		// scene it starts on opening. Whether it has each to wait for.
+		struct ProjectLoad
+		{
+			bool compiles = false;
+			bool opens = false;
+		};
+
+		std::optional<ProjectLoad> m_projectLoad{ };
 
 		std::string m_projectPath{ };
 		std::string m_projectFile{ };

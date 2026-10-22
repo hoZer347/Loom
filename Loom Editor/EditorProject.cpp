@@ -1257,6 +1257,9 @@ namespace Loom
 
 	void Editor::StepOpening()
 	{
+		if (!m_opening && m_scripts.IsIdle())
+			m_projectLoad.reset();
+
 		if (!m_opening || m_opening->Step(OPENING_SLICE_SECONDS))
 			return;
 
@@ -1299,23 +1302,47 @@ namespace Loom
 
 		if (m_opening || !m_scripts.IsIdle())
 		{
-			const std::string caption = m_opening
+			const std::string step = m_opening
 				? "Opening " + std::filesystem::path(m_openingPath).stem().string()
 				: std::string("Compiling scripts");
 
 			// A negative fraction is ImGui's for a bar that sweeps with no end
 			// in sight.
-			const float fraction = m_opening
+			float fraction = m_opening
 				? m_opening->Progress()
-				: -(float)ImGui::GetTime();
+				: m_scripts.BuildProgress().value_or(-(float)ImGui::GetTime());
+
+			// A project's steps share its bar, a part each.
+			if (m_projectLoad && fraction >= 0.0f)
+			{
+				const int steps = (int)m_projectLoad->compiles + (int)m_projectLoad->opens;
+				const int done = m_projectLoad->compiles && m_opening ? 1 : 0;
+
+				fraction = (done + fraction) / steps;
+			};
+
+			// A project's name goes above its bar and the step below.
+			constexpr float project_lines = 2.0f;
 
 			const float width = (std::min)(available.x, ImGui::GetFontSize() * OPENING_BAR_LINES);
+			const float lines = m_projectLoad ? project_lines : 1.0f;
 
-			centre(width, ImGui::GetTextLineHeightWithSpacing() + ImGui::GetFrameHeight());
+			centre(width, lines * ImGui::GetTextLineHeightWithSpacing() + ImGui::GetFrameHeight());
 
 			ImGui::BeginGroup();
-			ImGui::TextUnformatted(caption.c_str());
-			ImGui::ProgressBar(fraction, ImVec2(width, 0.0f));
+
+			if (m_projectLoad)
+			{
+				ImGui::Text("Loading %s", m_projectName.c_str());
+				ImGui::ProgressBar(fraction, ImVec2(width, 0.0f));
+				ImGui::TextDisabled("%s", step.c_str());
+			}
+			else
+			{
+				ImGui::TextUnformatted(step.c_str());
+				ImGui::ProgressBar(fraction, ImVec2(width, 0.0f));
+			};
+
 			ImGui::EndGroup();
 
 			return;

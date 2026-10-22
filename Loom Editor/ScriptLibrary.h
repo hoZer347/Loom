@@ -4,8 +4,10 @@
 
 #include <atomic>
 #include <chrono>
+#include <filesystem>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <thread>
 #include <utility>
@@ -59,6 +61,10 @@ namespace Loom
 		// load the result on the main thread.
 		Progress Poll();
 
+		// How far the build under way has got, going by how long the last of
+		// its kind took. None until one of its kind has finished.
+		std::optional<float> BuildProgress() const;
+
 		bool LastBuildSucceeded() const { return m_succeeded; };
 
 		bool Load();
@@ -103,6 +109,9 @@ namespace Loom
 		// the engine moved, so this is also what decides a full rebuild.
 		bool BuiltAgainstOlderEditor() const;
 
+		// Where how long the library's builds took is kept between sessions.
+		std::filesystem::path TimingsFile() const;
+
 		std::string m_project{ };
 		std::string m_library{ };
 		std::string m_status{ "No script project." };
@@ -128,6 +137,12 @@ namespace Loom
 
 		mutable std::chrono::steady_clock::time_point m_staleCheckedAt{ };
 		mutable bool m_stale = false;
+
+		// When the build under way started, whether it is a rebuild, and how long
+		// the last of its kind took: 0 when none has.
+		std::chrono::steady_clock::time_point m_buildStarted{ };
+		bool m_rebuilding = false;
+		double m_expectedSeconds = 0.0;
 
 		// One per build, held by the worker as well, so a build nobody is waiting
 		// for any more has somewhere to put its result that nothing reads.
