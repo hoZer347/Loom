@@ -59,7 +59,7 @@ if (-not $NoBuild)
     try
     {
         & $msbuild (Join-Path $root 'Loom.sln') /t:"Loom Tests" `
-            /p:Configuration=$Configuration /p:Platform=x64 /nologo /v:minimal /m
+            /p:Configuration=$Configuration /p:Platform=x64 /nologo /v:minimal '/clp:ErrorsOnly;WarningsOnly;Summary' /m
     }
     finally { $ErrorActionPreference = $previous }
 
