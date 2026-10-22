@@ -324,6 +324,40 @@ void main()
 
 			return "";
 		};
+
+		// Failing that, the shader a new project draws with, or else the first
+		// the project of the prefab has, relative to the project.
+		std::string ProjectShader(const std::string& prefab)
+		{
+			std::error_code code;
+
+			for (std::filesystem::path folder = std::filesystem::path(prefab).parent_path(); folder.has_relative_path(); folder = folder.parent_path())
+			{
+				const bool project = std::any_of(
+					std::filesystem::directory_iterator(folder, code),
+					std::filesystem::directory_iterator(),
+					[](const std::filesystem::directory_entry& entry) { return entry.path().extension() == ProjectTemplate::extension; });
+
+				if (!project)
+					continue;
+
+				if (std::filesystem::exists(folder / ProjectTemplate::shader_path, code))
+					break;
+
+				std::vector<std::filesystem::path> shaders{ };
+
+				for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator(folder, code))
+					if (entry.path().extension() == ProjectAssets::shaderExtension)
+						shaders.push_back(entry.path());
+
+				if (shaders.empty())
+					break;
+
+				return std::min_element(shaders.begin(), shaders.end())->lexically_relative(folder).generic_string();
+			};
+
+			return ProjectTemplate::shader_path;
+		};
 	};
 
 	ModelEditor::~ModelEditor()
@@ -672,7 +706,7 @@ void main()
 			{
 				const std::string shader = ShaderOf(*document.root);
 
-				document.root->Attach<Material>()->SetShaderPath(shader.empty() ? ProjectTemplate::shader_path : shader);
+				document.root->Attach<Material>()->SetShaderPath(shader.empty() ? ProjectShader(document.path) : shader);
 
 				Mesh* mesh = document.root->Attach<Mesh>(Mesh::Triangles);
 				document.parts.push_back(Part{ document.root, mesh, EditableMesh{ } });
@@ -2055,6 +2089,11 @@ void main()
 		m_tool = Tool::Move;
 
 		Changed(*document);
+
+		const auto info = std::find_if(std::begin(shapes), std::end(shapes), [shape](const ShapeInfo& each) { return each.shape == shape; });
+
+		document->message = std::string("Added a ") + info->label + " where the view is looking. It is picked, so the arrows move it; tick See Through if it is inside the model.";
+		document->messageTime = ImGui::GetTime();
 	};
 
 	void ModelEditor::Undo()
