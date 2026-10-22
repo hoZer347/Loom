@@ -209,6 +209,7 @@ namespace Loom
 			// cannot wait a frame for them to become findable.
 			std::lock_guard lock{ mutex };
 
+			by_id.emplace(ID, this);
 			by_guid[m_guid] = this;
 		};
 
@@ -221,7 +222,6 @@ namespace Loom
 					return;
 
 				by_name.emplace(m_name, this);
-				by_id.emplace(m_ID, this);
 			});
 
 		return ID;

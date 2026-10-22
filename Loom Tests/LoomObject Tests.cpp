@@ -90,24 +90,15 @@ TEST_SUITE("LoomObject")
 		Pump();
 	};
 
-	// Initialize() queues the registration, but the queued task bails out with
-	//
-	//     if (by_name.contains(NameAndID())) return;
-	//
-	// before it ever reaches by_id.emplace. SetName has already put NameAndID()
-	// into by_name by then, so an object named before the first drain -- which is
-	// every GameObject and every Scene, both of which SetName in their
-	// constructor -- never makes it into the ID table at all.
-	//
-	// Marked should_fail rather than deleted: doctest reports it as a failure the
-	// day it starts passing, which is the signal to drop the marker.
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "GetByID finds a registered object" * doctest::should_fail())
+	// Named before the queue drains, as every GameObject and Scene is in its
+	// constructor, and before the queue has run at all.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "GetByID finds a registered object")
 	{
 		Thing thing;
 		thing.SetName("Findable");
 
-		// Registration is queued, not immediate -- before the pump the lookup
-		// table does not know about the object yet.
+		CHECK(Loom::LoomObject::GetByID(thing.m_ID) == &thing);
+
 		Pump();
 
 		CHECK(Loom::LoomObject::GetByID(thing.m_ID) == &thing);
@@ -117,17 +108,12 @@ TEST_SUITE("LoomObject")
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "GetByID returns null for an ID that was never issued")
 	{
-		// _GetByID indexes the map with operator[], so a miss inserts a null
-		// entry rather than leaving the table alone. The result is still null,
-		// which is what a caller checks, but the table grows on every miss.
 		CHECK(Loom::LoomObject::GetByID(~Loom::uint64_t(0)) == nullptr);
 
 		Pump();
 	};
 
-	// Blocked by the same registration bug: the object never reaches by_id, so
-	// there is nothing to observe being removed from it.
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "destroying an object unregisters its ID" * doctest::should_fail())
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "destroying an object unregisters its ID")
 	{
 		Loom::uint64_t id = 0;
 
@@ -145,8 +131,7 @@ TEST_SUITE("LoomObject")
 		CHECK(Loom::LoomObject::GetByID(id) == nullptr);
 	};
 
-	// Blocked by the same registration bug.
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "GetByID casts to the requested type" * doctest::should_fail())
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "GetByID casts to the requested type")
 	{
 		Thing thing;
 		thing.SetName("Typed");
