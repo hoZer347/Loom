@@ -947,6 +947,10 @@ namespace Loom
 		std::string_view m_projectTab = ProjectTabs::Scenes;
 		std::string_view m_projectTabToShow{ };
 
+		// How narrow the Project panel goes and still shows every tab's icon,
+		// as it was last drawn, or none before it has its tabs.
+		float m_projectMinWidth = 0.0f;
+
 		bool m_showHierarchy = true;
 		bool m_hierarchyFocused = false;
 		bool m_showInspector = true;

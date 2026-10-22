@@ -196,6 +196,12 @@ namespace Loom
 			return IsModelFile(path) ? EditorIcons::Model : EditorIcons::Of(path);
 		};
 
+		// One of ProjectTabs with its name left off.
+		std::string IconOfTab(std::string_view label)
+		{
+			return std::string(label.substr(0, label.find(' ')));
+		};
+
 		// As wide as the icon it stands in for, a line high and no wider,
 		// keeping the picture's shape.
 		ImVec2 ThumbnailSize(const Texture& texture)
@@ -636,10 +642,13 @@ namespace Loom
 			m_focusProject = false;
 		};
 
+		ImGui::SetNextWindowSizeConstraints(ImVec2(m_projectMinWidth, 0.0f), ImVec2(FLT_MAX, FLT_MAX));
+
 		if (ImGui::Begin(EditorPanels::Project, &m_showProject))
 		{
 			if (m_projectPath.empty())
 			{
+				m_projectMinWidth = 0.0f;
 				ImGui::TextDisabled("No scene folder chosen.");
 
 				if (ImGui::Button("Choose Folder..."))
@@ -675,13 +684,16 @@ namespace Loom
 					m_dialogs->folder.Open();
 
 				// The tabs show their names while every one fits, and only their
-				// icons, named in a tooltip, once they don't. Narrower still, they
-				// scroll rather than cut their icons short.
-				const float tab_spacing = ImGui::GetStyle().ItemInnerSpacing.x;
-				float names_width = -tab_spacing;
-				const auto add_width = [&names_width, tab_spacing](const char* label)
+				// icons, named in a tooltip, once they don't. The panel goes no
+				// narrower than the icons, and should the screen, they scroll
+				// rather than cut their icons short.
+				const ImGuiStyle& style = ImGui::GetStyle();
+				float names_width = -style.ItemInnerSpacing.x;
+				float icons_width = -style.ItemInnerSpacing.x;
+				const auto add_width = [&names_width, &icons_width, &style](const char* label)
 				{
-					names_width += ImGui::TabItemCalcSize(label, false).x + tab_spacing;
+					names_width += ImGui::TabItemCalcSize(label, false).x + style.ItemInnerSpacing.x;
+					icons_width += ImGui::TabItemCalcSize(IconOfTab(label).c_str(), false).x + style.ItemInnerSpacing.x;
 				};
 
 				add_width(ProjectTabs::Scenes);
@@ -691,6 +703,7 @@ namespace Loom
 					add_width(tab.kind.title);
 
 				const bool icons_only = names_width > ImGui::GetContentRegionAvail().x;
+				m_projectMinWidth = icons_width + style.WindowPadding.x * 2.0f;
 
 				if (ImGui::BeginTabBar("##project_tabs", ImGuiTabBarFlags_FittingPolicyScroll))
 				{
@@ -701,9 +714,7 @@ namespace Loom
 						if (show)
 							m_projectTabToShow = { };
 
-						const std::string_view name = label;
-						const size_t space = name.find(' ');
-						const std::string shown = std::string(icons_only ? name.substr(0, space) : name) + "###" + label;
+						const std::string shown = (icons_only ? IconOfTab(label) : std::string(label)) + "###" + label;
 						ImGuiTabItemFlags flags = show ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
 
 						if (icons_only)
@@ -712,7 +723,7 @@ namespace Loom
 						const bool open = ImGui::BeginTabItem(shown.c_str(), nullptr, flags);
 
 						if (icons_only)
-							ImGui::SetItemTooltip("%s", label + space + 1);
+							ImGui::SetItemTooltip("%s", label + IconOfTab(label).size() + 1);
 
 						if (!open)
 							return false;

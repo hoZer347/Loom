@@ -1655,8 +1655,15 @@ namespace Loom
 	{
 		DrawMainMenuBar();
 
+		// Docked panels keep no size constraints of their own, so while the
+		// Project panel is open none goes narrower than its tabs' icons need.
+		const ImVec2 min_size = ImGui::GetStyle().WindowMinSize;
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2((std::max)(min_size.x, m_showProject ? m_projectMinWidth : 0.0f), min_size.y));
+
 		const ImGuiID dockspace_id =
 			ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
+
+		ImGui::PopStyleVar();
 
 		if (m_firstFrame)
 			m_checkLayout = true;
