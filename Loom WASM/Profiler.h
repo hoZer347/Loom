@@ -34,7 +34,7 @@ namespace Loom
 	*/
 	struct LOOM_API Profiler final
 	{
-		// The frames a Row reaches back over.
+		// The frames all of a Row but its trend reaches back over.
 		static constexpr int Window = 100;
 
 		// The frames each point of a Row's trend is the average of.

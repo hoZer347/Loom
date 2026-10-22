@@ -4046,6 +4046,9 @@ namespace Loom
 
 			for (const Profiler::Row& row : thread.rows)
 			{
+				if (row.average <= 0.0)
+					continue;
+
 				const float from = left + width * (float)std::clamp(row.start / frame, 0.0, 1.0);
 				const float to = (std::max)(from + narrowest_bar, left + width * (float)std::clamp((row.start + row.average) / frame, 0.0, 1.0));
 				const ImVec2 low(from, corner.y + lane * (float)row.depth);
