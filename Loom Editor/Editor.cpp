@@ -1627,6 +1627,7 @@ namespace Loom
 		Input::SetView(0, 0, 0, 0);
 		m_gamePanelFocused = false;
 		m_gamePanelHovered = false;
+		m_flyingView = false;
 
 		if (ImGui::IsKeyPressed(ImGuiKey_F11, false))
 			m_fullscreen ? LeaveFullscreen() : EnterFullscreen(m_lastView);
@@ -1663,6 +1664,9 @@ namespace Loom
 		DrawSaveLayoutPrompt();
 		DrawCreateAssetPrompt();
 		DrawFileDialogs();
+
+		if (m_flyingView)
+			return;
 
 		if (ImGui::IsAnyItemActive())
 			m_historyDirty = true;
@@ -3561,6 +3565,9 @@ namespace Loom
 				ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
 
 			camera->Drive(ImGui::IsItemHovered(), ImGui::IsItemActive());
+
+			if (ImGui::IsItemActive() || ImGui::IsItemDeactivated())
+				m_flyingView = true;
 
 			ImGui::SetCursorScreenPos(corner);
 		};

@@ -7,9 +7,11 @@
 
 #include "Utilities/StateReference.h"
 
-#include <cstdio>
+#include <charconv>
 #include <cctype>
 #include <cstdlib>
+#include <iterator>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -19,13 +21,33 @@ namespace Loom
 {
 	namespace
 	{
+		constexpr size_t NUMBER_LENGTH = 64;
+
 		// %g with enough digits to round-trip, so a value written and read back
-		// is the same value rather than nearly the same one.
-		std::string Number(const char* format, auto value)
+		// is the same value rather than nearly the same one. to_chars writes
+		// what snprintf would, many times faster, which a scene holding meshes
+		// of a million floats needs.
+		template<typename T>
+		void AppendNumber(std::string& text, T value)
 		{
-			char buffer[64]{ };
-			snprintf(buffer, sizeof(buffer), format, value);
-			return buffer;
+			char buffer[NUMBER_LENGTH];
+
+			const std::to_chars_result written = std::to_chars(
+				std::begin(buffer),
+				std::end(buffer),
+				value,
+				std::chars_format::general,
+				std::numeric_limits<T>::max_digits10);
+
+			text.append(buffer, written.ptr);
+		};
+
+		template<typename T>
+		std::string Number(T value)
+		{
+			std::string text;
+			AppendNumber(text, value);
+			return text;
 		};
 
 		std::string Quote(const std::string& text)
@@ -77,7 +99,12 @@ namespace Loom
 			std::string text = "(";
 
 			for (int i = 0; i < count; i++)
-				text += (i ? ", " : "") + Number("%.9g", values[i]);
+			{
+				if (i)
+					text += ", ";
+
+				AppendNumber(text, values[i]);
+			};
 
 			return text + ')';
 		};
@@ -183,8 +210,8 @@ namespace Loom
 		case FieldType::UInt:	return std::to_string(*(unsigned int*)data);
 		case FieldType::Int64:	return std::to_string(*(long long*)data);
 		case FieldType::UInt64:	return std::to_string(*(unsigned long long*)data);
-		case FieldType::Float:	return Number("%.9g", *(float*)data);
-		case FieldType::Double:	return Number("%.17g", *(double*)data);
+		case FieldType::Float:	return Number(*(float*)data);
+		case FieldType::Double:	return Number(*(double*)data);
 		case FieldType::String:	return Quote(*(std::string*)data);
 		case FieldType::Vec2:	return WriteVector((float*)data, 2);
 		case FieldType::Vec3:	return WriteVector((float*)data, 3);
@@ -197,7 +224,12 @@ namespace Loom
 			std::string text = "[";
 
 			for (size_t i = 0; i < values.size(); i++)
-				text += (i ? ", " : "") + Number("%.9g", values[i]);
+			{
+				if (i)
+					text += ", ";
+
+				AppendNumber(text, values[i]);
+			};
 
 			return text + ']';
 		};

@@ -777,6 +777,11 @@ namespace Loom
 		// scenes are compared on the first frame after that with nothing held down.
 		bool m_historyDirty = true;
 
+		// Whether a view's camera is being flown this frame or was just let go
+		// of. That edits nothing, so it marks nothing, since comparing a large
+		// scene takes long enough to stall the editor.
+		bool m_flyingView = false;
+
 		bool m_showProject = true;
 		bool m_showScripts = true;
 		bool m_focusScripts = false;
