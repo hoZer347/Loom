@@ -9,6 +9,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -95,6 +96,34 @@ namespace
 	std::string FolderRow(const std::string& name)
 	{
 		return std::string(Loom::EditorIcons::Folder) + " " + name;
+	};
+
+	constexpr const char* search = "click \"Key Bindings\" \"##search\"\n";
+
+	// Two actions filed in Camera, which starts closed, and two at the top.
+	const std::vector<Action> filed =
+	{
+		{ "Pan Up", { Loom::Key::W }, "Camera" },
+		{ "Pan Down", { Loom::Key::Comma }, "Camera" },
+		{ "Jump", { Loom::Key::Space } },
+		{ "Zoom", { Loom::Key::Equal } },
+	};
+
+	// How many actions' rows the panel drew on the last frame.
+	int ActionRows(const Driven& driven)
+	{
+		std::ostringstream items;
+		driven.script->WriteItems(items, "Key Bindings");
+
+		const std::string listed = items.str();
+		const std::string row = "\t" + std::string(Loom::EditorIcons::Bindings) + "##action\t";
+
+		int rows = 0;
+
+		for (size_t at = listed.find(row); at != std::string::npos; at = listed.find(row, at + 1))
+			rows++;
+
+		return rows;
 	};
 };
 
@@ -237,5 +266,80 @@ TEST_SUITE("KeyBindings")
 		CHECK_FALSE(driven.script->Failed());
 		CHECK(Loom::InputActions::Folders().empty());
 		CHECK(Loom::InputActions::All()[0].folder.empty());
+	};
+
+	TEST_CASE("the search narrows the actions to those with its text in their names, whatever its case")
+	{
+		Driven driven(std::string(drawn) + search + "type PAN\n" + drawn, filed, { "Camera" });
+
+		CHECK(driven.Run() == 0);
+		CHECK_FALSE(driven.script->Failed());
+		CHECK(ActionRows(driven) == 2);
+	};
+
+	TEST_CASE("an action's place in the list is not searched")
+	{
+		Driven driven(std::string(drawn) + search + "type 0\n" + drawn, filed, { "Camera" });
+
+		driven.Run();
+
+		CHECK_FALSE(driven.script->Failed());
+		CHECK(ActionRows(driven) == 0);
+	};
+
+	TEST_CASE("a folder whose name has the search's text shows all it holds")
+	{
+		Driven driven(std::string(drawn) + search + "type cam\n" + drawn, filed, { "Camera" });
+
+		driven.Run();
+
+		CHECK_FALSE(driven.script->Failed());
+		CHECK(ActionRows(driven) == 2);
+	};
+
+	TEST_CASE("clearing the search leaves the folders open or closed as they were")
+	{
+		Driven driven(std::string(drawn) + search + "type pan\n" + drawn + "key ctrl+a\nkey delete\n" + drawn, filed, { "Camera" });
+
+		driven.Run();
+
+		CHECK_FALSE(driven.script->Failed());
+		CHECK(ActionRows(driven) == 2);
+	};
+
+	TEST_CASE("a folder closed during one search opens again for the next")
+	{
+		const std::string closing = std::string(drawn) + search + "type pan\n" + drawn + "click \"Key Bindings\" \"" + FolderRow("Camera") + "\" left\n" + drawn;
+
+		Driven closed(closing, filed, { "Camera" });
+
+		closed.Run();
+
+		CHECK_FALSE(closed.script->Failed());
+		CHECK(ActionRows(closed) == 0);
+
+		Driven searched_again(closing + search + "key ctrl+a\ntype up\n" + drawn, filed, { "Camera" });
+
+		searched_again.Run();
+
+		CHECK_FALSE(searched_again.script->Failed());
+		CHECK(ActionRows(searched_again) == 1);
+	};
+
+	TEST_CASE("Add Action and Add Folder clear the search, so what they make shows")
+	{
+		const std::string searched = std::string(drawn) + search + "type zzz\n" + drawn;
+
+		Driven action(searched + "click \"Key Bindings\" \"Add Action\"\n" + drawn, slowdown);
+
+		CHECK(action.Run() == 1);
+		CHECK_FALSE(action.script->Failed());
+		CHECK(ActionRows(action) == 2);
+
+		Driven folder(searched + "click \"Key Bindings\" \"Add Folder\"\n" + drawn + "key ctrl+a\ntype Camera\nkey enter\n", slowdown);
+
+		CHECK(folder.Run() == 2);
+		CHECK_FALSE(folder.script->Failed());
+		CHECK(Loom::InputActions::Folders() == std::vector<std::string>{ "Camera" });
 	};
 };

@@ -576,6 +576,10 @@ namespace Loom
 				if (ImGui::Button(change))
 					m_dialogs->folder.Open();
 
+				// Something new is selected to be shown, which the search may hide.
+				if (m_revealSelectedAsset)
+					m_assetSearch.Clear();
+
 				m_assetSearch.Draw();
 
 				ImGui::BeginChild("##assets", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders);
@@ -583,19 +587,13 @@ namespace Loom
 				if (m_assets.children.empty())
 					ImGui::TextDisabled("Nothing here yet. Right-click to create something.");
 
-				// Apart from the folders' own, so each opens to what was found and
-				// closes back as it was when the search is cleared.
-				const bool searching = m_assetSearch.Searching();
-
-				if (searching)
-					ImGui::PushID("##found");
+				m_assetSearch.BeginResults();
 
 				for (const AssetNode& node : m_assets.children)
 					if (ShowsAsset(node))
 						DrawAssetNode(node, 0, false);
 
-				if (searching)
-					ImGui::PopID();
+				m_assetSearch.EndResults();
 
 				// Dropped anywhere else in the list, it goes in the project folder.
 				TakeImportFolder(m_projectPath, ImGui::IsWindowHovered());
@@ -654,8 +652,10 @@ namespace Loom
 
 			// The top level is only a handful of folders, and the scenes are in
 			// one of them.
-			if (depth == 0 || m_assetSearch.Searching())
+			if (depth == 0)
 				flags |= ImGuiTreeNodeFlags_DefaultOpen;
+
+			m_assetSearch.OpenFound();
 
 			if (m_revealSelectedAsset && ProjectAssets::IsUnder(m_selectedAsset, node.path))
 				ImGui::SetNextItemOpen(true);
@@ -1371,6 +1371,9 @@ namespace Loom
 		{
 			if (m_scriptWatch.Changed())
 				RefreshScripts();
+
+			if (m_revealSelectedScript)
+				m_scriptFolderTree.ClearSearch();
 
 			m_scriptFolderTree.DrawSearch();
 

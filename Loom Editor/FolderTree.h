@@ -62,6 +62,7 @@ namespace Loom
 
 		// Above the tree, where the panel has room for it.
 		void DrawSearch() { m_search.Draw(); };
+		void ClearSearch() { m_search.Clear(); };
 
 		// The folders and items at the top, as the search leaves them.
 		void Draw(VirtualFolders& folders, const VirtualFolders::Node& top, const Hooks& hooks);
@@ -76,8 +77,8 @@ namespace Loom
 	private:
 		static constexpr size_t name_size = 128;
 
-		// The folder's row and, while it is open, the folders and items in it,
-		// all of them once found has the search's text in its name.
+		// The folder's row and, while it is open, the folders and items in it.
+		// found: a folder above matched the search, so all of this one shows.
 		void DrawFolder(VirtualFolders& folders, const VirtualFolders::Node& node, const Hooks& hooks, bool found);
 		void DrawRename(VirtualFolders& folders, const Hooks& hooks);
 

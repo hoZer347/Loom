@@ -13,12 +13,7 @@ namespace Loom
 {
 	void FolderTree::Draw(VirtualFolders& folders, const VirtualFolders::Node& top, const Hooks& hooks)
 	{
-		// Apart from the folders' own, so each opens to what was found and
-		// closes back as it was when the search is cleared.
-		const bool searching = m_search.Searching();
-
-		if (searching)
-			ImGui::PushID("##found");
+		m_search.BeginResults();
 
 		for (const VirtualFolders::Node& folder : top.children)
 			if (Shows(folder, hooks))
@@ -28,13 +23,14 @@ namespace Loom
 			if (Shows(item, hooks))
 				hooks.item(item);
 
-		if (searching)
-			ImGui::PopID();
+		m_search.EndResults();
 	};
 
 	void FolderTree::DrawFolder(VirtualFolders& folders, const VirtualFolders::Node& node, const Hooks& hooks, bool found)
 	{
 		const bool renaming = node.path == m_renaming;
+
+		m_search.OpenFound();
 
 		if ((hooks.reveal && hooks.reveal(node.path)) ||
 			(m_focus && VirtualFolders::IsAtOrUnder(VirtualFolders::ParentOf(m_renaming), node.path)))
@@ -45,8 +41,7 @@ namespace Loom
 
 		const bool open = ImGui::TreeNodeEx(
 			("folder:" + node.path).c_str(),
-			hooks.span | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick |
-				(m_search.Searching() ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None),
+			hooks.span | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick,
 			"%s %s",
 			EditorIcons::Folder,
 			renaming ? "" : node.name.c_str());
@@ -148,6 +143,8 @@ namespace Loom
 
 	void FolderTree::Rename(const std::string& folder)
 	{
+		// A new folder's name matches nothing yet.
+		m_search.Clear();
 		m_renaming = folder;
 		snprintf(m_name, sizeof(m_name), "%s", VirtualFolders::NameOf(folder).c_str());
 		m_focus = true;

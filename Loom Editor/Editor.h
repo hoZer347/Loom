@@ -303,7 +303,7 @@ namespace Loom
 
 		void DrawMainMenuBar();
 		void DrawProject();
-		// All of a folder once found has the search's text in its name.
+		// found: a folder above matched the search, so all of this one shows.
 		void DrawAssetNode(const AssetNode& node, int depth, bool found);
 		bool ShowsAsset(const AssetNode& node) const;
 		void DrawAssetContextMenu(const AssetNode& node);
