@@ -100,6 +100,7 @@ namespace Loom
 	*   own while the GUI is drawn. Scene::Physics takes one step by hand
 	* - A collider is where the scene's last physics step left it, so one
 	*   moved in OnUpdate is found where it went after the next step
+	* - Any thread may raycast, or ask a collider where it is, while others do
 	* - A ray that starts inside a box or sphere does not hit it
 	*/
 	namespace Physics

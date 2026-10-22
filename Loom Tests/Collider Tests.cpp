@@ -9,8 +9,10 @@
 
 #include "glm/glm.hpp"
 
+#include <atomic>
 #include <cmath>
 #include <random>
+#include <thread>
 #include <type_traits>
 
 using LoomTests::Pump;
@@ -532,4 +534,71 @@ TEST_SUITE("ColliderTree")
 			CHECK(agreed == RAYS);
 		};
 	};
+
+	// Without -pthread, emscripten's std::thread throws rather than running
+	// anything. Both web builds link with it.
+#if !defined(__EMSCRIPTEN__) || defined(__EMSCRIPTEN_PTHREADS__)
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "threads may raycast and reshape their own colliders at once")
+	{
+		constexpr int ROWS = 8;
+		constexpr float SPACING = 3.0f;
+		constexpr int THREADS = 4;
+		constexpr int ROUNDS = 5000;
+
+		// Shrinking and growing past the padding, so each change refits the
+		// leaf and rebalances the tree around it.
+		constexpr float SMALL = 0.5f;
+		constexpr float LARGE = 2.5f;
+		constexpr float ABOVE = 10.0f;
+
+		Loom::Scene scene("asked at once");
+		Pump();
+
+		std::vector<Loom::BoxCollider*> boxes{ };
+
+		for (int row = 0; row < ROWS; row++)
+			for (int column = 0; column < ROWS; column++)
+				boxes.push_back(Place<Loom::BoxCollider>(scene, glm::vec3(row * SPACING, 0.0f, column * SPACING)));
+
+		scene.Physics();
+
+		// Straight down onto a box, which stands still and keeps its size.
+		const auto struck =
+			[&](const Loom::BoxCollider* box)
+			{
+				const Loom::Bounds bounds = box->WorldBounds();
+				const Loom::Ray down{ bounds.Center() + glm::vec3(0.0f, ABOVE, 0.0f), DOWN };
+
+				Loom::RaycastHit hit;
+
+				return scene.Raycast(down, hit) && hit.collider == box && std::abs(hit.distance - (ABOVE - bounds.Extents().y)) < EPSILON;
+			};
+
+		const Loom::BoxCollider* target = boxes.back();
+		std::atomic<int> missed{ 0 };
+		std::vector<std::thread> threads{ };
+
+		for (int i = 0; i < THREADS; i++)
+			threads.emplace_back(
+				[&, grower = boxes[i]]()
+				{
+					for (int round = 0; round < ROUNDS; round++)
+					{
+						grower->size = glm::vec3(round % 2 == 0 ? LARGE : SMALL);
+						grower->WorldBounds();
+
+						if (!struck(target))
+							missed++;
+					};
+				});
+
+		for (std::thread& thread : threads)
+			thread.join();
+
+		CHECK(missed == 0);
+
+		for (const Loom::BoxCollider* box : boxes)
+			CHECK(struck(box));
+	};
+#endif
 };

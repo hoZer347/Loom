@@ -260,16 +260,24 @@ namespace Loom
 		return above == glm::mat4(1.0f) ? LocalMatrix() : above * LocalMatrix();
 	};
 
-	void GameObject::Update(const int& thread)
+	void GameObject::Gather(std::vector<std::vector<ComponentBase*>>& byLane, size_t lanes)
 	{
 		if (m_disabled)
 			return;
 
-		for (ComponentBase* updateable : m_updateables)
-			//if (thread == m_threadID)
-				updateable->OnUpdate();
+		if (m_threadID > Unprocessed && !m_updateables.empty())
+		{
+			const size_t lane = m_threadID == 0 ? 0 : ((size_t)m_threadID - 1) % lanes + 1;
+
+			if (lane >= byLane.size())
+				byLane.resize(lane + 1);
+
+			std::vector<ComponentBase*>& updates = byLane[lane];
+			updates.insert(updates.end(), m_updateables.begin(), m_updateables.end());
+		};
+
 		for (GameObject* child : m_children)
-			child->Update(thread);
+			child->Gather(byLane, lanes);
 	};
 
 	void GameObject::Render()
@@ -277,9 +285,10 @@ namespace Loom
 		if (m_disabled)
 			return;
 
-		for (auto& renderable : m_renderables)
-			//if (m_threadID != -1)
+		if (m_threadID != Unprocessed)
+			for (auto& renderable : m_renderables)
 				renderable->OnRender();
+
 		for (auto& child : m_children)
 			child->Render();
 	};

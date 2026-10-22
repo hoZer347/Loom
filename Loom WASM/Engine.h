@@ -21,7 +21,7 @@ namespace Loom
 	/**
 	* Loom::Engine
 	* - Manages the runtime of the application
-	* - Updates all GameObjects
+	* - Updates every GameObject on the thread its thread ID names
 	* - Opens the window on the Renderer for Engine::backend, and runs ImGui on it
 	*/
 	struct LOOM_API Engine final
@@ -52,7 +52,8 @@ namespace Loom
 		// Runs everything QueueTask has collected so far, on the calling
 		// thread. renderFrame calls this once a frame; it is public so a host
 		// that drives the engine itself (a test, a tool) can flush deferred
-		// work without a window or a renderer.
+		// work without a window or a renderer. From a Lane it does nothing,
+		// leaving the queue to the main thread, whose objects it would change.
 		static void DoTasks() noexcept;
 
 		static inline bool doGUI = true;

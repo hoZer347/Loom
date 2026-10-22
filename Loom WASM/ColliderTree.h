@@ -5,6 +5,7 @@
 #include "Physics.h"
 
 #include <functional>
+#include <shared_mutex>
 #include <utility>
 #include <vector>
 
@@ -108,6 +109,10 @@ namespace Loom
 		// The current tree during Scene::Physics, which a collider's OnPhysics
 		// enlists itself in.
 		static inline ColliderTree* current = nullptr;
+
+		// Held shared while threads ask where the colliders are, and alone
+		// while a tree or a collider's shape changes, so any thread may ask.
+		static std::shared_mutex guard;
 
 	private:
 		struct Node

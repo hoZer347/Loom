@@ -2,6 +2,7 @@
 
 #include "Test Support.h"
 
+#include "Jobs.h"
 #include "Scene.h"
 #include "GameObject.h"
 
@@ -9,6 +10,7 @@
 
 #include <algorithm>
 #include <string>
+#include <thread>
 #include <vector>
 
 using LoomTests::Pump;
@@ -27,6 +29,33 @@ namespace
 	{
 		void OnDetach() override { detachCount++; };
 		void OnUpdate() override { };
+	};
+
+	// Which thread ran its OnUpdate last, and how often it ran.
+	struct ThreadProbe final : Loom::Component<ThreadProbe>
+	{
+		void OnUpdate() override
+		{
+			thread = std::this_thread::get_id();
+			updates++;
+		};
+
+		std::thread::id thread{ };
+		int updates = 0;
+	};
+
+	// An object of its own with a ThreadProbe on it, set to thread.
+	ThreadProbe* ProbeOn(Loom::Scene& scene, int thread)
+	{
+		Loom::GameObject* object = scene.AddChild("Probe");
+		Pump();
+
+		object->SetThreadID(thread);
+
+		ThreadProbe* probe = object->Attach<ThreadProbe>();
+		Pump();
+
+		return probe;
 	};
 };
 
@@ -611,5 +640,90 @@ TEST_SUITE("GameObject")
 		const glm::vec4 origin = child->WorldMatrix() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
 		CHECK(origin == glm::vec4(5.0f, 1.0f, 0.0f, 1.0f));
+	};
+
+#if !defined(__EMSCRIPTEN__) || defined(__EMSCRIPTEN_PTHREADS__)
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "each object updates on the thread its thread ID names, 0 on the caller's")
+	{
+		constexpr int ROUNDS = 3;
+
+		Loom::Scene scene("threads");
+		Pump();
+
+		ThreadProbe* onCaller = ProbeOn(scene, 0);
+		ThreadProbe* onFirst = ProbeOn(scene, 1);
+		ThreadProbe* onSecond = ProbeOn(scene, 2);
+		ThreadProbe* alsoOnFirst = ProbeOn(scene, 1);
+
+		scene.Update();
+
+		const std::thread::id first = onFirst->thread;
+
+		for (int round = 1; round < ROUNDS; round++)
+			scene.Update();
+
+		const std::thread::id caller = std::this_thread::get_id();
+
+		CHECK(onCaller->thread == caller);
+		CHECK(onFirst->thread != caller);
+		CHECK(onSecond->thread != caller);
+		CHECK(onFirst->thread != onSecond->thread);
+		CHECK(alsoOnFirst->thread == onFirst->thread);
+		CHECK(onFirst->thread == first);
+
+		for (const ThreadProbe* probe : { onCaller, onFirst, onSecond, alsoOnFirst })
+			CHECK(probe->updates == ROUNDS);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "thread IDs past the lanes there are wrap round to share them")
+	{
+		// Far enough past the lanes to wrap more than once.
+		constexpr int WRAPS = 3;
+
+		const int lanes = (int)Loom::Jobs::Cores();
+
+		Loom::Scene scene("wrapped");
+		Pump();
+
+		ThreadProbe* onFirst = ProbeOn(scene, 1);
+		ThreadProbe* wrapped = ProbeOn(scene, lanes + 1);
+		ThreadProbe* farOut = ProbeOn(scene, lanes * WRAPS + 1);
+
+		scene.Update();
+
+		CHECK(onFirst->thread != std::this_thread::get_id());
+		CHECK(wrapped->thread == onFirst->thread);
+		CHECK(farOut->thread == onFirst->thread);
+
+		for (const ThreadProbe* probe : { onFirst, wrapped, farOut })
+			CHECK(probe->updates == 1);
+	};
+#endif
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an unprocessed object's own components are not updated or drawn, and its children go by theirs")
+	{
+		Loom::Scene scene("unprocessed");
+		Pump();
+
+		Loom::GameObject* parent = scene.AddChild("Parent");
+		Pump();
+
+		Loom::GameObject* child = parent->AddChild("Child");
+		Pump();
+
+		Probe<>* skipped = parent->Attach<Probe<>>();
+		Probe<>* kept = child->Attach<Probe<>>();
+		Pump();
+
+		child->SetInheritThreadID(false);
+		parent->SetThreadID(Loom::GameObject::Unprocessed);
+
+		scene.Update();
+		scene.Render();
+
+		CHECK(skipped->Count("update") == 0);
+		CHECK(skipped->Count("render") == 0);
+		CHECK(kept->Count("update") == 1);
+		CHECK(kept->Count("render") == 1);
 	};
 };

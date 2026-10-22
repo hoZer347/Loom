@@ -53,7 +53,6 @@
 #include <fstream>
 #include <iostream>
 #include <string>
-#include <thread>
 #include <unordered_map>
 
 #define WIN32_LEAN_AND_MEAN
@@ -66,9 +65,6 @@ namespace Loom
 	namespace
 	{
 		constexpr float rotation_drag_speed = 0.5f;
-
-		// The thread ID that takes a GameObject out of the update loop entirely.
-		constexpr int unprocessed_thread = -1;
 
 		constexpr int selection_frames = 60;
 
@@ -3241,14 +3237,14 @@ namespace Loom
 		if (ImGui::SliderInt(
 			"##thread",
 			&thread,
-			unprocessed_thread,
-			(int)std::thread::hardware_concurrency()))
+			GameObject::Unprocessed,
+			(int)Jobs::Cores()))
 			gameObject->SetThreadID(thread);
 
 		ImGui::EndDisabled();
 
 		if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-			ImGui::SetTooltip("%d is not processed", unprocessed_thread);
+			ImGui::SetTooltip("%d is not processed, 0 updates on the main thread, and each above on a thread of its own", GameObject::Unprocessed);
 
 		ImGui::PopItemWidth();
 	};

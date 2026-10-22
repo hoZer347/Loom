@@ -7,6 +7,7 @@
 #include "Renderer.h"
 #include "Scene.h"
 #include "Input.h"
+#include "Lane.h"
 #include "Physics.h"
 #include "Profiler.h"
 #include "Ui.h"
@@ -282,11 +283,7 @@ namespace Loom
 
 		if (updateScenes)
 		{
-			for (auto& scene : Scene::allScenes)
-			{
-				LOOM_STAGE("Scene::Update");
-				scene->Update();
-			};
+			Scene::Update(Scene::allScenes);
 
 			LOOM_STAGE("Utilities::Update");
 			Utilities::Update();
@@ -381,6 +378,9 @@ namespace Loom
 
 	void Engine::DoTasks() noexcept
 	{
+		if (Lane::OnOne())
+			return;
+
 		// A task may take away what a step begun is solving against.
 		try
 		{

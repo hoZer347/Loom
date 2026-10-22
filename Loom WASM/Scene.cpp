@@ -3,12 +3,15 @@
 #include "Camera.h"
 #include "Collider.h"
 #include "Engine.h"
+#include "Jobs.h"
+#include "Lane.h"
 #include "Light.h"
 #include "Mesh.h"
 #include "Profiler.h"
 #include "Renderer.h"
 
 #include <algorithm>
+#include <memory>
 #include <optional>
 #include <vector>
 #include <string>
@@ -39,6 +42,22 @@ namespace Loom
 				? FirstAmong<Light>(scenes)
 				: nullptr;
 		};
+
+		// What each lane updates, 0 being the caller, kept from one update to
+		// the next so gathering it does not allocate.
+		std::vector<std::vector<ComponentBase*>> s_updates(1);
+
+		// Each lane at one below its number, made the first time an object
+		// asks for it.
+		std::vector<std::unique_ptr<Lane>> s_lanes{ };
+
+		void RunUpdates(const std::vector<ComponentBase*>& updates)
+		{
+			LOOM_STAGE("Scene::Update");
+
+			for (ComponentBase* updateable : updates)
+				updateable->OnUpdate();
+		};
 	};
 
 	Scene::Scene(
@@ -60,9 +79,40 @@ namespace Loom
 			});
 	};
 	
-	void Scene::Update(int thread)
+	void Scene::Update(const std::vector<Scene*>& scenes)
 	{
-		root.Update(thread);
+		for (std::vector<ComponentBase*>& updates : s_updates)
+			updates.clear();
+
+		{
+			LOOM_STAGE("GameObject::Gather");
+
+			for (Scene* scene : scenes)
+				scene->root.Gather(s_updates, Jobs::Cores());
+		};
+
+		for (size_t number = 1; number < s_updates.size(); number++)
+		{
+			if (s_updates[number].empty())
+				continue;
+
+			if (s_lanes.size() < number)
+				s_lanes.resize(number);
+
+			std::unique_ptr<Lane>& lane = s_lanes[number - 1];
+
+			// After the job workers in the profiler.
+			if (!lane)
+				lane = std::make_unique<Lane>("Update " + std::to_string(number), (int)(Jobs::Cores() + number));
+
+			lane->Start([&updates = s_updates[number]]() { RunUpdates(updates); });
+		};
+
+		RunUpdates(s_updates[0]);
+
+		for (const std::unique_ptr<Lane>& lane : s_lanes)
+			if (lane)
+				lane->Wait();
 	};
 
 	void Scene::Render(Camera* camera, const std::vector<Scene*>& drawn)
@@ -258,6 +308,8 @@ namespace Loom
 		if (!ray)
 			return false;
 
+		const std::shared_lock asking(ColliderTree::guard);
+
 		colliders.Raycast(*ray, maxDistance,
 			[&](const RaycastHit& nearer, float)
 			{
@@ -277,6 +329,8 @@ namespace Loom
 
 		if (!ray)
 			return hits;
+
+		const std::shared_lock asking(ColliderTree::guard);
 
 		colliders.Raycast(*ray, maxDistance,
 			[&](const RaycastHit& hit, float within)

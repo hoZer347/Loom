@@ -748,17 +748,14 @@ namespace Loom
 
 		// Everything built so far has work queued against it: a child waiting
 		// to be linked to its parent, a component waiting for OnAttach. That
-		// work has to land before the objects go, or it lands on freed memory
-		// the next time the queue is drained.
+		// work has to land before the objects go, or it lands on freed memory,
+		// so the scene goes behind it in the queue.
 		void Discard()
 		{
 			if (scene == nullptr)
 				return;
 
-			Engine::DoTasks();
-
-			delete std::exchange(scene, nullptr);
-
+			Engine::QueueTask([gone = std::exchange(scene, nullptr)]() { delete gone; });
 			Engine::DoTasks();
 		};
 	};

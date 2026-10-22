@@ -134,7 +134,7 @@ Crowd(0846789a-b7b3-4827-8023-29aa5e55f8f1):
 				2 = 12
 				3 = 0.5
 		GameObject Scanner(11df0959-918b-46e5-b946-4e65e965d62f)
-			0 = 0
+			0 = 1
 			1 = false
 			Component Scanner(690da712-a631-4d09-b76f-a2ad3026b048)
 				0 = 160

@@ -32,7 +32,7 @@ $webLinkFlags = @(
     '-sAUDIO_WORKLET=1'             # miniaudio mixes in an AudioWorklet rather than the deprecated ScriptProcessorNode...
     '-sWASM_WORKERS=1'              # ...which runs on a Wasm Worker.
     '-sALLOW_MEMORY_GROWTH=1'
-    '-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency'  # One pre-spawned for each thread the browser runs: a later one cannot start while main blocks.
+    '-sPTHREAD_POOL_SIZE=2*navigator.hardwareConcurrency'  # Pre-spawned, since a later one cannot start while main blocks: the job workers, the physics thread and an update lane for each thread ID the editor offers.
     '-Wno-pthreads-mem-growth'
 )
 

@@ -119,6 +119,7 @@
     <ClCompile Include="InputActions.cpp" />
     <ClCompile Include="Jobs.cpp" />
     <ClCompile Include="KeySet.cpp" />
+    <ClCompile Include="Lane.cpp" />
     <ClCompile Include="Light.cpp" />
     <ClCompile Include="LoomObject.cpp" />
     <ClCompile Include="Material.cpp" />
@@ -180,6 +181,7 @@
     <ClInclude Include="InputActions.h" />
     <ClInclude Include="Jobs.h" />
     <ClInclude Include="KeySet.h" />
+    <ClInclude Include="Lane.h" />
     <ClInclude Include="Light.h" />
     <ClInclude Include="Loom API.h" />
     <ClInclude Include="Loom.h" />

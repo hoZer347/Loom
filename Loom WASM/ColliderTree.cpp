@@ -120,6 +120,8 @@ namespace Loom
 		};
 	};
 
+	std::shared_mutex ColliderTree::guard;
+
 	ColliderTree::~ColliderTree()
 	{
 		for (Node& node : m_nodes)

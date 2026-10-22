@@ -181,8 +181,19 @@ namespace Loom
 
 		void RemoveChild(GameObject* gameObject);
 
+		// The thread whose turn runs the object's OnUpdate: 0 is the thread
+		// updating the scenes, the main one, and each above a Lane of its own
+		// running beside it, as many as Jobs::Cores, past which they wrap
+		// round to share them. Unprocessed leaves its own components out of
+		// updates and rendering, while its children go by theirs. Physics
+		// takes in every object, so the colliders are all there to hit.
+		// An OnUpdate on a lane changes only its own thread's objects, and
+		// what it makes, such as a prefab instantiated, is linked in when the
+		// main thread next runs Engine::DoTasks.
 		int GetThreadID() const { return m_threadID; };
 		void SetThreadID(int thread_id);
+
+		static constexpr int Unprocessed = -1;
 
 		bool InheritsThreadID() const { return m_inherit_thread_id; };
 		void SetInheritThreadID(bool inherit);
@@ -252,7 +263,9 @@ namespace Loom
 
 		char newName[128];
 
-		void Update(const int& thread);
+		// Adds the OnUpdate of this object and those under it to byLane, at
+		// the lane each one's thread ID falls to among lanes, 0 for the caller.
+		void Gather(std::vector<std::vector<ComponentBase*>>& byLane, size_t lanes);
 		void Render();
 		void Physics();
 		void Gui();

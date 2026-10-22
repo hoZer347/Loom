@@ -24,7 +24,10 @@ namespace Loom
 	Collider::~Collider()
 	{
 		if (m_tree)
+		{
+			const std::unique_lock removing(ColliderTree::guard);
 			m_tree->Remove(*this);
+		};
 	};
 
 	void Collider::OnPhysics()
@@ -44,6 +47,7 @@ namespace Loom
 
 	bool Collider::Raycast(const Ray& ray, RaycastHit& hit, float maxDistance)
 	{
+		const std::unique_lock catching(ColliderTree::guard);
 		CatchUp();
 
 		return RaycastAt(WorldOf(m_gameObject), ray, hit, maxDistance);
@@ -51,6 +55,7 @@ namespace Loom
 
 	Bounds Collider::WorldBounds() const
 	{
+		const std::unique_lock catching(ColliderTree::guard);
 		CatchUp();
 
 		return BoundsIn(WorldOf(m_gameObject));
@@ -60,6 +65,7 @@ namespace Loom
 	{
 		std::vector<glm::vec3> lines{ };
 
+		const std::unique_lock catching(ColliderTree::guard);
 		CatchUp();
 		WireframeIn(WorldOf(m_gameObject), lines);
 

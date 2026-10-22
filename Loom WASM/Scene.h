@@ -40,7 +40,13 @@ namespace Loom
 		// One tick / draw / physics step of the whole hierarchy. Engine calls
 		// these every frame; the editor calls Render() itself when it is drawing
 		// the scene into its own framebuffer.
-		void Update(int thread = 0);
+		void Update() { Update({ this }); };
+
+		// Each object's OnUpdate on the thread its thread ID names, the caller
+		// running thread 0's while the lanes run theirs, and returns once all
+		// are done. What each runs is gathered first, so an object disabled or
+		// moved mid-update goes by where it was.
+		static void Update(const std::vector<Scene*>& scenes);
 
 		// Seen through camera when one is given, in place of the first Camera in
 		// the hierarchy: the editor's views that look on from outside the game.

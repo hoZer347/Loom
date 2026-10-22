@@ -154,6 +154,7 @@
     <ClCompile Include="SceneHistory Performance Tests.cpp" />
     <ClCompile Include="Contacts Tests.cpp" />
     <ClCompile Include="Jobs Tests.cpp" />
+    <ClCompile Include="Lane Tests.cpp" />
     <ClCompile Include="Profiler Tests.cpp" />
     <ClCompile Include="KeySet Tests.cpp" />
     <ClCompile Include="Rigidbody Tests.cpp" />
