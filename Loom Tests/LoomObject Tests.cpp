@@ -91,7 +91,7 @@ TEST_SUITE("LoomObject")
 	};
 
 	// Named before the queue drains, as every GameObject and Scene is in its
-	// constructor, and before the queue has run at all.
+	// constructor, and found both before and after it drains.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "GetByID finds a registered object")
 	{
 		Thing thing;

@@ -76,6 +76,9 @@
     <ClCompile Include="KindFilter.cpp">
       <Filter>Panels</Filter>
     </ClCompile>
+    <ClCompile Include="Hierarchy.cpp">
+      <Filter>Panels</Filter>
+    </ClCompile>
     <ClCompile Include="ComponentMenu.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
@@ -214,6 +217,9 @@
       <Filter>Panels</Filter>
     </ClInclude>
     <ClInclude Include="KindFilter.h">
+      <Filter>Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="Hierarchy.h">
       <Filter>Panels</Filter>
     </ClInclude>
     <ClInclude Include="ShaderEditor.h">

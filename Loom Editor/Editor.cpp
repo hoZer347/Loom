@@ -30,6 +30,7 @@
 #include "EditorFileDialogs.h"
 #include "EditorIcons.h"
 #include "FieldNames.h"
+#include "Hierarchy.h"
 #include "ModelImporter.h"
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
@@ -1306,7 +1307,7 @@ namespace Loom
 	{
 		GameObject* root = m_prefabScene ? LoomObject::GetByGuid<GameObject>(m_prefabRoot) : nullptr;
 
-		return root && IsInHierarchy(m_prefabScene->GetRoot(), root) ? root : nullptr;
+		return root && Hierarchy::Contains(m_prefabScene->GetRoot(), root) ? root : nullptr;
 	};
 
 	void Editor::Select(GameObject* gameObject)
@@ -1461,21 +1462,12 @@ namespace Loom
 		};
 	};
 
-	bool Editor::IsInHierarchy(const GameObject& root, const GameObject* target)
-	{
-		for (const GameObject* at = target; at; at = at->GetParent())
-			if (at == &root)
-				return true;
-
-		return false;
-	};
-
 	bool Editor::IsSelectedIn(const GameObject& root) const
 	{
 		return
 			m_selected &&
 			LoomObject::GetByID(m_selectedId) == m_selected &&
-			IsInHierarchy(root, m_selected);
+			Hierarchy::Contains(root, m_selected);
 	};
 
 	void Editor::RequestSelection(const std::string& name)
@@ -2606,71 +2598,33 @@ namespace Loom
 
 	void Editor::DrawChildNodes(GameObject& parent, bool disabled, bool in_prefab)
 	{
-		const float row = ImGui::GetTextLineHeightWithSpacing();
 		const ImRect& clip = ImGui::GetCurrentWindow()->ClipRect;
+		const auto open = m_openUnder.find(&parent);
 
-		size_t from = 0;
-
-		if (const auto open = m_openUnder.find(&parent); open != m_openUnder.end())
-			for (const auto& [index, child] : open->second)
-			{
-				// What was gathered at the top of the frame may since have been
-				// moved or deleted, so the child is taken from where it now is.
-				if (index >= parent.GetChildren().size())
-					break;
-
-				DrawClosedRows(parent, from, index, disabled, in_prefab);
-				from = index + 1;
-
-				const size_t rows = 1 + m_rowsBelow.at(child);
-				const float top = ImGui::GetCursorScreenPos().y;
-				const bool renaming = m_renaming && IsInHierarchy(*parent.GetChildren()[index], m_selected);
-
-				if (renaming || (top < clip.Max.y && top + rows * row > clip.Min.y))
-					DrawGameObjectNode(parent.GetChildren()[index], disabled, in_prefab);
-				else
-					SkipRows(rows);
-			};
-
-		DrawClosedRows(parent, from, parent.GetChildren().size(), disabled, in_prefab);
-	};
-
-	void Editor::DrawClosedRows(GameObject& parent, size_t from, size_t to, bool disabled, bool in_prefab)
-	{
-		const float row = ImGui::GetTextLineHeightWithSpacing();
-		const ImRect& clip = ImGui::GetCurrentWindow()->ClipRect;
-		const float top = ImGui::GetCursorScreenPos().y;
-		const float count = (float)(to - from);
-
-		const size_t first = from + (size_t)std::clamp(std::floor((clip.Min.y - top) / row), 0.0f, count);
-		const size_t last = from + (size_t)std::clamp(std::ceil((clip.Max.y - top) / row), 0.0f, count);
+		const Hierarchy::View view
+		{
+			ImGui::GetCursorScreenPos().y,
+			ImGui::GetTextLineHeightWithSpacing(),
+			clip.Min.y,
+			clip.Max.y
+		};
 
 		// The row being renamed is drawn wherever it is, or its field would let
 		// go of the keyboard.
-		const size_t renamed = m_renaming && m_selected->GetParent() == &parent ? m_selected->GetSiblingIndex() : to;
+		const std::vector<Hierarchy::Step> steps = Hierarchy::Plan(
+			parent,
+			open == m_openUnder.end() ? nullptr : &open->second,
+			m_rowsBelow,
+			view,
+			m_renaming ? m_selected : nullptr);
 
-		size_t at = from;
+		for (const Hierarchy::Step& step : steps)
+		{
+			SkipRows(step.skip);
 
-		const auto draw =
-			[&](size_t index)
-			{
-				SkipRows(index - at);
-				at = index + 1;
-
-				if (index < parent.GetChildren().size())
-					DrawGameObjectNode(parent.GetChildren()[index], disabled, in_prefab);
-			};
-
-		if (renamed >= from && renamed < first)
-			draw(renamed);
-
-		for (size_t index = (std::max)(first, at); index < last; index++)
-			draw(index);
-
-		if (renamed >= (std::max)(last, at) && renamed < to)
-			draw(renamed);
-
-		SkipRows(to - at);
+			if (step.child)
+				DrawGameObjectNode(step.child, disabled, in_prefab);
+		};
 	};
 
 	void Editor::SkipRows(size_t rows)
@@ -2687,7 +2641,6 @@ namespace Loom
 		std::unordered_map<uint64_t, Guid> open{ };
 
 		m_openUnder.clear();
-		m_rowsBelow.clear();
 
 		for (const auto& [id, guid] : m_openNodes)
 		{
@@ -2708,29 +2661,7 @@ namespace Loom
 		};
 
 		m_openNodes = std::move(open);
-
-		const auto rows_below =
-			[this](const auto& self, const GameObject& node) -> size_t
-			{
-				if (const auto found = m_rowsBelow.find(&node); found != m_rowsBelow.end())
-					return found->second;
-
-				size_t rows = node.GetChildren().size();
-
-				if (const auto under = m_openUnder.find(&node); under != m_openUnder.end())
-					for (const auto& [index, child] : under->second)
-						rows += self(self, *child);
-
-				return m_rowsBelow[&node] = rows;
-			};
-
-		for (auto& [parent, children] : m_openUnder)
-		{
-			std::sort(children.begin(), children.end());
-
-			for (const auto& [index, child] : children)
-				rows_below(rows_below, *child);
-		};
+		m_rowsBelow = Hierarchy::CountRowsBelow(m_openUnder);
 	};
 
 	bool Editor::NodeOpen(const GameObject& node)

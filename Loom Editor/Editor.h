@@ -12,6 +12,7 @@
 #include "KindFilter.h"
 #include "GameFocus.h"
 #include "Guid.h"
+#include "Hierarchy.h"
 #include "EditorSettings.h"
 #include "ShaderEditor.h"
 #include "SpriteEditor.h"
@@ -382,7 +383,6 @@ namespace Loom
 		// Only the rows in view are drawn, and the rest are stepped over, so the
 		// tree costs what is open and on screen rather than what the scenes hold.
 		void DrawChildNodes(GameObject& parent, bool disabled, bool in_prefab);
-		void DrawClosedRows(GameObject& parent, size_t from, size_t to, bool disabled, bool in_prefab);
 		static void SkipRows(size_t rows);
 
 		// Finds the open nodes still there, under their parents in order, and
@@ -675,9 +675,6 @@ namespace Loom
 		// edits itself between frames, so both are checked for liveness once per
 		// frame rather than trusted.
 		void ValidateSelection();
-
-		// Walks up from target, which has to be alive.
-		static bool IsInHierarchy(const GameObject& root, const GameObject* target);
 
 		// Whether the selection is root or under it. False once the selection is
 		// gone, which can happen partway through a frame.
@@ -1043,8 +1040,8 @@ namespace Loom
 
 		// This frame's open nodes under each node, with their sibling indices,
 		// and the rows below each one.
-		std::unordered_map<const GameObject*, std::vector<std::pair<size_t, const GameObject*>>> m_openUnder{ };
-		std::unordered_map<const GameObject*, size_t> m_rowsBelow{ };
+		Hierarchy::OpenUnder m_openUnder{ };
+		Hierarchy::RowsBelow m_rowsBelow{ };
 
 		// How many children each row had when drawn last frame, and this frame.
 		std::unordered_map<uint64_t, size_t> m_childCounts{ };

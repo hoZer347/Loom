@@ -49,7 +49,7 @@ namespace Loom
 		if (const Prefab* link = Prefabs::NearestLink(gameObject))
 			return PrefabFile(*link->path);
 
-		if (const GameObject* root = GetPrefabRoot(); root != nullptr && IsInHierarchy(*root, &gameObject))
+		if (const GameObject* root = GetPrefabRoot(); root != nullptr && Hierarchy::Contains(*root, &gameObject))
 			return PrefabFile(m_prefabPath);
 
 		return { };
@@ -120,7 +120,7 @@ namespace Loom
 
 	bool Editor::IsInPrefab(const GameObject* gameObject, const std::string& path) const
 	{
-		if (path == m_prefabPath && m_prefabScene && gameObject && IsInHierarchy(m_prefabScene->GetRoot(), gameObject))
+		if (path == m_prefabPath && m_prefabScene && gameObject && Hierarchy::Contains(m_prefabScene->GetRoot(), gameObject))
 			return true;
 
 		for (const GameObject* at = gameObject; at; at = at->GetParent())
