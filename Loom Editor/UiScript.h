@@ -39,6 +39,8 @@ namespace Loom
 	*                          shown window whose name contains window
 	*     items [file]         every labelled item drawn last frame, to the file
 	*                          or the console: window, label, x, y, width, height
+	*     resize <width> <height>
+	*                          the window, in pixels
 	*     quit
 	* - A target is x y in pixels from the window's top left, or
 	*   "window" "label" [left|right] [dx dy]: the first item with that label in

@@ -319,7 +319,7 @@ TEST_SUITE("UiScript")
 	{
 		CapturedErrors errors;
 
-		for (const char* text : { "fly away\n", "key ctrl+nothing\n", "click \"Panel\"\n", "wait\n", "\"\" \"Cube\"\n", "hold\n", "release\n", "scroll\n", "scroll up\n" })
+		for (const char* text : { "fly away\n", "key ctrl+nothing\n", "click \"Panel\"\n", "wait\n", "\"\" \"Cube\"\n", "hold\n", "release\n", "scroll\n", "scroll up\n", "resize 800\n", "resize wide 600\n", "resize 0 600\n" })
 		{
 			ScriptedUi ui(text);
 			ui.Run([]() { });
@@ -433,6 +433,17 @@ TEST_SUITE("UiScript")
 		CHECK_FALSE(ui.script->Failed());
 		CHECK(panels_heard == notches);
 		CHECK(game_heard == notches);
+	};
+
+	TEST_CASE("resize with no window to resize fails the script")
+	{
+		CapturedErrors errors;
+		ScriptedUi ui("resize 800 600\n");
+
+		ui.Run([]() { });
+
+		CHECK(ui.script->Failed());
+		CHECK(errors.text.str().find("no window") != std::string::npos);
 	};
 
 	TEST_CASE("blank lines and comments are skipped, and quit ends early")

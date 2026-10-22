@@ -685,8 +685,8 @@ namespace Loom
 
 				// The tabs show their names while every one fits, and only their
 				// icons, named in a tooltip, once they don't. The panel goes no
-				// narrower than the icons, and should the screen, they scroll
-				// rather than cut their icons short.
+				// narrower than the icons; on a screen too narrow even for that,
+				// they scroll rather than cut short.
 				const ImGuiStyle& style = ImGui::GetStyle();
 				float names_width = -style.ItemInnerSpacing.x;
 				float icons_width = -style.ItemInnerSpacing.x;
@@ -714,7 +714,8 @@ namespace Loom
 						if (show)
 							m_projectTabToShow = { };
 
-						const std::string shown = (icons_only ? IconOfTab(label) : std::string(label)) + "###" + label;
+						const std::string icon = IconOfTab(label);
+						const std::string shown = (icons_only ? icon : std::string(label)) + "###" + label;
 						ImGuiTabItemFlags flags = show ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
 
 						if (icons_only)
@@ -723,7 +724,7 @@ namespace Loom
 						const bool open = ImGui::BeginTabItem(shown.c_str(), nullptr, flags);
 
 						if (icons_only)
-							ImGui::SetItemTooltip("%s", label + IconOfTab(label).size() + 1);
+							ImGui::SetItemTooltip("%s", label + icon.size() + 1);
 
 						if (!open)
 							return false;

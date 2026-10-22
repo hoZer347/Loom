@@ -873,7 +873,7 @@ namespace Loom
 				"Drives the panels with input injected in-process, one UiScript command a line, and answers once they have run with what they logged. "
 				"Commands: wait <frames>; move, click, rightclick or doubleclick <target>; drag <target> to <target>; "
 				"key <chord> (ImGui key names joined by +, as ctrl+z); hold or release <chord>, to keep it down through a click; "
-				"scroll <notches> (the wheel where the mouse is, away from you positive); type <text>; screenshot <file>; items. "
+				"scroll <notches> (the wheel where the mouse is, away from you positive); type <text>; screenshot <file>; items; resize <width> <height> (the window, in pixels). "
 				"A target is x y in pixels from the window's top left, or \"window\" \"label\" [left|right] [dx dy], "
 				"which waits for the item to be drawn. ImGui takes the injected pointer in place of the person's until they next move the mouse.",
 				R"({

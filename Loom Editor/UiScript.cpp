@@ -2,6 +2,7 @@
 
 #include "Engine.h"
 #include "Input.h"
+#include "OpenGL.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -525,6 +526,27 @@ namespace Loom
 					};
 
 					WriteItems(file);
+					return Result::Done;
+				});
+		}
+		else if (verb == "resize")
+		{
+			float width = 0.0f;
+			float height = 0.0f;
+
+			if (tokens.size() != 3 || !Number(tokens[1], &width) || !Number(tokens[2], &height) || width < 1.0f || height < 1.0f)
+			{
+				Fail("resize takes a width and a height in pixels");
+				return false;
+			};
+
+			m_actions.push_back(
+				[this, width, height]()
+				{
+					if (Engine::window)
+						glfwSetWindowSize(Engine::window, (int)width, (int)height);
+					else Fail("there is no window to resize");
+
 					return Result::Done;
 				});
 		}
