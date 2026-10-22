@@ -13,6 +13,7 @@
 #include "SceneSerializer.h"
 #include "SerializedField.h"
 
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -293,6 +294,33 @@ TEST_SUITE("SerializedField")
 		CHECK(Field(object, Flag).type == Loom::FieldType::Bool);
 		CHECK(Field(object, Ratio).type == Loom::FieldType::Float);
 		CHECK(Field(object, Numbers).type == Loom::FieldType::FloatArray);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a number is written with just enough digits to read back the same")
+	{
+		EveryField object;
+		Pump();
+
+		object.ratio = 0.1f;
+		CHECK(Field(object, Ratio).Write() == "0.100000001");
+
+		object.ratio = -0.0f;
+		CHECK(Field(object, Ratio).Write() == "-0");
+
+		object.ratio = 1e20f;
+		CHECK(Field(object, Ratio).Write() == "1.00000002e+20");
+
+		object.ratio = std::numeric_limits<float>::denorm_min();
+		CHECK(Field(object, Ratio).Write() == "1.40129846e-45");
+
+		object.ratio = std::numeric_limits<float>::infinity();
+		CHECK(Field(object, Ratio).Write() == "inf");
+
+		object.precise = 0.1;
+		CHECK(Field(object, Precise).Write() == "0.10000000000000001");
+
+		object.numbers = { 0.1f, 2.0f };
+		CHECK(Field(object, Numbers).Write() == "[0.100000001, 2]");
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a field keeps the name its Serial was given")

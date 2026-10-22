@@ -27,7 +27,7 @@ namespace Loom
 		// is the same value rather than nearly the same one. to_chars writes
 		// what snprintf would, many times faster, which a scene holding meshes
 		// of a million floats needs.
-		template<typename T>
+		template <typename T>
 		void AppendNumber(std::string& text, T value)
 		{
 			char buffer[NUMBER_LENGTH];
@@ -42,7 +42,7 @@ namespace Loom
 			text.append(buffer, written.ptr);
 		};
 
-		template<typename T>
+		template <typename T>
 		std::string Number(T value)
 		{
 			std::string text;
