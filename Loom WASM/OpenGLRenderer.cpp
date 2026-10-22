@@ -113,6 +113,9 @@ namespace Loom
 			if (m_vbo)
 				glDeleteBuffers(1, &m_vbo);
 
+			if (m_instances)
+				glDeleteBuffers(1, &m_instances);
+
 			if (m_noNormal)
 				glDeleteBuffers(1, &m_noNormal);
 
@@ -202,6 +205,7 @@ namespace Loom
 			std::cout << "GLSL Version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
 
 			glGenBuffers(1, &m_vbo);
+			glGenBuffers(1, &m_instances);
 
 			constexpr float NO_NORMAL[3] = { };
 			glGenBuffers(1, &m_noNormal);
@@ -542,14 +546,23 @@ namespace Loom
 				DrawBuffer(program, primitive, vertices, found->second.count, found->second.format);
 		};
 
+		void DrawInstances(uint32_t program, uint32_t primitive, uint32_t vertices, const float* instances, size_t count) override
+		{
+			const auto found = m_kept.find(vertices);
+
+			if (found != m_kept.end())
+				DrawBuffer(program, primitive, vertices, found->second.count, found->second.format, instances, count);
+		};
+
 		void DestroyVertices(uint32_t vertices) override
 		{
 			if (m_kept.erase(vertices))
 				glDeleteBuffers(1, &vertices);
 		};
 
-		// Draws count vertices laid out as format says from buffer, which holds them already.
-		void DrawBuffer(uint32_t program, uint32_t primitive, GLuint buffer, size_t count, VertexFormat format)
+		// Draws count vertices laid out as format says from buffer, which holds
+		// them already: once, or once for each of instanceCount instances.
+		void DrawBuffer(uint32_t program, uint32_t primitive, GLuint buffer, size_t count, VertexFormat format, const float* instances = nullptr, size_t instanceCount = 0)
 		{
 			constexpr GLint POSITION_COMPONENTS = 3;
 			constexpr GLint UV_COMPONENTS = 2;
@@ -595,9 +608,46 @@ namespace Loom
 
 			glEnableVertexAttribArray(NORMAL_LOCATION);
 
-			glDrawArrays(primitive, 0, (GLsizei)count);
+			if (!instances)
+				glDrawArrays(primitive, 0, (GLsizei)count);
+			else
+				DrawInstanced(primitive, count, instances, instanceCount);
 
 			glBindBuffer(GL_ARRAY_BUFFER, 0);
+		};
+
+		// Draws with each instance's model matrix and colour read from m_instances.
+		void DrawInstanced(uint32_t primitive, size_t count, const float* instances, size_t instanceCount)
+		{
+			constexpr GLint COLUMN_COMPONENTS = 4;
+			constexpr GLint COLOR_COMPONENTS = 3;
+			constexpr GLuint COLUMNS = 4;
+			constexpr GLsizei STRIDE = (GLsizei)(FLOATS_PER_INSTANCE * sizeof(float));
+			constexpr GLuint PER_INSTANCE = 1;
+
+			glBindBuffer(GL_ARRAY_BUFFER, m_instances);
+			glBufferData(GL_ARRAY_BUFFER, instanceCount * STRIDE, instances, GL_STREAM_DRAW);
+
+			for (GLuint column = 0; column < COLUMNS; column++)
+			{
+				const GLuint location = INSTANCE_MODEL_LOCATION + column;
+				glVertexAttribPointer(location, COLUMN_COMPONENTS, GL_FLOAT, GL_FALSE, STRIDE, (void*)(column * COLUMN_COMPONENTS * sizeof(float)));
+				glVertexAttribDivisor(location, PER_INSTANCE);
+				glEnableVertexAttribArray(location);
+			};
+
+			glVertexAttribPointer(INSTANCE_COLOR_LOCATION, COLOR_COMPONENTS, GL_FLOAT, GL_FALSE, STRIDE, (void*)(COLUMNS * COLUMN_COMPONENTS * sizeof(float)));
+			glVertexAttribDivisor(INSTANCE_COLOR_LOCATION, PER_INSTANCE);
+			glEnableVertexAttribArray(INSTANCE_COLOR_LOCATION);
+
+			glDrawArraysInstanced(primitive, 0, (GLsizei)count, (GLsizei)instanceCount);
+
+			// Off again, as WebGL refuses a draw whose enabled arrays run short of
+			// it, and these are only as long as the last batch.
+			for (GLuint column = 0; column < COLUMNS; column++)
+				glDisableVertexAttribArray(INSTANCE_MODEL_LOCATION + column);
+
+			glDisableVertexAttribArray(INSTANCE_COLOR_LOCATION);
 		};
 
 		void SetPixelated(uint32_t program, bool pixelated) override
@@ -857,6 +907,9 @@ namespace Loom
 
 		GLuint m_vbo = 0;
 		GLuint m_vao = 0;
+
+		// What DrawInstances hands its instances over in.
+		GLuint m_instances = 0;
 
 		// What CreateVertices handed out, by GL name: how many vertices each
 		// holds and how they are laid out.

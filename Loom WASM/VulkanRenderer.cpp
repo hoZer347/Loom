@@ -64,10 +64,14 @@ namespace Loom
 		constexpr uint32_t NORMAL_OFFSET = (POSITION_COMPONENTS + UV_COMPONENTS) * sizeof(float);
 		constexpr uint32_t NORMAL_SIZE = NORMAL_COMPONENTS * sizeof(float);
 
-		// The vertices' binding, and the one aNormal reads its zeros from when
-		// they have no normals.
+		// The vertices' binding, the one aNormal reads its zeros from when
+		// they have no normals, and the one DrawInstances hands its instances in.
 		constexpr uint32_t VERTEX_BINDING = 0;
 		constexpr uint32_t NO_NORMAL_BINDING = 1;
+		constexpr uint32_t INSTANCE_BINDING = 2;
+		constexpr uint32_t INSTANCE_SIZE = Renderer::FLOATS_PER_INSTANCE * sizeof(float);
+		constexpr uint32_t INSTANCE_COLUMNS = 4;
+		constexpr uint32_t INSTANCE_COLUMN_SIZE = INSTANCE_COLUMNS * sizeof(float);
 
 		constexpr float FAR_DEPTH = 1.0f;
 		constexpr uint8_t WHITE = 0xFF;
@@ -597,17 +601,23 @@ namespace Loom
 
 		void Draw(uint32_t handle, uint32_t primitive, const float* vertices, size_t count, uint32_t, VertexFormat format) override
 		{
-			DrawWith(handle, primitive, count, format,
+			DrawWith(handle, primitive, count, format, 1,
 				[&](VkCommandBuffer command, size_t drawn, size_t stride)
 				{
-					const Allocation vertexData = Allocate(drawn * stride, sizeof(float));
-					memcpy(vertexData.mapped, vertices, count * stride);
-
-					if (drawn > count)
-						memcpy(vertexData.mapped + count * stride, vertices, stride);
-
-					vkCmdBindVertexBuffers(command, VERTEX_BINDING, 1, &vertexData.buffer, &vertexData.offset);
+					BindStreamed(command, vertices, count, drawn, stride);
 				});
+		};
+
+		// Hands count vertices over for this draw alone, drawn of them.
+		void BindStreamed(VkCommandBuffer command, const float* vertices, size_t count, size_t drawn, size_t stride)
+		{
+			const Allocation vertexData = Allocate(drawn * stride, sizeof(float));
+			memcpy(vertexData.mapped, vertices, count * stride);
+
+			if (drawn > count)
+				memcpy(vertexData.mapped + count * stride, vertices, stride);
+
+			vkCmdBindVertexBuffers(command, VERTEX_BINDING, 1, &vertexData.buffer, &vertexData.offset);
 		};
 
 		uint32_t CreateVertices() override
@@ -637,6 +647,18 @@ namespace Loom
 
 		void DrawVertices(uint32_t program, uint32_t primitive, uint32_t handle) override
 		{
+			DrawKept(program, primitive, handle, nullptr, 1);
+		};
+
+		void DrawInstances(uint32_t program, uint32_t primitive, uint32_t vertices, const float* instances, size_t count) override
+		{
+			DrawKept(program, primitive, vertices, instances, count);
+		};
+
+		// Draws kept vertices once, or once for each of instanceCount instances
+		// when there are instances.
+		void DrawKept(uint32_t program, uint32_t primitive, uint32_t handle, const float* instances, size_t instanceCount)
+		{
 			const auto found = m_kept.find(handle);
 
 			if (found == m_kept.end())
@@ -650,17 +672,23 @@ namespace Loom
 			if (!kept.buffer && kept.settles && kept.setOn != m_framesBegun)
 				Settle(kept);
 
-			if (!kept.buffer)
-			{
-				Draw(program, primitive, kept.streamed.data(), kept.count, 0, kept.format);
-				return;
-			};
-
-			DrawWith(program, primitive, kept.count, kept.format,
-				[&](VkCommandBuffer command, size_t, size_t)
+			DrawWith(program, primitive, kept.count, kept.format, instanceCount,
+				[&](VkCommandBuffer command, size_t drawn, size_t stride)
 				{
-					const VkDeviceSize offset = 0;
-					vkCmdBindVertexBuffers(command, VERTEX_BINDING, 1, &kept.buffer, &offset);
+					if (kept.buffer)
+					{
+						const VkDeviceSize offset = 0;
+						vkCmdBindVertexBuffers(command, VERTEX_BINDING, 1, &kept.buffer, &offset);
+					}
+					else BindStreamed(command, kept.streamed.data(), kept.count, drawn, stride);
+
+					if (instances)
+					{
+						const Allocation instanceData = Allocate(instanceCount * INSTANCE_SIZE, sizeof(float));
+						memcpy(instanceData.mapped, instances, instanceCount * INSTANCE_SIZE);
+
+						vkCmdBindVertexBuffers(command, INSTANCE_BINDING, 1, &instanceData.buffer, &instanceData.offset);
+					};
 				});
 		};
 
@@ -675,11 +703,12 @@ namespace Loom
 			m_kept.erase(found);
 		};
 
-		// Draws count vertices laid out as format says, which bind puts in
-		// VERTEX_BINDING, given the command, how many are drawn (one more than
-		// count for a loop, closed on its first) and their stride.
+		// Draws count vertices laid out as format says, once for each of
+		// instances, which bind puts in VERTEX_BINDING, and the instances in
+		// INSTANCE_BINDING, given the command, how many are drawn (one more
+		// than count for a loop, closed on its first) and their stride.
 		template<typename Bind>
-		void DrawWith(uint32_t handle, uint32_t primitive, size_t count, VertexFormat format, const Bind& bind)
+		void DrawWith(uint32_t handle, uint32_t primitive, size_t count, VertexFormat format, size_t instances, const Bind& bind)
 		{
 			if (!m_recording || count == 0)
 				return;
@@ -714,7 +743,7 @@ namespace Loom
 			const size_t drawn = primitive == GL_LINE_LOOP_ ? count + 1 : count;
 			const size_t stride = FloatsPerVertex(format) * sizeof(float);
 
-			if (program.hasPosition || program.hasUV || program.hasNormal)
+			if (program.hasPosition || program.hasUV || program.hasNormal || program.hasInstance)
 				bind(command, drawn, stride);
 
 			if (program.hasNormal && format != VertexFormat::PositionUVNormal)
@@ -767,7 +796,7 @@ namespace Loom
 			if (!writes.empty())
 				m_pushDescriptorSet(command, VK_PIPELINE_BIND_POINT_GRAPHICS, program.layout, 0, (uint32_t)writes.size(), writes.data());
 
-			vkCmdDraw(command, (uint32_t)drawn, 1, 0, 0);
+			vkCmdDraw(command, (uint32_t)drawn, (uint32_t)instances, 0, 0);
 		};
 
 		uint32_t CreateTexture(int width, int height, const uint8_t* rgba) override
@@ -1042,6 +1071,7 @@ namespace Loom
 			bool hasPosition = false;
 			bool hasUV = false;
 			bool hasNormal = false;
+			bool hasInstance = false;
 			bool pixelated = false;
 			uint32_t blockSize = 0;
 			std::vector<uint8_t> block;
@@ -1721,8 +1751,19 @@ namespace Loom
 				attributes.push_back({ NORMAL_LOCATION, VERTEX_BINDING, VK_FORMAT_R32G32B32_SFLOAT, NORMAL_OFFSET });
 			else if (program.hasNormal)
 			{
-				bindings.push_back({ NO_NORMAL_BINDING, NORMAL_SIZE, VK_VERTEX_INPUT_RATE_INSTANCE });
+				// No stride, so every vertex of every instance reads the same zeros.
+				bindings.push_back({ NO_NORMAL_BINDING, 0, VK_VERTEX_INPUT_RATE_VERTEX });
 				attributes.push_back({ NORMAL_LOCATION, NO_NORMAL_BINDING, VK_FORMAT_R32G32B32_SFLOAT, 0 });
+			};
+
+			if (program.hasInstance)
+			{
+				bindings.push_back({ INSTANCE_BINDING, INSTANCE_SIZE, VK_VERTEX_INPUT_RATE_INSTANCE });
+
+				for (uint32_t column = 0; column < INSTANCE_COLUMNS; column++)
+					attributes.push_back({ INSTANCE_MODEL_LOCATION + column, INSTANCE_BINDING, VK_FORMAT_R32G32B32A32_SFLOAT, column * INSTANCE_COLUMN_SIZE });
+
+				attributes.push_back({ INSTANCE_COLOR_LOCATION, INSTANCE_BINDING, VK_FORMAT_R32G32B32_SFLOAT, INSTANCE_COLUMNS * INSTANCE_COLUMN_SIZE });
 			};
 
 			VkPipelineVertexInputStateCreateInfo input{ VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
@@ -1871,6 +1912,7 @@ namespace Loom
 					program.hasPosition |= variable->location == POSITION_LOCATION;
 					program.hasUV |= variable->location == UV_LOCATION;
 					program.hasNormal |= variable->location == NORMAL_LOCATION;
+					program.hasInstance |= variable->location == INSTANCE_MODEL_LOCATION;
 				};
 			};
 

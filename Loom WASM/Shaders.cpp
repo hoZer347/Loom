@@ -15,6 +15,7 @@
 #include <fstream>
 #include <filesystem>
 #include <iterator>
+#include <optional>
 #include <regex>
 #include <stdexcept>
 
@@ -83,6 +84,7 @@ bool LoomDitheredOut(float alpha)
 )";
 
 		constexpr const char* SHADOW_PROGRAM_SUFFIX = " shadows";
+		constexpr const char* INSTANCED_PROGRAM_SUFFIX = " instanced";
 
 		// What the shading section's vertex half reads, and the declaration it
 		// adds when the stage has not made its own.
@@ -210,6 +212,63 @@ bool LoomDitheredOut(float alpha)
 				"}\n";
 		};
 
+		// The stages of a program drawn as instances.
+		struct InstancedStages
+		{
+			std::string vertex;
+			std::string fragment;
+		};
+
+		// The stages, reading the model matrix and colour each draw would set
+		// from each instance, or none when they declare either some other way
+		// or the fragment stage reads the model matrix.
+		std::optional<InstancedStages> Instanced(const std::string& vertex, const std::string& fragment)
+		{
+			static const std::regex model(R"(\buniform\s+(?:(?:lowp|mediump|highp)\s+)?mat4\s+u_model\s*;)");
+			static const std::regex color(R"(\buniform\s+(?:(?:lowp|mediump|highp)\s+)?vec3\s+u_color\s*;)");
+			static const std::regex otherwise(R"(\buniform\b[^;]*\bu_(?:model|color)\b)");
+			static const std::regex readsModel(R"(\bu_model\b)");
+
+			InstancedStages stages{ std::regex_replace(std::regex_replace(vertex, model, ""), color, ""), std::regex_replace(fragment, color, "") };
+
+			if (std::regex_search(stages.vertex, otherwise) || std::regex_search(stages.fragment, otherwise) || std::regex_search(fragment, readsModel))
+				return std::nullopt;
+
+			// The colour is the instance's, handed on to the fragment stage
+			// unblended.
+			stages.vertex =
+				"layout(location = " + std::to_string(Renderer::INSTANCE_MODEL_LOCATION) + ") in mat4 loom_InstanceModel;\n"
+				"layout(location = " + std::to_string(Renderer::INSTANCE_COLOR_LOCATION) + ") in vec3 loom_InstanceColor;\n"
+				"flat out vec3 loom_Color;\n"
+				"#define u_model loom_InstanceModel\n"
+				"#define u_color loom_InstanceColor\n" +
+				std::regex_replace(stages.vertex, MainPattern(), "$1loom_instance_main$2") +
+				"\nvoid main()\n{\n"
+				"\tloom_Color = loom_InstanceColor;\n"
+				"\tloom_instance_main();\n"
+				"}\n";
+
+			stages.fragment = "flat in vec3 loom_Color;\n#define u_color loom_Color\n" + stages.fragment;
+
+			return stages;
+		};
+
+		// The program, or 0 when the stages do not compile.
+		uint32_t CreateIfCompiles(Renderer& renderer, const std::string& name, const std::optional<InstancedStages>& stages)
+		{
+			if (!stages)
+				return 0;
+
+			try
+			{
+				return renderer.CreateProgram(name, stages->vertex, stages->fragment);
+			}
+			catch (const std::runtime_error&)
+			{
+				return 0;
+			};
+		};
+
 #ifndef __EMSCRIPTEN__
 		// glslang's "ERROR: 0:12: 'x' : undeclared identifier", and its warnings.
 		const std::regex& MessagePattern()
@@ -304,10 +363,9 @@ bool LoomDitheredOut(float alpha)
 
 		if (Renderer* renderer = Renderer::Get())
 		{
-			renderer->DeleteProgram(id);
-
-			if (shadow_id)
-				renderer->DeleteProgram(shadow_id);
+			for (const uint32_t program : { id, shadow_id, instanced_id, shadow_instanced_id })
+				if (program)
+					renderer->DeleteProgram(program);
 		};
 	};
 
@@ -347,8 +405,7 @@ bool LoomDitheredOut(float alpha)
 	{
 		std::scoped_lock lock{ mutex };
 
-		const uint32_t previous = id;
-		const uint32_t previous_shadow = shadow_id;
+		const uint32_t previous[] = { id, shadow_id, instanced_id, shadow_instanced_id };
 
 		try
 		{
@@ -362,12 +419,9 @@ bool LoomDitheredOut(float alpha)
 		};
 
 		if (Renderer* renderer = Renderer::Get())
-		{
-			renderer->DeleteProgram(previous);
-
-			if (previous_shadow)
-				renderer->DeleteProgram(previous_shadow);
-		};
+			for (const uint32_t program : previous)
+				if (program)
+					renderer->DeleteProgram(program);
 
 		return true;
 	};
@@ -385,6 +439,8 @@ bool LoomDitheredOut(float alpha)
 	{
 		settings = programs.settings;
 		shadow_id = programs.shadow;
+		instanced_id = programs.instanced;
+		shadow_instanced_id = programs.shadowInstanced;
 		vertex = programs.vertex;
 
 		return programs.id;
@@ -495,6 +551,11 @@ bool LoomDitheredOut(float alpha)
 				renderer->DeleteProgram(programs.id);
 				throw;
 			};
+
+		programs.instanced = CreateIfCompiles(*renderer, name + INSTANCED_PROGRAM_SUFFIX, Instanced(stages.vertex, stages.fragment));
+
+		if (stages.settings.shadows)
+			programs.shadowInstanced = CreateIfCompiles(*renderer, name + SHADOW_PROGRAM_SUFFIX + INSTANCED_PROGRAM_SUFFIX, Instanced(stages.shadowVertex, stages.shadowFragment));
 
 		// After the programs, so a reload that fails leaves these describing
 		// the ones still in use.

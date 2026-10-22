@@ -10,6 +10,8 @@
 #include "Component.h"
 #include "Renderer.h"
 
+#include "glm/gtc/type_ptr.hpp"
+
 #include <array>
 #include <bit>
 #include <cstdint>
@@ -203,6 +205,23 @@ namespace LoomTests
 
 		void DestroyVertices(uint32_t vertices) override { kept.erase(vertices); };
 
+		// Each instance is recorded, and drawn as DrawVertices would draw it.
+		void DrawInstances(uint32_t program, uint32_t primitive, uint32_t vertices, const float* instances, size_t count) override
+		{
+			constexpr size_t MODEL_FLOATS = sizeof(glm::mat4) / sizeof(float);
+
+			instanceCounts.push_back(count);
+
+			for (size_t i = 0; i < count; i++)
+			{
+				const float* instance = instances + i * FLOATS_PER_INSTANCE;
+
+				instanceModels.push_back(glm::make_mat4(instance));
+				instanceColors.push_back(glm::make_vec3(instance + MODEL_FLOATS));
+				DrawVertices(program, primitive, vertices);
+			};
+		};
+
 		void SetPixelated(uint32_t program, bool pixelated) override
 		{
 			if (pixelated)
@@ -256,6 +275,12 @@ namespace LoomTests
 		std::vector<glm::vec4> drawnColors;
 		std::vector<uint32_t> drawnTextures;
 		std::vector<std::vector<float>> drawnVertices;
+
+		// How many instances each DrawInstances drew, and each instance's model
+		// matrix and colour.
+		std::vector<size_t> instanceCounts;
+		std::vector<glm::mat4> instanceModels;
+		std::vector<glm::vec3> instanceColors;
 
 		// Each Clear: whether it was given a colour, and whether it cleared depth.
 		std::vector<std::pair<bool, bool>> clears;

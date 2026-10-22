@@ -11,7 +11,10 @@
 #include "Skin.h"
 #include "Utilities/Clock.h"
 
+#include "glm/gtc/type_ptr.hpp"
+
 #include <algorithm>
+#include <bit>
 #include <iostream>
 #include <utility>
 
@@ -29,6 +32,33 @@ namespace Loom
 	static_assert(Mesh::Stream == GL_STREAM_DRAW);
 	static_assert(Mesh::Static == GL_STATIC_DRAW);
 	static_assert(Mesh::Dynamic == GL_DYNAMIC_DRAW);
+
+	namespace
+	{
+		constexpr size_t MODEL_FLOATS = sizeof(glm::mat4) / sizeof(float);
+		constexpr size_t COLOR_FLOATS = sizeof(glm::vec3) / sizeof(float);
+
+		static_assert(MODEL_FLOATS + COLOR_FLOATS == Renderer::FLOATS_PER_INSTANCE);
+
+		constexpr uint64_t FNV_OFFSET_BASIS = 14695981039346656037ull;
+		constexpr uint64_t FNV_PRIME = 1099511628211ull;
+
+		// FNV-1a, a 32 bit value at a time.
+		uint64_t Mixed(uint64_t hash, uint32_t value)
+		{
+			return (hash ^ value) * FNV_PRIME;
+		};
+
+		uint64_t Hashed(const std::vector<float>& vertices, VertexFormat format)
+		{
+			uint64_t hash = Mixed(FNV_OFFSET_BASIS, (uint32_t)format);
+
+			for (const float value : vertices)
+				hash = Mixed(hash, std::bit_cast<uint32_t>(value));
+
+			return hash;
+		};
+	};
 
 	Mesh::Mesh(Primitive primitive)
 	{
@@ -77,18 +107,34 @@ namespace Loom
 			return;
 		};
 
-		material->Apply(material->shader->id, &*std::as_const(variables));
-		Scene::ApplyView(material->shader->id);
-		Draw(material->shader->id);
+		const uint32_t program = material->shader->id;
+
+		if (batch && batch->Add(*this, program, material->shader->instanced_id))
+			return;
+
+		Ready(*this, program);
+		Draw(program);
+	};
+
+	void Mesh::Ready(Mesh& mesh, uint32_t program)
+	{
+		mesh.material->Apply(program, &*std::as_const(mesh.variables));
+		Scene::ApplyView(program);
 	};
 
 	void Mesh::Draw(uint32_t program)
 	{
 		Renderer* renderer = Renderer::Get();
 
-		if (!renderer)
+		if (!renderer || !Keep(*renderer))
 			return;
 
+		renderer->SetUniform(program, "u_model", m_gameObject->WorldMatrix());
+		renderer->DrawVertices(program, *std::as_const(primitive_id), m_kept);
+	};
+
+	bool Mesh::Keep(Renderer& renderer)
+	{
 		if (m_indices.size())
 		{
 			// Indexed drawing is not wired up yet, and saying so once beats
@@ -101,7 +147,7 @@ namespace Loom
 				std::cerr << "Mesh: indexed drawing is not supported yet" << std::endl;
 			};
 
-			return;
+			return false;
 		};
 
 		constexpr size_t POSITION_COMPONENTS = 3;
@@ -137,16 +183,16 @@ namespace Loom
 			deformed,
 			deformed ? m_deformedFrame : 0 };
 
-		if (m_keeper != renderer)
+		if (m_keeper != &renderer)
 		{
-			m_keeper = renderer;
+			m_keeper = &renderer;
 			m_kept = 0;
 		};
 
 		if (m_kept == 0 || handed != m_handed)
 		{
 			if (m_kept == 0)
-				m_kept = renderer->CreateVertices();
+				m_kept = renderer.CreateVertices();
 
 			m_handed = handed;
 
@@ -157,7 +203,10 @@ namespace Loom
 			const bool hasNormals = normals.size() == count * NORMAL_COMPONENTS;
 
 			if (!hasUVs && !hasNormals)
-				renderer->SetVertices(m_kept, positions.data(), count, *std::as_const(m_draw_type), VertexFormat::Position);
+			{
+				renderer.SetVertices(m_kept, positions.data(), count, *std::as_const(m_draw_type), VertexFormat::Position);
+				m_geometry = Hashed(positions, VertexFormat::Position);
+			}
 			else
 			{
 				const VertexFormat format = hasNormals ? VertexFormat::PositionUVNormal : VertexFormat::PositionUV;
@@ -175,12 +224,12 @@ namespace Loom
 						out = std::copy_n(normals.data() + i * NORMAL_COMPONENTS, NORMAL_COMPONENTS, out);
 				};
 
-				renderer->SetVertices(m_kept, interleaved.data(), count, *std::as_const(m_draw_type), format);
+				renderer.SetVertices(m_kept, interleaved.data(), count, *std::as_const(m_draw_type), format);
+				m_geometry = Hashed(interleaved, format);
 			};
 		};
 
-		renderer->SetUniform(program, "u_model", m_gameObject->WorldMatrix());
-		renderer->DrawVertices(program, *std::as_const(primitive_id), m_kept);
+		return true;
 	};
 
 	void Mesh::DrawTransparent(const std::vector<Mesh*>& meshes)
@@ -219,6 +268,79 @@ namespace Loom
 		};
 
 		renderer->SetDepthTestEqual(false);
+	};
+
+	bool MeshBatch::Add(Mesh& mesh, uint32_t program, uint32_t instanced)
+	{
+		Renderer* renderer = Renderer::Get();
+
+		if (!instanced || !renderer || *std::as_const(mesh.m_draw_type) != Mesh::Static || !mesh.Keep(*renderer) || mesh.m_handed.deformed)
+			return false;
+
+		const uint64_t key = Mixed(Mixed(mesh.m_geometry, program), *std::as_const(mesh.primitive_id));
+		const auto [first, last] = m_byKey.equal_range(key);
+
+		for (auto found = first; found != last; ++found)
+			if (Alike(m_lots[found->second], mesh, program))
+			{
+				m_lots[found->second].meshes.push_back(&mesh);
+				return true;
+			};
+
+		m_byKey.emplace(key, m_lots.size());
+		m_lots.push_back({ program, instanced, { &mesh } });
+
+		return true;
+	};
+
+	bool MeshBatch::Alike(const Lot& lot, const Mesh& mesh, uint32_t program)
+	{
+		const Mesh& first = *lot.meshes.front();
+		const Material& a = **first.material;
+		const Material& b = **mesh.material;
+
+		// All Material::Apply sets but the colour, which each instance has its own of.
+		const bool materials = &a == &b || (*a.shadows == *b.shadows && *a.sampling == *b.sampling && *a.variables == *b.variables);
+
+		return lot.program == program
+			&& first.m_geometry == mesh.m_geometry
+			&& *first.primitive_id == *mesh.primitive_id
+			&& materials
+			&& *first.variables == *mesh.variables;
+	};
+
+	void MeshBatch::Draw(const Ready& ready)
+	{
+		Renderer* renderer = Renderer::Get();
+
+		for (Lot& lot : m_lots)
+		{
+			Mesh& first = *lot.meshes.front();
+
+			if (lot.meshes.size() == 1)
+			{
+				ready(first, lot.program);
+				first.Draw(lot.program);
+				continue;
+			};
+
+			m_instances.clear();
+
+			for (const Mesh* mesh : lot.meshes)
+			{
+				const glm::mat4 model = mesh->m_gameObject->WorldMatrix();
+				const float* color = glm::value_ptr(*std::as_const(mesh->material->color));
+
+				m_instances.insert(m_instances.end(), glm::value_ptr(model), glm::value_ptr(model) + MODEL_FLOATS);
+				m_instances.insert(m_instances.end(), color, color + COLOR_FLOATS);
+			};
+
+			ready(first, lot.instanced);
+			renderer->DrawInstances(lot.instanced, *std::as_const(first.primitive_id), first.m_kept, m_instances.data(), lot.meshes.size());
+		};
+
+		m_lots.clear();
+		m_byKey.clear();
 	};
 
 	void Mesh::OnGui()

@@ -120,6 +120,19 @@ namespace Loom
 		virtual void DrawVertices(uint32_t program, uint32_t primitive, uint32_t vertices) = 0;
 		virtual void DestroyVertices(uint32_t vertices) = 0;
 
+		// Where an instanced program's vertex stage reads each instance's model
+		// matrix, a column a location from the first, and its colour.
+		static constexpr uint32_t INSTANCE_MODEL_LOCATION = 11;
+		static constexpr uint32_t INSTANCE_COLOR_LOCATION = 15;
+
+		// What each instance DrawInstances is handed holds, its floats one
+		// after another: its model matrix, column by column, then its colour.
+		static constexpr size_t FLOATS_PER_INSTANCE = 19;
+
+		// Draws kept vertices once for each of count instances, with a program
+		// that reads them at the instance locations.
+		virtual void DrawInstances(uint32_t program, uint32_t primitive, uint32_t vertices, const float* instances, size_t count) = 0;
+
 		// Whether the program samples its colour textures nearest, so each texel
 		// draws as a hard-edged square, rather than blending between them, from
 		// the textures it is next handed and the next draw on. Off until it is

@@ -79,6 +79,13 @@ namespace Loom
 		// are off. Declared before id, which is what fills it in.
 		uint32_t shadow_id = 0;
 
+		// The program and the shadow program drawing many meshes at once, each
+		// with a model matrix and colour of its own, or 0 for stages that
+		// declare either some other way. Declared before id, which is what
+		// fills them in.
+		uint32_t instanced_id = 0;
+		uint32_t shadow_instanced_id = 0;
+
 		// The vertex stage the program was linked from, for drawing the same
 		// shape with another fragment stage. Declared before id, which is what
 		// fills it in.
@@ -95,6 +102,8 @@ namespace Loom
 		{
 			uint32_t id = 0;
 			uint32_t shadow = 0;
+			uint32_t instanced = 0;
+			uint32_t shadowInstanced = 0;
 			ShaderSettings settings;
 			std::string vertex;
 		};
@@ -102,7 +111,7 @@ namespace Loom
 		uint32_t CompileSource(const std::string& file_path);
 		uint32_t CompileStream(const std::string& name, std::istream& source);
 
-		// Takes on the settings, shadow program and vertex stage of programs,
+		// Takes on the settings, other programs and vertex stage of programs,
 		// and answers its id.
 		uint32_t Cached(const Programs& programs);
 

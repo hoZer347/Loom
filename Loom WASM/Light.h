@@ -13,6 +13,8 @@
 namespace Loom
 {
 	struct GameObject;
+	struct Mesh;
+	struct MeshBatch;
 
 	/**
 	* Loom::Light
@@ -95,7 +97,11 @@ namespace Loom
 		bool Allocate();
 		void Release();
 
-		void DrawCasters(GameObject& gameObject) const;
+		// Draws what casts a shadow, or adds it to the batch to be drawn with others alike.
+		void DrawCasters(GameObject& gameObject, MeshBatch& batch) const;
+
+		// Readies a program to draw a mesh as seen from the light.
+		void ReadyCaster(Mesh& mesh, uint32_t program) const;
 
 		uint32_t m_depth_texture = 0;
 

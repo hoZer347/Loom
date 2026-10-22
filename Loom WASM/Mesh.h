@@ -5,11 +5,14 @@
 #include "Component.h"
 #include "ShaderVariables.h"
 
+#include <functional>
+#include <unordered_map>
 #include <vector>
 
 namespace Loom
 {
 	struct Material;
+	struct MeshBatch;
 	struct Renderer;
 
 	struct LOOM_API Mesh : Component<Mesh, "Rendering">
@@ -53,6 +56,10 @@ namespace Loom
 		// changed, or the Skin has bent them again.
 		void Draw(uint32_t program);
 
+		// Gives the program the mesh's material and the scene's view, as its
+		// own pass does before drawing it.
+		static void Ready(Mesh& mesh, uint32_t program);
+
 		// Draws the meshes farthest from Camera::current first, writing no
 		// depth, so each blends over everything behind it.
 		static void DrawTransparent(const std::vector<Mesh*>& meshes);
@@ -61,6 +68,10 @@ namespace Loom
 		// transparency on goes onto it rather than being drawn, so it can be
 		// drawn after everything opaque.
 		static inline std::vector<Mesh*>* transparent = nullptr;
+
+		// While Scene::Render points this at a batch, an opaque mesh that can
+		// be drawn as an instance joins it rather than being drawn.
+		static inline MeshBatch* batch = nullptr;
 
 		void OnGui() override;
 
@@ -102,6 +113,12 @@ namespace Loom
 		std::vector<float> m_deformedNormals;
 
 	private:
+		friend struct MeshBatch;
+
+		// Hands the renderer the vertices again once they have changed. False
+		// when there is nothing it can draw.
+		bool Keep(Renderer& renderer);
+
 		// The frame m_deformed was bent for, so the passes after the first in
 		// a frame draw what it bent.
 		unsigned long long m_deformedFrame = 0;
@@ -125,5 +142,49 @@ namespace Loom
 		uint32_t m_kept = 0;
 		Renderer* m_keeper = nullptr;
 		Handed m_handed;
+
+		// What the vertices last handed over hash to, so meshes handing over
+		// the same can be drawn as instances of one.
+		uint64_t m_geometry = 0;
+	};
+
+	/**
+	* Loom::MeshBatch
+	* - Opaque meshes a pass draws together once it has found them all, one
+	*   draw for each lot that differ only in their transform and colour: the
+	*   same vertices, shader and material otherwise
+	* - A mesh joins only when its shader has an instanced program for the
+	*   pass, and its vertices are set to stay and are not bent by a Skin
+	*/
+	struct LOOM_API MeshBatch
+	{
+		// Readies a program to draw a mesh, as the pass would before drawing it alone.
+		typedef std::function<void(Mesh& mesh, uint32_t program)> Ready;
+
+		// Whether the mesh joined, to be drawn with program, or with instanced
+		// among others alike.
+		bool Add(Mesh& mesh, uint32_t program, uint32_t instanced);
+
+		// Draws what joined and empties the batch.
+		void Draw(const Ready& ready);
+
+	private:
+		struct Lot
+		{
+			uint32_t program;
+			uint32_t instanced;
+			std::vector<Mesh*> meshes;
+		};
+
+		// Whether the mesh can be drawn as one of the lot.
+		static bool Alike(const Lot& lot, const Mesh& mesh, uint32_t program);
+
+		std::vector<Lot> m_lots;
+
+		// Into m_lots, by what their meshes' geometry, program and primitive hash to.
+		std::unordered_multimap<uint64_t, size_t> m_byKey;
+
+		// Each instance's model matrix and colour, for the lot being drawn.
+		std::vector<float> m_instances;
 	};
 };

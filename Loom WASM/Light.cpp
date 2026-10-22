@@ -237,8 +237,12 @@ vec3 LoomLight(vec3 normal)
 		{
 			renderer->SetDepthBias(SLOPE_OFFSET, CONSTANT_OFFSET);
 
+			MeshBatch batch;
+
 			for (GameObject* root : roots)
-				DrawCasters(*root);
+				DrawCasters(*root, batch);
+
+			batch.Draw([this](Mesh& mesh, uint32_t program) { ReadyCaster(mesh, program); });
 
 			renderer->SetDepthBias(0.0f, 0.0f);
 		};
@@ -302,12 +306,24 @@ vec3 LoomLight(vec3 normal)
 		m_depth_texture = 0;
 	};
 
-	void Light::DrawCasters(GameObject& gameObject) const
+	void Light::ReadyCaster(Mesh& mesh, uint32_t program) const
+	{
+		Renderer& renderer = *Renderer::Get();
+
+		// The pass is the shader's own vertex stage seen from the light,
+		// so it is handed the light's view-projection in the camera's place.
+		mesh.material->Apply(program, &*std::as_const(mesh.variables));
+		renderer.SetUniform(program, "u_viewProjection", m_view_projection);
+		// A transparent shader's pass runs its fragment stage, which may call LoomShadow.
+		if (mesh.material->shader->settings.transparency)
+			renderer.SetTexture(program, "u_shadowMap", NothingInShadow(renderer));
+		renderer.SetUniform(program, "u_lightViewProjection", m_view_projection);
+	};
+
+	void Light::DrawCasters(GameObject& gameObject, MeshBatch& batch) const
 	{
 		if (gameObject.IsDisabled())
 			return;
-
-		Renderer& renderer = *Renderer::Get();
 
 		// By type name, the way GetComponent matches: a script library's Mesh
 		// carries its own copy of the type info.
@@ -319,25 +335,18 @@ vec3 LoomLight(vec3 normal)
 				if (!mesh->IsDrawable() || !mesh->material->shadows)
 					continue;
 
-				const uint32_t program = mesh->material->shader->shadow_id;
+				const Shader& shader = *mesh->material->shader;
 
-				if (!program)
+				if (!shader.shadow_id || batch.Add(*mesh, shader.shadow_id, shader.shadow_instanced_id))
 					continue;
 
-				// The pass is the shader's own vertex stage seen from the light,
-				// so it is handed the light's view-projection in the camera's place.
-				mesh->material->Apply(program, &*std::as_const(mesh->variables));
-				renderer.SetUniform(program, "u_viewProjection", m_view_projection);
-				// A transparent shader's pass runs its fragment stage, which may call LoomShadow.
-				if (mesh->material->shader->settings.transparency)
-					renderer.SetTexture(program, "u_shadowMap", NothingInShadow(renderer));
-				renderer.SetUniform(program, "u_lightViewProjection", m_view_projection);
-				mesh->Draw(program);
+				ReadyCaster(*mesh, shader.shadow_id);
+				mesh->Draw(shader.shadow_id);
 			}
 			else if (strcmp(component->GetTypeName(), typeid(Sprite).name()) == 0)
 				((Sprite*)component)->DrawShadow(m_view_projection);
 
 		for (GameObject* child : gameObject.GetChildren())
-			DrawCasters(*child);
+			DrawCasters(*child, batch);
 	};
 };

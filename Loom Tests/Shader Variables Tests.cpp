@@ -333,9 +333,11 @@ TEST_SUITE("Shader variables")
 
 		file.Write("// ===COMMON===\nuniform float u_speed;\nuniform vec3 u_tint; // instance\n" + STAGES);
 
+		const uint32_t firstInstanced = shader.instanced_id;
+
 		CHECK(shader.Reload());
 		CHECK(shader.id != first);
-		CHECK(renderer.deleted == std::vector<uint32_t>{ first });
+		CHECK(renderer.deleted == std::vector<uint32_t>{ first, firstInstanced });
 		REQUIRE(shader.variables.size() == 2);
 		CHECK(shader.variables[1].scope == Loom::UniformScope::Instance);
 
@@ -468,6 +470,8 @@ TEST_SUITE("Shader variables")
 
 		uint32_t main = 0;
 		uint32_t shadow = 0;
+		uint32_t instanced = 0;
+		uint32_t shadowInstanced = 0;
 
 		{
 			std::istringstream source("// ===SETTINGS===\nshadows = on\n" + STAGES);
@@ -475,16 +479,52 @@ TEST_SUITE("Shader variables")
 
 			main = shader.id;
 			shadow = shader.shadow_id;
+			instanced = shader.instanced_id;
+			shadowInstanced = shader.shadow_instanced_id;
 
 			CHECK(shader.settings.shadows);
 			CHECK(shadow != 0);
 			CHECK(shadow != main);
+			CHECK(shadowInstanced != 0);
 		};
 
-		CHECK(renderer.deleted == std::vector<uint32_t>{ main, shadow });
+		CHECK(renderer.deleted == std::vector<uint32_t>{ main, shadow, instanced, shadowInstanced });
 
 		std::istringstream unshadowed(STAGES);
 		CHECK(Loom::Shader("no shadow program", unshadowed).shadow_id == 0);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader has an instanced program reading its model matrix and colour from each instance")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream source(
+			"// ===VERTEX===\nuniform highp mat4 u_model;\nuniform vec3 u_color;\nvoid main() { }\n"
+			"// ===FRAGMENT===\nuniform vec3 u_color;\nvoid main() { }\n");
+		Loom::Shader shader("instanced", source);
+
+		REQUIRE(shader.instanced_id != 0);
+		CHECK(shader.instanced_id != shader.id);
+
+		const std::string& vertex = renderer.vertices.at("instanced instanced");
+		CHECK(vertex.find("in mat4 loom_InstanceModel") != std::string::npos);
+		CHECK(vertex.find("uniform highp mat4 u_model") == std::string::npos);
+		CHECK(vertex.find("loom_instance_main()") != std::string::npos);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader whose fragment stage reads the model matrix, or that declares its colour otherwise, has no instanced program")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream readsModel(
+			"// ===VERTEX===\nuniform mat4 u_model;\nvoid main() { }\n"
+			"// ===FRAGMENT===\nuniform mat4 u_model;\nvoid main() { }\n");
+		CHECK(Loom::Shader("reads model", readsModel).instanced_id == 0);
+
+		std::istringstream vec4Color(
+			"// ===VERTEX===\nuniform mat4 u_model;\nvoid main() { }\n"
+			"// ===FRAGMENT===\nuniform vec4 u_color;\nvoid main() { }\n");
+		CHECK(Loom::Shader("vec4 colour", vec4Color).instanced_id == 0);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a second shader of the same name takes the compiled one's settings and shadow program")

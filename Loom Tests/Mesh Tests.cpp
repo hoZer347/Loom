@@ -6,7 +6,9 @@
 #include "Material.h"
 #include "Scene.h"
 #include "SceneSerializer.h"
+#include "Shaders.h"
 
+#include <sstream>
 #include <string>
 
 using LoomTests::Pump;
@@ -140,6 +142,62 @@ TEST_SUITE("Mesh")
 
 		CHECK(renderer.handed == 2);
 		CHECK(renderer.lastVertices == std::vector<float>(9, 2.0f));
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "meshes alike are drawn as instances of one, each with its own transform and colour")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream source(
+			"// ===VERTEX===\nuniform mat4 u_model;\nuniform vec3 u_color;\nvoid main() { }\n"
+			"// ===FRAGMENT===\nuniform vec3 u_color;\nvoid main() { }\n");
+		Loom::Shader shader("instanced meshes", source);
+
+		REQUIRE(shader.instanced_id != 0);
+
+		Loom::Scene scene("instanced");
+		Pump();
+
+		const std::vector<float> triangle(9, 1.0f);
+		const std::vector<float> other(9, 2.0f);
+
+		const auto add = [&](const std::vector<float>& vertices, const glm::vec3& color, Loom::Mesh::DrawType drawType)
+		{
+			Loom::GameObject* holder = scene.AddChild("Shape");
+			holder->transform.position = color;
+
+			Loom::Material* material = holder->Attach<Loom::Material>();
+			material->shader = &shader;
+			material->color = color;
+
+			Loom::Mesh* mesh = holder->Attach<Loom::Mesh>(Loom::Mesh::Triangles);
+			mesh->m_vertices = vertices;
+			mesh->m_draw_type = drawType;
+		};
+
+		const glm::vec3 red(1.0f, 0.0f, 0.0f);
+		const glm::vec3 green(0.0f, 1.0f, 0.0f);
+		const glm::vec3 blue(0.0f, 0.0f, 1.0f);
+
+		add(triangle, red, Loom::Mesh::Static);
+		add(triangle, green, Loom::Mesh::Static);
+		add(other, red, Loom::Mesh::Static);
+		add(triangle, blue, Loom::Mesh::Static);
+		add(triangle, red, Loom::Mesh::Dynamic);
+		Pump();
+
+		scene.Render();
+
+		// The dynamic one as it is found, then the three alike as one, then the odd one out alone.
+		const uint32_t id = shader.id;
+		const uint32_t instanced = shader.instanced_id;
+
+		CHECK(renderer.drawn == std::vector<uint32_t>{ id, instanced, instanced, instanced, id });
+		CHECK(renderer.instanceCounts == std::vector<size_t>{ 3 });
+		CHECK(renderer.instanceColors == std::vector<glm::vec3>{ red, green, blue });
+		REQUIRE(renderer.instanceModels.size() == 3);
+		CHECK(glm::vec3(renderer.instanceModels[1][3]) == green);
+		CHECK(renderer.drawnVertices.back() == other);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the draw type is settable to any GL usage hint")

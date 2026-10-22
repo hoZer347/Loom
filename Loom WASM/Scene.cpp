@@ -107,7 +107,9 @@ namespace Loom
 		s_drawing = true;
 
 		std::vector<Mesh*> transparent;
+		MeshBatch batch;
 		Mesh::transparent = &transparent;
+		Mesh::batch = &batch;
 
 		{
 			LOOM_STAGE("GameObject::Render");
@@ -115,6 +117,12 @@ namespace Loom
 		};
 
 		Mesh::transparent = nullptr;
+		Mesh::batch = nullptr;
+
+		{
+			LOOM_STAGE("MeshBatch::Draw");
+			batch.Draw(Mesh::Ready);
+		};
 
 		{
 			LOOM_STAGE("Mesh::DrawTransparent");

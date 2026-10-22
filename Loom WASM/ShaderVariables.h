@@ -116,6 +116,8 @@ namespace Loom
 
 		// Zero, or the identity for a matrix.
 		static UniformValue Default(UniformType type);
+
+		bool operator==(const UniformValue&) const = default;
 	};
 
 	/**
@@ -138,6 +140,8 @@ namespace Loom
 		void Read(const std::string& text);
 
 		std::map<std::string, UniformValue> values;
+
+		bool operator==(const UniformValues&) const = default;
 	};
 
 	// Every uniform the source declares, bar the ones the engine sets.
