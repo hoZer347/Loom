@@ -38,15 +38,17 @@ namespace
 		return text.str();
 	};
 
-	// A prefab of one object, drawn with a mesh of the shape given.
-	std::string WritePrefab(const std::string& name, const EditableMesh& shape)
+	// A prefab drawn with a mesh of the shape given, on its top object or on
+	// a child of it.
+	std::string WritePrefab(const std::string& name, const EditableMesh& shape, bool child = false)
 	{
 		const std::string path = (std::filesystem::temp_directory_path() / (name + ".loomprefab")).string();
 
 		Loom::Scene source("Source");
 		LoomTests::Pump();
 
-		Loom::GameObject* crate = source.AddChild("Crate");
+		Loom::GameObject* top = source.AddChild("Crate");
+		Loom::GameObject* crate = child ? top->AddChild("Lid") : top;
 		crate->Attach<Loom::Material>()->SetShaderPath("Assets/Shader.shader");
 
 		std::vector<float> positions{ };
@@ -60,7 +62,7 @@ namespace
 		mesh->m_normals = normals;
 		LoomTests::Pump();
 
-		std::ofstream(path, std::ios::binary) << Loom::SceneSerializer::Serialize(*crate);
+		std::ofstream(path, std::ios::binary) << Loom::SceneSerializer::Serialize(*top);
 
 		return path;
 	};
@@ -173,6 +175,23 @@ TEST_CASE("The Model panel opens a prefab's mesh with its triangles welded back 
 
 	CHECK(driven.Mesh().vertices.size() == 8);
 	CHECK(driven.Mesh().faces.size() == 6);
+};
+
+TEST_CASE("The Model panel finds a mesh on a child of the prefab's top object")
+{
+	LoomTests::EngineFixture engine;
+
+	const std::string path = WritePrefab("model_child", EditableMesh::Cube(1.0f), true);
+
+	ModelEditor editor;
+	editor.Open(path);
+	LoomTests::Pump();
+
+	REQUIRE(editor.Editing() != nullptr);
+	CHECK(editor.Editing()->faces.size() == 6);
+
+	std::error_code code;
+	std::filesystem::remove(path, code);
 };
 
 TEST_CASE("The Model panel picks the face clicked, and nothing when the click misses")

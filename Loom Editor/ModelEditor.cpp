@@ -440,6 +440,10 @@ void main()
 
 		scene->AddChild(model_light)->Attach<Light>();
 
+		// Children join their parents through the queue, so the meshes under
+		// the top object are only found once it has run.
+		Engine::DoTasks();
+
 		document.scene = scene;
 		document.root = root;
 		document.written = WriteTime(document.path);
