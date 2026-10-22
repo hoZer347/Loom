@@ -178,6 +178,25 @@ namespace
 			Frame();
 		};
 
+		// The corners of a box round every vertex of the mesh being edited, a
+		// little way out: the top left, or the bottom right.
+		ImVec2 Around(bool far = false) const
+		{
+			constexpr float margin = 20.0f;
+
+			ImVec2 low(width, height);
+			ImVec2 high(0.0f, 0.0f);
+
+			for (const glm::vec3& vertex : Mesh().vertices)
+			{
+				const ImVec2 point = Screen(vertex);
+				low = ImVec2((std::min)(low.x, point.x), (std::min)(low.y, point.y));
+				high = ImVec2((std::max)(high.x, point.x), (std::max)(high.y, point.y));
+			};
+
+			return far ? ImVec2(high.x + margin, high.y + margin) : ImVec2(low.x - margin, low.y - margin);
+		};
+
 		ImVec2 Screen(const glm::vec3& point) const
 		{
 			const std::optional<ImVec2> found = editor.ScreenOf(point);
@@ -246,6 +265,29 @@ TEST_CASE("The Model panel goes on to edit the part whose face is clicked")
 	CHECK(driven.editor.Selected()->faces == std::set<uint32_t>{ 0 });
 };
 
+TEST_CASE("The Model panel's box leaves out corners another part hides")
+{
+	// A lid just above the cube and wider than it, which the camera, looking
+	// down, sees the cube's top through.
+	constexpr float lid_height = 0.6f;
+	constexpr float lid_size = 3.0f;
+
+	EditableMesh lid = EditableMesh::Plane(lid_size);
+	lid.Transform({ 0, 1, 2, 3 }, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, lid_height, 0.0f)));
+
+	Driven driven("model_hidden", &lid);
+	REQUIRE(driven.Mesh().faces.size() == 6);
+
+	driven.editor.SetPick(ModelEditor::Pick::Vertices);
+	driven.Drag(driven.Around(), driven.Around(true));
+
+	// The bottom corners the cube itself leaves in view are still picked.
+	REQUIRE_FALSE(driven.editor.Selected()->vertices.empty());
+
+	for (const uint32_t vertex : driven.editor.Selected()->vertices)
+		CHECK(driven.Mesh().vertices[vertex].y < 0.0f);
+};
+
 TEST_CASE("The Model panel picks the face clicked, and nothing when the click misses")
 {
 	Driven driven("model_click");
@@ -267,19 +309,7 @@ TEST_CASE("The Model panel's box picks the corners it covers that can be seen")
 	Driven driven("model_box");
 
 	driven.editor.SetPick(ModelEditor::Pick::Vertices);
-
-	ImVec2 low(Driven::width, Driven::height);
-	ImVec2 high(0.0f, 0.0f);
-
-	for (const glm::vec3& vertex : driven.Mesh().vertices)
-	{
-		const ImVec2 point = driven.Screen(vertex);
-		low = ImVec2((std::min)(low.x, point.x), (std::min)(low.y, point.y));
-		high = ImVec2((std::max)(high.x, point.x), (std::max)(high.y, point.y));
-	};
-
-	constexpr float margin = 20.0f;
-	driven.Drag(ImVec2(low.x - margin, low.y - margin), ImVec2(high.x + margin, high.y + margin));
+	driven.Drag(driven.Around(), driven.Around(true));
 
 	// The camera looks down from the +X +Z side, so the far bottom corner is
 	// hidden behind the cube.

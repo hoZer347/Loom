@@ -26,7 +26,6 @@
 #include <fstream>
 #include <iostream>
 #include <map>
-#include <sstream>
 #include <utility>
 
 
@@ -1264,10 +1263,21 @@ void main()
 		if (m_seeThrough)
 			return true;
 
-		const glm::vec3 eye(document.view.local * glm::vec4(document.view.eye, 1.0f));
-		const std::optional<EditableMesh::Hit> hit = document.parts[document.part].editing.Raycast(eye, local - eye);
+		// Against every part, each in its own space along the same ray from
+		// the eye, so another part in front hides it too.
+		const glm::vec3 point(document.view.world * glm::vec4(local, 1.0f));
 
-		return !hit || hit->distance > 1.0f - seen_share;
+		for (const Part& part : document.parts)
+		{
+			const glm::mat4 inverse = glm::inverse(part.object->WorldMatrix());
+			const glm::vec3 eye(inverse * glm::vec4(document.view.eye, 1.0f));
+			const std::optional<EditableMesh::Hit> hit = part.editing.Raycast(eye, glm::vec3(inverse * glm::vec4(point, 1.0f)) - eye);
+
+			if (hit && hit->distance < 1.0f - seen_share)
+				return false;
+		};
+
+		return true;
 	};
 
 	std::set<uint32_t> ModelEditor::Moving(const Document& document) const
