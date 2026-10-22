@@ -483,11 +483,10 @@ namespace Loom
 		// takes it out and makes it again.
 		void StepHistory(bool (SceneHistory::* step)(const std::vector<Scene*>&));
 
-		// Whether input in the window can change a scene, so the scenes are
-		// compared for the history after it, which takes long enough on a large
-		// scene to be felt. The Scripts, Shaders and Sprites panels and the
-		// FilePanels only edit, file and open files: what is dragged out of
-		// them lands in another window.
+		// Whether input in the window can change a scene, so a step is
+		// recorded for the history once it is let go. The Scripts, Shaders and
+		// Sprites panels and the FilePanels only edit, file and open files:
+		// what is dragged out of them lands in another window.
 		bool CanEditScenes(const ImGuiWindow* window) const;
 
 		// One open scene as the text it serializes to, so it can be put back
@@ -878,7 +877,7 @@ namespace Loom
 		SceneHistory m_history{ };
 
 		// Set when a click lands or a widget is let go of in a window that
-		// CanEditScenes, or a scene arrives; the scenes are compared on the first
+		// CanEditScenes, or a scene arrives; a step is recorded on the first
 		// frame after that with nothing held down.
 		bool m_historyDirty = true;
 

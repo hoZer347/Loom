@@ -130,12 +130,18 @@ namespace Loom
 		void Drop(Tracker& tracker);
 
 		Tracker* TrackerOf(const GameObject& gameObject) const;
-		State StateOf(GameObject& gameObject, const std::string* own) const;
 
-		// Brings gameObject's entry up to date, its own text too when own is
-		// set. One no tracker has seen, or that came from another, has its
-		// subtree adopted with it, and one in no tracker's scene is let go.
-		void Update(GameObject& gameObject, bool own, bool record);
+		// Fills in where gameObject sits now.
+		static void Place(State& state, const GameObject& gameObject);
+
+		// Counts parent, by guid, among the changed for its children.
+		void Rearranged(const Tracker& tracker, const Guid& parent);
+
+		// Brings gameObject's entry up to date, its own text when own is set
+		// and where it sits when placed is. One no tracker has seen, or that
+		// came from another, has its subtree adopted with it, and one in no
+		// tracker's scene is let go.
+		void Update(GameObject& gameObject, bool own, bool placed, bool record);
 		void Adopt(GameObject& top, Tracker& tracker, bool record);
 		void Add(GameObject& gameObject, Tracker& tracker, bool record);
 		void Remove(const LoomObject* object, bool record);

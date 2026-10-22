@@ -255,6 +255,9 @@ namespace Loom
 			return;
 
 		ImGui::SeparatorText("Instance Variables");
-		DrawShaderVariables(declared, UniformScope::Instance, *variables);
+		UniformValues values = variables;
+
+		if (DrawShaderVariables(declared, UniformScope::Instance, values))
+			variables = std::move(values);
 	};
 };

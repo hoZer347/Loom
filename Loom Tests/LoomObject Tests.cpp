@@ -26,11 +26,12 @@ namespace
 		Loom::Serial<Loom::GameObject*> partner;
 	};
 
-	// Whether the journal names object, and for its children too.
-	bool Names(const Loom::LoomObject::Journal& journal, const Loom::LoomObject* object, bool children = false)
+	// Whether the journal names object for what it holds, or with placed for
+	// where it sits.
+	bool Names(const Loom::LoomObject::Journal& journal, const Loom::LoomObject* object, bool placed = false)
 	{
 		return std::any_of(journal.touched.begin(), journal.touched.end(),
-			[&](const auto& touched) { return touched.first == object && (!children || touched.second); });
+			[&](const auto& touched) { return touched.object == object && (placed ? touched.placed : touched.own); });
 	};
 };
 
@@ -174,7 +175,7 @@ TEST_SUITE("LoomObject")
 
 		CHECK(Names(journal, &holder));
 		CHECK(std::count_if(journal.touched.begin(), journal.touched.end(),
-			[&](const auto& touched) { return touched.first == &holder; }) == 1);
+			[&](const auto& touched) { return touched.object == &holder; }) == 1);
 		CHECK(Loom::LoomObject::TakeJournal().touched.empty());
 	};
 
@@ -202,28 +203,48 @@ TEST_SUITE("LoomObject")
 		CHECK(holder.count == 2);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a child coming or going puts its parent in the journal for its children")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a child coming, going or moving puts it and the sibling before it in the journal, and nothing else")
 	{
 		LoomTests::Watching watching;
 
 		Loom::Scene scene("Journal");
 		Loom::GameObject* parent = scene.AddChild("Parent");
+		Loom::GameObject* first = parent->AddChild("First");
+		Loom::GameObject* second = parent->AddChild("Second");
 		Pump();
 		Loom::LoomObject::TakeJournal();
 
-		Loom::GameObject* child = parent->AddChild("Child");
+		Loom::GameObject* third = parent->AddChild("Third");
 		Pump();
 
-		CHECK(Names(Loom::LoomObject::TakeJournal(), parent, true));
+		Loom::LoomObject::Journal journal = Loom::LoomObject::TakeJournal();
 
-		child->Destroy();
+		CHECK(Names(journal, third, true));
+		CHECK(Names(journal, second, true));
+		CHECK_FALSE(Names(journal, first, true));
+		CHECK_FALSE(Names(journal, parent));
+		CHECK_FALSE(Names(journal, parent, true));
+
+		first->SetParent(parent, third);
 		Pump();
+		journal = Loom::LoomObject::TakeJournal();
 
-		const Loom::LoomObject::Journal journal = Loom::LoomObject::TakeJournal();
+		CHECK(parent->GetChildren() == std::vector<Loom::GameObject*>{ second, first, third });
+		CHECK(first->GetSiblingIndex() == 1);
+		CHECK(Names(journal, first, true));
+		CHECK(Names(journal, second, true));
+		CHECK_FALSE(Names(journal, third, true));
+		CHECK_FALSE(Names(journal, first));
 
-		CHECK(Names(journal, parent, true));
-		CHECK_FALSE(Names(journal, child));
-		CHECK(std::find(journal.destroyed.begin(), journal.destroyed.end(), child) != journal.destroyed.end());
+		first->Destroy();
+		Pump();
+		journal = Loom::LoomObject::TakeJournal();
+
+		CHECK(Names(journal, second, true));
+		CHECK_FALSE(Names(journal, third, true));
+		CHECK_FALSE(Names(journal, parent, true));
+		CHECK(third->GetSiblingIndex() == 1);
+		CHECK(std::find(journal.destroyed.begin(), journal.destroyed.end(), first) != journal.destroyed.end());
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "nothing is kept unwatched, and watching again counts up")

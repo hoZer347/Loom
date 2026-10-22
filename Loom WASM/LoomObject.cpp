@@ -66,12 +66,12 @@ namespace Loom
 		Touch();
 	};
 
-	void LoomObject::Touch(bool children)
+	void LoomObject::Touch(bool placed)
 	{
 		if (!watching)
 			return;
 
-		const unsigned char kinds = children ? touched_self | touched_children : touched_self;
+		const unsigned char kinds = placed ? touched_placed : touched_self;
 
 		// Already in for this: whoever takes the journal reads the object
 		// after taking it, so sees this change too.
@@ -122,7 +122,7 @@ namespace Loom
 
 		for (LoomObject* object : journal)
 		{
-			taken.touched.emplace_back(object, (object->m_touched & touched_children) != 0);
+			taken.touched.push_back({ object, (object->m_touched & touched_self) != 0, (object->m_touched & touched_placed) != 0 });
 			object->m_touched = 0;
 		};
 

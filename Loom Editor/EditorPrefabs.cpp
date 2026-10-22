@@ -317,14 +317,14 @@ namespace Loom
 
 		GameObject* root = GetPrefabRoot();
 		Prefabs::ObjectNode shown;
-		const std::string panelText = root ? SceneSerializer::Serialize(*root) : std::string();
-		const bool showing = root && Prefabs::Parse(panelText, shown);
+		const std::string panel_text = root ? SceneSerializer::Serialize(*root) : std::string();
+		const bool showing = root && Prefabs::Parse(panel_text, shown);
 
 		// A copy just shown agrees with its file as it now serializes.
 		if (showing && m_prefabShape.empty())
 			m_prefabShape = Prefabs::Shape(shown, Prefabs::TransformKeys(*root), Prefabs::Part::Whole);
 
-		if (showing && panelText != m_panelText)
+		if (showing && panel_text != m_panelText)
 			paths.insert(m_prefabPath);
 
 		bool reshow = false;

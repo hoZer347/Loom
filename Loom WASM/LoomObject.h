@@ -102,20 +102,28 @@ namespace Loom
 
 		// What may have changed of what the scene format writes, since it was
 		// last taken: the objects whose name, guid or fields were written, or
-		// for a GameObject its components, and whose children came or went,
-		// and the objects destroyed. Kept only while watched, so whoever looks
-		// at it looks at what changed rather than at every object.
+		// for a GameObject its components, the GameObjects whose parent or
+		// next sibling may be another, and the objects destroyed. Kept only
+		// while watched, so whoever looks at it looks at what changed rather
+		// than at every object.
 		struct Journal
 		{
-			// Each with whether its children were among what changed.
-			std::vector<std::pair<LoomObject*, bool>> touched{ };
+			struct Touched
+			{
+				LoomObject* object = nullptr;
+				bool own = false;
+				bool placed = false;
+			};
+
+			std::vector<Touched> touched{ };
 
 			// Gone by now: only for finding what was kept under the address.
 			std::vector<const LoomObject*> destroyed{ };
 		};
 
-		// Puts this object in the journal, while it is watched.
-		void Touch(bool children = false);
+		// Puts this object in the journal, while it is watched: for what it
+		// holds, or with placed for where it sits.
+		void Touch(bool placed = false);
 
 		// Starting to watch again counts up WatchCount, since whatever was
 		// kept by address while nothing was watched may since be gone. Stopping
@@ -162,7 +170,7 @@ namespace Loom
 		// Which of the journal's kinds of change this object is in it for, and
 		// where, so a destructor takes it out without looking.
 		static constexpr unsigned char touched_self = 1;
-		static constexpr unsigned char touched_children = 2;
+		static constexpr unsigned char touched_placed = 2;
 		std::atomic<unsigned char> m_touched = 0;
 		size_t m_journalAt = 0;
 

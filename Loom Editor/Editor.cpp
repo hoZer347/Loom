@@ -199,18 +199,6 @@ namespace Loom
 			return nullptr;
 		};
 
-		GameObject* FindByGuid(GameObject& root, const Guid& guid)
-		{
-			if (root.GetGuid() == guid)
-				return &root;
-
-			for (GameObject* child : root.GetChildren())
-				if (GameObject* found = FindByGuid(*child, guid))
-					return found;
-
-			return nullptr;
-		};
-
 		// Sits beside the executable and holds what the editor remembers between
 		// runs. Beside the executable rather than in the working directory,
 		// because opening a project moves the working directory to it.

@@ -75,7 +75,7 @@ namespace Loom
 			size_t last;
 		};
 
-		constexpr size_t none = static_cast<size_t>(-1);
+		constexpr size_t none = (size_t)-1;
 		const size_t keyword = strlen(SceneSerializer::gameobject_keyword);
 
 		States states{ };
@@ -223,10 +223,10 @@ namespace Loom
 		for (const LoomObject* gone : journal.destroyed)
 			Remove(gone, record);
 
-		std::unordered_set<GameObject*> own{ };
-		std::vector<GameObject*> parents{ };
+		// Each with whether what it holds changed, and where it sits.
+		std::unordered_map<GameObject*, std::pair<bool, bool>> changed{ };
 
-		for (const auto& [object, children] : journal.touched)
+		for (const auto& [object, own, placed] : journal.touched)
 		{
 			if (Scene* scene = dynamic_cast<Scene*>(object))
 			{
@@ -246,63 +246,45 @@ namespace Loom
 			};
 
 			GameObject* gameObject = dynamic_cast<GameObject*>(object);
+			bool holds = own;
 
 			if (ComponentBase* component = gameObject ? nullptr : dynamic_cast<ComponentBase*>(object))
+			{
 				gameObject = component->GetGameObject();
+				holds = true;
+			};
 
 			if (gameObject == nullptr)
 				continue;
 
-			own.insert(gameObject);
+			auto& [was_held, was_placed] = changed[gameObject];
 
-			if (children)
-				parents.push_back(gameObject);
+			was_held = was_held || holds;
+			was_placed = was_placed || placed;
 		};
 
-		for (GameObject* gameObject : own)
+		// What says where its children and the sibling before it sit names it
+		// by guid.
+		std::vector<GameObject*> renamed{ };
+
+		for (const auto& [gameObject, what] : changed)
+			if (const auto found = m_entries.find(gameObject); found != m_entries.end() && found->second.guid != gameObject->GetGuid())
+				renamed.push_back(gameObject);
+
+		for (GameObject* gameObject : renamed)
 		{
-			// What says where it sits names it by guid.
-			const auto found = m_entries.find(gameObject);
+			for (GameObject* child : gameObject->GetChildren())
+				changed[child].second = true;
 
-			if (found != m_entries.end() && found->second.guid != gameObject->GetGuid())
-			{
-				parents.push_back(gameObject);
+			const GameObject* parent = gameObject->GetParent();
+			const size_t at = gameObject->GetSiblingIndex();
 
-				if (gameObject->GetParent())
-					parents.push_back(gameObject->GetParent());
-			};
-
-			Update(*gameObject, true, record);
+			if (parent && at > 0 && at < parent->GetChildren().size())
+				changed[parent->GetChildren()[at - 1]].second = true;
 		};
 
-		std::unordered_set<GameObject*> rescanned{ };
-
-		for (GameObject* parent : parents)
-		{
-			const auto found = m_entries.find(parent);
-
-			if (found == m_entries.end() || !rescanned.insert(parent).second)
-				continue;
-
-			m_changed.insert(parent);
-
-			const std::vector<GameObject*>& children = parent->GetChildren();
-
-			for (size_t i = 0; i < children.size(); i++)
-			{
-				GameObject* child = children[i];
-				const Guid next = i + 1 < children.size() ? children[i + 1]->GetGuid() : Guid{ };
-				const auto entry = m_entries.find(child);
-
-				if (own.contains(child))
-					continue;
-
-				if (entry == m_entries.end() || entry->second.tracker != found->second.tracker)
-					Update(*child, false, record);
-				else if (entry->second.state.parent != parent->GetGuid() || entry->second.state.next != next)
-					Set(entry->second, State{ entry->second.state.own, parent->GetGuid(), next }, record);
-			};
-		};
+		for (const auto& [gameObject, what] : changed)
+			Update(*gameObject, what.first, what.second, record);
 
 		// Last, so nothing above is taken for an edit to a scene only now seen.
 		std::vector<Tracker*> fresh{ };
@@ -404,25 +386,32 @@ namespace Loom
 		return found == m_roots.end() ? nullptr : found->second;
 	};
 
-	SceneHistory::State SceneHistory::StateOf(GameObject& gameObject, const std::string* own) const
+	void SceneHistory::Place(State& state, const GameObject& gameObject)
 	{
-		State state{ own ? *own : SceneSerializer::SerializeOwn(gameObject) };
+		state.parent = { };
+		state.next = { };
 
-		if (const GameObject* parent = gameObject.GetParent())
-		{
-			const std::vector<GameObject*>& siblings = parent->GetChildren();
-			const auto at = std::find(siblings.begin(), siblings.end(), &gameObject);
+		const GameObject* parent = gameObject.GetParent();
 
-			state.parent = parent->GetGuid();
+		if (parent == nullptr)
+			return;
 
-			if (at != siblings.end() && at + 1 != siblings.end())
-				state.next = (*(at + 1))->GetGuid();
-		};
+		const std::vector<GameObject*>& siblings = parent->GetChildren();
+		const size_t at = gameObject.GetSiblingIndex();
 
-		return state;
+		state.parent = parent->GetGuid();
+
+		if (at + 1 < siblings.size())
+			state.next = siblings[at + 1]->GetGuid();
 	};
 
-	void SceneHistory::Update(GameObject& gameObject, bool own, bool record)
+	void SceneHistory::Rearranged(const Tracker& tracker, const Guid& parent)
+	{
+		if (const auto found = tracker.objects.find(parent); found != tracker.objects.end())
+			m_changed.insert(found->second);
+	};
+
+	void SceneHistory::Update(GameObject& gameObject, bool own, bool placed, bool record)
 	{
 		Tracker* tracker = TrackerOf(gameObject);
 		const auto found = m_entries.find(&gameObject);
@@ -454,7 +443,13 @@ namespace Loom
 		};
 
 		Entry& entry = found->second;
-		State state = StateOf(gameObject, own ? nullptr : &entry.state.own);
+		State state = entry.state;
+
+		if (own)
+			state.own = SceneSerializer::SerializeOwn(gameObject);
+
+		if (placed)
+			Place(state, gameObject);
 
 		if (own)
 		{
@@ -508,7 +503,8 @@ namespace Loom
 
 		Entry& entry = m_entries[&gameObject];
 
-		entry = { &tracker, &gameObject, gameObject.GetGuid(), StateOf(gameObject, nullptr) };
+		entry = { &tracker, &gameObject, gameObject.GetGuid(), State{ SceneSerializer::SerializeOwn(gameObject) } };
+		Place(entry.state, gameObject);
 
 		for (ComponentBase* component : gameObject.GetComponents())
 		{
@@ -518,6 +514,7 @@ namespace Loom
 
 		tracker.objects[entry.guid] = &gameObject;
 		m_changed.insert(&gameObject);
+		Rearranged(tracker, entry.state.parent);
 
 		Note(tracker, entry.guid, std::nullopt, entry.state, record);
 	};
@@ -533,6 +530,7 @@ namespace Loom
 		Tracker& tracker = *entry.tracker;
 
 		Note(tracker, entry.guid, entry.state, std::nullopt, record);
+		Rearranged(tracker, entry.state.parent);
 
 		const auto at = tracker.objects.find(entry.guid);
 
@@ -552,6 +550,12 @@ namespace Loom
 			return;
 
 		Note(*entry.tracker, entry.guid, entry.state, state, record);
+
+		if (state.parent != entry.state.parent || state.next != entry.state.next)
+		{
+			Rearranged(*entry.tracker, entry.state.parent);
+			Rearranged(*entry.tracker, state.parent);
+		};
 
 		entry.state = std::move(state);
 		m_changed.insert(entry.object);
@@ -728,9 +732,9 @@ namespace Loom
 					continue;
 
 				const std::vector<GameObject*>& siblings = parent->GetChildren();
-				const auto at = std::find(siblings.begin(), siblings.end(), gameObject);
+				const size_t at = gameObject->GetSiblingIndex();
 
-				if (at != siblings.end() && (at + 1 == siblings.end() ? nullptr : *(at + 1)) == next)
+				if (gameObject->GetParent() == parent && at < siblings.size() && (at + 1 < siblings.size() ? siblings[at + 1] : nullptr) == next)
 					continue;
 
 				gameObject->SetParent(parent, next);
@@ -773,10 +777,10 @@ namespace Loom
 
 		for (const std::unique_ptr<Tracker>& tracker : m_trackers)
 		{
-			std::vector<Tracker*>& ofScene = copies[tracker->guid];
+			std::vector<Tracker*>& of_scene = copies[tracker->guid];
 
-			ofScene.push_back(tracker.get());
-			most = std::max(most, ofScene.size());
+			of_scene.push_back(tracker.get());
+			most = std::max(most, of_scene.size());
 		};
 
 		while (!from.empty())

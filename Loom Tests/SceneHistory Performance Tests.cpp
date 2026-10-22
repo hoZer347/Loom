@@ -4,6 +4,7 @@
 
 #include "ComponentRegistry.h"
 #include "GameObject.h"
+#include "Guid.h"
 #include "Scene.h"
 #include "SceneHistory.h"
 
@@ -11,6 +12,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <functional>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -22,7 +24,7 @@ using LoomTests::Pump;
 namespace
 {
 	// Objects sit in groups of this many under the scene's root, as a scene
-	// built by hand tends to be laid out.
+	// built by hand tends to be laid out, or all under the root.
 	constexpr int GROUP = 16;
 
 	// Each pass makes this many edits, undoes each and redoes each, so a
@@ -59,30 +61,40 @@ namespace
 		double redo = std::numeric_limits<double>::max();
 	};
 
-	// A scene of count objects, each with a Load pointing at the one before.
+	struct Crowd;
+
+	// The edits timed: the edit made to the object numbered by the int.
+	struct Kind
+	{
+		const char* name;
+		std::function<void(Crowd&, int)> edit;
+	};
+
+	// A scene of count objects, each with a Load pointing at the one before,
+	// in groups or all under the root.
 	struct Crowd
 	{
-		explicit Crowd(int count) :
+		Crowd(int count, bool grouped) :
 			scene(new Loom::Scene("Crowd"))
 		{
 			Pump();
 
-			Loom::GameObject* group = nullptr;
+			Loom::GameObject* group = &scene->GetRoot();
+			Loom::GameObject* last = nullptr;
 
 			for (int i = 0; i < count; i++)
 			{
-				if (i % GROUP == 0)
+				if (grouped && i % GROUP == 0)
 					group = scene->AddChild("Group");
 
 				Loom::GameObject* object = group->AddChild("Object");
 				Load* load = object->Attach<Load>();
 
 				load->label = "Object " + std::to_string(i);
+				load->partner = last;
 
-				if (!objects.empty())
-					load->partner = objects.back();
-
-				objects.push_back(object);
+				guids.push_back(object->GetGuid());
+				last = object;
 			};
 
 			Pump();
@@ -94,7 +106,13 @@ namespace
 			Pump();
 		};
 
-		Costs Time()
+		// By guid, since an undone delete makes the object again.
+		Loom::GameObject* At(int i) const
+		{
+			return Loom::LoomObject::GetByGuid<Loom::GameObject>(guids[i]);
+		};
+
+		Costs Time(const Kind& kind)
 		{
 			using Clock = std::chrono::steady_clock;
 
@@ -110,16 +128,16 @@ namespace
 
 			history.Record(open);
 
+			// Spread through the scene, so no part of it stays warm.
+			const int stride = (int)guids.size() / EDITS;
+
 			for (int pass = 0; pass < TRIES; pass++)
 			{
-				// Spread through the scene, so no part of it stays warm.
-				const size_t stride = objects.size() / EDITS;
-
 				Clock::time_point start = Clock::now();
 
 				for (int i = 0; i < EDITS; i++)
 				{
-					objects[i * stride]->GetComponent<Load>()->label = "Pass " + std::to_string(pass);
+					kind.edit(*this, i * stride);
 					history.Record(open);
 				};
 
@@ -136,13 +154,55 @@ namespace
 					history.Redo(open);
 
 				best.redo = std::min(best.redo, since(start) / EDITS);
+
+				// Back as it was for the next pass.
+				for (int i = 0; i < EDITS; i++)
+					history.Undo(open);
 			};
 
 			return best;
 		};
 
 		Loom::Scene* scene = nullptr;
-		std::vector<Loom::GameObject*> objects{ };
+		std::vector<Loom::Guid> guids{ };
+	};
+
+	const std::vector<Kind> KINDS =
+	{
+		{
+			"field",
+			[](Crowd& crowd, int i)
+			{
+				crowd.At(i)->GetComponent<Load>()->label = "Edited";
+			}
+		},
+		{
+			"duplicate",
+			[](Crowd& crowd, int i)
+			{
+				Loom::GameObject* original = crowd.At(i);
+				Loom::GameObject* copy = original->GetParent()->AddChild("Copy");
+
+				copy->Attach<Load>()->partner = original;
+				copy->SetParent(original->GetParent(), original);
+			}
+		},
+		{
+			"delete",
+			[](Crowd& crowd, int i)
+			{
+				crowd.At(i)->Destroy();
+			}
+		},
+		{
+			"move",
+			[](Crowd& crowd, int i)
+			{
+				Loom::GameObject* across = crowd.At((i + (int)crowd.guids.size() / 2) % (int)crowd.guids.size());
+
+				crowd.At(i)->SetParent(across->GetParent(), across);
+			}
+		},
 	};
 };
 
@@ -151,39 +211,43 @@ TEST_SUITE("Performance" * doctest::skip())
 {
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an edit, an undo and a redo cost about the same among sixteen times the GameObjects")
 	{
-		constexpr int FEW = 4000;
-		constexpr int GROWTH = 16;
-		constexpr int MANY = FEW * GROWTH;
+		constexpr int few = 4000;
+		constexpr int growth = 16;
+		constexpr int many = few * growth;
 
 		// Looking at every object would make each sixteen times the cost;
 		// this leaves room for larger tables missing the cache more.
-		constexpr double MOST_GROWTH = 3.0;
+		constexpr double most_growth = 3.0;
 
 		LoadRegistered registered;
 		LoomTests::Watching watching;
 
-		Costs few{ };
-		Costs many{ };
+		for (const bool grouped : { true, false })
+			for (const Kind& kind : KINDS)
+			{
+				Costs fewCosts{ };
+				Costs manyCosts{ };
 
-		{
-			Crowd crowd(FEW);
-			few = crowd.Time();
-		};
+				{
+					Crowd crowd(few, grouped);
+					fewCosts = crowd.Time(kind);
+				};
 
-		{
-			Crowd crowd(MANY);
-			many = crowd.Time();
-		};
+				{
+					Crowd crowd(many, grouped);
+					manyCosts = crowd.Time(kind);
+				};
 
-		std::ostringstream report;
-		report << "among " << FEW << " GameObjects then " << MANY << ", in us: edit "
-			<< few.edit * MICROSECONDS_PER_MILLISECOND << " then " << many.edit * MICROSECONDS_PER_MILLISECOND << ", undo "
-			<< few.undo * MICROSECONDS_PER_MILLISECOND << " then " << many.undo * MICROSECONDS_PER_MILLISECOND << ", redo "
-			<< few.redo * MICROSECONDS_PER_MILLISECOND << " then " << many.redo * MICROSECONDS_PER_MILLISECOND;
-		MESSAGE(report.str());
+				std::ostringstream report;
+				report << kind.name << (grouped ? " in groups" : " all under the root") << ", among " << few << " GameObjects then " << many << ", in us: edit "
+					<< fewCosts.edit * MICROSECONDS_PER_MILLISECOND << " then " << manyCosts.edit * MICROSECONDS_PER_MILLISECOND << ", undo "
+					<< fewCosts.undo * MICROSECONDS_PER_MILLISECOND << " then " << manyCosts.undo * MICROSECONDS_PER_MILLISECOND << ", redo "
+					<< fewCosts.redo * MICROSECONDS_PER_MILLISECOND << " then " << manyCosts.redo * MICROSECONDS_PER_MILLISECOND;
+				MESSAGE(report.str());
 
-		CHECK(many.edit / few.edit <= MOST_GROWTH);
-		CHECK(many.undo / few.undo <= MOST_GROWTH);
-		CHECK(many.redo / few.redo <= MOST_GROWTH);
+				CHECK(manyCosts.edit / fewCosts.edit <= most_growth);
+				CHECK(manyCosts.undo / fewCosts.undo <= most_growth);
+				CHECK(manyCosts.redo / fewCosts.redo <= most_growth);
+			};
 	};
 };

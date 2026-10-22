@@ -101,15 +101,18 @@ namespace Loom
 		Engine::QueueTask(
 			[this, child]()
 			{
-				m_children.erase(
-					std::remove(
-						m_children.begin(),
-						m_children.end(),
-						child));
+				const size_t at = child->GetSiblingIndex();
+
+				if (at < m_children.size())
+				{
+					if (at > 0)
+						m_children[at - 1]->Touch(true);
+
+					m_children.erase(m_children.begin() + at);
+				};
 
 				delete child;
 				hierarchy_changes++;
-				Touch(true);
 			});
 	};
 
@@ -151,9 +154,13 @@ namespace Loom
 		Engine::QueueTask(
 			[gameObject, this]()
 			{
+				if (!m_children.empty())
+					m_children.back()->Touch(true);
+
+				gameObject->m_siblingAt = m_children.size();
 				m_children.emplace_back(gameObject);
 				hierarchy_changes++;
-				Touch(true);
+				gameObject->Touch(true);
 			});
 
 		return gameObject;
@@ -171,22 +178,51 @@ namespace Loom
 					if (above == this)
 						return;
 
-				std::erase(parent->m_children, this);
-				parent->Touch(true);
+				// Each place's sibling before it gets another after it.
+				const size_t from = GetSiblingIndex();
+
+				if (from < parent->m_children.size())
+				{
+					if (from > 0)
+						parent->m_children[from - 1]->Touch(true);
+
+					parent->m_children.erase(parent->m_children.begin() + from);
+				};
 
 				parent = new_parent;
 
-				parent->m_children.insert(
-					std::find(
-						parent->m_children.begin(),
-						parent->m_children.end(),
-						before),
-					this);
+				const size_t to = before && before->parent == parent ? before->GetSiblingIndex() : parent->m_children.size();
+
+				if (to > 0)
+					parent->m_children[to - 1]->Touch(true);
+
+				m_siblingAt = to;
+				parent->m_children.insert(parent->m_children.begin() + to, this);
 
 				hierarchy_changes++;
-				parent->Touch(true);
-				Touch();
+				Touch(true);
 			});
+	};
+
+	size_t GameObject::GetSiblingIndex() const
+	{
+		if (parent == nullptr)
+			return 0;
+
+		const std::vector<GameObject*>& siblings = parent->m_children;
+		const size_t count = siblings.size();
+		const size_t from = std::min(m_siblingAt, count == 0 ? 0 : count - 1);
+
+		for (size_t distance = 0; distance < count; distance++)
+		{
+			if (from + distance < count && siblings[from + distance] == this)
+				return m_siblingAt = from + distance;
+
+			if (distance <= from && siblings[from - distance] == this)
+				return m_siblingAt = from - distance;
+		};
+
+		return count;
 	};
 
 	void GameObject::OrderComponents(const std::vector<ComponentBase*>& order)

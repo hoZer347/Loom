@@ -9,6 +9,7 @@
 #include <iostream>
 #include <string>
 #include <unordered_map>
+#include <utility>
 
 
 namespace Loom
@@ -161,7 +162,10 @@ namespace Loom
 			return;
 
 		DrawSettings();
-		DrawShaderVariables(shader->variables, UniformScope::Material, *variables);
+		UniformValues values = variables;
+
+		if (DrawShaderVariables(shader->variables, UniformScope::Material, values))
+			variables = std::move(values);
 		DrawDeclarations();
 	};
 

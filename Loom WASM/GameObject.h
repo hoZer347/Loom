@@ -166,6 +166,11 @@ namespace Loom
 		const std::vector<ComponentBase*>& GetComponents() const { return m_components; };
 		GameObject* GetParent() const { return parent; };
 
+		// Where it is among its parent's children, or their count when it is
+		// not among them yet. Looked for outward from where it was put or last
+		// found, so it costs as much as it has moved since.
+		size_t GetSiblingIndex() const;
+
 		// Removes one component instance. By instance rather than by type: a
 		// GameObject is free to carry two of the same kind.
 		void DetachComponent(ComponentBase* component);
@@ -243,6 +248,7 @@ namespace Loom
 
 	private:
 		GameObject* parent;
+		mutable size_t m_siblingAt = 0;
 
 		char newName[128];
 
