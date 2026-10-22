@@ -208,6 +208,10 @@ namespace Loom
 			std::vector<Kept> kept;
 		};
 
+		// Readies every body Add noted, takes gravity and what AddForce
+		// gathered into its velocity, and finds how far that takes it.
+		void ReadyBodies(float seconds);
+
 		// Fills in a body Add only noted, false for one that cannot move.
 		bool Ready(Body& body, const Joining& joining);
 
@@ -263,6 +267,9 @@ namespace Loom
 		// many pairs are made ready at once.
 		void Prepare(Pair& pair, float seconds);
 
+		// Makes every pair's contacts ready at once.
+		void PrepareContacts(float seconds);
+
 		// Splits the pairs to solve between slabs of space, the borders
 		// between them, and those across more than one border: no two slabs
 		// share a body the solver moves, nor two borders but neighbours.
@@ -288,6 +295,10 @@ namespace Loom
 		// The Rigidbody the collider moves with, if it has one, at once and
 		// from outside a step too.
 		static void WakeOwner(const Collider& collider);
+
+		// Moves every body and places it in the tree, and keeps what each
+		// touching pair ended on.
+		void MoveBodies(float seconds);
 
 		// Moves an awake body, writes its transform and measures its
 		// colliders, touching nothing but the body, so many move at once.

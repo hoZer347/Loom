@@ -3497,7 +3497,7 @@ namespace Loom
 
 	void Editor::DrawSceneView()
 	{
-		LOOM_STAGE("Scene view");
+		LOOM_STAGE("Editor::DrawSceneView");
 
 		if (m_activeScene == nullptr)
 			ImGui::TextDisabled("No scene open. Pick one in the Project panel.");
@@ -3538,7 +3538,7 @@ namespace Loom
 
 	void Editor::DrawPrefabView()
 	{
-		LOOM_STAGE("Prefab view");
+		LOOM_STAGE("Editor::DrawPrefabView");
 
 		if (GetPrefabRoot() == nullptr)
 			ImGui::TextDisabled("No prefab open. Double-click one in the Project panel.");
@@ -3574,7 +3574,7 @@ namespace Loom
 
 	void Editor::DrawGameView()
 	{
-		LOOM_STAGE("Game view");
+		LOOM_STAGE("Editor::DrawGameView");
 
 		m_gamePanelFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 		m_gamePanelHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
@@ -3612,7 +3612,7 @@ namespace Loom
 
 	void Editor::DrawDebugView()
 	{
-		LOOM_STAGE("Debug view");
+		LOOM_STAGE("Editor::DrawDebugView");
 
 		if (Scene::GetScenes().empty())
 			ImGui::TextDisabled("Nothing loaded.");

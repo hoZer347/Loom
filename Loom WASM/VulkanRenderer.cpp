@@ -348,7 +348,7 @@ namespace Loom
 			Frame& frame = m_frames[m_frameIndex];
 
 			{
-				LOOM_STAGE("Wait for GPU");
+				LOOM_STAGE("vkWaitForFences");
 				vkWaitForFences(m_device, 1, &frame.fence, VK_TRUE, UINT64_MAX);
 			};
 
@@ -362,7 +362,7 @@ namespace Loom
 				CreateSwapchain();
 
 			{
-				LOOM_STAGE("Acquire");
+				LOOM_STAGE("VulkanRenderer::Acquire");
 				m_haveImage = Acquire(frame);
 			};
 
@@ -430,7 +430,7 @@ namespace Loom
 			};
 
 			{
-				LOOM_STAGE("Submit");
+				LOOM_STAGE("vkQueueSubmit");
 				Succeeded(vkQueueSubmit(m_queue, 1, &submit, frame.fence), "submitting the frame");
 			};
 
@@ -443,7 +443,7 @@ namespace Loom
 				present.pSwapchains = &m_swapchain;
 				present.pImageIndices = &m_imageIndex;
 
-				LOOM_STAGE("Swap");
+				LOOM_STAGE("vkQueuePresentKHR");
 				const VkResult result = vkQueuePresentKHR(m_queue, &present);
 
 				if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)

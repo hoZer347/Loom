@@ -283,9 +283,12 @@ namespace Loom
 				m_capture = nullptr;
 			};
 
-			LOOM_STAGE("Swap");
+			{
+				LOOM_STAGE("glFlush");
+				glFlush();
+			};
 
-			glFlush();
+			LOOM_STAGE("glfwSwapBuffers");
 			glfwSwapBuffers(m_window);
 		};
 

@@ -65,6 +65,8 @@ namespace Loom
 
 	void Scene::Render(Camera* camera, const std::vector<Scene*>& drawn)
 	{
+		LOOM_STAGE("Scene::Render");
+
 		Camera* seen = camera ? camera : root.FindComponent<Camera>();
 
 		// A scene whose cameras are all disabled shows nothing.
@@ -84,7 +86,7 @@ namespace Loom
 		// on, so shadows cross between them but not from scenes out of view.
 		if (light)
 		{
-			LOOM_STAGE("Shadows");
+			LOOM_STAGE("Light::RenderShadowMap");
 
 			std::vector<GameObject*> lit{ &root };
 
@@ -102,14 +104,14 @@ namespace Loom
 		Mesh::transparent = &transparent;
 
 		{
-			LOOM_STAGE("Opaque");
+			LOOM_STAGE("GameObject::Render");
 			root.Render();
 		};
 
 		Mesh::transparent = nullptr;
 
 		{
-			LOOM_STAGE("Transparent");
+			LOOM_STAGE("Mesh::DrawTransparent");
 			Mesh::DrawTransparent(transparent);
 		};
 
@@ -138,22 +140,32 @@ namespace Loom
 
 	void Scene::Physics()
 	{
+		LOOM_STAGE("Scene::Physics");
+
 		ColliderTree::current = &colliders;
 		Simulation::current = &simulation;
+
 		{
-			LOOM_STAGE("Colliders");
-
+			LOOM_STAGE("ColliderTree::BeginSync");
 			colliders.BeginSync();
+		};
 
+		{
+			LOOM_STAGE("GameObject::Physics");
 			root.Physics();
+		};
+
+		{
+			LOOM_STAGE("ColliderTree::SyncEnlisted");
 			colliders.SyncEnlisted();
+		};
+
+		{
+			LOOM_STAGE("ColliderTree::EndSync");
 			colliders.EndSync();
 		};
 
-		{
-			LOOM_STAGE("Simulation");
-			simulation.Step(Loom::Physics::FixedDeltaTime());
-		};
+		simulation.Step(Loom::Physics::FixedDeltaTime());
 
 		ColliderTree::current = nullptr;
 		Simulation::current = nullptr;

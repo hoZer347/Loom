@@ -41,11 +41,21 @@ namespace
 
 		return { };
 	};
+
+	// Starts each test on a frame of its own, since tests before may have
+	// filled the last with stages of theirs.
+	struct NewFrame
+	{
+		NewFrame()
+		{
+			Loom::Profiler::EndFrame();
+		};
+	};
 };
 
 TEST_SUITE("Profiler")
 {
-	TEST_CASE("a stage's parts follow it one deeper, in the order they began")
+	TEST_CASE_FIXTURE(NewFrame, "a stage's parts follow it one deeper, in the order they began")
 	{
 		{
 			LOOM_STAGE("Profiler outer");
@@ -83,7 +93,7 @@ TEST_SUITE("Profiler")
 		CHECK(first.history.back() == doctest::Approx(first.average));
 	};
 
-	TEST_CASE("stages are listed in the order they began in the last frame")
+	TEST_CASE_FIXTURE(NewFrame, "stages are listed in the order they began in the last frame")
 	{
 		{
 			LOOM_STAGE("Profiler later");
@@ -112,7 +122,7 @@ TEST_SUITE("Profiler")
 		CHECK(sooner.row < later.row);
 	};
 
-	TEST_CASE("a stage run twice counts as their sum, and a frame it misses as none")
+	TEST_CASE_FIXTURE(NewFrame, "a stage run twice counts as their sum, and a frame it misses as none")
 	{
 		for (int run = 0; run < 2; run++)
 		{
@@ -143,7 +153,7 @@ TEST_SUITE("Profiler")
 		CHECK(row.history.back() == 0.0);
 	};
 
-	TEST_CASE("a point of the trend is its frames' average, a frame missed counting as none")
+	TEST_CASE_FIXTURE(NewFrame, "a point of the trend is its frames' average, a frame missed counting as none")
 	{
 		static_assert(Loom::Profiler::Bucket % 2 == 0, "every other frame of a bucket must be half of it");
 
@@ -166,7 +176,7 @@ TEST_SUITE("Profiler")
 		CHECK(row.trend.back() <= doctest::Approx(row.peak / 2.0));
 	};
 
-	TEST_CASE("a stage that has not run for the whole trend is forgotten")
+	TEST_CASE_FIXTURE(NewFrame, "a stage that has not run for the whole trend is forgotten")
 	{
 		constexpr int SPAN = Loom::Profiler::Trend * Loom::Profiler::Bucket;
 
@@ -187,7 +197,7 @@ TEST_SUITE("Profiler")
 		CHECK_FALSE(FindRow("Profiler once").thread);
 	};
 
-	TEST_CASE("the stage open innermost is the current one")
+	TEST_CASE_FIXTURE(NewFrame, "the stage open innermost is the current one")
 	{
 		CHECK(Loom::Profiler::Current() == nullptr);
 
@@ -206,7 +216,7 @@ TEST_SUITE("Profiler")
 		Loom::Profiler::EndFrame();
 	};
 
-	TEST_CASE("a worker's share of a For counts towards the stage it was started in")
+	TEST_CASE_FIXTURE(NewFrame, "a worker's share of a For counts towards the stage it was started in")
 	{
 		if (Loom::Jobs::Threads() < 2)
 			return;

@@ -132,39 +132,54 @@ namespace Loom
 
 	void Engine::RenderImGui()
 	{
-		LOOM_STAGE("GUI");
+		LOOM_STAGE("Engine::RenderImGui");
 
 		{
-			LOOM_STAGE("Build");
-
+			LOOM_STAGE("Renderer::NewImGuiFrame");
 			renderer->NewImGuiFrame();
+		};
 
-			if (onImGuiInput)
-				onImGuiInput();
-
-			ImGui::NewFrame();
-
-			if (onGui)
-				onGui();
-			else if (Engine::doGUI)
-				for (auto& scene : Scene::allScenes)
-				{
-					if (ImGui::Begin(scene->NameAndID().c_str()))
-						scene->root.Gui();
-					ImGui::End();
-				};
+		if (onImGuiInput)
+		{
+			LOOM_STAGE("Engine::onImGuiInput");
+			onImGuiInput();
 		};
 
 		{
-			LOOM_STAGE("Draw");
+			LOOM_STAGE("ImGui::NewFrame");
+			ImGui::NewFrame();
+		};
 
+		if (onGui)
+		{
+			LOOM_STAGE("Engine::onGui");
+			onGui();
+		}
+		else if (Engine::doGUI)
+			for (auto& scene : Scene::allScenes)
+			{
+				if (ImGui::Begin(scene->NameAndID().c_str()))
+				{
+					LOOM_STAGE("GameObject::Gui");
+					scene->root.Gui();
+				};
+
+				ImGui::End();
+			};
+
+		{
+			LOOM_STAGE("ImGui::Render");
 			ImGui::Render();
+		};
+
+		{
+			LOOM_STAGE("Renderer::RenderImGui");
 			renderer->RenderImGui(ImGui::GetDrawData());
 		};
 
 		if (io->ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 		{
-			LOOM_STAGE("Windows");
+			LOOM_STAGE("Renderer::RenderImGuiWindows");
 			renderer->RenderImGuiWindows();
 		};
 	};
@@ -190,32 +205,40 @@ namespace Loom
 	void Engine::renderFrame()
 	{
 		{
-			LOOM_STAGE("Input");
-
+			LOOM_STAGE("glfwPollEvents");
 			glfwPollEvents();
+		};
 
+		{
+			LOOM_STAGE("Input::Tick");
 			Input::Tick();
+		};
 
-			// The frame clock, the edge-detected dialogue input and the StaticStateMachine.
-			// First thing in the frame, so everything ticked below reads the same delta and
-			// the same key presses.
+		// The frame clock, the edge-detected dialogue input and the StaticStateMachine.
+		// First thing in the frame, so everything ticked below reads the same delta and
+		// the same key presses.
+		{
+			LOOM_STAGE("Utilities::Tick");
 			Utilities::Tick();
 		};
 
 		{
-			LOOM_STAGE("Begin frame");
-
+			LOOM_STAGE("Renderer::BeginFrame");
 			renderer->BeginFrame();
+		};
+
+		{
+			LOOM_STAGE("Renderer::Clear");
 			renderer->Clear(clearColor, true);
 		};
 
 		{
-			LOOM_STAGE("Tasks");
+			LOOM_STAGE("Engine::DoTasks");
 			DoTasks();
 		};
 
 		{
-			LOOM_STAGE("Update");
+			LOOM_STAGE("Engine::onUpdate");
 			onUpdate();
 		};
 
@@ -236,8 +259,6 @@ namespace Loom
 
 			for (int step = 0; step < MOST_STEPS && s_physicsTime >= Physics::FixedDeltaTime(); step++)
 			{
-				LOOM_STAGE("Physics");
-
 				s_physicsTime -= Physics::FixedDeltaTime();
 
 				for (auto& scene : Scene::allScenes)
@@ -246,34 +267,37 @@ namespace Loom
 
 			s_physicsTime = std::min(s_physicsTime, Physics::FixedDeltaTime());
 
-			LOOM_STAGE("Scripts");
-
 			for (auto& scene : Scene::allScenes)
+			{
+				LOOM_STAGE("Scene::Update");
 				scene->Update();
+			};
 
+			LOOM_STAGE("Utilities::Update");
 			Utilities::Update();
 		};
 
 		{
-			LOOM_STAGE("Audio");
+			LOOM_STAGE("Audio::Tick");
 			Audio::Tick();
 		};
 
 		if (renderScenes)
 		{
-			LOOM_STAGE("Scenes");
-
-			Ui::BeginOverlay();
+			{
+				LOOM_STAGE("Ui::BeginOverlay");
+				Ui::BeginOverlay();
+			};
 
 			for (auto& scene : Scene::allScenes)
 				scene->Render();
 
-			LOOM_STAGE("UI");
+			LOOM_STAGE("Ui::DrawOverlay");
 			Ui::DrawOverlay();
 		};
 
 		{
-			LOOM_STAGE("Present");
+			LOOM_STAGE("Renderer::EndFrame");
 			renderer->EndFrame();
 		};
 

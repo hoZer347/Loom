@@ -261,8 +261,55 @@ namespace Loom
 
 	void Simulation::Step(float seconds)
 	{
+		LOOM_STAGE("Simulation::Step");
+
 		m_step++;
 
+		{
+			LOOM_STAGE("Simulation::ReadyBodies");
+			ReadyBodies(seconds);
+		};
+
+		{
+			LOOM_STAGE("Simulation::Gather");
+			Gather(seconds);
+		};
+
+		{
+			LOOM_STAGE("Simulation::Partition");
+			Partition();
+		};
+
+		{
+			LOOM_STAGE("Simulation::PrepareContacts");
+			PrepareContacts(seconds);
+		};
+
+		{
+			LOOM_STAGE("Simulation::SolveSlabs");
+			SolveSlabs();
+		};
+
+		{
+			LOOM_STAGE("Simulation::MoveBodies");
+			MoveBodies(seconds);
+		};
+
+		{
+			LOOM_STAGE("Simulation::Report");
+			Report();
+		};
+
+		for (const Body& body : m_bodies)
+			for (Collider* collider : body.colliders)
+				collider->m_body = NONE;
+
+		m_joining.clear();
+		m_noted.clear();
+	};
+
+	void Simulation::ReadyBodies(float seconds)
+	{
 		// Once the tree is in step, so a collider attached since the body
 		// was is in it and moves with the body. The bodies are kept from step
 		// to step, so readying one only overwrites it.
@@ -272,70 +319,51 @@ namespace Loom
 		// its velocity, and how far that takes it found.
 		const glm::vec3 gravity = Physics::GetGravity();
 
-		{
-			LOOM_STAGE("Bodies");
-
-			Jobs::For(m_bodies.size(), BODY_GRAIN,
-				[&](size_t, size_t begin, size_t end)
+		Jobs::For(m_bodies.size(), BODY_GRAIN,
+			[&](size_t, size_t begin, size_t end)
+			{
+				for (size_t i = begin; i < end; i++)
 				{
-					for (size_t i = begin; i < end; i++)
+					Body& body = m_bodies[i];
+
+					if (!Ready(body, m_joining[i]))
 					{
-						Body& body = m_bodies[i];
-
-						if (!Ready(body, m_joining[i]))
-						{
-							body.object = nullptr;
-							continue;
-						};
-
-						for (Collider* collider : body.colliders)
-							collider->m_body = (int)i;
-
-						Accelerate(body, gravity, seconds);
-
-						body.travel = glm::length(body.velocity) * seconds;
-						body.refit = body.awake && Outgrown(body, seconds);
+						body.object = nullptr;
+						continue;
 					};
-				});
 
-			// Numbered again, past any that cannot move.
-			if (std::erase_if(m_bodies, [](const Body& body) { return body.object == nullptr; }) > 0)
-				for (int index = 0; index < (int)m_bodies.size(); index++)
-					for (Collider* collider : m_bodies[index].colliders)
-						collider->m_body = index;
-		};
+					for (Collider* collider : body.colliders)
+						collider->m_body = (int)i;
 
-		{
-			LOOM_STAGE("Pairs");
-			Gather(seconds);
-		};
+					Accelerate(body, gravity, seconds);
 
-		{
-			LOOM_STAGE("Partition");
-			Partition();
-		};
+					body.travel = glm::length(body.velocity) * seconds;
+					body.refit = body.awake && Outgrown(body, seconds);
+				};
+			});
 
-		{
-			LOOM_STAGE("Contacts");
+		// Numbered again, past any that cannot move.
+		if (std::erase_if(m_bodies, [](const Body& body) { return body.object == nullptr; }) > 0)
+			for (int index = 0; index < (int)m_bodies.size(); index++)
+				for (Collider* collider : m_bodies[index].colliders)
+					collider->m_body = index;
+	};
 
-			// Every pair's contacts made ready at once, from the velocities before
-			// any warm start.
-			Jobs::For(m_groups.size(), 1,
-				[&](size_t, size_t begin, size_t end)
-				{
-					for (size_t group = begin; group < end; group++)
-						for (size_t pair : m_groups[group])
-							Prepare(m_pairs[pair], seconds);
-				});
-		};
+	void Simulation::PrepareContacts(float seconds)
+	{
+		// Every pair's contacts made ready at once, from the velocities before
+		// any warm start.
+		Jobs::For(m_groups.size(), 1,
+			[&](size_t, size_t begin, size_t end)
+			{
+				for (size_t group = begin; group < end; group++)
+					for (size_t pair : m_groups[group])
+						Prepare(m_pairs[pair], seconds);
+			});
+	};
 
-		{
-			LOOM_STAGE("Solve");
-			SolveSlabs();
-		};
-
-		LOOM_STAGE("Move");
-
+	void Simulation::MoveBodies(float seconds)
+	{
 		// A body with others hanging under it moves first, outermost first,
 		// so those under it are placed from where it ends up; the rest move at
 		// once, then their leaves are placed.
@@ -389,15 +417,6 @@ namespace Loom
 				const size_t begin = (chunk - 1) * PAIR_GRAIN;
 				Keep(begin, std::min(begin + PAIR_GRAIN, m_pairs.size()));
 			});
-
-		Report();
-
-		for (const Body& body : m_bodies)
-			for (Collider* collider : body.colliders)
-				collider->m_body = NONE;
-
-		m_joining.clear();
-		m_noted.clear();
 	};
 
 	Simulation::Key Simulation::Ordered(const Collider* a, const Collider* b)
