@@ -378,7 +378,7 @@ namespace Loom
 
 	void Engine::DoTasks() noexcept
 	{
-		if (Lane::OnOne())
+		if (Lane::OnOne() || Lane::AnyBusy())
 			return;
 
 		// A task may take away what a step begun is solving against.

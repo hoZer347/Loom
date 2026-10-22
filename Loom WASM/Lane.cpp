@@ -8,6 +8,8 @@ namespace Loom
 	namespace
 	{
 		thread_local bool t_onLane = false;
+
+		std::atomic<int> s_busy{ 0 };
 	};
 
 	Lane::Lane(const std::string& name, int order) :
@@ -31,6 +33,7 @@ namespace Loom
 		Wait();
 
 		m_work = work;
+		s_busy++;
 		m_busy = true;
 		m_generation++;
 		m_generation.notify_one();
@@ -45,6 +48,11 @@ namespace Loom
 	bool Lane::OnOne()
 	{
 		return t_onLane;
+	};
+
+	bool Lane::AnyBusy()
+	{
+		return s_busy > 0;
 	};
 
 	void Lane::Run(const std::string& name, int order)
@@ -62,6 +70,7 @@ namespace Loom
 
 			m_work();
 
+			s_busy--;
 			m_busy = false;
 			m_busy.notify_all();
 		};

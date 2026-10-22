@@ -52,8 +52,9 @@ namespace Loom
 		// Runs everything QueueTask has collected so far, on the calling
 		// thread. renderFrame calls this once a frame; it is public so a host
 		// that drives the engine itself (a test, a tool) can flush deferred
-		// work without a window or a renderer. From a Lane it does nothing,
-		// leaving the queue to the main thread, whose objects it would change.
+		// work without a window or a renderer. From a Lane, or while one has
+		// work, it does nothing, leaving the queue to the main thread once the
+		// lanes are done, since its tasks would change the objects they update.
 		static void DoTasks() noexcept;
 
 		static inline bool doGUI = true;

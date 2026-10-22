@@ -13,8 +13,8 @@ namespace Loom
 	/**
 	* Loom::Lane
 	* - A thread of its own that runs one piece of work at a time beside
-	*   whatever started it: the scenes' physics beside the editor's drawing,
-	*   or the objects set to a thread beside those on the main one
+	*   whatever started it, such as the objects set to a thread beside
+	*   those on the main one
 	* - Start hands it work and returns at once; Wait returns once that work
 	*   is done, and the work is started again only after
 	* - Named in the profiler, so the Stats panel shows it as a lane of its own
@@ -40,6 +40,9 @@ namespace Loom
 
 		// Whether the thread asking is any lane's.
 		static bool OnOne();
+
+		// Whether any lane has work started and not yet done.
+		static bool AnyBusy();
 
 	private:
 		void Run(const std::string& name, int order);

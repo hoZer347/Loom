@@ -9,6 +9,7 @@
 #include "glm/glm.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <string>
 #include <thread>
 #include <vector>
@@ -56,6 +57,61 @@ namespace
 		Pump();
 
 		return probe;
+	};
+
+	// Between a Queuer on a lane and a Drainer on the caller's thread.
+	struct Handoff final
+	{
+		std::atomic<bool> queued{ false };
+		std::atomic<bool> drained{ false };
+		bool ran = false;
+		bool ranInUpdate = false;
+	};
+
+	// Queues a task, then holds its lane until the Drainer has drained.
+	struct Queuer final : Loom::Component<Queuer>
+	{
+		void OnUpdate() override
+		{
+			Loom::Engine::QueueTask([handoff = handoff]() { handoff->ran = true; });
+
+			handoff->queued = true;
+			handoff->queued.notify_one();
+
+			handoff->drained.wait(false);
+		};
+
+		Handoff* handoff = nullptr;
+	};
+
+	// Drains the task queue once the Queuer has queued.
+	struct Drainer final : Loom::Component<Drainer>
+	{
+		void OnUpdate() override
+		{
+			handoff->queued.wait(false);
+
+			Loom::Engine::DoTasks();
+			handoff->ranInUpdate = handoff->ran;
+
+			handoff->drained = true;
+			handoff->drained.notify_one();
+		};
+
+		Handoff* handoff = nullptr;
+	};
+
+	// An object of its own with a T on it, set to thread and handed handoff.
+	template <typename T>
+	void HandOn(Loom::Scene& scene, int thread, Handoff& handoff)
+	{
+		Loom::GameObject* object = scene.AddChild("Hand");
+		Pump();
+
+		object->SetThreadID(thread);
+
+		object->Attach<T>()->handoff = &handoff;
+		Pump();
 	};
 };
 
@@ -697,6 +753,24 @@ TEST_SUITE("GameObject")
 
 		for (const ThreadProbe* probe : { onFirst, wrapped, farOut })
 			CHECK(probe->updates == 1);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the caller's thread drains the task queue only once the lanes are done")
+	{
+		Loom::Scene scene("drained");
+		Pump();
+
+		Handoff handoff;
+		HandOn<Drainer>(scene, 0, handoff);
+		HandOn<Queuer>(scene, 1, handoff);
+
+		scene.Update();
+
+		CHECK_FALSE(handoff.ranInUpdate);
+
+		Pump();
+
+		CHECK(handoff.ran);
 	};
 #endif
 
