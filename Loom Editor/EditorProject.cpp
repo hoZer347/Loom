@@ -53,6 +53,33 @@ namespace Loom
 		// the user to sort out.
 		constexpr int maxDefaultNameSuffix = 1000;
 
+		constexpr const char* ellipsis = "...";
+
+		// The bytes after the first of a character UTF-8 spells in several.
+		constexpr unsigned char utf8ContinuationMask = 0xC0;
+		constexpr unsigned char utf8Continuation = 0x80;
+
+		// As much of the end of path as fits in width, behind an ellipsis, as
+		// the folders nearest the project are what tell it apart.
+		std::string PathTail(const std::string& path, float width)
+		{
+			if (ImGui::CalcTextSize(path.c_str()).x <= width)
+				return path;
+
+			for (size_t start = 1; start < path.size(); start++)
+			{
+				if (((unsigned char)path[start] & utf8ContinuationMask) == utf8Continuation)
+					continue;
+
+				const std::string shown = ellipsis + path.substr(start);
+
+				if (ImGui::CalcTextSize(shown.c_str()).x <= width)
+					return shown;
+			};
+
+			return ellipsis;
+		};
+
 		struct AssetKindInfo
 		{
 			AssetKind kind;
@@ -563,13 +590,10 @@ namespace Loom
 				const float button_x = ImGui::GetContentRegionMax().x - button_width;
 
 				ImGui::AlignTextToFramePadding();
-				// Zero or less would mean no wrapping at all on a panel narrower than
-				// the button.
-				ImGui::PushTextWrapPos((std::max)(
-					button_x - ImGui::GetStyle().ItemSpacing.x,
-					ImGui::GetCursorPosX() + ImGui::GetFontSize()));
-				ImGui::TextWrapped("%s", m_projectPath.c_str());
-				ImGui::PopTextWrapPos();
+				ImGui::TextUnformatted(PathTail(
+					m_projectPath,
+					button_x - ImGui::GetStyle().ItemSpacing.x - ImGui::GetCursorPosX()).c_str());
+				ImGui::SetItemTooltip("%s", m_projectPath.c_str());
 
 				ImGui::SameLine(button_x);
 
