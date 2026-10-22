@@ -93,6 +93,10 @@ namespace Loom
 		// Told of every collider that leaves the tree, while it still exists.
 		std::function<void(const Collider&)> onRemove{ };
 
+		// Told before a collider is resized or taken out, so a step solving
+		// against the tree meanwhile lands first.
+		std::function<void()> onChange{ };
+
 		size_t Size() const { return m_leaves; };
 
 		// Leaves are height 0. An empty tree is height -1.

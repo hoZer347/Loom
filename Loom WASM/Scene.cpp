@@ -50,6 +50,7 @@ namespace Loom
 		SetName(name);
 
 		colliders.onRemove = [this](const Collider& collider) { simulation.Forget(collider); };
+		colliders.onChange = [this]() { simulation.Land(); };
 
 		Engine::QueueTask(
 			[this]()
@@ -142,6 +143,23 @@ namespace Loom
 	{
 		LOOM_STAGE("Scene::Physics");
 
+		Sync();
+		simulation.Step(Loom::Physics::FixedDeltaTime());
+	};
+
+	void Scene::BeginPhysics()
+	{
+		LOOM_STAGE("Scene::BeginPhysics");
+
+		Sync();
+		simulation.Begin(Loom::Physics::FixedDeltaTime());
+	};
+
+	void Scene::Sync()
+	{
+		// The walk changes the tree, which a step still solving reads.
+		simulation.End();
+
 		ColliderTree::current = &colliders;
 		Simulation::current = &simulation;
 
@@ -164,8 +182,6 @@ namespace Loom
 			LOOM_STAGE("ColliderTree::EndSync");
 			colliders.EndSync();
 		};
-
-		simulation.Step(Loom::Physics::FixedDeltaTime());
 
 		ColliderTree::current = nullptr;
 		Simulation::current = nullptr;
@@ -228,6 +244,8 @@ namespace Loom
 
 	Scene::~Scene()
 	{
+		simulation.Drop();
+
 		Engine::QueueTask(
 			[this]()
 			{

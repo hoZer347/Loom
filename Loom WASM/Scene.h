@@ -54,6 +54,10 @@ namespace Loom
 		// its rigid bodies, then moves them by FixedDeltaTime.
 		void Physics();
 
+		// The same, left solving on the simulation's own thread for
+		// Simulation::EndAll to finish.
+		void BeginPhysics();
+
 		// Against this scene's colliders alone; see Loom::Physics.
 		bool Raycast(const Ray& ray, RaycastHit& hit, float maxDistance = INFINITE_DISTANCE) const;
 		std::vector<RaycastHit> RaycastAll(const Ray& ray, float maxDistance = INFINITE_DISTANCE) const;
@@ -79,6 +83,10 @@ namespace Loom
 		friend struct MainMenu;
 		friend struct Engine;
 		int thread_id;
+
+		// Walks the hierarchy's OnPhysics into the collider tree and the
+		// simulation, ready for a step of either kind.
+		void Sync();
 
 		// Before root, so they outlive the colliders root deletes on the spot.
 		ColliderTree colliders;

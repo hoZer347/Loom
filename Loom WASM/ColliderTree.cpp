@@ -250,6 +250,9 @@ namespace Loom
 		if (collider.m_tree != this)
 			return;
 
+		if (onChange)
+			onChange();
+
 		collider.m_bounds = collider.BoundsIn(collider.m_synced);
 		collider.m_shape = Contacts::Pose(collider, collider.m_synced);
 		Fit(collider.m_node, collider.m_bounds, glm::vec3(0.0f));
@@ -299,6 +302,9 @@ namespace Loom
 	{
 		if (collider.m_tree != this)
 			return;
+
+		if (onChange)
+			onChange();
 
 		if (onRemove)
 			onRemove(collider);

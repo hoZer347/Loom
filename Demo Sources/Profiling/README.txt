@@ -19,5 +19,7 @@ Console.
 In a Debug build the Stats panel times every stage of the frame on every
 thread, each named after the function it times. Its timeline, graph and table
 show where the frame goes: drawing the scene under Engine::onGui >
-Editor::DrawGameView > Scene::Render > GameObject::Render, the physics under
-Scene::Physics > Simulation::Step, and the workers' share of each.
+Editor::DrawGameView > Scene::Render > GameObject::Render, and the workers'
+share of each. The physics starts under Scene::BeginPhysics, finds and solves
+its contacts under Simulation::Resolve on the Physics thread while the GUI is
+drawn, and moves the bodies under Simulation::EndAll once the GUI is done.

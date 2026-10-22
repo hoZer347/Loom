@@ -19,7 +19,8 @@ namespace Loom
 	*   chunk writes to its own slot can be put together the same way every
 	*   run, however the threads happened to share them out
 	* - Without other threads to share with, everything runs on the caller.
-	*   One For at a time: work must not start another
+	*   Fors from different threads take turns, and work must not start
+	*   another
 	*/
 	struct LOOM_API Jobs final
 	{

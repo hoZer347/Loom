@@ -104,6 +104,11 @@ namespace Loom
 		// numbers them, or -1 for none.
 		int m_body = -1;
 
+		// Whether its GameObject has a component told of contacts, as of the
+		// step's walk, which a step solving on its own thread reads in place
+		// of the components a GUI may be attaching to.
+		bool m_listens = false;
+
 		// The order colliders were made in, which orders each pair's two the
 		// same way every run, as their addresses do not. Atomic, as colliders
 		// may be made on any thread.

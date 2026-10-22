@@ -8,7 +8,9 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
 
+#include <atomic>
 #include <span>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -22,8 +24,8 @@ namespace Loom
 
 	/**
 	* Loom::Simulation
-	* - A scene's rigid bodies, stepped by Scene::Physics once the collider
-	*   tree is in step: forces and gravity, then contacts between the
+	* - A scene's rigid bodies, stepped by Scene::Physics or BeginPhysics once
+	*   the collider tree is in step: forces and gravity, then contacts between the
 	*   colliders of awake bodies and whatever they overlap, solved by
 	*   sequential impulses with friction and bounce, then the new poses
 	*   written back into the bodies' transforms
@@ -34,6 +36,10 @@ namespace Loom
 	*   they ended it with, which is what lets a stack stand still
 	* - Reports pairs that start, keep on or stop touching to both sides'
 	*   components; a pair asleep keeps touching without being told so again
+	* - Steps whole, or in two halves around other work: Begin readies the
+	*   bodies and hands their contacts to a physics thread of its own to
+	*   find and solve, and End waits for that, then moves the bodies and
+	*   reports. A velocity or pose set in between wins over the step's own
 	*/
 	struct Simulation final
 	{
@@ -42,15 +48,33 @@ namespace Loom
 		Simulation(const Simulation&) = delete;
 		Simulation& operator=(const Simulation&) = delete;
 
+		~Simulation();
+
 		// A body joining this step, from its OnPhysics.
 		void Add(Rigidbody& rigidbody);
 
 		// A collider the walk has found, from its OnPhysics. The walk calls a
 		// GameObject's physics components one after another, so a body's
 		// colliders are those noted beside it.
-		void Note(Collider& collider) { m_noted.push_back(&collider); };
+		void Note(Collider& collider);
 
 		void Step(float seconds);
+
+		// Step, in two halves. Until End, no body or collider may be taken
+		// away: Engine::DoTasks, which does that, ends every step begun first.
+		// On the web Begin solves on the caller, as there is no thread to spare.
+		void Begin(float seconds);
+		void End();
+
+		static void EndAll();
+
+		// Waits for a step begun to be solved and moves its bodies, leaving
+		// only its report for End: for a change to the tree while it solves.
+		void Land();
+
+		// Waits for a step begun to be solved and lets it go unfinished, for
+		// a scene going away.
+		void Drop();
 
 		// A collider leaving its tree, so no pair outlives it.
 		void Forget(const Collider& collider);
@@ -98,6 +122,11 @@ namespace Loom
 			// How many contacts it has, and the slab the solver puts it in.
 			size_t load;
 			int slab;
+
+			// Its transform's, as readied, so one moved while the step is
+			// solved stays where it was put.
+			glm::vec3 placed;
+			glm::vec3 turned;
 
 			// Those on its GameObject, among the step's noted ones.
 			std::span<Collider* const> colliders;
@@ -219,7 +248,11 @@ namespace Loom
 		// scaled to nothing.
 		bool Weigh(Body& body);
 
-		void Gather(float seconds);
+		// Finds the bodies' contacts and solves them: all a step does off the
+		// caller's thread, writing nothing outside the simulation.
+		void Resolve(float seconds);
+
+		void Gather();
 
 		// What one chunk of candidates gave: its pairs, their contacts, and
 		// the sleepers they wake.
@@ -317,6 +350,12 @@ namespace Loom
 		// do, once Keep has kept them all.
 		void Report();
 
+		// Lets go of the step's bodies and colliders, once it is over.
+		void Clear();
+
+		// The physics thread: solves each step handed to it until stopped.
+		void Serve();
+
 		int BodyOf(const Collider& collider) const;
 
 		// The body, or for NONE one that never moves.
@@ -330,6 +369,10 @@ namespace Loom
 		// This step's bodies and colliders, in the order the walk found them.
 		std::vector<Joining> m_joining{ };
 		std::vector<Collider*> m_noted{ };
+
+		// The leaves put in or refitted since the last step, taken from the
+		// tree as the bodies are readied.
+		std::vector<Collider*> m_moved{ };
 
 		// Stands in for a static collider: no mass, no velocity.
 		Body m_ground{ };
@@ -370,5 +413,20 @@ namespace Loom
 		std::vector<Candidate> m_parted{ };
 
 		unsigned m_step = 0;
+
+		// The step begun, and whether its bodies have moved yet.
+		float m_seconds = 0.0f;
+		bool m_begun = false;
+		bool m_landed = false;
+
+		// Started by the first Begin. Each step handed to it counts up
+		// m_asked, and m_solved follows once it is solved.
+		std::thread m_solver{ };
+		std::atomic<int> m_asked{ 0 };
+		std::atomic<int> m_solved{ 0 };
+		std::atomic<bool> m_stopping{ false };
+
+		// Every simulation with a step begun, for EndAll.
+		static inline std::vector<Simulation*> s_begun{ };
 	};
 };

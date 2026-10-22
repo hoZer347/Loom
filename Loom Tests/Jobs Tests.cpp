@@ -160,5 +160,26 @@ TEST_SUITE("Jobs")
 
 		CHECK(afterwards);
 	};
+
+	TEST_CASE("Fors started on two threads at once take turns, each giving out every chunk once")
+	{
+		constexpr int ROUNDS = 500;
+		constexpr size_t COUNT = GRAIN * 8;
+
+		std::atomic<int> good{ 0 };
+
+		const auto tally =
+			[&]()
+			{
+				for (int round = 0; round < ROUNDS; round++)
+					good += Tally(COUNT).EachOnce();
+			};
+
+		std::thread other(tally);
+		tally();
+		other.join();
+
+		CHECK(good == 2 * ROUNDS);
+	};
 #endif
 };

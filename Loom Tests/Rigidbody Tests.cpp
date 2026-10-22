@@ -14,7 +14,9 @@
 
 #include "glm/glm.hpp"
 
+#include <algorithm>
 #include <string>
+#include <utility>
 #include <vector>
 
 using LoomTests::Pump;
@@ -785,5 +787,105 @@ TEST_SUITE("Rigidbody")
 		const std::vector<glm::mat4> shared = pile();
 
 		CHECK(alone == shared);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a pile solved on the physics thread while the frame goes on ends up as one stepped whole")
+	{
+		constexpr int COUNT = 100;
+		constexpr int PER_ROW = 5;
+		constexpr float SPACING = 1.2f;
+		constexpr float FIRST_LAYER = 1.0f;
+		constexpr float SECONDS = 2.0f;
+
+		const auto pile =
+			[&](bool begun)
+			{
+				Loom::Scene scene("pile");
+				Pump();
+
+				Floor(scene);
+
+				std::vector<Toucher*> touchers{ };
+				std::vector<Loom::Rigidbody*> bodies{ };
+
+				for (int i = 0; i < COUNT; i++)
+				{
+					const glm::vec3 position(
+						(i % PER_ROW - PER_ROW * HALF) * SPACING,
+						FIRST_LAYER + i / (PER_ROW * PER_ROW) * SPACING,
+						(i / PER_ROW % PER_ROW - PER_ROW * HALF) * SPACING);
+
+					Loom::GameObject* object = Spawn(scene, "Body", position);
+					object->Attach<Loom::BoxCollider>();
+					touchers.push_back(object->Attach<Toucher>());
+					bodies.push_back(object->Attach<Loom::Rigidbody>());
+				};
+
+				Pump();
+
+				for (int step = 0; step < (int)(SECONDS * SECOND); step++)
+					if (begun)
+					{
+						scene.BeginPhysics();
+						Pump();
+					}
+					else
+						scene.Physics();
+
+				std::vector<glm::mat4> poses{ };
+				size_t told = 0;
+
+				for (size_t i = 0; i < bodies.size(); i++)
+				{
+					poses.push_back(bodies[i]->GetGameObject()->WorldMatrix());
+					told += touchers[i]->events.size();
+				};
+
+				return std::make_pair(poses, told);
+			};
+
+		const auto whole = pile(false);
+		const auto begun = pile(true);
+
+		CHECK(whole.first == begun.first);
+		CHECK(whole.second == begun.second);
+		CHECK(whole.second > 0);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a velocity or position set while a step is solved wins over the step's")
+	{
+		constexpr glm::vec3 SET_VELOCITY(3.0f, 0.0f, 0.0f);
+		constexpr glm::vec3 SET_POSITION(2.0f, 5.0f, 0.0f);
+
+		Loom::Scene scene("set");
+		Pump();
+
+		Floor(scene);
+		Loom::Rigidbody* pushed = Body<Loom::SphereCollider>(scene, glm::vec3(-2.0f, 3.0f, 0.0f));
+		Loom::Rigidbody* moved = Body<Loom::SphereCollider>(scene, glm::vec3(4.0f, 3.0f, 0.0f));
+
+		scene.BeginPhysics();
+		pushed->velocity = SET_VELOCITY;
+		moved->GetGameObject()->transform.position = SET_POSITION;
+		Pump();
+
+		CHECK(pushed->velocity == SET_VELOCITY);
+		CHECK(*moved->GetGameObject()->transform.position == SET_POSITION);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene deleted while its step is solved lets the step go")
+	{
+		Loom::Scene* scene = new Loom::Scene("deleted");
+		Pump();
+
+		Floor(*scene);
+		Body<Loom::BoxCollider>(*scene, glm::vec3(0.0f, 1.0f, 0.0f));
+
+		scene->BeginPhysics();
+		delete scene;
+		Pump();
+
+		const std::vector<Loom::Scene*>& scenes = Loom::Scene::GetScenes();
+		CHECK(std::find(scenes.begin(), scenes.end(), scene) == scenes.end());
 	};
 };

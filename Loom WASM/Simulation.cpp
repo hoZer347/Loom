@@ -173,6 +173,9 @@ namespace Loom
 
 		body.dynamic = !rigidbody.isKinematic && rigidbody.mass > 0.0f;
 
+		body.placed = *body.object->transform.position;
+		body.turned = *body.object->transform.rotation;
+
 		// Anything set on a sleeping body since it fell asleep wakes it.
 		if (rigidbody.m_sleeping && (rigidbody.velocity != glm::vec3(0.0f) || rigidbody.angularVelocity != glm::vec3(0.0f)))
 			rigidbody.WakeUp();
@@ -259,10 +262,30 @@ namespace Loom
 		return true;
 	};
 
+	Simulation::~Simulation()
+	{
+		Drop();
+
+		if (!m_solver.joinable())
+			return;
+
+		m_stopping = true;
+		m_asked++;
+		m_asked.notify_all();
+		m_solver.join();
+	};
+
+	void Simulation::Note(Collider& collider)
+	{
+		collider.m_listens = Listens(*collider.m_gameObject);
+		m_noted.push_back(&collider);
+	};
+
 	void Simulation::Step(float seconds)
 	{
 		LOOM_STAGE("Simulation::Step");
 
+		End();
 		m_step++;
 
 		{
@@ -270,9 +293,133 @@ namespace Loom
 			ReadyBodies(seconds);
 		};
 
+		Resolve(seconds);
+
+		{
+			LOOM_STAGE("Simulation::MoveBodies");
+			MoveBodies(seconds);
+		};
+
+		{
+			LOOM_STAGE("Simulation::Report");
+			Report();
+		};
+
+		Clear();
+	};
+
+	void Simulation::Begin(float seconds)
+	{
+		LOOM_STAGE("Simulation::Begin");
+
+		End();
+		m_step++;
+
+		{
+			LOOM_STAGE("Simulation::ReadyBodies");
+			ReadyBodies(seconds);
+		};
+
+		m_seconds = seconds;
+		m_begun = true;
+		m_landed = false;
+		s_begun.push_back(this);
+
+#ifdef __EMSCRIPTEN__
+		Resolve(seconds);
+		m_solved = ++m_asked;
+#else
+		if (!m_solver.joinable())
+			m_solver = std::thread([this]() { Serve(); });
+
+		m_asked++;
+		m_asked.notify_all();
+#endif
+	};
+
+	void Simulation::Serve()
+	{
+		// After Main, being the first to name itself with that order.
+		Profiler::NameThread("Physics", 0);
+
+		int seen = 0;
+
+		while (true)
+		{
+			m_asked.wait(seen);
+			seen = m_asked;
+
+			if (m_stopping)
+				return;
+
+			Resolve(m_seconds);
+
+			m_solved.store(seen, std::memory_order_release);
+			m_solved.notify_all();
+		};
+	};
+
+	void Simulation::Land()
+	{
+		if (!m_begun || m_landed)
+			return;
+
+		LOOM_STAGE("Simulation::Land");
+
+		Jobs::WaitFor(m_solved, m_asked);
+		m_landed = true;
+
+		LOOM_STAGE("Simulation::MoveBodies");
+		MoveBodies(m_seconds);
+	};
+
+	void Simulation::End()
+	{
+		if (!m_begun)
+			return;
+
+		LOOM_STAGE("Simulation::End");
+
+		Land();
+
+		// Taken off first, so a listener's change to the tree lands nothing.
+		m_begun = false;
+		std::erase(s_begun, this);
+
+		{
+			LOOM_STAGE("Simulation::Report");
+			Report();
+		};
+
+		Clear();
+	};
+
+	void Simulation::EndAll()
+	{
+		while (!s_begun.empty())
+			s_begun.front()->End();
+	};
+
+	void Simulation::Drop()
+	{
+		if (!m_begun)
+			return;
+
+		Jobs::WaitFor(m_solved, m_asked);
+
+		m_begun = false;
+		std::erase(s_begun, this);
+
+		Clear();
+	};
+
+	void Simulation::Resolve(float seconds)
+	{
+		LOOM_STAGE("Simulation::Resolve");
+
 		{
 			LOOM_STAGE("Simulation::Gather");
-			Gather(seconds);
+			Gather();
 		};
 
 		{
@@ -289,17 +436,10 @@ namespace Loom
 			LOOM_STAGE("Simulation::SolveSlabs");
 			SolveSlabs();
 		};
+	};
 
-		{
-			LOOM_STAGE("Simulation::MoveBodies");
-			MoveBodies(seconds);
-		};
-
-		{
-			LOOM_STAGE("Simulation::Report");
-			Report();
-		};
-
+	void Simulation::Clear()
+	{
 		for (const Body& body : m_bodies)
 			for (Collider* collider : body.colliders)
 				collider->m_body = NONE;
@@ -347,6 +487,21 @@ namespace Loom
 			for (int index = 0; index < (int)m_bodies.size(); index++)
 				for (Collider* collider : m_bodies[index].colliders)
 					collider->m_body = index;
+
+		// Each moving body's leaf reaches along the travel it is about to
+		// make, which a velocity set or changed since the last step may not:
+		// those found to have outgrown theirs are refitted. The last change to
+		// the tree, so the contacts are found and solved in a tree held still.
+		for (Body& body : m_bodies)
+			if (body.refit)
+			{
+				for (const Collider* collider : body.colliders)
+					m_tree.Reach(*collider, body.velocity * seconds);
+
+				body.refit = false;
+			};
+
+		m_moved = m_tree.TakeMoved();
 	};
 
 	void Simulation::PrepareContacts(float seconds)
@@ -371,11 +526,22 @@ namespace Loom
 
 		for (Body& body : m_bodies)
 		{
-			body.velocity = glm::vec3(body.linear);
-			body.angularVelocity = glm::vec3(body.angular);
+			Rigidbody& rigidbody = *body.rigidbody;
+			const glm::vec3 linear(body.linear);
+			const glm::vec3 angular(body.angular);
 
-			body.rigidbody->velocity = body.velocity;
-			body.rigidbody->angularVelocity = body.angularVelocity;
+			if (body.awake && rigidbody.m_sleeping)
+				rigidbody.WakeUp();
+
+			// Unless set since the step was readied, which wins.
+			if (rigidbody.velocity == body.velocity)
+				rigidbody.velocity = linear;
+
+			if (rigidbody.angularVelocity == body.angularVelocity)
+				rigidbody.angularVelocity = angular;
+
+			body.velocity = linear;
+			body.angularVelocity = angular;
 
 			if (!body.object->GetChildren().empty())
 				m_parents.push_back(&body);
@@ -502,38 +668,22 @@ namespace Loom
 	{
 		Body& sleeper = m_bodies[body];
 
-		if (!Weigh(sleeper))
-			return;
-
-		sleeper.rigidbody->WakeUp();
-		sleeper.awake = true;
+		// Its Rigidbody is woken as it moves, on the thread that owns it.
+		if (Weigh(sleeper))
+			sleeper.awake = true;
 	};
 
-	void Simulation::Gather(float seconds)
+	void Simulation::Gather()
 	{
 		m_pairs.clear();
-
-		// Each moving body's leaf reaches along the travel it is about to
-		// make, which a velocity set or changed since the last step may not:
-		// those found to have outgrown theirs are refitted.
-		for (Body& body : m_bodies)
-			if (body.refit)
-			{
-				for (const Collider* collider : body.colliders)
-					m_tree.Reach(*collider, body.velocity * seconds);
-
-				body.refit = false;
-			};
 
 		// New candidates: each leaf put in or refitted since the last step,
 		// against whatever it now overlaps, found in parallel and taken in
 		// chunk order. Leaves cover their bodies' travel, so two that can
 		// meet this step overlap.
-		const std::vector<Collider*> moved = m_tree.TakeMoved();
+		m_found.resize(std::max(m_found.size(), Jobs::Chunks(m_moved.size(), QUERY_GRAIN)));
 
-		m_found.resize(std::max(m_found.size(), Jobs::Chunks(moved.size(), QUERY_GRAIN)));
-
-		Jobs::For(moved.size(), QUERY_GRAIN,
+		Jobs::For(m_moved.size(), QUERY_GRAIN,
 			[&](size_t chunk, size_t begin, size_t end)
 			{
 				std::vector<Key>& found = m_found[chunk];
@@ -541,7 +691,7 @@ namespace Loom
 
 				for (size_t i = begin; i < end; i++)
 				{
-					const Collider* collider = moved[i];
+					const Collider* collider = m_moved[i];
 					const Bounds* padded = m_tree.PaddedBounds(*collider);
 
 					if (padded == nullptr)
@@ -556,7 +706,7 @@ namespace Loom
 				};
 			});
 
-		for (size_t chunk = 0; chunk < Jobs::Chunks(moved.size(), QUERY_GRAIN); chunk++)
+		for (size_t chunk = 0; chunk < Jobs::Chunks(m_moved.size(), QUERY_GRAIN); chunk++)
 			for (const Key& key : m_found[chunk])
 				if (m_candidateSet.Insert(key))
 					m_candidates.push_back({ key });
@@ -730,8 +880,8 @@ namespace Loom
 			return;
 		};
 
-		pair.aListens = Listens(*a.m_gameObject);
-		pair.bListens = Listens(*b.m_gameObject);
+		pair.aListens = a.m_listens;
+		pair.bListens = b.m_listens;
 
 		const Rigidbody* first = pair.bodyA == NONE ? nullptr : m_bodies[pair.bodyA].rigidbody;
 		const Rigidbody* second = pair.bodyB == NONE ? nullptr : m_bodies[pair.bodyB].rigidbody;
@@ -1110,7 +1260,8 @@ namespace Loom
 	{
 		Rigidbody& rigidbody = *body.rigidbody;
 
-		if (!body.awake)
+		// One put somewhere else while the step was solved stays there.
+		if (!body.awake || *body.object->transform.position != body.placed || *body.object->transform.rotation != body.turned)
 			return;
 
 		// Only what moved is written back, so a body set still, a kinematic

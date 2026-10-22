@@ -244,10 +244,6 @@ namespace Loom
 
 		//Shader::SetUniforms();
 
-#ifndef __EMSCRIPTEN__
-		RenderImGui();
-#endif
-
 		if (updateScenes)
 		{
 			// As many fixed steps as the frame's time covers, carrying the
@@ -257,16 +253,35 @@ namespace Loom
 
 			s_physicsTime += Time::DeltaTime();
 
-			for (int step = 0; step < MOST_STEPS && s_physicsTime >= Physics::FixedDeltaTime(); step++)
-			{
-				s_physicsTime -= Physics::FixedDeltaTime();
+			int steps = 0;
 
-				for (auto& scene : Scene::allScenes)
-					scene->Physics();
-			};
+			for (; steps < MOST_STEPS && s_physicsTime >= Physics::FixedDeltaTime(); steps++)
+				s_physicsTime -= Physics::FixedDeltaTime();
 
 			s_physicsTime = std::min(s_physicsTime, Physics::FixedDeltaTime());
 
+			// All but the last whole, and the last solved on its own thread
+			// while the GUI is drawn.
+			for (int step = 1; step < steps; step++)
+				for (auto& scene : Scene::allScenes)
+					scene->Physics();
+
+			if (steps > 0)
+				for (auto& scene : Scene::allScenes)
+					scene->BeginPhysics();
+		};
+
+#ifndef __EMSCRIPTEN__
+		RenderImGui();
+#endif
+
+		{
+			LOOM_STAGE("Simulation::EndAll");
+			Simulation::EndAll();
+		};
+
+		if (updateScenes)
+		{
 			for (auto& scene : Scene::allScenes)
 			{
 				LOOM_STAGE("Scene::Update");
@@ -366,6 +381,20 @@ namespace Loom
 
 	void Engine::DoTasks() noexcept
 	{
+		// A task may take away what a step begun is solving against.
+		try
+		{
+			Simulation::EndAll();
+		}
+		catch (const std::exception& error)
+		{
+			std::cerr << "Simulation::EndAll threw: " << error.what() << std::endl;
+		}
+		catch (...)
+		{
+			std::cerr << "Simulation::EndAll threw an unknown exception" << std::endl;
+		};
+
 		// Each task is popped under the lock but run outside it, so a task is
 		// free to queue more work (Attach doing so from OnAttach is normal) and
 		// the follow-up still runs in this same drain.

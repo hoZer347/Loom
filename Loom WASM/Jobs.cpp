@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -192,6 +193,10 @@ namespace Loom
 			std::atomic<Job*> current{ nullptr };
 			std::atomic<unsigned> helping{ 0 };
 			std::atomic<bool> stopping{ false };
+
+			// Held by the For the workers are on, so one from another thread
+			// waits its turn.
+			std::mutex taking{ };
 		};
 
 		Pool& Workers()
@@ -214,6 +219,7 @@ namespace Loom
 			return;
 		};
 
+		const std::lock_guard<std::mutex> taken(pool.taking);
 		const char* const stage = Profiler::Current();
 
 		Job job;

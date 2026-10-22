@@ -96,7 +96,8 @@ namespace Loom
 	*   scene's own Scene::Raycast keeps to that scene
 	* - The engine steps every scene's physics at a fixed rate, as Unity's
 	*   FixedUpdate does: as many steps of FixedDeltaTime as the frame's time
-	*   covers, before OnUpdate. Scene::Physics takes one step by hand
+	*   covers, before OnUpdate. The last of them is solved on a thread of its
+	*   own while the GUI is drawn. Scene::Physics takes one step by hand
 	* - A collider is where the scene's last physics step left it, so one
 	*   moved in OnUpdate is found where it went after the next step
 	* - A ray that starts inside a box or sphere does not hit it
