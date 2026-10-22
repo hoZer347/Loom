@@ -340,4 +340,25 @@ TEST_SUITE("Prefabs")
 
 		CHECK(Loom::Prefabs::TransformKeys(scene.GetRoot()) == transform_keys);
 	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a GameObject's nearest link is the prefab it is part of")
+	{
+		Loom::Scene scene("Links");
+		Loom::GameObject* outer = scene.GetRoot().AddChild("Outer");
+		Loom::GameObject* child = outer->AddChild("Child");
+		Loom::GameObject* inner = child->AddChild("Inner");
+		Loom::GameObject* inner_child = inner->AddChild("Inner Child");
+		Loom::GameObject* loose = scene.GetRoot().AddChild("Loose");
+		Loom::Prefab* outer_link = outer->Attach<Loom::Prefab>();
+		Loom::Prefab* inner_link = inner->Attach<Loom::Prefab>();
+
+		outer_link->path = std::string("Outer.loomprefab");
+		inner_link->path = std::string("Inner.loomprefab");
+		LoomTests::Pump();
+
+		CHECK(Loom::Prefabs::NearestLink(*outer) == outer_link);
+		CHECK(Loom::Prefabs::NearestLink(*child) == outer_link);
+		CHECK(Loom::Prefabs::NearestLink(*inner_child) == inner_link);
+		CHECK(Loom::Prefabs::NearestLink(*loose) == nullptr);
+	};
 };

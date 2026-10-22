@@ -634,6 +634,10 @@ namespace Loom
 		bool WritePrefab(const std::string& path, const Prefabs::ObjectNode& prefab);
 		std::filesystem::path PrefabFile(const std::string& path) const;
 
+		// The file of the prefab gameObject is part of, whether as an instance
+		// or in the Prefab panel. Empty when it is in none.
+		std::filesystem::path PrefabFileOf(const GameObject& gameObject) const;
+
 		// Run with the history: carries an edit made in the Prefab panel or to
 		// an instance to the file and every instance, and brings instances
 		// that do not know their prefab yet into line with it.

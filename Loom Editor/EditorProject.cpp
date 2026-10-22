@@ -58,7 +58,6 @@ namespace Loom
 		constexpr float pingFillAlpha = 0.5f;
 		constexpr float pingOutlineThickness = 2.0f;
 		constexpr float pingRounding = 3.0f;
-		constexpr float scrollCentred = 0.5f;
 
 		// How far NewShader, NewShader1, ... counts before leaving the name to
 		// the user to sort out.
@@ -684,7 +683,7 @@ namespace Loom
 		const bool open = ImGui::TreeNodeEx(node.path.c_str(), flags, "%s %s", node.folder ? EditorIcons::Folder : IconOf(node.path), node.name.c_str());
 
 		if (m_revealSelectedAsset && node.path == m_selectedAsset)
-			ImGui::SetScrollHereY(scrollCentred);
+			ImGui::ScrollToItem(ImGuiScrollFlags_KeepVisibleCenterY);
 
 		if (node.path == m_pingedAsset)
 		{

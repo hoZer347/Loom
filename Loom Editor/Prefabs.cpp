@@ -300,6 +300,15 @@ namespace Loom
 		return link && !link->path->empty() ? link : nullptr;
 	};
 
+	Prefab* Prefabs::NearestLink(const GameObject& gameObject)
+	{
+		for (const GameObject* at = &gameObject; at != nullptr; at = at->GetParent())
+			if (Prefab* link = LinkOf(*at))
+				return link;
+
+		return nullptr;
+	};
+
 	const std::string& Prefabs::PrefabType()
 	{
 		static const std::string name = PrettyTypeName(typeid(Prefab).name());

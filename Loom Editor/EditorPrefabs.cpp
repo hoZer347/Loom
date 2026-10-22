@@ -56,6 +56,17 @@ namespace Loom
 		return (std::filesystem::path(m_projectPath) / path).lexically_normal();
 	};
 
+	std::filesystem::path Editor::PrefabFileOf(const GameObject& gameObject) const
+	{
+		if (const Prefab* link = Prefabs::NearestLink(gameObject))
+			return PrefabFile(*link->path);
+
+		if (const GameObject* root = GetPrefabRoot(); root != nullptr && IsInHierarchy(*root, &gameObject))
+			return PrefabFile(m_prefabPath);
+
+		return { };
+	};
+
 	const Prefabs::ObjectNode* Editor::LoadPrefab(const std::string& path)
 	{
 		std::error_code code;

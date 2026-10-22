@@ -83,6 +83,10 @@ namespace Loom
 		// it has none or one naming no file.
 		Prefab* LinkOf(const GameObject& gameObject);
 
+		// The link of the prefab gameObject is part of: its own, or its nearest
+		// ancestor's. Null when it is in none.
+		Prefab* NearestLink(const GameObject& gameObject);
+
 		// What SceneSerializer::Serialize(GameObject&) writes, and back. Parse
 		// is false, with why in error, for text that is not one GameObject.
 		bool Parse(const std::string& text, ObjectNode& root, std::string* error = nullptr);

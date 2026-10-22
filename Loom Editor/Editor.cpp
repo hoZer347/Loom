@@ -2568,13 +2568,10 @@ namespace Loom
 			if (ImGui::MenuItem("Add Child"))
 				Select(gameObject->AddChild());
 
-			const Prefab* prefab = nullptr;
+			const std::filesystem::path prefab = PrefabFileOf(*gameObject);
 
-			for (const GameObject* at = gameObject; at != nullptr && prefab == nullptr; at = at->GetParent())
-				prefab = Prefabs::LinkOf(*at);
-
-			if (prefab != nullptr && ImGui::MenuItem("Ping Prefab"))
-				PingAsset(PrefabFile(*prefab->path).string());
+			if (!prefab.empty() && ImGui::MenuItem("Ping Prefab", nullptr, false, std::filesystem::exists(prefab)))
+				PingAsset(prefab.string());
 
 			if (instance)
 			{
