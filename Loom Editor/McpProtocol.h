@@ -5,6 +5,7 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 
@@ -39,5 +40,9 @@ namespace Loom
 		bool LocalOrigin(const std::string& origin);
 
 		std::string Base64(const std::vector<char>& bytes);
+
+		// What Base64 was given, or nothing when text holds a character it
+		// would not have written.
+		std::vector<char> FromBase64(std::string_view text);
 	};
 };

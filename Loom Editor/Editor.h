@@ -79,6 +79,7 @@ namespace Loom
 		StateMachine,
 		Shader,
 		Texture,
+		Palette,
 	};
 
 	// What the Scripts panel lists.
@@ -196,6 +197,9 @@ namespace Loom
 		// A prefab, by its path in the project or on disk, in a tab of the
 		// Model panel, which comes forward.
 		void OpenModel(const std::string& path);
+
+		// In the Palette panel, which comes forward, for the sprite in front.
+		void OpenPalette(const std::string& path);
 
 		// The Inspector's Add Component menu, opened on the selection the next
 		// time it is drawn.
@@ -883,6 +887,7 @@ namespace Loom
 		bool m_showShaders = false;
 		bool m_showSprites = false;
 		bool m_showModels = false;
+		bool m_showPalette = false;
 		bool m_showPrefab = false;
 		bool m_showStats = true;
 		bool m_showKeyBindings = true;

@@ -54,6 +54,28 @@ namespace Loom
 		return pixels;
 	};
 
+	std::vector<uint8_t> Texture::Decode(const std::vector<char>& bytes, int& width, int& height)
+	{
+		stbi_set_flip_vertically_on_load(true);
+
+		int channels = 0;
+		stbi_uc* decoded = stbi_load_from_memory(
+			(const stbi_uc*)bytes.data(),
+			(int)bytes.size(),
+			&width,
+			&height,
+			&channels,
+			RGBA);
+
+		if (decoded == nullptr)
+			throw std::runtime_error(std::string("Could not decode an image: ") + stbi_failure_reason());
+
+		std::vector<uint8_t> pixels(decoded, decoded + (size_t)width * height * RGBA);
+		stbi_image_free(decoded);
+
+		return pixels;
+	};
+
 	Texture::~Texture()
 	{
 		if (Renderer* renderer = Renderer::Get(); renderer && handle)

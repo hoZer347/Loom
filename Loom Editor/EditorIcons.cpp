@@ -7,6 +7,7 @@
 #include "ProjectTemplate.h"
 #include "SceneSerializer.h"
 #include "ScriptFolders.h"
+#include "SpriteAsset.h"
 
 #include <algorithm>
 #include <cctype>
@@ -46,6 +47,12 @@ namespace Loom
 
 		if (extension == InputActions::extension)
 			return Bindings;
+
+		if (extension == SpriteAsset::extension)
+			return Sprite;
+
+		if (extension == Loom::Palette::extension)
+			return Palette;
 
 		if (ProjectAssets::IsTextureFile(path))
 			return Texture;

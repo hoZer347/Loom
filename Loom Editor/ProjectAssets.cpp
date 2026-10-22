@@ -3,6 +3,7 @@
 #include "ComponentRegistry.h"
 #include "Prefab.h"
 #include "SceneSerializer.h"
+#include "SpriteAsset.h"
 
 #include "Utilities/StateReference.h"
 
@@ -35,6 +36,9 @@ namespace Loom
 
 		// Whatever Textures.cpp has stb_image decode.
 		constexpr std::string_view textureExtensions[] = { ProjectAssets::textureExtension, ".jpg", ".jpeg", ".bmp", ".tga" };
+
+		// 2D art besides textures.
+		constexpr std::string_view twoDExtensions[] = { SpriteAsset::extension, Palette::extension };
 
 		// Whatever Audio.cpp has miniaudio decode.
 		constexpr std::string_view soundExtensions[] = { ".wav", ".mp3", ".flac" };
@@ -499,6 +503,16 @@ void main()
 		return path.string();
 	};
 
+	std::string ProjectAssets::CreatePalette(const std::string& folder, const std::string& name, std::string* error)
+	{
+		const std::filesystem::path path = std::filesystem::path(folder) / (name + Palette::extension);
+
+		if (!IsValidName(name) || !WriteNew(path, "", error))
+			return "";
+
+		return path.string();
+	};
+
 	std::string ProjectAssets::CopyInto(const std::string& file, const std::string& folder, std::string* error)
 	{
 		const std::filesystem::path source(file);
@@ -639,8 +653,11 @@ void main()
 		if (extension == shaderExtension)
 			return Opener::Shaders;
 
-		if (IsTextureFile(path))
+		if (IsTextureFile(path) || extension == SpriteAsset::extension)
 			return Opener::Sprites;
+
+		if (extension == Palette::extension)
+			return Opener::Palette;
 
 		return IsScriptFile(path) && !scripts_folder.empty() && IsUnder(path, scripts_folder)
 			? Opener::VisualStudio
@@ -662,7 +679,7 @@ void main()
 
 	bool ProjectAssets::IsGameFile(const std::string& name)
 	{
-		return HasExtension(name, gameFileExtensions) || IsShaderFile(name) || IsTextureFile(name) || IsSoundFile(name) || IsFontFile(name);
+		return HasExtension(name, gameFileExtensions) || IsShaderFile(name) || IsTwoDFile(name) || IsSoundFile(name) || IsFontFile(name);
 	};
 
 	bool ProjectAssets::IsScriptFile(const std::string& name)
@@ -678,6 +695,11 @@ void main()
 	bool ProjectAssets::IsTextureFile(const std::string& name)
 	{
 		return HasExtension(name, textureExtensions);
+	};
+
+	bool ProjectAssets::IsTwoDFile(const std::string& name)
+	{
+		return IsTextureFile(name) || HasExtension(name, twoDExtensions);
 	};
 
 	bool ProjectAssets::IsSoundFile(const std::string& name)

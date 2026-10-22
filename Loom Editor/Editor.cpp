@@ -415,7 +415,7 @@ namespace Loom
 		constexpr const char* prefab_light = "Prefab Light";
 
 		// Panels docked as a tab beside another, each with the one it goes beside.
-		constexpr std::pair<const char*, const char*> side_windows[] = { { EditorPanels::Scripts, EditorPanels::Project }, { EditorPanels::KeyBindings, EditorPanels::Console } };
+		constexpr std::pair<const char*, const char*> side_windows[] = { { EditorPanels::Scripts, EditorPanels::Project }, { EditorPanels::KeyBindings, EditorPanels::Console }, { EditorPanels::Palette, EditorPanels::Inspector } };
 
 		// The ImGui settings entry that holds which panels are open.
 		constexpr const char* panel_settings = "LoomEditor";
@@ -1506,9 +1506,9 @@ namespace Loom
 		if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_R))
 			FullRefresh();
 
-		// The Sprites panel has the keyboard, and none of the scene's
-		// shortcuts mean anything there.
-		if (m_showSprites && m_sprites.IsFocused())
+		// The Sprites or Palette panel has the keyboard, and none of the
+		// scene's shortcuts mean anything there.
+		if ((m_showSprites && m_sprites.IsFocused()) || (m_showPalette && m_sprites.IsPaletteFocused()))
 			return;
 
 		if (m_showModels && m_models.IsFocused())
@@ -1810,8 +1810,9 @@ namespace Loom
 		if (m_showSceneData)	DrawSceneData();
 		if (m_showConsole)		m_console.Draw(&m_showConsole);
 		if (m_showShaders)		m_shaders.Draw(&m_showShaders);
-		if (m_showSprites)		m_sprites.Draw(&m_showSprites);
 		if (m_showModels)		m_models.Draw(&m_showModels);
+		if (m_showSprites)		m_sprites.Draw(&m_showSprites, &m_showPalette);
+		if (m_showPalette)		m_sprites.DrawPalette(&m_showPalette, m_projectPath);
 		if (m_showStats)		DrawStats();
 
 		if (m_showKeyBindings && m_keyBindings.Draw(&m_showKeyBindings, !m_projectFile.empty()))
@@ -2008,6 +2009,7 @@ namespace Loom
 			{ EditorPanels::Shaders, &m_showShaders, false },
 			{ EditorPanels::Sprites, &m_showSprites, false },
 			{ EditorPanels::Model, &m_showModels, false },
+			{ EditorPanels::Palette, &m_showPalette, false },
 			{ EditorPanels::Prefab, &m_showPrefab, false },
 			{ EditorPanels::Stats, &m_showStats, true },
 			{ EditorPanels::KeyBindings, &m_showKeyBindings, true } });

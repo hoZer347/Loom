@@ -25,6 +25,10 @@ TEST_SUITE("EditorIcons")
 		CHECK(EditorIcons::Of("Game.loominput") == EditorIcons::Bindings);
 		CHECK(EditorIcons::Of("Game.LoomInput") == EditorIcons::Bindings);
 		CHECK(EditorIcons::Of("Assets/Tree.png") == EditorIcons::Texture);
+		CHECK(EditorIcons::Of("Assets/Tree.loomsprite") == EditorIcons::Sprite);
+		CHECK(EditorIcons::Of("Assets/Tree.LoomSprite") == EditorIcons::Sprite);
+		CHECK(EditorIcons::Of("Assets/Forest.loompalette") == EditorIcons::Palette);
+		CHECK(EditorIcons::Of("Assets/Forest.LoomPalette") == EditorIcons::Palette);
 		CHECK(EditorIcons::Of("Assets/Tree.JPEG") == EditorIcons::Texture);
 		CHECK(EditorIcons::Of("Assets/Bell.wav") == EditorIcons::Sound);
 		CHECK(EditorIcons::Of("Assets/Theme.MP3") == EditorIcons::Sound);
@@ -54,6 +58,17 @@ TEST_SUITE("EditorIcons")
 			CHECK_FALSE(ProjectAssets::IsTextureFile(name));
 
 		CHECK(ProjectAssets::IsGameFile("a.png"));
+	};
+
+	TEST_CASE("the 2D panel's files are textures, sprites and palettes")
+	{
+		using Loom::ProjectAssets;
+
+		for (const char* name : { "a.png", "a.TGA", "a.loomsprite", "a.loompalette", "Art/a.LoomPalette" })
+			CHECK(ProjectAssets::IsTwoDFile(name));
+
+		for (const char* name : { "a.wav", "a.loomscene", "a.shader", "a.loom2d", "loomsprite" })
+			CHECK_FALSE(ProjectAssets::IsTwoDFile(name));
 	};
 
 	TEST_CASE("a font is a TrueType or OpenType file or collection, whatever the extension's case")

@@ -49,6 +49,9 @@ namespace Loom
 		// does.
 		static std::vector<uint8_t> Decode(const std::string& file_path, int& width, int& height);
 
+		// As the file would, from its bytes.
+		static std::vector<uint8_t> Decode(const std::vector<char>& bytes, int& width, int& height);
+
 		const std::string file_path;
 
 		int width = 0;

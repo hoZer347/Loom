@@ -34,7 +34,7 @@ namespace Loom
 
 	namespace FilePanels
 	{
-		inline constexpr FilePanelKind TwoD{ EditorPanels::TwoD, "2D", "textures", EditorIcons::TwoD, { EditorIcons::Texture, "Textures" }, ".loom2d", "2d.", "Loom2DFolder" };
+		inline constexpr FilePanelKind TwoD{ EditorPanels::TwoD, "2D", "textures, sprites or palettes", EditorIcons::TwoD, { EditorIcons::Texture, "Textures, sprites and palettes" }, ".loom2d", "2d.", "Loom2DFolder" };
 		inline constexpr FilePanelKind ThreeD{ EditorPanels::ThreeD, "3D", "models", EditorIcons::ThreeD, { EditorIcons::Model, "Models" }, ".loom3d", "3d.", "Loom3DFolder" };
 		inline constexpr FilePanelKind Sounds{ EditorPanels::Sounds, "Sounds", "sounds", EditorIcons::Sound, { EditorIcons::Sound, "Sounds" }, ".loomsounds", "sound.", "LoomSoundFolder" };
 		inline constexpr FilePanelKind Fonts{ EditorPanels::Fonts, "Fonts", "fonts", EditorIcons::Font, { EditorIcons::Font, "Fonts" }, ".loomfonts", "font.", "LoomFontFolder" };
@@ -45,8 +45,8 @@ namespace Loom
 	/**
 	* Loom::FilePanel
 	* - A panel holding the project's files of one kind, which the Project
-	*   panel leaves to it: the 2D panel its textures, and the 3D, Sounds and
-	*   Fonts panels theirs
+	*   panel leaves to it: the 2D panel its textures, sprites and palettes,
+	*   and the 3D, Sounds and Fonts panels theirs
 	* - Its files are filed in folders of its own by their paths in the
 	*   project, apart from the folders they are in, so filing one moves no
 	*   file. A project keeps them beside its .loomproject in a file of the

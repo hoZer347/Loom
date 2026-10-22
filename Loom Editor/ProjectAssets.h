@@ -37,13 +37,15 @@ namespace Loom
 			Prefab,
 			Shaders,
 			Sprites,
+			Palette,
 			VisualStudio,
 			Shell,
 		};
 
 		// Scenes open in the editor, prefabs in its Prefab panel, shaders in its
-		// Shaders panel, textures in its Sprites panel, the scripts project's
-		// sources in Visual Studio, and anything else through the shell.
+		// Shaders panel, textures and sprites in its Sprites panel, palettes in
+		// its Palette panel, the scripts project's sources in Visual Studio,
+		// and anything else through the shell.
 		// scripts_folder is empty when there is no scripts project.
 		static Opener OpenerOf(const std::string& path, const std::string& scripts_folder);
 
@@ -56,6 +58,7 @@ namespace Loom
 		static std::string CreateFolder(const std::string& folder, const std::string& name, std::string* error = nullptr);
 		static std::string CreateShader(const std::string& folder, const std::string& name, std::string* error = nullptr);
 		static std::string CreateTexture(const std::string& folder, const std::string& name, std::string* error = nullptr);
+		static std::string CreatePalette(const std::string& folder, const std::string& name, std::string* error = nullptr);
 
 		// Copies file into folder under its own name, or with the first number
 		// after its stem that nothing there is using. A file already in folder
@@ -105,15 +108,18 @@ namespace Loom
 
 		static std::string Replace(std::string text, const std::string& token, const std::string& value);
 
-		// Whether name is a scene, prefab, shader, texture, sound or font, which
-		// the Project panel, the Scripts panel and the FilePanels list along
-		// with models. The scripts are the Scripts panel's too, and anything
-		// else in the project folder (Visual Studio's files, notes) is not
-		// part of the game.
+		// Whether name is a scene, prefab, shader, texture, sprite, palette,
+		// sound or font, which the Project panel, the Scripts panel and the
+		// FilePanels list along with models. The scripts are the Scripts
+		// panel's too, and anything else in the project folder (Visual
+		// Studio's files, notes) is not part of the game.
 		static bool IsGameFile(const std::string& name);
 		static bool IsScriptFile(const std::string& name);
 		static bool IsShaderFile(const std::string& name);
 		static bool IsTextureFile(const std::string& name);
+
+		// A texture, sprite or palette, which the 2D panel lists.
+		static bool IsTwoDFile(const std::string& name);
 		static bool IsSoundFile(const std::string& name);
 		static bool IsFontFile(const std::string& name);
 

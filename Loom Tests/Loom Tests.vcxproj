@@ -119,6 +119,7 @@
     <ClCompile Include="ScriptFolders Tests.cpp" />
     <ClCompile Include="EditorLayouts Tests.cpp" />
     <ClCompile Include="ShaderEditor Tests.cpp" />
+    <ClCompile Include="SpriteAsset Tests.cpp" />
     <ClCompile Include="SpriteEditor Tests.cpp" />
     <ClCompile Include="EditableMesh Tests.cpp" />
     <ClCompile Include="ModelEditor Tests.cpp" />
@@ -201,6 +202,7 @@
     <ClCompile Include="..\Loom Editor\KindFilter.cpp" />
     <ClCompile Include="..\Loom Editor\EditorLayouts.cpp" />
     <ClCompile Include="..\Loom Editor\ShaderEditor.cpp" />
+    <ClCompile Include="..\Loom Editor\SpriteAsset.cpp" />
     <ClCompile Include="..\Loom Editor\SpriteEditor.cpp" />
     <ClCompile Include="..\Loom Editor\EditableMesh.cpp" />
     <ClCompile Include="..\Loom Editor\ModelEditor.cpp" />

@@ -3,38 +3,31 @@
 #include "Test Support.h"
 
 #include "SpriteEditor.h"
+#include "UiScript.h"
 
 #include "imgui.h"
 #include "imgui_internal.h"
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
 
 namespace
 {
+	using Loom::SpriteAsset;
 	using Loom::SpriteEditor;
 
-	constexpr int RGBA = 4;
 	constexpr uint8_t FULL = 255;
 
-	constexpr SpriteEditor::Colour RED = { FULL, 0, 0, FULL };
-	constexpr SpriteEditor::Colour GREEN = { 0, FULL, 0, FULL };
-	constexpr SpriteEditor::Colour CLEAR = { 0, 0, 0, 0 };
+	constexpr SpriteAsset::Colour RED = { FULL, 0, 0, FULL };
+	constexpr SpriteAsset::Colour BLACK = { 0, 0, 0, FULL };
+	constexpr SpriteAsset::Colour WHITE = { FULL, FULL, FULL, FULL };
+	constexpr SpriteAsset::Colour CLEAR = { 0, 0, 0, 0 };
 
-	SpriteEditor::Image Blank(int width, int height, const SpriteEditor::Colour& colour = CLEAR)
-	{
-		SpriteEditor::Image image{ width, height, { } };
-
-		for (int i = 0; i < width * height; i++)
-			image.pixels.insert(image.pixels.end(), colour.begin(), colour.end());
-
-		return image;
-	};
-
-	int Count(const SpriteEditor::Image& image, const SpriteEditor::Colour& colour)
+	int Count(const SpriteAsset::Image& image, const SpriteAsset::Colour& colour)
 	{
 		int count = 0;
 
@@ -46,7 +39,8 @@ namespace
 	};
 
 	// The Sprites panel in an ImGui context of the test's own, with no window
-	// and no renderer, filling the display with one small image open.
+	// and no renderer, filling the display but for the Palette panel's room
+	// on the right, with one small image open.
 	struct Driven
 	{
 		static constexpr float width = 900.0f;
@@ -55,19 +49,30 @@ namespace
 		// The image is fitted in the middle of the canvas, as large as it goes.
 		static constexpr int side = 4;
 
+		// The Palette panel's, which sits to the right of the Sprites panel.
+		static constexpr float paletteWidth = 300.0f;
+
 		// Enough for the panel to dock its tab and take focus.
 		static constexpr int opening_frames = 4;
 
-		explicit Driven(const std::string& name) :
-			path(LoomTests::WriteTga(name, side, side, Blank(side, side).pixels))
+		// With a sprite, it is written beside the image first, with the image
+		// its sheet unless another is given, and the image opens as it.
+		explicit Driven(const std::string& name, const SpriteAsset* sprite = nullptr, const SpriteAsset::Image* image = nullptr) :
+			path(LoomTests::WriteTga(name, side, side, SpriteAsset::Image::Blank(side, side).pixels))
 		{
+			if (sprite != nullptr)
+			{
+				REQUIRE(SpriteAsset::Save(SpriteAsset::For(path), *sprite, { path, "" }));
+				REQUIRE(SpriteAsset::SaveImage(path, image != nullptr ? *image : sprite->Sheet()));
+			};
+
 			constexpr float frame_time = 1.0f / 60.0f;
 
 			context = ImGui::CreateContext();
 
 			ImGuiIO& io = ImGui::GetIO();
 			io.IniFilename = nullptr;
-			io.DisplaySize = ImVec2(width, height);
+			io.DisplaySize = ImVec2(width + paletteWidth, height);
 			io.DeltaTime = frame_time;
 			io.ConfigInputTrickleEventQueue = false;
 
@@ -88,6 +93,7 @@ namespace
 
 			std::error_code code;
 			std::filesystem::remove(path, code);
+			std::filesystem::remove(SpriteAsset::For(path), code);
 		};
 
 		void Frame()
@@ -95,25 +101,45 @@ namespace
 			ImGui::NewFrame();
 			ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
 			ImGui::SetNextWindowSize(ImVec2(width, height));
-			editor.Draw(&open);
+			editor.Draw(&open, &paletteOpen);
+
+			// Beside the Sprites panel, once a test opens it.
+			if (paletteOpen)
+			{
+				ImGui::SetNextWindowPos(ImVec2(width, 0.0f));
+				ImGui::SetNextWindowSize(ImVec2(paletteWidth, height));
+				editor.DrawPalette(&paletteOpen, "");
+			};
 			ImGui::EndFrame();
 		};
 
 		// Presses at from, moves to to, and lets go.
-		void Stroke(const ImVec2& from, const ImVec2& to)
+		void Stroke(const ImVec2& from, const ImVec2& to, ImGuiMouseButton button = ImGuiMouseButton_Left)
 		{
 			ImGuiIO& io = ImGui::GetIO();
 
 			io.AddMousePosEvent(from.x, from.y);
 			Frame();
 
-			io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+			io.AddMouseButtonEvent(button, true);
 			Frame();
 
 			io.AddMousePosEvent(to.x, to.y);
 			Frame();
 
-			io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+			io.AddMouseButtonEvent(button, false);
+			Frame();
+		};
+
+		// A key on its own, as a tool's is.
+		void Tap(ImGuiKey key)
+		{
+			ImGuiIO& io = ImGui::GetIO();
+
+			io.AddKeyEvent(key, true);
+			Frame();
+
+			io.AddKeyEvent(key, false);
 			Frame();
 		};
 
@@ -130,12 +156,54 @@ namespace
 			Frame();
 		};
 
-		SpriteEditor::Image Saved()
+		// Runs a UiScript on the panels until it ends.
+		void Run(const std::string& text)
+		{
+			constexpr int most_frames = 600;
+
+			Loom::UiScript script{ std::filesystem::path() };
+			script.LoadText(text);
+
+			for (int frame = 0; frame < most_frames && !script.Finished(); frame++)
+			{
+				script.Step();
+				Frame();
+			};
+
+			CHECK_FALSE(script.Failed());
+		};
+
+		// The sprite as Ctrl+S writes it.
+		SpriteAsset SavedSprite()
 		{
 			Press(ImGuiKey_S);
 
-			SpriteEditor::Image image;
-			REQUIRE(SpriteEditor::Load(path, image));
+			SpriteAsset sprite;
+			SpriteAsset::Links links;
+			REQUIRE(SpriteAsset::Load(SpriteAsset::For(path), sprite, links));
+
+			return sprite;
+		};
+
+		// How many tabs the panel has.
+		static int Tabs()
+		{
+			ImGuiContext& g = *ImGui::GetCurrentContext();
+			int tabs = 0;
+
+			for (int i = 0; i < g.TabBars.GetMapSize(); i++)
+				if (ImGuiTabBar* bar = g.TabBars.TryGetMapData(i))
+					tabs += bar->Tabs.Size;
+
+			return tabs;
+		};
+
+		SpriteAsset::Image Saved()
+		{
+			Press(ImGuiKey_S);
+
+			SpriteAsset::Image image;
+			REQUIRE(SpriteAsset::LoadImage(path, image));
 
 			return image;
 		};
@@ -157,6 +225,7 @@ namespace
 		ImGuiContext* context = nullptr;
 		SpriteEditor editor;
 		bool open = true;
+		bool paletteOpen = false;
 	};
 
 	// A point in the canvas well inside the image, which sits in the middle of
@@ -171,89 +240,6 @@ namespace
 
 TEST_SUITE("SpriteEditor")
 {
-	TEST_CASE("a line reaches both ends with no gaps")
-	{
-		constexpr int length = 8;
-
-		SpriteEditor::Image image = Blank(length, length);
-
-		image.Line(0, 0, length - 1, 3, RED);
-
-		CHECK(image.Get(0, 0) == RED);
-		CHECK(image.Get(length - 1, 3) == RED);
-
-		// One pixel a column, along the axis it covers more of.
-		CHECK(Count(image, RED) == length);
-
-		for (int x = 0; x < length; x++)
-		{
-			bool painted = false;
-
-			for (int y = 0; y < length; y++)
-				painted |= image.Get(x, y) == RED;
-
-			CHECK(painted);
-		};
-	};
-
-	TEST_CASE("a line off the image paints only the part on it")
-	{
-		SpriteEditor::Image image = Blank(4, 4);
-
-		image.Line(-3, 1, 6, 1, RED);
-
-		CHECK(Count(image, RED) == 4);
-	};
-
-	TEST_CASE("fill stops at other colours and does not leak through corners")
-	{
-		// A red wall down column 2, with a gap only at a corner.
-		SpriteEditor::Image image = Blank(5, 3);
-
-		image.Set(2, 0, RED);
-		image.Set(2, 1, RED);
-		image.Set(3, 2, RED);
-		image.Set(2, 2, RED);
-
-		image.Fill(0, 0, GREEN);
-
-		CHECK(Count(image, GREEN) == 6);
-		CHECK(image.Get(4, 0) == CLEAR);
-		CHECK(Count(image, RED) == 4);
-	};
-
-	TEST_CASE("each format saves and loads back the same pixels, top row first")
-	{
-		SpriteEditor::Image image = Blank(3, 2);
-
-		image.Set(0, 0, RED);
-		image.Set(2, 1, GREEN);
-		image.Set(1, 0, { 10, 20, 30, 128 });
-
-		for (const char* extension : { ".png", ".bmp", ".tga" })
-		{
-			CAPTURE(extension);
-
-			const std::string path = (std::filesystem::temp_directory_path() / (std::string("loom sprite round trip") + extension)).string();
-
-			REQUIRE(SpriteEditor::Save(path, image));
-
-			SpriteEditor::Image loaded;
-			REQUIRE(SpriteEditor::Load(path, loaded));
-
-			CHECK(loaded == image);
-
-			std::filesystem::remove(path);
-		};
-	};
-
-	TEST_CASE("a file that will not decode does not open")
-	{
-		SpriteEditor::Image image;
-
-		CHECK_FALSE(SpriteEditor::Load("no such sprite.png", image));
-	};
-
 	TEST_CASE("a click with the pencil paints one pixel, and Ctrl+S writes it")
 	{
 		Driven driven("loom sprite click.tga");
@@ -271,8 +257,8 @@ TEST_SUITE("SpriteEditor")
 
 		CHECK(driven.editor.SaveAll());
 
-		SpriteEditor::Image saved;
-		REQUIRE(SpriteEditor::Load(driven.path, saved));
+		SpriteAsset::Image saved;
+		REQUIRE(SpriteAsset::LoadImage(driven.path, saved));
 
 		CHECK(Count(saved, CLEAR) == Driven::side * Driven::side - 1);
 	};
@@ -283,16 +269,16 @@ TEST_SUITE("SpriteEditor")
 
 		driven.Stroke(ImVec2(middle.x - reach, middle.y), ImVec2(middle.x + reach, middle.y));
 
-		const SpriteEditor::Image saved = driven.Saved();
+		const SpriteAsset::Image saved = driven.Saved();
 
 		CHECK(Count(saved, CLEAR) == Driven::side * (Driven::side - 1));
 	};
 
-	TEST_CASE("an image moved while its tab is in front stays in front, and Ctrl+S writes where it went")
+	TEST_CASE("an image moved while its tab is in front stays in front, and Ctrl+S writes it and its sprite where it went")
 	{
 		Driven driven("loom sprite first.tga");
 
-		const std::string opened = LoomTests::WriteTga("loom sprite opened.tga", Driven::side, Driven::side, Blank(Driven::side, Driven::side).pixels);
+		const std::string opened = LoomTests::WriteTga("loom sprite opened.tga", Driven::side, Driven::side, SpriteAsset::Image::Blank(Driven::side, Driven::side).pixels);
 		const std::filesystem::path moved = std::filesystem::path(opened).parent_path() / "loom sprite moved.tga";
 
 		driven.editor.Open(opened);
@@ -302,18 +288,20 @@ TEST_SUITE("SpriteEditor")
 		driven.editor.Relocate(std::filesystem::path(opened).lexically_normal().string(), moved.string());
 		driven.Frame();
 
-		CHECK(Driven::SelectedTab().find(moved.filename().string()) != std::string::npos);
+		CHECK(Driven::SelectedTab().find(moved.stem().string()) != std::string::npos);
 
 		driven.Stroke(middle, middle);
 		driven.Press(ImGuiKey_S);
 
-		SpriteEditor::Image saved;
-		REQUIRE(SpriteEditor::Load(moved.string(), saved));
+		SpriteAsset::Image saved;
+		REQUIRE(SpriteAsset::LoadImage(moved.string(), saved));
 
 		CHECK(Count(saved, CLEAR) == Driven::side * Driven::side - 1);
 		CHECK_FALSE(std::filesystem::exists(opened));
+		CHECK(std::filesystem::exists(SpriteAsset::For(moved.string())));
 
 		std::filesystem::remove(moved);
+		std::filesystem::remove(SpriteAsset::For(moved.string()));
 	};
 
 	TEST_CASE("Ctrl+Z takes a stroke back and Ctrl+Y puts it back")
@@ -381,5 +369,542 @@ TEST_SUITE("SpriteEditor")
 		driven.Stroke(middle, middle);
 
 		CHECK(Count(driven.Saved(), CLEAR) == 0);
+	};
+
+	TEST_CASE("an image with a sprite opens as it: a stroke paints the first frame of the bottom layer, and saving writes both")
+	{
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.AddFrame(1, false);
+		sprite.AddLayer(1, "Hidden");
+		sprite.layers[1].visible = false;
+		sprite.layers[1].cels[0].Fill(0, 0, RED);
+
+		Driven driven("loom sprite layered.tga", &sprite);
+
+		driven.Stroke(middle, middle);
+
+		// The hidden layer is left out, and the frames lie side by side.
+		const SpriteAsset::Image sheet = driven.Saved();
+
+		CHECK(sheet.width == Driven::side * 2);
+		CHECK(Count(sheet, RED) == 0);
+		CHECK(Count(sheet, CLEAR) == sheet.width * sheet.height - 1);
+
+		SpriteAsset saved;
+		SpriteAsset::Links links;
+		REQUIRE(SpriteAsset::Load(SpriteAsset::For(driven.path), saved, links));
+
+		CHECK(Count(saved.layers[0].cels[0], CLEAR) == Driven::side * Driven::side - 1);
+		CHECK(saved.layers[0].cels[1] == sprite.layers[0].cels[1]);
+		CHECK(saved.layers[1] == sprite.layers[1]);
+		CHECK(links.image == std::filesystem::path(driven.path).lexically_normal().string());
+	};
+
+	TEST_CASE("opening a sprite's image and then the sprite brings the one tab forward")
+	{
+		const SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+
+		Driven driven("loom sprite twice.tga", &sprite);
+
+		driven.editor.Open(SpriteAsset::For(driven.path));
+		driven.Frame();
+		driven.Stroke(middle, middle);
+
+		// Had a second tab opened, it would be the one in front, and painted.
+		CHECK(Count(driven.Saved(), CLEAR) == Driven::side * Driven::side - 1);
+		CHECK(Driven::Tabs() == 1);
+	};
+
+	TEST_CASE("a sprite with the Palette panel shut offers to open it, and New there makes a palette of the sprite's colours")
+	{
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.layers[0].cels[0].Set(0, 0, RED);
+
+		Driven driven("loom sprite palette.tga", &sprite);
+
+		driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\n");
+
+		CHECK(driven.paletteOpen);
+
+		const std::string palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension).string();
+
+		Loom::Palette made;
+		REQUIRE(Loom::Palette::Load(palette, made));
+		CHECK(made.colours == std::vector<SpriteAsset::Colour>{ RED });
+
+		REQUIRE(driven.editor.SaveAll());
+
+		SpriteAsset saved;
+		SpriteAsset::Links links;
+		REQUIRE(SpriteAsset::Load(SpriteAsset::For(driven.path), saved, links));
+		CHECK(links.palette == palette);
+
+		std::filesystem::remove(palette);
+	};
+
+	TEST_CASE("+ Layer adds a clear layer above the one painted, the arrows move it, and - Layer takes it out")
+	{
+		const SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+
+		Driven driven("loom sprite layers.tga", &sprite);
+
+		driven.Run("click \"Sprites\" \"+ Layer\"\nwait 2\nclick \"Sprites\" \"##down\"\nwait 2\n");
+
+		SpriteAsset saved = driven.SavedSprite();
+
+		REQUIRE(saved.layers.size() == 2);
+		CHECK(saved.layers[0].name == "Layer 2");
+		CHECK(saved.layers[0].cels[0].IsClear());
+		CHECK(saved.layers[1].name == "Layer 1");
+
+		driven.Run("click \"Sprites\" \"- Layer\"\nwait 2\n");
+
+		saved = driven.SavedSprite();
+
+		REQUIRE(saved.layers.size() == 1);
+		CHECK(saved.layers[0].name == "Layer 1");
+	};
+
+	TEST_CASE("- Frame on the last frame leaves the one before it to paint")
+	{
+		const SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+
+		Driven driven("loom sprite frames.tga", &sprite);
+
+		driven.Run("click \"Sprites\" \"+ Frame\"\nwait 2\nclick \"Sprites\" \"- Frame\"\nwait 2\n");
+		driven.Stroke(middle, middle);
+
+		const SpriteAsset saved = driven.SavedSprite();
+
+		REQUIRE(saved.Frames() == 1);
+		CHECK(Count(saved.layers[0].cels[0], CLEAR) == Driven::side * Driven::side - 1);
+	};
+
+	TEST_CASE("a hidden layer is left out of the image, and Ctrl+Z shows it again")
+	{
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.layers[0].cels[0].Set(0, 0, RED);
+
+		Driven driven("loom sprite hidden.tga", &sprite);
+
+		driven.Run("click \"Sprites\" \"##visible\"\nwait 2\n");
+
+		CHECK(Count(driven.Saved(), RED) == 0);
+
+		driven.Press(ImGuiKey_Z);
+
+		CHECK(Count(driven.Saved(), RED) == 1);
+	};
+
+	TEST_CASE("a drag on a frame's milliseconds is one step to undo")
+	{
+		const SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+
+		Driven driven("loom sprite duration.tga", &sprite);
+
+		driven.Run("drag \"Sprites\" \"##duration\" to \"Sprites\" \"##duration\" 40 0\nwait 2\n");
+
+		CHECK(driven.SavedSprite().durations[0] > SpriteAsset::defaultDuration);
+
+		driven.Press(ImGuiKey_Z);
+
+		CHECK(driven.SavedSprite().durations[0] == SpriteAsset::defaultDuration);
+	};
+
+	TEST_CASE("Play steps the frames on by their milliseconds")
+	{
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.AddFrame(1, false);
+
+		// The first is over within a frame or two at sixty a second, and the
+		// second outlasts the test.
+		sprite.durations = { SpriteAsset::minDuration, SpriteAsset::maxDuration };
+
+		Driven driven("loom sprite play.tga", &sprite);
+
+		driven.Run("click \"Sprites\" \"Play\"\nwait 10\nclick \"Sprites\" \"Stop\"\nwait 2\n");
+		driven.Stroke(middle, middle);
+
+		const SpriteAsset saved = driven.SavedSprite();
+
+		CHECK(saved.layers[0].cels[0].IsClear());
+		CHECK(Count(saved.layers[0].cels[1], CLEAR) == Driven::side * Driven::side - 1);
+	};
+
+	TEST_CASE("an image written since its sprite is not saved over until it is taken in or the sprite kept")
+	{
+		const SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+
+		SpriteAsset::Image changed = SpriteAsset::Image::Blank(Driven::side, Driven::side);
+		changed.Set(0, 0, RED);
+
+		SUBCASE("taken in, it is a layer of its own")
+		{
+			Driven driven("loom sprite taken in.tga", &sprite, &changed);
+
+			driven.Stroke(middle, middle);
+			CHECK_FALSE(driven.editor.SaveAll());
+
+			driven.Run("click \"Sprites\" \"Take It In\"\nwait 2\n");
+
+			const SpriteAsset saved = driven.SavedSprite();
+
+			REQUIRE(saved.layers.size() == 2);
+			CHECK(saved.layers[1].cels[0] == changed);
+			CHECK(Count(driven.Saved(), RED) == 1);
+		};
+
+		SUBCASE("kept, the sprite is written over it")
+		{
+			Driven driven("loom sprite kept.tga", &sprite, &changed);
+
+			driven.Run("click \"Sprites\" \"Keep Sprite\"\nwait 2\n");
+			driven.Stroke(middle, middle);
+
+			CHECK(driven.editor.SaveAll());
+			CHECK(driven.SavedSprite().layers.size() == 1);
+			CHECK(Count(driven.Saved(), RED) == 0);
+		};
+	};
+
+	TEST_CASE("a lossy image saved from its sprite reads back as its own")
+	{
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.layers[0].cels[0].Set(1, 2, { 10, 200, 30, FULL / 2 });
+
+		Driven driven("loom sprite lossy.jpg", &sprite);
+
+		driven.Stroke(middle, middle);
+
+		CHECK(driven.editor.SaveAll());
+	};
+
+	TEST_CASE("an image opens as the sprite beside it that names no image")
+	{
+		const std::filesystem::path folder = std::filesystem::temp_directory_path();
+		const std::string image = (folder / "loom sprite bare.png").string();
+		const std::string bare = SpriteAsset::For(image);
+
+		REQUIRE(SpriteAsset::SaveImage(image, SpriteAsset::Image::Blank(Driven::side, Driven::side)));
+
+		{
+			std::ofstream file(bare);
+			file << "size=" << Driven::side << "x" << Driven::side << "\nframe=100\nlayer=Bare\ncel=\n";
+		};
+
+		Driven driven("loom sprite beside bare.tga");
+
+		driven.editor.Open(image);
+		driven.Frame();
+		driven.Frame();
+
+		CHECK(Driven::Tabs() == 2);
+		CHECK(Driven::SelectedTab().find("loom sprite bare") != std::string::npos);
+
+		std::filesystem::remove(image);
+		std::filesystem::remove(bare);
+	};
+
+	TEST_CASE("an image does not open as a sprite beside it that belongs to another image")
+	{
+		const SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+
+		Driven driven("loom sprite owner.tga", &sprite);
+
+		const std::string other = LoomTests::WriteTga("loom sprite other.tga", Driven::side, Driven::side, SpriteAsset::Image::Blank(Driven::side, Driven::side).pixels);
+		REQUIRE(SpriteAsset::Save(SpriteAsset::For(other), sprite, { driven.path, "" }));
+
+		driven.editor.Open(other);
+		driven.Frame();
+
+		CHECK(Driven::Tabs() == 1);
+
+		std::filesystem::remove(other);
+		std::filesystem::remove(SpriteAsset::For(other));
+	};
+
+	TEST_CASE("the left mouse paints black and the right white, until X swaps them")
+	{
+		Driven driven("loom sprite hands.tga");
+
+		driven.Stroke(middle, middle, ImGuiMouseButton_Right);
+
+		CHECK(Count(driven.Saved(), WHITE) == 1);
+
+		driven.Tap(ImGuiKey_X);
+		driven.Stroke(middle, middle);
+
+		CHECK(Count(driven.Saved(), WHITE) == 1);
+		CHECK(Count(driven.Saved(), BLACK) == 0);
+
+		driven.Stroke(middle, middle, ImGuiMouseButton_Right);
+
+		CHECK(Count(driven.Saved(), BLACK) == 1);
+	};
+
+	TEST_CASE("the picker picks for the button that clicked it, and fill fills with that button's colour")
+	{
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.layers[0].cels[0].Fill(0, 0, RED);
+
+		Driven driven("loom sprite picker.tga", &sprite);
+
+		driven.Tap(ImGuiKey_I);
+		driven.Stroke(middle, middle, ImGuiMouseButton_Right);
+
+		// The picker goes back to the pencil, and the left colour is untouched.
+		driven.Stroke(middle, middle);
+		CHECK(Count(driven.Saved(), BLACK) == 1);
+
+		driven.Tap(ImGuiKey_G);
+		driven.Stroke(middle, middle, ImGuiMouseButton_Right);
+
+		CHECK(Count(driven.Saved(), RED) == Driven::side * Driven::side);
+	};
+
+	TEST_CASE("a stroke ends when its own button lets go, whatever the other does")
+	{
+		Driven driven("loom sprite two buttons.tga");
+		ImGuiIO& io = ImGui::GetIO();
+
+		io.AddMousePosEvent(middle.x - reach, middle.y);
+		driven.Frame();
+		io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+		driven.Frame();
+		io.AddMouseButtonEvent(ImGuiMouseButton_Right, true);
+		driven.Frame();
+		io.AddMouseButtonEvent(ImGuiMouseButton_Right, false);
+		driven.Frame();
+
+		io.AddMousePosEvent(middle.x + reach, middle.y);
+		driven.Frame();
+		io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+		driven.Frame();
+
+		const SpriteAsset::Image saved = driven.Saved();
+
+		CHECK(Count(saved, BLACK) == Driven::side);
+		CHECK(Count(saved, WHITE) == 0);
+	};
+
+	TEST_CASE("a swatch clicked with either button is that button's colour, and + and - put the left colour in the palette and take it out")
+	{
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.layers[0].cels[0].Set(0, 0, RED);
+
+		Driven driven("loom sprite swatches.tga", &sprite);
+
+		const std::string palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension).string();
+
+		// The palette holds red alone, its swatch just left of +, after clear.
+		const std::string swatch = "\"Palette\" \"+\" left -15 0";
+
+		driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\nrightclick " + swatch + "\nwait 2\n");
+		driven.Stroke(middle, middle, ImGuiMouseButton_Right);
+
+		CHECK(Count(driven.Saved(), RED) == 2);
+
+		driven.Run("click " + swatch + "\nwait 2\n");
+		driven.Tap(ImGuiKey_E);
+		driven.Stroke(middle, middle);
+		driven.Tap(ImGuiKey_B);
+		driven.Stroke(middle, middle);
+
+		CHECK(Count(driven.Saved(), RED) == 2);
+
+		Loom::Palette saved;
+
+		driven.Run("click \"Palette\" \"-\"\nwait 2\n");
+		REQUIRE(Loom::Palette::Load(palette, saved));
+		CHECK(saved.colours.empty());
+
+		driven.Run("click \"Palette\" \"+\"\nwait 2\n");
+		REQUIRE(Loom::Palette::Load(palette, saved));
+		CHECK(saved.colours == std::vector<SpriteAsset::Colour>{ RED });
+
+		std::filesystem::remove(palette);
+	};
+
+	TEST_CASE("clear comes first in every palette, paints as the eraser does, and is never added or taken out")
+	{
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.layers[0].cels[0].Fill(0, 0, RED);
+
+		Driven driven("loom sprite clear swatch.tga", &sprite);
+
+		const std::string palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension).string();
+
+		// Clear, then red, then +.
+		const std::string clear_swatch = "\"Palette\" \"+\" left -46 0";
+
+		driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\nrightclick " + clear_swatch + "\nwait 2\n");
+		driven.Stroke(middle, middle, ImGuiMouseButton_Right);
+
+		CHECK(Count(driven.Saved(), RED) == Driven::side * Driven::side - 1);
+		CHECK(Count(driven.Saved(), CLEAR) == 1);
+
+		driven.Run("click " + clear_swatch + "\nwait 2\nclick \"Palette\" \"+\"\nwait 2\nclick \"Palette\" \"-\"\nwait 2\n");
+
+		Loom::Palette saved;
+		REQUIRE(Loom::Palette::Load(palette, saved));
+		CHECK(saved.colours == std::vector<SpriteAsset::Colour>{ RED });
+
+		std::filesystem::remove(palette);
+	};
+
+	TEST_CASE("a see-through colour with red, green or blue left in it is clear, paints as clear, and + leaves it out of the palette")
+	{
+		constexpr SpriteAsset::Colour see_through_red = { FULL, 0, 0, 0 };
+
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.layers[0].cels[0].Fill(0, 0, see_through_red);
+
+		// A cel that is all see-through is saved as clear, so one pixel shows.
+		sprite.layers[0].cels[0].Set(0, 0, RED);
+
+		Driven driven("loom sprite see-through.tga", &sprite);
+
+		const std::string palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension).string();
+
+		driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\n");
+		driven.Tap(ImGuiKey_I);
+		driven.Stroke(middle, middle);
+		driven.Stroke(middle, middle);
+
+		CHECK(Count(driven.SavedSprite().layers[0].cels[0], CLEAR) == 1);
+
+		driven.Run("click \"Palette\" \"+\"\nwait 2\n");
+
+		Loom::Palette saved;
+		REQUIRE(Loom::Palette::Load(palette, saved));
+		CHECK(saved.colours == std::vector<SpriteAsset::Colour>{ RED });
+
+		std::filesystem::remove(palette);
+	};
+
+	TEST_CASE("a layer's outline toggle is kept with the sprite, changes nothing in the image, and Ctrl+Z turns it back")
+	{
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.layers[0].cels[0].Set(0, 0, RED);
+
+		Driven driven("loom sprite outlined.tga", &sprite);
+
+		driven.Run("click \"Sprites\" \"##outlined\"\nwait 2\n");
+
+		CHECK(driven.SavedSprite().layers[0].outlined);
+		CHECK(driven.Saved() == sprite.Sheet());
+
+		driven.Press(ImGuiKey_Z);
+
+		CHECK_FALSE(driven.SavedSprite().layers[0].outlined);
+	};
+
+	TEST_CASE("a layer dragged by its name onto another takes its place, is the one painted, and Ctrl+Z puts it back")
+	{
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.AddLayer(1, "Layer 2");
+		sprite.AddLayer(2, "Layer 3");
+
+		Driven driven("loom sprite drag layer.tga", &sprite);
+
+		driven.Run("drag \"Sprites\" \"Layer 1\" to \"Sprites\" \"Layer 3\"\nwait 2\n");
+		driven.Stroke(middle, middle);
+
+		SpriteAsset saved = driven.SavedSprite();
+
+		REQUIRE(saved.layers.size() == 3);
+		CHECK(saved.layers[0].name == "Layer 2");
+		CHECK(saved.layers[1].name == "Layer 3");
+		CHECK(saved.layers[2].name == "Layer 1");
+		CHECK(Count(saved.layers[2].cels[0], CLEAR) == Driven::side * Driven::side - 1);
+
+		driven.Press(ImGuiKey_Z);
+		driven.Press(ImGuiKey_Z);
+
+		saved = driven.SavedSprite();
+
+		CHECK(saved.layers[0].name == "Layer 1");
+		CHECK(saved.layers[2].name == "Layer 3");
+	};
+
+	TEST_CASE("a layer held over another sprite's tab leaves that tab behind, so it never drops into that sprite")
+	{
+		constexpr int held_frames = 60;
+
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.AddLayer(1, "Layer 2");
+
+		Driven driven("loom sprite drag first.tga", &sprite);
+
+		const std::string other = LoomTests::WriteTga("loom sprite drag other.tga", Driven::side, Driven::side, SpriteAsset::Image::Blank(Driven::side, Driven::side).pixels);
+
+		driven.editor.Open(other);
+		driven.Frame();
+		driven.Frame();
+		driven.editor.Open(driven.path);
+		driven.Frame();
+		driven.Frame();
+
+		const std::string first = Driven::SelectedTab();
+		const std::string other_name = std::filesystem::path(SpriteAsset::For(other)).filename().string();
+
+		// The middle of the other sprite's tab, which a script cannot aim at
+		// by its label.
+		ImVec2 other_tab{ };
+		ImGuiContext& g = *ImGui::GetCurrentContext();
+
+		for (int i = 0; i < g.TabBars.GetMapSize(); i++)
+			if (ImGuiTabBar* bar = g.TabBars.TryGetMapData(i))
+				for (ImGuiTabItem& tab : bar->Tabs)
+					if (std::string(ImGui::TabBarGetTabName(bar, &tab)).find(other_name) != std::string::npos)
+						other_tab = ImVec2(bar->BarRect.Min.x + tab.Offset + tab.Width * 0.5f, (bar->BarRect.Min.y + bar->BarRect.Max.y) * 0.5f);
+
+		REQUIRE(other_tab.x > 0.0f);
+
+		ImGuiIO& io = ImGui::GetIO();
+
+		driven.Run("move \"Sprites\" \"Layer 1\"\nwait 2\n");
+		io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+		driven.Frame();
+		driven.Run("move " + std::to_string((int)other_tab.x) + " " + std::to_string((int)other_tab.y) + "\nwait " + std::to_string(held_frames) + "\n");
+
+		CHECK(Driven::SelectedTab() == first);
+
+		io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+		driven.Frame();
+
+		CHECK(Driven::SelectedTab() == first);
+
+		std::filesystem::remove(other);
+	};
+
+	TEST_CASE("Ctrl+Z waits while a layer is dragged, so the drop moves the layer it picked up")
+	{
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.AddLayer(1, "Layer 2");
+
+		Driven driven("loom sprite undo mid-drag.tga", &sprite);
+		ImGuiIO& io = ImGui::GetIO();
+
+		// A third layer, between the two, for Ctrl+Z to take out.
+		driven.Run("click \"Sprites\" \"+ Layer\"\nwait 2\nmove \"Sprites\" \"Layer 2\"\nwait 2\n");
+		io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+		driven.Frame();
+		driven.Run("move \"Sprites\" \"Layer 1\"\nwait 2\n");
+		driven.Press(ImGuiKey_Z);
+		io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+		driven.Frame();
+
+		// Saved as a whole, since the drop leaves the keyboard elsewhere.
+		REQUIRE(driven.editor.SaveAll());
+
+		SpriteAsset saved;
+		SpriteAsset::Links links;
+		REQUIRE(SpriteAsset::Load(SpriteAsset::For(driven.path), saved, links));
+
+		REQUIRE(saved.layers.size() == 3);
+		CHECK(saved.layers[0].name == "Layer 2");
+		CHECK(saved.layers[1].name == "Layer 1");
+		CHECK(saved.layers[2].name == "Layer 3");
 	};
 };

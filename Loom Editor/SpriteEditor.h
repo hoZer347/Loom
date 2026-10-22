@@ -1,10 +1,13 @@
 #pragma once
 
+#include "SpriteAsset.h"
+
 #include "imgui.h"
 
 #include <array>
-#include <cstdint>
+#include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -13,41 +16,29 @@ namespace Loom
 {
 	/**
 	* Loom::SpriteEditor
-	* - The Sprites panel: a tab for each open image, drawn pixel for pixel
-	*   over a checkerboard where it is see-through
-	* - The left mouse paints with the pencil, eraser, fill or picker; the
-	*   middle mouse pans and the wheel zooms about the mouse. Ctrl+Z and
-	*   Ctrl+Y step back and forward a stroke at a time
-	* - Ctrl+S writes the file in the format its extension names, and every
-	*   Sprite showing it picks the change up
+	* - The Sprites panel: a tab for each open sprite, its frame drawn pixel
+	*   for pixel over a checkerboard where it is see-through, over a timeline
+	*   of its layers and frames
+	* - The Palette panel: the pencil, eraser, fill and picker, a colour for
+	*   each of the left and right mouse buttons, which X swaps, and the
+	*   swatches of the palette the sprite in front paints from, clear always
+	*   first, a click on one picking it for the button that clicked. A
+	*   sprite whose Palette panel is out of sight says so, with a button to
+	*   bring it
+	* - The left and right mouse paint the layer and frame picked in the
+	*   timeline, each with its own colour, and the picker picks for the
+	*   button that clicked; the middle mouse pans and the wheel zooms about
+	*   the mouse. Ctrl+Z and Ctrl+Y step back and forward an edit at a time
+	* - A layer can be outlined, hidden or not, which draws round its pixels
+	*   on the canvas and nowhere else, and dragged by its name onto another
+	*   to take its place
+	* - Ctrl+S writes the sprite and the image it is flattened into, and every
+	*   Sprite showing that image picks the change up
 	*/
 	struct SpriteEditor final
 	{
-		using Colour = std::array<uint8_t, 4>;
-
-		// Eight bit RGBA, top row first.
-		struct Image
-		{
-			int width = 0;
-			int height = 0;
-			std::vector<uint8_t> pixels;
-
-			bool Contains(int x, int y) const;
-			Colour Get(int x, int y) const;
-
-			// Off the image does nothing.
-			void Set(int x, int y, const Colour& colour);
-
-			// Every pixel from one end to the other, both included, so a stroke
-			// has no gaps however fast the mouse went.
-			void Line(int x0, int y0, int x1, int y1, const Colour& colour);
-
-			// The pixel and every one joined to it side by side through pixels
-			// of its colour.
-			void Fill(int x, int y, const Colour& colour);
-
-			bool operator==(const Image&) const = default;
-		};
+		// The left and right mouse buttons, which each paint with a colour.
+		static constexpr size_t paintButtons = 2;
 
 		enum struct Tool
 		{
@@ -57,53 +48,88 @@ namespace Loom
 			Picker,
 		};
 
-		// Each says what went wrong on std::cerr.
-		static bool Load(const std::string& path, Image& image);
-		static bool Save(const std::string& path, const Image& image);
-
-		// The file Save writes for an extension, such as ".png". Empty for one
-		// it cannot write.
-		static std::vector<char> Encode(const std::string& extension, const Image& image);
-
-		// Opens the file in a tab of its own, or brings its tab forward, and
-		// the panel with it.
+		// Opens a sprite, or the sprite kept for an image, in a tab of its own,
+		// or brings its tab forward, and the panel with it. An image with no
+		// sprite yet opens as one of a frame and a layer, written beside it on
+		// the first save.
 		void Open(const std::string& path);
 
-		void Draw(bool* open);
+		// Into the Palette panel, as the palette of the sprite in front, or on
+		// its own when there is none.
+		void OpenPalette(const std::string& path);
+
+		// palette_open is the Palette panel's, which a sprite's tab can open.
+		void Draw(bool* open, bool* palette_open);
+
+		// project_folder is where it looks for palettes to pick from, or beside
+		// the sprite when it is empty.
+		void DrawPalette(bool* open, const std::string& project_folder);
 
 		// Keeps the tabs of files that were moved saving to where they are now.
 		void Relocate(const std::string& from, const std::string& to);
 
-		// Whether the panel had the keyboard when it was last drawn, so the
+		// Whether each panel had the keyboard when it was last drawn, so the
 		// scene's own undo keeps out of its way.
 		bool IsFocused() const { return m_focused; };
+		bool IsPaletteFocused() const { return m_paletteFocused; };
 
-		// Every tab with unsaved changes, to its file. False when one could not
-		// be written.
+		// Every tab with unsaved changes, to its files. False when one could
+		// not be written.
 		bool SaveAll();
 
-		// The files saved since the last call.
+		// The images saved since the last call.
 		std::vector<std::string> TakeSaved();
 
 	private:
+		using Image = SpriteAsset::Image;
+		using Colour = SpriteAsset::Colour;
+
 		struct Document
 		{
+			// The .loomsprite, which may not be written yet.
 			std::string path;
-			Image image;
-			Image saved;
+			SpriteAsset::Links links;
+			SpriteAsset sprite;
+
+			SpriteAsset saved;
+			SpriteAsset::Links savedLinks;
 			bool unsaved = false;
 
-			// One image for each stroke, as it was before it.
-			std::vector<Image> undo;
-			std::vector<Image> redo;
+			// The image as it was found, when something else wrote it since the
+			// sprite was saved, until the user takes it in or keeps the sprite.
+			std::optional<Image> outside;
+
+			// The sprite as it was before each edit.
+			std::vector<SpriteAsset> undo;
+			std::vector<SpriteAsset> redo;
+
+			// What is painted, as the timeline picked it.
+			int layer = 0;
+			int frame = 0;
+
+			// The frame's visible layers together, when there is more than one,
+			// made again once stale.
+			Image flattened;
+			bool stale = true;
+
+			// Milliseconds into the frame, while it plays.
+			bool playing = false;
+			float played = 0.0f;
 
 			// Screen pixels to an image pixel, and where the image's top left
 			// sits in the canvas. Zero until the canvas first has a size.
 			float zoom = 0.0f;
 			ImVec2 offset{ };
 
-			// The pixel a stroke last reached, while the mouse is held down.
+			// The pixel under the mouse, for the status line.
+			bool hovering = false;
+			int hoverX = 0;
+			int hoverY = 0;
+
+			// The pixel a stroke last reached, and the button painting it, while
+			// it is held down.
 			bool stroking = false;
+			ImGuiMouseButton strokeButton = ImGuiMouseButton_Left;
 			int lastX = 0;
 			int lastY = 0;
 
@@ -111,15 +137,40 @@ namespace Loom
 			bool select = true;
 		};
 
+		// What a layer dragged in the timeline carries.
+		struct LayerDrag
+		{
+			const Document* document;
+			int layer;
+		};
+
 		bool SaveDocument(Document& document);
 
-		void DrawDocument(Document& document);
-		void DrawToolbar(Document& document);
+		void DrawDocument(Document& document, bool* palette_open, bool palette_shown);
 		void DrawCanvas(Document& document, const ImVec2& size);
+		void DrawTimeline(Document& document, float height);
+		void DrawStatus(Document& document, bool* palette_open, bool palette_shown);
 		void DrawCloseQuestion();
 
-		void Paint(Document& document, int x, int y, bool pressed);
+		void DrawTools();
+		void DrawSwatches(const std::string& path);
+		void DrawPaletteChoice(const std::string& project_folder);
+		// The tools' keys, and X to swap the colours.
+		void ToolShortcuts();
+
+		// The palette of the sprite in front, or the one opened on its own.
+		const std::string& PalettePath() const;
+		void SetPalette(const std::string& path);
+		Palette& PaletteAt(const std::string& path);
+
+		// What the frame looks like.
+		static const Image& Shown(Document& document);
+
+		// pressed is the button that went down on the canvas this frame.
+		void Paint(Document& document, int x, int y, std::optional<ImGuiMouseButton> pressed);
+		void Play(Document& document);
 		static void Remember(Document& document);
+		static void Edited(Document& document);
 		static void Step(Document& document, bool undo);
 		static void Fit(Document& document, const ImVec2& size);
 		static void Zoom(Document& document, const ImVec2& about, float wheel);
@@ -128,6 +179,10 @@ namespace Loom
 
 		std::vector<std::unique_ptr<Document>> m_documents;
 
+		// The tab last in front of the Sprites panel, whose palette the Palette
+		// panel shows.
+		Document* m_active = nullptr;
+
 		// Closed with edits that were never saved, until the user says what to
 		// do with them.
 		Document* m_closing = nullptr;
@@ -135,11 +190,30 @@ namespace Loom
 		std::vector<std::string> m_saved;
 
 		Tool m_tool = Tool::Pencil;
-		Colour m_colour{ 0, 0, 0, UINT8_MAX };
+		// What the left and right mouse buttons paint with, by ImGuiMouseButton.
+		std::array<Colour, paintButtons> m_colours{ Colour{ 0, 0, 0, UINT8_MAX }, Colour{ UINT8_MAX, UINT8_MAX, UINT8_MAX, UINT8_MAX } };
 		bool m_grid = true;
 		bool m_focused = false;
 
+		// Every palette shown so far, by path, as last saved.
+		std::map<std::string, Palette> m_palettes;
+
+		// Opened with no sprite in front to take it.
+		std::string m_loosePalette;
+
+		// Found when the list of them opens.
+		std::vector<std::string> m_paletteFiles;
+
+		// Whether the Palette panel was in sight when it was last drawn.
+		bool m_paletteShown = false;
+		bool m_paletteFocused = false;
+
+		// What a layer's rename box holds while it is open.
+		static constexpr size_t layerNameSize = 64;
+		char m_layerName[layerNameSize] = { };
+
 		// Frames left to ask for focus on.
 		int m_focusFrames = 0;
+		int m_paletteFocusFrames = 0;
 	};
 };

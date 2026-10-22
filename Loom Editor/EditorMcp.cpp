@@ -12,7 +12,7 @@
 #include "EditorLog.h"
 #include "FieldNames.h"
 #include "McpProtocol.h"
-#include "SpriteEditor.h"
+#include "SpriteAsset.h"
 #include "UiScript.h"
 
 #include "Component.h"
@@ -316,13 +316,13 @@ namespace Loom
 		};
 
 		// The capture is RGB from the bottom row up, as a bitmap stores it.
-		SpriteEditor::Image Captured(int width, int height, const std::vector<uint8_t>& rgb)
+		SpriteAsset::Image Captured(int width, int height, const std::vector<uint8_t>& rgb)
 		{
 			constexpr int captured_channels = 3;
 			constexpr int image_channels = 4;
 			constexpr uint8_t opaque = 0xFF;
 
-			SpriteEditor::Image image{ width, height, std::vector<uint8_t>((size_t)width * height * image_channels) };
+			SpriteAsset::Image image{ width, height, std::vector<uint8_t>((size_t)width * height * image_channels) };
 
 			for (int y = 0; y < height; y++)
 				for (int x = 0; x < width; x++)
@@ -658,7 +658,7 @@ namespace Loom
 					capture->result = { { "content", json::array({ {
 						{ "type", "image" },
 						{ "mimeType", "image/png" },
-						{ "data", McpProtocol::Base64(SpriteEditor::Encode(".png", Captured(width, height, rgb))) } } }) } };
+						{ "data", McpProtocol::Base64(SpriteAsset::Encode(".png", Captured(width, height, rgb))) } } }) } };
 				});
 
 			EditorMcp::Call& call = context.call;

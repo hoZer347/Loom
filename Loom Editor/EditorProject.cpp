@@ -9,6 +9,7 @@
 #include "Prefab.h"
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
+#include "SpriteAsset.h"
 #include "TextFit.h"
 
 #include "Engine.h"
@@ -87,6 +88,7 @@ namespace Loom
 			{ AssetKind::StateMachine, EditorIcons::Script, "State Machine", "NewStateMachine", ProjectAssets::ScriptKind::StateMachine, "Add Component" },
 			{ AssetKind::Shader, EditorIcons::Shader, "Shader", "NewShader" },
 			{ AssetKind::Texture, EditorIcons::Texture, "Texture", "NewTexture" },
+			{ AssetKind::Palette, EditorIcons::Palette, "Palette", "NewPalette" },
 		};
 
 		const AssetKindInfo& InfoOf(AssetKind kind)
@@ -127,13 +129,13 @@ namespace Loom
 		// panel's or the Scripts panel's.
 		const FilePanelKind* PanelMaking(AssetKind kind)
 		{
-			return kind == AssetKind::Texture ? &FilePanels::TwoD : nullptr;
+			return kind == AssetKind::Texture || kind == AssetKind::Palette ? &FilePanels::TwoD : nullptr;
 		};
 
 		// The FilePanel that holds the file, or none.
 		const FilePanelKind* PanelHolding(const std::string& path)
 		{
-			if (ProjectAssets::IsTextureFile(path))
+			if (ProjectAssets::IsTwoDFile(path))
 				return &FilePanels::TwoD;
 
 			if (IsModelFile(path))
@@ -1063,6 +1065,10 @@ namespace Loom
 		case AssetKind::Texture:
 			path = ProjectAssets::CreateTexture(folder, name, &error);
 			break;
+
+		case AssetKind::Palette:
+			path = ProjectAssets::CreatePalette(folder, name, &error);
+			break;
 		};
 
 		if (path.empty())
@@ -1161,6 +1167,10 @@ namespace Loom
 			OpenSprite(path);
 			break;
 
+		case ProjectAssets::Opener::Palette:
+			OpenPalette(path);
+			break;
+
 		case ProjectAssets::Opener::VisualStudio:
 			OpenInVisualStudio(path);
 			break;
@@ -1187,6 +1197,12 @@ namespace Loom
 	{
 		m_models.Open(std::filesystem::path(path).is_absolute() ? path : PrefabFile(path).string());
 		m_showModels = true;
+	};
+
+	void Editor::OpenPalette(const std::string& path)
+	{
+		m_sprites.OpenPalette(path);
+		m_showPalette = true;
 	};
 
 	bool Editor::OpenInShell(ImGuiContext*, const char* path)
@@ -1279,6 +1295,22 @@ namespace Loom
 
 	void Editor::MoveAsset(const std::string& path, const std::string& folder)
 	{
+		// Found before the move, since a sprite says where its image is.
+		const std::string companion = SpriteAsset::Companion(path);
+
+		std::error_code code;
+
+		// Neither moves unless both can, so an image never leaves its sprite
+		// behind.
+		if (!companion.empty() && std::filesystem::path(path).parent_path().lexically_normal() != std::filesystem::path(folder).lexically_normal())
+			for (const std::string& file : { path, companion })
+				if (const std::filesystem::path target = std::filesystem::path(folder) / std::filesystem::path(file).filename();
+					std::filesystem::exists(target, code))
+				{
+					std::cerr << "Project: " << target.string() << " is already there, and an image and its sprite move together" << std::endl;
+					return;
+				};
+
 		std::string error;
 		const std::string moved = ProjectAssets::MoveInto(path, folder, &error);
 
@@ -1306,30 +1338,49 @@ namespace Loom
 
 		// The FilePanels file theirs by their paths, so they stay filed where
 		// they were.
-		for (FilePanel& panel : m_filePanels)
+		const auto refile = [this](const std::string& from, const std::string& to)
 		{
-			bool refiled = false;
-
-			for (const std::string& file : panel.files)
+			for (FilePanel& panel : m_filePanels)
 			{
-				const std::filesystem::path relocated = ProjectAssets::Relocate((std::filesystem::path(m_projectPath) / file).lexically_normal().string(), path, moved);
-				const std::string to = relocated.lexically_relative(m_projectPath).generic_string();
+				bool refiled = false;
 
-				if (to == file)
-					continue;
+				for (const std::string& file : panel.files)
+				{
+					const std::filesystem::path relocated = ProjectAssets::Relocate((std::filesystem::path(m_projectPath) / file).lexically_normal().string(), from, to);
+					const std::string now = relocated.lexically_relative(m_projectPath).generic_string();
 
-				const std::string filed = panel.folders.FolderOf(file);
+					if (now == file)
+						continue;
 
-				panel.folders.Move(file, "");
-				panel.folders.Move(to, filed);
-				refiled = true;
+					const std::string filed = panel.folders.FolderOf(file);
 
-				if (panel.selected == file)
-					panel.selected = to;
+					panel.folders.Move(file, "");
+					panel.folders.Move(now, filed);
+					refiled = true;
+
+					if (panel.selected == file)
+						panel.selected = now;
+				};
+
+				if (refiled)
+					SaveFileFolders(panel);
 			};
+		};
 
-			if (refiled)
-				SaveFileFolders(panel);
+		refile(path, moved);
+
+		if (!companion.empty())
+		{
+			const std::string companion_moved = ProjectAssets::MoveInto(companion, folder, &error);
+
+			if (companion_moved.empty())
+				std::cerr << "Project: " << error << std::endl;
+			else
+			{
+				std::cout << "Moved " << companion << " to " << companion_moved << std::endl;
+				m_sprites.Relocate(companion, companion_moved);
+				refile(companion, companion_moved);
+			};
 		};
 
 		RefreshProjectAssets();
@@ -1829,8 +1880,9 @@ namespace Loom
 			else m_selectedModel.clear();
 		};
 
-		// A texture opens on the release, so dragging one out to a field leaves
-		// the Sprites panel shut. Anything else opens on a double click.
+		// A texture, sprite or palette opens on the release, so dragging one
+		// out to a field leaves its panel shut. Anything else opens on a
+		// double click.
 		const ImGuiIO& io = ImGui::GetIO();
 		const float drag_threshold = io.MouseDragThreshold * io.MouseDragThreshold;
 
@@ -1842,7 +1894,7 @@ namespace Loom
 
 		const bool double_clicked = ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
 
-		if (ProjectAssets::IsTextureFile(node.path) ? released : double_clicked)
+		if (ProjectAssets::IsTwoDFile(node.path) ? released : double_clicked)
 			OpenAsset(node.path);
 
 		ImGui::SetItemTooltip("%s", file.c_str());

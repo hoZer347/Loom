@@ -173,7 +173,7 @@ namespace
 			<< "  --layout <name>                load a layout saved from the Layout menu\n"
 			<< "  --save-layout <name>           save the layout once the panels are drawn\n"
 			<< "  --save-layout-prompt           start with Layout > Save Layout... open\n"
-			<< "  --open-sprite <file>           open an image in the Sprites panel\n"
+			<< "  --open-sprite <file>           open an image or sprite in the Sprites panel\n"
 			<< "  --open-model <prefab>          open a prefab in the Model panel\n"
 			<< "  --add-component-prompt         start with Add Component open on the selection\n"
 			<< "  --set-component-category <component> <category>\n"
@@ -596,7 +596,7 @@ int main(int argc, char** argv)
 			{
 				if (i + 1 >= argc)
 				{
-					std::cerr << "--open-sprite needs an image file" << std::endl;
+					std::cerr << "--open-sprite needs an image or sprite file" << std::endl;
 					return 1;
 				};
 

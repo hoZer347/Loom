@@ -22,6 +22,15 @@ namespace Loom
 		constexpr int method_not_found = -32601;
 		constexpr int invalid_params = -32602;
 
+		constexpr std::string_view base64_digits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+		constexpr char base64_padding = '=';
+		constexpr size_t base64_group_bytes = 3;
+		constexpr size_t base64_group_digits = 4;
+		constexpr int base64_digit_bits = 6;
+		constexpr unsigned base64_digit_mask = 0x3F;
+		constexpr int byte_bits = 8;
+		constexpr unsigned byte_mask = 0xFF;
+
 		json Error(const json& id, int code, const std::string& message)
 		{
 			return { { "jsonrpc", "2.0" }, { "id", id }, { "error", { { "code", code }, { "message", message } } } };
@@ -121,28 +130,48 @@ namespace Loom
 
 	std::string McpProtocol::Base64(const std::vector<char>& bytes)
 	{
-		constexpr const char* digits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-		constexpr char padding = '=';
-		constexpr size_t group_bytes = 3;
-		constexpr size_t group_digits = 4;
-		constexpr int digit_bits = 6;
-		constexpr unsigned digit_mask = 0x3F;
-		constexpr int byte_bits = 8;
-
 		std::string out{ };
-		out.reserve((bytes.size() + group_bytes - 1) / group_bytes * group_digits);
+		out.reserve((bytes.size() + base64_group_bytes - 1) / base64_group_bytes * base64_group_digits);
 
-		for (size_t i = 0; i < bytes.size(); i += group_bytes)
+		for (size_t i = 0; i < bytes.size(); i += base64_group_bytes)
 		{
-			const size_t count = std::min(group_bytes, bytes.size() - i);
+			const size_t count = std::min(base64_group_bytes, bytes.size() - i);
 			unsigned group = 0;
 
-			for (size_t b = 0; b < group_bytes; b++)
+			for (size_t b = 0; b < base64_group_bytes; b++)
 				group = (group << byte_bits) | (b < count ? (unsigned char)bytes[i + b] : 0u);
 
 			// A group of n bytes fills n + 1 digits, and padding the rest.
-			for (size_t d = 0; d < group_digits; d++)
-				out += d <= count ? digits[(group >> (digit_bits * (group_digits - 1 - d))) & digit_mask] : padding;
+			for (size_t d = 0; d < base64_group_digits; d++)
+				out += d <= count ? base64_digits[(group >> (base64_digit_bits * (base64_group_digits - 1 - d))) & base64_digit_mask] : base64_padding;
+		};
+
+		return out;
+	};
+
+	std::vector<char> McpProtocol::FromBase64(std::string_view text)
+	{
+		std::vector<char> out{ };
+		out.reserve(text.size() / base64_group_digits * base64_group_bytes);
+
+		unsigned bits = 0;
+		int held = 0;
+
+		for (const char c : text.substr(0, text.find(base64_padding)))
+		{
+			const size_t digit = base64_digits.find(c);
+
+			if (digit == std::string_view::npos)
+				return { };
+
+			bits = (bits << base64_digit_bits) | (unsigned)digit;
+			held += base64_digit_bits;
+
+			if (held >= byte_bits)
+			{
+				held -= byte_bits;
+				out.push_back((char)((bits >> held) & byte_mask));
+			};
 		};
 
 		return out;

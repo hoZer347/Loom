@@ -206,6 +206,8 @@ TEST_SUITE("ProjectAssets")
 		CHECK(opener("Tools/Bake.cpp", scripts) == ProjectAssets::Opener::Shell);
 		CHECK(opener("Assets/Brick.png", scripts) == ProjectAssets::Opener::Sprites);
 		CHECK(opener("Assets/Hero.BMP", "") == ProjectAssets::Opener::Sprites);
+		CHECK(opener("Assets/Hero.loomsprite", "") == ProjectAssets::Opener::Sprites);
+		CHECK(opener("Assets/Hero.loompalette", "") == ProjectAssets::Opener::Palette);
 	};
 
 	TEST_CASE("a project without a RootNamespace uses its own name")
@@ -217,7 +219,7 @@ TEST_SUITE("ProjectAssets")
 		CHECK(ReadAll(scripts.Create("Spinner")).find("namespace GameScripts") != std::string::npos);
 	};
 
-	TEST_CASE("scenes, shaders, textures and sounds are game files, scripts and the project's other files are not")
+	TEST_CASE("scenes, shaders, sprites, palettes, textures and sounds are game files, scripts and the project's other files are not")
 	{
 		CHECK(Loom::ProjectAssets::IsGameFile("Level.loomscene"));
 		CHECK(Loom::ProjectAssets::IsGameFile("Flat.shader"));
@@ -228,6 +230,8 @@ TEST_SUITE("ProjectAssets")
 		CHECK(Loom::ProjectAssets::IsGameFile("Rain.flac"));
 		CHECK(Loom::ProjectAssets::IsShaderFile("Flat.Shader"));
 		CHECK_FALSE(Loom::ProjectAssets::IsShaderFile("Level.loomscene"));
+		CHECK(Loom::ProjectAssets::IsGameFile("Hero.loomsprite"));
+		CHECK(Loom::ProjectAssets::IsGameFile("Hero.loompalette"));
 
 		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("Spinner.hpp"));
 		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("Spinner.CPP"));

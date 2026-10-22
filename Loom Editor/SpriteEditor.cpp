@@ -2,19 +2,16 @@
 
 #include "EditorIcons.h"
 #include "ProjectAssets.h"
-#include "Textures.h"
 
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#define STBI_WRITE_NO_STDIO
-#include "stb_image_write.h"
+#include "imgui_internal.h"
 
 #include <algorithm>
-#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
-#include <fstream>
 #include <iostream>
+#include <iterator>
+#include <optional>
 #include <utility>
 
 
@@ -54,10 +51,68 @@ namespace Loom
 		constexpr ImU32 border_colour = IM_COL32(0, 0, 0, 160);
 		constexpr ImU32 hover_colour = IM_COL32(255, 255, 255, 200);
 
-		constexpr int jpeg_quality = 95;
+		// Round the pixels of an outlined layer, in screen pixels.
+		constexpr ImU32 outline_colour = IM_COL32(0, 255, 255, 255);
+		constexpr float outline_thickness = 2.0f;
 
-		// Shared by a document's strokes, so a large image keeps fewer of them.
+		// Shared by a document's edits, so a large sprite keeps fewer of them.
 		constexpr size_t max_undo_bytes = 256 * 1024 * 1024;
+
+		// The timeline's rows of layers, beyond which it scrolls, and in lines
+		// of text the widths of a frame's milliseconds, of its layers column
+		// and of a frame's column.
+		constexpr int timeline_rows = 4;
+		constexpr float name_lines = 8.0f;
+		constexpr float layers_lines = 10.0f;
+		constexpr float frame_lines = 1.5f;
+
+		// The timeline is a table, with a column for the layers' names and
+		// one for each frame.
+		static_assert(SpriteAsset::maxFrames < IMGUI_TABLE_MAX_COLUMNS);
+
+		// Above the layers: the timeline's buttons, and the frames' numbers.
+		constexpr float timeline_head_rows = 2.0f;
+
+		constexpr float milliseconds = 1000.0f;
+
+		// A layer dragged by its name in the timeline, as a LayerDrag.
+		constexpr const char* layer_payload = "SPRITE_LAYER";
+
+		// A new palette starts with the sprite's own colours, as many as fit.
+		constexpr size_t seeded_colours = 64;
+
+		// Swatches, in lines of text, and the corners marking those the left
+		// and right mouse paint with, as a share of a swatch's side.
+		constexpr float swatch_lines = 1.75f;
+		constexpr float marker_share = 0.4f;
+
+		constexpr ImGuiKey swap_key = ImGuiKey_X;
+
+		// First in every palette, whether its file has it or not, and painting
+		// as the eraser does.
+		constexpr SpriteAsset::Colour clear{ };
+
+		// Any colour with no alpha paints as clear does, and is the clear
+		// swatch, whatever its red, green and blue.
+		bool SeeThrough(const SpriteAsset::Colour& colour)
+		{
+			return colour[alpha] == 0;
+		};
+
+		// What a colour writes into the image, clear for one that is see-through.
+		SpriteAsset::Colour Painted(const SpriteAsset::Colour& colour)
+		{
+			return SeeThrough(colour) ? clear : colour;
+		};
+
+		bool Matches(const SpriteAsset::Colour& swatch, const SpriteAsset::Colour& chosen)
+		{
+			return swatch == chosen || (SeeThrough(swatch) && SeeThrough(chosen));
+		};
+
+		constexpr ImGuiMouseButton paint_buttons[] = { ImGuiMouseButton_Left, ImGuiMouseButton_Right };
+		static_assert(std::size(paint_buttons) == SpriteEditor::paintButtons);
+		constexpr const char* button_names[] = { "Left", "Right" };
 
 		struct ToolInfo
 		{
@@ -74,182 +129,35 @@ namespace Loom
 			{ SpriteEditor::Tool::Picker, "Picker", ImGuiKey_I },
 		};
 
-		std::string LowerExtension(const std::string& path)
-		{
-			std::string extension = std::filesystem::path(path).extension().string();
-
-			std::transform(
-				extension.begin(),
-				extension.end(),
-				extension.begin(),
-				[](unsigned char c) { return (char)std::tolower(c); });
-
-			return extension;
-		};
-
-		void FlipRows(SpriteEditor::Image& image)
-		{
-			const size_t row = (size_t)image.width * channels;
-
-			for (int y = 0; y < image.height / 2; y++)
-				std::swap_ranges(
-					image.pixels.begin() + (ptrdiff_t)(y * row),
-					image.pixels.begin() + (ptrdiff_t)((y + 1) * row),
-					image.pixels.begin() + (ptrdiff_t)((image.height - 1 - y) * row));
-		};
-
-		ImU32 ToImGui(const SpriteEditor::Colour& colour)
+		ImU32 ToImGui(const SpriteAsset::Colour& colour)
 		{
 			return IM_COL32(colour[0], colour[1], colour[2], colour[3]);
 		};
-	};
 
-	bool SpriteEditor::Image::Contains(int x, int y) const
-	{
-		return x >= 0 && y >= 0 && x < width && y < height;
-	};
-
-	SpriteEditor::Colour SpriteEditor::Image::Get(int x, int y) const
-	{
-		const uint8_t* pixel = &pixels[((size_t)y * width + x) * channels];
-
-		return { pixel[0], pixel[1], pixel[2], pixel[3] };
-	};
-
-	void SpriteEditor::Image::Set(int x, int y, const Colour& colour)
-	{
-		if (Contains(x, y))
-			std::copy(colour.begin(), colour.end(), &pixels[((size_t)y * width + x) * channels]);
-	};
-
-	void SpriteEditor::Image::Line(int x0, int y0, int x1, int y1, const Colour& colour)
-	{
-		// Bresenham's, stepping along whichever axis the line covers more of.
-		const int dx = std::abs(x1 - x0);
-		const int dy = -std::abs(y1 - y0);
-		const int sx = x0 < x1 ? 1 : -1;
-		const int sy = y0 < y1 ? 1 : -1;
-
-		int error = dx + dy;
-
-		while (true)
+		ImVec4 ToFloats(const SpriteAsset::Colour& colour)
 		{
-			Set(x0, y0, colour);
-
-			if (x0 == x1 && y0 == y1)
-				return;
-
-			const int doubled = error + error;
-
-			if (doubled >= dy)
-			{
-				error += dy;
-				x0 += sx;
-			};
-
-			if (doubled <= dx)
-			{
-				error += dx;
-				y0 += sy;
-			};
-		};
-	};
-
-	void SpriteEditor::Image::Fill(int x, int y, const Colour& colour)
-	{
-		if (!Contains(x, y))
-			return;
-
-		const Colour target = Get(x, y);
-
-		if (target == colour)
-			return;
-
-		std::vector<std::pair<int, int>> pending = { { x, y } };
-
-		while (!pending.empty())
-		{
-			const auto [px, py] = pending.back();
-			pending.pop_back();
-
-			if (!Contains(px, py) || Get(px, py) != target)
-				continue;
-
-			Set(px, py, colour);
-
-			pending.insert(pending.end(), { { px + 1, py }, { px - 1, py }, { px, py + 1 }, { px, py - 1 } });
-		};
-	};
-
-	bool SpriteEditor::Load(const std::string& path, Image& image)
-	{
-		try
-		{
-			image.pixels = Texture::Decode(path, image.width, image.height);
-		}
-		catch (const std::exception& e)
-		{
-			std::cerr << "Sprites: " << e.what() << std::endl;
-			return false;
+			return ImGui::ColorConvertU32ToFloat4(ToImGui(colour));
 		};
 
-		// Texture's rows run bottom up, the way the renderer uploads them.
-		FlipRows(image);
-
-		return true;
-	};
-
-	std::vector<char> SpriteEditor::Encode(const std::string& extension, const Image& image)
-	{
-		std::vector<char> bytes;
-
-		const auto append = [](void* context, void* data, int size)
+		std::string FileName(const std::string& path)
 		{
-			std::vector<char>& out = *static_cast<std::vector<char>*>(context);
-			out.insert(out.end(), (const char*)data, (const char*)data + size);
+			return std::filesystem::path(path).filename().string();
 		};
 
-		const int width = image.width;
-		const int height = image.height;
-		const uint8_t* pixels = image.pixels.data();
-
-		int written = 0;
-
-		if (extension == ".png")
-			written = stbi_write_png_to_func(append, &bytes, width, height, channels, pixels, width * channels);
-		else if (extension == ".bmp")
-			written = stbi_write_bmp_to_func(append, &bytes, width, height, channels, pixels);
-		else if (extension == ".tga")
-			written = stbi_write_tga_to_func(append, &bytes, width, height, channels, pixels);
-		else if (extension == ".jpg" || extension == ".jpeg")
-			written = stbi_write_jpg_to_func(append, &bytes, width, height, channels, pixels, jpeg_quality);
-
-		if (!written)
-			bytes.clear();
-
-		return bytes;
-	};
-
-	bool SpriteEditor::Save(const std::string& path, const Image& image)
-	{
-		const std::vector<char> bytes = Encode(LowerExtension(path), image);
-
-		// Checked before the file is opened, which empties it.
-		if (bytes.empty())
+		// Beside the sprite, under its stem, or with the first number after it
+		// that nothing there is using.
+		std::string NewPalettePath(const std::string& sprite)
 		{
-			std::cerr << "Sprites: could not encode " << path << std::endl;
-			return false;
+			std::filesystem::path path = std::filesystem::path(sprite).replace_extension(Palette::extension);
+			const std::string stem = path.stem().string();
+
+			std::error_code code;
+
+			for (int suffix = 1; std::filesystem::exists(path, code); suffix++)
+				path.replace_filename(stem + std::to_string(suffix) + Palette::extension);
+
+			return path.string();
 		};
-
-		std::ofstream file(path, std::ios::binary);
-
-		if (!file.write(bytes.data(), (std::streamsize)bytes.size()))
-		{
-			std::cerr << "Sprites: could not save " << path << std::endl;
-			return false;
-		};
-
-		return true;
 	};
 
 	void SpriteEditor::Open(const std::string& path)
@@ -258,30 +166,90 @@ namespace Loom
 		std::error_code code;
 		const std::string normal = std::filesystem::absolute(path, code).lexically_normal().string();
 
+		const bool sprite_file = std::filesystem::path(normal).extension() == SpriteAsset::extension;
+		const std::string sprite_path = sprite_file ? normal : SpriteAsset::For(normal);
+
 		m_focusFrames = focus_frames;
 
 		for (const std::unique_ptr<Document>& document : m_documents)
-			if (document->path == normal)
+			if (document->path == sprite_path || document->links.image == normal)
 			{
 				document->select = true;
 				return;
 			};
 
 		std::unique_ptr<Document> document = std::make_unique<Document>();
-		document->path = normal;
+		document->path = sprite_path;
 
-		if (!Load(normal, document->image))
-			return;
+		if (sprite_file || std::filesystem::exists(sprite_path, code))
+		{
+			// A sprite left beside it by another image is that image's.
+			if (!sprite_file && SpriteAsset::ImageOf(sprite_path) != normal)
+			{
+				std::cerr << "Sprites: " << sprite_path << " is the sprite of another image, not " << normal << std::endl;
+				return;
+			};
 
-		document->saved = document->image;
+			if (!SpriteAsset::Load(sprite_path, document->sprite, document->links))
+				return;
+
+			Image image;
+
+			if (std::filesystem::exists(document->links.image, code) &&
+				SpriteAsset::LoadImage(document->links.image, image) &&
+				image != SpriteAsset::AsSaved(document->links.image, document->sprite.Sheet()))
+				document->outside = std::move(image);
+		}
+		else
+		{
+			Image image;
+
+			if (!SpriteAsset::LoadImage(normal, image))
+				return;
+
+			document->sprite = SpriteAsset::FromImage(std::move(image));
+			document->links.image = normal;
+		};
+
+		document->saved = document->sprite;
+		document->savedLinks = document->links;
 
 		m_documents.push_back(std::move(document));
+	};
+
+	void SpriteEditor::OpenPalette(const std::string& path)
+	{
+		std::error_code code;
+
+		SetPalette(std::filesystem::absolute(path, code).lexically_normal().string());
+		m_paletteFocusFrames = focus_frames;
 	};
 
 	void SpriteEditor::Relocate(const std::string& from, const std::string& to)
 	{
 		for (const std::unique_ptr<Document>& document : m_documents)
-			document->path = ProjectAssets::Relocate(document->path, from, to);
+		{
+			const std::string image = ProjectAssets::Relocate(document->links.image, from, to);
+			const std::string path = ProjectAssets::Relocate(document->path, from, to);
+
+			std::error_code code;
+
+			// One not written yet goes wherever its image goes.
+			document->path = path == document->path && image != document->links.image && !std::filesystem::exists(path, code)
+				? SpriteAsset::For(image)
+				: path;
+
+			for (SpriteAsset::Links* links : { &document->links, &document->savedLinks })
+			{
+				links->image = ProjectAssets::Relocate(links->image, from, to);
+				links->palette = ProjectAssets::Relocate(links->palette, from, to);
+			};
+		};
+
+		m_loosePalette = ProjectAssets::Relocate(m_loosePalette, from, to);
+
+		// Loaded again from where they are now.
+		m_palettes.clear();
 	};
 
 	std::vector<std::string> SpriteEditor::TakeSaved()
@@ -289,7 +257,7 @@ namespace Loom
 		return std::exchange(m_saved, { });
 	};
 
-	void SpriteEditor::Draw(bool* open)
+	void SpriteEditor::Draw(bool* open, bool* palette_open)
 	{
 		if (m_focusFrames > 0)
 		{
@@ -299,13 +267,16 @@ namespace Loom
 
 		m_focused = false;
 
+		// As the Palette panel was last drawn, which is after this one.
+		const bool palette_shown = std::exchange(m_paletteShown, false);
+
 		// The wheel zooms the canvas rather than scrolling the panel.
 		if (ImGui::Begin(EditorPanels::Sprites, open, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
 		{
 			m_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
 			if (m_documents.empty())
-				ImGui::TextDisabled("Click an image in the 2D panel to edit it here.");
+				ImGui::TextDisabled("Click an image or a sprite in the 2D panel to edit it here.");
 			else if (ImGui::BeginTabBar("##sprites", ImGuiTabBarFlags_AutoSelectNewTabs | ImGuiTabBarFlags_FittingPolicyScroll))
 			{
 				const Document* closed = nullptr;
@@ -322,15 +293,16 @@ namespace Loom
 
 					// Known by the document rather than its path, so a file moved
 					// in the Project panel keeps its tab.
-					const std::string label = std::string(EditorIcons::Texture) + " " + std::filesystem::path(document->path).filename().string() + "###" + std::to_string((uintptr_t)document.get());
+					const std::string label = std::string(EditorIcons::Sprite) + " " + FileName(document->path) + "###" + std::to_string((uintptr_t)document.get());
 					bool keep = true;
 					const bool shown = ImGui::BeginTabItem(label.c_str(), &keep, flags);
 
-					ImGui::SetItemTooltip("%s", document->path.c_str());
+					ImGui::SetItemTooltip("%s\n%s", document->path.c_str(), document->links.image.c_str());
 
 					if (shown)
 					{
-						DrawDocument(*document);
+						m_active = document.get();
+						DrawDocument(*document, palette_open, palette_shown);
 						ImGui::EndTabItem();
 					};
 
@@ -353,7 +325,7 @@ namespace Loom
 		ImGui::End();
 	};
 
-	void SpriteEditor::DrawDocument(Document& document)
+	void SpriteEditor::DrawDocument(Document& document, bool* palette_open, bool palette_shown)
 	{
 		if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_S))
 			SaveDocument(document);
@@ -363,48 +335,27 @@ namespace Loom
 		const bool undo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z);
 		const bool redo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y) || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z);
 
-		if (!document.stroking && (undo || redo))
+		// Not while a layer is dragged either, which knows it by where it was.
+		const ImGuiPayload* dragged = ImGui::GetDragDropPayload();
+		const bool dragging_layer = dragged != nullptr && dragged->IsDataType(layer_payload);
+
+		if (!document.stroking && !dragging_layer && (undo || redo))
 			Step(document, undo);
 
-		DrawToolbar(document);
+		ToolShortcuts();
+		Play(document);
 
-		const float status_height = ImGui::GetTextLineHeightWithSpacing();
+		const ImGuiStyle& style = ImGui::GetStyle();
+		const float line = ImGui::GetFrameHeightWithSpacing();
+		const float rows = (float)(std::min)((int)document.sprite.layers.size(), timeline_rows);
+
+		const float timeline_height = line * (rows + timeline_head_rows) + style.ScrollbarSize;
+		const float status_height = line;
 		const ImVec2 available = ImGui::GetContentRegionAvail();
 
-		DrawCanvas(document, ImVec2(available.x, available.y - status_height));
-	};
-
-	void SpriteEditor::DrawToolbar(Document& document)
-	{
-		for (const ToolInfo& info : tools)
-		{
-			if (ImGui::Shortcut(info.key))
-				m_tool = info.tool;
-
-			if (ImGui::RadioButton(info.label, m_tool == info.tool))
-				m_tool = info.tool;
-
-			ImGui::SetItemTooltip("%s (%s)", info.label, ImGui::GetKeyName(info.key));
-			ImGui::SameLine();
-		};
-
-		float colour[channels];
-
-		for (int i = 0; i < channels; i++)
-			colour[i] = m_colour[i] / (float)UINT8_MAX;
-
-		if (ImGui::ColorEdit4("##colour", colour, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf))
-			for (int i = 0; i < channels; i++)
-				m_colour[i] = (uint8_t)std::lround(colour[i] * UINT8_MAX);
-
-		ImGui::SameLine();
-		ImGui::Checkbox("Grid", &m_grid);
-
-		ImGui::SameLine();
-
-		// Fitted again once the canvas is next drawn, at its size then.
-		if (ImGui::Button("Fit"))
-			document.zoom = 0.0f;
+		DrawCanvas(document, ImVec2(available.x, available.y - timeline_height - status_height));
+		DrawTimeline(document, timeline_height);
+		DrawStatus(document, palette_open, palette_shown);
 	};
 
 	void SpriteEditor::DrawCanvas(Document& document, const ImVec2& size)
@@ -412,10 +363,9 @@ namespace Loom
 		if (size.x < 1.0f || size.y < 1.0f)
 			return;
 
-		const Image& image = document.image;
 		const ImVec2 corner = ImGui::GetCursorScreenPos();
 
-		ImGui::InvisibleButton("##canvas", size, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonMiddle);
+		ImGui::InvisibleButton("##canvas", size, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
 
 		const bool hovered = ImGui::IsItemHovered();
 		const ImGuiIO& io = ImGui::GetIO();
@@ -438,7 +388,15 @@ namespace Loom
 		const int mouse_x = (int)std::floor((io.MousePos.x - origin.x) / zoom);
 		const int mouse_y = (int)std::floor((io.MousePos.y - origin.y) / zoom);
 
-		Paint(document, mouse_x, mouse_y, hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left));
+		std::optional<ImGuiMouseButton> pressed;
+
+		for (const ImGuiMouseButton button : paint_buttons)
+			if (hovered && ImGui::IsMouseClicked(button))
+				pressed = button;
+
+		Paint(document, mouse_x, mouse_y, pressed);
+
+		const Image& image = Shown(document);
 
 		ImDrawList* draw = ImGui::GetWindowDrawList();
 		const ImVec2 end(corner.x + size.x, corner.y + size.y);
@@ -502,63 +460,734 @@ namespace Loom
 				draw->AddLine(ImVec2(shown_min.x, origin.y + y * zoom), ImVec2(shown_max.x, origin.y + y * zoom), grid_colour);
 		};
 
+		// Where an outlined layer's pixel meets one it does not cover, or the
+		// image's edge. Not while a cell is a block of pixels.
+		if (step == 1)
+			for (const SpriteAsset::Layer& layer : document.sprite.layers)
+			{
+				if (!layer.outlined)
+					continue;
+
+				const Image& cel = layer.cels[document.frame];
+				const auto covers = [&cel](int x, int y) { return cel.Contains(x, y) && cel.Get(x, y)[alpha] != 0; };
+
+				for (int y = first_y; y < last_y; y++)
+					for (int x = first_x; x < last_x; x++)
+					{
+						if (!covers(x, y))
+							continue;
+
+						const ImVec2 min(origin.x + x * zoom, origin.y + y * zoom);
+						const ImVec2 max(min.x + zoom, min.y + zoom);
+
+						if (!covers(x - 1, y))
+							draw->AddLine(min, ImVec2(min.x, max.y), outline_colour, outline_thickness);
+
+						if (!covers(x + 1, y))
+							draw->AddLine(ImVec2(max.x, min.y), max, outline_colour, outline_thickness);
+
+						if (!covers(x, y - 1))
+							draw->AddLine(min, ImVec2(max.x, min.y), outline_colour, outline_thickness);
+
+						if (!covers(x, y + 1))
+							draw->AddLine(ImVec2(min.x, max.y), max, outline_colour, outline_thickness);
+					};
+			};
+
 		draw->AddRect(origin, image_end, border_colour);
 
-		const bool on_image = hovered && image.Contains(mouse_x, mouse_y);
+		document.hovering = hovered && image.Contains(mouse_x, mouse_y);
+		document.hoverX = mouse_x;
+		document.hoverY = mouse_y;
 
-		if (on_image)
+		if (document.hovering)
 			draw->AddRect(
 				ImVec2(origin.x + mouse_x * zoom, origin.y + mouse_y * zoom),
 				ImVec2(origin.x + (mouse_x + 1) * zoom, origin.y + (mouse_y + 1) * zoom),
 				hover_colour);
 
 		draw->PopClipRect();
+	};
 
-		ImGui::TextDisabled("%d x %d, %g%%", image.width, image.height, zoom * 100.0f);
+	void SpriteEditor::DrawTimeline(Document& document, float height)
+	{
+		SpriteAsset& sprite = document.sprite;
+		const int layers = (int)sprite.layers.size();
+		const int frames = sprite.Frames();
 
-		if (on_image)
+		if (ImGui::Button("+ Layer"))
 		{
-			const Colour colour = image.Get(mouse_x, mouse_y);
+			Remember(document);
+			sprite.AddLayer(document.layer + 1, "Layer " + std::to_string(layers + 1));
+			document.layer++;
+			Edited(document);
+		};
 
+		ImGui::SetItemTooltip("A clear layer above the one painted");
+		ImGui::SameLine();
+		ImGui::BeginDisabled(layers == 1);
+
+		if (ImGui::Button("- Layer"))
+		{
+			Remember(document);
+			sprite.layers.erase(sprite.layers.begin() + document.layer);
+			document.layer = (std::min)(document.layer, layers - 2);
+			Edited(document);
+		};
+
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		ImGui::BeginDisabled(document.layer == layers - 1);
+
+		if (ImGui::ArrowButton("##up", ImGuiDir_Up))
+		{
+			Remember(document);
+			sprite.MoveLayer(document.layer, document.layer + 1);
+			document.layer++;
+			Edited(document);
+		};
+
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		ImGui::BeginDisabled(document.layer == 0);
+
+		if (ImGui::ArrowButton("##down", ImGuiDir_Down))
+		{
+			Remember(document);
+			sprite.MoveLayer(document.layer, document.layer - 1);
+			document.layer--;
+			Edited(document);
+		};
+
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		ImGui::TextDisabled("|");
+		ImGui::SameLine();
+		ImGui::BeginDisabled(frames >= SpriteAsset::maxFrames);
+
+		if (ImGui::Button("+ Frame"))
+		{
+			Remember(document);
+			sprite.AddFrame(document.frame + 1, false);
+			document.frame++;
+			Edited(document);
+		};
+
+		ImGui::SetItemTooltip("A clear frame after this one");
+		ImGui::SameLine();
+
+		if (ImGui::Button("Copy Frame"))
+		{
+			Remember(document);
+			sprite.AddFrame(document.frame + 1, true);
+			document.frame++;
+			Edited(document);
+		};
+
+		ImGui::SetItemTooltip("This frame again, after it");
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		ImGui::BeginDisabled(frames == 1);
+
+		if (ImGui::Button("- Frame"))
+		{
+			Remember(document);
+			sprite.RemoveFrame(document.frame);
+			document.frame = (std::min)(document.frame, frames - 2);
+			Edited(document);
+		};
+
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+		ImGui::TextDisabled("|");
+		ImGui::SameLine();
+		ImGui::BeginDisabled(frames == 1 && !document.playing);
+
+		if (ImGui::Button(document.playing ? "Stop" : "Play"))
+		{
+			document.playing = !document.playing;
+			document.played = 0.0f;
+		};
+
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+
+		// One step to undo for each drag or typed value, as for a stroke.
+		int duration = sprite.durations[document.frame];
+		ImGui::SetNextItemWidth(ImGui::GetFontSize() * name_lines);
+		const bool timed = ImGui::DragInt("##duration", &duration, 1.0f, SpriteAsset::minDuration, SpriteAsset::maxDuration, "%d ms", ImGuiSliderFlags_AlwaysClamp);
+
+		if (ImGui::IsItemActivated())
+			Remember(document);
+
+		if (timed)
+			sprite.durations[document.frame] = duration;
+
+		if (ImGui::IsItemDeactivated())
+		{
+			if (!document.undo.empty() && sprite == document.undo.back())
+				document.undo.pop_back();
+
+			Edited(document);
+		};
+
+		ImGui::SetItemTooltip("How long this frame shows");
+
+		// Counted again, since the buttons may have just changed them.
+		const int shown_layers = (int)sprite.layers.size();
+		const int shown_frames = sprite.Frames();
+
+		const ImGuiTableFlags flags =
+			ImGuiTableFlags_ScrollX |
+			ImGuiTableFlags_ScrollY |
+			ImGuiTableFlags_BordersInnerV |
+			ImGuiTableFlags_RowBg |
+			ImGuiTableFlags_SizingFixedFit;
+
+		const float font = ImGui::GetFontSize();
+
+		if (!ImGui::BeginTable("##timeline", shown_frames + 1, flags, ImVec2(0.0f, height - ImGui::GetFrameHeightWithSpacing())))
+			return;
+
+		ImGui::TableSetupScrollFreeze(1, 1);
+		ImGui::TableSetupColumn("Layers", ImGuiTableColumnFlags_WidthFixed, font * layers_lines);
+
+		for (int frame = 0; frame < shown_frames; frame++)
+			ImGui::TableSetupColumn(std::to_string(frame + 1).c_str(), ImGuiTableColumnFlags_WidthFixed, font * frame_lines);
+
+		// The frames' numbers pick the frame.
+		ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
+		ImGui::TableSetColumnIndex(0);
+		ImGui::TextDisabled("Layers");
+
+		for (int frame = 0; frame < shown_frames; frame++)
+		{
+			ImGui::TableSetColumnIndex(frame + 1);
+			ImGui::PushID(frame);
+
+			if (ImGui::Selectable(std::to_string(frame + 1).c_str(), frame == document.frame))
+			{
+				document.frame = frame;
+				document.stale = true;
+			};
+
+			ImGui::PopID();
+		};
+
+		// From and to, once the rows are drawn, since they hold the layers.
+		std::optional<std::pair<int, int>> dropped;
+
+		// The top layer first, as they stack.
+		for (int layer = shown_layers - 1; layer >= 0; layer--)
+		{
+			SpriteAsset::Layer& row = sprite.layers[layer];
+
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::PushID(layer);
+
+			bool visible = row.visible;
+
+			if (ImGui::Checkbox("##visible", &visible))
+			{
+				Remember(document);
+				row.visible = visible;
+				Edited(document);
+			};
+
+			ImGui::SetItemTooltip(visible ? "Shown, and saved into the image" : "Hidden, and left out of the image");
 			ImGui::SameLine();
-			ImGui::TextDisabled("  %d, %d  #%02X%02X%02X%02X", mouse_x, mouse_y, colour[0], colour[1], colour[2], colour[3]);
+
+			// A square drawn as the outline is, bright while it is on.
+			const float box = ImGui::GetFrameHeight();
+
+			if (ImGui::InvisibleButton("##outlined", ImVec2(box, box)))
+			{
+				Remember(document);
+				row.outlined = !row.outlined;
+				Edited(document);
+			};
+
+			{
+				const ImVec2 min = ImGui::GetItemRectMin();
+				const ImVec2 max = ImGui::GetItemRectMax();
+				const float inset = ImGui::GetStyle().FramePadding.y;
+				ImDrawList* draw = ImGui::GetWindowDrawList();
+
+				draw->AddRectFilled(min, max, ImGui::GetColorU32(ImGui::IsItemHovered() ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg), ImGui::GetStyle().FrameRounding);
+				draw->AddRect(
+					ImVec2(min.x + inset, min.y + inset),
+					ImVec2(max.x - inset, max.y - inset),
+					row.outlined ? outline_colour : ImGui::GetColorU32(ImGuiCol_TextDisabled),
+					0.0f,
+					0,
+					outline_thickness);
+			};
+
+			ImGui::SetItemTooltip(row.outlined ? "Outlined on the canvas" : "Outline its pixels on the canvas");
+			ImGui::SameLine();
+
+			if (ImGui::Selectable(row.name.c_str(), layer == document.layer))
+				document.layer = layer;
+
+			ImGui::SetItemTooltip("Drag onto another layer to take its place. Right-click to rename");
+
+			// Held over another sprite's tab, it leaves that tab where it is.
+			if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers))
+			{
+				const LayerDrag drag{ &document, layer };
+
+				ImGui::SetDragDropPayload(layer_payload, &drag, sizeof(drag));
+				ImGui::TextUnformatted(row.name.c_str());
+				ImGui::EndDragDropSource();
+			};
+
+			if (ImGui::BeginDragDropTarget())
+			{
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(layer_payload))
+					if (const LayerDrag& drag = *static_cast<const LayerDrag*>(payload->Data); drag.document == &document)
+						dropped = std::pair(drag.layer, layer);
+
+				ImGui::EndDragDropTarget();
+			};
+
+			if (ImGui::BeginPopupContextItem("##rename"))
+			{
+				if (ImGui::IsWindowAppearing())
+				{
+					snprintf(m_layerName, sizeof(m_layerName), "%s", row.name.c_str());
+					ImGui::SetKeyboardFocusHere();
+				};
+
+				if (ImGui::InputText("##name", m_layerName, sizeof(m_layerName), ImGuiInputTextFlags_EnterReturnsTrue))
+				{
+					if (row.name != m_layerName)
+					{
+						Remember(document);
+						row.name = m_layerName;
+						Edited(document);
+					};
+
+					ImGui::CloseCurrentPopup();
+				};
+
+				ImGui::EndPopup();
+			};
+
+			for (int frame = 0; frame < shown_frames; frame++)
+			{
+				ImGui::TableSetColumnIndex(frame + 1);
+				ImGui::PushID(frame);
+
+				if (ImGui::Selectable("##cel", layer == document.layer && frame == document.frame))
+				{
+					document.layer = layer;
+					document.frame = frame;
+					document.stale = true;
+				};
+
+				ImGui::PopID();
+			};
+
+			ImGui::PopID();
+		};
+
+		ImGui::EndTable();
+
+		if (dropped && dropped->first != dropped->second)
+		{
+			Remember(document);
+			sprite.MoveLayer(dropped->first, dropped->second);
+			document.layer = dropped->second;
+			Edited(document);
 		};
 	};
 
-	void SpriteEditor::Paint(Document& document, int x, int y, bool pressed)
+	void SpriteEditor::DrawStatus(Document& document, bool* palette_open, bool palette_shown)
 	{
-		Image& image = document.image;
+		if (document.outside)
+		{
+			ImGui::Text("%s changed outside the sprite", FileName(document.links.image).c_str());
+			ImGui::SameLine();
+
+			if (ImGui::SmallButton("Take It In"))
+			{
+				Remember(document);
+				document.sprite.TakeIn(std::move(*document.outside), FileName(document.links.image));
+				document.layer = (int)document.sprite.layers.size() - 1;
+				document.frame = (std::min)(document.frame, document.sprite.Frames() - 1);
+				document.outside.reset();
+				Edited(document);
+			};
+
+			ImGui::SetItemTooltip("As a new layer, cut into the frames when it is the size of their sheet");
+			ImGui::SameLine();
+
+			if (ImGui::SmallButton("Keep Sprite"))
+				document.outside.reset();
+
+			ImGui::SetItemTooltip("Saving writes the sprite over the image");
+			ImGui::SameLine();
+			ImGui::TextDisabled("|");
+			ImGui::SameLine();
+		};
+
+		// Asked of the panel only while the palette is out of sight, since
+		// painting needs what it holds.
+		if (!palette_shown)
+		{
+			ImGui::TextDisabled("%s No palette open", EditorIcons::Palette);
+			ImGui::SameLine();
+
+			if (ImGui::SmallButton("Open Palette"))
+			{
+				*palette_open = true;
+				m_paletteFocusFrames = focus_frames;
+			};
+
+			ImGui::SameLine();
+			ImGui::TextDisabled("|");
+			ImGui::SameLine();
+		};
+
+		ImGui::Checkbox("Grid", &m_grid);
+		ImGui::SameLine();
+
+		// Fitted again once the canvas is next drawn, at its size then.
+		if (ImGui::SmallButton("Fit"))
+			document.zoom = 0.0f;
+
+		ImGui::SameLine();
+		ImGui::TextDisabled(
+			"%d x %d, %g%%, frame %d of %d",
+			document.sprite.width,
+			document.sprite.height,
+			document.zoom * 100.0f,
+			document.frame + 1,
+			document.sprite.Frames());
+
+		if (document.hovering)
+		{
+			const Colour colour = Shown(document).Get(document.hoverX, document.hoverY);
+
+			ImGui::SameLine();
+			ImGui::TextDisabled("  %d, %d  #%02X%02X%02X%02X", document.hoverX, document.hoverY, colour[0], colour[1], colour[2], colour[3]);
+		};
+	};
+
+	void SpriteEditor::DrawPalette(bool* open, const std::string& project_folder)
+	{
+		if (m_paletteFocusFrames > 0)
+		{
+			m_paletteFocusFrames--;
+			ImGui::SetNextWindowFocus();
+		};
+
+		m_paletteFocused = false;
+
+		if (ImGui::Begin(EditorPanels::Palette, open))
+		{
+			m_paletteShown = true;
+			m_paletteFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+
+			ToolShortcuts();
+			DrawTools();
+			ImGui::Separator();
+			DrawPaletteChoice(project_folder);
+
+			if (!PalettePath().empty())
+				DrawSwatches(PalettePath());
+			else if (m_active != nullptr)
+				ImGui::TextDisabled("No palette yet. New makes one of the sprite's colours.");
+			else
+				ImGui::TextDisabled("Open a sprite to paint it.");
+		};
+
+		ImGui::End();
+	};
+
+	void SpriteEditor::DrawTools()
+	{
+		for (const ToolInfo& info : tools)
+		{
+			if (ImGui::RadioButton(info.label, m_tool == info.tool))
+				m_tool = info.tool;
+
+			ImGui::SetItemTooltip("%s (%s)", info.label, ImGui::GetKeyName(info.key));
+			ImGui::SameLine();
+		};
+
+		ImGui::NewLine();
+
+		for (const ImGuiMouseButton button : paint_buttons)
+		{
+			Colour& chosen = m_colours[button];
+			float colour[channels];
+
+			for (int i = 0; i < channels; i++)
+				colour[i] = chosen[i] / (float)UINT8_MAX;
+
+			if (ImGui::ColorEdit4(button_names[button], colour, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf))
+				for (int i = 0; i < channels; i++)
+					chosen[i] = (uint8_t)std::lround(colour[i] * UINT8_MAX);
+
+			ImGui::SetItemTooltip("What the %s mouse button paints with", button_names[button]);
+			ImGui::SameLine();
+		};
+
+		if (ImGui::Button("Swap"))
+			std::swap(m_colours[ImGuiMouseButton_Left], m_colours[ImGuiMouseButton_Right]);
+
+		ImGui::SetItemTooltip("Swap the colours (%s)", ImGui::GetKeyName(swap_key));
+	};
+
+	void SpriteEditor::DrawPaletteChoice(const std::string& project_folder)
+	{
+		const std::string& current = PalettePath();
+		const std::string shown = current.empty() ? "None" : FileName(current);
+
+		ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("New").x - ImGui::GetStyle().FramePadding.x * 2.0f - ImGui::GetStyle().ItemSpacing.x);
+
+		if (ImGui::BeginCombo("##palette", (std::string(EditorIcons::Palette) + " " + shown).c_str()))
+		{
+			if (ImGui::IsWindowAppearing())
+			{
+				m_paletteFiles.clear();
+
+				const std::string root = !project_folder.empty() || m_active == nullptr
+					? project_folder
+					: std::filesystem::path(m_active->path).parent_path().string();
+
+				std::error_code code;
+
+				for (auto entry = std::filesystem::recursive_directory_iterator(root, std::filesystem::directory_options::skip_permission_denied, code);
+					entry != std::filesystem::recursive_directory_iterator();
+					entry.increment(code))
+					if (entry->path().extension() == Palette::extension)
+						m_paletteFiles.push_back(entry->path().lexically_normal().string());
+			};
+
+			if (ImGui::Selectable("None", current.empty()))
+				SetPalette("");
+
+			for (const std::string& file : m_paletteFiles)
+			{
+				if (ImGui::Selectable(FileName(file).c_str(), file == current))
+					SetPalette(file);
+
+				ImGui::SetItemTooltip("%s", file.c_str());
+			};
+
+			ImGui::EndCombo();
+		};
+
+		ImGui::SameLine();
+		ImGui::BeginDisabled(m_active == nullptr);
+
+		if (ImGui::Button("New"))
+		{
+			const std::string path = NewPalettePath(m_active->path);
+			const Palette palette{ m_active->sprite.Colours(seeded_colours) };
+
+			if (Palette::Save(path, palette))
+			{
+				m_palettes[path] = palette;
+				SetPalette(path);
+				std::cout << "Created " << path << std::endl;
+			};
+		};
+
+		ImGui::EndDisabled();
+		ImGui::SetItemTooltip("A palette beside the sprite, of the colours it already has");
+	};
+
+	void SpriteEditor::DrawSwatches(const std::string& path)
+	{
+		Palette& palette = PaletteAt(path);
+
+		const ImGuiStyle& style = ImGui::GetStyle();
+		const float side = ImGui::GetFontSize() * swatch_lines;
+		const float right = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
+
+		ImDrawList* draw = ImGui::GetWindowDrawList();
+		const ImU32 marker = ImGui::GetColorU32(ImGuiCol_Text);
+		const ImU32 marker_edge = ImGui::GetColorU32(ImGuiCol_WindowBg);
+		const float corner = side * marker_share;
+
+		std::vector<Colour> shown = { clear };
+		std::copy_if(palette.colours.begin(), palette.colours.end(), std::back_inserter(shown), [](const Colour& colour) { return !SeeThrough(colour); });
+
+		for (size_t i = 0; i < shown.size(); i++)
+		{
+			const Colour& colour = shown[i];
+
+			ImGui::PushID((int)i);
+
+			if (colour == clear)
+			{
+				ImGui::ColorButton("##swatch", ToFloats(colour), ImGuiColorEditFlags_NoTooltip, ImVec2(side, side));
+				ImGui::SetItemTooltip("Clear, which paints as the eraser does");
+			}
+			else
+				ImGui::ColorButton("##swatch", ToFloats(colour), ImGuiColorEditFlags_AlphaPreviewHalf, ImVec2(side, side));
+
+			ImGui::PopID();
+
+			for (const ImGuiMouseButton button : paint_buttons)
+				if (ImGui::IsItemClicked(button))
+					m_colours[button] = colour;
+
+			// The left colour's in the top left corner, the right's in the
+			// bottom right.
+			const ImVec2 min = ImGui::GetItemRectMin();
+			const ImVec2 max = ImGui::GetItemRectMax();
+
+			if (Matches(colour, m_colours[ImGuiMouseButton_Left]))
+			{
+				draw->AddTriangleFilled(min, ImVec2(min.x + corner, min.y), ImVec2(min.x, min.y + corner), marker);
+				draw->AddTriangle(min, ImVec2(min.x + corner, min.y), ImVec2(min.x, min.y + corner), marker_edge);
+			};
+
+			if (Matches(colour, m_colours[ImGuiMouseButton_Right]))
+			{
+				draw->AddTriangleFilled(max, ImVec2(max.x - corner, max.y), ImVec2(max.x, max.y - corner), marker);
+				draw->AddTriangle(max, ImVec2(max.x - corner, max.y), ImVec2(max.x, max.y - corner), marker_edge);
+			};
+
+			if (ImGui::GetItemRectMax().x + style.ItemSpacing.x + side <= right)
+				ImGui::SameLine();
+		};
+
+		const Colour& left = m_colours[ImGuiMouseButton_Left];
+		const auto found = std::find(palette.colours.begin(), palette.colours.end(), left);
+		const bool listed = found != palette.colours.end() && !SeeThrough(left);
+		const bool has = listed || SeeThrough(left);
+
+		ImGui::BeginDisabled(has);
+
+		if (ImGui::Button("+", ImVec2(side, side)))
+		{
+			palette.colours.push_back(left);
+			Palette::Save(path, palette);
+		};
+
+		ImGui::EndDisabled();
+		ImGui::SetItemTooltip(has ? "The left colour is in the palette" : "Add the left colour to the palette");
+		ImGui::SameLine();
+		ImGui::BeginDisabled(!listed);
+
+		if (ImGui::Button("-", ImVec2(side, side)))
+		{
+			palette.colours.erase(found);
+			Palette::Save(path, palette);
+		};
+
+		ImGui::EndDisabled();
+		ImGui::SetItemTooltip("Take the left colour out of the palette");
+	};
+
+	void SpriteEditor::ToolShortcuts()
+	{
+		for (const ToolInfo& info : tools)
+			if (ImGui::Shortcut(info.key))
+				m_tool = info.tool;
+
+		if (ImGui::Shortcut(swap_key))
+			std::swap(m_colours[ImGuiMouseButton_Left], m_colours[ImGuiMouseButton_Right]);
+	};
+
+	const std::string& SpriteEditor::PalettePath() const
+	{
+		return m_active != nullptr ? m_active->links.palette : m_loosePalette;
+	};
+
+	void SpriteEditor::SetPalette(const std::string& path)
+	{
+		if (m_active == nullptr)
+		{
+			m_loosePalette = path;
+			return;
+		};
+
+		m_active->links.palette = path;
+		Edited(*m_active);
+	};
+
+	Palette& SpriteEditor::PaletteAt(const std::string& path)
+	{
+		const auto found = m_palettes.find(path);
+
+		if (found != m_palettes.end())
+			return found->second;
+
+		// One that will not load shows empty, and is said once.
+		Palette& palette = m_palettes[path];
+		Palette::Load(path, palette);
+
+		return palette;
+	};
+
+	const SpriteAsset::Image& SpriteEditor::Shown(Document& document)
+	{
+		// A layer on its own is drawn as it is, with nothing to flatten while
+		// it is painted.
+		const Image* only = nullptr;
+		int visible = 0;
+
+		for (const SpriteAsset::Layer& layer : document.sprite.layers)
+			if (layer.visible)
+			{
+				only = &layer.cels[document.frame];
+				visible++;
+			};
+
+		if (visible == 1)
+			return *only;
+
+		if (std::exchange(document.stale, false))
+			document.flattened = document.sprite.Flatten(document.frame);
+
+		return document.flattened;
+	};
+
+	void SpriteEditor::Paint(Document& document, int x, int y, std::optional<ImGuiMouseButton> pressed)
+	{
+		Image& cel = document.sprite.layers[document.layer].cels[document.frame];
 
 		// Before the tool is looked at, since it may have changed mid-stroke.
 		// A stroke that changed nothing, such as one wholly off the image,
 		// leaves nothing to undo.
-		if (document.stroking && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
+		if (document.stroking && !ImGui::IsMouseDown(document.strokeButton))
 		{
 			document.stroking = false;
 
-			if (image == document.undo.back())
+			if (document.sprite == document.undo.back())
 				document.undo.pop_back();
 
-			document.unsaved = image != document.saved;
+			Edited(document);
 			return;
 		};
+
+		// The other button, mid-stroke, starts nothing.
+		if (document.stroking)
+			pressed.reset();
 
 		switch (m_tool)
 		{
 		case Tool::Picker:
-			if (pressed && image.Contains(x, y))
+			if (pressed && Shown(document).Contains(x, y))
 			{
-				m_colour = image.Get(x, y);
+				m_colours[*pressed] = Shown(document).Get(x, y);
 				m_tool = Tool::Pencil;
 			};
 			return;
 
 		case Tool::Fill:
-			if (pressed && image.Contains(x, y) && image.Get(x, y) != m_colour)
+			if (pressed && cel.Contains(x, y) && cel.Get(x, y) != Painted(m_colours[*pressed]))
 			{
 				Remember(document);
-				image.Fill(x, y, m_colour);
-				document.unsaved = image != document.saved;
+				cel.Fill(x, y, Painted(m_colours[*pressed]));
+				Edited(document);
 			};
 			return;
 
@@ -571,6 +1200,7 @@ namespace Loom
 		{
 			Remember(document);
 			document.stroking = true;
+			document.strokeButton = *pressed;
 			document.lastX = x;
 			document.lastY = y;
 		};
@@ -578,56 +1208,85 @@ namespace Loom
 		if (!document.stroking)
 			return;
 
-		const Colour colour = m_tool == Tool::Eraser ? Colour{ } : m_colour;
+		const Colour colour = m_tool == Tool::Eraser ? clear : Painted(m_colours[document.strokeButton]);
 
-		image.Line(document.lastX, document.lastY, x, y, colour);
+		cel.Line(document.lastX, document.lastY, x, y, colour);
 		document.lastX = x;
 		document.lastY = y;
 		document.unsaved = true;
+		document.stale = true;
+	};
+
+	void SpriteEditor::Play(Document& document)
+	{
+		if (!document.playing || document.sprite.Frames() == 1)
+		{
+			document.playing = false;
+			return;
+		};
+
+		document.played += ImGui::GetIO().DeltaTime * milliseconds;
+
+		while (document.played >= (float)document.sprite.durations[document.frame])
+		{
+			document.played -= (float)document.sprite.durations[document.frame];
+			document.frame = (document.frame + 1) % document.sprite.Frames();
+			document.stale = true;
+		};
 	};
 
 	void SpriteEditor::Remember(Document& document)
 	{
-		const size_t bytes = (std::max)(document.image.pixels.size(), (size_t)1);
+		const size_t bytes = (std::max)(document.sprite.Bytes(), (size_t)1);
 		const size_t kept = (std::max)(max_undo_bytes / bytes, (size_t)1);
 
-		document.undo.push_back(document.image);
+		document.undo.push_back(document.sprite);
 		document.redo.clear();
 
 		if (document.undo.size() > kept)
 			document.undo.erase(document.undo.begin(), document.undo.end() - (ptrdiff_t)kept);
 	};
 
+	void SpriteEditor::Edited(Document& document)
+	{
+		document.unsaved = document.sprite != document.saved || document.links != document.savedLinks;
+		document.stale = true;
+	};
+
 	void SpriteEditor::Step(Document& document, bool undo)
 	{
-		std::vector<Image>& from = undo ? document.undo : document.redo;
-		std::vector<Image>& to = undo ? document.redo : document.undo;
+		std::vector<SpriteAsset>& from = undo ? document.undo : document.redo;
+		std::vector<SpriteAsset>& to = undo ? document.redo : document.undo;
 
 		if (from.empty())
 			return;
 
-		to.push_back(std::move(document.image));
-		document.image = std::move(from.back());
+		to.push_back(std::move(document.sprite));
+		document.sprite = std::move(from.back());
 		from.pop_back();
 
-		document.unsaved = document.image != document.saved;
+		// The layer or frame picked may be gone.
+		document.layer = (std::min)(document.layer, (int)document.sprite.layers.size() - 1);
+		document.frame = (std::min)(document.frame, document.sprite.Frames() - 1);
+
+		Edited(document);
 	};
 
 	void SpriteEditor::Fit(Document& document, const ImVec2& size)
 	{
-		const Image& image = document.image;
+		const SpriteAsset& sprite = document.sprite;
 
 		constexpr float half = 0.5f;
 
-		float zoom = (std::min)(size.x / image.width, size.y / image.height) * fit_share;
+		float zoom = (std::min)(size.x / sprite.width, size.y / sprite.height) * fit_share;
 
 		if (zoom >= 1.0f)
 			zoom = std::floor(zoom);
 
 		document.zoom = std::clamp(zoom, min_zoom, max_zoom);
 		document.offset = ImVec2(
-			std::floor((size.x - image.width * document.zoom) * half),
-			std::floor((size.y - image.height * document.zoom) * half));
+			std::floor((size.x - sprite.width * document.zoom) * half),
+			std::floor((size.y - sprite.height * document.zoom) * half));
 	};
 
 	void SpriteEditor::Zoom(Document& document, const ImVec2& about, float wheel)
@@ -664,12 +1323,21 @@ namespace Loom
 
 	bool SpriteEditor::SaveDocument(Document& document)
 	{
-		if (!Save(document.path, document.image))
+		if (document.outside)
+		{
+			std::cerr << "Sprites: " << document.links.image << " changed outside the sprite. Take it in, or keep the sprite, to save" << std::endl;
+			return false;
+		};
+
+		// The image first, since it is what the game draws.
+		if (!SpriteAsset::SaveImage(document.links.image, document.sprite.Sheet()) ||
+			!SpriteAsset::Save(document.path, document.sprite, document.links))
 			return false;
 
-		document.saved = document.image;
+		document.saved = document.sprite;
+		document.savedLinks = document.links;
 		document.unsaved = false;
-		m_saved.push_back(document.path);
+		m_saved.push_back(document.links.image);
 
 		return true;
 	};
@@ -691,7 +1359,7 @@ namespace Loom
 			return;
 		};
 
-		ImGui::Text("Save the changes to %s?", std::filesystem::path(m_closing->path).filename().string().c_str());
+		ImGui::Text("Save the changes to %s?", FileName(m_closing->path).c_str());
 
 		const bool save = ImGui::Button("Save");
 		ImGui::SameLine();
@@ -716,6 +1384,9 @@ namespace Loom
 
 	void SpriteEditor::Close(const Document* document)
 	{
+		if (m_active == document)
+			m_active = nullptr;
+
 		std::erase_if(m_documents, [document](const std::unique_ptr<Document>& open) { return open.get() == document; });
 	};
 };

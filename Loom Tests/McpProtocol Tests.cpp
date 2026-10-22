@@ -124,4 +124,16 @@ TEST_SUITE("McpProtocol")
 		CHECK(Base64(Bytes("foobar")) == "Zm9vYmFy");
 		CHECK(Base64({ (char)0xFF, (char)0x00, (char)0x80 }) == "/wCA");
 	};
+
+	TEST_CASE("base64 reads back what it wrote, and nothing from what it would not write")
+	{
+		using Loom::McpProtocol::Base64;
+		using Loom::McpProtocol::FromBase64;
+
+		for (const char* text : { "", "f", "fo", "foo", "foobar" })
+			CHECK(FromBase64(Base64(Bytes(text))) == Bytes(text));
+
+		CHECK(FromBase64("/wCA") == std::vector<char>{ (char)0xFF, (char)0x00, (char)0x80 });
+		CHECK(FromBase64("Zm9v!").empty());
+	};
 };
