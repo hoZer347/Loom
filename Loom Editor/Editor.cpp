@@ -946,6 +946,7 @@ namespace Loom
 		CloseAllScenes();
 		ClosePrefab();
 		m_prefabs.clear();
+		m_readInstances.clear();
 		m_linkedInstances.clear();
 
 		m_projectPath = resolved;

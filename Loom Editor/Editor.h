@@ -733,14 +733,27 @@ namespace Loom
 		std::string m_prefabBeforeBuild{ };
 
 		// Each prefab file read so far, by its path from the project folder,
-		// with when it was written as it was read.
+		// with when it was written as it was read, and the instances that
+		// agreed with that read on the last pass, which a pass with them as
+		// they were skips.
 		struct LoadedPrefab
 		{
 			Prefabs::ObjectNode tree;
 			std::filesystem::file_time_type written;
+			std::vector<Guid> settled{ };
 		};
 
 		std::map<std::string, LoadedPrefab> m_prefabs{ };
+
+		// Each instance as the last pass read it, by its GameObject's guid:
+		// parsing a model's vertices again on every edit is most of a pass.
+		struct ReadInstance
+		{
+			std::string text;
+			Prefabs::ObjectNode tree;
+		};
+
+		std::unordered_map<Guid, ReadInstance> m_readInstances{ };
 
 		// The instances known to agree with their prefab, by the guid of the
 		// Prefab component linking them and the path it names. One not in here
