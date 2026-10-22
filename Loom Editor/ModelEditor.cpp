@@ -16,6 +16,7 @@
 #include "Scene.h"
 #include "SceneSerializer.h"
 #include "SerializedField.h"
+#include "Skin.h"
 
 #include "glm/gtc/constants.hpp"
 #include "glm/gtc/matrix_transform.hpp"
@@ -251,25 +252,21 @@ void main()
 			return std::filesystem::last_write_time(path, code);
 		};
 
-		std::string ReadText(const std::string& path)
-		{
-			std::ifstream file(path, std::ios::binary);
-			std::stringstream text;
-			text << file.rdbuf();
-
-			return text.str();
-		};
-
 		// Writes the meshes' geometry into the file's own tree rather than this
 		// copy over it, so the file keeps its guids, and any component this
-		// build could not read stays as it was. A component the file's object
-		// lacks, such as a mesh added here, is added.
+		// build could not read stays as it was. Components pair up as the nth
+		// of their type on each side, and one the file's object lacks, such as
+		// a mesh added here, is added.
 		void MergeGeometry(const Prefabs::ObjectNode& shown, Prefabs::ObjectNode& file, const std::map<std::string, std::vector<std::string>>& geometry)
 		{
+			std::map<std::string, size_t> seen{ };
+
 			for (const Prefabs::ComponentNode& component : shown.components)
 			{
+				size_t before = seen[component.type]++;
+
 				const auto counterpart = std::find_if(file.components.begin(), file.components.end(),
-					[&](const Prefabs::ComponentNode& other) { return other.type == component.type; });
+					[&](const Prefabs::ComponentNode& other) { return other.type == component.type && before-- == 0; });
 
 				if (counterpart == file.components.end())
 				{
@@ -302,13 +299,19 @@ void main()
 				MergeGeometry(shown.children[i], file.children[i], geometry);
 		};
 
-		void FindParts(GameObject& object, std::vector<GameObject*>& found)
+		// A Skin keeps a weight for each of the mesh's corners as it is, which
+		// a change to them would scramble, so an animated mesh is skipped.
+		void FindParts(GameObject& object, std::vector<GameObject*>& found, size_t& skipped)
 		{
-			if (const Mesh* mesh = object.GetComponent<Mesh>(); mesh && !mesh->m_generated && *std::as_const(mesh->primitive_id) == Mesh::Triangles)
-				found.push_back(&object);
+			if (const Mesh* mesh = object.GetComponent<Mesh>())
+			{
+				if (!mesh->m_generated && *std::as_const(mesh->primitive_id) == Mesh::Triangles && !object.GetComponent<Skin>())
+					found.push_back(&object);
+				else skipped++;
+			};
 
 			for (GameObject* child : object.GetChildren())
-				FindParts(*child, found);
+				FindParts(*child, found, skipped);
 		};
 
 		// The shader another mesh of the prefab draws with, so a mesh added to
@@ -416,7 +419,7 @@ void main()
 
 	bool ModelEditor::Load(Document& document)
 	{
-		const std::string text = ReadText(document.path);
+		const std::string text = ProjectAssets::ReadText(document.path);
 		Prefabs::ObjectNode prefab;
 		std::string error;
 
@@ -450,7 +453,8 @@ void main()
 		document.text = text;
 
 		std::vector<GameObject*> found{ };
-		FindParts(*root, found);
+		document.skipped = 0;
+		FindParts(*root, found, document.skipped);
 
 		for (GameObject* object : found)
 		{
@@ -475,7 +479,7 @@ void main()
 	{
 		if (document.scene)
 		{
-			// Deferred past whatever the frame still draws, as a closed scene is.
+			// Deferred, as a closed scene is, to the next time the queue runs.
 			Scene* scene = std::exchange(document.scene, nullptr);
 			Engine::QueueTask([scene]() { delete scene; });
 		};
@@ -487,6 +491,12 @@ void main()
 		document.undo.clear();
 		document.redo.clear();
 		document.drag = Drag::None;
+		document.hoveredHandle.reset();
+		document.hoveredVertex.reset();
+		document.hoveredEdge.reset();
+		document.hoveredFace.reset();
+		document.edgesOf.reset();
+		document.pickedOf.reset();
 	};
 
 	void ModelEditor::Relocate(const std::string& from, const std::string& to)
@@ -518,7 +528,7 @@ void main()
 		std::string error;
 
 		if (document.root == nullptr ||
-			!Prefabs::Parse(ReadText(document.path), file, &error) ||
+			!Prefabs::Parse(ProjectAssets::ReadText(document.path), file, &error) ||
 			!Prefabs::Parse(SceneSerializer::Serialize(*document.root), shown, &error))
 		{
 			std::cerr << "Model panel: could not save " << document.path << ": " << error << std::endl;
@@ -616,7 +626,7 @@ void main()
 
 			document->written = WriteTime(document->path);
 
-			if (ReadText(document->path) == document->text)
+			if (ProjectAssets::ReadText(document->path) == document->text)
 				continue;
 
 			Unload(*document);
@@ -688,7 +698,7 @@ void main()
 		const bool undo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z);
 		const bool redo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y) || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z);
 
-		if (document.drag != Drag::Handle && (undo || redo))
+		if (document.drag == Drag::None && (undo || redo))
 			Step(document, undo);
 
 		HandleKeys(document);
@@ -704,20 +714,21 @@ void main()
 		if (document.parts.empty())
 		{
 			ImGui::BeginGroup();
-			ImGui::TextDisabled("This prefab has no mesh to shape yet.");
 
-			if (ImGui::Button("Add a Mesh"))
+			if (document.root == nullptr)
+				ImGui::TextDisabled("This prefab could not be read. It may have been moved, deleted or broken.");
+			else if (document.skipped > 0)
+				ImGui::TextDisabled("This prefab's meshes cannot be shaped here: they are animated, made by a script, or not triangles.");
+			else
 			{
-				const std::string shader = ShaderOf(*document.root);
+				ImGui::TextDisabled("This prefab has no mesh to shape yet.");
 
-				document.root->Attach<Material>()->SetShaderPath(shader.empty() ? ProjectShader(document.path) : shader);
+				if (ImGui::Button("Add a Mesh"))
+					AddMesh();
 
-				Mesh* mesh = document.root->Attach<Mesh>(Mesh::Triangles);
-				document.parts.push_back(Part{ document.root, mesh, EditableMesh{ } });
-				Add(Shape::Cube);
+				ImGui::SetItemTooltip("Gives the prefab's top object a mesh, starting as a cube.");
 			};
 
-			ImGui::SetItemTooltip("Gives the prefab's top object a mesh, starting as a cube.");
 			ImGui::EndGroup();
 		}
 		else DrawCanvas(document, ImVec2(available.x - side_width - ImGui::GetStyle().ItemSpacing.x, height));
@@ -727,34 +738,35 @@ void main()
 
 	void ModelEditor::HandleKeys(Document& document)
 	{
-		// The Centre field's text box has the keyboard.
-		if (ImGui::GetIO().WantTextInput || document.parts.empty())
-			return;
+		// Asked every frame for the routing, as undo is, but left alone while
+		// the Centre field's text box has the keyboard or the mouse is in a
+		// drag, which holds on to what is under it.
+		const bool idle = !ImGui::GetIO().WantTextInput && !document.parts.empty() && document.drag == Drag::None;
 
 		for (const PickInfo& info : picks)
-			if (ImGui::Shortcut(info.key))
+			if (ImGui::Shortcut(info.key) && idle)
 				SetPick(info.pick);
 
 		for (const ToolInfo& info : tools)
-			if (ImGui::Shortcut(info.key))
+			if (ImGui::Shortcut(info.key) && idle)
 				m_tool = info.tool;
 
-		if (ImGui::Shortcut(ImGuiKey_Delete) || ImGui::Shortcut(ImGuiKey_Backspace))
+		if ((ImGui::Shortcut(ImGuiKey_Delete) || ImGui::Shortcut(ImGuiKey_Backspace)) && idle)
 			Delete();
 
-		if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_E))
+		if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_E) && idle)
 			Extrude();
 
-		if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_D))
+		if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_D) && idle)
 			Duplicate();
 
-		if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_A))
+		if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_A) && idle)
 			SelectAll();
 
-		if (document.drag == Drag::None && ImGui::Shortcut(ImGuiKey_Escape))
+		if (ImGui::Shortcut(ImGuiKey_Escape) && idle)
 			SelectNone();
 
-		if (ImGui::Shortcut(ImGuiKey_F))
+		if (ImGui::Shortcut(ImGuiKey_F) && idle)
 			Frame(document);
 	};
 
@@ -893,7 +905,7 @@ void main()
 				const bool changed = ImGui::DragFloat3("Centre", &centre.x, centre_drag_speed);
 
 				if (ImGui::IsItemActivated())
-					Remember(document);
+					document.pending = Take(document);
 
 				ImGui::SetItemTooltip("Where the middle of what is picked is. Drag or type to move it.");
 
@@ -902,10 +914,20 @@ void main()
 					document.parts[document.part].editing.Transform(Moving(document), glm::translate(glm::mat4(1.0f), centre - *pivot));
 					Changed(document);
 				};
+
+				if (ImGui::IsItemDeactivated() && document.parts[document.part].editing != document.pending.mesh)
+					Commit(document, std::move(document.pending));
 			};
 
 			ImGui::SeparatorText("Mesh");
 			ImGui::Text("%zu vertices, %zu faces", mesh.vertices.size(), mesh.faces.size());
+		};
+
+		if (document.skipped > 0)
+		{
+			ImGui::PushTextWrapPos();
+			ImGui::TextDisabled("%zu more cannot be shaped here: animated, made by a script, or not triangles.", document.skipped);
+			ImGui::PopTextWrapPos();
 		};
 
 		ImGui::SeparatorText("Controls");
@@ -1037,8 +1059,8 @@ void main()
 
 			if (document.hoveredHandle)
 			{
-				Remember(document);
-				document.before = document.parts[document.part].editing;
+				document.pending = Take(document);
+				document.wasUnsaved = document.unsaved;
 				document.held = *document.hoveredHandle;
 				document.pivot = Pivot(document).value_or(glm::vec3(0.0f));
 				document.drag = Drag::Handle;
@@ -1053,9 +1075,9 @@ void main()
 		{
 			if (ImGui::IsKeyPressed(ImGuiKey_Escape))
 			{
-				document.parts[document.part].editing = document.before;
-				document.undo.pop_back();
+				document.parts[document.part].editing = document.pending.mesh;
 				Changed(document);
+				document.unsaved = document.wasUnsaved;
 				document.drag = Drag::None;
 			}
 			else if (ImGui::IsMouseDown(ImGuiMouseButton_Left))
@@ -1068,8 +1090,10 @@ void main()
 				Click(document, document.pressed);
 			else if (document.drag == Drag::Box)
 				Box(document, document.pressed, mouse);
-			else if (document.drag == Drag::Handle && document.parts[document.part].editing == document.before)
-				document.undo.pop_back();
+			else if (document.drag == Drag::Handle && document.parts[document.part].editing != document.pending.mesh)
+				Commit(document, std::move(document.pending));
+			else if (document.drag == Drag::Handle)
+				document.unsaved = document.wasUnsaved;
 
 			if (document.drag == Drag::Click || document.drag == Drag::Box || document.drag == Drag::Handle)
 				document.drag = Drag::None;
@@ -1273,11 +1297,20 @@ void main()
 		return sum / (float)moving.size();
 	};
 
-	std::set<uint32_t> ModelEditor::PickedFaces(const Document& document) const
+	const std::set<uint32_t>& ModelEditor::PickedFaces(Document& document) const
 	{
-		return document.pick == Pick::Faces
-			? document.selection.faces
-			: document.parts[document.part].editing.FacesWithin(Moving(document));
+		const std::pair<size_t, Pick> of(document.part, document.pick);
+
+		if (document.pickedOf != of || document.pickedFrom != document.selection)
+		{
+			document.pickedFaces = document.pick == Pick::Faces
+				? document.selection.faces
+				: document.parts[document.part].editing.FacesWithin(Moving(document));
+			document.pickedOf = of;
+			document.pickedFrom = document.selection;
+		};
+
+		return document.pickedFaces;
 	};
 
 	std::optional<ModelEditor::Handle> ModelEditor::HandleAt(const Document& document, const ImVec2& mouse) const
@@ -1409,7 +1442,7 @@ void main()
 
 		std::vector<std::pair<float, EditableMesh::Edge>> found{ };
 
-		for (const EditableMesh::Edge& edge : mesh.Edges())
+		for (const EditableMesh::Edge& edge : Edges(document))
 		{
 			const std::optional<ImVec2> a = Project(view, glm::vec3(view.world * glm::vec4(mesh.vertices[edge.first], 1.0f)));
 			const std::optional<ImVec2> b = Project(view, glm::vec3(view.world * glm::vec4(mesh.vertices[edge.second], 1.0f)));
@@ -1492,7 +1525,7 @@ void main()
 			break;
 
 		case Pick::Edges:
-			for (const EditableMesh::Edge& edge : mesh.Edges())
+			for (const EditableMesh::Edge& edge : Edges(document))
 				if (inside(mesh.vertices[edge.first]) && inside(mesh.vertices[edge.second]) &&
 					Visible(document, (mesh.vertices[edge.first] + mesh.vertices[edge.second]) / 2.0f))
 					selection.edges.insert(edge);
@@ -1610,17 +1643,19 @@ void main()
 				if (snapping)
 					factor = Snap(factor, scale_snap);
 
+				factor = (std::max)(min_scale, factor);
 				sizing = glm::mat4(glm::mat3(1.0f) + (factor - 1.0f) * glm::outerProduct(direction, direction));
 			}
 			else
 			{
 				// Grabbed at the middle, so by how far right and up it has gone
 				// rather than out from there: a handle's length doubles it.
-				factor = (std::max)(min_scale, 1.0f + ((mouse.x - document.pressed.x) - (mouse.y - document.pressed.y)) / handle_length);
+				factor = 1.0f + ((mouse.x - document.pressed.x) - (mouse.y - document.pressed.y)) / handle_length;
 
 				if (snapping)
 					factor = Snap(factor, scale_snap);
 
+				factor = (std::max)(min_scale, factor);
 				sizing = glm::scale(glm::mat4(1.0f), glm::vec3(factor));
 			};
 
@@ -1628,7 +1663,7 @@ void main()
 		};
 
 		EditableMesh& mesh = document.parts[document.part].editing;
-		mesh = document.before;
+		mesh = document.pending.mesh;
 		mesh.Transform(Moving(document), view.local * change * view.world);
 
 		Changed(document);
@@ -1650,7 +1685,7 @@ void main()
 			});
 	};
 
-	void ModelEditor::DrawOverlay(const Document& document)
+	void ModelEditor::DrawOverlay(Document& document)
 	{
 		Renderer* renderer = Renderer::Get();
 
@@ -1768,15 +1803,19 @@ void main()
 		draw(z_axis, glm::vec4(axis_colours[axes - 1], grid_axis_alpha));
 
 		const std::set<uint32_t> moving = Moving(document);
-		const std::set<EditableMesh::Edge> picked_edges = document.pick == Pick::Edges ? document.selection.edges : mesh.EdgesWithin(moving);
+		std::vector<EditableMesh::Edge> picked_edges{ };
+
+		for (const EditableMesh::Edge& edge : Edges(document))
+			if (document.pick == Pick::Edges ? document.selection.edges.contains(edge) : moving.contains(edge.first) && moving.contains(edge.second))
+				picked_edges.push_back(edge);
 
 		draw(fill(document.parts[document.part], PickedFaces(document)), picked_fill);
 
 		if (document.hoveredFace)
 			draw(fill(document.parts[document.hoveredPart], { *document.hoveredFace }), hovered_fill);
 
-		draw(strips(mesh.Edges(), wire_half_width), wire_colour);
-		draw(strips({ picked_edges.begin(), picked_edges.end() }, picked_wire_half_width), picked_colour);
+		draw(strips(Edges(document), wire_half_width), wire_colour);
+		draw(strips(picked_edges, picked_wire_half_width), picked_colour);
 
 		if (document.hoveredEdge)
 			draw(strips({ *document.hoveredEdge }, picked_wire_half_width), hovered_colour);
@@ -1875,14 +1914,24 @@ void main()
 		else draw->AddRect(ImVec2(middle->x - centre_size, middle->y - centre_size), ImVec2(middle->x + centre_size, middle->y + centre_size), free, 0.0f, ImDrawFlags_None, handle_width);
 	};
 
-	void ModelEditor::Remember(Document& document)
+	ModelEditor::Snapshot ModelEditor::Take(const Document& document)
 	{
-		document.undo.push_back(Snapshot{ document.part, document.parts[document.part].editing, document.selection });
+		return Snapshot{ document.part, document.parts[document.part].editing, document.selection };
+	};
+
+	void ModelEditor::Commit(Document& document, Snapshot snapshot)
+	{
+		document.undo.push_back(std::move(snapshot));
 
 		if (document.undo.size() > max_steps)
 			document.undo.erase(document.undo.begin());
 
 		document.redo.clear();
+	};
+
+	void ModelEditor::Remember(Document& document)
+	{
+		Commit(document, Take(document));
 	};
 
 	void ModelEditor::Step(Document& document, bool undo)
@@ -1919,6 +1968,24 @@ void main()
 		part.mesh->m_normals = std::move(normals);
 
 		document.unsaved = true;
+
+		// What was under the mouse may be gone, and is found again once it moves.
+		document.hoveredVertex.reset();
+		document.hoveredEdge.reset();
+		document.hoveredFace.reset();
+		document.edgesOf.reset();
+		document.pickedOf.reset();
+	};
+
+	const std::vector<EditableMesh::Edge>& ModelEditor::Edges(Document& document)
+	{
+		if (document.edgesOf != document.part)
+		{
+			document.edges = document.parts[document.part].editing.Edges();
+			document.edgesOf = document.part;
+		};
+
+		return document.edges;
 	};
 
 	ModelEditor::Selection ModelEditor::Converted(const EditableMesh& mesh, const Selection& selection, Pick from, Pick to)
@@ -2004,8 +2071,16 @@ void main()
 				edges += glm::distance(mesh.vertices[corners[i].vertex], mesh.vertices[corners[(i + 1) % corners.size()].vertex]);
 		};
 
-		Remember(*document);
-		mesh.Extrude(faces, edges / count * extrude_share);
+		Snapshot before = Take(*document);
+
+		if (!mesh.Extrude(faces, edges / count * extrude_share))
+		{
+			document->message = "These faces face every way between them, so there is no one way to pull them out. Pick fewer.";
+			document->messageTime = ImGui::GetTime();
+			return;
+		};
+
+		Commit(*document, std::move(before));
 
 		document->pick = Pick::Faces;
 		document->selection = Selection{ { }, { }, faces };
@@ -2143,6 +2218,27 @@ void main()
 	{
 		if (Document* document = Front(); document && !document->parts.empty())
 			Step(*document, false);
+	};
+
+	void ModelEditor::AddMesh()
+	{
+		Document* document = Front();
+
+		// A mesh the top object has already, which cannot be shaped here, is
+		// left alone rather than joined by a second.
+		if (document == nullptr || document->root == nullptr || !document->parts.empty() || document->root->GetComponent<Mesh>())
+			return;
+
+		if (document->root->GetComponent<Material>() == nullptr)
+		{
+			const std::string shader = ShaderOf(*document->root);
+			document->root->Attach<Material>()->SetShaderPath(shader.empty() ? ProjectShader(document->path) : shader);
+		};
+
+		Mesh* mesh = document->root->Attach<Mesh>(Mesh::Triangles);
+		document->parts.push_back(Part{ document->root, mesh, EditableMesh{ } });
+
+		Add(Shape::Cube);
 	};
 
 	bool ModelEditor::Save()

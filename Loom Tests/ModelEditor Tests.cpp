@@ -10,6 +10,7 @@
 #include "Mesh.h"
 #include "Scene.h"
 #include "SceneSerializer.h"
+#include "Skin.h"
 
 #include "imgui.h"
 
@@ -57,8 +58,8 @@ namespace
 	};
 
 	// A prefab drawn with a mesh of the shape given on its top object, and
-	// any child's shape on a child of it.
-	std::string WritePrefab(const std::string& name, const EditableMesh* shape, const EditableMesh* child = nullptr)
+	// any child's shape on a child of it, animated by a Skin if skinned.
+	std::string WritePrefab(const std::string& name, const EditableMesh* shape, const EditableMesh* child = nullptr, bool skinned = false)
 	{
 		const std::string path = (std::filesystem::temp_directory_path() / (name + ".loomprefab")).string();
 
@@ -71,7 +72,13 @@ namespace
 			Draw(*top, *shape);
 
 		if (child)
-			Draw(*top->AddChild("Lid"), *child);
+		{
+			Loom::GameObject* lid = top->AddChild("Lid");
+			Draw(*lid, *child);
+
+			if (skinned)
+				lid->Attach<Loom::Skin>();
+		};
 
 		LoomTests::Pump();
 
@@ -90,8 +97,9 @@ namespace
 		// Enough for the panel to dock its tab, take focus and size its view.
 		static constexpr int opening_frames = 4;
 
-		explicit Driven(const std::string& name, const EditableMesh* child = nullptr) :
-			path(WritePrefab(name, &cube, child))
+		// The prefab at file, or a cube's with any child's shape under it.
+		explicit Driven(const std::string& name, const EditableMesh* child = nullptr, const std::string& file = "") :
+			path(file.empty() ? WritePrefab(name, &cube, child) : file)
 		{
 			constexpr float frame_time = 1.0f / 60.0f;
 
@@ -156,6 +164,17 @@ namespace
 		void Click(const ImVec2& at)
 		{
 			Drag(at, at);
+		};
+
+		void Key(ImGuiKey key)
+		{
+			ImGuiIO& io = ImGui::GetIO();
+
+			io.AddKeyEvent(key, true);
+			Frame();
+
+			io.AddKeyEvent(key, false);
+			Frame();
 		};
 
 		ImVec2 Screen(const glm::vec3& point) const
@@ -433,4 +452,128 @@ TEST_CASE("The Model panel's save keeps what it could not read of the prefab")
 
 	REQUIRE(reopened.Editing() != nullptr);
 	CHECK(reopened.Editing()->faces.size() == 12);
+};
+
+TEST_CASE("The Model panel leaves animated meshes out")
+{
+	LoomTests::EngineFixture engine;
+
+	const EditableMesh cube = EditableMesh::Cube(1.0f);
+	const std::string path = WritePrefab("model_skinned", nullptr, &cube, true);
+
+	ModelEditor editor;
+	editor.Open(path);
+	LoomTests::Pump();
+
+	CHECK(editor.Editing() == nullptr);
+
+	std::error_code code;
+	std::filesystem::remove(path, code);
+};
+
+TEST_CASE("The Model panel gives a prefab with no mesh one, drawn with a shader its project has")
+{
+	const std::filesystem::path project = std::filesystem::temp_directory_path() / "model_add_mesh";
+	const std::filesystem::path prefab = project / "Assets" / "Prefabs" / "Empty.loomprefab";
+
+	std::filesystem::create_directories(prefab.parent_path());
+	std::ofstream(project / "Model.loomproject") << "name=Model\n";
+	std::ofstream(project / "Assets" / "Lit.shader") << "";
+	std::ofstream(prefab, std::ios::binary) << "GameObject Empty(5d0c6b7e-2f43-4a8e-9c1d-7a6e0b3f2c11)\n\t0 = 0\n\t1 = false\n\t2 = (0, 0, 0)\n\t3 = (0, 0, 0)\n\t4 = (1, 1, 1)\n\t5 = false\n";
+
+	{
+		Driven driven("model_add_mesh", nullptr, prefab.string());
+		CHECK(driven.editor.Editing() == nullptr);
+
+		driven.editor.AddMesh();
+		CHECK(driven.Mesh().faces.size() == 6);
+		REQUIRE(driven.editor.Save());
+
+		ModelEditor reopened;
+		reopened.Open(prefab.string());
+		LoomTests::Pump();
+
+		REQUIRE(reopened.Editing() != nullptr);
+		CHECK(reopened.Editing()->faces.size() == 6);
+		CHECK(ReadFile(prefab.string()).find("\"Assets/Lit.shader\"") != std::string::npos);
+	};
+
+	std::error_code code;
+	std::filesystem::remove_all(project, code);
+};
+
+TEST_CASE("The Model panel's Esc puts a dragged face back and keeps what redo would do")
+{
+	Driven driven("model_escape");
+
+	driven.editor.SetPick(ModelEditor::Pick::Faces);
+	driven.Click(driven.Screen(glm::vec3(0.1f, 0.5f, 0.1f)));
+	REQUIRE(driven.editor.Selected()->faces.size() == 1);
+
+	const uint32_t face = *driven.editor.Selected()->faces.begin();
+	const glm::vec3 centre = driven.Mesh().FaceCentre(face);
+
+	driven.editor.Flip();
+	driven.editor.Undo();
+
+	const ImVec2 middle = driven.Screen(centre);
+	const ImVec2 above = driven.Screen(centre + glm::vec3(0.0f, 0.1f, 0.0f));
+	const float reach = std::hypot(above.x - middle.x, above.y - middle.y);
+	const ImVec2 up((above.x - middle.x) / reach, (above.y - middle.y) / reach);
+
+	constexpr float grab = 60.0f;
+	constexpr float pull = 40.0f;
+
+	ImGuiIO& io = ImGui::GetIO();
+	io.AddMousePosEvent(middle.x + up.x * grab, middle.y + up.y * grab);
+	driven.Frame();
+	io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+	driven.Frame();
+	io.AddMousePosEvent(middle.x + up.x * (grab + pull), middle.y + up.y * (grab + pull));
+	driven.Frame();
+
+	REQUIRE(driven.Mesh().FaceCentre(face).y > centre.y + TOLERANCE);
+
+	driven.Key(ImGuiKey_Escape);
+	io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+	driven.Frame();
+
+	CHECK(std::abs(driven.Mesh().FaceCentre(face).y - centre.y) < TOLERANCE);
+
+	driven.editor.Redo();
+	CHECK(driven.Mesh().FaceNormal(face).y < -1.0f + TOLERANCE);
+};
+
+TEST_CASE("The Model panel's extrude of faces facing every way does nothing, and is no step")
+{
+	Driven driven("model_extrude_all");
+
+	driven.editor.Add(ModelEditor::Shape::Cube);
+	REQUIRE(driven.Mesh().faces.size() == 12);
+
+	driven.editor.SetPick(ModelEditor::Pick::Faces);
+	driven.editor.SelectAll();
+	driven.editor.Extrude();
+	CHECK(driven.Mesh().faces.size() == 12);
+
+	driven.editor.Undo();
+	CHECK(driven.Mesh().faces.size() == 6);
+};
+
+TEST_CASE("The Model panel shows a prefab deleted from under it as one it cannot read")
+{
+	Driven driven("model_deleted");
+
+	std::error_code code;
+	std::filesystem::remove(driven.path, code);
+
+	driven.Frame();
+	driven.Frame();
+
+	CHECK(driven.editor.Editing() == nullptr);
+
+	driven.editor.AddMesh();
+	driven.Frame();
+
+	CHECK(driven.editor.Editing() == nullptr);
 };

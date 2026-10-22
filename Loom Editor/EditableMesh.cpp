@@ -20,7 +20,8 @@ namespace Loom
 		// triangle the ray starts on.
 		constexpr float ray_epsilon = 1e-7f;
 
-		// Two faces whose normals are this close lie flat together.
+		// Two faces whose normals are this close lie flat together, and faces
+		// whose normals add up to less than this have no way they face.
 		constexpr float flat_epsilon = 1e-4f;
 
 		// A UV square's corners, in the order a quad's corners go round.
@@ -385,18 +386,15 @@ namespace Loom
 				Flatten(face);
 	};
 
-	void EditableMesh::Extrude(const std::set<uint32_t>& selected, float distance)
+	bool EditableMesh::Extrude(const std::set<uint32_t>& selected, float distance)
 	{
-		if (selected.empty())
-			return;
-
 		glm::vec3 direction(0.0f);
 
 		for (const uint32_t face : selected)
 			direction += FaceNormal(face);
 
-		if (glm::length(direction) == 0.0f)
-			return;
+		if (glm::length(direction) < flat_epsilon)
+			return false;
 
 		const glm::vec3 offset = glm::normalize(direction) * distance;
 
@@ -442,6 +440,8 @@ namespace Loom
 			AddFace(corners, uvs);
 
 		RemoveUnused();
+
+		return true;
 	};
 
 	std::set<uint32_t> EditableMesh::Duplicate(const std::set<uint32_t>& selected)

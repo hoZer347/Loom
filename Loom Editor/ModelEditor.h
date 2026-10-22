@@ -109,6 +109,9 @@ namespace Loom
 		void Delete();
 		void Flip();
 		void Add(Shape shape);
+
+		// Gives a prefab with no mesh one on its top object, starting as a cube.
+		void AddMesh();
 		void Undo();
 		void Redo();
 		bool Save();
@@ -209,8 +212,24 @@ namespace Loom
 			Drag drag = Drag::None;
 			ImVec2 pressed{ };
 			Handle held;
-			EditableMesh before;
 			glm::vec3 pivot{ 0.0f };
+
+			// How things stood when a drag that may change the mesh began, a
+			// step for undo once it has.
+			Snapshot pending;
+			bool wasUnsaved = false;
+
+			// The meshes that cannot be shaped here: animated, made by a
+			// script, or not triangles.
+			size_t skipped = 0;
+
+			// Worked out from the mesh being edited, and from it and what is
+			// picked, and kept until those change.
+			std::optional<size_t> edgesOf;
+			std::vector<EditableMesh::Edge> edges;
+			std::optional<std::pair<size_t, Pick>> pickedOf;
+			Selection pickedFrom;
+			std::set<uint32_t> pickedFaces;
 
 			std::optional<Handle> hoveredHandle;
 			std::optional<uint32_t> hoveredVertex;
@@ -250,7 +269,7 @@ namespace Loom
 		void DragHandle(Document& document, const ImVec2& mouse);
 
 		void Render(Document& document);
-		void DrawOverlay(const Document& document);
+		void DrawOverlay(Document& document);
 		void DrawHandles(const Document& document, ImDrawList* draw) const;
 
 		std::optional<ImVec2> Project(const View& view, const glm::vec3& world) const;
@@ -265,8 +284,11 @@ namespace Loom
 
 		// The faces an action on faces takes: those picked, or those whose
 		// every corner is picked.
-		std::set<uint32_t> PickedFaces(const Document& document) const;
+		const std::set<uint32_t>& PickedFaces(Document& document) const;
+		static const std::vector<EditableMesh::Edge>& Edges(Document& document);
 
+		static Snapshot Take(const Document& document);
+		static void Commit(Document& document, Snapshot snapshot);
 		static void Remember(Document& document);
 		static void Step(Document& document, bool undo);
 		static void Changed(Document& document);

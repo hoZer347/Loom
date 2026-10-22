@@ -83,8 +83,10 @@ namespace Loom
 
 		// Lifts the faces off the rest of the mesh by distance along their
 		// average normal, walling in the gap from where they were. The faces
-		// keep their indices; the walls go on the end.
-		void Extrude(const std::set<uint32_t>& faces, float distance);
+		// keep their indices; the walls go on the end. False, with nothing
+		// done, for none, or for faces facing every way so they have no
+		// average, such as the whole of a closed shape.
+		bool Extrude(const std::set<uint32_t>& faces, float distance);
 
 		// The faces copied onto vertices of their own, which the indices
 		// returned name.
