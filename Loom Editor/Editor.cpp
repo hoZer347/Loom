@@ -2857,26 +2857,36 @@ namespace Loom
 
 		const std::string path = (const char*)dragged->Data;
 
-		const std::filesystem::path extension = std::filesystem::path(path).extension();
-
 		// A prefab inside itself would take in its own every edit.
-		if (extension == Prefab::extension)
-		{
-			if (!IsInPrefab(gameObject, path) && ImGui::AcceptDragDropPayload(ASSET_PAYLOAD))
-				Instantiate(path, *gameObject);
-
-			return true;
-		};
-
-		// Anything else dragged out of the Project panel or an asset panel has
-		// no place here.
-		if (extension != ProjectAssets::shaderExtension)
-			return true;
-
-		if (ImGui::AcceptDragDropPayload(ASSET_PAYLOAD))
-			DropShader(gameObject, path);
+		if (std::filesystem::path(path).extension() == Prefab::extension &&
+			!IsInPrefab(gameObject, path) &&
+			ImGui::AcceptDragDropPayload(ASSET_PAYLOAD))
+			Instantiate(path, *gameObject);
 
 		return true;
+	};
+
+	bool Editor::AcceptShaderDrop(std::string& path)
+	{
+		if (!ImGui::BeginDragDropTarget())
+			return false;
+
+		const ImGuiPayload* dragged = ImGui::GetDragDropPayload();
+		bool dropped = false;
+
+		if (dragged != nullptr && dragged->IsDataType(script_payload))
+			if (const auto entry = m_scriptEntries.find((const char*)dragged->Data);
+				entry != m_scriptEntries.end() &&
+				entry->second.kind == ScriptEntryKind::Shader &&
+				ImGui::AcceptDragDropPayload(script_payload))
+			{
+				path = entry->first;
+				dropped = true;
+			};
+
+		ImGui::EndDragDropTarget();
+
+		return dropped;
 	};
 
 	void Editor::DropShader(GameObject* gameObject, const std::string& path)
@@ -3353,6 +3363,7 @@ namespace Loom
 
 				changed = InputTextString(label, text);
 				changed |= AcceptAssetDrop(text);
+				changed |= AcceptShaderDrop(text);
 			}
 			break;
 

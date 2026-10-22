@@ -21,6 +21,7 @@ namespace Loom
 		constexpr const char* Shader = "✨";
 		constexpr const char* Texture = "🖼";
 		constexpr const char* TwoD = "🎨";
+		constexpr const char* ThreeD = "🗿";
 		constexpr const char* Sound = "🔊";
 		constexpr const char* Font = "🔤";
 		constexpr const char* Model = "🧊";
@@ -42,7 +43,7 @@ namespace Loom
 		constexpr const char* Project = "📁 Project###Project";
 		constexpr const char* Scripts = "🧩 Scripts###Scripts";
 		constexpr const char* TwoD = "🎨 2D###2D";
-		constexpr const char* ThreeD = "🧊 3D###3D";
+		constexpr const char* ThreeD = "🗿 3D###3D";
 		constexpr const char* Sounds = "🔊 Sounds###Sounds";
 		constexpr const char* Fonts = "🔤 Fonts###Fonts";
 		constexpr const char* Inspector = "🔍 Inspector###Inspector";

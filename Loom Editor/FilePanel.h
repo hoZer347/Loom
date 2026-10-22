@@ -35,7 +35,7 @@ namespace Loom
 	namespace FilePanels
 	{
 		inline constexpr FilePanelKind TwoD{ EditorPanels::TwoD, "2D", "textures", EditorIcons::TwoD, { EditorIcons::Texture, "Textures" }, ".loom2d", "2d.", "Loom2DFolder" };
-		inline constexpr FilePanelKind ThreeD{ EditorPanels::ThreeD, "3D", "models", EditorIcons::Model, { EditorIcons::Model, "Models" }, ".loom3d", "3d.", "Loom3DFolder" };
+		inline constexpr FilePanelKind ThreeD{ EditorPanels::ThreeD, "3D", "models", EditorIcons::ThreeD, { EditorIcons::Model, "Models" }, ".loom3d", "3d.", "Loom3DFolder" };
 		inline constexpr FilePanelKind Sounds{ EditorPanels::Sounds, "Sounds", "sounds", EditorIcons::Sound, { EditorIcons::Sound, "Sounds" }, ".loomsounds", "sound.", "LoomSoundFolder" };
 		inline constexpr FilePanelKind Fonts{ EditorPanels::Fonts, "Fonts", "fonts", EditorIcons::Font, { EditorIcons::Font, "Fonts" }, ".loomfonts", "font.", "LoomFontFolder" };
 

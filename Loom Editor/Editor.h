@@ -566,10 +566,13 @@ namespace Loom
 		// else, or a texture that will not load.
 		const Texture* Thumbnail(const std::string& path);
 
-		// Takes a file dragged out of the Project panel or a FilePanel onto a
-		// GameObject in the hierarchy. Whether the drag was one, taken or
-		// turned away.
+		// Takes a prefab dragged out of the Project panel onto a GameObject in
+		// the hierarchy. Whether the drag was a file, taken or turned away.
 		bool DropAsset(GameObject* gameObject);
+
+		// AcceptAssetDrop for a shader dragged out of the Scripts panel, which
+		// lists the shaders: path becomes the shader's path from the project.
+		bool AcceptShaderDrop(std::string& path);
 
 		// Gives the GameObject the shader, on its Material or a new one.
 		void DropShader(GameObject* gameObject, const std::string& path);
