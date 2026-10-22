@@ -267,8 +267,8 @@ TEST_CASE("The Model panel goes on to edit the part whose face is clicked")
 
 TEST_CASE("The Model panel's box leaves out corners another part hides")
 {
-	// A lid just above the cube and wider than it, which the camera, looking
-	// down, sees the cube's top through.
+	// A lid just above the cube and wider than it, which hides the cube's
+	// top from the camera looking down.
 	constexpr float lid_height = 0.6f;
 	constexpr float lid_size = 3.0f;
 
