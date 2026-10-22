@@ -747,6 +747,8 @@ namespace Loom
 
 		// Each instance as the last pass read it, by its GameObject's guid:
 		// parsing a model's vertices again on every edit is most of a pass.
+		// A scene open twice shares its entries, SyncSceneCopies having made
+		// the copies read the same.
 		struct ReadInstance
 		{
 			std::string text;
