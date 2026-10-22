@@ -143,21 +143,47 @@ TEST_SUITE("Profiler")
 		CHECK(row.history.back() == 0.0);
 	};
 
-	TEST_CASE("a stage that has not run for a whole window is forgotten")
+	TEST_CASE("a point of the trend is its frames' average, a frame missed counting as none")
 	{
+		static_assert(Loom::Profiler::Bucket % 2 == 0, "every other frame of a bucket must be half of it");
+
+		for (int frame = 0; frame < 2 * Loom::Profiler::Bucket; frame++)
+		{
+			if (frame % 2 == 0)
+			{
+				LOOM_STAGE("Profiler alternate");
+				Busy(BUSY_FOR);
+			};
+
+			Loom::Profiler::EndFrame();
+		};
+
+		const Found found = FindRow("Profiler alternate");
+		REQUIRE(found.thread);
+
+		const Loom::Profiler::Row& row = found.thread->rows[found.row];
+		CHECK(row.trend.back() >= (double)BUSY_FOR.count() / 2.0);
+		CHECK(row.trend.back() <= doctest::Approx(row.peak / 2.0));
+	};
+
+	TEST_CASE("a stage that has not run for the whole trend is forgotten")
+	{
+		constexpr int SPAN = Loom::Profiler::Trend * Loom::Profiler::Bucket;
+
 		{
 			LOOM_STAGE("Profiler once");
 		};
 
 		Loom::Profiler::EndFrame();
 
-		for (int frame = 1; frame < Loom::Profiler::Window; frame++)
-		{
+		for (int frame = 1; frame < SPAN; frame++)
 			Loom::Profiler::EndFrame();
-			REQUIRE(FindRow("Profiler once").thread);
-		};
 
-		Loom::Profiler::EndFrame();
+		REQUIRE(FindRow("Profiler once").thread);
+
+		for (int frame = 0; frame < Loom::Profiler::Bucket; frame++)
+			Loom::Profiler::EndFrame();
+
 		CHECK_FALSE(FindRow("Profiler once").thread);
 	};
 

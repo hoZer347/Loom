@@ -73,6 +73,11 @@ namespace Loom
 			std::array<double, Profiler::Window> starts{ };
 			double began = 0.0;
 
+			// Each whole Bucket's average, the slot a bucket's number picks
+			// overwritten as the trend moves on, and the sum of this one so far.
+			std::array<double, Profiler::Trend> trend{ };
+			double gathered = 0.0;
+
 			unsigned long long first = 0;
 			unsigned long long last = 0;
 
@@ -137,16 +142,25 @@ namespace Loom
 			return *t_log;
 		};
 
-		// Takes this frame's sums into the window and forgets the parts that
-		// have not run within it.
+		// Takes this frame's sums into the window and the trend, and forgets
+		// the parts that have not run within the trend.
 		void Close(Node& node, unsigned long long frame)
 		{
+			const unsigned long long buckets = (frame + 1) / Profiler::Bucket;
+
 			node.history[frame % Profiler::Window] = node.sum;
 			node.starts[frame % Profiler::Window] = node.last == frame ? node.began : NOT_RUN;
+			node.gathered += node.sum;
 			node.sum = 0.0;
 			node.placed = 0;
 
-			std::erase_if(node.parts, [frame](const Node& part) { return frame - part.last >= Profiler::Window; });
+			if ((frame + 1) % Profiler::Bucket == 0)
+			{
+				node.trend[(buckets - 1) % Profiler::Trend] = node.gathered / (double)Profiler::Bucket;
+				node.gathered = 0.0;
+			};
+
+			std::erase_if(node.parts, [buckets](const Node& part) { return part.last / Profiler::Bucket + Profiler::Trend < buckets; });
 
 			for (Node& part : node.parts)
 				Close(part, frame);
@@ -154,10 +168,12 @@ namespace Loom
 
 		void List(const Node& node, unsigned long long frame, int depth, std::vector<Profiler::Row>& rows)
 		{
+			const unsigned long long buckets = (frame + 1) / Profiler::Bucket;
+
 			for (const Node& part : node.parts)
 			{
 				const unsigned long long counted = std::min<unsigned long long>(frame - part.first + 1, Profiler::Window);
-				Profiler::Row& row = rows.emplace_back(Profiler::Row{ part.name, depth, 0.0, 0.0, 0.0, { } });
+				Profiler::Row& row = rows.emplace_back(Profiler::Row{ part.name, depth, 0.0, 0.0, 0.0, { }, { } });
 				double began = 0.0;
 				int ran = 0;
 
@@ -175,6 +191,9 @@ namespace Loom
 						ran++;
 					};
 				};
+
+				for (int point = 0; point < Profiler::Trend; point++)
+					row.trend[point] = part.trend[(buckets + point) % Profiler::Trend];
 
 				row.average /= (double)counted;
 				row.start = began / (double)std::max(ran, 1);

@@ -4065,10 +4065,15 @@ namespace Loom
 				ImGui::SetTooltip("%s: %.3f ms average, %.3f ms peak", under->name.c_str(), under->average, under->peak);
 		};
 
-		ImGui::TextDisabled("Milliseconds a frame over the last %d", Profiler::Window);
-
-		// Each thread's stages stacked frame by frame, the oldest on the left.
+		// Each thread's stages stacked a point every Bucket frames, the oldest
+		// on the left.
 		constexpr float graph_lines = 6.0f;
+		constexpr int graph_frames = Profiler::Trend * Profiler::Bucket;
+		constexpr double milliseconds_per_second = 1000.0;
+
+		const double seconds_per_point = frame * (double)Profiler::Bucket / milliseconds_per_second;
+
+		ImGui::TextDisabled("Milliseconds a frame over the last %d, about %.0f s", graph_frames, seconds_per_point * (double)Profiler::Trend);
 
 		// Stage, Average and Peak.
 		constexpr int columns = 3;
@@ -4083,13 +4088,13 @@ namespace Loom
 				continue;
 			};
 
-			std::array<double, Profiler::Window> below{ };
+			std::array<double, Profiler::Trend> below{ };
 			double highest = 0.0;
 
 			for (const Profiler::Row& row : thread.rows)
 				if (row.depth == 0)
-					for (int age = 0; age < Profiler::Window; age++)
-						below[age] += row.history[age];
+					for (int age = 0; age < Profiler::Trend; age++)
+						below[age] += row.trend[age];
 
 			for (const double total : below)
 				highest = (std::max)(highest, total);
@@ -4100,18 +4105,18 @@ namespace Loom
 
 			const ImVec2 corner = ImGui::GetCursorScreenPos();
 			const ImVec2 size((std::max)(ImGui::GetContentRegionAvail().x, narrowest_bar), ImGui::GetTextLineHeight() * graph_lines);
-			const float step = size.x / (float)(Profiler::Window - 1);
+			const float step = size.x / (float)(Profiler::Trend - 1);
 
 			ImGui::InvisibleButton("##graph", size);
 
-			const int pointed = ImGui::IsItemHovered() ? std::clamp((int)std::lround((mouse.x - corner.x) / step), 0, Profiler::Window - 1) : -1;
+			const int pointed = ImGui::IsItemHovered() ? std::clamp((int)std::lround((mouse.x - corner.x) / step), 0, Profiler::Trend - 1) : -1;
 			const auto height = [&](double length) { return corner.y + size.y - size.y * (float)(length / highest); };
 			const Profiler::Row* under = nullptr;
 
 			draw->AddRectFilled(corner, ImVec2(corner.x + size.x, corner.y + size.y), ImGui::GetColorU32(ImGuiCol_FrameBg));
 
 			// Antialiased edges would show the background through the seams
-			// between one frame's quad and the next.
+			// between one point's quad and the next.
 			const ImDrawListFlags flags = draw->Flags;
 			draw->Flags &= ~ImDrawListFlags_AntiAliasedFill;
 
@@ -4122,30 +4127,30 @@ namespace Loom
 
 				const ImU32 fill = colour(row.name);
 
-				for (int age = 0; age + 1 < Profiler::Window; age++)
+				for (int age = 0; age + 1 < Profiler::Trend; age++)
 				{
 					const float from = corner.x + step * (float)age;
 					const float to = from + step;
 
 					draw->AddQuadFilled(
-						ImVec2(from, height(below[age] + row.history[age])),
-						ImVec2(to, height(below[age + 1] + row.history[age + 1])),
+						ImVec2(from, height(below[age] + row.trend[age])),
+						ImVec2(to, height(below[age + 1] + row.trend[age + 1])),
 						ImVec2(to, height(below[age + 1])),
 						ImVec2(from, height(below[age])),
 						fill);
 				};
 
-				if (pointed >= 0 && mouse.y <= height(below[pointed]) && mouse.y >= height(below[pointed] + row.history[pointed]))
+				if (pointed >= 0 && mouse.y <= height(below[pointed]) && mouse.y >= height(below[pointed] + row.trend[pointed]))
 					under = &row;
 
-				for (int age = 0; age < Profiler::Window; age++)
-					below[age] += row.history[age];
+				for (int age = 0; age < Profiler::Trend; age++)
+					below[age] += row.trend[age];
 			};
 
 			draw->Flags = flags;
 
 			if (under)
-				ImGui::SetTooltip("%s: %.3f ms, %d frames ago", under->name.c_str(), under->history[pointed], Profiler::Window - 1 - pointed);
+				ImGui::SetTooltip("%s: %.3f ms, about %.1f s ago", under->name.c_str(), under->trend[pointed], seconds_per_point * (double)(Profiler::Trend - 1 - pointed));
 
 			if (!ImGui::BeginTable("##stages", columns, ImGuiTableFlags_RowBg))
 			{

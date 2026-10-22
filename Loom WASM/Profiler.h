@@ -37,9 +37,16 @@ namespace Loom
 		// The frames a Row reaches back over.
 		static constexpr int Window = 100;
 
-		// A stage as it has run on a thread over the last Window frames, in
-		// milliseconds a frame: a frame it did not run in counts as none, and
-		// one it ran in more than once as their sum.
+		// The frames each point of a Row's trend is the average of.
+		static constexpr int Bucket = 10;
+
+		// The points a Row's trend holds, so it reaches back Trend * Bucket
+		// frames.
+		static constexpr int Trend = 300;
+
+		// A stage as it has run on a thread, in milliseconds a frame: a frame
+		// it did not run in counts as none, and one it ran in more than once
+		// as their sum. All but trend reach back over the last Window frames.
 		struct Row
 		{
 			std::string name;
@@ -54,14 +61,17 @@ namespace Loom
 
 			// Each frame's, oldest first.
 			std::array<double, Window> history;
+
+			// Each whole Bucket's average, oldest first.
+			std::array<double, Trend> trend;
 		};
 
-		// What one thread ran over the window.
+		// What one thread ran over the trend.
 		struct Thread
 		{
 			std::string name;
 
-			// Every stage run within the window, each followed by its parts,
+			// Every stage run within the trend, each followed by its parts,
 			// in the order they began in the last frame they ran in.
 			std::vector<Row> rows{ };
 		};
@@ -91,7 +101,7 @@ namespace Loom
 		// Gathers what every thread recorded since the last call as a frame.
 		static void EndFrame();
 
-		// The threads that ran a stage within the window, as of the last frame.
+		// The threads that ran a stage within the trend, as of the last frame.
 		static const std::vector<Thread>& Threads();
 
 		// In milliseconds from one EndFrame to the next, averaged over the
