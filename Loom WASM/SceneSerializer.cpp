@@ -65,9 +65,16 @@ namespace Loom
 		{
 			const std::vector<SerializedField>& fields = object.GetFields();
 
+			// Appended a piece at a time, since a value can be a mesh's vertices.
 			for (size_t i = 0; i < fields.size(); i++)
 				if (object.IsSaved(fields[i]))
-					text += Indent(depth) + std::to_string(i) + " = " + fields[i].Write() + '\n';
+				{
+					text += Indent(depth);
+					text += std::to_string(i);
+					text += " = ";
+					text += fields[i].Write();
+					text += '\n';
+				};
 		};
 
 		void WriteGameObject(std::string& text, GameObject& gameObject, int depth)

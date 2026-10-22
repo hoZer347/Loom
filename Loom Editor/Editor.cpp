@@ -1405,9 +1405,30 @@ namespace Loom
 		if (m_playing)
 			return;
 
+		// AddChild and Destroy defer; the text has to show where they land.
+		Engine::DoTasks();
+
+		if (OpenSceneTexts() == m_recordedTexts && !PrefabsNeedSync())
+			return;
+
 		SyncSceneCopies();
 		SyncPrefabs();
 		m_history.Record(m_ownedScenes);
+
+		m_recordedTexts = OpenSceneTexts();
+	};
+
+	std::vector<std::string> Editor::OpenSceneTexts() const
+	{
+		std::vector<std::string> texts{ };
+
+		for (Scene* scene : m_ownedScenes)
+			texts.push_back(SceneSerializer::Serialize(*scene));
+
+		if (m_prefabScene)
+			texts.push_back(SceneSerializer::Serialize(*m_prefabScene));
+
+		return texts;
 	};
 
 	void Editor::SyncSceneCopies()

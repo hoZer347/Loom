@@ -268,6 +268,22 @@ namespace Loom
 			Select(again);
 	};
 
+	bool Editor::PrefabsNeedSync()
+	{
+		if (m_reshowPrefab || (GetPrefabRoot() && m_prefabShape.empty()))
+			return true;
+
+		for (const auto& [path, loaded] : m_prefabs)
+		{
+			std::error_code code;
+
+			if (std::filesystem::last_write_time(PrefabFile(path), code) != loaded.written)
+				return true;
+		};
+
+		return false;
+	};
+
 	void Editor::SyncPrefabs()
 	{
 		if (m_projectPath.empty())

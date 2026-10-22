@@ -468,8 +468,14 @@ namespace Loom
 
 		void HandleShortcuts();
 
+		// Syncs the prefabs and records a step once a scene has changed since
+		// the last time, which on a large scene takes long enough to be felt.
 		void RecordHistory();
 		bool CanStepHistory() const;
+
+		// The open scenes' text and then the Prefab panel's, as RecordHistory
+		// compares them.
+		std::vector<std::string> OpenSceneTexts() const;
 
 		// Whether input in the window can change a scene, so the scenes are
 		// compared for the history after it, which takes long enough on a large
@@ -681,6 +687,10 @@ namespace Loom
 		// that do not know their prefab yet into line with it.
 		void SyncPrefabs();
 
+		// Whether SyncPrefabs has work with no scene changed: a prefab file
+		// written from outside, or a Prefab panel still to agree with its file.
+		bool PrefabsNeedSync();
+
 		// The Prefab panel's copy made the file's again, in place: the same
 		// guids, so the selection and the panel's focus stay where they are.
 		void ReshowPrefab();
@@ -854,6 +864,9 @@ namespace Loom
 
 		// Each scene open more than once, as its copies last agreed it was.
 		std::unordered_map<Guid, std::string> m_copyTexts{ };
+
+		// OpenSceneTexts as the last RecordHistory to sync left them.
+		std::vector<std::string> m_recordedTexts{ };
 
 		// Set when a click lands or a widget is let go of in a window that
 		// CanEditScenes, or a scene arrives; the scenes are compared on the first

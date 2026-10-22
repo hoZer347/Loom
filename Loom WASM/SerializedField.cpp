@@ -10,6 +10,7 @@
 #include <charconv>
 #include <cctype>
 #include <cstdlib>
+#include <cstring>
 #include <iterator>
 #include <limits>
 #include <string>
@@ -22,6 +23,9 @@ namespace Loom
 	namespace
 	{
 		constexpr size_t NUMBER_LENGTH = 64;
+
+		// Shorter FloatArrays write quickly enough not to keep.
+		constexpr size_t KEPT_ARRAY_LENGTH = 1024;
 
 		// %g with enough digits to round-trip, so a value written and read back
 		// is the same value rather than nearly the same one. to_chars writes
@@ -221,6 +225,12 @@ namespace Loom
 		{
 			const std::vector<float>& values = *(std::vector<float>*)data;
 
+			// Byte for byte, since -0 and 0 compare equal but write apart.
+			if (m_written &&
+				m_written->values.size() == values.size() &&
+				std::memcmp(m_written->values.data(), values.data(), values.size() * sizeof(float)) == 0)
+				return m_written->text;
+
 			std::string text = "[";
 
 			for (size_t i = 0; i < values.size(); i++)
@@ -231,7 +241,12 @@ namespace Loom
 				AppendNumber(text, values[i]);
 			};
 
-			return text + ']';
+			text += ']';
+
+			if (values.size() >= KEPT_ARRAY_LENGTH)
+				m_written = std::make_shared<WrittenArray>(WrittenArray{ values, text });
+
+			return text;
 		};
 
 		case FieldType::Uniforms:	return Quote(((UniformValues*)data)->Write());

@@ -4,8 +4,10 @@
 
 #include "Guid.h"
 
+#include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 
 namespace Loom
@@ -98,6 +100,18 @@ namespace Loom
 
 	private:
 		bool ReadValue(const std::string& text) const;
+
+		// A long FloatArray's last Write, kept with the values it was written
+		// from: writing a mesh's vertices out again each time the editor
+		// compares a scene is most of what that costs. The copies of a field
+		// share it, as they share the values.
+		struct WrittenArray
+		{
+			std::vector<float> values;
+			std::string text;
+		};
+
+		mutable std::shared_ptr<WrittenArray> m_written{ };
 
 	public:
 

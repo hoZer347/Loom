@@ -557,6 +557,35 @@ TEST_SUITE("SerializedField")
 		CHECK(object.numbers->empty());
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a long float list writes what it holds now, however it was changed")
+	{
+		EveryField object;
+		Pump();
+
+		constexpr size_t long_list = 4096;
+
+		object.numbers = std::vector<float>(long_list, 1.0f);
+
+		const std::string first = Field(object, Numbers).Write();
+
+		CHECK(Field(object, Numbers).Write() == first);
+
+		// Behind the Serial's back, as a reference held onto would.
+		std::vector<float>& held = *(std::vector<float>*)Field(object, Numbers).data;
+		held.back() = 2.0f;
+
+		CHECK(Field(object, Numbers).Write().ends_with(", 2]"));
+
+		held.back() = -0.0f;
+		CHECK(Field(object, Numbers).Write().ends_with(", -0]"));
+
+		held.back() = 0.0f;
+		CHECK(Field(object, Numbers).Write().ends_with(", 0]"));
+
+		held.push_back(3.0f);
+		CHECK(Field(object, Numbers).Write().ends_with(", 0, 3]"));
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a reference is written as the guid of what it points at")
 	{
 		Loom::Scene scene("references");
