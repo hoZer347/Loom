@@ -1207,7 +1207,7 @@ namespace Loom
 		std::string error;
 
 		m_opening = SceneSerializer::BeginLoadFromFile(path, &error);
-		m_openingPath = path;
+		m_openingPath = std::filesystem::path(path).lexically_normal().string();
 
 		if (!m_opening)
 			std::cerr << "Could not open scene: " << error << std::endl;

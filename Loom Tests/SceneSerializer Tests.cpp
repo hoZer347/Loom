@@ -46,6 +46,35 @@ namespace
 		};
 	};
 
+	// Counts the instances alive, so a test can tell what a scene left behind.
+	struct Counted final : Loom::Component<Counted>
+	{
+		static inline int live = 0;
+
+		Counted()
+		{
+			live++;
+		};
+
+		~Counted()
+		{
+			live--;
+		};
+	};
+
+	struct CountedRegistered
+	{
+		CountedRegistered()
+		{
+			Loom::ComponentRegistry::Register<Counted>("Counted");
+		};
+
+		~CountedRegistered()
+		{
+			Loom::ComponentRegistry::Unregister("Counted");
+		};
+	};
+
 	// Owns the scene a test loaded, so a failing CHECK cannot leak it.
 	struct Loaded
 	{
@@ -524,14 +553,14 @@ TEST_SUITE("SceneSerializer")
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene dropped halfway through reading takes what it built with it")
 	{
-		MarkerRegistered registered;
+		CountedRegistered registered;
 
 		std::string text;
 
 		{
 			Loom::Scene scene("Dropped");
-			scene.AddChild("First");
-			scene.AddChild("Second");
+			scene.AddChild("First")->Attach<Counted>();
+			scene.AddChild("Second")->Attach<Counted>();
 			Pump();
 
 			text = Written(scene);
@@ -539,20 +568,20 @@ TEST_SUITE("SceneSerializer")
 
 		Pump();
 
-		const size_t before = Loom::Scene::GetScenes().size();
+		REQUIRE(Counted::live == 0);
 
 		{
 			Loom::SceneSerializer::Loading loading(text, "");
 
-			for (int slice = 0; slice < 3; slice++)
-				loading.Step(0.0);
+			while (Counted::live == 0 && loading.Step(0.0));
 
+			REQUIRE(Counted::live > 0);
 			CHECK(loading.Progress() < 1.0f);
 		};
 
 		Pump();
 
-		CHECK(Loom::Scene::GetScenes().size() == before);
+		CHECK(Counted::live == 0);
 	};
 
 	// A hand-written scene file is going to have a typo in it eventually, and a

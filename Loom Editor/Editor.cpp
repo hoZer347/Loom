@@ -714,6 +714,7 @@ namespace Loom
 		// in is still loaded. A run that never reached its first frame, such as
 		// one stopped by a bad argument, still has all of it queued.
 		ClosePrefab();
+		m_opening.reset();
 		Engine::DoTasks();
 
 		for (Scene* scene : m_ownedScenes)
@@ -796,7 +797,7 @@ namespace Loom
 		m_settings.Write(out);
 
 		// So the editor comes back up on the scene that was open, rather than on
-		// whichever of the project's scenes sorts first. Written from what the
+		// the views' list of the project's scenes. Written from what the
 		// session last made active rather than from what is open right now: a
 		// rebuild saves with every scene closed, and that is not the user
 		// leaving the scene behind.
@@ -812,7 +813,8 @@ namespace Loom
 		std::error_code code;
 
 		// The one the last session left open, as long as it is still there and
-		// still belongs to this project; otherwise the first the project has.
+		// still belongs to this project; otherwise its only one, or none when
+		// there is a choice.
 		if (!m_startupScene.empty() &&
 			m_startupScene.rfind(m_projectPath, 0) == 0 &&
 			std::filesystem::exists(m_startupScene, code))
@@ -1033,6 +1035,9 @@ namespace Loom
 		Stop();
 
 		const std::string normal = std::filesystem::path(path).lexically_normal().string();
+
+		if (m_opening && m_openingPath == normal)
+			return true;
 
 		if (m_ownedScenes.size() == 1 && ScenePathOf(m_ownedScenes.front()) == normal)
 		{
