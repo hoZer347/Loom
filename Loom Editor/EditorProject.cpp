@@ -3,6 +3,7 @@
 #include "EditorFileDialogs.h"
 #include "EditorGui.h"
 #include "EditorIcons.h"
+#include "EditorTheme.h"
 #include "ModelImporter.h"
 #include "Prefab.h"
 #include "ProjectAssets.h"
@@ -26,6 +27,7 @@
 #include <filesystem>
 #include <iostream>
 #include <map>
+#include <numbers>
 #include <thread>
 #include <utility>
 
@@ -48,6 +50,14 @@ namespace Loom
 		constexpr const char* FOLDER_PAYLOAD = "LoomFolder";
 
 		constexpr float namePromptWidth = 320.0f;
+
+		// A pinged file's row flashes this many times over this long, fading.
+		constexpr double pingSeconds = 1.5;
+		constexpr double pingFlashes = 3.0;
+		constexpr float pingFillAlpha = 0.5f;
+		constexpr float pingOutlineThickness = 2.0f;
+		constexpr float pingRounding = 3.0f;
+		constexpr float scrollCentred = 0.5f;
 		constexpr float promptButtonWidth = 120.0f;
 
 		// How far NewShader, NewShader1, ... counts before leaving the name to
@@ -543,6 +553,12 @@ namespace Loom
 
 	void Editor::DrawProject()
 	{
+		if (m_focusProject)
+		{
+			ImGui::SetNextWindowFocus();
+			m_focusProject = false;
+		};
+
 		if (ImGui::Begin(EditorPanels::Project, &m_showProject))
 		{
 			if (m_projectPath.empty())
@@ -666,6 +682,28 @@ namespace Loom
 			flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 
 		const bool open = ImGui::TreeNodeEx(node.path.c_str(), flags, "%s %s", node.folder ? EditorIcons::Folder : IconOf(node.path), node.name.c_str());
+
+		if (m_revealSelectedAsset && node.path == m_selectedAsset)
+			ImGui::SetScrollHereY(scrollCentred);
+
+		if (node.path == m_pingedAsset)
+		{
+			const double pinged = ImGui::GetTime() - m_pingedSince;
+
+			if (pinged < pingSeconds)
+			{
+				const double fade = 1.0 - pinged / pingSeconds;
+				const double flash = (1.0 + std::cos(pinged / pingSeconds * pingFlashes * 2.0 * std::numbers::pi)) * 0.5;
+				ImVec4 colour = EditorTheme::AccentText;
+				ImDrawList* draw = ImGui::GetWindowDrawList();
+
+				colour.w = (float)(flash * fade);
+				draw->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImGui::GetColorU32(colour), pingRounding, 0, pingOutlineThickness);
+				colour.w *= pingFillAlpha;
+				draw->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImGui::GetColorU32(colour), pingRounding);
+			}
+			else m_pingedAsset.clear();
+		};
 
 		if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen())
 		{
@@ -1507,6 +1545,16 @@ namespace Loom
 		m_revealSelectedTwoD = true;
 		m_showTwoD = true;
 		m_focusTwoD = true;
+	};
+
+	void Editor::PingAsset(const std::string& path)
+	{
+		m_selectedAsset = std::filesystem::path(path).lexically_normal().string();
+		m_revealSelectedAsset = true;
+		m_showProject = true;
+		m_focusProject = true;
+		m_pingedAsset = m_selectedAsset;
+		m_pingedSince = ImGui::GetTime();
 	};
 
 	FolderTree::Hooks Editor::ScriptFolderHooks()

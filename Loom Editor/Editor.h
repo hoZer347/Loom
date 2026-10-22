@@ -336,6 +336,9 @@ namespace Loom
 		// Selects and shows the texture at path in the 2D panel.
 		void RevealTwoD(const std::string& path);
 
+		// Selects, shows and flashes the file at path in the Project panel.
+		void PingAsset(const std::string& path);
+
 		// Where the project keeps its InputActions, beside its .loomproject in
 		// the same way. Empty for a folder with no project file.
 		std::string InputActionsFile() const;
@@ -737,6 +740,10 @@ namespace Loom
 		std::unordered_set<std::string> m_noThumbnail{ };
 		bool m_revealSelectedAsset = false;
 
+		// The file PingAsset last flashed, and when.
+		std::string m_pingedAsset{ };
+		double m_pingedSince = 0.0;
+
 		// A file or folder dropped on a folder, and that folder.
 		std::string m_assetToMove{ };
 		std::string m_assetMoveFolder{ };
@@ -817,6 +824,7 @@ namespace Loom
 		bool m_flyingView = false;
 
 		bool m_showProject = true;
+		bool m_focusProject = false;
 		bool m_showScripts = true;
 		bool m_focusScripts = false;
 		bool m_showTwoD = true;
