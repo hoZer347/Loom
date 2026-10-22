@@ -462,6 +462,99 @@ TEST_SUITE("SceneSerializer")
 		std::filesystem::remove(path);
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene read a slice at a time is the scene read in one go")
+	{
+		MarkerRegistered registered;
+
+		constexpr int children = 8;
+
+		std::string text;
+
+		{
+			Loom::Scene scene("Sliced");
+
+			for (int i = 0; i < children; i++)
+				scene.AddChild("Child " + std::to_string(i));
+
+			Pump();
+
+			for (Loom::GameObject* child : scene.GetRoot().GetChildren())
+				child->Attach<Marker>();
+
+			text = Written(scene);
+		};
+
+		Pump();
+
+		// No time at all still reads a line a slice.
+		Loom::SceneSerializer::Loading loading(text, "");
+		float progress = loading.Progress();
+		int slices = 1;
+
+		CHECK(progress == 0.0f);
+
+		// Frames run between slices, and none of them sees the scene halfway.
+		const size_t before = Loom::Scene::GetScenes().size();
+
+		while (loading.Step(0.0))
+		{
+			Pump();
+
+			CHECK(Loom::Scene::GetScenes().size() == before);
+			CHECK(loading.Progress() > progress);
+			progress = loading.Progress();
+			slices++;
+		};
+
+		CHECK(slices > children);
+		CHECK(loading.Progress() == 1.0f);
+
+		std::string error;
+		std::unique_ptr<Loom::Scene> scene(loading.Finish(&error));
+		Pump();
+
+		REQUIRE(scene != nullptr);
+		CHECK(error.empty());
+		CHECK(Written(*scene) == text);
+		CHECK(Loom::Scene::GetScenes().size() == before + 1);
+
+		scene.reset();
+		Pump();
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene dropped halfway through reading takes what it built with it")
+	{
+		MarkerRegistered registered;
+
+		std::string text;
+
+		{
+			Loom::Scene scene("Dropped");
+			scene.AddChild("First");
+			scene.AddChild("Second");
+			Pump();
+
+			text = Written(scene);
+		};
+
+		Pump();
+
+		const size_t before = Loom::Scene::GetScenes().size();
+
+		{
+			Loom::SceneSerializer::Loading loading(text, "");
+
+			for (int slice = 0; slice < 3; slice++)
+				loading.Step(0.0);
+
+			CHECK(loading.Progress() < 1.0f);
+		};
+
+		Pump();
+
+		CHECK(Loom::Scene::GetScenes().size() == before);
+	};
+
 	// A hand-written scene file is going to have a typo in it eventually, and a
 	// typo has to be a message rather than a crash: everything built before the
 	// bad line still has deferred work pointing at it.

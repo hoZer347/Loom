@@ -21,6 +21,7 @@
 #include "Prefabs.h"
 #include "SelectionOutline.h"
 #include "SceneHistory.h"
+#include "SceneSerializer.h"
 #include "SearchBar.h"
 #include "FileTab.h"
 #include "FolderTree.h"
@@ -133,8 +134,10 @@ namespace Loom
 
 		// What double-clicking a scene in the Project panel does: every open
 		// scene is saved and closed, so this one is all there is. Stops a run
-		// first. Nothing closes if something will not save.
-		Scene* OpenSceneAlone(const std::string& path);
+		// first. Nothing closes if something will not save. The scene is read
+		// over the frames that follow, with a bar in the views; false when it
+		// cannot start.
+		bool OpenSceneAlone(const std::string& path);
 
 		// Writes the GameObject to a new .loomprefab in folder, named after it,
 		// and makes it an instance of that prefab. The path of the file, or
@@ -677,8 +680,30 @@ namespace Loom
 		// finished, and ends the run if the screenshot asked to.
 		void CaptureFrame();
 
-		// Which of the project's scenes a session opens with.
+		// Which of the project's scenes a session opens with: the one it was
+		// last on, or its only one. None when there is a choice to make, which
+		// the views then offer.
 		std::string StartupScene() const;
+
+		// Starts reading the scene a slice a frame, in place of any other being
+		// opened, so the views can show how far it has got.
+		void BeginOpeningScene(const std::string& path);
+
+		// Reads the next slice of the scene being opened. Once it is all read,
+		// opens it and starts a run that was waiting on it.
+		void StepOpening();
+
+		// Reads the rest of the scene being opened here and now, and opens it.
+		void FinishOpening();
+
+		// Makes a scene just read from path one of the editor's own, and the
+		// active one.
+		void AdoptScene(Scene* scene, const std::string& path);
+
+		// What a view holds with no scene in it: how far the scene on its way,
+		// or the scripts it waits for, have got, or else the project's scenes
+		// to pick from.
+		void DrawNoScene();
 
 		// Selection and the active scene are raw pointers into a hierarchy that
 		// edits itself between frames, so both are checked for liveness once per
@@ -806,6 +831,10 @@ namespace Loom
 		// Where each open scene came from, so a scene can be put back after the
 		// script library it depends on is rebuilt.
 		std::map<Scene*, std::string> m_scenePaths{ };
+
+		// The scene being opened a slice a frame, and the file it is read from.
+		std::unique_ptr<SceneSerializer::Loading> m_opening{ };
+		std::string m_openingPath{ };
 
 		std::string m_projectPath{ };
 		std::string m_projectFile{ };

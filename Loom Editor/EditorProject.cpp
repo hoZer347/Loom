@@ -54,6 +54,14 @@ namespace Loom
 		constexpr float namePromptWidth = 320.0f;
 		constexpr float promptButtonWidth = 120.0f;
 
+		// How long a frame spends reading a scene being opened: long enough
+		// that the reading, not the frames between, takes the time, and short
+		// enough that its bar still moves.
+		constexpr double OPENING_SLICE_SECONDS = 1.0 / 15.0;
+
+		// The widest the bar of a scene being opened gets, in lines of text.
+		constexpr float OPENING_BAR_LINES = 20.0f;
+
 		// A pinged file's row flashes this many times over this long, fading.
 		constexpr double pingSeconds = 1.5;
 		constexpr double pingFlashes = 3.0;
@@ -1192,6 +1200,133 @@ namespace Loom
 		}
 		else
 			Shell(devenv.c_str(), "/Edit \"" + path + '"');
+	};
+
+	void Editor::BeginOpeningScene(const std::string& path)
+	{
+		std::string error;
+
+		m_opening = SceneSerializer::BeginLoadFromFile(path, &error);
+		m_openingPath = path;
+
+		if (!m_opening)
+			std::cerr << "Could not open scene: " << error << std::endl;
+	};
+
+	void Editor::StepOpening()
+	{
+		if (!m_opening || m_opening->Step(OPENING_SLICE_SECONDS))
+			return;
+
+		FinishOpening();
+
+		if (std::exchange(m_playAfterCompile, false))
+			BeginPlay();
+	};
+
+	void Editor::FinishOpening()
+	{
+		if (!m_opening)
+			return;
+
+		std::string error;
+		Scene* scene = std::exchange(m_opening, nullptr)->Finish(&error);
+		const std::string path = std::exchange(m_openingPath, { });
+
+		if (scene == nullptr)
+			std::cerr << "Could not open scene: " << error << std::endl;
+		else AdoptScene(scene, path);
+	};
+
+	void Editor::DrawNoScene()
+	{
+		constexpr float half = 0.5f;
+
+		const ImGuiStyle& style = ImGui::GetStyle();
+		const ImVec2 available = ImGui::GetContentRegionAvail();
+		const ImVec2 corner = ImGui::GetCursorPos();
+
+		// Centred in the view, or from its top where it does not fit.
+		const auto centre =
+			[&](float width, float height)
+			{
+				ImGui::SetCursorPos(ImVec2(
+					corner.x + (std::max)(0.0f, (available.x - width) * half),
+					corner.y + (std::max)(0.0f, (available.y - height) * half)));
+			};
+
+		if (m_opening || !m_scripts.IsIdle())
+		{
+			const std::string caption = m_opening
+				? "Opening " + std::filesystem::path(m_openingPath).stem().string()
+				: std::string("Compiling scripts");
+
+			// A negative fraction is ImGui's for a bar that sweeps with no end
+			// in sight.
+			const float fraction = m_opening
+				? m_opening->Progress()
+				: -(float)ImGui::GetTime();
+
+			const float width = (std::min)(available.x, ImGui::GetFontSize() * OPENING_BAR_LINES);
+
+			centre(width, ImGui::GetTextLineHeightWithSpacing() + ImGui::GetFrameHeight());
+
+			ImGui::BeginGroup();
+			ImGui::TextUnformatted(caption.c_str());
+			ImGui::ProgressBar(fraction, ImVec2(width, 0.0f));
+			ImGui::EndGroup();
+
+			return;
+		};
+
+		if (m_projectPath.empty())
+		{
+			ImGui::TextDisabled("No project open.");
+			return;
+		};
+
+		if (m_projectScenes.empty())
+		{
+			ImGui::TextDisabled("This project has no scenes yet. File > New Scene makes one.");
+			return;
+		};
+
+		const char* const title = "Open a scene";
+
+		std::vector<std::string> labels;
+		float list_width = ImGui::CalcTextSize(title).x;
+
+		for (const std::string& scene : m_projectScenes)
+		{
+			labels.push_back(std::string(EditorIcons::Scene) + ' ' + ProjectAssets::RelativeTo(scene, m_projectPath));
+			list_width = (std::max)(list_width, ImGui::CalcTextSize(labels.back().c_str()).x);
+		};
+
+		list_width = (std::min)(available.x, list_width + style.WindowPadding.x * 2.0f);
+
+		const float title_height = ImGui::GetTextLineHeightWithSpacing();
+		const float list_height = (std::min)(
+			available.y - title_height,
+			(float)labels.size() * ImGui::GetTextLineHeightWithSpacing() + style.WindowPadding.y * 2.0f);
+
+		centre(list_width, title_height + list_height);
+
+		ImGui::BeginGroup();
+		ImGui::TextDisabled("%s", title);
+		ImGui::BeginChild("##scenes", ImVec2(list_width, list_height), ImGuiChildFlags_Borders);
+
+		// Opened once the list is drawn: opening rescans the project's scenes.
+		std::string chosen;
+
+		for (size_t i = 0; i < labels.size(); i++)
+			if (ImGui::Selectable(labels[i].c_str()))
+				chosen = m_projectScenes[i];
+
+		ImGui::EndChild();
+		ImGui::EndGroup();
+
+		if (!chosen.empty())
+			OpenSceneAlone(chosen);
 	};
 
 	void Editor::OpenAsset(const std::string& path)

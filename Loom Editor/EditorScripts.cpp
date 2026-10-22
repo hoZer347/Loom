@@ -167,6 +167,10 @@ namespace Loom
 		if (m_scripts.IsBuilding())
 			return;
 
+		// A scene halfway in goes out with the rest rather than finishing on
+		// a library that has gone.
+		FinishOpening();
+
 		// The components in the open scenes are about to have the code behind
 		// them unloaded, so the scenes go out as text and come back the same way.
 		m_snapshots = TakeSnapshots();
@@ -230,7 +234,7 @@ namespace Loom
 		// scripts it mentions.
 		if (m_ownedScenes.empty())
 			if (const std::string scene = StartupScene(); !scene.empty())
-				OpenScene(scene);
+				BeginOpeningScene(scene);
 
 		if (m_playAfterCompile)
 		{
@@ -324,8 +328,9 @@ namespace Loom
 	void Editor::BeginPlay()
 	{
 		// Mid-build the scenes are down and there is nothing to snapshot or to
-		// update: the run waits for the ones PollScripts puts back.
-		if (m_scripts.IsBuilding())
+		// update: the run waits for the ones PollScripts puts back, or for the
+		// one being opened.
+		if (m_scripts.IsBuilding() || m_opening)
 		{
 			m_playAfterCompile = true;
 			return;

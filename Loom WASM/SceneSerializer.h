@@ -4,6 +4,7 @@
 
 #include "Guid.h"
 
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -77,7 +78,48 @@ namespace Loom
 
 		static void ResolveReferences(const PendingReferences& pending);
 
-		// A file with nothing in it is an empty scene named after the file.
+		// A scene read a slice at a time, for a caller that draws frames while
+		// it loads. Deserialize is one of these read to the end.
+		struct LOOM_API Loading final
+		{
+			// Text with nothing in it is an empty scene called blank_name, or
+			// with no blank_name, not a scene.
+			Loading(std::string text, std::string blank_name);
+			~Loading();
+
+			Loading(const Loading&) = delete;
+			Loading& operator=(const Loading&) = delete;
+
+			// Reads on for about that many seconds, at least a line. False once
+			// there is nothing left to read or the text has turned out not to
+			// be a scene.
+			bool Step(double seconds);
+
+			// How far through the text the reading is, from 0 to 1.
+			[[nodiscard]] float Progress() const;
+
+			// Reads whatever is left and hands the scene over, as Deserialize
+			// does. Once only. A Loading dropped before this takes what it has
+			// built so far with it.
+			Scene* Finish(std::string* error = nullptr, PendingReferences* pending = nullptr);
+
+		private:
+			friend struct SceneSerializer;
+
+			struct State;
+
+			// Reads text the caller keeps alive until Finish, with no copy.
+			explicit Loading(const std::string& text);
+
+			std::unique_ptr<State> m_state;
+		};
+
+		// The file's text, ready to be read a slice at a time. Null, with error
+		// filled in, when the file cannot be opened. A file with nothing in it
+		// is an empty scene named after the file.
+		static std::unique_ptr<Loading> BeginLoadFromFile(const std::string& path, std::string* error = nullptr);
+
+		// BeginLoadFromFile read to the end in one go.
 		static Scene* LoadFromFile(const std::string& path, std::string* error = nullptr);
 
 		// One GameObject and everything under it, as a scene writes it. Nothing

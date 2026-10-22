@@ -139,6 +139,16 @@ namespace Loom
 		Engine::QueueTask([scene]() { std::erase(allScenes, scene); });
 	};
 
+	void Scene::Relist(Scene* scene)
+	{
+		Engine::QueueTask(
+			[scene]()
+			{
+				if (std::find(allScenes.begin(), allScenes.end(), scene) == allScenes.end())
+					allScenes.push_back(scene);
+			});
+	};
+
 	void Scene::Physics()
 	{
 		LOOM_STAGE("Scene::Physics");

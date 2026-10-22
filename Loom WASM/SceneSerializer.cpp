@@ -6,11 +6,14 @@
 #include "Scene.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <filesystem>
 #include <functional>
 #include <fstream>
 #include <iostream>
+#include <iterator>
+#include <limits>
 #include <sstream>
 #include <unordered_map>
 #include <vector>
@@ -148,6 +151,36 @@ namespace Loom
 			GameObject* gameObject = nullptr;
 		};
 
+		// Walks text a line at a time from wherever it last stopped, handing out
+		// each line that carries something to read with how deep it sits.
+		struct LineCursor
+		{
+			const std::string* text = nullptr;
+			size_t at = 0;
+			int line_number = 0;
+
+			bool Next(int& depth, std::string& content)
+			{
+				while (at < text->size())
+				{
+					const size_t end = std::min(text->find('\n', at), text->size());
+					const std::string line = text->substr(at, end - at);
+
+					at = end + 1;
+					line_number++;
+
+					size_t content_start = 0;
+					depth = SceneSerializer::DepthOf(line, content_start);
+					content = Trim(line.substr(content_start));
+
+					if (!content.empty() && content[0] != '#')
+						return true;
+				};
+
+				return false;
+			};
+		};
+
 		// Hands each line that carries something to read, with how deep it sits.
 		// Stops at the first line read turns down.
 		bool ReadLines(
@@ -155,25 +188,19 @@ namespace Loom
 			int& line_number,
 			const std::function<bool(int depth, const std::string& content)>& read)
 		{
-			std::stringstream lines(text);
-			std::string line;
+			LineCursor lines{ &text };
+			int depth = 0;
+			std::string content;
 
-			line_number = 0;
-
-			while (std::getline(lines, line))
+			while (lines.Next(depth, content))
 			{
-				line_number++;
-
-				size_t content_start = 0;
-				const int depth = SceneSerializer::DepthOf(line, content_start);
-				const std::string content = Trim(line.substr(content_start));
-
-				if (content.empty() || content[0] == '#')
-					continue;
+				line_number = lines.line_number;
 
 				if (!read(depth, content))
 					return false;
 			};
+
+			line_number = lines.line_number;
 
 			return true;
 		};
@@ -592,9 +619,182 @@ namespace Loom
 		return true;
 	};
 
-	Scene* SceneSerializer::LoadFromFile(const std::string& path, std::string* error)
+	// Everything a scene being read needs to pick up where the last slice left
+	// off. The text is either its own or one the caller keeps alive.
+	struct SceneSerializer::Loading::State
 	{
-		std::ifstream in(path);
+		std::string owned{ };
+		std::string blank_name{ };
+		LineCursor lines{ };
+
+		Scene* scene = nullptr;
+		bool root_claimed = false;
+		Reader reader{ };
+		std::string reason{ };
+
+		State(const std::string& text) :
+			lines{ &text }
+		{ };
+
+		State(std::string&& text, std::string&& blank) :
+			owned(std::move(text)),
+			blank_name(std::move(blank)),
+			lines{ &owned }
+		{ };
+
+		State(const State&) = delete;
+		State& operator=(const State&) = delete;
+
+		~State()
+		{
+			Discard();
+		};
+
+		bool Step(double seconds)
+		{
+			const auto start = std::chrono::steady_clock::now();
+			int depth = 0;
+			std::string content;
+
+			while (reason.empty() && lines.Next(depth, content))
+			{
+				if (!Read(depth, content))
+					return false;
+
+				if (std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() >= seconds)
+					return lines.at < lines.text->size();
+			};
+
+			return false;
+		};
+
+		Scene* Finish(std::string* error, PendingReferences* pending_out)
+		{
+			while (Step(std::numeric_limits<double>::infinity()));
+
+			if (reason.empty() && scene == nullptr)
+			{
+				if (!blank_name.empty())
+					return new Scene(blank_name);
+
+				reason = "the file is empty";
+			};
+
+			if (!reason.empty())
+			{
+				if (error)
+					*error = "line " + std::to_string(lines.line_number) + ": " + reason;
+
+				Discard();
+
+				return nullptr;
+			};
+
+			if (pending_out)
+				pending_out->insert(pending_out->end(), reader.pending.begin(), reader.pending.end());
+			else ResolveReferences(reader.pending);
+
+			Scene::Relist(scene);
+
+			return std::exchange(scene, nullptr);
+		};
+
+	private:
+		bool Read(int depth, const std::string& content)
+		{
+			if (scene)
+			{
+				if (reader.Read(depth, content))
+					return true;
+
+				reason = reader.error;
+				return false;
+			};
+
+			// The header names the scene and hands it its identity back.
+			std::string name;
+			Guid guid;
+
+			if (depth != 0 || content.back() != ':')
+				reason = "expected a scene header, '<name>(<guid>):'";
+			else if (!SplitNameAndGuid(content.substr(0, content.size() - 1), name, guid))
+				reason = "scene header is missing a valid guid";
+			else
+			{
+				// Kept out of the open scenes until it is whole, so nothing
+				// draws, saves or edits it halfway.
+				scene = new Scene(name);
+				scene->SetGuid(guid);
+				Scene::Unlist(scene);
+
+				reader.levels.assign(1, Level{ scene, nullptr });
+
+				// The first GameObject in the file is the scene's own root,
+				// which already exists; everything else hangs off one.
+				reader.top_level =
+					[this](const std::string& child)
+					{
+						if (root_claimed)
+							return scene->GetRoot().AddChild(child);
+
+						root_claimed = true;
+
+						return &scene->GetRoot();
+					};
+			};
+
+			return reason.empty();
+		};
+
+		// Everything built so far has work queued against it: a child waiting
+		// to be linked to its parent, a component waiting for OnAttach. That
+		// work has to land before the objects go, or it lands on freed memory
+		// the next time the queue is drained.
+		void Discard()
+		{
+			if (scene == nullptr)
+				return;
+
+			Engine::DoTasks();
+
+			delete std::exchange(scene, nullptr);
+
+			Engine::DoTasks();
+		};
+	};
+
+	SceneSerializer::Loading::Loading(std::string text, std::string blank_name) :
+		m_state(std::make_unique<State>(std::move(text), std::move(blank_name)))
+	{ };
+
+	SceneSerializer::Loading::Loading(const std::string& text) :
+		m_state(std::make_unique<State>(text))
+	{ };
+
+	SceneSerializer::Loading::~Loading() = default;
+
+	bool SceneSerializer::Loading::Step(double seconds)
+	{
+		return m_state->Step(seconds);
+	};
+
+	float SceneSerializer::Loading::Progress() const
+	{
+		const size_t size = m_state->lines.text->size();
+
+		return size == 0
+			? 1.0f
+			: (float)std::min(m_state->lines.at, size) / (float)size;
+	};
+
+	Scene* SceneSerializer::Loading::Finish(std::string* error, PendingReferences* pending)
+	{
+		return m_state->Finish(error, pending);
+	};
+
+	std::unique_ptr<SceneSerializer::Loading> SceneSerializer::BeginLoadFromFile(const std::string& path, std::string* error)
+	{
+		std::ifstream in(path, std::ios::binary);
 
 		if (!in)
 		{
@@ -604,18 +804,18 @@ namespace Loom
 			return nullptr;
 		};
 
-		std::stringstream buffer;
-		buffer << in.rdbuf();
+		std::string text{ std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>() };
 
-		const std::string text = buffer.str();
+		return std::make_unique<Loading>(std::move(text), std::filesystem::path(path).stem().string());
+	};
 
-		int line_number = 0;
-		const bool blank = ReadLines(text, line_number, [](int, const std::string&) { return false; });
+	Scene* SceneSerializer::LoadFromFile(const std::string& path, std::string* error)
+	{
+		const std::unique_ptr<Loading> loading = BeginLoadFromFile(path, error);
 
-		if (blank)
-			return new Scene(std::filesystem::path(path).stem().string());
-
-		return Deserialize(text, error);
+		return loading
+			? loading->Finish(error)
+			: nullptr;
 	};
 
 	Scene* SceneSerializer::Deserialize(
@@ -623,85 +823,7 @@ namespace Loom
 		std::string* error,
 		PendingReferences* pending_out)
 	{
-		Scene* scene = nullptr;
-		bool root_claimed = false;
-		Reader reader;
-
-		int line_number = 0;
-		std::string reason;
-
-		const bool read = ReadLines(
-			text,
-			line_number,
-			[&](int depth, const std::string& content)
-			{
-				if (scene)
-				{
-					if (reader.Read(depth, content))
-						return true;
-
-					reason = reader.error;
-					return false;
-				};
-
-				// The header names the scene and hands it its identity back.
-				std::string name;
-				Guid guid;
-
-				if (depth != 0 || content.back() != ':')
-					reason = "expected a scene header, '<name>(<guid>):'";
-				else if (!SplitNameAndGuid(content.substr(0, content.size() - 1), name, guid))
-					reason = "scene header is missing a valid guid";
-				else
-				{
-					scene = new Scene(name);
-					scene->SetGuid(guid);
-
-					reader.levels.assign(1, Level{ scene, nullptr });
-
-					// The first GameObject in the file is the scene's own root,
-					// which already exists; everything else hangs off one.
-					reader.top_level =
-						[scene, &root_claimed](const std::string& child)
-						{
-							if (root_claimed)
-								return scene->GetRoot().AddChild(child);
-
-							root_claimed = true;
-
-							return &scene->GetRoot();
-						};
-				};
-
-				return reason.empty();
-			});
-
-		if (read && scene == nullptr)
-			reason = "the file is empty";
-
-		if (!reason.empty())
-		{
-			if (error)
-				*error = "line " + std::to_string(line_number) + ": " + reason;
-
-			// Everything built so far has work queued against it: a child
-			// waiting to be linked to its parent, a component waiting for
-			// OnAttach. That work has to land before the objects go, or it
-			// lands on freed memory the next time the queue is drained.
-			Engine::DoTasks();
-
-			delete scene;
-
-			Engine::DoTasks();
-
-			return nullptr;
-		};
-
-		if (pending_out)
-			pending_out->insert(pending_out->end(), reader.pending.begin(), reader.pending.end());
-		else ResolveReferences(reader.pending);
-
-		return scene;
+		return Loading(text).Finish(error, pending_out);
 	};
 
 	void SceneSerializer::ResolveReferences(const PendingReferences& pending)

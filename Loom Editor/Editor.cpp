@@ -818,9 +818,9 @@ namespace Loom
 			std::filesystem::exists(m_startupScene, code))
 			return m_startupScene;
 
-		return m_projectScenes.empty()
-			? ""
-			: m_projectScenes.front();
+		return m_projectScenes.size() == 1
+			? m_projectScenes.front()
+			: "";
 	};
 
 	bool Editor::OpenProject(const std::string& path, bool open_scene)
@@ -887,10 +887,10 @@ namespace Loom
 				const auto open = std::find_if(m_scenePaths.begin(), m_scenePaths.end(),
 					[&](const auto& entry) { return entry.second == m_startupScene; });
 
-				if (open == m_scenePaths.end())
-					OpenScene(m_startupScene);
-				else
+				if (open != m_scenePaths.end())
 					SetActiveScene(open->first);
+				else if (m_openingPath != m_startupScene)
+					BeginOpeningScene(m_startupScene);
 			};
 
 			return true;
@@ -917,9 +917,9 @@ namespace Loom
 			if (!m_scripts.HasProject())
 				LoadProjectFile();
 
-			if (open_scene && !m_scripts.IsBuilding() && m_ownedScenes.empty())
+			if (open_scene && !m_scripts.IsBuilding() && m_ownedScenes.empty() && !m_opening)
 				if (const std::string scene = StartupScene(); !scene.empty())
-					OpenScene(scene);
+					BeginOpeningScene(scene);
 
 			return true;
 		};
@@ -933,6 +933,9 @@ namespace Loom
 		m_snapshots.clear();
 
 		Audio::Unload();
+
+		m_opening.reset();
+		m_openingPath.clear();
 
 		CloseAllScenes();
 		ClosePrefab();
@@ -961,7 +964,7 @@ namespace Loom
 		// opens it once the component types the scene names actually exist.
 		if (open_scene && !m_scripts.IsBuilding() && m_ownedScenes.empty())
 			if (const std::string scene = StartupScene(); !scene.empty())
-				OpenScene(scene);
+				BeginOpeningScene(scene);
 
 		return true;
 	};
@@ -997,6 +1000,13 @@ namespace Loom
 			return nullptr;
 		};
 
+		AdoptScene(scene, path);
+
+		return scene;
+	};
+
+	void Editor::AdoptScene(Scene* scene, const std::string& path)
+	{
 		m_ownedScenes.push_back(scene);
 		m_historyDirty = true;
 		m_scenePaths[scene] = std::filesystem::path(path).lexically_normal().string();
@@ -1010,16 +1020,14 @@ namespace Loom
 		std::cout
 			<< "Opened '" << path << "' as "
 			<< scene->GetName() << '(' << scene->GetGuid().ToString() << ')' << std::endl;
-
-		return scene;
 	};
 
-	Scene* Editor::OpenSceneAlone(const std::string& path)
+	bool Editor::OpenSceneAlone(const std::string& path)
 	{
 		if (!m_scripts.IsIdle())
 		{
 			std::cerr << "The scenes are down while the scripts build; open it once they are back." << std::endl;
-			return nullptr;
+			return false;
 		};
 
 		Stop();
@@ -1029,14 +1037,14 @@ namespace Loom
 		if (m_ownedScenes.size() == 1 && ScenePathOf(m_ownedScenes.front()) == normal)
 		{
 			SetActiveScene(m_ownedScenes.front());
-			return m_ownedScenes.front();
+			return true;
 		};
 
 		for (Scene* scene : m_ownedScenes)
 			if (!SaveToProject(scene))
 			{
 				std::cerr << "'" << scene->GetName() << "' did not save, so it stays open." << std::endl;
-				return nullptr;
+				return false;
 			};
 
 		const std::vector<Scene*> closing = m_ownedScenes;
@@ -1045,8 +1053,9 @@ namespace Loom
 			CloseScene(scene);
 
 		RefreshProjectAssets();
+		BeginOpeningScene(normal);
 
-		return OpenScene(normal);
+		return true;
 	};
 
 	bool Editor::SaveScene(Scene* scene, const std::string& path)
@@ -1586,6 +1595,7 @@ namespace Loom
 		ImportQueued();
 		ClickQueued();
 		PollScripts();
+		StepOpening();
 		PollRefresh();
 
 		// The renderer reads the window back once this frame has finished
@@ -3442,7 +3452,7 @@ namespace Loom
 		LOOM_STAGE("Editor::DrawSceneView");
 
 		if (m_activeScene == nullptr)
-			ImGui::TextDisabled("No scene open. Pick one in the Project panel.");
+			DrawNoScene();
 		else
 		{
 			DrawView(m_sceneView, { m_activeScene }, &m_sceneCamera, &m_sceneOutline);
@@ -3522,7 +3532,7 @@ namespace Loom
 		m_gamePanelHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
 
 		if (Scene::GetScenes().empty())
-			ImGui::TextDisabled("No scene open. Pick one in the Project panel.");
+			DrawNoScene();
 		else
 		{
 			// GLFW reports the cursor from the main window's corner, which
@@ -3557,7 +3567,7 @@ namespace Loom
 		LOOM_STAGE("Editor::DrawDebugView");
 
 		if (Scene::GetScenes().empty())
-			ImGui::TextDisabled("Nothing loaded.");
+			DrawNoScene();
 		else
 		{
 			DrawView(m_debugView, Scene::GetScenes(), &m_debugCamera, &m_debugOutline);

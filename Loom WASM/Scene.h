@@ -76,6 +76,10 @@ namespace Loom
 		// lands after the scene has registered itself.
 		static void Unlist(Scene* scene);
 
+		// Puts a scene Unlist took out back at the end of GetScenes. Deferred,
+		// like Unlist.
+		static void Relist(Scene* scene);
+
 		static inline std::atomic<bool> is_engine_running = false;
 		
 
