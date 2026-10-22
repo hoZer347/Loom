@@ -1,5 +1,6 @@
 #pragma once
 
+#include "SearchBar.h"
 #include "VirtualFolders.h"
 
 #include "imgui.h"
@@ -17,6 +18,9 @@ namespace Loom
 	*   Bindings panels show theirs: a row a folder, opened by its arrow or a
 	*   double click, dragged into another, renamed in place and taken out
 	*   from its right-click menu, with the panel's items inside
+	* - Its SearchBar narrows the tree to the folders and items with the text
+	*   in their names, and what is in a folder that has it, opened to show
+	*   them
 	* - The panel draws its items and the top of each folder's menu, and
 	*   hears when the folders change, through Hooks
 	*/
@@ -49,12 +53,18 @@ namespace Loom
 
 			std::function<void(const std::string& item)> item{ };
 
+			// What an item is searched by, if not the item itself.
+			std::function<std::string(const std::string& item)> name{ };
+
 			// After the folders, or what is filed in them, change.
 			std::function<void()> changed{ };
 		};
 
-		// The folder's row and, while it is open, the folders and items in it.
-		void Draw(VirtualFolders& folders, const VirtualFolders::Node& node, const Hooks& hooks);
+		// Above the tree, where the panel has room for it.
+		void DrawSearch() { m_search.Draw(); };
+
+		// The folders and items at the top, as the search leaves them.
+		void Draw(VirtualFolders& folders, const VirtualFolders::Node& top, const Hooks& hooks);
 
 		// Takes an item or a folder dropped on the target begun last into folder.
 		static void Drop(VirtualFolders& folders, const std::string& folder, const Hooks& hooks);
@@ -66,7 +76,15 @@ namespace Loom
 	private:
 		static constexpr size_t name_size = 128;
 
+		// The folder's row and, while it is open, the folders and items in it,
+		// all of them once found has the search's text in its name.
+		void DrawFolder(VirtualFolders& folders, const VirtualFolders::Node& node, const Hooks& hooks, bool found);
 		void DrawRename(VirtualFolders& folders, const Hooks& hooks);
+
+		bool Shows(const VirtualFolders::Node& node, const Hooks& hooks) const;
+		bool Shows(const std::string& item, const Hooks& hooks) const;
+
+		SearchBar m_search{ };
 
 		std::string m_renaming{ };
 		char m_name[name_size]{ };

@@ -576,13 +576,26 @@ namespace Loom
 				if (ImGui::Button(change))
 					m_dialogs->folder.Open();
 
+				m_assetSearch.Draw();
+
 				ImGui::BeginChild("##assets", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders);
 
 				if (m_assets.children.empty())
 					ImGui::TextDisabled("Nothing here yet. Right-click to create something.");
 
+				// Apart from the folders' own, so each opens to what was found and
+				// closes back as it was when the search is cleared.
+				const bool searching = m_assetSearch.Searching();
+
+				if (searching)
+					ImGui::PushID("##found");
+
 				for (const AssetNode& node : m_assets.children)
-					DrawAssetNode(node, 0);
+					if (ShowsAsset(node))
+						DrawAssetNode(node, 0, false);
+
+				if (searching)
+					ImGui::PopID();
 
 				// Dropped anywhere else in the list, it goes in the project folder.
 				TakeImportFolder(m_projectPath, ImGui::IsWindowHovered());
@@ -628,7 +641,7 @@ namespace Loom
 		ImGui::End();
 	};
 
-	void Editor::DrawAssetNode(const AssetNode& node, int depth)
+	void Editor::DrawAssetNode(const AssetNode& node, int depth, bool found)
 	{
 		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth;
 
@@ -641,7 +654,7 @@ namespace Loom
 
 			// The top level is only a handful of folders, and the scenes are in
 			// one of them.
-			if (depth == 0)
+			if (depth == 0 || m_assetSearch.Searching())
 				flags |= ImGuiTreeNodeFlags_DefaultOpen;
 
 			if (m_revealSelectedAsset && ProjectAssets::IsUnder(m_selectedAsset, node.path))
@@ -686,11 +699,20 @@ namespace Loom
 
 		if (node.folder && open)
 		{
+			found = found || m_assetSearch.Matches(node.name);
+
 			for (const AssetNode& child : node.children)
-				DrawAssetNode(child, depth + 1);
+				if (found || ShowsAsset(child))
+					DrawAssetNode(child, depth + 1, found);
 
 			ImGui::TreePop();
 		};
+	};
+
+	bool Editor::ShowsAsset(const AssetNode& node) const
+	{
+		return m_assetSearch.Matches(node.name) ||
+			std::ranges::any_of(node.children, [this](const AssetNode& child) { return ShowsAsset(child); });
 	};
 
 	void Editor::DrawAssetContextMenu(const AssetNode& node)
@@ -1350,6 +1372,8 @@ namespace Loom
 			if (m_scriptWatch.Changed())
 				RefreshScripts();
 
+			m_scriptFolderTree.DrawSearch();
+
 			ImGui::BeginChild("##scripts", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders);
 
 			std::vector<std::string> names{ };
@@ -1368,11 +1392,7 @@ namespace Loom
 
 			const FolderTree::Hooks hooks = ScriptFolderHooks();
 
-			for (const ScriptFolders::Node& folder : root.children)
-				m_scriptFolderTree.Draw(m_scriptFolders, folder, hooks);
-
-			for (const std::string& script : root.items)
-				DrawScriptEntry(script);
+			m_scriptFolderTree.Draw(m_scriptFolders, root, hooks);
 
 			m_revealSelectedScript = false;
 
@@ -1511,6 +1531,8 @@ namespace Loom
 			if (m_projectWatch.Changed())
 				RefreshProjectAssets();
 
+			m_twoDFolderTree.DrawSearch();
+
 			ImGui::BeginChild("##2d", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders);
 
 			const TwoDFolders::Node root = m_twoDFolders.Build(m_twoDFiles);
@@ -1522,11 +1544,7 @@ namespace Loom
 
 			const FolderTree::Hooks hooks = TwoDFolderHooks();
 
-			for (const TwoDFolders::Node& folder : root.children)
-				m_twoDFolderTree.Draw(m_twoDFolders, folder, hooks);
-
-			for (const std::string& file : root.items)
-				DrawTwoDEntry(file);
+			m_twoDFolderTree.Draw(m_twoDFolders, root, hooks);
 
 			m_revealSelectedTwoD = false;
 
@@ -1651,6 +1669,7 @@ namespace Loom
 		hooks.reveal = [this](const std::string& folder) { return m_revealSelectedTwoD && VirtualFolders::IsAtOrUnder(m_twoDFolders.FolderOf(m_selectedTwoD), folder); };
 		hooks.create = [this](const std::string& folder) { DrawTwoDCreateMenu(folder); };
 		hooks.item = [this](const std::string& file) { DrawTwoDEntry(file); };
+		hooks.name = [](const std::string& file) { return std::filesystem::path(file).filename().string(); };
 		hooks.changed = [this]() { SaveTwoDFolders(); };
 
 		return hooks;

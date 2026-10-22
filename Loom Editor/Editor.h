@@ -18,6 +18,7 @@
 #include "Prefabs.h"
 #include "SelectionOutline.h"
 #include "SceneHistory.h"
+#include "SearchBar.h"
 #include "TwoDFolders.h"
 #include "FolderTree.h"
 #include "ScriptFolders.h"
@@ -302,7 +303,9 @@ namespace Loom
 
 		void DrawMainMenuBar();
 		void DrawProject();
-		void DrawAssetNode(const AssetNode& node, int depth);
+		// All of a folder once found has the search's text in its name.
+		void DrawAssetNode(const AssetNode& node, int depth, bool found);
+		bool ShowsAsset(const AssetNode& node) const;
 		void DrawAssetContextMenu(const AssetNode& node);
 		void DrawCreateMenu(const std::string& folder);
 		void DrawCreateAssetPrompt();
@@ -728,6 +731,7 @@ namespace Loom
 		AssetNode m_assets{ };
 		FolderWatch m_projectWatch;
 		std::string m_selectedAsset{ };
+		SearchBar m_assetSearch{ };
 
 		// Textures that would not load, so each is tried once per scan.
 		std::unordered_set<std::string> m_noThumbnail{ };

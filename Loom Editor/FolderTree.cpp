@@ -2,6 +2,7 @@
 
 #include "EditorIcons.h"
 
+#include <algorithm>
 #include <cfloat>
 #include <cstdio>
 #include <iostream>
@@ -10,7 +11,28 @@
 
 namespace Loom
 {
-	void FolderTree::Draw(VirtualFolders& folders, const VirtualFolders::Node& node, const Hooks& hooks)
+	void FolderTree::Draw(VirtualFolders& folders, const VirtualFolders::Node& top, const Hooks& hooks)
+	{
+		// Apart from the folders' own, so each opens to what was found and
+		// closes back as it was when the search is cleared.
+		const bool searching = m_search.Searching();
+
+		if (searching)
+			ImGui::PushID("##found");
+
+		for (const VirtualFolders::Node& folder : top.children)
+			if (Shows(folder, hooks))
+				DrawFolder(folders, folder, hooks, false);
+
+		for (const std::string& item : top.items)
+			if (Shows(item, hooks))
+				hooks.item(item);
+
+		if (searching)
+			ImGui::PopID();
+	};
+
+	void FolderTree::DrawFolder(VirtualFolders& folders, const VirtualFolders::Node& node, const Hooks& hooks, bool found)
 	{
 		const bool renaming = node.path == m_renaming;
 
@@ -23,7 +45,8 @@ namespace Loom
 
 		const bool open = ImGui::TreeNodeEx(
 			("folder:" + node.path).c_str(),
-			hooks.span | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick,
+			hooks.span | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick |
+				(m_search.Searching() ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None),
 			"%s %s",
 			EditorIcons::Folder,
 			renaming ? "" : node.name.c_str());
@@ -68,13 +91,29 @@ namespace Loom
 		if (!open)
 			return;
 
+		found = found || m_search.Matches(node.name);
+
 		for (const VirtualFolders::Node& child : node.children)
-			Draw(folders, child, hooks);
+			if (found || Shows(child, hooks))
+				DrawFolder(folders, child, hooks, found);
 
 		for (const std::string& item : node.items)
-			hooks.item(item);
+			if (found || Shows(item, hooks))
+				hooks.item(item);
 
 		ImGui::TreePop();
+	};
+
+	bool FolderTree::Shows(const VirtualFolders::Node& node, const Hooks& hooks) const
+	{
+		return m_search.Matches(node.name) ||
+			std::ranges::any_of(node.items, [&](const std::string& item) { return Shows(item, hooks); }) ||
+			std::ranges::any_of(node.children, [&](const VirtualFolders::Node& child) { return Shows(child, hooks); });
+	};
+
+	bool FolderTree::Shows(const std::string& item, const Hooks& hooks) const
+	{
+		return m_search.Matches(hooks.name ? hooks.name(item) : item);
 	};
 
 	void FolderTree::Drop(VirtualFolders& folders, const std::string& folder, const Hooks& hooks)

@@ -102,6 +102,8 @@ namespace Loom
 		const FolderTree::Hooks hooks = Hooks(edit);
 
 		DrawAddItems("", edit, false);
+		ImGui::SameLine();
+		m_tree.DrawSearch();
 
 		if (ImGui::BeginTable("Actions", columns, ImGuiTableFlags_RowBg))
 		{
@@ -110,11 +112,7 @@ namespace Loom
 			ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
 			ImGui::TableHeadersRow();
 
-			for (const VirtualFolders::Node& folder : root.children)
-				m_tree.Draw(edit.folders, folder, hooks);
-
-			for (const std::string& item : root.items)
-				hooks.item(item);
+			m_tree.Draw(edit.folders, root, hooks);
 
 			ImGui::EndTable();
 		};
@@ -171,6 +169,7 @@ namespace Loom
 		hooks.row = []() { ImGui::TableNextRow(); ImGui::TableNextColumn(); };
 		hooks.create = [this, &edit](const std::string& folder) { DrawAddItems(folder, edit, true); };
 		hooks.changed = [&edit]() { edit.refiled = true; };
+		hooks.name = [](const std::string& item) { return item.substr(0, item.rfind(index_mark)); };
 		hooks.item = [this, &edit, hooks](const std::string& item) { DrawAction(IndexOf(item), edit, hooks); };
 
 		return hooks;
