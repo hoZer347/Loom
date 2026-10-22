@@ -512,9 +512,14 @@ TEST_SUITE("Shader variables")
 		CHECK(vertex.find("loom_instance_main()") != std::string::npos);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader whose fragment stage reads the model matrix, or that declares its colour otherwise, has no instanced program")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader that declares no model matrix, whose fragment stage reads it, or that declares its colour otherwise, has no instanced program")
 	{
 		RecordingRenderer renderer;
+
+		std::istringstream noModel(
+			"// ===VERTEX===\nvoid main() { }\n"
+			"// ===FRAGMENT===\nuniform vec3 u_color;\nvoid main() { }\n");
+		CHECK(Loom::Shader("no model", noModel).instanced_id == 0);
 
 		std::istringstream readsModel(
 			"// ===VERTEX===\nuniform mat4 u_model;\nvoid main() { }\n"
