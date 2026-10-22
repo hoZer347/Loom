@@ -1,0 +1,3 @@
+name=Profiling
+scripts=Scripts/ProfilingScripts.vcxproj
+library=Build/ProfilingScripts.dll
