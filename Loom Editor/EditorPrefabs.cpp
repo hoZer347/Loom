@@ -268,7 +268,7 @@ namespace Loom
 			Select(again);
 	};
 
-	bool Editor::PrefabsNeedSync()
+	bool Editor::PrefabsNeedSync() const
 	{
 		if (m_reshowPrefab || (GetPrefabRoot() && m_prefabShape.empty()))
 			return true;
@@ -276,8 +276,10 @@ namespace Loom
 		for (const auto& [path, loaded] : m_prefabs)
 		{
 			std::error_code code;
+			const std::filesystem::file_time_type written = std::filesystem::last_write_time(PrefabFile(path), code);
 
-			if (std::filesystem::last_write_time(PrefabFile(path), code) != loaded.written)
+			// A prefab deleted or renamed away leaves SyncPrefabs nothing to load.
+			if (!code && written != loaded.written)
 				return true;
 		};
 

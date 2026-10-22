@@ -1213,6 +1213,7 @@ namespace Loom
 
 		m_scenePaths.erase(scene);
 		m_history.Forget(scene->GetGuid());
+		m_recordedTexts.clear();
 
 		// Deleting a scene mid-GUI would leave the rest of the frame walking a
 		// dangling pointer; deferring puts the delete (and the unregistering it
@@ -1381,14 +1382,20 @@ namespace Loom
 	{
 		if (CanStepHistory() &&
 			m_history.Undo(m_ownedScenes, [this](Scene* scene, const std::string& text) { return ReplaceScene(scene, text); }))
+		{
 			SyncSceneCopies();
+			m_recordedTexts.clear();
+		};
 	};
 
 	void Editor::Redo()
 	{
 		if (CanStepHistory() &&
 			m_history.Redo(m_ownedScenes, [this](Scene* scene, const std::string& text) { return ReplaceScene(scene, text); }))
+		{
 			SyncSceneCopies();
+			m_recordedTexts.clear();
+		};
 	};
 
 	bool Editor::CanStepHistory() const

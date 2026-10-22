@@ -689,7 +689,7 @@ namespace Loom
 
 		// Whether SyncPrefabs has work with no scene changed: a prefab file
 		// written from outside, or a Prefab panel still to agree with its file.
-		bool PrefabsNeedSync();
+		bool PrefabsNeedSync() const;
 
 		// The Prefab panel's copy made the file's again, in place: the same
 		// guids, so the selection and the panel's focus stay where they are.
