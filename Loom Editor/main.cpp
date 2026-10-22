@@ -66,7 +66,10 @@ namespace
 		{ ProjectTemplate::extension, L"Loom.Project", L"Loom Project" },
 		{ SceneSerializer::extension, L"Loom.Scene", L"Loom Scene" },
 		{ ScriptFolders::extension, L"Loom.ScriptFolders", L"Loom Script Folders" },
-		{ TwoDFolders::extension, L"Loom.TwoDFolders", L"Loom 2D Folders" },
+		{ FilePanels::TwoD.extension, L"Loom.TwoDFolders", L"Loom 2D Folders" },
+		{ FilePanels::ThreeD.extension, L"Loom.ThreeDFolders", L"Loom 3D Folders" },
+		{ FilePanels::Sounds.extension, L"Loom.SoundFolders", L"Loom Sound Folders" },
+		{ FilePanels::Fonts.extension, L"Loom.FontFolders", L"Loom Font Folders" },
 		{ InputActions::extension, L"Loom.InputActions", L"Loom Key Bindings" },
 	};
 
@@ -157,7 +160,8 @@ namespace
 			<< "  --play                         start with the scene running\n"
 			<< "  --play-web                     build the scene for the web and open it\n"
 			<< "  --import <file> [x y]          import a model, as if dropped on the window;\n"
-			<< "                                 over the Project or 2D panel, copy the file there\n"
+			<< "                                 over the Project or an asset panel, copy the\n"
+			<< "                                 file there\n"
 			<< "  --preview <file>               select a model file, showing it in the Inspector\n"
 			<< "  --select <name>                select the first GameObject called that\n"
 			<< "  --open-project-dialog          start with File > Open Project... open\n"

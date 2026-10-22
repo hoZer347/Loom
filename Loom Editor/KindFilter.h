@@ -14,8 +14,8 @@ namespace Loom
 	/**
 	* Loom::KindFilter
 	* - The row of icons along the bottom of a panel that lists files, as the
-	*   Project, Scripts and 2D panels do, one for each kind of file the panel
-	*   lists. Each is highlighted while its kind shows and dimmed while it is
+	*   Project and Scripts panels and the FilePanels do, one for each kind of
+	*   file the panel lists. Each is highlighted while its kind shows and dimmed while it is
 	*   hidden, a click toggles it, and its tooltip names its kind
 	* - A kind is known by its icon, the one the panel shows beside its files
 	*/

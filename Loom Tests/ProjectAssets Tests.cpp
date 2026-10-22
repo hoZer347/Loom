@@ -226,6 +226,8 @@ TEST_SUITE("ProjectAssets")
 		CHECK(Loom::ProjectAssets::IsGameFile("Bell.wav"));
 		CHECK(Loom::ProjectAssets::IsGameFile("Theme.MP3"));
 		CHECK(Loom::ProjectAssets::IsGameFile("Rain.flac"));
+		CHECK(Loom::ProjectAssets::IsShaderFile("Flat.Shader"));
+		CHECK_FALSE(Loom::ProjectAssets::IsShaderFile("Level.loomscene"));
 
 		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("Spinner.hpp"));
 		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("Spinner.CPP"));

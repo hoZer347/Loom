@@ -305,7 +305,7 @@ namespace Loom
 			m_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
 			if (m_documents.empty())
-				ImGui::TextDisabled("Click an image in the Project panel to edit it here.");
+				ImGui::TextDisabled("Click an image in the 2D panel to edit it here.");
 			else if (ImGui::BeginTabBar("##sprites", ImGuiTabBarFlags_AutoSelectNewTabs | ImGuiTabBarFlags_FittingPolicyScroll))
 			{
 				const Document* closed = nullptr;

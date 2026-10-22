@@ -415,7 +415,7 @@ namespace Loom
 		constexpr const char* prefab_light = "Prefab Light";
 
 		// Panels docked as a tab beside another, each with the one it goes beside.
-		constexpr std::pair<const char*, const char*> side_windows[] = { { EditorPanels::Scripts, EditorPanels::Project }, { EditorPanels::TwoD, EditorPanels::Project }, { EditorPanels::KeyBindings, EditorPanels::Console } };
+		constexpr std::pair<const char*, const char*> side_windows[] = { { EditorPanels::Scripts, EditorPanels::Project }, { EditorPanels::KeyBindings, EditorPanels::Console } };
 
 		// The ImGui settings entry that holds which panels are open.
 		constexpr const char* panel_settings = "LoomEditor";
@@ -866,15 +866,16 @@ namespace Loom
 			return OpenProject(std::filesystem::absolute(path, code).parent_path().string(), open_scene);
 		};
 
-		// And the 2D panel's.
-		if (std::filesystem::path(path).extension() == TwoDFolders::extension &&
-			std::filesystem::is_regular_file(path, code))
-		{
-			m_showTwoD = true;
-			m_focusTwoD = true;
+		// And each FilePanel's.
+		for (FilePanel& panel : m_filePanels)
+			if (std::filesystem::path(path).extension() == panel.kind.extension &&
+				std::filesystem::is_regular_file(path, code))
+			{
+				panel.show = true;
+				panel.focus = true;
 
-			return OpenProject(std::filesystem::absolute(path, code).parent_path().string(), open_scene);
-		};
+				return OpenProject(std::filesystem::absolute(path, code).parent_path().string(), open_scene);
+			};
 
 		// So does a scene file, for the project it belongs to, which then starts
 		// on that scene.
@@ -1682,12 +1683,32 @@ namespace Loom
 		if (m_flyingView)
 			return;
 
-		if (ImGui::IsAnyItemActive())
+		const ImGuiContext& context = *ImGui::GetCurrentContext();
+
+		if (ImGui::IsAnyItemActive() && CanEditScenes(context.ActiveIdWindow))
 			m_historyDirty = true;
 
 		for (int button = 0; button < ImGuiMouseButton_COUNT; button++)
-			if (ImGui::IsMouseReleased(button))
+			if (ImGui::IsMouseReleased(button) && CanEditScenes(context.HoveredWindow))
 				m_historyDirty = true;
+	};
+
+	bool Editor::CanEditScenes(const ImGuiWindow* window) const
+	{
+		if (window == nullptr)
+			return true;
+
+		const ImGuiWindow* root = window->RootWindow;
+
+		for (const char* files_only : { EditorPanels::Scripts, EditorPanels::Shaders, EditorPanels::Sprites })
+			if (root == ImGui::FindWindowByName(files_only))
+				return false;
+
+		for (const FilePanel& panel : m_filePanels)
+			if (root == ImGui::FindWindowByName(panel.kind.title))
+				return false;
+
+		return true;
 	};
 
 	void Editor::DrawWorkspace()
@@ -1727,10 +1748,18 @@ namespace Loom
 						if (!placed(window))
 							ImGui::DockBuilderDockWindow(window, centre->ID);
 
-				for (const auto& [window, beside] : side_windows)
+				const auto dock_beside = [&placed](const char* window, const char* beside)
+				{
 					if (const ImGuiWindowSettings* settings = ImGui::FindWindowSettingsByID(ImHashStr(beside));
 						!placed(window) && settings != nullptr && settings->DockId != 0)
 						ImGui::DockBuilderDockWindow(window, settings->DockId);
+				};
+
+				for (const auto& [window, beside] : side_windows)
+					dock_beside(window, beside);
+
+				for (const FilePanelKind* kind : FilePanels::all)
+					dock_beside(kind->title, EditorPanels::Project);
 			};
 
 			m_layoutWindows.clear();
@@ -1767,7 +1796,11 @@ namespace Loom
 
 		if (m_showProject)		DrawProject();
 		if (m_showScripts)		DrawScripts();
-		if (m_showTwoD)			DrawTwoD();
+
+		for (FilePanel& panel : m_filePanels)
+			if (panel.show)
+				DrawFilePanel(panel);
+
 		if (m_showHierarchy)	DrawHierarchy();
 		if (m_showInspector)	DrawInspector();
 		if (m_showScene)		DrawScene();
@@ -1939,7 +1972,10 @@ namespace Loom
 		ImGui::DockBuilderDockWindow(EditorPanels::Hierarchy, left);
 		ImGui::DockBuilderDockWindow(EditorPanels::Project, left_bottom);
 		ImGui::DockBuilderDockWindow(EditorPanels::Scripts, left_bottom);
-		ImGui::DockBuilderDockWindow(EditorPanels::TwoD, left_bottom);
+
+		for (const FilePanelKind* kind : FilePanels::all)
+			ImGui::DockBuilderDockWindow(kind->title, left_bottom);
+
 		ImGui::DockBuilderDockWindow(EditorPanels::Inspector, right);
 		ImGui::DockBuilderDockWindow(EditorPanels::Console, bottom);
 		ImGui::DockBuilderDockWindow(EditorPanels::SceneData, bottom);
@@ -1954,11 +1990,15 @@ namespace Loom
 
 	std::vector<Editor::Panel> Editor::Panels()
 	{
-		return {
+		std::vector<Panel> panels = {
 			{ EditorPanels::Hierarchy, &m_showHierarchy, true },
 			{ EditorPanels::Project, &m_showProject, true },
-			{ EditorPanels::Scripts, &m_showScripts, true },
-			{ EditorPanels::TwoD, &m_showTwoD, true },
+			{ EditorPanels::Scripts, &m_showScripts, true } };
+
+		for (FilePanel& panel : m_filePanels)
+			panels.push_back({ panel.kind.title, &panel.show, true });
+
+		panels.insert(panels.end(), {
 			{ EditorPanels::Inspector, &m_showInspector, true },
 			{ EditorPanels::Scene, &m_showScene, true },
 			{ EditorPanels::Game, &m_showGame, true },
@@ -1970,7 +2010,9 @@ namespace Loom
 			{ EditorPanels::Model, &m_showModels, false },
 			{ EditorPanels::Prefab, &m_showPrefab, false },
 			{ EditorPanels::Stats, &m_showStats, true },
-			{ EditorPanels::KeyBindings, &m_showKeyBindings, true } };
+			{ EditorPanels::KeyBindings, &m_showKeyBindings, true } });
+
+		return panels;
 	};
 
 	void Editor::AddPanelSettings()
@@ -2298,7 +2340,7 @@ namespace Loom
 			ImGuiWindowFlags_NoSavedSettings))
 		{
 			ImGui::TextUnformatted("The editor works out of a folder of scene files.");
-			ImGui::TextDisabled("Everything under it shows up in the Project panel, its textures in the 2D panel and its scripts in the Scripts panel.");
+			ImGui::TextDisabled("Its scenes and prefabs show up in the Project panel, its scripts and shaders in the Scripts panel, and its textures, models, sounds and fonts each in a panel of their own.");
 
 			ImGui::Separator();
 
@@ -2826,7 +2868,8 @@ namespace Loom
 			return true;
 		};
 
-		// Anything else dragged out of the Project panel has no place here.
+		// Anything else dragged out of the Project panel or an asset panel has
+		// no place here.
 		if (extension != ProjectAssets::shaderExtension)
 			return true;
 
@@ -3783,7 +3826,7 @@ namespace Loom
 	{
 		if (!ProjectAssets::IsGameFile(file) && !IsModelFile(file))
 		{
-			std::cerr << "Project: " << file << " is not a file the Project panel lists" << std::endl;
+			std::cerr << "Project: " << file << " is not a file the Project panel or one of the asset panels lists" << std::endl;
 			return;
 		};
 
@@ -3798,8 +3841,8 @@ namespace Loom
 
 		std::cout << "Copied " << file << " to " << copied << std::endl;
 
-		if (ProjectAssets::IsTextureFile(copied))
-			return RevealTwoD(copied);
+		if (RevealFile(copied))
+			return;
 
 		m_selectedAsset = std::filesystem::path(copied).lexically_normal().string();
 		m_revealSelectedAsset = true;

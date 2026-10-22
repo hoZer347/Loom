@@ -149,7 +149,7 @@
     <ClInclude Include="HiddenProcess.h" />
     <ClInclude Include="ScriptLibrary.h" />
     <ClInclude Include="ScriptFolders.h" />
-    <ClInclude Include="TwoDFolders.h" />
+    <ClInclude Include="FilePanel.h" />
     <ClInclude Include="VirtualFolders.h" />
     <ClInclude Include="FolderTree.h" />
     <ClInclude Include="SearchBar.h" />

@@ -1,6 +1,6 @@
 #include "EditorIcons.h"
 
-#include "TwoDFolders.h"
+#include "FilePanel.h"
 #include "InputActions.h"
 #include "Prefab.h"
 #include "ProjectAssets.h"
@@ -40,8 +40,9 @@ namespace Loom
 		if (extension == ScriptFolders::extension)
 			return Script;
 
-		if (extension == TwoDFolders::extension)
-			return TwoD;
+		for (const FilePanelKind* kind : FilePanels::all)
+			if (extension == kind->extension)
+				return kind->icon;
 
 		if (extension == InputActions::extension)
 			return Bindings;

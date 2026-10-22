@@ -21,7 +21,7 @@
 #include "SelectionOutline.h"
 #include "SceneHistory.h"
 #include "SearchBar.h"
-#include "TwoDFolders.h"
+#include "FilePanel.h"
 #include "FolderTree.h"
 #include "ScriptFolders.h"
 #include "ScriptLibrary.h"
@@ -29,6 +29,7 @@
 #include "WindowFullscreen.h"
 
 #include <filesystem>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <optional>
@@ -40,6 +41,7 @@
 #include <vector>
 
 struct ImGuiContext;
+struct ImGuiWindow;
 struct ImRect;
 
 
@@ -96,11 +98,11 @@ namespace Loom
 	*   in a window named after it, where editing it edits every copy of it
 	*   that is open, the way a prefab works; the game as its own cameras see
 	*   it; and everything loaded, from a camera the editor flies
-	* - Works out of a project folder: everything under it is listed in the
-	*   Project panel, which also creates new assets, apart from the textures,
-	*   which the 2D panel lists and creates, and the scripts, which the
-	*   Scripts panel does. They are a C++ project that builds into a library
-	*   the editor loads
+	* - Works out of a project folder: its scenes and prefabs are listed in the
+	*   Project panel, which also creates them, its scripts and shaders in the
+	*   Scripts panel, which creates those, and its textures, models, sounds
+	*   and fonts each in a FilePanel, the 2D panel creating textures. The
+	*   scripts are a C++ project that builds into a library the editor loads
 	* - Reads and writes scenes through SceneSerializer, and shows the text form
 	*   of the open scene live in its Scene Data panel
 	* - Takes over Engine's GUI hook on construction and hands it back on
@@ -239,8 +241,8 @@ namespace Loom
 		void QueueImport(const std::string& path);
 
 		// The same, with the mouse moved to x, y first, in ImGui's coordinates.
-		// Over the Project or 2D panel, the file is copied into the folder
-		// there instead.
+		// Over the Project panel or a FilePanel, the file is copied into the
+		// folder there instead.
 		void Drop(const std::string& path, float x, float y);
 
 		// File > Open Project..., starting beside the project that is open.
@@ -341,17 +343,20 @@ namespace Loom
 		std::string ScriptFoldersFile() const;
 		void SaveScriptFolders();
 
-		// The 2D panel: the project's textures, in folders of its own kept
-		// beside the .loomproject as the Scripts panel's are.
-		void DrawTwoD();
-		void DrawTwoDEntry(const std::string& file);
-		void DrawTwoDCreateMenu(const std::string& folder);
-		FolderTree::Hooks TwoDFolderHooks();
-		std::string TwoDFoldersFile() const;
-		void SaveTwoDFolders();
+		// The FilePanels, each drawn alike.
+		void DrawFilePanel(FilePanel& panel);
+		void DrawFileEntry(FilePanel& panel, const std::string& file);
+		void DrawFileCreateMenu(FilePanel& panel, const std::string& folder);
+		FolderTree::Hooks FileFolderHooks(FilePanel& panel);
+		std::string FileFoldersFile(const FilePanel& panel) const;
+		void SaveFileFolders(const FilePanel& panel);
 
-		// Selects and shows the texture at path in the 2D panel.
-		void RevealTwoD(const std::string& path);
+		// The FilePanel that holds the file, or none.
+		FilePanel* FilePanelOf(const std::string& path);
+
+		// Selects and shows the file at path in its FilePanel. False when none
+		// holds it.
+		bool RevealFile(const std::string& path);
 
 		// Selects, shows and flashes the file at path in the Project panel.
 		void PingAsset(const std::string& path);
@@ -462,6 +467,13 @@ namespace Loom
 		void RecordHistory();
 		bool CanStepHistory() const;
 
+		// Whether input in the window can change a scene, so the scenes are
+		// compared for the history after it, which takes long enough on a large
+		// scene to be felt. The Scripts, Shaders and Sprites panels and the
+		// FilePanels only edit, file and open files: what is dragged out of
+		// them lands in another window.
+		bool CanEditScenes(const ImGuiWindow* window) const;
+
 		// Copies of one scene, opened twice and so sharing its guid, are one
 		// scene edited in several places: whichever has changed since the last
 		// call is written over the others.
@@ -513,8 +525,8 @@ namespace Loom
 		// mouse is over it.
 		void TakeImportTarget(GameObject* gameObject);
 
-		// The same for the Project and 2D panels, with the folder a drop there
-		// goes in.
+		// The same for the Project panel and the FilePanels, with the folder a
+		// drop there goes in.
 		void TakeImportFolder(const std::string& folder, bool hovered);
 
 		// Into the folder the drop landed in, selecting the copy.
@@ -523,7 +535,7 @@ namespace Loom
 		void ClickQueued();
 
 		// Rescans the project folder: the asset tree the Project panel draws,
-		// the textures the 2D panel does, and the scenes.
+		// the scenes in it, the shaders and each FilePanel's files.
 		void RefreshProjectAssets();
 
 		// Where ProjectAssets::OpenerOf says; the shell's opener is whatever
@@ -538,9 +550,9 @@ namespace Loom
 		// OpenAsset's.
 		static bool OpenInShell(ImGuiContext* context, const char* path);
 
-		// Lets a file be dragged out of the Project or 2D panel, onto a field
-		// that names a file or a GameObject in the hierarchy, and a file or
-		// folder onto another folder.
+		// Lets a file be dragged out of the Project panel or a FilePanel, onto a
+		// field that names a file or a GameObject in the hierarchy, and a file
+		// or folder onto another folder.
 		void DragAsset(const AssetNode& node);
 
 		// Inside a drag and drop target, takes a file or folder dropped there
@@ -554,8 +566,9 @@ namespace Loom
 		// else, or a texture that will not load.
 		const Texture* Thumbnail(const std::string& path);
 
-		// Takes a file dragged out of the Project panel onto a GameObject in the
-		// hierarchy. Whether the drag was one, taken or turned away.
+		// Takes a file dragged out of the Project panel or a FilePanel onto a
+		// GameObject in the hierarchy. Whether the drag was one, taken or
+		// turned away.
 		bool DropAsset(GameObject* gameObject);
 
 		// Gives the GameObject the shader, on its Material or a new one.
@@ -565,10 +578,6 @@ namespace Loom
 		// from the project, or a folder's path.
 		static constexpr const char* script_payload = "LoomScript";
 		static constexpr const char* script_folder_payload = "LoomScriptFolder";
-
-		// What the 2D panel drags for a folder. Its textures go as the Project
-		// panel's files do, so fields take them.
-		static constexpr const char* two_d_folder_payload = "Loom2DFolder";
 
 		// Takes a script or shader dragged out of the Scripts panel onto a
 		// GameObject in the hierarchy, attaching it. Whether the drag was one.
@@ -751,12 +760,15 @@ namespace Loom
 		std::string m_projectName{ };
 		std::vector<std::string> m_projectScenes{ };
 
-		// A model file picked in the Project panel, previewed in the Inspector
+		// The shaders from the last scan, which the Scripts panel lists.
+		std::vector<std::string> m_projectShaders{ };
+
+		// A model file picked in the 3D panel, previewed in the Inspector
 		// in place of a GameObject.
 		std::string m_selectedModel{ };
 		ModelPreview m_modelPreview;
 
-		// The project as it stood at the last scan, its textures aside.
+		// The project's scenes and prefabs as they stood at the last scan.
 		AssetNode m_assets{ };
 		FolderWatch m_projectWatch;
 		KindFilter m_projectFilter;
@@ -808,17 +820,7 @@ namespace Loom
 		// Where the Create prompt's script is filed once it is written.
 		std::string m_newScriptFolder{ };
 
-		// The 2D panel's textures from the last scan, each by its path in the
-		// project, as fields name it.
-		std::vector<std::string> m_twoDFiles{ };
-		TwoDFolders m_twoDFolders;
-		KindFilter m_twoDFilter;
-		std::string m_selectedTwoD{ };
-		bool m_revealSelectedTwoD = false;
-		FolderTree m_twoDFolderTree;
-
-		// Where the Create prompt's texture is filed once it is written.
-		std::string m_newTwoDFolder{ };
+		std::vector<FilePanel> m_filePanels{ std::begin(FilePanels::all), std::end(FilePanels::all) };
 
 		// The scene a session opens with: what the settings file said last time,
 		// and then whichever one this session last made active.
@@ -846,8 +848,9 @@ namespace Loom
 		// Each scene open more than once, as its copies last agreed it was.
 		std::unordered_map<Guid, std::string> m_copyTexts{ };
 
-		// Set when a click lands, a widget is let go of or a scene arrives; the
-		// scenes are compared on the first frame after that with nothing held down.
+		// Set when a click lands or a widget is let go of in a window that
+		// CanEditScenes, or a scene arrives; the scenes are compared on the first
+		// frame after that with nothing held down.
 		bool m_historyDirty = true;
 
 		// Whether a view's camera is being flown this frame or was just let go
@@ -859,8 +862,6 @@ namespace Loom
 		bool m_focusProject = false;
 		bool m_showScripts = true;
 		bool m_focusScripts = false;
-		bool m_showTwoD = true;
-		bool m_focusTwoD = false;
 		bool m_showHierarchy = true;
 		bool m_hierarchyFocused = false;
 		bool m_showInspector = true;

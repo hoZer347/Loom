@@ -4,11 +4,12 @@
 #include <cctype>
 #include <cstring>
 #include <fstream>
+#include <string_view>
 
 
 namespace Loom
 {
-	bool VirtualFolders::Alphabetical(const std::string& a, const std::string& b)
+	bool VirtualFolders::Alphabetical(std::string_view a, std::string_view b)
 	{
 		return std::ranges::lexicographical_compare(
 			a,
@@ -18,6 +19,17 @@ namespace Loom
 
 	namespace
 	{
+		// By what follows the last separator, as a FilePanel shows its files by
+		// their names, and then whole.
+		bool ByName(std::string_view a, std::string_view b)
+		{
+			const std::string_view name_a = a.substr(a.rfind(VirtualFolders::separator) + 1);
+			const std::string_view name_b = b.substr(b.rfind(VirtualFolders::separator) + 1);
+
+			return VirtualFolders::Alphabetical(name_a, name_b) ||
+				(!VirtualFolders::Alphabetical(name_b, name_a) && VirtualFolders::Alphabetical(a, b));
+		};
+
 		// The child of node called name, made if it is not there.
 		VirtualFolders::Node& ChildOf(VirtualFolders::Node& node, const std::string& name)
 		{
@@ -55,7 +67,7 @@ namespace Loom
 				node.children.end(),
 				[](const VirtualFolders::Node& a, const VirtualFolders::Node& b) { return VirtualFolders::Alphabetical(a.name, b.name); });
 
-			std::sort(node.items.begin(), node.items.end(), VirtualFolders::Alphabetical);
+			std::sort(node.items.begin(), node.items.end(), ByName);
 
 			for (VirtualFolders::Node& child : node.children)
 				Sort(child);

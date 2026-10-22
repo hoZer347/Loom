@@ -29,8 +29,8 @@ namespace Loom
 		constexpr const char* Bindings = "⌨";
 		constexpr const char* File = "📄";
 
-		// What the Project panel shows beside a file, models aside, which only
-		// ModelImporter can tell.
+		// What the Project panel and the FilePanels show beside a file, models
+		// aside, which only ModelImporter can tell.
 		const char* Of(const std::string& path);
 	};
 
@@ -42,6 +42,9 @@ namespace Loom
 		constexpr const char* Project = "📁 Project###Project";
 		constexpr const char* Scripts = "🧩 Scripts###Scripts";
 		constexpr const char* TwoD = "🎨 2D###2D";
+		constexpr const char* ThreeD = "🧊 3D###3D";
+		constexpr const char* Sounds = "🔊 Sounds###Sounds";
+		constexpr const char* Fonts = "🔤 Fonts###Fonts";
 		constexpr const char* Inspector = "🔍 Inspector###Inspector";
 		constexpr const char* Scene = "🎬 Scene###Scene";
 		constexpr const char* SceneId = "###Scene";

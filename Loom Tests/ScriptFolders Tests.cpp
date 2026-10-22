@@ -1,6 +1,6 @@
 #include "doctest.h"
 
-#include "TwoDFolders.h"
+#include "FilePanel.h"
 #include "ScriptFolders.h"
 
 #include <filesystem>
@@ -10,7 +10,6 @@
 
 namespace
 {
-	using Loom::TwoDFolders;
 	using Loom::ScriptFolders;
 
 	// The node at the folder's path under root, or null.
@@ -153,14 +152,14 @@ TEST_SUITE("ScriptFolders")
 		CHECK(loaded.Build({ "Patrol" }).children.empty());
 	};
 
-	TEST_CASE("the 2D panel's textures come back filed by their paths, and its file holds none of the Scripts panel's")
+	TEST_CASE("a FilePanel's files come back filed by their paths, and its file holds none of another panel's")
 	{
 		const std::filesystem::path two_d = std::filesystem::temp_directory_path() / "loom 2d folders.loom2d";
 		const std::filesystem::path scripts = std::filesystem::temp_directory_path() / "loom 2d folders.loomscripts";
 
-		TwoDFolders saved;
-		saved.Move("Assets/Units/Tank.png", "Units");
-		saved.Move("Assets/Units/Tank=Heavy.png", "Units");
+		Loom::FilePanel saved(&Loom::FilePanels::TwoD);
+		saved.folders.Move("Assets/Units/Tank.png", "Units");
+		saved.folders.Move("Assets/Units/Tank=Heavy.png", "Units");
 
 		REQUIRE(saved.Save(two_d.string()));
 
@@ -169,19 +168,33 @@ TEST_SUITE("ScriptFolders")
 
 		REQUIRE(other.Save(scripts.string()));
 
-		TwoDFolders loaded;
+		Loom::FilePanel loaded(&Loom::FilePanels::TwoD);
 		loaded.Load(two_d.string());
 
-		CHECK(loaded.FolderOf("Assets/Units/Tank.png") == "Units");
-		CHECK(loaded.FolderOf("Assets/Units/Tank=Heavy.png") == "Units");
-		CHECK(loaded.Build({ "Assets/Units/Tank=Heavy.png" }).children.size() == 1);
+		CHECK(loaded.folders.FolderOf("Assets/Units/Tank.png") == "Units");
+		CHECK(loaded.folders.FolderOf("Assets/Units/Tank=Heavy.png") == "Units");
+		CHECK(loaded.folders.Build({ "Assets/Units/Tank=Heavy.png" }).children.size() == 1);
 
 		loaded.Load(scripts.string());
 
-		CHECK(loaded.FolderOf("Patrol").empty());
-		CHECK(loaded.AddFolder("", "a=b").empty());
+		CHECK(loaded.folders.FolderOf("Patrol").empty());
+		CHECK(loaded.folders.AddFolder("", "a=b").empty());
+
+		Loom::FilePanel three_d(&Loom::FilePanels::ThreeD);
+		three_d.Load(two_d.string());
+
+		CHECK(three_d.folders.FolderOf("Assets/Units/Tank.png").empty());
 
 		std::filesystem::remove(two_d);
 		std::filesystem::remove(scripts);
+	};
+
+	TEST_CASE("a FilePanel's files are in the order of their names, wherever they are")
+	{
+		const Loom::VirtualFolders folders;
+
+		const std::vector<std::string> items = folders.Build({ "Assets/Units/Tank.glb", "Assets/Buildings/Turret.glb", "Assets/Nature/rock.glb", "Assets/Buildings/Host.glb" }).items;
+
+		CHECK(items == std::vector<std::string>{ "Assets/Buildings/Host.glb", "Assets/Nature/rock.glb", "Assets/Units/Tank.glb", "Assets/Buildings/Turret.glb" });
 	};
 };

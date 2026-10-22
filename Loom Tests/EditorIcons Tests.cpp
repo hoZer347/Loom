@@ -19,6 +19,9 @@ TEST_SUITE("EditorIcons")
 		CHECK(EditorIcons::Of("Game.loomscripts") == EditorIcons::Script);
 		CHECK(EditorIcons::Of("Game.LoomScripts") == EditorIcons::Script);
 		CHECK(EditorIcons::Of("Game.loom2d") == EditorIcons::TwoD);
+		CHECK(EditorIcons::Of("Game.loom3d") == EditorIcons::Model);
+		CHECK(EditorIcons::Of("Game.loomsounds") == EditorIcons::Sound);
+		CHECK(EditorIcons::Of("Game.LoomFonts") == EditorIcons::Font);
 		CHECK(EditorIcons::Of("Game.loominput") == EditorIcons::Bindings);
 		CHECK(EditorIcons::Of("Game.LoomInput") == EditorIcons::Bindings);
 		CHECK(EditorIcons::Of("Assets/Tree.png") == EditorIcons::Texture);

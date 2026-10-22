@@ -24,13 +24,14 @@ namespace Loom
 	{
 		constexpr size_t maxNameLength = 64;
 
-		// Scripts, textures, sounds and fonts aside.
+		// Scripts, shaders, textures, sounds and fonts aside.
 		constexpr std::string_view gameFileExtensions[] =
 		{
 			SceneSerializer::extension,
 			Prefab::extension,
-			ProjectAssets::shaderExtension,
 		};
+
+		constexpr std::string_view shaderExtensions[] = { ProjectAssets::shaderExtension };
 
 		// Whatever Textures.cpp has stb_image decode.
 		constexpr std::string_view textureExtensions[] = { ProjectAssets::textureExtension, ".jpg", ".jpeg", ".bmp", ".tga" };
@@ -661,12 +662,17 @@ void main()
 
 	bool ProjectAssets::IsGameFile(const std::string& name)
 	{
-		return HasExtension(name, gameFileExtensions) || IsTextureFile(name) || IsSoundFile(name) || IsFontFile(name);
+		return HasExtension(name, gameFileExtensions) || IsShaderFile(name) || IsTextureFile(name) || IsSoundFile(name) || IsFontFile(name);
 	};
 
 	bool ProjectAssets::IsScriptFile(const std::string& name)
 	{
 		return HasExtension(name, scriptExtensions);
+	};
+
+	bool ProjectAssets::IsShaderFile(const std::string& name)
+	{
+		return HasExtension(name, shaderExtensions);
 	};
 
 	bool ProjectAssets::IsTextureFile(const std::string& name)
