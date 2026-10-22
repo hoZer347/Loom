@@ -751,6 +751,9 @@ namespace Loom
 		bool m_gamePanelFocused = false;
 		bool m_gamePanelHovered = false;
 		GameFocus m_gameFocus;
+
+		// Whether a run was going when the Game panel was last drawn.
+		bool m_gameDrawnPlaying = false;
 		bool m_showSceneData = true;
 		bool m_showConsole = true;
 		bool m_showShaders = false;

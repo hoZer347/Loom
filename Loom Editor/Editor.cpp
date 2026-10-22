@@ -3117,6 +3117,13 @@ namespace Loom
 
 	void Editor::DrawGame()
 	{
+		// A run starts with the panel in front and holding the keyboard, as
+		// the game only hears it there.
+		if (m_playing && !m_gameDrawnPlaying)
+			ImGui::SetNextWindowFocus();
+
+		m_gameDrawnPlaying = m_playing;
+
 		// While it plays, the keys are the game's, not a way round the panel's buttons.
 		if (ImGui::Begin(EditorPanels::Game, &m_showGame, m_playing ? view_flags | ImGuiWindowFlags_NoNavInputs : view_flags))
 		{

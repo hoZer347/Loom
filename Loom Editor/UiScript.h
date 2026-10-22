@@ -20,7 +20,9 @@ namespace Loom
 	* - Drives ImGui from a text file, a command a line, by queueing input
 	*   events in-process. The real mouse and keyboard are never touched, so it
 	*   runs on a hidden window. The game hears the mouse, the keys and the
-	*   wheel too, as it would the platform's
+	*   wheel too. With a window, keys and the wheel are handed to it as the
+	*   platform hands it real ones, so they reach ImGui and the game the way
+	*   real ones do; without one, as in a test, they go to each directly
 	* - Commands, with a line starting # a comment:
 	*     wait <frames>
 	*     move <target>

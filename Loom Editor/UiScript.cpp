@@ -4,12 +4,25 @@
 #include "Input.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
+
+// The editor only runs on Windows, but the web test build compiles this too.
+// windows.h goes before GLFW, which defines APIENTRY itself without it.
+#ifndef __EMSCRIPTEN__
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#endif
 
 
 // How ImGui's GLFW backend turns GLFW's keys into its own, which it leaves
@@ -71,6 +84,84 @@ namespace Loom
 			const auto found = numbers.find(key);
 
 			return found == numbers.end() ? -1 : found->second;
+		};
+
+#ifndef __EMSCRIPTEN__
+		// Hands the editor's own window a key, by GLFW's number, the way the
+		// platform hands it a real one, so it goes the same way on: GLFW's
+		// window procedure, which keeps the key's state, then GLFW's
+		// callbacks, ImGui's first, which hands it on to the game's. Sent
+		// rather than posted, so it lands this frame and types nothing, as a
+		// key command never has. False without a window, as in a test.
+		bool SendKey(int key, bool down)
+		{
+			// A key message carries the scan code's low byte and its extended
+			// bit; the key's virtual code names the extended ones by a prefix.
+			constexpr int scancode_byte = 0xff;
+			constexpr int extended_bit = 0x100;
+			constexpr UINT extended_prefix = 0xe000;
+			constexpr WORD one_press = 1;
+
+			// The thread's own key state, held down, which GLFW asks of the
+			// modifiers it lets go of when the keyboard no longer holds them.
+			constexpr size_t virtual_keys = 256;
+			constexpr BYTE held_down = 0x80;
+
+			const int scancode = Engine::window != nullptr && key >= 0 ? glfwGetKeyScancode(key) : -1;
+
+			if (scancode <= 0)
+				return false;
+
+			const UINT virtual_key = MapVirtualKeyW((scancode & scancode_byte) | (scancode & extended_bit ? extended_prefix : 0), MAPVK_VSC_TO_VK_EX);
+
+			BYTE state[virtual_keys];
+
+			if (GetKeyboardState(state))
+			{
+				state[virtual_key] = down ? held_down : 0;
+				SetKeyboardState(state);
+			};
+
+			const WORD flags = (WORD)(scancode & (scancode_byte | extended_bit)) | (down ? 0 : KF_UP | KF_REPEAT);
+
+			SendMessageW(glfwGetWin32Window(Engine::window), down ? WM_KEYDOWN : WM_KEYUP, virtual_key, MAKELPARAM(one_press, flags));
+
+			return true;
+		};
+
+		// The wheel the same way, WHEEL_DELTA a notch.
+		bool SendWheel(float notches)
+		{
+			if (Engine::window == nullptr)
+				return false;
+
+			SendMessageW(glfwGetWin32Window(Engine::window), WM_MOUSEWHEEL, MAKEWPARAM(0, (SHORT)std::lround(notches * WHEEL_DELTA)), 0);
+
+			return true;
+		};
+#else
+		bool SendKey(int, bool)
+		{
+			return false;
+		};
+
+		bool SendWheel(float)
+		{
+			return false;
+		};
+#endif
+
+		// A key down or up for ImGui and the game alike, through the window
+		// when there is one, or else to each directly.
+		void Press(ImGuiIO& io, ImGuiKey key, bool down)
+		{
+			const int number = GameKey(key);
+
+			if (SendKey(number, down))
+				return;
+
+			io.AddKeyEvent(key, down);
+			Input::OnKeyThisFrame(number, down);
 		};
 
 		// Words and "quoted strings", the quotes taken off.
@@ -428,8 +519,7 @@ namespace Loom
 					{
 						for (ImGuiKey key : held)
 						{
-							io.AddKeyEvent(key, true);
-							Input::OnKeyThisFrame(GameKey(key), true);
+							Press(io, key, true);
 							m_held.push_back(key);
 						};
 
@@ -442,8 +532,7 @@ namespace Loom
 					{
 						for (auto key = held.rbegin(); key != held.rend(); key++)
 						{
-							io.AddKeyEvent(*key, false);
-							Input::OnKeyThisFrame(GameKey(*key), false);
+							Press(io, *key, false);
 							m_held.erase(std::remove(m_held.begin(), m_held.end(), *key), m_held.end());
 						};
 
@@ -463,8 +552,12 @@ namespace Loom
 			m_actions.push_back(
 				[&io, notches]()
 				{
-					io.AddMouseWheelEvent(0.0f, notches);
-					Input::OnMouseWheelThisFrame(notches);
+					if (!SendWheel(notches))
+					{
+						io.AddMouseWheelEvent(0.0f, notches);
+						Input::OnMouseWheelThisFrame(notches);
+					};
+
 					return Result::Done;
 				});
 		}
@@ -648,10 +741,7 @@ namespace Loom
 	void UiScript::ReleaseHeld()
 	{
 		for (auto key = m_held.rbegin(); key != m_held.rend(); key++)
-		{
-			m_context->IO.AddKeyEvent(*key, false);
-			Input::OnKeyThisFrame(GameKey(*key), false);
-		};
+			Press(m_context->IO, *key, false);
 
 		m_held.clear();
 	};
