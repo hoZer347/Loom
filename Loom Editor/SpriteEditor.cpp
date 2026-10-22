@@ -75,8 +75,6 @@ namespace Loom
 
 		constexpr float milliseconds = 1000.0f;
 
-		// A layer dragged by its name in the timeline, as a LayerDrag.
-		constexpr const char* layer_payload = "SPRITE_LAYER";
 
 		// A new palette starts with the sprite's own colours, as many as fit.
 		constexpr size_t seeded_colours = 64;
@@ -335,11 +333,8 @@ namespace Loom
 		const bool undo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z);
 		const bool redo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y) || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z);
 
-		// Not while a layer is dragged either, which knows it by where it was.
-		const ImGuiPayload* dragged = ImGui::GetDragDropPayload();
-		const bool dragging_layer = dragged != nullptr && dragged->IsDataType(layer_payload);
-
-		if (!document.stroking && !dragging_layer && (undo || redo))
+		// Not while a layer is held either, which knows it by where it is.
+		if (!document.stroking && document.grabbed < 0 && (undo || redo))
 			Step(document, undo);
 
 		ToolShortcuts();
@@ -537,30 +532,6 @@ namespace Loom
 
 		ImGui::EndDisabled();
 		ImGui::SameLine();
-		ImGui::BeginDisabled(document.layer == layers - 1);
-
-		if (ImGui::ArrowButton("##up", ImGuiDir_Up))
-		{
-			Remember(document);
-			sprite.MoveLayer(document.layer, document.layer + 1);
-			document.layer++;
-			Edited(document);
-		};
-
-		ImGui::EndDisabled();
-		ImGui::SameLine();
-		ImGui::BeginDisabled(document.layer == 0);
-
-		if (ImGui::ArrowButton("##down", ImGuiDir_Down))
-		{
-			Remember(document);
-			sprite.MoveLayer(document.layer, document.layer - 1);
-			document.layer--;
-			Edited(document);
-		};
-
-		ImGui::EndDisabled();
-		ImGui::SameLine();
 		ImGui::TextDisabled("|");
 		ImGui::SameLine();
 		ImGui::BeginDisabled(frames >= SpriteAsset::maxFrames);
@@ -674,8 +645,9 @@ namespace Loom
 			ImGui::PopID();
 		};
 
-		// From and to, once the rows are drawn, since they hold the layers.
-		std::optional<std::pair<int, int>> dropped;
+		// The row the mouse is over, for a held layer to move to once the rows
+		// are drawn, since they hold the layers.
+		std::optional<int> under;
 
 		// The top layer first, as they stack.
 		for (int layer = shown_layers - 1; layer >= 0; layer--)
@@ -730,26 +702,18 @@ namespace Loom
 			if (ImGui::Selectable(row.name.c_str(), layer == document.layer))
 				document.layer = layer;
 
-			ImGui::SetItemTooltip("Drag onto another layer to take its place. Right-click to rename");
-
-			// Held over another sprite's tab, it leaves that tab where it is.
-			if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers))
+			if (ImGui::IsItemActivated())
 			{
-				const LayerDrag drag{ &document, layer };
-
-				ImGui::SetDragDropPayload(layer_payload, &drag, sizeof(drag));
-				ImGui::TextUnformatted(row.name.c_str());
-				ImGui::EndDragDropSource();
+				document.layer = layer;
+				document.grabbed = layer;
+				document.grabMoved = false;
 			};
 
-			if (ImGui::BeginDragDropTarget())
-			{
-				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(layer_payload))
-					if (const LayerDrag& drag = *static_cast<const LayerDrag*>(payload->Data); drag.document == &document)
-						dropped = std::pair(drag.layer, layer);
+			ImGui::SetItemTooltip("Drag up or down to move it. Right-click to rename");
 
-				ImGui::EndDragDropTarget();
-			};
+			if (const float mouse_y = ImGui::GetIO().MousePos.y;
+				mouse_y >= ImGui::GetItemRectMin().y && mouse_y < ImGui::GetItemRectMax().y)
+				under = layer;
 
 			if (ImGui::BeginPopupContextItem("##rename"))
 			{
@@ -794,11 +758,21 @@ namespace Loom
 
 		ImGui::EndTable();
 
-		if (dropped && dropped->first != dropped->second)
+		if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+			document.grabbed = -1;
+
+		if (document.grabbed < 0)
+			return;
+
+		ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+
+		if (under && *under != document.grabbed)
 		{
-			Remember(document);
-			sprite.MoveLayer(dropped->first, dropped->second);
-			document.layer = dropped->second;
+			if (!std::exchange(document.grabMoved, true))
+				Remember(document);
+
+			sprite.MoveLayer(document.grabbed, *under);
+			document.grabbed = document.layer = *under;
 			Edited(document);
 		};
 	};

@@ -30,8 +30,8 @@ namespace Loom
 	*   button that clicked; the middle mouse pans and the wheel zooms about
 	*   the mouse. Ctrl+Z and Ctrl+Y step back and forward an edit at a time
 	* - A layer can be outlined, hidden or not, which draws round its pixels
-	*   on the canvas and nowhere else, and dragged by its name onto another
-	*   to take its place
+	*   on the canvas and nowhere else, and dragged by its name up or down the
+	*   timeline, the others making way as it goes
 	* - Ctrl+S writes the sprite and the image it is flattened into, and every
 	*   Sprite showing that image picks the change up
 	*/
@@ -133,15 +133,14 @@ namespace Loom
 			int lastX = 0;
 			int lastY = 0;
 
+			// The layer held by its name in the timeline, which follows the
+			// mouse up and down the rows until it lets go, or -1. Whether it has
+			// moved yet, so one hold is one step to undo.
+			int grabbed = -1;
+			bool grabMoved = false;
+
 			// Brings the tab forward on the next frame.
 			bool select = true;
-		};
-
-		// What a layer dragged in the timeline carries.
-		struct LayerDrag
-		{
-			const Document* document;
-			int layer;
 		};
 
 		bool SaveDocument(Document& document);

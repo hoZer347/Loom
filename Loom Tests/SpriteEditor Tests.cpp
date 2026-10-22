@@ -442,13 +442,13 @@ TEST_SUITE("SpriteEditor")
 		std::filesystem::remove(palette);
 	};
 
-	TEST_CASE("+ Layer adds a clear layer above the one painted, the arrows move it, and - Layer takes it out")
+	TEST_CASE("+ Layer adds a clear layer above the one painted, a drag moves it, and - Layer takes it out")
 	{
 		const SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
 
 		Driven driven("loom sprite layers.tga", &sprite);
 
-		driven.Run("click \"Sprites\" \"+ Layer\"\nwait 2\nclick \"Sprites\" \"##down\"\nwait 2\n");
+		driven.Run("click \"Sprites\" \"+ Layer\"\nwait 2\ndrag \"Sprites\" \"Layer 2\" to \"Sprites\" \"Layer 1\"\nwait 2\n");
 
 		SpriteAsset saved = driven.SavedSprite();
 
@@ -799,7 +799,7 @@ TEST_SUITE("SpriteEditor")
 		CHECK_FALSE(driven.SavedSprite().layers[0].outlined);
 	};
 
-	TEST_CASE("a layer dragged by its name onto another takes its place, is the one painted, and Ctrl+Z puts it back")
+	TEST_CASE("a layer dragged by its name past others takes their place, is the one painted, and Ctrl+Z puts it back in one step")
 	{
 		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
 		sprite.AddLayer(1, "Layer 2");
@@ -827,7 +827,7 @@ TEST_SUITE("SpriteEditor")
 		CHECK(saved.layers[2].name == "Layer 3");
 	};
 
-	TEST_CASE("a layer held over another sprite's tab leaves that tab behind, so it never drops into that sprite")
+	TEST_CASE("a layer held over another sprite's tab leaves that tab behind")
 	{
 		constexpr int held_frames = 60;
 
@@ -878,7 +878,7 @@ TEST_SUITE("SpriteEditor")
 		std::filesystem::remove(other);
 	};
 
-	TEST_CASE("Ctrl+Z waits while a layer is dragged, so the drop moves the layer it picked up")
+	TEST_CASE("Ctrl+Z waits while a layer is held, so it lets go of the layer it picked up")
 	{
 		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
 		sprite.AddLayer(1, "Layer 2");
@@ -895,7 +895,7 @@ TEST_SUITE("SpriteEditor")
 		io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
 		driven.Frame();
 
-		// Saved as a whole, since the drop leaves the keyboard elsewhere.
+		// Saved as a whole, wherever the keyboard is.
 		REQUIRE(driven.editor.SaveAll());
 
 		SpriteAsset saved;
