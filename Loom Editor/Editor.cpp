@@ -2569,8 +2569,9 @@ namespace Loom
 				Select(gameObject->AddChild());
 
 			const std::filesystem::path prefab = PrefabFileOf(*gameObject);
+			std::error_code code;
 
-			if (!prefab.empty() && ImGui::MenuItem("Ping Prefab", nullptr, false, std::filesystem::exists(prefab)))
+			if (!prefab.empty() && ImGui::MenuItem("Ping Prefab", nullptr, false, std::filesystem::exists(prefab, code)))
 				PingAsset(prefab.string());
 
 			if (instance)
