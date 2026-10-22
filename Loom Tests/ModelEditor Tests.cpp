@@ -44,7 +44,8 @@ namespace
 
 	void Draw(Loom::GameObject& object, const EditableMesh& shape)
 	{
-		object.Attach<Loom::Material>()->SetShaderPath("Assets/Shader.shader");
+		// With no shader, which the web build would fetch, and node cannot.
+		object.Attach<Loom::Material>();
 
 		std::vector<float> positions{ };
 		std::vector<float> uvs{ };
@@ -471,6 +472,9 @@ TEST_CASE("The Model panel leaves animated meshes out")
 	std::filesystem::remove(path, code);
 };
 
+// The mesh's new material reads the project's shader, which the web build
+// fetches, and node cannot.
+#ifndef __EMSCRIPTEN__
 TEST_CASE("The Model panel gives a prefab with no mesh one, drawn with a shader its project has")
 {
 	const std::filesystem::path project = std::filesystem::temp_directory_path() / "model_add_mesh";
@@ -501,6 +505,7 @@ TEST_CASE("The Model panel gives a prefab with no mesh one, drawn with a shader 
 	std::error_code code;
 	std::filesystem::remove_all(project, code);
 };
+#endif
 
 TEST_CASE("The Model panel's Esc puts a dragged face back and keeps what redo would do")
 {
