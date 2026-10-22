@@ -2851,9 +2851,19 @@ namespace Loom
 
 		const std::string name = (const char*)dragged->Data;
 
+		const auto entry = m_scriptEntries.find(name);
+
 		// A state goes in a state machine's Start or Current, not on an object.
-		if (const auto entry = m_scriptEntries.find(name); entry != m_scriptEntries.end() && entry->second.state)
+		if (entry != m_scriptEntries.end() && entry->second.kind == ScriptEntryKind::State)
 			return true;
+
+		if (entry != m_scriptEntries.end() && entry->second.kind == ScriptEntryKind::Shader)
+		{
+			if (ImGui::AcceptDragDropPayload(script_payload))
+				DropShader(gameObject, name);
+
+			return true;
+		};
 
 		if (!ImGui::AcceptDragDropPayload(script_payload))
 			return true;

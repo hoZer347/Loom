@@ -654,6 +654,11 @@ void main()
 		return !relative.empty() && *relative.begin() != "..";
 	};
 
+	std::string ProjectAssets::RelativeTo(const std::string& path, const std::string& folder)
+	{
+		return std::filesystem::path(path).lexically_normal().lexically_relative(folder).generic_string();
+	};
+
 	bool ProjectAssets::IsGameFile(const std::string& name)
 	{
 		return HasExtension(name, gameFileExtensions) || IsTextureFile(name) || IsSoundFile(name) || IsFontFile(name);

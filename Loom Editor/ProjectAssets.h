@@ -118,6 +118,10 @@ namespace Loom
 		// Whether path is folder or somewhere inside it.
 		static bool IsUnder(const std::string& path, const std::string& folder);
 
+		// Where path is from folder, with / between folders, the way components
+		// name the files they use.
+		static std::string RelativeTo(const std::string& path, const std::string& folder);
+
 		// The whole file, or an empty string when it cannot be read.
 		static std::string ReadText(const std::string& path);
 

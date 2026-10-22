@@ -56,6 +56,17 @@ TEST_SUITE("ScriptFolders")
 		CHECK(Find(folders.Build(scripts), "Gameplay/AI") != nullptr);
 	};
 
+	TEST_CASE("items and folders go in order whatever their case")
+	{
+		CHECK(ScriptFolders::Alphabetical("glow", "Zone"));
+		CHECK_FALSE(ScriptFolders::Alphabetical("Zone", "glow"));
+		CHECK_FALSE(ScriptFolders::Alphabetical("Glow", "glow"));
+
+		const ScriptFolders::Node root = ScriptFolders{ }.Build({ "Zone", "glow", "Beam" });
+
+		CHECK(root.items == std::vector<std::string>{ "Beam", "glow", "Zone" });
+	};
+
 	TEST_CASE("a folder takes a tidy name that nothing beside it has")
 	{
 		ScriptFolders folders;

@@ -313,6 +313,16 @@ TEST_SUITE("ProjectAssets")
 		std::filesystem::remove_all(root);
 	};
 
+	TEST_CASE("a file is named from the project by its own path there, so two of one name stay apart")
+	{
+		const std::filesystem::path root = std::filesystem::temp_directory_path() / "loom project assets relative";
+
+		CHECK(Loom::ProjectAssets::RelativeTo((root / "Glow.shader").string(), root.string()) == "Glow.shader");
+		CHECK(Loom::ProjectAssets::RelativeTo((root / "Assets" / "Glow.shader").string(), root.string()) == "Assets/Glow.shader");
+		CHECK(Loom::ProjectAssets::RelativeTo((root / "Assets" / "Old" / "Glow.shader").string(), root.string()) == "Assets/Old/Glow.shader");
+		CHECK(Loom::ProjectAssets::RelativeTo((root / "Assets" / "." / "Glow.shader").string(), root.string()) == "Assets/Glow.shader");
+	};
+
 	TEST_CASE("a path inside what was moved follows it, and any other stays")
 	{
 		const std::filesystem::path root = std::filesystem::temp_directory_path() / "loom project assets relocate";

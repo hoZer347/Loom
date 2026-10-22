@@ -183,7 +183,7 @@ namespace Loom
 			m_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
 			if (m_documents.empty())
-				ImGui::TextDisabled("Double-click a shader in the Project panel to edit it here.");
+				ImGui::TextDisabled("Double-click a shader in the Project or Scripts panel to edit it here.");
 			else if (ImGui::BeginTabBar("##shaders", ImGuiTabBarFlags_AutoSelectNewTabs | ImGuiTabBarFlags_FittingPolicyScroll))
 			{
 				const Document* closed = nullptr;

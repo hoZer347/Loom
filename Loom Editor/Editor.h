@@ -9,6 +9,7 @@
 #include "EditorRefresh.h"
 #include "EditorViewport.h"
 #include "FolderWatch.h"
+#include "KindFilter.h"
 #include "GameFocus.h"
 #include "Guid.h"
 #include "EditorSettings.h"
@@ -60,6 +61,9 @@ namespace Loom
 		std::string name;
 		bool folder = false;
 		std::vector<AssetNode> children{ };
+
+		// A file's, as the scan found it.
+		const char* icon = nullptr;
 	};
 
 	enum class AssetKind
@@ -72,6 +76,14 @@ namespace Loom
 		StateMachine,
 		Shader,
 		Texture,
+	};
+
+	// What the Scripts panel lists.
+	enum class ScriptEntryKind
+	{
+		Script,
+		State,
+		Shader,
 	};
 
 	/**
@@ -310,8 +322,8 @@ namespace Loom
 		void DrawCreateMenu(const std::string& folder);
 		void DrawCreateAssetPrompt();
 
-		// The project's script types, filed in folders of the Scripts panel's
-		// own that move no files.
+		// The project's script types and shaders, filed in folders of the
+		// Scripts panel's own that move no files.
 		void DrawScripts();
 		void DrawScriptEntry(const std::string& name);
 		void DrawScriptsCreateMenu(const std::string& folder);
@@ -544,7 +556,8 @@ namespace Loom
 		// Gives the GameObject the shader, on its Material or a new one.
 		void DropShader(GameObject* gameObject, const std::string& path);
 
-		// What the Scripts panel drags: a script type's name, or a folder's path.
+		// What the Scripts panel drags: a script type's name, a shader's path
+		// from the project, or a folder's path.
 		static constexpr const char* script_payload = "LoomScript";
 		static constexpr const char* script_folder_payload = "LoomScriptFolder";
 
@@ -552,8 +565,8 @@ namespace Loom
 		// panel's files do, so fields take them.
 		static constexpr const char* two_d_folder_payload = "Loom2DFolder";
 
-		// Takes a script dragged out of the Scripts panel onto a GameObject in
-		// the hierarchy, attaching it. Whether the drag was one.
+		// Takes a script or shader dragged out of the Scripts panel onto a
+		// GameObject in the hierarchy, attaching it. Whether the drag was one.
 		bool DropScript(GameObject* gameObject);
 
 		// Recompiles the shaders whose files something else has written, every
@@ -737,6 +750,7 @@ namespace Loom
 		// The project as it stood at the last scan, its textures aside.
 		AssetNode m_assets{ };
 		FolderWatch m_projectWatch;
+		KindFilter m_projectFilter;
 		std::string m_selectedAsset{ };
 		SearchBar m_assetSearch{ };
 
@@ -759,18 +773,22 @@ namespace Loom
 		// drawn, since opening one can rescan the tree being drawn.
 		std::string m_assetToOpen{ };
 
-		// Where a script is written, and whether it has been compiled.
+		// Where a script or shader is written, what the Scripts panel calls it,
+		// and whether it has been compiled.
 		struct ScriptEntry
 		{
-			std::string header;
-			bool state = false;
+			std::string file;
+			std::string label;
+			ScriptEntryKind kind = ScriptEntryKind::Script;
 			bool compiled = false;
 		};
 
-		// By name: each type the scripts project's headers declare as a script
-		// or its library registered.
+		// Each type the scripts project's headers declare as a script or its
+		// library registered, by name, and each of the project's shaders, by its
+		// path from the project.
 		std::map<std::string, ScriptEntry> m_scriptEntries{ };
 		ScriptFolders m_scriptFolders;
+		KindFilter m_scriptFilter;
 
 		// Saves to the headers rescan the Scripts panel.
 		FolderWatch m_scriptWatch;
@@ -785,6 +803,7 @@ namespace Loom
 		// project, as fields name it.
 		std::vector<std::string> m_twoDFiles{ };
 		TwoDFolders m_twoDFolders;
+		KindFilter m_twoDFilter;
 		std::string m_selectedTwoD{ };
 		bool m_revealSelectedTwoD = false;
 		FolderTree m_twoDFolderTree;

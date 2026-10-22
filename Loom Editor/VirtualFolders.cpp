@@ -8,16 +8,16 @@
 
 namespace Loom
 {
+	bool VirtualFolders::Alphabetical(const std::string& a, const std::string& b)
+	{
+		return std::ranges::lexicographical_compare(
+			a,
+			b,
+			[](unsigned char x, unsigned char y) { return std::tolower(x) < std::tolower(y); });
+	};
+
 	namespace
 	{
-		bool Alphabetical(const std::string& a, const std::string& b)
-		{
-			return std::ranges::lexicographical_compare(
-				a,
-				b,
-				[](unsigned char x, unsigned char y) { return std::tolower(x) < std::tolower(y); });
-		};
-
 		// The child of node called name, made if it is not there.
 		VirtualFolders::Node& ChildOf(VirtualFolders::Node& node, const std::string& name)
 		{
@@ -53,9 +53,9 @@ namespace Loom
 			std::sort(
 				node.children.begin(),
 				node.children.end(),
-				[](const VirtualFolders::Node& a, const VirtualFolders::Node& b) { return Alphabetical(a.name, b.name); });
+				[](const VirtualFolders::Node& a, const VirtualFolders::Node& b) { return VirtualFolders::Alphabetical(a.name, b.name); });
 
-			std::sort(node.items.begin(), node.items.end(), Alphabetical);
+			std::sort(node.items.begin(), node.items.end(), VirtualFolders::Alphabetical);
 
 			for (VirtualFolders::Node& child : node.children)
 				Sort(child);

@@ -12,8 +12,8 @@ namespace Loom
 	* Loom::VirtualFolders
 	* - A panel's folders: a tree its items are filed in, by name, apart from
 	*   wherever the items themselves live, so filing one moves nothing else.
-	*   The Scripts panel files script types in them, the 2D panel textures
-	*   and the Key Bindings panel actions
+	*   The Scripts panel files script types and shaders in them, the 2D
+	*   panel textures and the Key Bindings panel actions
 	* - Folders are paths with '/' between nested ones. An item filed nowhere
 	*   is at the top
 	* - A panel that keeps them in a file writes folder=<path> and
@@ -76,6 +76,10 @@ namespace Loom
 
 		// Whether path is folder or a folder inside it.
 		static bool IsAtOrUnder(const std::string& path, const std::string& folder);
+
+		// Whether a goes before b, whatever their case: the order Build files
+		// folders and items in.
+		static bool Alphabetical(const std::string& a, const std::string& b);
 
 		// The folder path up to its last separator, or empty at the top.
 		static std::string ParentOf(const std::string& folder);

@@ -122,6 +122,44 @@ namespace Loom
 			return kind == AssetKind::Texture;
 		};
 
+		// What each panel lists, in the order its filter shows them.
+		constexpr KindFilter::Kind projectKinds[] =
+		{
+			{ EditorIcons::Scene, "Scenes" },
+			{ EditorIcons::Prefab, "Prefabs" },
+			{ EditorIcons::Shader, "Shaders" },
+			{ EditorIcons::Model, "Models" },
+			{ EditorIcons::Sound, "Sounds" },
+			{ EditorIcons::Font, "Fonts" },
+		};
+
+		constexpr KindFilter::Kind scriptKinds[] =
+		{
+			{ EditorIcons::Script, "Scripts" },
+			{ EditorIcons::State, "States" },
+			{ EditorIcons::Shader, "Shaders" },
+		};
+
+		constexpr KindFilter::Kind twoDKinds[] =
+		{
+			{ EditorIcons::Texture, "Textures" },
+		};
+
+		const char* IconOf(ScriptEntryKind kind)
+		{
+			switch (kind)
+			{
+			case ScriptEntryKind::State:
+				return EditorIcons::State;
+
+			case ScriptEntryKind::Shader:
+				return EditorIcons::Shader;
+
+			default:
+				return EditorIcons::Script;
+			};
+		};
+
 		// Textures are uploaded bottom row first, so V is flipped.
 		const ImVec2 thumbnailTop(0.0f, 1.0f);
 		const ImVec2 thumbnailBottom(1.0f, 0.0f);
@@ -214,8 +252,13 @@ namespace Loom
 					if (child.children.empty() && held_elsewhere)
 						continue;
 				}
-				else if (path.extension() == SceneSerializer::extension)
-					scenes.push_back(child.path);
+				else
+				{
+					child.icon = IconOf(child.path);
+
+					if (path.extension() == SceneSerializer::extension)
+						scenes.push_back(child.path);
+				};
 
 				node.children.push_back(std::move(child));
 			};
@@ -526,28 +569,29 @@ namespace Loom
 		if (m_projectWatch.GetFolder() != m_projectPath)
 			m_projectWatch.Watch(m_projectPath, false);
 
-		RefreshScripts();
-
 		m_projectScenes.clear();
 		m_twoDFiles.clear();
 		m_noThumbnail.clear();
 		m_assets = AssetNode{ m_projectPath, "", true };
 
-		if (m_projectPath.empty())
-			return;
+		if (!m_projectPath.empty())
+		{
+			const std::filesystem::path build = m_scripts.HasProject()
+				? std::filesystem::path(m_scripts.GetLibrary()).parent_path().lexically_normal()
+				: std::filesystem::path();
 
-		const std::filesystem::path build = m_scripts.HasProject()
-			? std::filesystem::path(m_scripts.GetLibrary()).parent_path().lexically_normal()
-			: std::filesystem::path();
+			std::vector<std::string> textures{ };
 
-		std::vector<std::string> textures{ };
+			Scan(m_projectPath, build, m_assets, m_projectScenes, textures);
 
-		Scan(m_projectPath, build, m_assets, m_projectScenes, textures);
+			std::sort(m_projectScenes.begin(), m_projectScenes.end());
 
-		std::sort(m_projectScenes.begin(), m_projectScenes.end());
+			for (const std::string& texture : textures)
+				m_twoDFiles.push_back(ProjectAssets::RelativeTo(texture, m_projectPath));
+		};
 
-		for (const std::string& texture : textures)
-			m_twoDFiles.push_back(std::filesystem::path(texture).lexically_relative(m_projectPath).generic_string());
+		// After the scan, which finds the shaders.
+		RefreshScripts();
 	};
 
 	void Editor::DrawProject()
@@ -599,7 +643,7 @@ namespace Loom
 
 				m_assetSearch.Draw();
 
-				ImGui::BeginChild("##assets", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders);
+				ImGui::BeginChild("##assets", m_projectFilter.DrawUnder(projectKinds), ImGuiChildFlags_Borders);
 
 				if (m_assets.children.empty())
 					ImGui::TextDisabled("Nothing here yet. Right-click to create something.");
@@ -658,6 +702,11 @@ namespace Loom
 
 	void Editor::DrawAssetNode(const AssetNode& node, int depth, bool found)
 	{
+		const char* icon = node.folder ? EditorIcons::Folder : node.icon;
+
+		if (!m_projectFilter.Shows(icon))
+			return;
+
 		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth;
 
 		if (node.path == m_selectedAsset)
@@ -680,7 +729,7 @@ namespace Loom
 		else
 			flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 
-		const bool open = ImGui::TreeNodeEx(node.path.c_str(), flags, "%s %s", node.folder ? EditorIcons::Folder : IconOf(node.path), node.name.c_str());
+		const bool open = ImGui::TreeNodeEx(node.path.c_str(), flags, "%s %s", icon, node.name.c_str());
 
 		if (m_revealSelectedAsset && node.path == m_selectedAsset)
 			ImGui::ScrollToItem(ImGuiScrollFlags_KeepVisibleCenterY);
@@ -937,9 +986,7 @@ namespace Loom
 			Engine::QueueTask([blank]() { delete blank; });
 
 			if (parsed &&
-				WritePrefab(
-					std::filesystem::path(NewAssetPath()).lexically_normal().lexically_relative(m_projectPath).generic_string(),
-					prefab))
+				WritePrefab(ProjectAssets::RelativeTo(NewAssetPath(), m_projectPath), prefab))
 				path = NewAssetPath();
 			else error = "the prefab could not be written";
 			break;
@@ -1059,7 +1106,7 @@ namespace Loom
 
 		case ProjectAssets::Opener::Prefab:
 			OpenPrefab(std::filesystem::path(path).is_absolute()
-				? std::filesystem::path(path).lexically_normal().lexically_relative(m_projectPath).generic_string()
+				? ProjectAssets::RelativeTo(path, m_projectPath)
 				: std::filesystem::path(path).generic_string());
 			break;
 
@@ -1125,8 +1172,7 @@ namespace Loom
 		if (!ImGui::BeginDragDropSource())
 			return;
 
-		// Relative, the way components name the files they use.
-		const std::string relative = std::filesystem::path(node.path).lexically_relative(m_projectPath).generic_string();
+		const std::string relative = ProjectAssets::RelativeTo(node.path, m_projectPath);
 
 		ImGui::SetDragDropPayload(node.folder ? FOLDER_PAYLOAD : ASSET_PAYLOAD, relative.c_str(), relative.size() + 1);
 		if (node.folder)
@@ -1336,6 +1382,27 @@ namespace Loom
 	{
 		m_scriptEntries.clear();
 
+		const auto shaders = [&](const auto& self, const AssetNode& node) -> void
+		{
+			for (const AssetNode& child : node.children)
+			{
+				if (child.folder)
+				{
+					self(self, child);
+					continue;
+				};
+
+				const std::filesystem::path path(child.path);
+
+				if (path.extension() == ProjectAssets::shaderExtension)
+					m_scriptEntries.try_emplace(
+						ProjectAssets::RelativeTo(child.path, m_projectPath),
+						ScriptEntry{ child.path, path.stem().string(), ScriptEntryKind::Shader, true });
+			};
+		};
+
+		shaders(shaders, m_assets);
+
 		if (!m_scripts.HasProject())
 		{
 			m_scriptWatch.Watch("", false);
@@ -1346,6 +1413,9 @@ namespace Loom
 
 		if (m_scriptWatch.GetFolder() != root.string())
 			m_scriptWatch.Watch(root.string(), true);
+
+		// What the watch has seen so far, this scan takes in.
+		m_scriptWatch.Changed();
 
 		// Every type the headers declare, for the compiled scripts that do not
 		// look like one to DeclaredScripts.
@@ -1377,25 +1447,28 @@ namespace Loom
 				headers.try_emplace(type, path);
 
 			for (const ProjectAssets::DeclaredScript& script : ProjectAssets::DeclaredScripts(text))
-				m_scriptEntries.try_emplace(script.name, ScriptEntry{ path, script.state });
+				m_scriptEntries.try_emplace(
+					script.name,
+					ScriptEntry{ path, script.name, script.state ? ScriptEntryKind::State : ScriptEntryKind::Script });
 		};
 
-		const auto compiled = [&](const std::string& name, bool state)
+		const auto compiled = [&](const std::string& name, ScriptEntryKind kind)
 		{
 			ScriptEntry& entry = m_scriptEntries[name];
 
-			entry.state = state;
+			entry.label = name;
+			entry.kind = kind;
 			entry.compiled = true;
 
-			if (const auto found = headers.find(name); entry.header.empty() && found != headers.end())
-				entry.header = found->second;
+			if (const auto found = headers.find(name); entry.file.empty() && found != headers.end())
+				entry.file = found->second;
 		};
 
 		for (const std::string& type : m_scripts.GetTypes())
-			compiled(type, false);
+			compiled(type, ScriptEntryKind::Script);
 
 		for (const std::string& state : m_scripts.GetStates())
-			compiled(state, true);
+			compiled(state, ScriptEntryKind::State);
 	};
 
 	void Editor::DrawScripts()
@@ -1408,7 +1481,10 @@ namespace Loom
 
 		if (ImGui::Begin(EditorPanels::Scripts, &m_showScripts))
 		{
-			if (m_scriptWatch.Changed())
+			// A change anywhere in the project rescans its shaders as well as the scripts.
+			if (m_projectWatch.Changed())
+				RefreshProjectAssets();
+			else if (m_scriptWatch.Changed())
 				RefreshScripts();
 
 			if (m_revealSelectedScript)
@@ -1416,17 +1492,38 @@ namespace Loom
 
 			m_scriptFolderTree.DrawSearch();
 
-			ImGui::BeginChild("##scripts", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders);
+			ImGui::BeginChild("##scripts", m_scriptFilter.DrawUnder(scriptKinds), ImGuiChildFlags_Borders);
 
 			std::vector<std::string> names{ };
 
 			for (const auto& [name, entry] : m_scriptEntries)
-				names.push_back(name);
+				if (m_scriptFilter.Shows(IconOf(entry.kind)))
+					names.push_back(name);
 
-			const ScriptFolders::Node root = m_scriptFolders.Build(names);
+			ScriptFolders::Node root = m_scriptFolders.Build(names);
+
+			// By what each shows, so a shader sits among the scripts by its name
+			// rather than its path.
+			const auto by_label = [&](const auto& self, ScriptFolders::Node& node) -> void
+			{
+				std::stable_sort(
+					node.items.begin(),
+					node.items.end(),
+					[&](const std::string& a, const std::string& b)
+					{
+						return ScriptFolders::Alphabetical(m_scriptEntries.at(a).label, m_scriptEntries.at(b).label);
+					});
+
+				for (ScriptFolders::Node& child : node.children)
+					self(self, child);
+			};
+
+			by_label(by_label, root);
 
 			if (m_projectPath.empty())
 				ImGui::TextDisabled("No project open.");
+			else if (root.children.empty() && root.items.empty() && !m_scriptEntries.empty())
+				ImGui::TextDisabled("None of the kinds highlighted below.");
 			else if (root.children.empty() && root.items.empty())
 				ImGui::TextDisabled(m_scripts.HasProject()
 					? "No scripts yet. Right-click to create one."
@@ -1463,7 +1560,8 @@ namespace Loom
 	void Editor::DrawScriptEntry(const std::string& name)
 	{
 		const ScriptEntry& entry = m_scriptEntries.at(name);
-		const char* icon = entry.state ? EditorIcons::State : EditorIcons::Script;
+		const char* icon = IconOf(entry.kind);
+		const std::string& label = entry.label;
 
 		ImGuiTreeNodeFlags flags =
 			ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanAvailWidth;
@@ -1474,7 +1572,7 @@ namespace Loom
 		if (!entry.compiled)
 			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 
-		ImGui::TreeNodeEx(("script:" + name).c_str(), flags, "%s %s", icon, name.c_str());
+		ImGui::TreeNodeEx(("script:" + name).c_str(), flags, "%s %s", icon, label.c_str());
 
 		if (!entry.compiled)
 			ImGui::PopStyleColor();
@@ -1482,20 +1580,20 @@ namespace Loom
 		if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
 			m_selectedScript = name;
 
-		if (!entry.header.empty() &&
+		if (!entry.file.empty() &&
 			ImGui::IsItemHovered() &&
 			ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-			OpenAsset(entry.header);
+			OpenAsset(entry.file);
 
 		ImGui::SetItemTooltip(
 			"%s%s",
-			entry.header.empty() ? "Not in any of the scripts project's headers" : entry.header.c_str(),
+			entry.file.empty() ? "Not in any of the scripts project's headers" : entry.file.c_str(),
 			entry.compiled ? "" : "\nNot compiled yet");
 
 		if (ImGui::BeginDragDropSource())
 		{
 			ImGui::SetDragDropPayload(script_payload, name.c_str(), name.size() + 1);
-			ImGui::Text("%s %s", icon, name.c_str());
+			ImGui::Text("%s %s", icon, label.c_str());
 			ImGui::EndDragDropSource();
 		};
 
@@ -1506,11 +1604,11 @@ namespace Loom
 
 		const std::string folder = m_scriptFolders.FolderOf(name);
 
-		if (ImGui::MenuItem("Open", nullptr, false, !entry.header.empty()))
-			OpenAsset(entry.header);
+		if (ImGui::MenuItem("Open", nullptr, false, !entry.file.empty()))
+			OpenAsset(entry.file);
 
-		if (ImGui::MenuItem("Show in Explorer", nullptr, false, !entry.header.empty()))
-			ShowInExplorer(entry.header);
+		if (ImGui::MenuItem("Show in Explorer", nullptr, false, !entry.file.empty()))
+			ShowInExplorer(entry.file);
 
 		if (!folder.empty() && ImGui::MenuItem("Move to Top"))
 		{
@@ -1565,6 +1663,7 @@ namespace Loom
 		hooks.reveal = [this](const std::string& folder) { return m_revealSelectedScript && VirtualFolders::IsAtOrUnder(m_scriptFolders.FolderOf(m_selectedScript), folder); };
 		hooks.create = [this](const std::string& folder) { DrawScriptsCreateMenu(folder); };
 		hooks.item = [this](const std::string& script) { DrawScriptEntry(script); };
+		hooks.name = [this](const std::string& script) { return m_scriptEntries.at(script).label; };
 		hooks.changed = [this]() { SaveScriptFolders(); };
 
 		return hooks;
@@ -1588,12 +1687,16 @@ namespace Loom
 
 			m_twoDFolderTree.DrawSearch();
 
-			ImGui::BeginChild("##2d", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders);
+			ImGui::BeginChild("##2d", m_twoDFilter.DrawUnder(twoDKinds), ImGuiChildFlags_Borders);
 
-			const TwoDFolders::Node root = m_twoDFolders.Build(m_twoDFiles);
+			// Every file here is a texture.
+			static const std::vector<std::string> none{ };
+			const TwoDFolders::Node root = m_twoDFolders.Build(m_twoDFilter.Shows(EditorIcons::Texture) ? m_twoDFiles : none);
 
 			if (m_projectPath.empty())
 				ImGui::TextDisabled("No project open.");
+			else if (root.children.empty() && root.items.empty() && !m_twoDFiles.empty())
+				ImGui::TextDisabled("None of the kinds highlighted below.");
 			else if (root.children.empty() && root.items.empty())
 				ImGui::TextDisabled("No textures yet. Right-click to create one.");
 

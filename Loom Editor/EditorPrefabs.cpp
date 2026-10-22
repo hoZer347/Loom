@@ -158,7 +158,7 @@ namespace Loom
 		for (int copy = 2; std::filesystem::exists(file, code); copy++)
 			file = into / (name + " " + std::to_string(copy) + Prefab::extension);
 
-		const std::string path = file.lexically_normal().lexically_relative(m_projectPath).generic_string();
+		const std::string path = ProjectAssets::RelativeTo(file.string(), m_projectPath);
 
 		Prefabs::ObjectNode prefab;
 
