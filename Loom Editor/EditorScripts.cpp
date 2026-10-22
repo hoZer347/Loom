@@ -48,7 +48,7 @@ namespace Loom
 		m_projectFile.clear();
 		m_componentMenu.Clear();
 		m_scriptFolders.Clear();
-		m_artFolders.Clear();
+		m_twoDFolders.Clear();
 		InputActions::Set({ });
 
 		// Unless the project file names it otherwise.
@@ -71,7 +71,7 @@ namespace Loom
 			return;
 
 		m_scriptFolders.Load(ScriptFoldersFile());
-		m_artFolders.Load(ArtFoldersFile());
+		m_twoDFolders.Load(TwoDFoldersFile());
 		InputActions::Load(InputActionsFile());
 
 		std::ifstream in(m_projectFile);

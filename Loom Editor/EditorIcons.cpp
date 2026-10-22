@@ -1,6 +1,6 @@
 #include "EditorIcons.h"
 
-#include "ArtFolders.h"
+#include "TwoDFolders.h"
 #include "InputActions.h"
 #include "Prefab.h"
 #include "ProjectAssets.h"
@@ -40,8 +40,8 @@ namespace Loom
 		if (extension == ScriptFolders::extension)
 			return Script;
 
-		if (extension == ArtFolders::extension)
-			return Art;
+		if (extension == TwoDFolders::extension)
+			return TwoD;
 
 		if (extension == InputActions::extension)
 			return Bindings;

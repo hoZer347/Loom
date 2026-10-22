@@ -1,6 +1,6 @@
 #include "doctest.h"
 
-#include "ArtFolders.h"
+#include "TwoDFolders.h"
 #include "ScriptFolders.h"
 
 #include <filesystem>
@@ -10,7 +10,7 @@
 
 namespace
 {
-	using Loom::ArtFolders;
+	using Loom::TwoDFolders;
 	using Loom::ScriptFolders;
 
 	// The node at the folder's path under root, or null.
@@ -142,24 +142,24 @@ TEST_SUITE("ScriptFolders")
 		CHECK(loaded.Build({ "Patrol" }).children.empty());
 	};
 
-	TEST_CASE("the Art panel's textures come back filed by their paths, and its file holds none of the Scripts panel's")
+	TEST_CASE("the 2D panel's textures come back filed by their paths, and its file holds none of the Scripts panel's")
 	{
-		const std::filesystem::path art = std::filesystem::temp_directory_path() / "loom art folders.loomart";
-		const std::filesystem::path scripts = std::filesystem::temp_directory_path() / "loom art folders.loomscripts";
+		const std::filesystem::path two_d = std::filesystem::temp_directory_path() / "loom 2d folders.loom2d";
+		const std::filesystem::path scripts = std::filesystem::temp_directory_path() / "loom 2d folders.loomscripts";
 
-		ArtFolders saved;
+		TwoDFolders saved;
 		saved.Move("Assets/Units/Tank.png", "Units");
 		saved.Move("Assets/Units/Tank=Heavy.png", "Units");
 
-		REQUIRE(saved.Save(art.string()));
+		REQUIRE(saved.Save(two_d.string()));
 
 		ScriptFolders other;
 		other.Move("Patrol", "AI");
 
 		REQUIRE(other.Save(scripts.string()));
 
-		ArtFolders loaded;
-		loaded.Load(art.string());
+		TwoDFolders loaded;
+		loaded.Load(two_d.string());
 
 		CHECK(loaded.FolderOf("Assets/Units/Tank.png") == "Units");
 		CHECK(loaded.FolderOf("Assets/Units/Tank=Heavy.png") == "Units");
@@ -170,7 +170,7 @@ TEST_SUITE("ScriptFolders")
 		CHECK(loaded.FolderOf("Patrol").empty());
 		CHECK(loaded.AddFolder("", "a=b").empty());
 
-		std::filesystem::remove(art);
+		std::filesystem::remove(two_d);
 		std::filesystem::remove(scripts);
 	};
 };

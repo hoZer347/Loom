@@ -18,7 +18,7 @@
 #include "Prefabs.h"
 #include "SelectionOutline.h"
 #include "SceneHistory.h"
-#include "ArtFolders.h"
+#include "TwoDFolders.h"
 #include "FolderTree.h"
 #include "ScriptFolders.h"
 #include "ScriptLibrary.h"
@@ -84,7 +84,7 @@ namespace Loom
 	*   it; and everything loaded, from a camera the editor flies
 	* - Works out of a project folder: everything under it is listed in the
 	*   Project panel, which also creates new assets, apart from the textures,
-	*   which the Art panel lists and creates, and the scripts, which the
+	*   which the 2D panel lists and creates, and the scripts, which the
 	*   Scripts panel does. They are a C++ project that builds into a library
 	*   the editor loads
 	* - Reads and writes scenes through SceneSerializer, and shows the text form
@@ -221,7 +221,7 @@ namespace Loom
 		void QueueImport(const std::string& path);
 
 		// The same, with the mouse moved to x, y first, in ImGui's coordinates.
-		// Over the Project or Art panel, the file is copied into the folder
+		// Over the Project or 2D panel, the file is copied into the folder
 		// there instead.
 		void Drop(const std::string& path, float x, float y);
 
@@ -321,17 +321,17 @@ namespace Loom
 		std::string ScriptFoldersFile() const;
 		void SaveScriptFolders();
 
-		// The Art panel: the project's textures, in folders of its own kept
+		// The 2D panel: the project's textures, in folders of its own kept
 		// beside the .loomproject as the Scripts panel's are.
-		void DrawArt();
-		void DrawArtEntry(const std::string& file);
-		void DrawArtCreateMenu(const std::string& folder);
-		FolderTree::Hooks ArtFolderHooks();
-		std::string ArtFoldersFile() const;
-		void SaveArtFolders();
+		void DrawTwoD();
+		void DrawTwoDEntry(const std::string& file);
+		void DrawTwoDCreateMenu(const std::string& folder);
+		FolderTree::Hooks TwoDFolderHooks();
+		std::string TwoDFoldersFile() const;
+		void SaveTwoDFolders();
 
-		// Selects and shows the texture at path in the Art panel.
-		void RevealArt(const std::string& path);
+		// Selects and shows the texture at path in the 2D panel.
+		void RevealTwoD(const std::string& path);
 
 		// Where the project keeps its InputActions, beside its .loomproject in
 		// the same way. Empty for a folder with no project file.
@@ -490,7 +490,7 @@ namespace Loom
 		// mouse is over it.
 		void TakeImportTarget(GameObject* gameObject);
 
-		// The same for the Project and Art panels, with the folder a drop there
+		// The same for the Project and 2D panels, with the folder a drop there
 		// goes in.
 		void TakeImportFolder(const std::string& folder, bool hovered);
 
@@ -500,7 +500,7 @@ namespace Loom
 		void ClickQueued();
 
 		// Rescans the project folder: the asset tree the Project panel draws,
-		// the textures the Art panel does, and the scenes.
+		// the textures the 2D panel does, and the scenes.
 		void RefreshProjectAssets();
 
 		// Where ProjectAssets::OpenerOf says; the shell's opener is whatever
@@ -515,7 +515,7 @@ namespace Loom
 		// OpenAsset's.
 		static bool OpenInShell(ImGuiContext* context, const char* path);
 
-		// Lets a file be dragged out of the Project or Art panel, onto a field
+		// Lets a file be dragged out of the Project or 2D panel, onto a field
 		// that names a file or a GameObject in the hierarchy, and a file or
 		// folder onto another folder.
 		void DragAsset(const AssetNode& node);
@@ -542,9 +542,9 @@ namespace Loom
 		static constexpr const char* script_payload = "LoomScript";
 		static constexpr const char* script_folder_payload = "LoomScriptFolder";
 
-		// What the Art panel drags for a folder. Its textures go as the Project
+		// What the 2D panel drags for a folder. Its textures go as the Project
 		// panel's files do, so fields take them.
-		static constexpr const char* art_folder_payload = "LoomArtFolder";
+		static constexpr const char* two_d_folder_payload = "Loom2DFolder";
 
 		// Takes a script dragged out of the Scripts panel onto a GameObject in
 		// the hierarchy, attaching it. Whether the drag was one.
@@ -766,16 +766,16 @@ namespace Loom
 		// Where the Create prompt's script is filed once it is written.
 		std::string m_newScriptFolder{ };
 
-		// The Art panel's textures from the last scan, each by its path in the
+		// The 2D panel's textures from the last scan, each by its path in the
 		// project, as fields name it.
-		std::vector<std::string> m_artFiles{ };
-		ArtFolders m_artFolders;
-		std::string m_selectedArt{ };
-		bool m_revealSelectedArt = false;
-		FolderTree m_artFolderTree;
+		std::vector<std::string> m_twoDFiles{ };
+		TwoDFolders m_twoDFolders;
+		std::string m_selectedTwoD{ };
+		bool m_revealSelectedTwoD = false;
+		FolderTree m_twoDFolderTree;
 
 		// Where the Create prompt's texture is filed once it is written.
-		std::string m_newArtFolder{ };
+		std::string m_newTwoDFolder{ };
 
 		// The scene a session opens with: what the settings file said last time,
 		// and then whichever one this session last made active.
@@ -815,8 +815,8 @@ namespace Loom
 		bool m_showProject = true;
 		bool m_showScripts = true;
 		bool m_focusScripts = false;
-		bool m_showArt = true;
-		bool m_focusArt = false;
+		bool m_showTwoD = true;
+		bool m_focusTwoD = false;
 		bool m_showHierarchy = true;
 		bool m_hierarchyFocused = false;
 		bool m_showInspector = true;

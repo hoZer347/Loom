@@ -143,8 +143,8 @@
     <ClInclude Include="Editor.h" />
     <ClInclude Include="HiddenProcess.h" />
     <ClInclude Include="ScriptLibrary.h" />
-    <ClInclude Include="ArtFolders.h" />
     <ClInclude Include="ScriptFolders.h" />
+    <ClInclude Include="TwoDFolders.h" />
     <ClInclude Include="VirtualFolders.h" />
     <ClInclude Include="FolderTree.h" />
     <ClInclude Include="FolderWatch.h" />

@@ -12,7 +12,7 @@ namespace Loom
 	* Loom::VirtualFolders
 	* - A panel's folders: a tree its items are filed in, by name, apart from
 	*   wherever the items themselves live, so filing one moves nothing else.
-	*   The Scripts panel files script types in them, the Art panel textures
+	*   The Scripts panel files script types in them, the 2D panel textures
 	*   and the Key Bindings panel actions
 	* - Folders are paths with '/' between nested ones. An item filed nowhere
 	*   is at the top

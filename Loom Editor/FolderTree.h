@@ -13,7 +13,7 @@ namespace Loom
 {
 	/**
 	* Loom::FolderTree
-	* - A panel's VirtualFolders drawn as a tree, as the Scripts, Art and Key
+	* - A panel's VirtualFolders drawn as a tree, as the Scripts, 2D and Key
 	*   Bindings panels show theirs: a row a folder, opened by its arrow or a
 	*   double click, dragged into another, renamed in place and taken out
 	*   from its right-click menu, with the panel's items inside
