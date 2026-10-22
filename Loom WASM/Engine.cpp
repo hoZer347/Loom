@@ -137,7 +137,6 @@ namespace Loom
 		{
 			LOOM_STAGE("Build");
 
-			// Start the Dear ImGui frame
 			renderer->NewImGuiFrame();
 
 			if (onImGuiInput)
@@ -145,7 +144,6 @@ namespace Loom
 
 			ImGui::NewFrame();
 
-			// GUI
 			if (onGui)
 				onGui();
 			else if (Engine::doGUI)
@@ -160,7 +158,6 @@ namespace Loom
 		{
 			LOOM_STAGE("Draw");
 
-			// Rendering
 			ImGui::Render();
 			renderer->RenderImGui(ImGui::GetDrawData());
 		};

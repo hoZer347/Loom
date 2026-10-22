@@ -12,7 +12,7 @@
 #ifndef NDEBUG
 namespace
 {
-	constexpr std::chrono::milliseconds busy_for{ 2 };
+	constexpr std::chrono::milliseconds BUSY_FOR{ 2 };
 
 	// Spins rather than sleeps, since the web's main thread cannot sleep.
 	void Busy(std::chrono::milliseconds length)
@@ -61,11 +61,11 @@ TEST_SUITE("Profiler")
 
 			{
 				LOOM_STAGE("Profiler first part");
-				Busy(busy_for);
+				Busy(BUSY_FOR);
 			};
 
 			LOOM_STAGE("Profiler second part");
-			Busy(busy_for);
+			Busy(BUSY_FOR);
 		};
 
 		Loom::Profiler::EndFrame();
@@ -91,7 +91,7 @@ TEST_SUITE("Profiler")
 		CHECK(whole->start <= first->start);
 		CHECK(first->start + first->length <= second->start);
 		CHECK(whole->length >= first->length + second->length);
-		CHECK(first->length >= (double)busy_for.count());
+		CHECK(first->length >= (double)BUSY_FOR.count());
 	};
 
 	TEST_CASE("stages are listed in the order they began in the last frame")
@@ -128,7 +128,7 @@ TEST_SUITE("Profiler")
 		for (int run = 0; run < 2; run++)
 		{
 			LOOM_STAGE("Profiler twice");
-			Busy(busy_for);
+			Busy(BUSY_FOR);
 		};
 
 		Loom::Profiler::EndFrame();
@@ -137,7 +137,7 @@ TEST_SUITE("Profiler")
 		REQUIRE(ran.thread);
 
 		const double sum = ran.thread->rows[ran.row].peak;
-		CHECK(sum >= 2.0 * (double)busy_for.count());
+		CHECK(sum >= 2.0 * (double)BUSY_FOR.count());
 		CHECK(ran.thread->rows[ran.row].average == doctest::Approx(sum));
 
 		Loom::Profiler::EndFrame();
@@ -190,16 +190,16 @@ TEST_SUITE("Profiler")
 		if (Loom::Jobs::Threads() < 2)
 			return;
 
-		constexpr size_t chunks = 64;
-		constexpr std::chrono::milliseconds chunk_for{ 1 };
+		constexpr size_t CHUNKS = 64;
+		constexpr std::chrono::milliseconds CHUNK_FOR{ 1 };
 
 		{
 			LOOM_STAGE("Profiler spread");
 
-			Loom::Jobs::For(chunks, 1,
+			Loom::Jobs::For(CHUNKS, 1,
 				[&](size_t, size_t, size_t)
 				{
-					Busy(chunk_for);
+					Busy(CHUNK_FOR);
 				});
 		};
 

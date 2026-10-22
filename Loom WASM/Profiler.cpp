@@ -47,12 +47,14 @@ namespace Loom
 					Node& part = parts.emplace_back();
 					part.name = name;
 					part.first = frame;
-					part.last = frame;
 				};
 
 				std::rotate(parts.begin() + placed, parts.begin() + at, parts.begin() + at + 1);
 
-				return parts[placed++];
+				Node& part = parts[placed++];
+				part.last = frame;
+
+				return part;
 			};
 
 			std::string name{ };
@@ -130,10 +132,6 @@ namespace Loom
 		void Close(Node& node, unsigned long long frame)
 		{
 			node.history[frame % Profiler::Window] = node.sum;
-
-			if (node.sum > 0.0)
-				node.last = frame;
-
 			node.sum = 0.0;
 			node.placed = 0;
 

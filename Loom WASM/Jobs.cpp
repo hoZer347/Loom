@@ -214,10 +214,10 @@ namespace Loom
 			return;
 		};
 
-		Job job;
-		job.work = &work;
 		const char* const stage = Profiler::Current();
 
+		Job job;
+		job.work = &work;
 		job.stage = stage ? stage : UNSTAGED;
 		job.count = count;
 		job.grain = grain;

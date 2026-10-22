@@ -4028,9 +4028,11 @@ namespace Loom
 			const float left = corner.x + label_width;
 			const float width = (std::max)(ImGui::GetContentRegionAvail().x - label_width, narrowest_bar);
 
+			ImGui::PushID(thread.name.c_str());
 			ImGui::TextUnformatted(thread.name.c_str());
 			ImGui::SetCursorScreenPos(ImVec2(left, corner.y));
-			ImGui::InvisibleButton(thread.name.c_str(), ImVec2(width, lane * (float)(deepest + 1)));
+			ImGui::InvisibleButton("##lanes", ImVec2(width, lane * (float)(deepest + 1)));
+			ImGui::PopID();
 
 			const bool hovered = ImGui::IsItemHovered();
 			const Profiler::Span* under = nullptr;
@@ -4058,15 +4060,20 @@ namespace Loom
 
 		ImGui::TextDisabled("Milliseconds a frame over the last %d", Profiler::Window);
 
+		// Stage, Average and Peak.
 		constexpr int columns = 3;
 
 		for (const Profiler::Thread& thread : threads)
 		{
-			if (!ImGui::CollapsingHeader(thread.name.c_str(), &thread == &threads.front() ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None))
-				continue;
+			ImGui::PushID(thread.name.c_str());
 
-			if (!ImGui::BeginTable(thread.name.c_str(), columns, ImGuiTableFlags_RowBg))
+			const bool open = ImGui::CollapsingHeader(thread.name.c_str(), &thread == &threads.front() ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None);
+
+			if (!open || !ImGui::BeginTable("##stages", columns, ImGuiTableFlags_RowBg))
+			{
+				ImGui::PopID();
 				continue;
+			};
 
 			ImGui::TableSetupColumn("Stage", ImGuiTableColumnFlags_WidthStretch);
 			ImGui::TableSetupColumn("Average", ImGuiTableColumnFlags_WidthFixed);
@@ -4089,6 +4096,7 @@ namespace Loom
 			};
 
 			ImGui::EndTable();
+			ImGui::PopID();
 		};
 	};
 };

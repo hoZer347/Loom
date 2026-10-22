@@ -57,6 +57,7 @@ namespace Loom
 			double peak;
 		};
 
+		// What one thread ran, as of the last frame.
 		struct Thread
 		{
 			std::string name;
