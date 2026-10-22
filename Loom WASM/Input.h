@@ -72,10 +72,9 @@ namespace Loom
 		// the window's top left, and the window's size.
 		static void OnMouseMove(int x, int y, int window_width, int window_height);
 
-		// What the platform reports as the cursor leaves the window. It is
-		// outside the view from then until it moves over the window again, and
-		// is until it first does: a cursor that has not come over the window,
-		// such as a page's before the mouse moves onto it, is not in the corner.
+		// What the platform reports as the cursor leaves the window. The cursor
+		// is outside the view whenever it is not over the window: since it left,
+		// or before it first came over, as on a page the mouse has not touched.
 		static void OnMouseLeave();
 
 		// What the platform's resize callback reports: the window's size.
