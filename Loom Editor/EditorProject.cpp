@@ -1055,9 +1055,6 @@ namespace Loom
 			m_selectedScript = name;
 			m_revealSelectedScript = true;
 			m_focusScripts = true;
-
-			// Not listed until the headers are scanned again.
-			m_scriptFilter.Show(InfoOf(m_newAssetKind).icon, true);
 		}
 		else if (IsTwoD(m_newAssetKind))
 		{
