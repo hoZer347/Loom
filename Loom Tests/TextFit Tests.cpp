@@ -85,6 +85,12 @@ TEST_SUITE("TextFit")
 	{
 		Measuring measuring;
 
+		// What the font has no glyph for, the stray bytes of a cut character
+		// among them, narrower than é, so a tail starting inside é would fit
+		// where é itself does not.
+		constexpr float narrow_fallback = 1.0f;
+		ImGui::GetFontBaked()->FallbackAdvanceX = narrow_fallback;
+
 		// é, then ✓, two and three bytes long in UTF-8.
 		const std::string text = "Caf\xC3\xA9 \xE2\x9C\x93 Game";
 		constexpr unsigned char continuation_mask = 0xC0;
@@ -94,7 +100,7 @@ TEST_SUITE("TextFit")
 		for (float width = 0.0f; width <= Width(text); width += step)
 		{
 			const std::string shown = Loom::FitTail(text, width);
-			const std::string kept = shown.substr(shown.rfind(Loom::ellipsis) == 0 ? std::string(Loom::ellipsis).size() : 0);
+			const std::string kept = shown.substr(shown.starts_with(Loom::ellipsis) ? std::string(Loom::ellipsis).size() : 0);
 
 			CAPTURE(width);
 			CHECK(text.ends_with(kept));
