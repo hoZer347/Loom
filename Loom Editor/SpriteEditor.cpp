@@ -75,6 +75,9 @@ namespace Loom
 
 		constexpr float milliseconds = 1000.0f;
 
+		// How fast the timeline scrolls while a layer is held past its top or
+		// bottom row.
+		constexpr float held_scroll_rows = 8.0f;
 
 		// A new palette starts with the sprite's own colours, as many as fit.
 		constexpr size_t seeded_colours = 64;
@@ -646,8 +649,17 @@ namespace Loom
 		};
 
 		// The row the mouse is over, for a held layer to move to once the rows
-		// are drawn, since they hold the layers.
+		// are drawn, since they hold the layers. Only rows in sight count, the
+		// top and bottom of which are kept for a layer held past them.
+		struct ShownRow
+		{
+			int layer;
+			float edge;
+		};
+
 		std::optional<int> under;
+		std::optional<ShownRow> top_shown;
+		std::optional<ShownRow> bottom_shown;
 
 		// The top layer first, as they stack.
 		for (int layer = shown_layers - 1; layer >= 0; layer--)
@@ -711,9 +723,19 @@ namespace Loom
 
 			ImGui::SetItemTooltip("Drag up or down to move it. Right-click to rename");
 
-			if (const float mouse_y = ImGui::GetIO().MousePos.y;
-				mouse_y >= ImGui::GetItemRectMin().y && mouse_y < ImGui::GetItemRectMax().y)
-				under = layer;
+			if (ImGui::IsItemVisible())
+			{
+				const float top = ImGui::GetItemRectMin().y;
+				const float bottom = ImGui::GetItemRectMax().y;
+
+				if (const float mouse_y = ImGui::GetIO().MousePos.y; mouse_y >= top && mouse_y < bottom)
+					under = layer;
+
+				if (!top_shown)
+					top_shown = ShownRow{ layer, top };
+
+				bottom_shown = ShownRow{ layer, bottom };
+			};
 
 			if (ImGui::BeginPopupContextItem("##rename"))
 			{
@@ -754,6 +776,25 @@ namespace Loom
 			};
 
 			ImGui::PopID();
+		};
+
+		// Held past the rows in sight, the layer goes to the one at that edge
+		// and the rows scroll on to bring more into sight.
+		if (document.grabbed >= 0 && !under && top_shown)
+		{
+			const float mouse_y = ImGui::GetIO().MousePos.y;
+			const float step = ImGui::GetIO().DeltaTime * held_scroll_rows * ImGui::GetFrameHeightWithSpacing();
+
+			if (mouse_y < top_shown->edge)
+			{
+				ImGui::SetScrollY((std::max)(0.0f, ImGui::GetScrollY() - step));
+				under = top_shown->layer;
+			}
+			else if (mouse_y >= bottom_shown->edge)
+			{
+				ImGui::SetScrollY((std::min)(ImGui::GetScrollMaxY(), ImGui::GetScrollY() + step));
+				under = bottom_shown->layer;
+			};
 		};
 
 		ImGui::EndTable();

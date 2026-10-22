@@ -907,4 +907,38 @@ TEST_SUITE("SpriteEditor")
 		CHECK(saved.layers[1].name == "Layer 1");
 		CHECK(saved.layers[2].name == "Layer 3");
 	};
+
+	TEST_CASE("a layer held above the timeline's rows climbs past those out of sight, the rows scrolling with it")
+	{
+		constexpr int layers = 6;
+		constexpr int held_frames = 120;
+		constexpr int scroll_to_bottom = -10;
+
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+
+		for (int layer = 1; layer < layers; layer++)
+			sprite.AddLayer(layer, "Layer " + std::to_string(layer + 1));
+
+		Driven driven("loom sprite scrolled layers.tga", &sprite);
+		ImGuiIO& io = ImGui::GetIO();
+
+		// The bottom layer comes into sight at the foot of the rows, and the
+		// mouse holds it up by the buttons above them.
+		driven.Run("move \"Sprites\" \"Layer 4\"\nscroll " + std::to_string(scroll_to_bottom) + "\nwait 2\nmove \"Sprites\" \"Layer 1\"\nwait 2\n");
+		io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+		driven.Frame();
+		driven.Run("move \"Sprites\" \"+ Layer\"\nwait " + std::to_string(held_frames) + "\n");
+		io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+		driven.Frame();
+
+		REQUIRE(driven.editor.SaveAll());
+
+		SpriteAsset saved;
+		SpriteAsset::Links links;
+		REQUIRE(SpriteAsset::Load(SpriteAsset::For(driven.path), saved, links));
+
+		REQUIRE(saved.layers.size() == layers);
+		CHECK(saved.layers.back().name == "Layer 1");
+		CHECK(saved.layers.front().name == "Layer 2");
+	};
 };
