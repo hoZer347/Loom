@@ -236,8 +236,9 @@ namespace Loom
 
 		// Writes the editor as it stands - panels and all - to a bitmap once the
 		// given number of frames have gone by, so a scene can be looked at
-		// without a visible window.
-		void RequestScreenshot(const std::string& path, int after_frames, bool exit_after);
+		// without a visible window. Given a window, only the first shown one
+		// whose name contains it.
+		void RequestScreenshot(const std::string& path, int after_frames, bool exit_after, const std::string& window = "");
 
 		// Imports a model file once the next frame has drawn the panels, into
 		// whatever the mouse is over: a Hierarchy node, one of the views, or
@@ -1041,6 +1042,7 @@ namespace Loom
 		int m_sceneFocusFrames = 0;
 
 		std::string m_screenshotPath{ };
+		std::string m_screenshotWindow{ };
 		int m_screenshotFrame = 0;
 		bool m_screenshotExits = false;
 		int m_frame = 0;

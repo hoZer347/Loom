@@ -10,6 +10,7 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <string>
 
@@ -511,5 +512,82 @@ TEST_SUITE("UiScript")
 		ui.script->WriteItems(unheard);
 
 		CHECK(unheard.str().empty());
+	};
+
+	TEST_CASE("a window's region is where it was drawn, in framebuffer pixels, and none once it is closed")
+	{
+		constexpr float corner = 10.0f;
+		constexpr float side = 300.0f;
+		constexpr float scale = 2.0f;
+
+		ScriptedUi ui("wait 2\n");
+		ImGui::GetIO().DisplayFramebufferScale = ImVec2(scale, scale);
+
+		ui.Run([]()
+			{
+				Panel(
+					[]()
+					{
+						ImGui::BeginChild("Inner");
+						ImGui::EndChild();
+					});
+			});
+
+		const std::optional<Loom::Engine::Region> region = Loom::UiScript::WindowRegion("Pan");
+
+		REQUIRE(region.has_value());
+		CHECK(region->x == (int)(corner * scale));
+		CHECK(region->y == (int)(corner * scale));
+		CHECK(region->width == (int)(side * scale));
+		CHECK(region->height == (int)(side * scale));
+
+		// The panel's child is named after it, and is not what is meant.
+		CHECK_FALSE(Loom::UiScript::WindowRegion("Inner").has_value());
+		CHECK_FALSE(Loom::UiScript::WindowRegion("Missing").has_value());
+
+		ui.script->Run("wait 2\n");
+		ui.Run([]() { });
+
+		CHECK_FALSE(Loom::UiScript::WindowRegion("Panel").has_value());
+	};
+
+	TEST_CASE("a docked window behind another tab has no region")
+	{
+		ScriptedUi ui("wait 1\n");
+		ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+		// The dock builder needs settings loaded, which the first frame does.
+		ui.Run([]() { });
+
+		const ImGuiID node = ImGui::DockBuilderAddNode(0, ImGuiDockNodeFlags_None);
+		ImGui::DockBuilderSetNodePos(node, ImVec2(0.0f, 0.0f));
+		ImGui::DockBuilderSetNodeSize(node, ImGui::GetIO().DisplaySize);
+		ImGui::DockBuilderDockWindow("Front", node);
+		ImGui::DockBuilderDockWindow("Behind", node);
+		ImGui::DockBuilderFinish(node);
+
+		ui.script->Run("wait 3\n");
+		ui.Run([]()
+			{
+				ImGui::Begin("Front");
+				ImGui::End();
+				ImGui::Begin("Behind");
+				ImGui::End();
+			});
+
+		// The last docked window takes the tab.
+		CHECK_FALSE(Loom::UiScript::WindowRegion("Front"));
+		CHECK(Loom::UiScript::WindowRegion("Behind"));
+	};
+
+	TEST_CASE("a screenshot of a window not showing fails the script, saying which")
+	{
+		CapturedErrors errors;
+		ScriptedUi ui("wait 1\nscreenshot shot.bmp \"Missing\"\n");
+
+		ui.Run([]() { Panel([]() { }); });
+
+		CHECK(ui.script->Failed());
+		CHECK(errors.text.str().find("Missing") != std::string::npos);
 	};
 };

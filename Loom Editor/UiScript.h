@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Engine.h"
 #include "ImGuiItemHooks.h"
 
 #include "imgui_internal.h"
@@ -7,6 +8,7 @@
 #include <deque>
 #include <filesystem>
 #include <functional>
+#include <optional>
 #include <ostream>
 #include <string>
 #include <unordered_map>
@@ -32,7 +34,9 @@ namespace Loom
 	*     scroll <notches>     turns the wheel where the mouse is, away from you
 	*                          positive
 	*     type <text>          the rest of the line
-	*     screenshot <file>    the whole window, as a bitmap
+	*     screenshot <file> [window]
+	*                          the whole window as a bitmap, or only the first
+	*                          shown window whose name contains window
 	*     items [file]         every labelled item drawn last frame, to the file
 	*                          or the console: window, label, x, y, width, height
 	*     quit
@@ -77,6 +81,11 @@ namespace Loom
 
 		// What items lists, from the windows whose names contain window.
 		void WriteItems(std::ostream& out, const std::string& window = "") const;
+
+		// Where the first window whose name contains window was drawn last
+		// frame, in the framebuffer's pixels. None when it is closed or behind
+		// another tab.
+		static std::optional<Engine::Region> WindowRegion(const std::string& window);
 
 		void ItemAdded(ImGuiID id, const ImRect& rect) override;
 		void ItemLabelled(ImGuiID id, const char* label) override;

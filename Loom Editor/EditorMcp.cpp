@@ -628,12 +628,18 @@ namespace Loom
 			return Text(LogFrom(first_id, errors_only, limit));
 		};
 
-		json Screenshot(Context& context, const json&)
+		json Screenshot(Context& context, const json& arguments)
 		{
 			Renderer* renderer = Renderer::Get();
 
 			if (renderer == nullptr)
 				throw ToolError("there is no renderer to capture from");
+
+			const std::string window = OptionalArgument(arguments, "window");
+			const std::optional<Engine::Region> region = window.empty() ? std::nullopt : UiScript::WindowRegion(window);
+
+			if (!window.empty() && !region)
+				throw ToolError("no window whose name contains \"" + window + "\" is showing");
 
 			struct Capture
 			{
@@ -645,9 +651,12 @@ namespace Loom
 			auto capture = std::make_shared<Capture>();
 
 			renderer->Capture(
-				[capture](int width, int height, const std::vector<uint8_t>& rgb)
+				[capture, region](int width, int height, const std::vector<uint8_t>& captured)
 				{
 					capture->taken = true;
+
+					const std::vector<uint8_t> cut = region ? Engine::Crop(*region, width, height, captured) : std::vector<uint8_t>{ };
+					const std::vector<uint8_t>& rgb = region ? cut : captured;
 
 					if (width <= 0 || height <= 0)
 					{
@@ -855,8 +864,8 @@ namespace Loom
 			},
 			{
 				"screenshot",
-				"The whole editor window as a PNG, as the next frame draws it.",
-				no_arguments,
+				"The whole editor window as a PNG, as the next frame draws it, or only one panel in it.",
+				R"({ "type": "object", "properties": { "window": { "type": "string", "description": "Only the first shown window whose name contains this, such as Inspector" } } })",
 				Screenshot,
 			},
 			{

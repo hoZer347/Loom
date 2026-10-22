@@ -179,4 +179,47 @@ TEST_SUITE("Engine")
 
 		CHECK_FALSE(called);
 	};
+
+	TEST_CASE("Crop cuts a region from the top left out of a capture stored bottom row first, clipped to it")
+	{
+		constexpr int width = 3;
+		constexpr int height = 2;
+		constexpr int channels = 3;
+
+		// Every byte its own index, so each pixel can be told from the rest.
+		std::vector<uint8_t> rgb(width * height * channels);
+		for (size_t i = 0; i < rgb.size(); i++)
+			rgb[i] = (uint8_t)i;
+
+		const auto pixel = [&rgb](int stored_row, int column)
+		{
+			const size_t at = ((size_t)stored_row * width + column) * channels;
+			return std::vector<uint8_t>(rgb.begin() + at, rgb.begin() + at + channels);
+		};
+
+		int cutWidth = width;
+		int cutHeight = height;
+		const std::vector<uint8_t> top = Loom::Engine::Crop({ 1, 0, 2, 1 }, cutWidth, cutHeight, rgb);
+
+		CHECK(cutWidth == 2);
+		CHECK(cutHeight == 1);
+
+		std::vector<uint8_t> expected = pixel(1, 1);
+		const std::vector<uint8_t> next = pixel(1, 2);
+		expected.insert(expected.end(), next.begin(), next.end());
+		CHECK(top == expected);
+
+		cutWidth = width;
+		cutHeight = height;
+		const std::vector<uint8_t> clipped = Loom::Engine::Crop({ 2, 1, 5, 5 }, cutWidth, cutHeight, rgb);
+
+		CHECK(cutWidth == 1);
+		CHECK(cutHeight == 1);
+		CHECK(clipped == pixel(0, 2));
+
+		cutWidth = width;
+		cutHeight = height;
+		CHECK(Loom::Engine::Crop({ width, 0, 1, 1 }, cutWidth, cutHeight, rgb).empty());
+		CHECK(cutWidth == 0);
+	};
 };

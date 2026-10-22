@@ -186,6 +186,8 @@ namespace
 			<< "  --vulkan, --opengl             run on that graphics API this time\n"
 			<< "  --screenshot <file> [frames]   write the editor to a bitmap and exit,\n"
 			<< "                                 without showing a window\n"
+			<< "  --screenshot-window <name>     only the first shown window whose name\n"
+			<< "                                 contains name, such as Inspector\n"
 			<< "  --ui-script <file>             click, type and screenshot through the UI\n"
 			<< "                                 from a script (see UiScript.h), then exit,\n"
 			<< "                                 without showing a window\n"
@@ -384,6 +386,7 @@ int main(int argc, char** argv)
 		bool open_project_dialog = false;
 		bool settings = false;
 		std::string screenshot;
+		std::string screenshot_window;
 		std::string preview;
 		std::string selection;
 		std::string new_script;
@@ -433,6 +436,16 @@ int main(int argc, char** argv)
 				// for the scene to have been ticked.
 				if (i + 1 < argc && isdigit((unsigned char)argv[i + 1][0]))
 					frames = atoi(argv[++i]);
+			}
+			else if (argument == "--screenshot-window")
+			{
+				if (i + 1 >= argc)
+				{
+					std::cerr << "--screenshot-window needs a window's name" << std::endl;
+					return 1;
+				};
+
+				screenshot_window = argv[++i];
 			}
 			else if (argument == "--ui-script")
 			{
@@ -688,7 +701,7 @@ int main(int argc, char** argv)
 			editor.RequestSelection(selection);
 
 		if (!screenshot.empty())
-			editor.RequestScreenshot(screenshot, frames, true);
+			editor.RequestScreenshot(screenshot, frames, true, screenshot_window);
 
 		// The server's ui tool runs its commands through the same UiScript as a
 		// --ui-script run, since only one can listen to ImGui's items.

@@ -480,14 +480,26 @@ namespace Loom
 					return Result::Done;
 				});
 		}
-		else if (verb == "screenshot" && tokens.size() == 2)
+		else if (verb == "screenshot" && (tokens.size() == 2 || tokens.size() == 3))
 		{
 			const std::string path = (m_folder / tokens[1]).string();
+			const std::optional<std::string> window = tokens.size() == 3 ? std::optional(tokens[2]) : std::nullopt;
 
 			m_actions.push_back(
-				[path]()
+				[this, path, window]()
 				{
-					Engine::CaptureFrame(path);
+					if (!window)
+					{
+						Engine::CaptureFrame(path);
+						return Result::Done;
+					};
+
+					const std::optional<Engine::Region> region = WindowRegion(*window);
+
+					if (region)
+						Engine::CaptureFrame(path, region);
+					else Fail("no window whose name contains \"" + *window + "\" is showing");
+
 					return Result::Done;
 				});
 		}
@@ -643,6 +655,25 @@ namespace Loom
 					<< item.max.y - item.min.y << '\n';
 
 		out.flush();
+	};
+
+	std::optional<Engine::Region> UiScript::WindowRegion(const std::string& window)
+	{
+		const ImVec2 origin = ImGui::GetMainViewport()->Pos;
+		const ImVec2 scale = ImGui::GetIO().DisplayFramebufferScale;
+
+		for (const ImGuiWindow* shown : ImGui::GetCurrentContext()->Windows)
+			if (std::string(shown->Name).find(window) != std::string::npos &&
+				((shown->Flags & ImGuiWindowFlags_ChildWindow) == 0 || shown->DockIsActive) &&
+				shown->WasActive &&
+				!shown->Hidden)
+				return Engine::Region{
+					(int)((shown->Pos.x - origin.x) * scale.x),
+					(int)((shown->Pos.y - origin.y) * scale.y),
+					(int)(shown->Size.x * scale.x),
+					(int)(shown->Size.y * scale.y) };
+
+		return std::nullopt;
 	};
 
 	void UiScript::ReleaseHeld()

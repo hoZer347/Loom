@@ -5,6 +5,7 @@
 
 #include <functional>
 #include <mutex>
+#include <optional>
 #include <queue>
 #include <string>
 #include <iostream>
@@ -88,11 +89,23 @@ namespace Loom
 
 		static void renderFrame();
 
-		// Writes this frame, once it is finished, to a 24 bit bitmap. Works on a
-		// hidden window, which is what lets an automated run look at a frame
-		// without putting it on screen. Says on the console what it wrote, or
-		// why it did not.
-		static void CaptureFrame(const std::string& path);
+		// A part of the window, in its pixels from the top left.
+		struct Region
+		{
+			int x = 0;
+			int y = 0;
+			int width = 0;
+			int height = 0;
+		};
+
+		// Writes this frame, once it is finished, to a 24 bit bitmap, or only
+		// the region of it. Works on a hidden window, which is what lets an
+		// automated run look at a frame without putting it on screen. Says on
+		// the console what it wrote, or why it did not.
+		static void CaptureFrame(const std::string& path, const std::optional<Region>& region = std::nullopt);
+
+		// The region of a capture, clipped to it, with width and height made its.
+		static std::vector<uint8_t> Crop(const Region& region, int& width, int& height, const std::vector<uint8_t>& rgb);
 
 		static inline bool isRunning;
 

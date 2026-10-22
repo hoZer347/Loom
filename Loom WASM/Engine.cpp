@@ -280,17 +280,40 @@ namespace Loom
 		Profiler::EndFrame();
 	};
 
-	void Engine::CaptureFrame(const std::string& path)
+	void Engine::CaptureFrame(const std::string& path, const std::optional<Region>& region)
 	{
 		renderer->Capture(
-			[path](int width, int height, const std::vector<uint8_t>& rgb)
+			[path, region](int width, int height, const std::vector<uint8_t>& captured)
 			{
+				const std::vector<uint8_t> cut = region ? Crop(*region, width, height, captured) : std::vector<uint8_t>{ };
+				const std::vector<uint8_t>& rgb = region ? cut : captured;
+
 				if (width <= 0 || height <= 0)
 					std::cerr << "Nothing to capture: the window has no size" << std::endl;
 				else if (!WriteBitmap(path, width, height, rgb))
 					std::cerr << "Could not write " << path << std::endl;
 				else std::cout << "Wrote " << path << " (" << width << 'x' << height << ')' << std::endl;
 			});
+	};
+
+	std::vector<uint8_t> Engine::Crop(const Region& region, int& width, int& height, const std::vector<uint8_t>& rgb)
+	{
+		const int left = std::clamp(region.x, 0, width);
+		const int right = std::clamp(region.x + region.width, left, width);
+		const int top = std::clamp(region.y, 0, height);
+		const int bottom = std::clamp(region.y + region.height, top, height);
+		const size_t row = (size_t)(right - left) * BYTES_PER_PIXEL;
+
+		std::vector<uint8_t> cut(row * (bottom - top));
+
+		// Rows run from the bottom up, so the region's lowest comes first.
+		for (int y = 0; y < bottom - top; y++)
+			std::copy_n(rgb.data() + ((size_t)(height - bottom + y) * width + left) * BYTES_PER_PIXEL, row, cut.data() + y * row);
+
+		width = right - left;
+		height = bottom - top;
+
+		return cut;
 	};
 
 	void Engine::SetUpdateFunction(const Task& task)

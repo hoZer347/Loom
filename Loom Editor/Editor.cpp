@@ -34,6 +34,7 @@
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
 #include "TextFit.h"
+#include "UiScript.h"
 
 #include "OpenGL.h"
 
@@ -1974,7 +1975,11 @@ namespace Loom
 
 	void Editor::CaptureFrame()
 	{
-		Engine::CaptureFrame(m_screenshotPath);
+		if (m_screenshotWindow.empty())
+			Engine::CaptureFrame(m_screenshotPath);
+		else if (const std::optional<Engine::Region> region = UiScript::WindowRegion(m_screenshotWindow))
+			Engine::CaptureFrame(m_screenshotPath, region);
+		else std::cerr << "No window whose name contains \"" << m_screenshotWindow << "\" is showing" << std::endl;
 
 		m_screenshotPath.clear();
 
@@ -1982,9 +1987,10 @@ namespace Loom
 			Engine::Stop();
 	};
 
-	void Editor::RequestScreenshot(const std::string& path, int after_frames, bool exit_after)
+	void Editor::RequestScreenshot(const std::string& path, int after_frames, bool exit_after, const std::string& window)
 	{
 		m_screenshotPath = path;
+		m_screenshotWindow = window;
 		m_screenshotFrame = after_frames;
 		m_screenshotExits = exit_after;
 		m_frame = 0;
