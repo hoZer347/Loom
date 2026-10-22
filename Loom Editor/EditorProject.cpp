@@ -637,9 +637,15 @@ namespace Loom
 				if (ImGui::Button(change))
 					m_dialogs->folder.Open();
 
-				// Something new is selected to be shown, which the search may hide.
+				// Something new is selected to be shown, which the search or the
+				// filter may hide.
 				if (m_revealSelectedAsset)
+				{
 					m_assetSearch.Clear();
+
+					if (std::error_code code; !std::filesystem::is_directory(m_selectedAsset, code))
+						m_projectFilter.Show(IconOf(m_selectedAsset), true);
+				};
 
 				m_assetSearch.Draw();
 
@@ -799,6 +805,9 @@ namespace Loom
 
 	bool Editor::ShowsAsset(const AssetNode& node) const
 	{
+		if (!node.folder && !m_projectFilter.Shows(node.icon))
+			return false;
+
 		return m_assetSearch.Matches(node.name) ||
 			std::ranges::any_of(node.children, [this](const AssetNode& child) { return ShowsAsset(child); });
 	};
@@ -1046,6 +1055,9 @@ namespace Loom
 			m_selectedScript = name;
 			m_revealSelectedScript = true;
 			m_focusScripts = true;
+
+			// Not listed until the headers are scanned again.
+			m_scriptFilter.Show(InfoOf(m_newAssetKind).icon, true);
 		}
 		else if (IsTwoD(m_newAssetKind))
 		{
@@ -1488,7 +1500,12 @@ namespace Loom
 				RefreshScripts();
 
 			if (m_revealSelectedScript)
+			{
 				m_scriptFolderTree.ClearSearch();
+
+				if (const auto entry = m_scriptEntries.find(m_selectedScript); entry != m_scriptEntries.end())
+					m_scriptFilter.Show(IconOf(entry->second.kind), true);
+			};
 
 			m_scriptFolderTree.DrawSearch();
 
@@ -1683,7 +1700,10 @@ namespace Loom
 				RefreshProjectAssets();
 
 			if (m_revealSelectedTwoD)
+			{
 				m_twoDFolderTree.ClearSearch();
+				m_twoDFilter.Show(EditorIcons::Texture, true);
+			};
 
 			m_twoDFolderTree.DrawSearch();
 
