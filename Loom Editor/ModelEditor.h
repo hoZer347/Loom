@@ -101,6 +101,7 @@ namespace Loom
 		// What the toolbar's buttons do, to the tab in front. Each change is one
 		// step for undo.
 		void SetPick(Pick pick);
+		void SetTool(Tool tool) { m_tool = tool; };
 		void SelectAll();
 		void SelectNone();
 		void Extrude();

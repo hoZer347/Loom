@@ -249,6 +249,46 @@ TEST_CASE("The Model panel's move arrow lifts the picked face, and undo puts it 
 	CHECK(std::abs(driven.Mesh().FaceCentre(face).y - moved.y) < TOLERANCE);
 };
 
+TEST_CASE("The Model panel's middle handles size and turn the picked face about its middle")
+{
+	// How far the middle handles are dragged, in screen pixels: right and up
+	// to size, and a quarter of the way round the outer ring to turn.
+	constexpr float pull = 40.0f;
+	constexpr float ring = 112.5f;
+
+	Driven driven("model_size_turn");
+
+	driven.editor.SetPick(ModelEditor::Pick::Faces);
+	driven.Click(driven.Screen(glm::vec3(0.1f, 0.5f, 0.1f)));
+	REQUIRE(driven.editor.Selected()->faces.size() == 1);
+
+	const uint32_t face = *driven.editor.Selected()->faces.begin();
+	const glm::vec3 centre = driven.Mesh().FaceCentre(face);
+	const auto side = [&]()
+	{
+		const std::vector<EditableMesh::Corner>& corners = driven.Mesh().faces[face].corners;
+		return glm::distance(driven.Mesh().vertices[corners[0].vertex], driven.Mesh().vertices[corners[1].vertex]);
+	};
+
+	const ImVec2 middle = driven.Screen(centre);
+
+	driven.editor.SetTool(ModelEditor::Tool::Scale);
+	driven.Drag(middle, ImVec2(middle.x + pull, middle.y - pull));
+
+	const float sized = side();
+	CHECK(sized > 1.5f);
+	CHECK(glm::distance(driven.Mesh().FaceCentre(face), centre) < TOLERANCE);
+
+	const glm::vec3 corner = driven.Mesh().vertices[driven.Mesh().faces[face].corners[0].vertex];
+
+	driven.editor.SetTool(ModelEditor::Tool::Rotate);
+	driven.Drag(ImVec2(middle.x + ring, middle.y), ImVec2(middle.x, middle.y - ring));
+
+	CHECK(std::abs(side() - sized) < TOLERANCE);
+	CHECK(glm::distance(driven.Mesh().FaceCentre(face), centre) < TOLERANCE);
+	CHECK(glm::distance(driven.Mesh().vertices[driven.Mesh().faces[face].corners[0].vertex], corner) > 0.1f);
+};
+
 TEST_CASE("The Model panel saves an extrusion into the prefab, keeping its guids")
 {
 	Driven driven("model_save");

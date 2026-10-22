@@ -96,6 +96,9 @@ namespace Loom
 		constexpr float turn_snap = 15.0f;
 		constexpr float scale_snap = 0.1f;
 
+		// Short of nothing, where what is picked would fold flat.
+		constexpr float min_scale = 0.01f;
+
 		constexpr float centre_drag_speed = 0.01f;
 
 		constexpr int axes = 3;
@@ -892,7 +895,8 @@ void main()
 		else if (document.hoveredHandle)
 			hint = document.hoveredHandle->tool == Tool::Move ? "Drag to move what is picked." :
 				document.hoveredHandle->tool == Tool::Rotate ? "Drag round to turn what is picked." :
-				"Drag out to make what is picked bigger, in to make it smaller.";
+				document.hoveredHandle->axis ? "Drag out along the arrow to make what is picked bigger, in to make it smaller." :
+				"Drag right or up to make what is picked bigger, left or down to make it smaller.";
 		else if (document.hoveredVertex || document.hoveredEdge || document.hoveredFace)
 			hint = "Click to pick this. Shift + click adds it to, or takes it from, what is picked.";
 
@@ -1543,10 +1547,9 @@ void main()
 			}
 			else
 			{
-				const float reach = std::hypot(from.x, from.y);
-
-				if (reach >= 1.0f)
-					factor = std::hypot(to.x, to.y) / reach;
+				// Grabbed at the middle, so by how far right and up it has gone
+				// rather than out from there: a handle's length doubles it.
+				factor = (std::max)(min_scale, 1.0f + ((mouse.x - document.pressed.x) - (mouse.y - document.pressed.y)) / handle_length);
 
 				if (snapping)
 					factor = Snap(factor, scale_snap);
