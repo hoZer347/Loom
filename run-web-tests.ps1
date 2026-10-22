@@ -134,7 +134,9 @@ if (-not $NoBuild)
         '-sUSE_GLFW=3'                  # Engine and the ImGui backend link against GLFW.
         '-sFULL_ES3'
         '-sFETCH'                       # Shader::Request fetches shader sources over HTTP.
-        '-sASYNCIFY'                    # ...and waits on the fetch with emscripten_sleep.
+        '-sASYNCIFY'                    # ...and waits on the fetch with emscripten_sleep, as miniaudio waits on its audio worklet.
+        '-sAUDIO_WORKLET=1'             # Audio mixes in an AudioWorklet, as the site build's does...
+        '-sWASM_WORKERS=1'              # ...which runs on a Wasm Worker.
         '-sALLOW_MEMORY_GROWTH=1'
         '-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency'  # One pre-spawned for each thread the browser runs: a later one cannot start while main blocks.
         '-Wno-pthreads-mem-growth'

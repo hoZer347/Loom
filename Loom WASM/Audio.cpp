@@ -6,6 +6,7 @@
 
 #define MA_NO_ENCODING
 #define MA_NO_GENERATION
+#define MA_ENABLE_AUDIO_WORKLETS
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
 

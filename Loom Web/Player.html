@@ -91,6 +91,18 @@
         requestAnimationFrame(tick);
       })();
 
+      // The audio worklet's script is asked for by its bare name, which the
+      // base above would look for at the project root rather than beside the
+      // player script.
+      (function locateAudioWorklet() {
+        const addModule = AudioWorklet.prototype.addModule;
+        const folder = new URL("{SCRIPT}", document.baseURI);
+
+        AudioWorklet.prototype.addModule = function (url, options) {
+          return addModule.call(this, new URL(url, folder).href, options);
+        };
+      })();
+
       Module.canvas.addEventListener("click", () => Module.canvas.focus());
       Module.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
     </script>
