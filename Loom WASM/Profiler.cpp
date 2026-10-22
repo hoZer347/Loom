@@ -17,6 +17,9 @@ namespace Loom
 		// recording with no frames ending, such as a test's, stays bounded.
 		constexpr size_t MOST_SPANS = 4096;
 
+		// A frame's start for a stage that did not run in it.
+		constexpr double NOT_RUN = -1.0;
+
 		// Where a thread never named is listed, and what it is called.
 		constexpr int UNNAMED_ORDER = std::numeric_limits<int>::max();
 		constexpr const char* UNNAMED = "Thread ";
@@ -34,7 +37,7 @@ namespace Loom
 		{
 			// Moves the parts to the order they begin in this frame, ahead of
 			// those that have not run in it.
-			Node& Part(const std::string& name, unsigned long long frame)
+			Node& Part(const std::string& name, unsigned long long frame, double start)
 			{
 				const auto found = std::find_if(parts.begin(), parts.end(), [&name](const Node& part) { return part.name == name; });
 				const size_t at = (size_t)(found - parts.begin());
@@ -47,12 +50,14 @@ namespace Loom
 					Node& part = parts.emplace_back();
 					part.name = name;
 					part.first = frame;
+					part.starts.fill(NOT_RUN);
 				};
 
 				std::rotate(parts.begin() + placed, parts.begin() + at, parts.begin() + at + 1);
 
 				Node& part = parts[placed++];
 				part.last = frame;
+				part.began = start;
 
 				return part;
 			};
@@ -63,6 +68,10 @@ namespace Loom
 			// as the window moves on.
 			std::array<double, Profiler::Window> history{ };
 			double sum = 0.0;
+
+			// Each frame's first start, from the frame's, or NOT_RUN.
+			std::array<double, Profiler::Window> starts{ };
+			double began = 0.0;
 
 			unsigned long long first = 0;
 			unsigned long long last = 0;
@@ -91,6 +100,7 @@ namespace Loom
 
 			const std::chrono::steady_clock::time_point origin = std::chrono::steady_clock::now();
 			double frameStart = 0.0;
+			std::array<double, Profiler::Window> frameLengths{ };
 			double frameLength = 0.0;
 			unsigned long long frame = 0;
 
@@ -132,6 +142,7 @@ namespace Loom
 		void Close(Node& node, unsigned long long frame)
 		{
 			node.history[frame % Profiler::Window] = node.sum;
+			node.starts[frame % Profiler::Window] = node.last == frame ? node.began : NOT_RUN;
 			node.sum = 0.0;
 			node.placed = 0;
 
@@ -146,16 +157,28 @@ namespace Loom
 			for (const Node& part : node.parts)
 			{
 				const unsigned long long counted = std::min<unsigned long long>(frame - part.first + 1, Profiler::Window);
-				double total = 0.0;
-				double peak = 0.0;
+				Profiler::Row& row = rows.emplace_back(Profiler::Row{ part.name, depth, 0.0, 0.0, 0.0, { } });
+				double began = 0.0;
+				int ran = 0;
 
-				for (const double length : part.history)
+				for (int age = 0; age < Profiler::Window; age++)
 				{
-					total += length;
-					peak = std::max(peak, length);
+					const size_t slot = (size_t)((frame + 1 + age) % Profiler::Window);
+
+					row.history[age] = part.history[slot];
+					row.average += part.history[slot];
+					row.peak = std::max(row.peak, part.history[slot]);
+
+					if (part.starts[slot] != NOT_RUN)
+					{
+						began += part.starts[slot];
+						ran++;
+					};
 				};
 
-				rows.push_back({ part.name, depth, total / (double)counted, peak });
+				row.average /= (double)counted;
+				row.start = began / (double)std::max(ran, 1);
+
 				List(part, frame, depth + 1, rows);
 			};
 		};
@@ -202,7 +225,13 @@ namespace Loom
 
 		std::lock_guard<std::mutex> lock(shared.mutex);
 
-		shared.frameLength = now - shared.frameStart;
+		shared.frameLengths[shared.frame % Window] = now - shared.frameStart;
+		shared.frameLength = 0.0;
+
+		for (const double length : shared.frameLengths)
+			shared.frameLength += length;
+
+		shared.frameLength /= (double)std::min<unsigned long long>(shared.frame + 1, Window);
 		shared.threads.clear();
 
 		std::vector<Recorded> recorded{ };
@@ -239,11 +268,9 @@ namespace Loom
 
 				open.resize(depth);
 
-				Node& node = (depth == 0 ? log->root : *open.back()).Part(span.name, shared.frame);
+				Node& node = (depth == 0 ? log->root : *open.back()).Part(span.name, shared.frame, span.start - shared.frameStart);
 				node.sum += length;
 				open.push_back(&node);
-
-				thread.spans.push_back({ span.name, (int)depth, span.start - shared.frameStart, length });
 			};
 
 			Close(log->root, shared.frame);

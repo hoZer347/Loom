@@ -2,6 +2,7 @@
 
 #include "Loom API.h"
 
+#include <array>
 #include <string>
 #include <vector>
 
@@ -34,17 +35,7 @@ namespace Loom
 	struct LOOM_API Profiler final
 	{
 		// The frames a Row reaches back over.
-		static constexpr int Window = 60;
-
-		// A stage as a thread ran it in the last frame, in milliseconds from
-		// the frame's start.
-		struct Span
-		{
-			std::string name;
-			int depth;
-			double start;
-			double length;
-		};
+		static constexpr int Window = 100;
 
 		// A stage as it has run on a thread over the last Window frames, in
 		// milliseconds a frame: a frame it did not run in counts as none, and
@@ -53,17 +44,22 @@ namespace Loom
 		{
 			std::string name;
 			int depth;
+
+			// From the start of each frame it ran in to when it first began
+			// in it, averaged over those frames.
+			double start;
+
 			double average;
 			double peak;
+
+			// Each frame's, oldest first.
+			std::array<double, Window> history;
 		};
 
-		// What one thread ran, as of the last frame.
+		// What one thread ran over the window.
 		struct Thread
 		{
 			std::string name;
-
-			// The last frame's, in the order they began.
-			std::vector<Span> spans{ };
 
 			// Every stage run within the window, each followed by its parts,
 			// in the order they began in the last frame they ran in.
@@ -98,7 +94,8 @@ namespace Loom
 		// The threads that ran a stage within the window, as of the last frame.
 		static const std::vector<Thread>& Threads();
 
-		// In milliseconds, from one EndFrame to the next.
+		// In milliseconds from one EndFrame to the next, averaged over the
+		// window.
 		static double FrameLength();
 	};
 };

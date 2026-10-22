@@ -41,15 +41,6 @@ namespace
 
 		return { };
 	};
-
-	const Loom::Profiler::Span* FindSpan(const Loom::Profiler::Thread& thread, const std::string& name)
-	{
-		for (const Loom::Profiler::Span& span : thread.spans)
-			if (span.name == name)
-				return &span;
-
-		return nullptr;
-	};
 };
 
 TEST_SUITE("Profiler")
@@ -81,17 +72,15 @@ TEST_SUITE("Profiler")
 		CHECK(rows[outer.row + 1].depth == rows[outer.row].depth + 1);
 		CHECK(rows[outer.row + 2].depth == rows[outer.row].depth + 1);
 
-		const Loom::Profiler::Span* whole = FindSpan(*outer.thread, "Profiler outer");
-		const Loom::Profiler::Span* first = FindSpan(*outer.thread, "Profiler first part");
-		const Loom::Profiler::Span* second = FindSpan(*outer.thread, "Profiler second part");
-		REQUIRE(whole);
-		REQUIRE(first);
-		REQUIRE(second);
+		const Loom::Profiler::Row& whole = rows[outer.row];
+		const Loom::Profiler::Row& first = rows[outer.row + 1];
+		const Loom::Profiler::Row& second = rows[outer.row + 2];
 
-		CHECK(whole->start <= first->start);
-		CHECK(first->start + first->length <= second->start);
-		CHECK(whole->length >= first->length + second->length);
-		CHECK(first->length >= (double)BUSY_FOR.count());
+		CHECK(whole.start <= first.start);
+		CHECK(first.start + first.average <= second.start);
+		CHECK(whole.average >= first.average + second.average);
+		CHECK(first.average >= (double)BUSY_FOR.count());
+		CHECK(first.history.back() == doctest::Approx(first.average));
 	};
 
 	TEST_CASE("stages are listed in the order they began in the last frame")
@@ -137,6 +126,7 @@ TEST_SUITE("Profiler")
 		REQUIRE(ran.thread);
 
 		const double sum = ran.thread->rows[ran.row].peak;
+		const double start = ran.thread->rows[ran.row].start;
 		CHECK(sum >= 2.0 * (double)BUSY_FOR.count());
 		CHECK(ran.thread->rows[ran.row].average == doctest::Approx(sum));
 
@@ -144,8 +134,13 @@ TEST_SUITE("Profiler")
 
 		const Found missed = FindRow("Profiler twice");
 		REQUIRE(missed.thread);
-		CHECK(missed.thread->rows[missed.row].peak == doctest::Approx(sum));
-		CHECK(missed.thread->rows[missed.row].average == doctest::Approx(sum / 2.0));
+
+		const Loom::Profiler::Row& row = missed.thread->rows[missed.row];
+		CHECK(row.peak == doctest::Approx(sum));
+		CHECK(row.average == doctest::Approx(sum / 2.0));
+		CHECK(row.start == doctest::Approx(start));
+		CHECK(row.history[Loom::Profiler::Window - 2] == doctest::Approx(sum));
+		CHECK(row.history.back() == 0.0);
 	};
 
 	TEST_CASE("a stage that has not run for a whole window is forgotten")

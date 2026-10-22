@@ -43,6 +43,7 @@
 #include "imgui_internal.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -51,6 +52,7 @@
 #include <iostream>
 #include <string>
 #include <thread>
+#include <unordered_map>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -3981,8 +3983,10 @@ namespace Loom
 		if (threads.empty())
 			return;
 
-		// Each stage keeps its colour on every thread, a soft one under dark text.
-		constexpr int hues = 12;
+		// Each stage keeps its colour on every thread, a soft one under dark
+		// text. Hues step round the wheel by the golden ratio as stages are
+		// first seen, so those seen together stay far apart.
+		constexpr float hue_step = 0.618034f;
 		constexpr float saturation = 0.45f;
 		constexpr float value = 0.9f;
 
@@ -3992,13 +3996,16 @@ namespace Loom
 		constexpr float narrowest_bar = 1.0f;
 		constexpr float label_padding = 2.0f;
 
+		static std::unordered_map<std::string, int> seen{ };
+
 		const auto colour = [](const std::string& name)
 		{
+			const int order = seen.try_emplace(name, (int)seen.size()).first->second;
 			float r = 0.0f;
 			float g = 0.0f;
 			float b = 0.0f;
 
-			ImGui::ColorConvertHSVtoRGB((float)(std::hash<std::string>{ }(name) % hues) / hues, saturation, value, r, g, b);
+			ImGui::ColorConvertHSVtoRGB(std::fmod(hue_step * (float)order, 1.0f), saturation, value, r, g, b);
 
 			return ImGui::GetColorU32(ImVec4(r, g, b, 1.0f));
 		};
@@ -4015,14 +4022,14 @@ namespace Loom
 		const ImVec2 mouse = ImGui::GetIO().MousePos;
 		ImDrawList* const draw = ImGui::GetWindowDrawList();
 
-		ImGui::TextDisabled("The last frame, %.2f ms", frame);
+		ImGui::TextDisabled("An average frame of the last %d, %.2f ms", Profiler::Window, frame);
 
 		for (const Profiler::Thread& thread : threads)
 		{
 			int deepest = 0;
 
-			for (const Profiler::Span& span : thread.spans)
-				deepest = (std::max)(deepest, span.depth);
+			for (const Profiler::Row& row : thread.rows)
+				deepest = (std::max)(deepest, row.depth);
 
 			const ImVec2 corner = ImGui::GetCursorScreenPos();
 			const float left = corner.x + label_width;
@@ -4035,30 +4042,33 @@ namespace Loom
 			ImGui::PopID();
 
 			const bool hovered = ImGui::IsItemHovered();
-			const Profiler::Span* under = nullptr;
+			const Profiler::Row* under = nullptr;
 
-			for (const Profiler::Span& span : thread.spans)
+			for (const Profiler::Row& row : thread.rows)
 			{
-				const float from = left + width * (float)std::clamp(span.start / frame, 0.0, 1.0);
-				const float to = (std::max)(from + narrowest_bar, left + width * (float)std::clamp((span.start + span.length) / frame, 0.0, 1.0));
-				const ImVec2 low(from, corner.y + lane * (float)span.depth);
+				const float from = left + width * (float)std::clamp(row.start / frame, 0.0, 1.0);
+				const float to = (std::max)(from + narrowest_bar, left + width * (float)std::clamp((row.start + row.average) / frame, 0.0, 1.0));
+				const ImVec2 low(from, corner.y + lane * (float)row.depth);
 				const ImVec2 high(to, low.y + lane - lane_gap);
 
-				draw->AddRectFilled(low, high, colour(span.name));
+				draw->AddRectFilled(low, high, colour(row.name));
 
-				if (ImGui::CalcTextSize(span.name.c_str()).x + label_padding * 2.0f <= to - from)
-					draw->AddText(ImVec2(from + label_padding, low.y), IM_COL32_BLACK, span.name.c_str());
+				if (ImGui::CalcTextSize(row.name.c_str()).x + label_padding * 2.0f <= to - from)
+					draw->AddText(ImVec2(from + label_padding, low.y), IM_COL32_BLACK, row.name.c_str());
 
 				// A part is drawn after its stage, so the deepest under the mouse wins.
 				if (hovered && mouse.x >= low.x && mouse.x < high.x && mouse.y >= low.y && mouse.y < high.y)
-					under = &span;
+					under = &row;
 			};
 
 			if (under)
-				ImGui::SetTooltip("%s: %.3f ms", under->name.c_str(), under->length);
+				ImGui::SetTooltip("%s: %.3f ms average, %.3f ms peak", under->name.c_str(), under->average, under->peak);
 		};
 
 		ImGui::TextDisabled("Milliseconds a frame over the last %d", Profiler::Window);
+
+		// Each thread's stages stacked frame by frame, the oldest on the left.
+		constexpr float graph_lines = 6.0f;
 
 		// Stage, Average and Peak.
 		constexpr int columns = 3;
@@ -4067,9 +4077,77 @@ namespace Loom
 		{
 			ImGui::PushID(thread.name.c_str());
 
-			const bool open = ImGui::CollapsingHeader(thread.name.c_str(), &thread == &threads.front() ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None);
+			if (!ImGui::CollapsingHeader(thread.name.c_str(), &thread == &threads.front() ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None))
+			{
+				ImGui::PopID();
+				continue;
+			};
 
-			if (!open || !ImGui::BeginTable("##stages", columns, ImGuiTableFlags_RowBg))
+			std::array<double, Profiler::Window> below{ };
+			double highest = 0.0;
+
+			for (const Profiler::Row& row : thread.rows)
+				if (row.depth == 0)
+					for (int age = 0; age < Profiler::Window; age++)
+						below[age] += row.history[age];
+
+			for (const double total : below)
+				highest = (std::max)(highest, total);
+
+			below.fill(0.0);
+
+			ImGui::TextDisabled("Up to %.2f ms", highest);
+
+			const ImVec2 corner = ImGui::GetCursorScreenPos();
+			const ImVec2 size((std::max)(ImGui::GetContentRegionAvail().x, narrowest_bar), ImGui::GetTextLineHeight() * graph_lines);
+			const float step = size.x / (float)(Profiler::Window - 1);
+
+			ImGui::InvisibleButton("##graph", size);
+
+			const int pointed = ImGui::IsItemHovered() ? std::clamp((int)std::lround((mouse.x - corner.x) / step), 0, Profiler::Window - 1) : -1;
+			const auto height = [&](double length) { return corner.y + size.y - size.y * (float)(length / highest); };
+			const Profiler::Row* under = nullptr;
+
+			draw->AddRectFilled(corner, ImVec2(corner.x + size.x, corner.y + size.y), ImGui::GetColorU32(ImGuiCol_FrameBg));
+
+			// Antialiased edges would show the background through the seams
+			// between one frame's quad and the next.
+			const ImDrawListFlags flags = draw->Flags;
+			draw->Flags &= ~ImDrawListFlags_AntiAliasedFill;
+
+			for (const Profiler::Row& row : thread.rows)
+			{
+				if (row.depth != 0 || highest <= 0.0)
+					continue;
+
+				const ImU32 fill = colour(row.name);
+
+				for (int age = 0; age + 1 < Profiler::Window; age++)
+				{
+					const float from = corner.x + step * (float)age;
+					const float to = from + step;
+
+					draw->AddQuadFilled(
+						ImVec2(from, height(below[age] + row.history[age])),
+						ImVec2(to, height(below[age + 1] + row.history[age + 1])),
+						ImVec2(to, height(below[age + 1])),
+						ImVec2(from, height(below[age])),
+						fill);
+				};
+
+				if (pointed >= 0 && mouse.y <= height(below[pointed]) && mouse.y >= height(below[pointed] + row.history[pointed]))
+					under = &row;
+
+				for (int age = 0; age < Profiler::Window; age++)
+					below[age] += row.history[age];
+			};
+
+			draw->Flags = flags;
+
+			if (under)
+				ImGui::SetTooltip("%s: %.3f ms, %d frames ago", under->name.c_str(), under->history[pointed], Profiler::Window - 1 - pointed);
+
+			if (!ImGui::BeginTable("##stages", columns, ImGuiTableFlags_RowBg))
 			{
 				ImGui::PopID();
 				continue;
@@ -4080,12 +4158,19 @@ namespace Loom
 			ImGui::TableSetupColumn("Peak", ImGuiTableColumnFlags_WidthFixed);
 			ImGui::TableHeadersRow();
 
+			const float swatch = ImGui::GetTextLineHeight();
+
 			for (const Profiler::Row& row : thread.rows)
 			{
 				ImGui::TableNextRow();
 
 				ImGui::TableNextColumn();
 				ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetStyle().IndentSpacing * (float)row.depth);
+
+				const ImVec2 at = ImGui::GetCursorScreenPos();
+				ImGui::GetWindowDrawList()->AddRectFilled(at, ImVec2(at.x + swatch, at.y + swatch), colour(row.name));
+				ImGui::Dummy(ImVec2(swatch, swatch));
+				ImGui::SameLine();
 				ImGui::TextUnformatted(row.name.c_str());
 
 				ImGui::TableNextColumn();
