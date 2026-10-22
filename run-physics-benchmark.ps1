@@ -4,7 +4,7 @@
     side by side.
 
 .DESCRIPTION
-    The scene is the Raycasts demo's Crowd: a walled pit, three ring
+    The scene is the Profiling demo's Crowd: a walled pit, three ring
     MeshColliders, and fifteen hundred boxes and balls dropped from a grid,
     with a row of 160 raycasts every step. Loom runs it as the Benchmark suite
     in Loom Tests, built in Release; Unity runs it headless from

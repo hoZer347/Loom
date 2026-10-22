@@ -26,7 +26,7 @@ using LoomTests::Pump;
 
 namespace
 {
-	// The Raycasts demo's Crowd scene, as Benchmarks/Unity Crowd builds it in
+	// The Profiling demo's Crowd scene, as Benchmarks/Unity Crowd builds it in
 	// Unity, so the two can be timed against each other; every number here
 	// matches one there, and so does every body, drawn from the same
 	// generator in the same order. run-physics-benchmark.ps1 runs both.

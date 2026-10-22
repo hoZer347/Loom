@@ -7,7 +7,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 
-// The Raycasts demo's Crowd scene, built in Unity to time against: a walled
+// The Profiling demo's Crowd scene, built in Unity to time against: a walled
 // pit, three ring MeshColliders, fifteen hundred boxes and balls dropped from
 // a jittered grid, and a row of 160 rays cast through the camera every step.
 // Every number matches Loom's Benchmark suite, and so does every body, drawn

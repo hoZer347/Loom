@@ -12,7 +12,9 @@ A Loom project heavy enough to time. Press Play and open the Stats panel.
 On Play, Crowd drops fifteen hundred boxes and balls, each with a collider
 and a Rigidbody, onto three rings with MeshColliders and into a walled pit,
 where they pile up and fall asleep. Scanner sweeps 160 x 90 rays through the
-camera, one row a frame.
+camera, one row a frame, and draws a yellow tick along the surface normal at
+every hit. After each full sweep it writes how long the rays took to the
+Console.
 
 In a Debug build the Stats panel times every stage of the frame on every
 thread, each named after the function it times. Its timeline, graph and table

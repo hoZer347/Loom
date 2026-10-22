@@ -1,5 +1,5 @@
 # Loom house style
-Derived from settled files: Loom WASM/Camera.h, Camera.cpp, Audio.h, Audio.cpp, Utilities/Attributes.h, Utilities/StateMachine.cpp; Loom Editor/EditorSettings.h, EditorSettings.cpp, SceneHistory.h, EditorConsole.cpp, EditorTheme.h; Demo Sources/Raycasts/Scripts/Laser.hpp, Scanner.hpp, Assets/Beam.shader; run-tests.ps1, Loom Visual Studio/install.ps1, ScriptNameDialog.cs.
+Derived from settled files: Loom WASM/Camera.h, Camera.cpp, Audio.h, Audio.cpp, Utilities/Attributes.h, Utilities/StateMachine.cpp; Loom Editor/EditorSettings.h, EditorSettings.cpp, SceneHistory.h, EditorConsole.cpp, EditorTheme.h; Demo Sources/Raycasts/Scripts/Laser.hpp, Assets/Beam.shader, Demo Sources/Profiling/Scripts/Scanner.hpp; run-tests.ps1, Loom Visual Studio/install.ps1, ScriptNameDialog.cs.
 
 ## Braces and blocks
 - Allman everywhere: namespaces, types, functions, ifs, loops, lambdas.
