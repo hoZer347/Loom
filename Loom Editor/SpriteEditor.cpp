@@ -63,7 +63,7 @@ namespace Loom
 		// and of a frame's column.
 		constexpr int timeline_rows = 4;
 		constexpr float name_lines = 8.0f;
-		constexpr float layers_lines = 10.0f;
+		constexpr float layers_lines = 12.0f;
 		constexpr float frame_lines = 1.5f;
 
 		// The timeline is a table, with a column for the layers' names and
@@ -84,6 +84,7 @@ namespace Loom
 		constexpr int grip_columns = 2;
 		constexpr int grip_rows = 3;
 		constexpr float grip_dot = 0.1f;
+
 		constexpr float half = 0.5f;
 
 		// A new palette starts with the sprite's own colours, as many as fit.
