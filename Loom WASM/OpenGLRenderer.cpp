@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string_view>
 #include <unordered_map>
@@ -571,9 +572,10 @@ namespace Loom
 			constexpr GLuint UV_LOCATION = 1;
 			constexpr GLuint NORMAL_LOCATION = 2;
 
-			// A divisor of 1 reads one value for the whole of a draw of one instance.
+			// A divisor no instance count reaches reads the first value for
+			// every vertex of every instance.
 			constexpr GLuint PER_VERTEX = 0;
-			constexpr GLuint PER_DRAW = 1;
+			constexpr GLuint PER_DRAW = std::numeric_limits<GLuint>::max();
 
 			const GLsizei stride = (GLsizei)(FloatsPerVertex(format) * sizeof(float));
 
