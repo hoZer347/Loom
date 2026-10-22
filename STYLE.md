@@ -30,11 +30,11 @@ Derived from settled files: Loom WASM/Camera.h, Camera.cpp, Audio.h, Audio.cpp, 
 - Private members: `m_` + camelCase: `m_autoScroll`, `m_pose`.
 - Public fields and `Serial` fields on engine components: camelCase, no prefix: `Serial<float> fieldOfView = 45.0f;`
 - Script components keep their `Serial` fields private with `m_`: `Loom::Serial<float> m_range = 12.0f;`
-- Locals and parameters: snake_case in the Editor and scripts (`line_height`, `select_all`); single words in engine code; Utilities uses camelCase. Mixed overall; follow the file.
+- Locals and parameters: snake_case in the Editor (`select_all`, EditorConsole.cpp). camelCase in the engine, Utilities and scripts (`toLocal`, Laser.hpp).
 - File-scope constants (anonymous namespace, `static constexpr` in scripts): UPPER_SNAKE: `constexpr float PARALLEL = 1e-4f;`
-- Public constants on a type or namespace: PascalCase (`EditorTheme::DefaultFontSize`, `EditorSettings::MinScale`); snake_case also appears (`SceneHistory::max_steps`).
+- Public constants on a type or namespace: PascalCase (`EditorTheme::DefaultFontSize`, `EditorSettings::MinScale`).
 - Function-local constants: lower case (`constexpr float half = 0.5f;`).
-- `enum class` with PascalCase values: `enum class Theme { Loom, Dark, Light, Classic, Count };` Plain enums mix UPPER and Pascal values.
+- `enum class` with PascalCase values: `enum class Theme { Loom, Dark, Light, Classic, Count };`
 - Template parameters: `T`, `Enum`, or `_ValueType` in Utilities.
 - Files: PascalCase, `.h`/`.cpp` in engine and editor, `.hpp` for game scripts; a few engine files have spaces (`Loom API.h`, `Macro Helpers.h`); tests are `<Name> Tests.cpp`.
 - Script namespaces: `<Project>Scripts` (`RaycastsScripts`); engine and editor live in `namespace Loom`.
