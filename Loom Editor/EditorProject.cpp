@@ -674,17 +674,47 @@ namespace Loom
 				if (ImGui::Button(change))
 					m_dialogs->folder.Open();
 
-				// Every tab stays in view, its icon showing however narrow it gets.
-				if (ImGui::BeginTabBar("##project_tabs", ImGuiTabBarFlags_FittingPolicyShrink))
+				// The tabs show their names while every one fits, and only their
+				// icons, named in a tooltip, once they don't. Narrower still, they
+				// scroll rather than cut their icons short.
+				const float tab_spacing = ImGui::GetStyle().ItemInnerSpacing.x;
+				float names_width = -tab_spacing;
+				const auto add_width = [&names_width, tab_spacing](const char* label)
 				{
-					const auto begin_tab = [this](const char* label)
+					names_width += ImGui::TabItemCalcSize(label, false).x + tab_spacing;
+				};
+
+				add_width(ProjectTabs::Scenes);
+				add_width(ProjectTabs::Scripts);
+
+				for (const FileTab& tab : m_fileTabs)
+					add_width(tab.kind.title);
+
+				const bool icons_only = names_width > ImGui::GetContentRegionAvail().x;
+
+				if (ImGui::BeginTabBar("##project_tabs", ImGuiTabBarFlags_FittingPolicyScroll))
+				{
+					const auto begin_tab = [this, icons_only](const char* label)
 					{
 						const bool show = label == m_projectTabToShow;
 
 						if (show)
 							m_projectTabToShow = { };
 
-						if (!ImGui::BeginTabItem(label, nullptr, show ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None))
+						const std::string_view name = label;
+						const size_t space = name.find(' ');
+						const std::string shown = std::string(icons_only ? name.substr(0, space) : name) + "###" + label;
+						ImGuiTabItemFlags flags = show ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+
+						if (icons_only)
+							flags |= ImGuiTabItemFlags_NoTooltip;
+
+						const bool open = ImGui::BeginTabItem(shown.c_str(), nullptr, flags);
+
+						if (icons_only)
+							ImGui::SetItemTooltip("%s", label + space + 1);
+
+						if (!open)
 							return false;
 
 						m_projectTab = label;
