@@ -1312,14 +1312,8 @@ namespace Loom
 				? m_opening->Progress()
 				: m_scripts.BuildProgress().value_or(-(float)ImGui::GetTime());
 
-			// A project's steps share its bar, a part each.
 			if (m_projectLoad && fraction >= 0.0f)
-			{
-				const int steps = (int)m_projectLoad->compiles + (int)m_projectLoad->opens;
-				const int done = m_projectLoad->compiles && m_opening ? 1 : 0;
-
-				fraction = (done + fraction) / steps;
-			};
+				fraction = m_projectLoad->Fraction(m_opening != nullptr, fraction);
 
 			// A project's name goes above its bar and the step below.
 			constexpr float project_lines = 2.0f;

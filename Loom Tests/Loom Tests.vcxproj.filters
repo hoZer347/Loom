@@ -166,6 +166,9 @@
     <ClCompile Include="GameFocus Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="LoadProgress Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="WindowFullscreen Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

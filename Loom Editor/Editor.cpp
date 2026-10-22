@@ -972,8 +972,12 @@ namespace Loom
 		if (!scene.empty() && !m_scripts.IsBuilding())
 			BeginOpeningScene(scene);
 
-		if (!m_scripts.IsIdle() || m_opening)
-			m_projectLoad = ProjectLoad{ !m_scripts.IsIdle(), !scene.empty() };
+		// A build opens the scene the project starts on once it is done, asked
+		// to or not.
+		if (!m_scripts.IsIdle())
+			m_projectLoad = ProjectLoad{ true, m_ownedScenes.empty() && !StartupScene().empty() };
+		else if (m_opening)
+			m_projectLoad = ProjectLoad{ false, true };
 
 		return true;
 	};

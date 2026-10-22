@@ -136,6 +136,7 @@
     <ClCompile Include="ModelPreview.cpp" />
     <ClCompile Include="SelectionOutline.cpp" />
     <ClCompile Include="GameFocus.cpp" />
+    <ClCompile Include="LoadProgress.cpp" />
     <ClCompile Include="WindowFullscreen.cpp" />
     <ClCompile Include="SceneHistory.cpp" />
     <ClCompile Include="Prefabs.cpp" />
@@ -185,6 +186,7 @@
     <ClInclude Include="ModelPreview.h" />
     <ClInclude Include="SelectionOutline.h" />
     <ClInclude Include="GameFocus.h" />
+    <ClInclude Include="LoadProgress.h" />
     <ClInclude Include="WindowFullscreen.h" />
     <ClInclude Include="SceneHistory.h" />
     <ClInclude Include="Prefabs.h" />

@@ -2,12 +2,12 @@
 
 #include "ComponentRegistry.h"
 #include "HiddenProcess.h"
+#include "LoadProgress.h"
 
 #include "Utilities/StateReference.h"
 
 #include <algorithm>
 #include <cstdio>
-#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -74,37 +74,6 @@ namespace Loom
 				});
 
 			return found;
-		};
-
-		// Kept beside the library: how long its last build and its last rebuild
-		// took, a key=seconds line each.
-		constexpr const char* TIMINGS_EXTENSION = ".buildtimes";
-		constexpr const char* BUILD_KEY = "build";
-		constexpr const char* REBUILD_KEY = "rebuild";
-
-		// Where a build that outlasts the last of its kind holds, rather than
-		// looking done before it is.
-		constexpr float BUILD_PROGRESS_HOLD = 0.95f;
-
-		std::map<std::string, double> ReadTimings(const std::filesystem::path& file)
-		{
-			std::map<std::string, double> timings;
-			std::ifstream in(file);
-			std::string line;
-
-			while (std::getline(in, line))
-				if (const size_t equals = line.find('='); equals != std::string::npos)
-					timings[line.substr(0, equals)] = std::atof(line.c_str() + equals + 1);
-
-			return timings;
-		};
-
-		void WriteTimings(const std::filesystem::path& file, const std::map<std::string, double>& timings)
-		{
-			std::ofstream out(file);
-
-			for (const auto& [key, seconds] : timings)
-				out << key << '=' << seconds << '\n';
 		};
 	};
 
@@ -339,7 +308,16 @@ namespace Loom
 
 		m_rebuilding = rebuild;
 		m_buildStarted = std::chrono::steady_clock::now();
-		m_expectedSeconds = ReadTimings(TimingsFile())[rebuild ? REBUILD_KEY : BUILD_KEY];
+		m_expected.reset();
+
+		if (!m_library.empty())
+		{
+			std::ifstream in(TimingsFile());
+			m_expected = BuildTimings::Read(in).Of(rebuild);
+		};
+
+		std::error_code code;
+		m_libraryBefore = std::filesystem::last_write_time(m_library, code);
 
 		const std::string command =
 			'"' + msbuild + "\" \"" + m_project + "\"" +
@@ -370,18 +348,17 @@ namespace Loom
 
 	std::optional<float> ScriptLibrary::BuildProgress() const
 	{
-		if (IsIdle() || m_expectedSeconds <= 0.0)
+		if (IsIdle())
 			return std::nullopt;
 
-		const double elapsed =
-			std::chrono::duration<double>(std::chrono::steady_clock::now() - m_buildStarted).count();
-
-		return (float)(std::min)(elapsed / m_expectedSeconds, (double)BUILD_PROGRESS_HOLD);
+		return BuildTimings::Progress(
+			std::chrono::duration<double>(std::chrono::steady_clock::now() - m_buildStarted).count(),
+			m_expected);
 	};
 
 	std::filesystem::path ScriptLibrary::TimingsFile() const
 	{
-		return std::filesystem::path(m_library).replace_extension(TIMINGS_EXTENSION);
+		return std::filesystem::path(m_library).replace_extension(BuildTimings::Extension);
 	};
 
 	ScriptLibrary::Progress ScriptLibrary::Poll()
@@ -402,17 +379,25 @@ namespace Loom
 
 		m_current.reset();
 
-		// One that failed may have stopped anywhere, so says nothing about how
-		// long the next will take.
-		if (m_succeeded)
+		// Only a build that wrote the library says how long the next will take:
+		// one that failed may have stopped anywhere, and one with nothing to
+		// compile, as every Play starts, took next to no time.
+		std::error_code code;
+
+		if (m_succeeded && !m_library.empty() &&
+			std::filesystem::last_write_time(m_library, code) != m_libraryBefore)
 		{
 			const std::filesystem::path file = TimingsFile();
 
-			std::map<std::string, double> timings = ReadTimings(file);
-			timings[m_rebuilding ? REBUILD_KEY : BUILD_KEY] =
-				std::chrono::duration<double>(std::chrono::steady_clock::now() - m_buildStarted).count();
+			std::ifstream in(file);
+			BuildTimings timings = BuildTimings::Read(in);
+			in.close();
 
-			WriteTimings(file, timings);
+			timings.Set(m_rebuilding,
+				std::chrono::duration<double>(std::chrono::steady_clock::now() - m_buildStarted).count());
+
+			std::ofstream out(file);
+			timings.Write(out);
 		};
 
 		// The library has just moved; whatever the cache last decided about it

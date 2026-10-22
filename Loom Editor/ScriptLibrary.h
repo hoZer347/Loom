@@ -138,11 +138,13 @@ namespace Loom
 		mutable std::chrono::steady_clock::time_point m_staleCheckedAt{ };
 		mutable bool m_stale = false;
 
-		// When the build under way started, whether it is a rebuild, and how long
-		// the last of its kind took: 0 when none has.
+		// When the build under way started, whether it is a rebuild, how long
+		// the last of its kind took, and when the library was last written
+		// before it.
 		std::chrono::steady_clock::time_point m_buildStarted{ };
 		bool m_rebuilding = false;
-		double m_expectedSeconds = 0.0;
+		std::optional<double> m_expected{ };
+		std::filesystem::file_time_type m_libraryBefore{ };
 
 		// One per build, held by the worker as well, so a build nobody is waiting
 		// for any more has somewhere to put its result that nothing reads.

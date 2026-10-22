@@ -10,6 +10,7 @@
 #include "EditorViewport.h"
 #include "FolderWatch.h"
 #include "KindFilter.h"
+#include "LoadProgress.h"
 #include "GameFocus.h"
 #include "Guid.h"
 #include "Hierarchy.h"
@@ -836,14 +837,7 @@ namespace Loom
 		std::unique_ptr<SceneSerializer::Loading> m_opening{ };
 		std::string m_openingPath{ };
 
-		// A project on its way in, under one bar: its scripts building, then the
-		// scene it starts on opening. Whether it has each to wait for.
-		struct ProjectLoad
-		{
-			bool compiles = false;
-			bool opens = false;
-		};
-
+		// A project on its way in, and what it waits on.
 		std::optional<ProjectLoad> m_projectLoad{ };
 
 		std::string m_projectPath{ };
