@@ -1536,6 +1536,9 @@ namespace Loom
 			if (m_projectWatch.Changed())
 				RefreshProjectAssets();
 
+			if (m_revealSelectedTwoD)
+				m_twoDFolderTree.ClearSearch();
+
 			m_twoDFolderTree.DrawSearch();
 
 			ImGui::BeginChild("##2d", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders);
