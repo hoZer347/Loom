@@ -50,6 +50,7 @@ namespace Loom
 		constexpr const char* FOLDER_PAYLOAD = "LoomFolder";
 
 		constexpr float namePromptWidth = 320.0f;
+		constexpr float promptButtonWidth = 120.0f;
 
 		// A pinged file's row flashes this many times over this long, fading.
 		constexpr double pingSeconds = 1.5;
@@ -58,7 +59,6 @@ namespace Loom
 		constexpr float pingOutlineThickness = 2.0f;
 		constexpr float pingRounding = 3.0f;
 		constexpr float scrollCentred = 0.5f;
-		constexpr float promptButtonWidth = 120.0f;
 
 		// How far NewShader, NewShader1, ... counts before leaving the name to
 		// the user to sort out.
