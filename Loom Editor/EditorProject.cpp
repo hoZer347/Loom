@@ -671,7 +671,12 @@ namespace Loom
 				{
 					const auto begin_tab = [this](const char* label)
 					{
-						if (!ImGui::BeginTabItem(label, nullptr, label == m_projectTabToShow ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None))
+						const bool show = label == m_projectTabToShow;
+
+						if (show)
+							m_projectTabToShow = { };
+
+						if (!ImGui::BeginTabItem(label, nullptr, show ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None))
 							return false;
 
 						m_projectTab = label;
@@ -697,8 +702,6 @@ namespace Loom
 							DrawFileTab(tab);
 							ImGui::EndTabItem();
 						};
-
-					m_projectTabToShow = { };
 
 					ImGui::EndTabBar();
 				};

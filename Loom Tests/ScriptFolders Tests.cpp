@@ -152,7 +152,7 @@ TEST_SUITE("ScriptFolders")
 		CHECK(loaded.Build({ "Patrol" }).children.empty());
 	};
 
-	TEST_CASE("a FileTab's files come back filed by their paths, and its file holds none of another panel's")
+	TEST_CASE("a FileTab's files come back filed by their paths, and its file holds none of another tab's")
 	{
 		const std::filesystem::path two_d = std::filesystem::temp_directory_path() / "loom 2d folders.loom2d";
 		const std::filesystem::path scripts = std::filesystem::temp_directory_path() / "loom 2d folders.loomscripts";

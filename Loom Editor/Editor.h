@@ -104,8 +104,8 @@ namespace Loom
 	*   its scenes and prefabs in the Scenes tab, which also creates them, its
 	*   scripts and shaders in the Scripts tab, which creates those, and its
 	*   textures, models, sounds and fonts each in a FileTab, the 2D tab
-	*   creating textures. The
-	*   scripts are a C++ project that builds into a library the editor loads
+	*   creating textures. The scripts are a C++ project that builds into a
+	*   library the editor loads
 	* - Reads and writes scenes through SceneSerializer, and shows the text form
 	*   of the open scene live in its Scene Data panel
 	* - Takes over Engine's GUI hook on construction and hands it back on
@@ -175,8 +175,8 @@ namespace Loom
 		std::string RelaunchTarget() const;
 
 		// The folder the editor works out of. Everything under it is listed in
-		// the Project panel; the choice is remembered between runs, so
-		// the folder prompt only shows up when there is nothing to remember.
+		// the Project panel; the choice is remembered between runs, so the
+		// folder prompt only shows up when there is nothing to remember.
 		// A .loomproject file opens the folder it is in, after giving it a
 		// scripts project if it has none, and a .loomscene file opens its
 		// project on that scene.
@@ -506,8 +506,7 @@ namespace Loom
 		// Whether input in the window can change a scene, so a step is
 		// recorded for the history once it is let go. The Shaders and Sprites
 		// panels and the Project panel's tabs but Scenes only edit, file and
-		// open files:
-		// what is dragged out of them lands in another window.
+		// open files: what is dragged out of them lands in another window.
 		bool CanEditScenes(const ImGuiWindow* window) const;
 
 		// One open scene as the text it serializes to, so it can be put back
