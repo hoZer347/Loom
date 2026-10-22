@@ -468,4 +468,24 @@ TEST_SUITE("Input")
 		CHECK(Loom::Input::mouse_x == cursor_x);
 		CHECK(Loom::Input::mouse_y == cursor_y);
 	};
+
+	TEST_CASE("a cursor that leaves the window is outside the view until it moves over it again")
+	{
+		constexpr float notches = 1.0f;
+
+		ReleaseAll();
+		CursorInWindow();
+		Loom::Input::OnMouseLeave();
+		Loom::Input::OnMouseWheel(notches);
+		Loom::Input::Tick();
+
+		CHECK(Loom::Input::mouse_x == -1);
+		CHECK(Loom::Input::mouse_y == -1);
+		CHECK(Loom::Input::GetMouseWheel() == 0.0f);
+
+		CursorInWindow();
+
+		CHECK(Loom::Input::mouse_x >= 0);
+		CHECK(Loom::Input::mouse_y >= 0);
+	};
 };

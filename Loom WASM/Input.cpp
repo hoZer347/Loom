@@ -270,9 +270,11 @@ namespace Loom
 			int height = 0;
 		};
 
-		// In the window's pixels, as the callbacks last said.
+		// In the window's pixels, as the callbacks last said, and whether the
+		// cursor is over the window at all.
 		int cursor_x = 0;
 		int cursor_y = 0;
+		bool cursor_over = false;
 		Rect whole_window;
 
 		std::optional<Rect> view;
@@ -281,8 +283,8 @@ namespace Loom
 		{
 			const Rect& seen = view ? *view : whole_window;
 
-			Input::mouse_x = cursor_x - seen.x;
-			Input::mouse_y = cursor_y - seen.y;
+			Input::mouse_x = cursor_over ? cursor_x - seen.x : -1;
+			Input::mouse_y = cursor_over ? cursor_y - seen.y : -1;
 			Input::screen_width = seen.width;
 			Input::screen_height = seen.height;
 		};
@@ -397,7 +399,14 @@ namespace Loom
 	{
 		cursor_x = x;
 		cursor_y = y;
+		cursor_over = true;
 		OnResize(window_width, window_height);
+	};
+
+	void Input::OnMouseLeave()
+	{
+		cursor_over = false;
+		Place();
 	};
 
 	void Input::OnResize(int window_width, int window_height)
@@ -468,6 +477,13 @@ namespace Loom
 		return EM_TRUE;
 	};
 
+	EM_BOOL mouse_leave_callback(int, const EmscriptenMouseEvent*, void*)
+	{
+		Input::OnMouseLeave();
+
+		return EM_TRUE;
+	};
+
 	// The DOM's own wheel event: GLFW's port rounds every one up to a whole
 	// notch, which turns a touchpad's run of small ones into a spin.
 	EM_BOOL wheel_callback(int, const EmscriptenWheelEvent* e, void*)
@@ -500,6 +516,12 @@ namespace Loom
 		Input::OnMouseMove((int)xpos, (int)ypos, width, height);
 	};
 
+	void cursor_enter_callback(GLFWwindow*, int entered)
+	{
+		if (!entered)
+			Input::OnMouseLeave();
+	};
+
 	void scroll_callback(GLFWwindow*, double, double notches)
 	{
 		Input::OnMouseWheel((float)notches);
@@ -523,10 +545,29 @@ namespace Loom
 			nullptr,
 			false,
 			wheel_callback);
+
+		emscripten_set_mouseleave_callback(
+			"#canvas",
+			nullptr,
+			false,
+			mouse_leave_callback);
 #else
 		glfwSetCursorPosCallback(
 			Engine::window,
 			mouse_move_callback);
+
+		glfwSetCursorEnterCallback(
+			Engine::window,
+			cursor_enter_callback);
+
+		// A window opened under the cursor has it from the start, before it moves.
+		if (glfwGetWindowAttrib(Engine::window, GLFW_HOVERED))
+		{
+			double x = 0.0;
+			double y = 0.0;
+			glfwGetCursorPos(Engine::window, &x, &y);
+			mouse_move_callback(Engine::window, x, y);
+		};
 
 		glfwSetScrollCallback(
 			Engine::window,
