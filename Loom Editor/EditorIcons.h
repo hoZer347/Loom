@@ -32,7 +32,7 @@ namespace Loom
 		constexpr const char* Bindings = "⌨";
 		constexpr const char* File = "📄";
 
-		// What the Project panel and the FilePanels show beside a file, models
+		// What the Project panel's tabs show beside a file, models
 		// aside, which only ModelImporter can tell.
 		const char* Of(const std::string& path);
 	};
@@ -43,11 +43,6 @@ namespace Loom
 	{
 		constexpr const char* Hierarchy = "🌳 Hierarchy###Hierarchy";
 		constexpr const char* Project = "📁 Project###Project";
-		constexpr const char* Scripts = "🧩 Scripts###Scripts";
-		constexpr const char* TwoD = "🎨 2D###2D";
-		constexpr const char* ThreeD = "🗿 3D###3D";
-		constexpr const char* Sounds = "🔊 Sounds###Sounds";
-		constexpr const char* Fonts = "🔤 Fonts###Fonts";
 		constexpr const char* Inspector = "🔍 Inspector###Inspector";
 		constexpr const char* Scene = "🎬 Scene###Scene";
 		constexpr const char* SceneId = "###Scene";
@@ -72,5 +67,16 @@ namespace Loom
 
 			return title.substr(title.find(marker) + marker.size());
 		};
+	};
+
+	// The tabs of the Project panel, each the project's files of one kind.
+	namespace ProjectTabs
+	{
+		constexpr const char* Scenes = "🎬 Scenes";
+		constexpr const char* Scripts = "🧩 Scripts";
+		constexpr const char* TwoD = "🎨 2D";
+		constexpr const char* ThreeD = "🗿 3D";
+		constexpr const char* Sounds = "🔊 Sounds";
+		constexpr const char* Fonts = "🔤 Fonts";
 	};
 };

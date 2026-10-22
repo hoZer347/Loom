@@ -14,8 +14,8 @@ namespace Loom
 {
 	/**
 	* Loom::FolderTree
-	* - A panel's VirtualFolders drawn as a tree, as the Scripts and Key
-	*   Bindings panels and the FilePanels show theirs: a row a folder, opened
+	* - A panel's VirtualFolders drawn as a tree, as the Scripts tab, the
+	*   FileTabs and the Key Bindings panel show theirs: a row a folder, opened
 	*   by its arrow or a double click, dragged into another, renamed in place
 	*   and taken out from its right-click menu, with the panel's items inside
 	* - Its SearchBar narrows the tree to the folders and items with the text

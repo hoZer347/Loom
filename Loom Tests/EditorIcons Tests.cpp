@@ -60,7 +60,7 @@ TEST_SUITE("EditorIcons")
 		CHECK(ProjectAssets::IsGameFile("a.png"));
 	};
 
-	TEST_CASE("the 2D panel's files are textures, sprites and palettes")
+	TEST_CASE("the 2D tab's files are textures, sprites and palettes")
 	{
 		using Loom::ProjectAssets;
 

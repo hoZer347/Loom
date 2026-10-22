@@ -66,10 +66,10 @@ namespace
 		{ ProjectTemplate::extension, L"Loom.Project", L"Loom Project" },
 		{ SceneSerializer::extension, L"Loom.Scene", L"Loom Scene" },
 		{ ScriptFolders::extension, L"Loom.ScriptFolders", L"Loom Script Folders" },
-		{ FilePanels::TwoD.extension, L"Loom.TwoDFolders", L"Loom 2D Folders" },
-		{ FilePanels::ThreeD.extension, L"Loom.ThreeDFolders", L"Loom 3D Folders" },
-		{ FilePanels::Sounds.extension, L"Loom.SoundFolders", L"Loom Sound Folders" },
-		{ FilePanels::Fonts.extension, L"Loom.FontFolders", L"Loom Font Folders" },
+		{ FileTabs::TwoD.extension, L"Loom.TwoDFolders", L"Loom 2D Folders" },
+		{ FileTabs::ThreeD.extension, L"Loom.ThreeDFolders", L"Loom 3D Folders" },
+		{ FileTabs::Sounds.extension, L"Loom.SoundFolders", L"Loom Sound Folders" },
+		{ FileTabs::Fonts.extension, L"Loom.FontFolders", L"Loom Font Folders" },
 		{ InputActions::extension, L"Loom.InputActions", L"Loom Key Bindings" },
 	};
 

@@ -253,7 +253,7 @@ namespace Loom
 					Engine::updateScenes ? "running" :
 					scripts.IsBuilding() ? "starting once the scripts are built" : "paused") << '\n';
 
-			// The Scripts panel's own words for it.
+			// The Scripts tab's own words for it.
 			out << "Scripts: " << (scripts.HasProject() ? scripts.GetStatus() : "none");
 
 			if (scripts.HasProject() && !scripts.IsBuilding() && scripts.IsStale())

@@ -3,7 +3,7 @@
 #include "EditorFileDialogs.h"
 #include "EditorGui.h"
 #include "EditorIcons.h"
-#include "FilePanel.h"
+#include "FileTab.h"
 #include "EditorTheme.h"
 #include "ModelImporter.h"
 #include "Prefab.h"
@@ -119,38 +119,38 @@ namespace Loom
 			tree.Rename(path);
 		};
 
-		// What the Scripts panel's Create menu makes, as it lists the shaders.
+		// What the Scripts tab's Create menu makes, as it lists the shaders.
 		bool IsScriptsPanels(AssetKind kind)
 		{
 			return IsScript(kind) || kind == AssetKind::Shader;
 		};
 
-		// The FilePanel whose Create menu makes kind, rather than the Project
-		// panel's or the Scripts panel's.
-		const FilePanelKind* PanelMaking(AssetKind kind)
+		// The FileTab whose Create menu makes kind, rather than the Scenes
+		// tab's or the Scripts tab's.
+		const FileTabKind* TabMaking(AssetKind kind)
 		{
-			return kind == AssetKind::Texture || kind == AssetKind::Palette ? &FilePanels::TwoD : nullptr;
+			return kind == AssetKind::Texture || kind == AssetKind::Palette ? &FileTabs::TwoD : nullptr;
 		};
 
-		// The FilePanel that holds the file, or none.
-		const FilePanelKind* PanelHolding(const std::string& path)
+		// The FileTab that holds the file, or none.
+		const FileTabKind* TabHolding(const std::string& path)
 		{
 			if (ProjectAssets::IsTwoDFile(path))
-				return &FilePanels::TwoD;
+				return &FileTabs::TwoD;
 
 			if (IsModelFile(path))
-				return &FilePanels::ThreeD;
+				return &FileTabs::ThreeD;
 
 			if (ProjectAssets::IsSoundFile(path))
-				return &FilePanels::Sounds;
+				return &FileTabs::Sounds;
 
 			if (ProjectAssets::IsFontFile(path))
-				return &FilePanels::Fonts;
+				return &FileTabs::Fonts;
 
 			return nullptr;
 		};
 
-		// What each panel lists, in the order its filter shows them.
+		// What each tab lists, in the order its filter shows them.
 		constexpr KindFilter::Kind projectKinds[] =
 		{
 			{ EditorIcons::Scene, "Scenes" },
@@ -225,7 +225,7 @@ namespace Loom
 		// then files, each alphabetically. Dot-prefixed folders (.vs) and the
 		// build output are left out, and so is a folder whose files are all
 		// something else, though an empty one stays, as a new folder is. The
-		// other files the game uses, which the Scripts panel and the FilePanels
+		// other files the game uses, which the Scripts tab and the FileTabs
 		// list, go in others. Whether there were files under folder.
 		bool Scan(
 			const std::filesystem::path& folder,
@@ -592,8 +592,8 @@ namespace Loom
 		m_projectShaders.clear();
 		m_noThumbnail.clear();
 
-		for (FilePanel& panel : m_filePanels)
-			panel.files.clear();
+		for (FileTab& tab : m_fileTabs)
+			tab.files.clear();
 
 		m_assets = AssetNode{ m_projectPath, "", true };
 
@@ -610,8 +610,8 @@ namespace Loom
 			std::sort(m_projectScenes.begin(), m_projectScenes.end());
 
 			for (const std::string& file : others)
-				if (FilePanel* panel = FilePanelOf(file))
-					panel->files.push_back(ProjectAssets::RelativeTo(file, m_projectPath));
+				if (FileTab* tab = FileTabOf(file))
+					tab->files.push_back(ProjectAssets::RelativeTo(file, m_projectPath));
 				else if (ProjectAssets::IsShaderFile(file))
 					m_projectShaders.push_back(file);
 		};
@@ -639,8 +639,11 @@ namespace Loom
 			}
 			else
 			{
+				// A change anywhere in the project rescans its shaders as well as the scripts.
 				if (m_projectWatch.Changed())
 					RefreshProjectAssets();
+				else if (m_scriptWatch.Changed())
+					RefreshScripts();
 
 				const char* const change = "Change...";
 
@@ -663,73 +666,120 @@ namespace Loom
 				if (ImGui::Button(change))
 					m_dialogs->folder.Open();
 
-				// Something new is selected to be shown, which the search or the
-				// filter may hide.
-				if (m_revealSelectedAsset)
+				// Every tab stays in view, its icon showing however narrow it gets.
+				if (ImGui::BeginTabBar("##project_tabs", ImGuiTabBarFlags_FittingPolicyShrink))
 				{
-					m_assetSearch.Clear();
+					const auto begin_tab = [this](const char* label)
+					{
+						if (!ImGui::BeginTabItem(label, nullptr, label == m_projectTabToShow ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None))
+							return false;
 
-					if (std::error_code code; !std::filesystem::is_directory(m_selectedAsset, code))
-						m_projectFilter.Show(IconOf(m_selectedAsset), true);
+						m_projectTab = label;
+
+						return true;
+					};
+
+					if (begin_tab(ProjectTabs::Scenes))
+					{
+						DrawScenes();
+						ImGui::EndTabItem();
+					};
+
+					if (begin_tab(ProjectTabs::Scripts))
+					{
+						DrawScripts();
+						ImGui::EndTabItem();
+					};
+
+					for (FileTab& tab : m_fileTabs)
+						if (begin_tab(tab.kind.title))
+						{
+							DrawFileTab(tab);
+							ImGui::EndTabItem();
+						};
+
+					m_projectTabToShow = { };
+
+					ImGui::EndTabBar();
 				};
-
-				m_assetSearch.Draw();
-
-				ImGui::BeginChild("##assets", m_projectFilter.DrawUnder(projectKinds), ImGuiChildFlags_Borders);
-
-				if (m_assets.children.empty())
-					ImGui::TextDisabled("Nothing here yet. Right-click to create something.");
-
-				m_assetSearch.BeginResults();
-
-				for (const AssetNode& node : m_assets.children)
-					if (ShowsAsset(node))
-						DrawAssetNode(node, 0, false);
-
-				m_assetSearch.EndResults();
-
-				// Dropped anywhere else in the list, it goes in the project folder.
-				TakeImportFolder(m_projectPath, ImGui::IsWindowHovered());
-
-				// The empty space under the rows, so a row that turns a drop away
-				// does not pass it on to the project folder.
-				const ImGuiWindow* list = ImGui::GetCurrentWindow();
-				const ImRect below(
-					list->InnerRect.Min.x,
-					(std::max)(ImGui::GetCursorScreenPos().y, list->InnerRect.Min.y),
-					list->InnerRect.Max.x,
-					list->InnerRect.Max.y);
-
-				if (below.GetHeight() > 0.0f && ImGui::BeginDragDropTargetCustom(below, list->ID))
-				{
-					AcceptMove(m_projectPath);
-					ImGui::EndDragDropTarget();
-				};
-
-				m_revealSelectedAsset = false;
-
-				if (ImGui::BeginPopupContextWindow(
-					"##project_create",
-					ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
-				{
-					DrawCreateMenu(m_projectPath);
-					ImGui::EndPopup();
-				};
-
-				ImGui::EndChild();
-
-				if (!m_assetToMove.empty())
-					MoveAsset(std::exchange(m_assetToMove, { }), m_assetMoveFolder);
-
-				if (GameObject* dropped = LoomObject::GetByGuid<GameObject>(std::exchange(m_objectToSave, Guid())))
-					SaveAsPrefab(dropped, m_assetMoveFolder);
-
-				if (!m_assetToOpen.empty())
-					OpenAsset(std::exchange(m_assetToOpen, { }));
 			};
 		};
 
 		ImGui::End();
+	};
+
+	void Editor::ShowProjectTab(std::string_view tab)
+	{
+		m_showProject = true;
+		m_focusProject = true;
+		m_projectTabToShow = tab;
+	};
+
+	void Editor::DrawScenes()
+	{
+		// Something new is selected to be shown, which the search or the
+		// filter may hide.
+		if (m_revealSelectedAsset)
+		{
+			m_assetSearch.Clear();
+
+			if (std::error_code code; !std::filesystem::is_directory(m_selectedAsset, code))
+				m_projectFilter.Show(IconOf(m_selectedAsset), true);
+		};
+
+		m_assetSearch.Draw();
+
+		ImGui::BeginChild("##assets", m_projectFilter.DrawUnder(projectKinds), ImGuiChildFlags_Borders);
+
+		if (m_assets.children.empty())
+			ImGui::TextDisabled("Nothing here yet. Right-click to create something.");
+
+		m_assetSearch.BeginResults();
+
+		for (const AssetNode& node : m_assets.children)
+			if (ShowsAsset(node))
+				DrawAssetNode(node, 0, false);
+
+		m_assetSearch.EndResults();
+
+		// Dropped anywhere else in the list, it goes in the project folder.
+		TakeImportFolder(m_projectPath, ImGui::IsWindowHovered());
+
+		// The empty space under the rows, so a row that turns a drop away
+		// does not pass it on to the project folder.
+		const ImGuiWindow* list = ImGui::GetCurrentWindow();
+		const ImRect below(
+			list->InnerRect.Min.x,
+			(std::max)(ImGui::GetCursorScreenPos().y, list->InnerRect.Min.y),
+			list->InnerRect.Max.x,
+			list->InnerRect.Max.y);
+
+		if (below.GetHeight() > 0.0f && ImGui::BeginDragDropTargetCustom(below, list->ID))
+		{
+			AcceptMove(m_projectPath);
+			ImGui::EndDragDropTarget();
+		};
+
+		m_revealSelectedAsset = false;
+
+		if (ImGui::BeginPopupContextWindow(
+			"##project_create",
+			ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
+		{
+			DrawCreateMenu(m_projectPath);
+			ImGui::EndPopup();
+		};
+
+		ImGui::EndChild();
+
+		if (!m_assetToMove.empty())
+			MoveAsset(std::exchange(m_assetToMove, { }), m_assetMoveFolder);
+
+		if (GameObject* dropped = LoomObject::GetByGuid<GameObject>(std::exchange(m_objectToSave, Guid())))
+			SaveAsPrefab(dropped, m_assetMoveFolder);
+
+		if (!m_assetToOpen.empty())
+			OpenAsset(std::exchange(m_assetToOpen, { }));
 	};
 
 	void Editor::DrawAssetNode(const AssetNode& node, int depth, bool found)
@@ -871,7 +921,7 @@ namespace Loom
 			return;
 
 		for (const AssetKindInfo& info : assetKinds)
-			if (!IsScriptsPanels(info.kind) && PanelMaking(info.kind) == nullptr && ImGui::MenuItem((std::string(info.icon) + " " + info.label).c_str()))
+			if (!IsScriptsPanels(info.kind) && TabMaking(info.kind) == nullptr && ImGui::MenuItem((std::string(info.icon) + " " + info.label).c_str()))
 				AskForAsset(info.kind, folder);
 
 		ImGui::EndMenu();
@@ -907,8 +957,8 @@ namespace Loom
 		m_newAssetFolder = folder;
 		m_newScriptFolder.clear();
 
-		for (FilePanel& panel : m_filePanels)
-			panel.newFolder.clear();
+		for (FileTab& tab : m_fileTabs)
+			tab.newFolder.clear();
 
 		m_askForAsset = true;
 		m_focusAssetName = true;
@@ -1094,12 +1144,12 @@ namespace Loom
 
 			m_selectedScript = item;
 			m_revealSelectedScript = true;
-			m_focusScripts = true;
+			ShowProjectTab(ProjectTabs::Scripts);
 		}
-		else if (FilePanel* panel = FilePanelOf(path))
+		else if (FileTab* tab = FileTabOf(path))
 		{
-			panel->folders.Move(ProjectAssets::RelativeTo(path, m_projectPath), panel->newFolder);
-			SaveFileFolders(*panel);
+			tab->folders.Move(ProjectAssets::RelativeTo(path, m_projectPath), tab->newFolder);
+			SaveFileFolders(*tab);
 
 			RevealFile(path);
 		}
@@ -1336,15 +1386,15 @@ namespace Loom
 		m_sprites.Relocate(path, moved);
 		m_models.Relocate(path, moved);
 
-		// The FilePanels file theirs by their paths, so they stay filed where
+		// The FileTabs file theirs by their paths, so they stay filed where
 		// they were.
 		const auto refile = [this](const std::string& from, const std::string& to)
 		{
-			for (FilePanel& panel : m_filePanels)
+			for (FileTab& tab : m_fileTabs)
 			{
 				bool refiled = false;
 
-				for (const std::string& file : panel.files)
+				for (const std::string& file : tab.files)
 				{
 					const std::filesystem::path relocated = ProjectAssets::Relocate((std::filesystem::path(m_projectPath) / file).lexically_normal().string(), from, to);
 					const std::string now = relocated.lexically_relative(m_projectPath).generic_string();
@@ -1352,18 +1402,18 @@ namespace Loom
 					if (now == file)
 						continue;
 
-					const std::string filed = panel.folders.FolderOf(file);
+					const std::string filed = tab.folders.FolderOf(file);
 
-					panel.folders.Move(file, "");
-					panel.folders.Move(now, filed);
+					tab.folders.Move(file, "");
+					tab.folders.Move(now, filed);
 					refiled = true;
 
-					if (panel.selected == file)
-						panel.selected = now;
+					if (tab.selected == file)
+						tab.selected = now;
 				};
 
 				if (refiled)
-					SaveFileFolders(panel);
+					SaveFileFolders(tab);
 			};
 		};
 
@@ -1561,93 +1611,73 @@ namespace Loom
 
 	void Editor::DrawScripts()
 	{
-		if (m_focusScripts)
+		if (m_revealSelectedScript)
 		{
-			ImGui::SetNextWindowFocus();
-			m_focusScripts = false;
+			m_scriptFolderTree.ClearSearch();
+
+			if (const auto entry = m_scriptEntries.find(m_selectedScript); entry != m_scriptEntries.end())
+				m_scriptFilter.Show(IconOf(entry->second.kind), true);
 		};
 
-		if (ImGui::Begin(EditorPanels::Scripts, &m_showScripts))
+		m_scriptFolderTree.DrawSearch();
+
+		ImGui::BeginChild("##scripts", m_scriptFilter.DrawUnder(scriptKinds), ImGuiChildFlags_Borders);
+
+		std::vector<std::string> names{ };
+
+		for (const auto& [name, entry] : m_scriptEntries)
+			if (m_scriptFilter.Shows(IconOf(entry.kind)))
+				names.push_back(name);
+
+		ScriptFolders::Node root = m_scriptFolders.Build(names);
+
+		// By what each shows, so a shader sits among the scripts by its name
+		// rather than its path.
+		const auto by_label = [&](const auto& self, ScriptFolders::Node& node) -> void
 		{
-			// A change anywhere in the project rescans its shaders as well as the scripts.
-			if (m_projectWatch.Changed())
-				RefreshProjectAssets();
-			else if (m_scriptWatch.Changed())
-				RefreshScripts();
+			std::stable_sort(
+				node.items.begin(),
+				node.items.end(),
+				[&](const std::string& a, const std::string& b)
+				{
+					return ScriptFolders::Alphabetical(m_scriptEntries.at(a).label, m_scriptEntries.at(b).label);
+				});
 
-			if (m_revealSelectedScript)
-			{
-				m_scriptFolderTree.ClearSearch();
-
-				if (const auto entry = m_scriptEntries.find(m_selectedScript); entry != m_scriptEntries.end())
-					m_scriptFilter.Show(IconOf(entry->second.kind), true);
-			};
-
-			m_scriptFolderTree.DrawSearch();
-
-			ImGui::BeginChild("##scripts", m_scriptFilter.DrawUnder(scriptKinds), ImGuiChildFlags_Borders);
-
-			std::vector<std::string> names{ };
-
-			for (const auto& [name, entry] : m_scriptEntries)
-				if (m_scriptFilter.Shows(IconOf(entry.kind)))
-					names.push_back(name);
-
-			ScriptFolders::Node root = m_scriptFolders.Build(names);
-
-			// By what each shows, so a shader sits among the scripts by its name
-			// rather than its path.
-			const auto by_label = [&](const auto& self, ScriptFolders::Node& node) -> void
-			{
-				std::stable_sort(
-					node.items.begin(),
-					node.items.end(),
-					[&](const std::string& a, const std::string& b)
-					{
-						return ScriptFolders::Alphabetical(m_scriptEntries.at(a).label, m_scriptEntries.at(b).label);
-					});
-
-				for (ScriptFolders::Node& child : node.children)
-					self(self, child);
-			};
-
-			by_label(by_label, root);
-
-			if (m_projectPath.empty())
-				ImGui::TextDisabled("No project open.");
-			else if (root.children.empty() && root.items.empty() && !m_scriptEntries.empty())
-				ImGui::TextDisabled("None of the kinds highlighted below.");
-			else if (root.children.empty() && root.items.empty())
-				ImGui::TextDisabled(m_scripts.HasProject()
-					? "No scripts yet. Right-click to create one."
-					: "No scripts project. Right-click to create a script.");
-
-			const FolderTree::Hooks hooks = ScriptFolderHooks();
-
-			m_scriptFolderTree.Draw(m_scriptFolders, root, hooks);
-
-			m_revealSelectedScript = false;
-
-			// Dropped anywhere else in the list, it goes to the top.
-			if (ImGui::BeginDragDropTargetCustom(ImGui::GetCurrentWindow()->InnerRect, ImGui::GetID("##scripts_top")))
-			{
-				FolderTree::Drop(m_scriptFolders, "", hooks);
-				ImGui::EndDragDropTarget();
-			};
-
-			if (!m_projectPath.empty() &&
-				ImGui::BeginPopupContextWindow(
-					"##scripts_create",
-					ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
-			{
-				DrawScriptsCreateMenu("");
-				ImGui::EndPopup();
-			};
-
-			ImGui::EndChild();
+			for (ScriptFolders::Node& child : node.children)
+				self(self, child);
 		};
 
-		ImGui::End();
+		by_label(by_label, root);
+
+		if (root.children.empty() && root.items.empty() && !m_scriptEntries.empty())
+			ImGui::TextDisabled("None of the kinds highlighted below.");
+		else if (root.children.empty() && root.items.empty())
+			ImGui::TextDisabled(m_scripts.HasProject()
+				? "No scripts yet. Right-click to create one."
+				: "No scripts project. Right-click to create a script.");
+
+		const FolderTree::Hooks hooks = ScriptFolderHooks();
+
+		m_scriptFolderTree.Draw(m_scriptFolders, root, hooks);
+
+		m_revealSelectedScript = false;
+
+		// Dropped anywhere else in the list, it goes to the top.
+		if (ImGui::BeginDragDropTargetCustom(ImGui::GetCurrentWindow()->InnerRect, ImGui::GetID("##scripts_top")))
+		{
+			FolderTree::Drop(m_scriptFolders, "", hooks);
+			ImGui::EndDragDropTarget();
+		};
+
+		if (ImGui::BeginPopupContextWindow(
+			"##scripts_create",
+			ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
+		{
+			DrawScriptsCreateMenu("");
+			ImGui::EndPopup();
+		};
+
+		ImGui::EndChild();
 	};
 
 	void Editor::DrawScriptEntry(const std::string& name)
@@ -1716,41 +1746,40 @@ namespace Loom
 		ImGui::EndPopup();
 	};
 
-	std::string Editor::FileFoldersFile(const FilePanel& panel) const
+	std::string Editor::FileFoldersFile(const FileTab& tab) const
 	{
 		return m_projectFile.empty()
 			? ""
-			: std::filesystem::path(m_projectFile).replace_extension(panel.kind.extension).string();
+			: std::filesystem::path(m_projectFile).replace_extension(tab.kind.extension).string();
 	};
 
-	void Editor::SaveFileFolders(const FilePanel& panel)
+	void Editor::SaveFileFolders(const FileTab& tab)
 	{
-		if (const std::string file = FileFoldersFile(panel); !panel.Save(file))
-			std::cerr << panel.kind.name << ": could not write the folders to " << file << std::endl;
+		if (const std::string file = FileFoldersFile(tab); !tab.Save(file))
+			std::cerr << tab.kind.name << ": could not write the folders to " << file << std::endl;
 	};
 
-	FilePanel* Editor::FilePanelOf(const std::string& path)
+	FileTab* Editor::FileTabOf(const std::string& path)
 	{
-		const FilePanelKind* kind = PanelHolding(path);
+		const FileTabKind* kind = TabHolding(path);
 
-		for (FilePanel& panel : m_filePanels)
-			if (&panel.kind == kind)
-				return &panel;
+		for (FileTab& tab : m_fileTabs)
+			if (&tab.kind == kind)
+				return &tab;
 
 		return nullptr;
 	};
 
 	bool Editor::RevealFile(const std::string& path)
 	{
-		FilePanel* panel = FilePanelOf(path);
+		FileTab* tab = FileTabOf(path);
 
-		if (panel == nullptr)
+		if (tab == nullptr)
 			return false;
 
-		panel->selected = std::filesystem::path(path).lexically_normal().lexically_relative(m_projectPath).generic_string();
-		panel->reveal = true;
-		panel->show = true;
-		panel->focus = true;
+		tab->selected = std::filesystem::path(path).lexically_normal().lexically_relative(m_projectPath).generic_string();
+		tab->reveal = true;
+		ShowProjectTab(tab->kind.title);
 
 		return true;
 	};
@@ -1759,8 +1788,7 @@ namespace Loom
 	{
 		m_selectedAsset = std::filesystem::path(path).lexically_normal().string();
 		m_revealSelectedAsset = true;
-		m_showProject = true;
-		m_focusProject = true;
+		ShowProjectTab(ProjectTabs::Scenes);
 		m_pingedAsset = m_selectedAsset;
 		m_pingedSince = ImGui::GetTime();
 	};
@@ -1780,77 +1808,59 @@ namespace Loom
 		return hooks;
 	};
 
-	void Editor::DrawFilePanel(FilePanel& panel)
+	void Editor::DrawFileTab(FileTab& tab)
 	{
-		if (panel.focus)
+		if (tab.reveal)
 		{
-			ImGui::SetNextWindowFocus();
-			panel.focus = false;
+			tab.tree.ClearSearch();
+			tab.filter.Show(tab.kind.filter.icon, true);
 		};
 
-		if (ImGui::Begin(panel.kind.title, &panel.show))
+		tab.tree.DrawSearch();
+
+		ImGui::BeginChild("##files", tab.filter.DrawUnder({ &tab.kind.filter, 1 }), ImGuiChildFlags_Borders);
+
+		// Every file here is of the one kind.
+		static const std::vector<std::string> none{ };
+		const VirtualFolders::Node root = tab.folders.Build(tab.filter.Shows(tab.kind.filter.icon) ? tab.files : none);
+
+		if (root.children.empty() && root.items.empty() && !tab.files.empty())
+			ImGui::TextDisabled("None of the kinds highlighted below.");
+		else if (root.children.empty() && root.items.empty())
+			ImGui::TextDisabled(
+				std::ranges::any_of(assetKinds, [&tab](const AssetKindInfo& info) { return TabMaking(info.kind) == &tab.kind; })
+					? "No %s yet. Right-click to create one."
+					: "No %s yet.",
+				tab.kind.files);
+
+		const FolderTree::Hooks hooks = FileFolderHooks(tab);
+
+		tab.tree.Draw(tab.folders, root, hooks);
+
+		tab.reveal = false;
+
+		// A file from outside goes in the project folder.
+		TakeImportFolder(m_projectPath, ImGui::IsWindowHovered());
+
+		// Dropped anywhere else in the list, it goes to the top.
+		if (ImGui::BeginDragDropTargetCustom(ImGui::GetCurrentWindow()->InnerRect, ImGui::GetID("##files_top")))
 		{
-			if (m_projectWatch.Changed())
-				RefreshProjectAssets();
-
-			if (panel.reveal)
-			{
-				panel.tree.ClearSearch();
-				panel.filter.Show(panel.kind.filter.icon, true);
-			};
-
-			panel.tree.DrawSearch();
-
-			ImGui::BeginChild("##files", panel.filter.DrawUnder({ &panel.kind.filter, 1 }), ImGuiChildFlags_Borders);
-
-			// Every file here is of the one kind.
-			static const std::vector<std::string> none{ };
-			const VirtualFolders::Node root = panel.folders.Build(panel.filter.Shows(panel.kind.filter.icon) ? panel.files : none);
-
-			if (m_projectPath.empty())
-				ImGui::TextDisabled("No project open.");
-			else if (root.children.empty() && root.items.empty() && !panel.files.empty())
-				ImGui::TextDisabled("None of the kinds highlighted below.");
-			else if (root.children.empty() && root.items.empty())
-				ImGui::TextDisabled(
-					std::ranges::any_of(assetKinds, [&panel](const AssetKindInfo& info) { return PanelMaking(info.kind) == &panel.kind; })
-						? "No %s yet. Right-click to create one."
-						: "No %s yet.",
-					panel.kind.files);
-
-			const FolderTree::Hooks hooks = FileFolderHooks(panel);
-
-			panel.tree.Draw(panel.folders, root, hooks);
-
-			panel.reveal = false;
-
-			// A file from outside goes in the project folder.
-			if (!m_projectPath.empty())
-				TakeImportFolder(m_projectPath, ImGui::IsWindowHovered());
-
-			// Dropped anywhere else in the list, it goes to the top.
-			if (ImGui::BeginDragDropTargetCustom(ImGui::GetCurrentWindow()->InnerRect, ImGui::GetID("##files_top")))
-			{
-				FolderTree::Drop(panel.folders, "", hooks);
-				ImGui::EndDragDropTarget();
-			};
-
-			if (!m_projectPath.empty() &&
-				ImGui::BeginPopupContextWindow(
-					"##files_create",
-					ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
-			{
-				DrawFileCreateMenu(panel, "");
-				ImGui::EndPopup();
-			};
-
-			ImGui::EndChild();
+			FolderTree::Drop(tab.folders, "", hooks);
+			ImGui::EndDragDropTarget();
 		};
 
-		ImGui::End();
+		if (ImGui::BeginPopupContextWindow(
+			"##files_create",
+			ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
+		{
+			DrawFileCreateMenu(tab, "");
+			ImGui::EndPopup();
+		};
+
+		ImGui::EndChild();
 	};
 
-	void Editor::DrawFileEntry(FilePanel& panel, const std::string& file)
+	void Editor::DrawFileEntry(FileTab& tab, const std::string& file)
 	{
 		const AssetNode node{
 			(std::filesystem::path(m_projectPath) / file).lexically_normal().string(),
@@ -1859,7 +1869,7 @@ namespace Loom
 		ImGuiTreeNodeFlags flags =
 			ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanAvailWidth;
 
-		if (file == panel.selected)
+		if (file == tab.selected)
 			flags |= ImGuiTreeNodeFlags_Selected;
 
 		const Texture* thumbnail = Thumbnail(node.path);
@@ -1872,7 +1882,7 @@ namespace Loom
 
 		if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
 		{
-			panel.selected = file;
+			tab.selected = file;
 
 			// A model shows in the Inspector, where it can be imported.
 			if (IsModelFile(node.path))
@@ -1887,7 +1897,7 @@ namespace Loom
 		const float drag_threshold = io.MouseDragThreshold * io.MouseDragThreshold;
 
 		const bool released =
-			file == panel.selected &&
+			file == tab.selected &&
 			ImGui::IsItemHovered() &&
 			ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
 			io.MouseDragMaxDistanceSqr[ImGuiMouseButton_Left] < drag_threshold;
@@ -1904,9 +1914,9 @@ namespace Loom
 		if (!ImGui::BeginPopupContextItem())
 			return;
 
-		panel.selected = file;
+		tab.selected = file;
 
-		const std::string folder = panel.folders.FolderOf(file);
+		const std::string folder = tab.folders.FolderOf(file);
 
 		if (ImGui::MenuItem("Open"))
 			OpenAsset(node.path);
@@ -1916,18 +1926,18 @@ namespace Loom
 
 		if (!folder.empty() && ImGui::MenuItem("Move to Top"))
 		{
-			panel.folders.Move(file, "");
-			SaveFileFolders(panel);
+			tab.folders.Move(file, "");
+			SaveFileFolders(tab);
 		};
 
 		ImGui::Separator();
 
-		DrawFileCreateMenu(panel, folder);
+		DrawFileCreateMenu(tab, folder);
 
 		ImGui::EndPopup();
 	};
 
-	void Editor::DrawFileCreateMenu(FilePanel& panel, const std::string& folder)
+	void Editor::DrawFileCreateMenu(FileTab& tab, const std::string& folder)
 	{
 		if (!ImGui::BeginMenu("Create"))
 			return;
@@ -1935,32 +1945,32 @@ namespace Loom
 		// Kept beside the project file, so not without one.
 		if (ImGui::MenuItem((std::string(EditorIcons::Folder) + " Folder").c_str(), nullptr, false, !m_projectFile.empty()))
 		{
-			AddNewFolder(panel.folders, panel.tree, folder);
-			SaveFileFolders(panel);
+			AddNewFolder(tab.folders, tab.tree, folder);
+			SaveFileFolders(tab);
 		};
 
 		for (const AssetKindInfo& info : assetKinds)
-			if (PanelMaking(info.kind) == &panel.kind && ImGui::MenuItem((std::string(info.icon) + " " + info.label).c_str()))
+			if (TabMaking(info.kind) == &tab.kind && ImGui::MenuItem((std::string(info.icon) + " " + info.label).c_str()))
 			{
 				AskForAsset(info.kind, m_projectPath);
-				panel.newFolder = folder;
+				tab.newFolder = folder;
 			};
 
 		ImGui::EndMenu();
 	};
 
-	FolderTree::Hooks Editor::FileFolderHooks(FilePanel& panel)
+	FolderTree::Hooks Editor::FileFolderHooks(FileTab& tab)
 	{
 		FolderTree::Hooks hooks;
 		hooks.item_payload = ASSET_PAYLOAD;
-		hooks.folder_payload = panel.kind.folderPayload;
-		hooks.takes = [&panel](const std::string& file) { return std::ranges::find(panel.files, file) != panel.files.end(); };
-		hooks.panel = panel.kind.name;
-		hooks.reveal = [&panel](const std::string& folder) { return panel.reveal && VirtualFolders::IsAtOrUnder(panel.folders.FolderOf(panel.selected), folder); };
-		hooks.create = [this, &panel](const std::string& folder) { DrawFileCreateMenu(panel, folder); };
-		hooks.item = [this, &panel](const std::string& file) { DrawFileEntry(panel, file); };
+		hooks.folder_payload = tab.kind.folderPayload;
+		hooks.takes = [&tab](const std::string& file) { return std::ranges::find(tab.files, file) != tab.files.end(); };
+		hooks.panel = tab.kind.name;
+		hooks.reveal = [&tab](const std::string& folder) { return tab.reveal && VirtualFolders::IsAtOrUnder(tab.folders.FolderOf(tab.selected), folder); };
+		hooks.create = [this, &tab](const std::string& folder) { DrawFileCreateMenu(tab, folder); };
+		hooks.item = [this, &tab](const std::string& file) { DrawFileEntry(tab, file); };
 		hooks.name = [](const std::string& file) { return std::filesystem::path(file).filename().string(); };
-		hooks.changed = [this, &panel]() { SaveFileFolders(panel); };
+		hooks.changed = [this, &tab]() { SaveFileFolders(tab); };
 
 		return hooks;
 	};

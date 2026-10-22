@@ -11,10 +11,10 @@
 
 namespace Loom
 {
-	// What sets one FilePanel apart from the others.
-	struct FilePanelKind
+	// What sets one FileTab apart from the others.
+	struct FileTabKind
 	{
-		// Its title in EditorPanels, what the console calls it, what its empty
+		// Its label in ProjectTabs, what the console calls it, what its empty
 		// list says it has none of, and its folders' file's icon.
 		const char* title;
 		const char* name;
@@ -32,35 +32,35 @@ namespace Loom
 		const char* folderPayload;
 	};
 
-	namespace FilePanels
+	namespace FileTabs
 	{
-		inline constexpr FilePanelKind TwoD{ EditorPanels::TwoD, "2D", "textures, sprites or palettes", EditorIcons::TwoD, { EditorIcons::Texture, "Textures, sprites and palettes" }, ".loom2d", "2d.", "Loom2DFolder" };
-		inline constexpr FilePanelKind ThreeD{ EditorPanels::ThreeD, "3D", "models", EditorIcons::ThreeD, { EditorIcons::Model, "Models" }, ".loom3d", "3d.", "Loom3DFolder" };
-		inline constexpr FilePanelKind Sounds{ EditorPanels::Sounds, "Sounds", "sounds", EditorIcons::Sound, { EditorIcons::Sound, "Sounds" }, ".loomsounds", "sound.", "LoomSoundFolder" };
-		inline constexpr FilePanelKind Fonts{ EditorPanels::Fonts, "Fonts", "fonts", EditorIcons::Font, { EditorIcons::Font, "Fonts" }, ".loomfonts", "font.", "LoomFontFolder" };
+		inline constexpr FileTabKind TwoD{ ProjectTabs::TwoD, "2D", "textures, sprites or palettes", EditorIcons::TwoD, { EditorIcons::Texture, "Textures, sprites and palettes" }, ".loom2d", "2d.", "Loom2DFolder" };
+		inline constexpr FileTabKind ThreeD{ ProjectTabs::ThreeD, "3D", "models", EditorIcons::ThreeD, { EditorIcons::Model, "Models" }, ".loom3d", "3d.", "Loom3DFolder" };
+		inline constexpr FileTabKind Sounds{ ProjectTabs::Sounds, "Sounds", "sounds", EditorIcons::Sound, { EditorIcons::Sound, "Sounds" }, ".loomsounds", "sound.", "LoomSoundFolder" };
+		inline constexpr FileTabKind Fonts{ ProjectTabs::Fonts, "Fonts", "fonts", EditorIcons::Font, { EditorIcons::Font, "Fonts" }, ".loomfonts", "font.", "LoomFontFolder" };
 
-		inline constexpr const FilePanelKind* all[] = { &TwoD, &ThreeD, &Sounds, &Fonts };
+		inline constexpr const FileTabKind* all[] = { &TwoD, &ThreeD, &Sounds, &Fonts };
 	};
 
 	/**
-	* Loom::FilePanel
-	* - A panel holding the project's files of one kind, which the Project
-	*   panel leaves to it: the 2D panel its textures, sprites and palettes,
-	*   and the 3D, Sounds and Fonts panels theirs
+	* Loom::FileTab
+	* - A tab of the Project panel holding the project's files of one kind:
+	*   the 2D tab its textures, sprites and palettes, and the 3D, Sounds and
+	*   Fonts tabs theirs
 	* - Its files are filed in folders of its own by their paths in the
 	*   project, apart from the folders they are in, so filing one moves no
 	*   file. A project keeps them beside its .loomproject in a file of the
-	*   panel's extension, as the Scripts panel's are
+	*   tab's extension, as the Scripts tab's are
 	*/
-	struct FilePanel final
+	struct FileTab final
 	{
-		explicit FilePanel(const FilePanelKind* kind) : kind(*kind) { };
+		explicit FileTab(const FileTabKind* kind) : kind(*kind) { };
 
 		// Empty when the file is not there yet.
 		void Load(const std::string& file) { folders.Load(file, kind.itemPrefix); };
 		bool Save(const std::string& file) const { return folders.Save(file, kind.itemPrefix); };
 
-		const FilePanelKind& kind;
+		const FileTabKind& kind;
 
 		// From the last scan, each by its path in the project, as fields name it.
 		std::vector<std::string> files{ };
@@ -72,8 +72,5 @@ namespace Loom
 
 		// Where the Create prompt's file is filed once it is written.
 		std::string newFolder{ };
-
-		bool show = true;
-		bool focus = false;
 	};
 };

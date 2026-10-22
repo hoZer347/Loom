@@ -49,8 +49,8 @@ namespace Loom
 		m_componentMenu.Clear();
 		m_scriptFolders.Clear();
 
-		for (FilePanel& panel : m_filePanels)
-			panel.folders.Clear();
+		for (FileTab& tab : m_fileTabs)
+			tab.folders.Clear();
 
 		InputActions::Set({ });
 
@@ -75,8 +75,8 @@ namespace Loom
 
 		m_scriptFolders.Load(ScriptFoldersFile());
 
-		for (FilePanel& panel : m_filePanels)
-			panel.Load(FileFoldersFile(panel));
+		for (FileTab& tab : m_fileTabs)
+			tab.Load(FileFoldersFile(tab));
 
 		InputActions::Load(InputActionsFile());
 

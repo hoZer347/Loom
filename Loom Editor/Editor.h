@@ -22,7 +22,7 @@
 #include "SelectionOutline.h"
 #include "SceneHistory.h"
 #include "SearchBar.h"
-#include "FilePanel.h"
+#include "FileTab.h"
 #include "FolderTree.h"
 #include "ScriptFolders.h"
 #include "ScriptLibrary.h"
@@ -83,7 +83,7 @@ namespace Loom
 		Palette,
 	};
 
-	// What the Scripts panel lists.
+	// What the Scripts tab lists.
 	enum class ScriptEntryKind
 	{
 		Script,
@@ -100,10 +100,11 @@ namespace Loom
 	*   in a window named after it, where editing it edits every copy of it
 	*   that is open, the way a prefab works; the game as its own cameras see
 	*   it; and everything loaded, from a camera the editor flies
-	* - Works out of a project folder: its scenes and prefabs are listed in the
-	*   Project panel, which also creates them, its scripts and shaders in the
-	*   Scripts panel, which creates those, and its textures, models, sounds
-	*   and fonts each in a FilePanel, the 2D panel creating textures. The
+	* - Works out of a project folder, which the Project panel lists in tabs:
+	*   its scenes and prefabs in the Scenes tab, which also creates them, its
+	*   scripts and shaders in the Scripts tab, which creates those, and its
+	*   textures, models, sounds and fonts each in a FileTab, the 2D tab
+	*   creating textures. The
 	*   scripts are a C++ project that builds into a library the editor loads
 	* - Reads and writes scenes through SceneSerializer, and shows the text form
 	*   of the open scene live in its Scene Data panel
@@ -247,7 +248,7 @@ namespace Loom
 		void QueueImport(const std::string& path);
 
 		// The same, with the mouse moved to x, y first, in ImGui's coordinates.
-		// Over the Project panel or a FilePanel, the file is copied into the
+		// Over the Scenes tab or a FileTab, the file is copied into the
 		// folder there instead.
 		void Drop(const std::string& path, float x, float y);
 
@@ -327,7 +328,15 @@ namespace Loom
 		void DrawGui();
 
 		void DrawMainMenuBar();
+
+		// The Project panel, its tabs drawn by the ones below.
 		void DrawProject();
+
+		// Brings the Project panel forward with one of ProjectTabs in front.
+		void ShowProjectTab(std::string_view tab);
+
+		// The project's scenes and prefabs, in the folders they are in.
+		void DrawScenes();
 		// found: a folder above matched the search, so all of this one shows.
 		void DrawAssetNode(const AssetNode& node, int depth, bool found);
 		bool ShowsAsset(const AssetNode& node) const;
@@ -336,12 +345,12 @@ namespace Loom
 		void DrawCreateAssetPrompt();
 
 		// The project's script types and shaders, filed in folders of the
-		// Scripts panel's own that move no files.
+		// Scripts tab's own that move no files.
 		void DrawScripts();
 		void DrawScriptEntry(const std::string& name);
 		void DrawScriptsCreateMenu(const std::string& folder);
 
-		// How the Scripts panel's FolderTree draws and files its scripts.
+		// How the Scripts tab's FolderTree draws and files its scripts.
 		FolderTree::Hooks ScriptFolderHooks();
 
 		// Where the project keeps them: beside its .loomproject, named the same.
@@ -349,22 +358,22 @@ namespace Loom
 		std::string ScriptFoldersFile() const;
 		void SaveScriptFolders();
 
-		// The FilePanels, each drawn alike.
-		void DrawFilePanel(FilePanel& panel);
-		void DrawFileEntry(FilePanel& panel, const std::string& file);
-		void DrawFileCreateMenu(FilePanel& panel, const std::string& folder);
-		FolderTree::Hooks FileFolderHooks(FilePanel& panel);
-		std::string FileFoldersFile(const FilePanel& panel) const;
-		void SaveFileFolders(const FilePanel& panel);
+		// The FileTabs, each drawn alike.
+		void DrawFileTab(FileTab& tab);
+		void DrawFileEntry(FileTab& tab, const std::string& file);
+		void DrawFileCreateMenu(FileTab& tab, const std::string& folder);
+		FolderTree::Hooks FileFolderHooks(FileTab& tab);
+		std::string FileFoldersFile(const FileTab& tab) const;
+		void SaveFileFolders(const FileTab& tab);
 
-		// The FilePanel that holds the file, or none.
-		FilePanel* FilePanelOf(const std::string& path);
+		// The FileTab that holds the file, or none.
+		FileTab* FileTabOf(const std::string& path);
 
-		// Selects and shows the file at path in its FilePanel. False when none
+		// Selects and shows the file at path in its FileTab. False when none
 		// holds it.
 		bool RevealFile(const std::string& path);
 
-		// Selects, shows and flashes the file at path in the Project panel.
+		// Selects, shows and flashes the file at path in the Scenes tab.
 		void PingAsset(const std::string& path);
 
 		// Where the project keeps its InputActions, beside its .loomproject in
@@ -495,8 +504,9 @@ namespace Loom
 		void StepHistory(bool (SceneHistory::* step)(const std::vector<Scene*>&));
 
 		// Whether input in the window can change a scene, so a step is
-		// recorded for the history once it is let go. The Scripts, Shaders and
-		// Sprites panels and the FilePanels only edit, file and open files:
+		// recorded for the history once it is let go. The Shaders and Sprites
+		// panels and the Project panel's tabs but Scenes only edit, file and
+		// open files:
 		// what is dragged out of them lands in another window.
 		bool CanEditScenes(const ImGuiWindow* window) const;
 
@@ -542,7 +552,7 @@ namespace Loom
 		// mouse is over it.
 		void TakeImportTarget(GameObject* gameObject);
 
-		// The same for the Project panel and the FilePanels, with the folder a
+		// The same for the Scenes tab and the FileTabs, with the folder a
 		// drop there goes in.
 		void TakeImportFolder(const std::string& folder, bool hovered);
 
@@ -551,8 +561,8 @@ namespace Loom
 		void ImportQueued();
 		void ClickQueued();
 
-		// Rescans the project folder: the asset tree the Project panel draws,
-		// the scenes in it, the shaders and each FilePanel's files.
+		// Rescans the project folder: the asset tree the Scenes tab draws,
+		// the scenes in it, the shaders and each FileTab's files.
 		void RefreshProjectAssets();
 
 		// Where ProjectAssets::OpenerOf says; the shell's opener is whatever
@@ -567,7 +577,7 @@ namespace Loom
 		// OpenAsset's.
 		static bool OpenInShell(ImGuiContext* context, const char* path);
 
-		// Lets a file be dragged out of the Project panel or a FilePanel, onto a
+		// Lets a file be dragged out of the Scenes tab or a FileTab, onto a
 		// field that names a file or a GameObject in the hierarchy, and a file
 		// or folder onto another folder.
 		void DragAsset(const AssetNode& node);
@@ -587,19 +597,19 @@ namespace Loom
 		// the hierarchy. Whether the drag was a file, taken or turned away.
 		bool DropAsset(GameObject* gameObject);
 
-		// AcceptAssetDrop for a shader dragged out of the Scripts panel, which
+		// AcceptAssetDrop for a shader dragged out of the Scripts tab, which
 		// lists the shaders: path becomes the shader's path from the project.
 		bool AcceptShaderDrop(std::string& path);
 
 		// Gives the GameObject the shader, on its Material or a new one.
 		void DropShader(GameObject* gameObject, const std::string& path);
 
-		// What the Scripts panel drags: a script type's name, a shader's path
+		// What the Scripts tab drags: a script type's name, a shader's path
 		// from the project, or a folder's path.
 		static constexpr const char* script_payload = "LoomScript";
 		static constexpr const char* script_folder_payload = "LoomScriptFolder";
 
-		// Takes a script or shader dragged out of the Scripts panel onto a
+		// Takes a script or shader dragged out of the Scripts tab onto a
 		// GameObject in the hierarchy, attaching it. Whether the drag was one.
 		bool DropScript(GameObject* gameObject);
 
@@ -806,10 +816,10 @@ namespace Loom
 		std::string m_projectName{ };
 		std::vector<std::string> m_projectScenes{ };
 
-		// The shaders from the last scan, which the Scripts panel lists.
+		// The shaders from the last scan, which the Scripts tab lists.
 		std::vector<std::string> m_projectShaders{ };
 
-		// A model file picked in the 3D panel, previewed in the Inspector
+		// A model file picked in the 3D tab, previewed in the Inspector
 		// in place of a GameObject.
 		std::string m_selectedModel{ };
 		ModelPreview m_modelPreview;
@@ -840,7 +850,7 @@ namespace Loom
 		// drawn, since opening one can rescan the tree being drawn.
 		std::string m_assetToOpen{ };
 
-		// Where a script or shader is written, what the Scripts panel calls it,
+		// Where a script or shader is written, what the Scripts tab calls it,
 		// and whether it has been compiled.
 		struct ScriptEntry
 		{
@@ -857,7 +867,7 @@ namespace Loom
 		ScriptFolders m_scriptFolders;
 		KindFilter m_scriptFilter;
 
-		// Saves to the headers rescan the Scripts panel.
+		// Saves to the headers rescan the Scripts tab.
 		FolderWatch m_scriptWatch;
 		std::string m_selectedScript{ };
 		bool m_revealSelectedScript = false;
@@ -866,7 +876,7 @@ namespace Loom
 		// Where the Create prompt's script is filed once it is written.
 		std::string m_newScriptFolder{ };
 
-		std::vector<FilePanel> m_filePanels{ std::begin(FilePanels::all), std::end(FilePanels::all) };
+		std::vector<FileTab> m_fileTabs{ std::begin(FileTabs::all), std::end(FileTabs::all) };
 
 		// The scene a session opens with: what the settings file said last time,
 		// and then whichever one this session last made active.
@@ -903,8 +913,12 @@ namespace Loom
 
 		bool m_showProject = true;
 		bool m_focusProject = false;
-		bool m_showScripts = true;
-		bool m_focusScripts = false;
+
+		// The Project panel's tab in front, and the one to bring forward on
+		// the next frame, or none: each one of ProjectTabs.
+		std::string_view m_projectTab = ProjectTabs::Scenes;
+		std::string_view m_projectTabToShow{ };
+
 		bool m_showHierarchy = true;
 		bool m_hierarchyFocused = false;
 		bool m_showInspector = true;

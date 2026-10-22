@@ -19,7 +19,7 @@ namespace Loom
 
 	namespace
 	{
-		// By what follows the last separator, as a FilePanel shows its files by
+		// By what follows the last separator, as a FileTab shows its files by
 		// their names, and then whole.
 		bool ByName(std::string_view a, std::string_view b)
 		{

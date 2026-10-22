@@ -1,6 +1,6 @@
 #include "doctest.h"
 
-#include "FilePanel.h"
+#include "FileTab.h"
 #include "ScriptFolders.h"
 
 #include <filesystem>
@@ -152,12 +152,12 @@ TEST_SUITE("ScriptFolders")
 		CHECK(loaded.Build({ "Patrol" }).children.empty());
 	};
 
-	TEST_CASE("a FilePanel's files come back filed by their paths, and its file holds none of another panel's")
+	TEST_CASE("a FileTab's files come back filed by their paths, and its file holds none of another panel's")
 	{
 		const std::filesystem::path two_d = std::filesystem::temp_directory_path() / "loom 2d folders.loom2d";
 		const std::filesystem::path scripts = std::filesystem::temp_directory_path() / "loom 2d folders.loomscripts";
 
-		Loom::FilePanel saved(&Loom::FilePanels::TwoD);
+		Loom::FileTab saved(&Loom::FileTabs::TwoD);
 		saved.folders.Move("Assets/Units/Tank.png", "Units");
 		saved.folders.Move("Assets/Units/Tank=Heavy.png", "Units");
 
@@ -168,7 +168,7 @@ TEST_SUITE("ScriptFolders")
 
 		REQUIRE(other.Save(scripts.string()));
 
-		Loom::FilePanel loaded(&Loom::FilePanels::TwoD);
+		Loom::FileTab loaded(&Loom::FileTabs::TwoD);
 		loaded.Load(two_d.string());
 
 		CHECK(loaded.folders.FolderOf("Assets/Units/Tank.png") == "Units");
@@ -180,7 +180,7 @@ TEST_SUITE("ScriptFolders")
 		CHECK(loaded.folders.FolderOf("Patrol").empty());
 		CHECK(loaded.folders.AddFolder("", "a=b").empty());
 
-		Loom::FilePanel three_d(&Loom::FilePanels::ThreeD);
+		Loom::FileTab three_d(&Loom::FileTabs::ThreeD);
 		three_d.Load(two_d.string());
 
 		CHECK(three_d.folders.FolderOf("Assets/Units/Tank.png").empty());
@@ -189,7 +189,7 @@ TEST_SUITE("ScriptFolders")
 		std::filesystem::remove(scripts);
 	};
 
-	TEST_CASE("a FilePanel's files are in the order of their names, wherever they are")
+	TEST_CASE("a FileTab's files are in the order of their names, wherever they are")
 	{
 		const Loom::VirtualFolders folders;
 

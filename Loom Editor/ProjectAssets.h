@@ -11,7 +11,7 @@ namespace Loom
 {
 	/**
 	* Loom::ProjectAssets
-	* - Writes the new files the Project, 2D and Scripts panels' Create menus
+	* - Writes the new files the Scenes, 2D and Scripts tabs' Create menus
 	*   offer, each one something the engine or the scripts build can use
 	*   straight away
 	* - A script is one header the scripts project compiles by its glob, so the
@@ -109,16 +109,16 @@ namespace Loom
 		static std::string Replace(std::string text, const std::string& token, const std::string& value);
 
 		// Whether name is a scene, prefab, shader, texture, sprite, palette,
-		// sound or font, which the Project panel, the Scripts panel and the
-		// FilePanels list along with models. The scripts are the Scripts
-		// panel's too, and anything else in the project folder (Visual
-		// Studio's files, notes) is not part of the game.
+		// sound or font, which the Project panel's tabs list along with
+		// models. The scripts are the Scripts tab's too, and anything else in
+		// the project folder (Visual Studio's files, notes) is not part of
+		// the game.
 		static bool IsGameFile(const std::string& name);
 		static bool IsScriptFile(const std::string& name);
 		static bool IsShaderFile(const std::string& name);
 		static bool IsTextureFile(const std::string& name);
 
-		// A texture, sprite or palette, which the 2D panel lists.
+		// A texture, sprite or palette, which the 2D tab lists.
 		static bool IsTwoDFile(const std::string& name);
 		static bool IsSoundFile(const std::string& name);
 		static bool IsFontFile(const std::string& name);

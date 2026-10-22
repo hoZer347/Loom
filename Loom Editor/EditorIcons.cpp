@@ -1,6 +1,6 @@
 #include "EditorIcons.h"
 
-#include "FilePanel.h"
+#include "FileTab.h"
 #include "InputActions.h"
 #include "Prefab.h"
 #include "ProjectAssets.h"
@@ -41,7 +41,7 @@ namespace Loom
 		if (extension == ScriptFolders::extension)
 			return Script;
 
-		for (const FilePanelKind* kind : FilePanels::all)
+		for (const FileTabKind* kind : FileTabs::all)
 			if (extension == kind->extension)
 				return kind->icon;
 

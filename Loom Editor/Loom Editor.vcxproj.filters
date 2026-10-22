@@ -159,7 +159,7 @@
     <ClInclude Include="ScriptLibrary.h">
       <Filter>Scripts</Filter>
     </ClInclude>
-    <ClInclude Include="FilePanel.h">
+    <ClInclude Include="FileTab.h">
       <Filter>Panels</Filter>
     </ClInclude>
     <ClInclude Include="ScriptFolders.h">
