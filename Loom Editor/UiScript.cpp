@@ -665,6 +665,7 @@ namespace Loom
 		for (const ImGuiWindow* shown : ImGui::GetCurrentContext()->Windows)
 			if (std::string(shown->Name).find(window) != std::string::npos &&
 				((shown->Flags & ImGuiWindowFlags_ChildWindow) == 0 || shown->DockIsActive) &&
+				shown->Viewport == ImGui::GetMainViewport() &&
 				shown->WasActive &&
 				!shown->Hidden)
 				return Engine::Region{

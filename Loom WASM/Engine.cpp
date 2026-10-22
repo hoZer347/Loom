@@ -289,7 +289,7 @@ namespace Loom
 				const std::vector<uint8_t>& rgb = region ? cut : captured;
 
 				if (width <= 0 || height <= 0)
-					std::cerr << "Nothing to capture: the window has no size" << std::endl;
+					std::cerr << "Nothing to capture: " << (region ? "the region is outside the window" : "the window has no size") << std::endl;
 				else if (!WriteBitmap(path, width, height, rgb))
 					std::cerr << "Could not write " << path << std::endl;
 				else std::cout << "Wrote " << path << " (" << width << 'x' << height << ')' << std::endl;

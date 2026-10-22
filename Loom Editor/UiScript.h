@@ -83,8 +83,8 @@ namespace Loom
 		void WriteItems(std::ostream& out, const std::string& window = "") const;
 
 		// Where the first window whose name contains window was drawn last
-		// frame, in the framebuffer's pixels. None when it is closed or behind
-		// another tab.
+		// frame, in the framebuffer's pixels. None when it is closed, behind
+		// another tab or floated out into a viewport of its own.
 		static std::optional<Engine::Region> WindowRegion(const std::string& window);
 
 		void ItemAdded(ImGuiID id, const ImRect& rect) override;
