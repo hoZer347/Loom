@@ -83,9 +83,10 @@ namespace Loom
 	*   that is open, the way a prefab works; the game as its own cameras see
 	*   it; and everything loaded, from a camera the editor flies
 	* - Works out of a project folder: everything under it is listed in the
-	*   Project panel, which also creates new assets, apart from the scripts,
-	*   which the Scripts panel lists and creates. They are a C++ project that
-	*   builds into a library the editor loads
+	*   Project panel, which also creates new assets, apart from the textures,
+	*   which the Art panel lists and creates, and the scripts, which the
+	*   Scripts panel does. They are a C++ project that builds into a library
+	*   the editor loads
 	* - Reads and writes scenes through SceneSerializer, and shows the text form
 	*   of the open scene live in its Scene Data panel
 	* - Takes over Engine's GUI hook on construction and hands it back on
@@ -220,8 +221,8 @@ namespace Loom
 		void QueueImport(const std::string& path);
 
 		// The same, with the mouse moved to x, y first, in ImGui's coordinates.
-		// Over the Project panel, the file is copied into the folder there
-		// instead.
+		// Over the Project or Art panel, the file is copied into the folder
+		// there instead.
 		void Drop(const std::string& path, float x, float y);
 
 		// File > Open Project..., starting beside the project that is open.
@@ -489,7 +490,8 @@ namespace Loom
 		// mouse is over it.
 		void TakeImportTarget(GameObject* gameObject);
 
-		// The same for the Project panel, with the folder a drop there goes in.
+		// The same for the Project and Art panels, with the folder a drop there
+		// goes in.
 		void TakeImportFolder(const std::string& folder, bool hovered);
 
 		// Into the folder the drop landed in, selecting the copy.
@@ -498,7 +500,7 @@ namespace Loom
 		void ClickQueued();
 
 		// Rescans the project folder: the asset tree the Project panel draws,
-		// and the scenes in it.
+		// the textures the Art panel does, and the scenes.
 		void RefreshProjectAssets();
 
 		// Where ProjectAssets::OpenerOf says; the shell's opener is whatever

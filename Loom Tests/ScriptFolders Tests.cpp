@@ -10,6 +10,7 @@
 
 namespace
 {
+	using Loom::ArtFolders;
 	using Loom::ScriptFolders;
 
 	// The node at the folder's path under root, or null.
@@ -146,8 +147,9 @@ TEST_SUITE("ScriptFolders")
 		const std::filesystem::path art = std::filesystem::temp_directory_path() / "loom art folders.loomart";
 		const std::filesystem::path scripts = std::filesystem::temp_directory_path() / "loom art folders.loomscripts";
 
-		Loom::ArtFolders saved;
+		ArtFolders saved;
 		saved.Move("Assets/Units/Tank.png", "Units");
+		saved.Move("Assets/Units/Tank=Heavy.png", "Units");
 
 		REQUIRE(saved.Save(art.string()));
 
@@ -156,14 +158,17 @@ TEST_SUITE("ScriptFolders")
 
 		REQUIRE(other.Save(scripts.string()));
 
-		Loom::ArtFolders loaded;
+		ArtFolders loaded;
 		loaded.Load(art.string());
 
 		CHECK(loaded.FolderOf("Assets/Units/Tank.png") == "Units");
+		CHECK(loaded.FolderOf("Assets/Units/Tank=Heavy.png") == "Units");
+		CHECK(loaded.Build({ "Assets/Units/Tank=Heavy.png" }).children.size() == 1);
 
 		loaded.Load(scripts.string());
 
 		CHECK(loaded.FolderOf("Patrol").empty());
+		CHECK(loaded.AddFolder("", "a=b").empty());
 
 		std::filesystem::remove(art);
 		std::filesystem::remove(scripts);

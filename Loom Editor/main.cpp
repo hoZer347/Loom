@@ -157,7 +157,7 @@ namespace
 			<< "  --play                         start with the scene running\n"
 			<< "  --play-web                     build the scene for the web and open it\n"
 			<< "  --import <file> [x y]          import a model, as if dropped on the window;\n"
-			<< "                                 over the Project panel, copy the file there\n"
+			<< "                                 over the Project or Art panel, copy the file there\n"
 			<< "  --preview <file>               select a model file, showing it in the Inspector\n"
 			<< "  --select <name>                select the first GameObject called that\n"
 			<< "  --open-project-dialog          start with File > Open Project... open\n"

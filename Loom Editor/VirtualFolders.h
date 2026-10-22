@@ -24,6 +24,10 @@ namespace Loom
 		static constexpr char separator = '/';
 		static constexpr const char* folder_key = "folder=";
 
+		// What a file of them puts between an item and its folder, so no
+		// folder's name holds one.
+		static constexpr char equals = '=';
+
 		struct Node
 		{
 			std::string name{ };
@@ -52,7 +56,7 @@ namespace Loom
 		void Move(const std::string& item, const std::string& folder);
 
 		// A folder called name in parent, which is the top when empty. Its path,
-		// or empty when the name is blank, holds a separator or is taken.
+		// or empty when the name is blank, holds a separator or '=', or is taken.
 		std::string AddFolder(const std::string& parent, const std::string& name);
 
 		// The same folder under a new name, holding what it held. Its new path,
@@ -82,7 +86,7 @@ namespace Loom
 		std::map<std::string, std::string> m_items{ };
 
 	private:
-		// A trimmed name with no separator in it, or empty when there is none.
+		// A trimmed name with no separator or '=' in it, or empty when there is none.
 		static std::string Tidy(const std::string& name);
 
 		static std::string Join(const std::string& parent, const std::string& name);

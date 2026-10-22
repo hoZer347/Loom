@@ -2292,7 +2292,7 @@ namespace Loom
 			ImGuiWindowFlags_NoSavedSettings))
 		{
 			ImGui::TextUnformatted("The editor works out of a folder of scene files.");
-			ImGui::TextDisabled("Everything under it shows up in the Project panel, and its scripts in the Scripts panel.");
+			ImGui::TextDisabled("Everything under it shows up in the Project panel, its textures in the Art panel and its scripts in the Scripts panel.");
 
 			ImGui::Separator();
 

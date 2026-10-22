@@ -93,10 +93,11 @@ namespace Loom
 				continue;
 			};
 
-			const size_t equals = line.find('=');
+			// Folders hold no '=', and file paths can.
+			const size_t split = line.rfind(equals);
 
-			if (line.rfind(item_prefix, 0) == 0 && equals != std::string::npos)
-				Move(line.substr(item_length, equals - item_length), line.substr(equals + 1));
+			if (line.rfind(item_prefix, 0) == 0 && split != std::string::npos)
+				Move(line.substr(item_length, split - item_length), line.substr(split + 1));
 		};
 	};
 
@@ -108,11 +109,10 @@ namespace Loom
 			out << folder_key << folder << '\n';
 
 		for (const auto& [item, folder] : m_items)
-			out << item_prefix << item << '=' << folder << '\n';
+			out << item_prefix << item << equals << folder << '\n';
 
 		return (bool)out;
 	};
-
 
 	std::string VirtualFolders::FolderOf(const std::string& item) const
 	{
@@ -254,7 +254,9 @@ namespace Loom
 
 		const size_t first = name.find_first_not_of(blank);
 
-		if (first == std::string::npos || name.find(separator) != std::string::npos)
+		if (first == std::string::npos ||
+			name.find(separator) != std::string::npos ||
+			name.find(equals) != std::string::npos)
 			return "";
 
 		return name.substr(first, name.find_last_not_of(blank) - first + 1);

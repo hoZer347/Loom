@@ -92,6 +92,20 @@ namespace Loom
 			return InfoOf(kind).appearsIn != nullptr;
 		};
 
+		// New Folder in parent, or the first of New Folder1, ... nothing there is
+		// using, its name then typed in place.
+		void AddNewFolder(VirtualFolders& folders, FolderTree& tree, const std::string& parent)
+		{
+			constexpr const char* newFolder = "New Folder";
+
+			std::string path = folders.AddFolder(parent, newFolder);
+
+			for (int suffix = 1; path.empty() && suffix < maxDefaultNameSuffix; suffix++)
+				path = folders.AddFolder(parent, newFolder + std::to_string(suffix));
+
+			tree.Rename(path);
+		};
+
 		// What the Art panel's Create menu makes, rather than the Project panel's.
 		bool IsArt(AssetKind kind)
 		{
@@ -636,18 +650,7 @@ namespace Loom
 		else
 			flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 
-		// A texture that loads is its own icon, drawn over spaces as wide as
-		// the icon it stands in for.
-		const Texture* thumbnail = node.folder ? nullptr : Thumbnail(node.path);
-
-		const std::string icon = thumbnail != nullptr
-			? ThumbnailSpaces()
-			: node.folder ? EditorIcons::Folder : IconOf(node.path);
-
-		const bool open = ImGui::TreeNodeEx(node.path.c_str(), flags, "%s %s", icon.c_str(), node.name.c_str());
-
-		if (thumbnail != nullptr)
-			DrawThumbnail(*thumbnail);
+		const bool open = ImGui::TreeNodeEx(node.path.c_str(), flags, "%s %s", node.folder ? EditorIcons::Folder : IconOf(node.path), node.name.c_str());
 
 		if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen())
 		{
@@ -663,18 +666,6 @@ namespace Loom
 			ImGui::IsItemHovered() &&
 			ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 			m_assetToOpen = node.path;
-
-		// On the release, so dragging one out to a field leaves the panel shut.
-		const ImGuiIO& io = ImGui::GetIO();
-		const float drag_threshold = io.MouseDragThreshold * io.MouseDragThreshold;
-
-		if (!node.folder &&
-			node.path == m_selectedAsset &&
-			ProjectAssets::IsTextureFile(node.path) &&
-			ImGui::IsItemHovered() &&
-			ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
-			io.MouseDragMaxDistanceSqr[ImGuiMouseButton_Left] < drag_threshold)
-			OpenSprite(node.path);
 
 		// Dropped on a file, it goes beside it.
 		const std::string folder = node.folder ? node.path : std::filesystem::path(node.path).parent_path().string();
@@ -745,16 +736,8 @@ namespace Loom
 		// Kept in the project file's .loomscripts, so not without one.
 		if (ImGui::MenuItem((std::string(EditorIcons::Folder) + " Folder").c_str(), nullptr, false, !m_projectFile.empty()))
 		{
-			constexpr const char* newFolder = "New Folder";
-
-			std::string path = m_scriptFolders.AddFolder(folder, newFolder);
-
-			for (int suffix = 1; path.empty() && suffix < maxDefaultNameSuffix; suffix++)
-				path = m_scriptFolders.AddFolder(folder, newFolder + std::to_string(suffix));
-
+			AddNewFolder(m_scriptFolders, m_scriptFolderTree, folder);
 			SaveScriptFolders();
-
-			m_scriptFolderTree.Rename(path);
 		};
 
 		for (const AssetKindInfo& info : assetKinds)
@@ -1176,10 +1159,10 @@ namespace Loom
 			if (to == file)
 				continue;
 
-			const std::string folder = m_artFolders.FolderOf(file);
+			const std::string filed = m_artFolders.FolderOf(file);
 
 			m_artFolders.Move(file, "");
-			m_artFolders.Move(to, folder);
+			m_artFolders.Move(to, filed);
 			refiled = true;
 
 			if (m_selectedArt == file)
@@ -1644,16 +1627,8 @@ namespace Loom
 		// Kept in the project file's .loomart, so not without one.
 		if (ImGui::MenuItem((std::string(EditorIcons::Folder) + " Folder").c_str(), nullptr, false, !m_projectFile.empty()))
 		{
-			constexpr const char* newFolder = "New Folder";
-
-			std::string path = m_artFolders.AddFolder(folder, newFolder);
-
-			for (int suffix = 1; path.empty() && suffix < maxDefaultNameSuffix; suffix++)
-				path = m_artFolders.AddFolder(folder, newFolder + std::to_string(suffix));
-
+			AddNewFolder(m_artFolders, m_artFolderTree, folder);
 			SaveArtFolders();
-
-			m_artFolderTree.Rename(path);
 		};
 
 		for (const AssetKindInfo& info : assetKinds)

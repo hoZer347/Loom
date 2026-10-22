@@ -139,7 +139,7 @@
       <Filter>Scripts</Filter>
     </ClInclude>
     <ClInclude Include="ArtFolders.h">
-      <Filter>Scripts</Filter>
+      <Filter>Panels</Filter>
     </ClInclude>
     <ClInclude Include="ScriptFolders.h">
       <Filter>Scripts</Filter>
