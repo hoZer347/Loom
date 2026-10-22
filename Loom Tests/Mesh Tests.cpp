@@ -7,6 +7,7 @@
 #include "Scene.h"
 #include "SceneSerializer.h"
 #include "Shaders.h"
+#include "Skin.h"
 
 #include <sstream>
 #include <string>
@@ -198,6 +199,84 @@ TEST_SUITE("Mesh")
 		REQUIRE(renderer.instanceModels.size() == 3);
 		CHECK(glm::vec3(renderer.instanceModels[1][3]) == green);
 		CHECK(renderer.drawnVertices.back() == other);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "meshes differing in their material's variables, their own variables or a Skin are drawn alone")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream source(
+			"// ===VERTEX===\nuniform mat4 u_model;\nuniform float u_speed;\nuniform float u_tint; // instance\nvoid main() { }\n"
+			"// ===FRAGMENT===\nuniform vec3 u_color;\nvoid main() { }\n");
+		Loom::Shader shader("instanced apart", source);
+
+		REQUIRE(shader.instanced_id != 0);
+
+		Loom::Scene scene("instanced apart");
+		Pump();
+
+		std::vector<Loom::GameObject*> holders;
+		std::vector<Loom::Material*> materials;
+		std::vector<Loom::Mesh*> meshes;
+
+		for (const char* name : { "First", "Second" })
+		{
+			Loom::GameObject* holder = scene.AddChild(name);
+			holders.push_back(holder);
+
+			Loom::Material* material = holder->Attach<Loom::Material>();
+			material->shader = &shader;
+			materials.push_back(material);
+
+			Loom::Mesh* mesh = holder->Attach<Loom::Mesh>(Loom::Mesh::Triangles);
+			mesh->m_vertices = std::vector<float>(9, 1.0f);
+			meshes.push_back(mesh);
+		};
+
+		Pump();
+
+		const uint32_t id = shader.id;
+		const uint32_t instanced = shader.instanced_id;
+
+		Loom::UniformValues faster;
+		faster.Set("u_speed", Loom::UniformType::Float, { 2.0 });
+
+		Loom::UniformValues tinted;
+		tinted.Set("u_tint", Loom::UniformType::Float, { 0.5 });
+
+		SUBCASE("alike, they are drawn as instances of one")
+		{
+			scene.Render();
+
+			CHECK(renderer.drawn == std::vector<uint32_t>{ instanced, instanced });
+		};
+
+		SUBCASE("the material's variables")
+		{
+			materials[1]->variables = faster;
+			scene.Render();
+
+			CHECK(renderer.drawn == std::vector<uint32_t>{ id, id });
+		};
+
+		SUBCASE("the mesh's own variables")
+		{
+			meshes[1]->variables = tinted;
+			scene.Render();
+
+			CHECK(renderer.drawn == std::vector<uint32_t>{ id, id });
+		};
+
+		SUBCASE("a Skin bending each")
+		{
+			for (Loom::GameObject* holder : holders)
+				holder->Attach<Loom::Skin>();
+
+			Pump();
+			scene.Render();
+
+			CHECK(renderer.drawn == std::vector<uint32_t>{ id, id });
+		};
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the draw type is settable to any GL usage hint")

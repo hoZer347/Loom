@@ -35,11 +35,13 @@ namespace Loom
 
 	namespace
 	{
+		// What each instance MeshBatch hands over holds: its model matrix, then its colour.
 		constexpr size_t MODEL_FLOATS = sizeof(glm::mat4) / sizeof(float);
 		constexpr size_t COLOR_FLOATS = sizeof(glm::vec3) / sizeof(float);
 
-		static_assert(MODEL_FLOATS + COLOR_FLOATS == Renderer::FLOATS_PER_INSTANCE);
+		static_assert(MODEL_FLOATS + COLOR_FLOATS == Renderer::FloatsPerInstance);
 
+		// 64 bit FNV-1a's.
 		constexpr uint64_t FNV_OFFSET_BASIS = 14695981039346656037ull;
 		constexpr uint64_t FNV_PRIME = 1099511628211ull;
 
@@ -202,10 +204,13 @@ namespace Loom
 			const bool hasUVs = textureCoordinates.size() == count * UV_COMPONENTS;
 			const bool hasNormals = normals.size() == count * NORMAL_COMPONENTS;
 
+			// Only vertices that can join a batch are worth hashing.
+			const bool batchable = *std::as_const(m_draw_type) == Static && !deformed;
+
 			if (!hasUVs && !hasNormals)
 			{
 				renderer.SetVertices(m_kept, positions.data(), count, *std::as_const(m_draw_type), VertexFormat::Position);
-				m_geometry = Hashed(positions, VertexFormat::Position);
+				m_geometry = batchable ? Hashed(positions, VertexFormat::Position) : 0;
 			}
 			else
 			{
@@ -225,7 +230,7 @@ namespace Loom
 				};
 
 				renderer.SetVertices(m_kept, interleaved.data(), count, *std::as_const(m_draw_type), format);
-				m_geometry = Hashed(interleaved, format);
+				m_geometry = batchable ? Hashed(interleaved, format) : 0;
 			};
 		};
 
@@ -274,7 +279,11 @@ namespace Loom
 	{
 		Renderer* renderer = Renderer::Get();
 
-		if (!instanced || !renderer || *std::as_const(mesh.m_draw_type) != Mesh::Static || !mesh.Keep(*renderer) || mesh.m_handed.deformed)
+		if (!instanced ||
+			!renderer ||
+			*std::as_const(mesh.m_draw_type) != Mesh::Static ||
+			!mesh.Keep(*renderer) ||
+			mesh.m_handed.deformed)
 			return false;
 
 		const uint64_t key = Mixed(Mixed(mesh.m_geometry, program), *std::as_const(mesh.primitive_id));
@@ -302,11 +311,11 @@ namespace Loom
 		// All Material::Apply sets but the colour, which each instance has its own of.
 		const bool materials = &a == &b || (*a.shadows == *b.shadows && *a.sampling == *b.sampling && *a.variables == *b.variables);
 
-		return lot.program == program
-			&& first.m_geometry == mesh.m_geometry
-			&& *first.primitive_id == *mesh.primitive_id
-			&& materials
-			&& *first.variables == *mesh.variables;
+		return lot.program == program &&
+			first.m_geometry == mesh.m_geometry &&
+			*first.primitive_id == *mesh.primitive_id &&
+			materials &&
+			*first.variables == *mesh.variables;
 	};
 
 	void MeshBatch::Draw(const Ready& ready)

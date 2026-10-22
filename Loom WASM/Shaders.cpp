@@ -220,8 +220,9 @@ bool LoomDitheredOut(float alpha)
 		};
 
 		// The stages, reading the model matrix and colour each draw would set
-		// from each instance, or none when they declare either some other way
-		// or the fragment stage reads the model matrix.
+		// from each instance, or none when the vertex stage declares no model
+		// matrix, either is declared some other way, or the fragment stage
+		// reads the model matrix.
 		std::optional<InstancedStages> Instanced(const std::string& vertex, const std::string& fragment)
 		{
 			static const std::regex model(R"(\buniform\s+(?:(?:lowp|mediump|highp)\s+)?mat4\s+u_model\s*;)");
@@ -229,16 +230,21 @@ bool LoomDitheredOut(float alpha)
 			static const std::regex otherwise(R"(\buniform\b[^;]*\bu_(?:model|color)\b)");
 			static const std::regex readsModel(R"(\bu_model\b)");
 
+			if (!std::regex_search(vertex, model))
+				return std::nullopt;
+
 			InstancedStages stages{ std::regex_replace(std::regex_replace(vertex, model, ""), color, ""), std::regex_replace(fragment, color, "") };
 
-			if (std::regex_search(stages.vertex, otherwise) || std::regex_search(stages.fragment, otherwise) || std::regex_search(fragment, readsModel))
+			if (std::regex_search(stages.vertex, otherwise) ||
+				std::regex_search(stages.fragment, otherwise) ||
+				std::regex_search(fragment, readsModel))
 				return std::nullopt;
 
 			// The colour is the instance's, handed on to the fragment stage
 			// unblended.
 			stages.vertex =
-				"layout(location = " + std::to_string(Renderer::INSTANCE_MODEL_LOCATION) + ") in mat4 loom_InstanceModel;\n"
-				"layout(location = " + std::to_string(Renderer::INSTANCE_COLOR_LOCATION) + ") in vec3 loom_InstanceColor;\n"
+				"layout(location = " + std::to_string(Renderer::InstanceModelLocation) + ") in mat4 loom_InstanceModel;\n"
+				"layout(location = " + std::to_string(Renderer::InstanceColorLocation) + ") in vec3 loom_InstanceColor;\n"
 				"flat out vec3 loom_Color;\n"
 				"#define u_model loom_InstanceModel\n"
 				"#define u_color loom_InstanceColor\n" +

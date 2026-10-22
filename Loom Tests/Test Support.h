@@ -156,7 +156,13 @@ namespace LoomTests
 		void SetUniform(uint32_t, const char* name, float value) override { floats[name] = value; };
 		void SetUniform(uint32_t, const char*, const glm::vec3&) override { };
 		void SetUniform(uint32_t, const char* name, const glm::vec4& value) override { vec4s[name] = value; };
-		void SetUniform(uint32_t, const char* name, const glm::mat4& value) override { matrices[name] = value; };
+		void SetUniform(uint32_t program, const char* name, const glm::mat4& value) override
+		{
+			matrices[name] = value;
+
+			if (std::string_view(name) == "u_viewProjection")
+				viewed.push_back(program);
+		};
 
 		void SetUniform(uint32_t, const char* name, Loom::UniformType type, const void* components) override
 		{
@@ -214,7 +220,7 @@ namespace LoomTests
 
 			for (size_t i = 0; i < count; i++)
 			{
-				const float* instance = instances + i * FLOATS_PER_INSTANCE;
+				const float* instance = instances + i * FloatsPerInstance;
 
 				instanceModels.push_back(glm::make_mat4(instance));
 				instanceColors.push_back(glm::make_vec3(instance + MODEL_FLOATS));
@@ -261,6 +267,10 @@ namespace LoomTests
 		std::vector<uint32_t> deleted;
 		std::vector<uint32_t> destroyedTextures;
 		std::vector<uint32_t> drawn;
+
+		// Each program given u_viewProjection, as often as it was given it.
+		std::vector<uint32_t> viewed;
+
 		std::vector<bool> colorWrites;
 		std::vector<bool> depthTestsEqual;
 

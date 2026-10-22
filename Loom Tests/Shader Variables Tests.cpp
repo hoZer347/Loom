@@ -588,6 +588,37 @@ TEST_SUITE("Shader variables")
 		CHECK(renderer.floats["u_shadowsOff"] == 1.0f);
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "casters alike are drawn into the shadow map as instances of one")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream source("// ===SETTINGS===\nshadows = on\n" + STAGES);
+		Loom::Shader shader("instanced shadow casters", source);
+
+		REQUIRE(shader.shadow_instanced_id != 0);
+
+		Loom::Scene scene("instanced shadow casters");
+		Pump();
+
+		Loom::Light* light = scene.Attach<Loom::Light>();
+
+		for (const char* name : { "First", "Second", "Third" })
+		{
+			Loom::GameObject* object = scene.AddChild(name);
+			object->Attach<Loom::Material>()->shader = &shader;
+			object->Attach<Loom::Mesh>()->m_vertices = std::vector<float>{ 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
+		};
+
+		Pump();
+
+		light->RenderShadowMap({ &scene.GetRoot() });
+
+		const uint32_t instanced = shader.shadow_instanced_id;
+
+		CHECK(renderer.drawn == std::vector<uint32_t>{ instanced, instanced, instanced });
+		CHECK(renderer.instanceCounts == std::vector<size_t>{ 3 });
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a light's shadow map holds every scene drawn in the view that it falls on")
 	{
 		RecordingRenderer renderer;

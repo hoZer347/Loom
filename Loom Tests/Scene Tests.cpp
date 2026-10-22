@@ -2,13 +2,20 @@
 
 #include "Test Support.h"
 
+#include "Camera.h"
+#include "Material.h"
+#include "Mesh.h"
 #include "Scene.h"
+#include "Shaders.h"
+#include "Sprite.h"
 
 #include <algorithm>
+#include <sstream>
 #include <string>
 
 using LoomTests::Pump;
 using LoomTests::Probe;
+using LoomTests::RecordingRenderer;
 
 namespace
 {
@@ -175,6 +182,70 @@ TEST_SUITE("Scene")
 
 		// Ticking one pass must not tick another.
 		CHECK(probe->Count("update") == 1);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a pass gives each program its view once, a pass through another camera gives it again, and outside a pass it is given every time")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream source("// ===VERTEX===\nuniform mat4 u_model;\nvoid main() { }\n// ===FRAGMENT===\nvoid main() { }\n");
+		Loom::Shader shader("viewed once a pass", source);
+
+		Loom::Scene scene("viewed once a pass");
+		Pump();
+
+		scene.Attach<Loom::Camera>();
+
+		const glm::vec3 away(0.0f, 0.0f, 10.0f);
+
+		Loom::GameObject* elsewhere = scene.AddChild("Elsewhere");
+		elsewhere->transform.position = away;
+		Loom::Camera* other = elsewhere->Attach<Loom::Camera>();
+
+		// Each drawn alone, so each readies the program itself.
+		for (const char* name : { "First", "Second", "Third" })
+		{
+			Loom::GameObject* holder = scene.AddChild(name);
+			holder->Attach<Loom::Material>()->shader = &shader;
+
+			Loom::Mesh* mesh = holder->Attach<Loom::Mesh>(Loom::Mesh::Triangles);
+			mesh->m_vertices = std::vector<float>(9, 1.0f);
+			mesh->m_draw_type = Loom::Mesh::Dynamic;
+		};
+
+		Pump();
+
+		scene.Render();
+
+		CHECK(renderer.drawn.size() == 3);
+		CHECK(renderer.viewed == std::vector<uint32_t>{ shader.id });
+
+		const glm::mat4 own = renderer.matrices["u_viewProjection"];
+
+		scene.Render(other);
+
+		CHECK(renderer.viewed == std::vector<uint32_t>{ shader.id, shader.id });
+		CHECK(renderer.matrices["u_viewProjection"] != own);
+
+		Loom::Scene::ApplyView(shader.id);
+		Loom::Scene::ApplyView(shader.id);
+
+		CHECK(renderer.viewed.size() == 4);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a sprite in a scene with no camera is drawn in world space")
+	{
+		RecordingRenderer renderer;
+		renderer.matrices["u_viewProjection"] = glm::mat4(0.0f);
+
+		Loom::Scene scene("sprite without a camera");
+		scene.Attach<Loom::Sprite>();
+		Pump();
+
+		scene.Render();
+
+		CHECK(renderer.viewed.size() == 1);
+		CHECK(renderer.matrices["u_viewProjection"] == glm::mat4(1.0f));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Physics drives OnPhysics")

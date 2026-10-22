@@ -122,12 +122,12 @@ namespace Loom
 
 		// Where an instanced program's vertex stage reads each instance's model
 		// matrix, a column a location from the first, and its colour.
-		static constexpr uint32_t INSTANCE_MODEL_LOCATION = 11;
-		static constexpr uint32_t INSTANCE_COLOR_LOCATION = 15;
+		static constexpr uint32_t InstanceModelLocation = 11;
+		static constexpr uint32_t InstanceColorLocation = 15;
 
 		// What each instance DrawInstances is handed holds, its floats one
 		// after another: its model matrix, column by column, then its colour.
-		static constexpr size_t FLOATS_PER_INSTANCE = 19;
+		static constexpr size_t FloatsPerInstance = 19;
 
 		// Draws kept vertices once for each of count instances, with a program
 		// that reads them at the instance locations.

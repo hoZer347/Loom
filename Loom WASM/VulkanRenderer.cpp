@@ -69,7 +69,7 @@ namespace Loom
 		constexpr uint32_t VERTEX_BINDING = 0;
 		constexpr uint32_t NO_NORMAL_BINDING = 1;
 		constexpr uint32_t INSTANCE_BINDING = 2;
-		constexpr uint32_t INSTANCE_SIZE = Renderer::FLOATS_PER_INSTANCE * sizeof(float);
+		constexpr uint32_t INSTANCE_SIZE = Renderer::FloatsPerInstance * sizeof(float);
 		constexpr uint32_t INSTANCE_COLUMNS = 4;
 		constexpr uint32_t INSTANCE_COLUMN_SIZE = INSTANCE_COLUMNS * sizeof(float);
 
@@ -1761,9 +1761,9 @@ namespace Loom
 				bindings.push_back({ INSTANCE_BINDING, INSTANCE_SIZE, VK_VERTEX_INPUT_RATE_INSTANCE });
 
 				for (uint32_t column = 0; column < INSTANCE_COLUMNS; column++)
-					attributes.push_back({ INSTANCE_MODEL_LOCATION + column, INSTANCE_BINDING, VK_FORMAT_R32G32B32A32_SFLOAT, column * INSTANCE_COLUMN_SIZE });
+					attributes.push_back({ InstanceModelLocation + column, INSTANCE_BINDING, VK_FORMAT_R32G32B32A32_SFLOAT, column * INSTANCE_COLUMN_SIZE });
 
-				attributes.push_back({ INSTANCE_COLOR_LOCATION, INSTANCE_BINDING, VK_FORMAT_R32G32B32_SFLOAT, INSTANCE_COLUMNS * INSTANCE_COLUMN_SIZE });
+				attributes.push_back({ InstanceColorLocation, INSTANCE_BINDING, VK_FORMAT_R32G32B32_SFLOAT, INSTANCE_COLUMNS * INSTANCE_COLUMN_SIZE });
 			};
 
 			VkPipelineVertexInputStateCreateInfo input{ VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
@@ -1912,7 +1912,7 @@ namespace Loom
 					program.hasPosition |= variable->location == POSITION_LOCATION;
 					program.hasUV |= variable->location == UV_LOCATION;
 					program.hasNormal |= variable->location == NORMAL_LOCATION;
-					program.hasInstance |= variable->location == INSTANCE_MODEL_LOCATION;
+					program.hasInstance |= variable->location >= InstanceModelLocation && variable->location <= InstanceColorLocation;
 				};
 			};
 

@@ -144,7 +144,9 @@ namespace Loom
 		Handed m_handed;
 
 		// What the vertices last handed over hash to, so meshes handing over
-		// the same can be drawn as instances of one.
+		// the same can be drawn as instances of one, or 0 when they never can
+		// be. Only the hashes are compared, so two meshes whose vertices differ
+		// but hash alike, a chance in 2^64, would draw as one.
 		uint64_t m_geometry = 0;
 	};
 
@@ -169,6 +171,7 @@ namespace Loom
 		void Draw(const Ready& ready);
 
 	private:
+		// Meshes drawn together: alone with program, or as instances with instanced.
 		struct Lot
 		{
 			uint32_t program;
@@ -179,6 +182,7 @@ namespace Loom
 		// Whether the mesh can be drawn as one of the lot.
 		static bool Alike(const Lot& lot, const Mesh& mesh, uint32_t program);
 
+		// In the order their first meshes joined.
 		std::vector<Lot> m_lots;
 
 		// Into m_lots, by what their meshes' geometry, program and primitive hash to.

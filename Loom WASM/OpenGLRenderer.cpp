@@ -622,7 +622,7 @@ namespace Loom
 			constexpr GLint COLUMN_COMPONENTS = 4;
 			constexpr GLint COLOR_COMPONENTS = 3;
 			constexpr GLuint COLUMNS = 4;
-			constexpr GLsizei STRIDE = (GLsizei)(FLOATS_PER_INSTANCE * sizeof(float));
+			constexpr GLsizei STRIDE = (GLsizei)(FloatsPerInstance * sizeof(float));
 			constexpr GLuint PER_INSTANCE = 1;
 
 			glBindBuffer(GL_ARRAY_BUFFER, m_instances);
@@ -630,24 +630,24 @@ namespace Loom
 
 			for (GLuint column = 0; column < COLUMNS; column++)
 			{
-				const GLuint location = INSTANCE_MODEL_LOCATION + column;
+				const GLuint location = InstanceModelLocation + column;
 				glVertexAttribPointer(location, COLUMN_COMPONENTS, GL_FLOAT, GL_FALSE, STRIDE, (void*)(column * COLUMN_COMPONENTS * sizeof(float)));
 				glVertexAttribDivisor(location, PER_INSTANCE);
 				glEnableVertexAttribArray(location);
 			};
 
-			glVertexAttribPointer(INSTANCE_COLOR_LOCATION, COLOR_COMPONENTS, GL_FLOAT, GL_FALSE, STRIDE, (void*)(COLUMNS * COLUMN_COMPONENTS * sizeof(float)));
-			glVertexAttribDivisor(INSTANCE_COLOR_LOCATION, PER_INSTANCE);
-			glEnableVertexAttribArray(INSTANCE_COLOR_LOCATION);
+			glVertexAttribPointer(InstanceColorLocation, COLOR_COMPONENTS, GL_FLOAT, GL_FALSE, STRIDE, (void*)(COLUMNS * COLUMN_COMPONENTS * sizeof(float)));
+			glVertexAttribDivisor(InstanceColorLocation, PER_INSTANCE);
+			glEnableVertexAttribArray(InstanceColorLocation);
 
 			glDrawArraysInstanced(primitive, 0, (GLsizei)count, (GLsizei)instanceCount);
 
 			// Off again, as WebGL refuses a draw whose enabled arrays run short of
 			// it, and these are only as long as the last batch.
 			for (GLuint column = 0; column < COLUMNS; column++)
-				glDisableVertexAttribArray(INSTANCE_MODEL_LOCATION + column);
+				glDisableVertexAttribArray(InstanceModelLocation + column);
 
-			glDisableVertexAttribArray(INSTANCE_COLOR_LOCATION);
+			glDisableVertexAttribArray(InstanceColorLocation);
 		};
 
 		void SetPixelated(uint32_t program, bool pixelated) override

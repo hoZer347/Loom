@@ -108,6 +108,8 @@ namespace Loom
 
 		// The programs ApplyView has given this pass's view, while Render draws.
 		static inline std::vector<uint32_t> s_viewed{ };
+
+		// Whether Render is drawing, so ApplyView need give each program its view only once.
 		static inline bool s_drawing = false;
 	};
 };
