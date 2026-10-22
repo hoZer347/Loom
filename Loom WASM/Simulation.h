@@ -36,8 +36,8 @@ namespace Loom
 	*   components; a pair asleep keeps touching without being told so again
 	* - Steps whole, or in two halves around other work: Begin readies the
 	*   bodies and hands their contacts to the physics thread, which every
-	*   simulation shares, to find and solve, and End waits for that, then moves the bodies and
-	*   reports. A velocity or pose set in between wins over the step's own
+	*   simulation shares, to find and solve, and End waits for that, then
+	*   moves the bodies and reports. A velocity or pose set in between wins over the step's own
 	*/
 	struct Simulation final
 	{
