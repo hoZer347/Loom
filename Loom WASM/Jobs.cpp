@@ -1,8 +1,11 @@
 #include "Jobs.h"
 
+#include "Profiler.h"
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -86,9 +89,13 @@ namespace Loom
 				value.wait(seen);
 		};
 
+		// What a worker's share of a For started outside any stage counts as.
+		constexpr const char* UNSTAGED = "Jobs";
+
 		struct Job
 		{
 			const Jobs::Work* work;
+			const char* stage;
 			size_t count;
 			size_t grain;
 			size_t chunks;
@@ -133,6 +140,8 @@ namespace Loom
 			// number counts the workers in the order they started, from one.
 			void Run(unsigned number)
 			{
+				Profiler::NameThread("Worker " + std::to_string(number), (int)number);
+
 				unsigned seen = 0;
 
 				for (;;)
@@ -162,7 +171,10 @@ namespace Loom
 					helping++;
 
 					if (Job* job = current; job && number < Jobs::Threads())
+					{
+						LOOM_STAGE(job->stage);
 						Help(*job);
+					};
 
 					helping--;
 					helping.notify_all();
@@ -204,6 +216,9 @@ namespace Loom
 
 		Job job;
 		job.work = &work;
+		const char* const stage = Profiler::Current();
+
+		job.stage = stage ? stage : UNSTAGED;
 		job.count = count;
 		job.grain = grain;
 		job.chunks = chunks;

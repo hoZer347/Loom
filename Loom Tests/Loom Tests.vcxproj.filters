@@ -148,6 +148,9 @@
     <ClCompile Include="Jobs Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="Profiler Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="KeySet Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

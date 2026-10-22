@@ -152,6 +152,7 @@
     <ClCompile Include="Physics Performance Tests.cpp" />
     <ClCompile Include="Contacts Tests.cpp" />
     <ClCompile Include="Jobs Tests.cpp" />
+    <ClCompile Include="Profiler Tests.cpp" />
     <ClCompile Include="KeySet Tests.cpp" />
     <ClCompile Include="Rigidbody Tests.cpp" />
     <ClCompile Include="Input Tests.cpp" />

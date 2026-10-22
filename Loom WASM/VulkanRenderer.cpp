@@ -2,6 +2,7 @@
 
 #include "Engine.h"
 #include "GlslCompiler.h"
+#include "Profiler.h"
 #include "Renderer.h"
 
 #define GLFW_INCLUDE_VULKAN
@@ -346,7 +347,11 @@ namespace Loom
 
 			Frame& frame = m_frames[m_frameIndex];
 
-			vkWaitForFences(m_device, 1, &frame.fence, VK_TRUE, UINT64_MAX);
+			{
+				LOOM_STAGE("Wait for GPU");
+				vkWaitForFences(m_device, 1, &frame.fence, VK_TRUE, UINT64_MAX);
+			};
+
 			RunDeletions(frame);
 			frame.chunkIndex = 0;
 
@@ -356,7 +361,10 @@ namespace Loom
 			if (m_swapchainDirty)
 				CreateSwapchain();
 
-			m_haveImage = Acquire(frame);
+			{
+				LOOM_STAGE("Acquire");
+				m_haveImage = Acquire(frame);
+			};
 
 			vkResetFences(m_device, 1, &frame.fence);
 			vkResetCommandPool(m_device, frame.pool, 0);
@@ -421,7 +429,10 @@ namespace Loom
 				submit.pSignalSemaphores = &m_rendered[m_imageIndex];
 			};
 
-			Succeeded(vkQueueSubmit(m_queue, 1, &submit, frame.fence), "submitting the frame");
+			{
+				LOOM_STAGE("Submit");
+				Succeeded(vkQueueSubmit(m_queue, 1, &submit, frame.fence), "submitting the frame");
+			};
 
 			if (m_haveImage)
 			{
@@ -432,6 +443,7 @@ namespace Loom
 				present.pSwapchains = &m_swapchain;
 				present.pImageIndices = &m_imageIndex;
 
+				LOOM_STAGE("Swap");
 				const VkResult result = vkQueuePresentKHR(m_queue, &present);
 
 				if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)

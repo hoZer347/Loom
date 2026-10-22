@@ -8,6 +8,7 @@
 #include "Scene.h"
 #include "Input.h"
 #include "Physics.h"
+#include "Profiler.h"
 #include "Ui.h"
 #include "Utilities/Clock.h"
 
@@ -131,31 +132,44 @@ namespace Loom
 
 	void Engine::RenderImGui()
 	{
-		// Start the Dear ImGui frame
-		renderer->NewImGuiFrame();
+		LOOM_STAGE("GUI");
 
-		if (onImGuiInput)
-			onImGuiInput();
+		{
+			LOOM_STAGE("Build");
 
-		ImGui::NewFrame();
+			// Start the Dear ImGui frame
+			renderer->NewImGuiFrame();
 
-		// GUI
-		if (onGui)
-			onGui();
-		else if (Engine::doGUI)
-			for (auto& scene : Scene::allScenes)
-			{
-				if (ImGui::Begin(scene->NameAndID().c_str()))
-					scene->root.Gui();
-				ImGui::End();
-			};
+			if (onImGuiInput)
+				onImGuiInput();
 
-		// Rendering
-		ImGui::Render();
-		renderer->RenderImGui(ImGui::GetDrawData());
+			ImGui::NewFrame();
+
+			// GUI
+			if (onGui)
+				onGui();
+			else if (Engine::doGUI)
+				for (auto& scene : Scene::allScenes)
+				{
+					if (ImGui::Begin(scene->NameAndID().c_str()))
+						scene->root.Gui();
+					ImGui::End();
+				};
+		};
+
+		{
+			LOOM_STAGE("Draw");
+
+			// Rendering
+			ImGui::Render();
+			renderer->RenderImGui(ImGui::GetDrawData());
+		};
 
 		if (io->ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+		{
+			LOOM_STAGE("Windows");
 			renderer->RenderImGuiWindows();
+		};
 	};
 
 	void Engine::Start()
@@ -178,21 +192,35 @@ namespace Loom
 
 	void Engine::renderFrame()
 	{
-		glfwPollEvents();
+		{
+			LOOM_STAGE("Input");
 
-		Input::Tick();
+			glfwPollEvents();
 
-		// The frame clock, the edge-detected dialogue input and the StaticStateMachine.
-		// First thing in the frame, so everything ticked below reads the same delta and
-		// the same key presses.
-		Utilities::Tick();
+			Input::Tick();
 
-		renderer->BeginFrame();
-		renderer->Clear(clearColor, true);
+			// The frame clock, the edge-detected dialogue input and the StaticStateMachine.
+			// First thing in the frame, so everything ticked below reads the same delta and
+			// the same key presses.
+			Utilities::Tick();
+		};
 
-		DoTasks();
+		{
+			LOOM_STAGE("Begin frame");
 
-		onUpdate();
+			renderer->BeginFrame();
+			renderer->Clear(clearColor, true);
+		};
+
+		{
+			LOOM_STAGE("Tasks");
+			DoTasks();
+		};
+
+		{
+			LOOM_STAGE("Update");
+			onUpdate();
+		};
 
 		//Shader::SetUniforms();
 
@@ -211,6 +239,8 @@ namespace Loom
 
 			for (int step = 0; step < MOST_STEPS && s_physicsTime >= Physics::FixedDeltaTime(); step++)
 			{
+				LOOM_STAGE("Physics");
+
 				s_physicsTime -= Physics::FixedDeltaTime();
 
 				for (auto& scene : Scene::allScenes)
@@ -219,25 +249,38 @@ namespace Loom
 
 			s_physicsTime = std::min(s_physicsTime, Physics::FixedDeltaTime());
 
+			LOOM_STAGE("Scripts");
+
 			for (auto& scene : Scene::allScenes)
 				scene->Update();
 
 			Utilities::Update();
 		};
 
-		Audio::Tick();
+		{
+			LOOM_STAGE("Audio");
+			Audio::Tick();
+		};
 
 		if (renderScenes)
 		{
+			LOOM_STAGE("Scenes");
+
 			Ui::BeginOverlay();
 
 			for (auto& scene : Scene::allScenes)
 				scene->Render();
 
+			LOOM_STAGE("UI");
 			Ui::DrawOverlay();
 		};
 
-		renderer->EndFrame();
+		{
+			LOOM_STAGE("Present");
+			renderer->EndFrame();
+		};
+
+		Profiler::EndFrame();
 	};
 
 	void Engine::CaptureFrame(const std::string& path)
@@ -339,6 +382,9 @@ namespace Loom
 		};
 
 		Renderer::current = renderer.get();
+
+		// Ahead of the job workers, which are numbered from one.
+		Profiler::NameThread("Main", 0);
 
 		Input::Init();
 

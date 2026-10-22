@@ -3,6 +3,7 @@
 #include "Engine.h"
 #include "Input.h"
 #include "OpenGL.h"
+#include "Profiler.h"
 #include "RenderMath.h"
 
 #include "imgui.h"
@@ -281,6 +282,8 @@ namespace Loom
 				ReadBack(m_capture);
 				m_capture = nullptr;
 			};
+
+			LOOM_STAGE("Swap");
 
 			glFlush();
 			glfwSwapBuffers(m_window);

@@ -460,6 +460,10 @@ namespace Loom
 		void DrawSceneData();
 		void DrawStats();
 
+		// What each thread spent on each stage of the frame, in a debug build:
+		// the last frame laid out in time, then each stage's average and peak.
+		void DrawStages();
+
 		// The first-run "where are your scenes?" prompt, the new project dialog,
 		// and the browsers behind every Browse... button.
 		void DrawFolderPrompt();

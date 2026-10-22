@@ -5,6 +5,7 @@
 #include "GameObject.h"
 #include "Jobs.h"
 #include "Physics.h"
+#include "Profiler.h"
 #include "Rigidbody.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -271,50 +272,69 @@ namespace Loom
 		// its velocity, and how far that takes it found.
 		const glm::vec3 gravity = Physics::GetGravity();
 
-		Jobs::For(m_bodies.size(), BODY_GRAIN,
-			[&](size_t, size_t begin, size_t end)
-			{
-				for (size_t i = begin; i < end; i++)
+		{
+			LOOM_STAGE("Bodies");
+
+			Jobs::For(m_bodies.size(), BODY_GRAIN,
+				[&](size_t, size_t begin, size_t end)
 				{
-					Body& body = m_bodies[i];
-
-					if (!Ready(body, m_joining[i]))
+					for (size_t i = begin; i < end; i++)
 					{
-						body.object = nullptr;
-						continue;
+						Body& body = m_bodies[i];
+
+						if (!Ready(body, m_joining[i]))
+						{
+							body.object = nullptr;
+							continue;
+						};
+
+						for (Collider* collider : body.colliders)
+							collider->m_body = (int)i;
+
+						Accelerate(body, gravity, seconds);
+
+						body.travel = glm::length(body.velocity) * seconds;
+						body.refit = body.awake && Outgrown(body, seconds);
 					};
+				});
 
-					for (Collider* collider : body.colliders)
-						collider->m_body = (int)i;
+			// Numbered again, past any that cannot move.
+			if (std::erase_if(m_bodies, [](const Body& body) { return body.object == nullptr; }) > 0)
+				for (int index = 0; index < (int)m_bodies.size(); index++)
+					for (Collider* collider : m_bodies[index].colliders)
+						collider->m_body = index;
+		};
 
-					Accelerate(body, gravity, seconds);
+		{
+			LOOM_STAGE("Pairs");
+			Gather(seconds);
+		};
 
-					body.travel = glm::length(body.velocity) * seconds;
-					body.refit = body.awake && Outgrown(body, seconds);
-				};
-			});
+		{
+			LOOM_STAGE("Partition");
+			Partition();
+		};
 
-		// Numbered again, past any that cannot move.
-		if (std::erase_if(m_bodies, [](const Body& body) { return body.object == nullptr; }) > 0)
-			for (int index = 0; index < (int)m_bodies.size(); index++)
-				for (Collider* collider : m_bodies[index].colliders)
-					collider->m_body = index;
+		{
+			LOOM_STAGE("Contacts");
 
-		Gather(seconds);
+			// Every pair's contacts made ready at once, from the velocities before
+			// any warm start.
+			Jobs::For(m_groups.size(), 1,
+				[&](size_t, size_t begin, size_t end)
+				{
+					for (size_t group = begin; group < end; group++)
+						for (size_t pair : m_groups[group])
+							Prepare(m_pairs[pair], seconds);
+				});
+		};
 
-		Partition();
+		{
+			LOOM_STAGE("Solve");
+			SolveSlabs();
+		};
 
-		// Every pair's contacts made ready at once, from the velocities before
-		// any warm start.
-		Jobs::For(m_groups.size(), 1,
-			[&](size_t, size_t begin, size_t end)
-			{
-				for (size_t group = begin; group < end; group++)
-					for (size_t pair : m_groups[group])
-						Prepare(m_pairs[pair], seconds);
-			});
-
-		SolveSlabs();
+		LOOM_STAGE("Move");
 
 		// A body with others hanging under it moves first, outermost first,
 		// so those under it are placed from where it ends up; the rest move at

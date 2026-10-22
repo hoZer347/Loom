@@ -15,6 +15,7 @@
 #include "LoomObject.h"
 #include "Material.h"
 #include "Prefab.h"
+#include "Profiler.h"
 #include "Scene.h"
 #include "SceneSerializer.h"
 #include "Textures.h"
@@ -3488,6 +3489,8 @@ namespace Loom
 
 	void Editor::DrawSceneView()
 	{
+		LOOM_STAGE("Scene view");
+
 		if (m_activeScene == nullptr)
 			ImGui::TextDisabled("No scene open. Pick one in the Project panel.");
 		else
@@ -3527,6 +3530,8 @@ namespace Loom
 
 	void Editor::DrawPrefabView()
 	{
+		LOOM_STAGE("Prefab view");
+
 		if (GetPrefabRoot() == nullptr)
 			ImGui::TextDisabled("No prefab open. Double-click one in the Project panel.");
 		else DrawView(m_prefabView, { m_prefabScene }, &m_prefabCamera, &m_prefabOutline);
@@ -3561,6 +3566,8 @@ namespace Loom
 
 	void Editor::DrawGameView()
 	{
+		LOOM_STAGE("Game view");
+
 		m_gamePanelFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 		m_gamePanelHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
 
@@ -3597,6 +3604,8 @@ namespace Loom
 
 	void Editor::DrawDebugView()
 	{
+		LOOM_STAGE("Debug view");
+
 		if (Scene::GetScenes().empty())
 			ImGui::TextDisabled("Nothing loaded.");
 		else
@@ -3958,8 +3967,128 @@ namespace Loom
 				ImGui::TextDisabled("%s", m_activeScene->GetGuid().ToString().c_str());
 			}
 			else ImGui::TextDisabled("No active scene");
+
+			DrawStages();
 		};
 
 		ImGui::End();
+	};
+
+	void Editor::DrawStages()
+	{
+		const std::vector<Profiler::Thread>& threads = Profiler::Threads();
+
+		if (threads.empty())
+			return;
+
+		// Each stage keeps its colour on every thread, a soft one under dark text.
+		constexpr int hues = 12;
+		constexpr float saturation = 0.45f;
+		constexpr float value = 0.9f;
+
+		// A lane for each depth, a little short of a line so lanes stand apart.
+		constexpr float lane_lines = 1.1f;
+		constexpr float lane_gap = 1.0f;
+		constexpr float narrowest_bar = 1.0f;
+		constexpr float label_padding = 2.0f;
+
+		const auto colour = [](const std::string& name)
+		{
+			float r = 0.0f;
+			float g = 0.0f;
+			float b = 0.0f;
+
+			ImGui::ColorConvertHSVtoRGB((float)(std::hash<std::string>{ }(name) % hues) / hues, saturation, value, r, g, b);
+
+			return ImGui::GetColorU32(ImVec4(r, g, b, 1.0f));
+		};
+
+		ImGui::SeparatorText("Frame stages");
+
+		const double frame = Profiler::FrameLength();
+		const float lane = ImGui::GetTextLineHeight() * lane_lines;
+		float label_width = 0.0f;
+
+		for (const Profiler::Thread& thread : threads)
+			label_width = (std::max)(label_width, ImGui::CalcTextSize(thread.name.c_str()).x + ImGui::GetStyle().ItemSpacing.x);
+
+		const ImVec2 mouse = ImGui::GetIO().MousePos;
+		ImDrawList* const draw = ImGui::GetWindowDrawList();
+
+		ImGui::TextDisabled("The last frame, %.2f ms", frame);
+
+		for (const Profiler::Thread& thread : threads)
+		{
+			int deepest = 0;
+
+			for (const Profiler::Span& span : thread.spans)
+				deepest = (std::max)(deepest, span.depth);
+
+			const ImVec2 corner = ImGui::GetCursorScreenPos();
+			const float left = corner.x + label_width;
+			const float width = (std::max)(ImGui::GetContentRegionAvail().x - label_width, narrowest_bar);
+
+			ImGui::TextUnformatted(thread.name.c_str());
+			ImGui::SetCursorScreenPos(ImVec2(left, corner.y));
+			ImGui::InvisibleButton(thread.name.c_str(), ImVec2(width, lane * (float)(deepest + 1)));
+
+			const bool hovered = ImGui::IsItemHovered();
+			const Profiler::Span* under = nullptr;
+
+			for (const Profiler::Span& span : thread.spans)
+			{
+				const float from = left + width * (float)std::clamp(span.start / frame, 0.0, 1.0);
+				const float to = (std::max)(from + narrowest_bar, left + width * (float)std::clamp((span.start + span.length) / frame, 0.0, 1.0));
+				const ImVec2 low(from, corner.y + lane * (float)span.depth);
+				const ImVec2 high(to, low.y + lane - lane_gap);
+
+				draw->AddRectFilled(low, high, colour(span.name));
+
+				if (ImGui::CalcTextSize(span.name.c_str()).x + label_padding * 2.0f <= to - from)
+					draw->AddText(ImVec2(from + label_padding, low.y), IM_COL32_BLACK, span.name.c_str());
+
+				// A part is drawn after its stage, so the deepest under the mouse wins.
+				if (hovered && mouse.x >= low.x && mouse.x < high.x && mouse.y >= low.y && mouse.y < high.y)
+					under = &span;
+			};
+
+			if (under)
+				ImGui::SetTooltip("%s: %.3f ms", under->name.c_str(), under->length);
+		};
+
+		ImGui::TextDisabled("Milliseconds a frame over the last %d", Profiler::Window);
+
+		constexpr int columns = 3;
+
+		for (const Profiler::Thread& thread : threads)
+		{
+			if (!ImGui::CollapsingHeader(thread.name.c_str(), &thread == &threads.front() ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None))
+				continue;
+
+			if (!ImGui::BeginTable(thread.name.c_str(), columns, ImGuiTableFlags_RowBg))
+				continue;
+
+			ImGui::TableSetupColumn("Stage", ImGuiTableColumnFlags_WidthStretch);
+			ImGui::TableSetupColumn("Average", ImGuiTableColumnFlags_WidthFixed);
+			ImGui::TableSetupColumn("Peak", ImGuiTableColumnFlags_WidthFixed);
+			ImGui::TableHeadersRow();
+
+			for (const Profiler::Row& row : thread.rows)
+			{
+				ImGui::TableNextRow();
+
+				ImGui::TableNextColumn();
+				ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetStyle().IndentSpacing * (float)row.depth);
+				ImGui::TextUnformatted(row.name.c_str());
+
+				ImGui::TableNextColumn();
+				ImGui::Text("%.2f", row.average);
+
+				ImGui::TableNextColumn();
+				ImGui::Text("%.2f", row.peak);
+			};
+
+			ImGui::EndTable();
+		};
 	};
 };

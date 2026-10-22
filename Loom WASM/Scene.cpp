@@ -5,6 +5,7 @@
 #include "Engine.h"
 #include "Light.h"
 #include "Mesh.h"
+#include "Profiler.h"
 
 #include <algorithm>
 #include <optional>
@@ -83,6 +84,8 @@ namespace Loom
 		// on, so shadows cross between them but not from scenes out of view.
 		if (light)
 		{
+			LOOM_STAGE("Shadows");
+
 			std::vector<GameObject*> lit{ &root };
 
 			for (Scene* scene : drawn)
@@ -98,10 +101,17 @@ namespace Loom
 		std::vector<Mesh*> transparent;
 		Mesh::transparent = &transparent;
 
-		root.Render();
+		{
+			LOOM_STAGE("Opaque");
+			root.Render();
+		};
 
 		Mesh::transparent = nullptr;
-		Mesh::DrawTransparent(transparent);
+
+		{
+			LOOM_STAGE("Transparent");
+			Mesh::DrawTransparent(transparent);
+		};
 
 		Light::current = nullptr;
 		Camera::current = nullptr;
@@ -130,12 +140,20 @@ namespace Loom
 	{
 		ColliderTree::current = &colliders;
 		Simulation::current = &simulation;
-		colliders.BeginSync();
+		{
+			LOOM_STAGE("Colliders");
 
-		root.Physics();
-		colliders.SyncEnlisted();
-		colliders.EndSync();
-		simulation.Step(Loom::Physics::FixedDeltaTime());
+			colliders.BeginSync();
+
+			root.Physics();
+			colliders.SyncEnlisted();
+			colliders.EndSync();
+		};
+
+		{
+			LOOM_STAGE("Simulation");
+			simulation.Step(Loom::Physics::FixedDeltaTime());
+		};
 
 		ColliderTree::current = nullptr;
 		Simulation::current = nullptr;
