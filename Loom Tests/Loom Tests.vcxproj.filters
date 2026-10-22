@@ -64,6 +64,9 @@
     <ClCompile Include="EditorConsole Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="TextFit Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="KeyBindings Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

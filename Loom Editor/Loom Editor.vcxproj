@@ -104,6 +104,7 @@
     <ClCompile Include="VirtualFolders.cpp" />
     <ClCompile Include="FolderTree.cpp" />
     <ClCompile Include="SearchBar.cpp" />
+    <ClCompile Include="TextFit.cpp" />
     <ClCompile Include="FolderWatch.cpp" />
     <ClCompile Include="WebPlayer.cpp" />
     <ClCompile Include="ProjectTemplate.cpp" />
@@ -149,6 +150,7 @@
     <ClInclude Include="VirtualFolders.h" />
     <ClInclude Include="FolderTree.h" />
     <ClInclude Include="SearchBar.h" />
+    <ClInclude Include="TextFit.h" />
     <ClInclude Include="FolderWatch.h" />
     <ClInclude Include="WebPlayer.h" />
     <ClInclude Include="ProjectTemplate.h" />

@@ -32,6 +32,7 @@
 #include "ModelImporter.h"
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
+#include "TextFit.h"
 
 #include "OpenGL.h"
 
@@ -425,8 +426,6 @@ namespace Loom
 			"Right mouse: look, with WASD and QE to fly (Shift for faster)\n"
 			"Middle mouse: pan\n"
 			"Wheel: in and out";
-
-		constexpr const char* ellipsis = "...";
 
 		// Inspector field names longer than this are cut, however wide the panel.
 		constexpr size_t max_label_chars = 20;

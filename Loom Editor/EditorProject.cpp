@@ -7,6 +7,7 @@
 #include "Prefab.h"
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
+#include "TextFit.h"
 
 #include "Engine.h"
 #include "Renderer.h"
@@ -52,33 +53,6 @@ namespace Loom
 		// How far NewShader, NewShader1, ... counts before leaving the name to
 		// the user to sort out.
 		constexpr int maxDefaultNameSuffix = 1000;
-
-		constexpr const char* ellipsis = "...";
-
-		// The bytes after the first of a character UTF-8 spells in several.
-		constexpr unsigned char utf8ContinuationMask = 0xC0;
-		constexpr unsigned char utf8Continuation = 0x80;
-
-		// As much of the end of path as fits in width, behind an ellipsis, as
-		// the folders nearest the project are what tell it apart.
-		std::string PathTail(const std::string& path, float width)
-		{
-			if (ImGui::CalcTextSize(path.c_str()).x <= width)
-				return path;
-
-			for (size_t start = 1; start < path.size(); start++)
-			{
-				if (((unsigned char)path[start] & utf8ContinuationMask) == utf8Continuation)
-					continue;
-
-				const std::string shown = ellipsis + path.substr(start);
-
-				if (ImGui::CalcTextSize(shown.c_str()).x <= width)
-					return shown;
-			};
-
-			return ellipsis;
-		};
 
 		struct AssetKindInfo
 		{
@@ -590,10 +564,14 @@ namespace Loom
 				const float button_x = ImGui::GetContentRegionMax().x - button_width;
 
 				ImGui::AlignTextToFramePadding();
-				ImGui::TextUnformatted(PathTail(
+				const std::string shown_path = FitTail(
 					m_projectPath,
-					button_x - ImGui::GetStyle().ItemSpacing.x - ImGui::GetCursorPosX()).c_str());
-				ImGui::SetItemTooltip("%s", m_projectPath.c_str());
+					button_x - ImGui::GetStyle().ItemSpacing.x - ImGui::GetCursorPosX());
+
+				ImGui::TextUnformatted(shown_path.c_str());
+
+				if (shown_path != m_projectPath)
+					ImGui::SetItemTooltip("%s", m_projectPath.c_str());
 
 				ImGui::SameLine(button_x);
 
