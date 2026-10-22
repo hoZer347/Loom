@@ -8,9 +8,7 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
 
-#include <atomic>
 #include <span>
-#include <thread>
 #include <utility>
 #include <vector>
 
@@ -37,8 +35,8 @@ namespace Loom
 	* - Reports pairs that start, keep on or stop touching to both sides'
 	*   components; a pair asleep keeps touching without being told so again
 	* - Steps whole, or in two halves around other work: Begin readies the
-	*   bodies and hands their contacts to a physics thread of its own to
-	*   find and solve, and End waits for that, then moves the bodies and
+	*   bodies and hands their contacts to the physics thread, which every
+	*   simulation shares, to find and solve, and End waits for that, then moves the bodies and
 	*   reports. A velocity or pose set in between wins over the step's own
 	*/
 	struct Simulation final
@@ -249,7 +247,8 @@ namespace Loom
 		bool Weigh(Body& body);
 
 		// Finds the bodies' contacts and solves them: all a step does off the
-		// caller's thread, writing nothing outside the simulation.
+		// caller's thread. Outside the simulation it writes only the pose and
+		// inertia Weigh keeps on each Rigidbody, which nothing else reads.
 		void Resolve(float seconds);
 
 		void Gather();
@@ -353,8 +352,12 @@ namespace Loom
 		// Lets go of the step's bodies and colliders, once it is over.
 		void Clear();
 
-		// The physics thread: solves each step handed to it until stopped.
-		void Serve();
+		// The physics thread, and the steps handed to it.
+		struct Solver;
+		static Solver& Solving();
+
+		// Waits until the physics thread has solved the step begun.
+		void Await();
 
 		int BodyOf(const Collider& collider) const;
 
@@ -418,13 +421,6 @@ namespace Loom
 		float m_seconds = 0.0f;
 		bool m_begun = false;
 		bool m_landed = false;
-
-		// Started by the first Begin. Each step handed to it counts up
-		// m_asked, and m_solved follows once it is solved.
-		std::thread m_solver{ };
-		std::atomic<int> m_asked{ 0 };
-		std::atomic<int> m_solved{ 0 };
-		std::atomic<bool> m_stopping{ false };
 
 		// Every simulation with a step begun, for EndAll.
 		static inline std::vector<Simulation*> s_begun{ };

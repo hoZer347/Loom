@@ -14,8 +14,12 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <condition_variable>
+#include <deque>
 #include <limits>
 #include <memory>
+#include <mutex>
+#include <thread>
 
 #if defined(_M_X64) || defined(__SSE2__)
 #include <immintrin.h>
@@ -262,17 +266,78 @@ namespace Loom
 		return true;
 	};
 
+#ifndef __EMSCRIPTEN__
+	struct Simulation::Solver
+	{
+		std::mutex mutex{ };
+		std::condition_variable handed{ };
+		std::condition_variable solved{ };
+
+		// Each taken off once solved, so one waiting knows its step is done
+		// when it is gone.
+		std::deque<Simulation*> queue{ };
+		bool stopping = false;
+
+		// Last, so it starts once the rest is ready.
+		std::thread thread{ [this]() { Serve(); } };
+
+		~Solver()
+		{
+			{
+				const std::lock_guard lock(mutex);
+				stopping = true;
+			};
+
+			handed.notify_one();
+			thread.join();
+		};
+
+		void Serve()
+		{
+			// After Main, being the first to name itself with that order.
+			Profiler::NameThread("Physics", 0);
+
+			std::unique_lock lock(mutex);
+
+			while (true)
+			{
+				handed.wait(lock, [this]() { return stopping || !queue.empty(); });
+
+				if (stopping)
+					return;
+
+				Simulation& simulation = *queue.front();
+
+				lock.unlock();
+				simulation.Resolve(simulation.m_seconds);
+				lock.lock();
+
+				queue.pop_front();
+				solved.notify_all();
+			};
+		};
+	};
+
+	Simulation::Solver& Simulation::Solving()
+	{
+		static Solver solver;
+		return solver;
+	};
+#endif
+
+	void Simulation::Await()
+	{
+#ifndef __EMSCRIPTEN__
+		Solver& solver = Solving();
+		std::unique_lock lock(solver.mutex);
+
+		solver.solved.wait(lock, [&]() { return std::ranges::find(solver.queue, this) == solver.queue.end(); });
+#endif
+	};
+
 	Simulation::~Simulation()
 	{
 		Drop();
-
-		if (!m_solver.joinable())
-			return;
-
-		m_stopping = true;
-		m_asked++;
-		m_asked.notify_all();
-		m_solver.join();
 	};
 
 	void Simulation::Note(Collider& collider)
@@ -327,36 +392,16 @@ namespace Loom
 
 #ifdef __EMSCRIPTEN__
 		Resolve(seconds);
-		m_solved = ++m_asked;
 #else
-		if (!m_solver.joinable())
-			m_solver = std::thread([this]() { Serve(); });
+		Solver& solver = Solving();
 
-		m_asked++;
-		m_asked.notify_all();
-#endif
-	};
-
-	void Simulation::Serve()
-	{
-		// After Main, being the first to name itself with that order.
-		Profiler::NameThread("Physics", 0);
-
-		int seen = 0;
-
-		while (true)
 		{
-			m_asked.wait(seen);
-			seen = m_asked;
-
-			if (m_stopping)
-				return;
-
-			Resolve(m_seconds);
-
-			m_solved.store(seen, std::memory_order_release);
-			m_solved.notify_all();
+			const std::lock_guard lock(solver.mutex);
+			solver.queue.push_back(this);
 		};
+
+		solver.handed.notify_one();
+#endif
 	};
 
 	void Simulation::Land()
@@ -366,7 +411,7 @@ namespace Loom
 
 		LOOM_STAGE("Simulation::Land");
 
-		Jobs::WaitFor(m_solved, m_asked);
+		Await();
 		m_landed = true;
 
 		LOOM_STAGE("Simulation::MoveBodies");
@@ -405,7 +450,7 @@ namespace Loom
 		if (!m_begun)
 			return;
 
-		Jobs::WaitFor(m_solved, m_asked);
+		Await();
 
 		m_begun = false;
 		std::erase(s_begun, this);
@@ -618,6 +663,11 @@ namespace Loom
 
 	void Simulation::Forget(const Collider& collider)
 	{
+		// Only one destroyed comes while a step is solved, which the rules
+		// forbid; that step goes rather than move a collider half gone.
+		if (!m_landed)
+			Drop();
+
 		const auto involves =
 			[&](const Key& key) { return key.first == &collider || key.second == &collider; };
 
@@ -668,7 +718,9 @@ namespace Loom
 	{
 		Body& sleeper = m_bodies[body];
 
-		// Its Rigidbody is woken as it moves, on the thread that owns it.
+		// Its Rigidbody is woken as it moves, back on the caller's thread;
+		// Weigh only refreshes the pose and inertia kept on it for the
+		// simulation.
 		if (Weigh(sleeper))
 			sleeper.awake = true;
 	};

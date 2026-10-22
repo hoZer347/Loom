@@ -224,7 +224,12 @@ namespace Loom
 		if (collider.m_tree != this)
 		{
 			if (collider.m_tree)
+			{
+				if (collider.m_tree->onChange)
+					collider.m_tree->onChange();
+
 				collider.m_tree->Remove(collider);
+			};
 
 			const int leaf = Allocate();
 
@@ -302,9 +307,6 @@ namespace Loom
 	{
 		if (collider.m_tree != this)
 			return;
-
-		if (onChange)
-			onChange();
 
 		if (onRemove)
 			onRemove(collider);

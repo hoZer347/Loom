@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -871,6 +872,79 @@ TEST_SUITE("Rigidbody")
 
 		CHECK(pushed->velocity == SET_VELOCITY);
 		CHECK(*moved->GetGameObject()->transform.position == SET_POSITION);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a collider resized while its step is solved lands the step first, as one stepped whole")
+	{
+		constexpr int COUNT = 9;
+		constexpr int PER_ROW = 3;
+		constexpr float SPACING = 3.0f;
+		constexpr float DROP = 1.0f;
+		constexpr float GROWN = 2.0f;
+
+		// Beside the resized box, within its new size but past its old.
+		constexpr glm::vec3 BESIDE(0.75f, 10.0f, 0.0f);
+		constexpr glm::vec3 DOWN(0.0f, -1.0f, 0.0f);
+
+		const auto drop =
+			[&](bool begun)
+			{
+				Loom::Scene scene("resized");
+				Pump();
+
+				Floor(scene);
+
+				std::vector<Toucher*> touchers{ };
+				std::vector<Loom::Rigidbody*> bodies{ };
+				Loom::BoxCollider* box = nullptr;
+
+				for (int i = 0; i < COUNT; i++)
+				{
+					Loom::GameObject* object = Spawn(scene, "Body", glm::vec3(i % PER_ROW * SPACING, DROP, i / PER_ROW * SPACING));
+					box = object->Attach<Loom::BoxCollider>();
+					touchers.push_back(object->Attach<Toucher>());
+					bodies.push_back(object->Attach<Loom::Rigidbody>());
+				};
+
+				Pump();
+
+				// Landing as the last step is taken.
+				for (int step = 0; step < (int)(SECOND * HALF); step++)
+					scene.Physics();
+
+				if (begun)
+					scene.BeginPhysics();
+				else
+					scene.Physics();
+
+				// Asked of it while the GUI is drawn, as an editor's raycast does.
+				box->size = glm::vec3(GROWN);
+				box->WorldBounds();
+				Pump();
+
+				std::vector<glm::mat4> poses{ };
+				size_t told = 0;
+
+				for (size_t i = 0; i < bodies.size(); i++)
+				{
+					poses.push_back(bodies[i]->GetGameObject()->WorldMatrix());
+					told += touchers[i]->events.size();
+				};
+
+				Loom::RaycastHit hit;
+				const bool grown = scene.Raycast({ Position(*bodies.back()) + BESIDE, DOWN }, hit) && hit.collider == box;
+
+				return std::make_tuple(poses, told, grown);
+			};
+
+		const auto [wholePoses, wholeTold, wholeGrown] = drop(false);
+		const auto [begunPoses, begunTold, begunGrown] = drop(true);
+
+		CHECK(wholePoses == begunPoses);
+		CHECK(wholeTold == begunTold);
+		CHECK(wholeTold > 0);
+		CHECK(wholeGrown);
+		CHECK(begunGrown);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene deleted while its step is solved lets the step go")
