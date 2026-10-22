@@ -13,7 +13,7 @@ namespace Loom
 {
 	/**
 	* Loom::FolderTree
-	* - A panel's VirtualFolders drawn as a tree, as the Scripts and Key
+	* - A panel's VirtualFolders drawn as a tree, as the Scripts, Art and Key
 	*   Bindings panels show theirs: a row a folder, opened by its arrow or a
 	*   double click, dragged into another, renamed in place and taken out
 	*   from its right-click menu, with the panel's items inside
@@ -27,6 +27,10 @@ namespace Loom
 			// What a dragged item and a dragged folder carry: its name or path.
 			const char* item_payload = nullptr;
 			const char* folder_payload = nullptr;
+
+			// Whether an item_payload is one of the panel's, when other panels
+			// drag the same kind. Every one is when empty.
+			std::function<bool(const std::string& item)> takes{ };
 
 			// The panel's name, for what the console is told.
 			const char* panel = nullptr;

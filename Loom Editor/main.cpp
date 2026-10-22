@@ -66,6 +66,7 @@ namespace
 		{ ProjectTemplate::extension, L"Loom.Project", L"Loom Project" },
 		{ SceneSerializer::extension, L"Loom.Scene", L"Loom Scene" },
 		{ ScriptFolders::extension, L"Loom.ScriptFolders", L"Loom Script Folders" },
+		{ ArtFolders::extension, L"Loom.ArtFolders", L"Loom Art Folders" },
 		{ InputActions::extension, L"Loom.InputActions", L"Loom Key Bindings" },
 	};
 

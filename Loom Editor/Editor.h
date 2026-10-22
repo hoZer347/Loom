@@ -18,6 +18,7 @@
 #include "Prefabs.h"
 #include "SelectionOutline.h"
 #include "SceneHistory.h"
+#include "ArtFolders.h"
 #include "FolderTree.h"
 #include "ScriptFolders.h"
 #include "ScriptLibrary.h"
@@ -319,6 +320,18 @@ namespace Loom
 		std::string ScriptFoldersFile() const;
 		void SaveScriptFolders();
 
+		// The Art panel: the project's textures, in folders of its own kept
+		// beside the .loomproject as the Scripts panel's are.
+		void DrawArt();
+		void DrawArtEntry(const std::string& file);
+		void DrawArtCreateMenu(const std::string& folder);
+		FolderTree::Hooks ArtFolderHooks();
+		std::string ArtFoldersFile() const;
+		void SaveArtFolders();
+
+		// Selects and shows the texture at path in the Art panel.
+		void RevealArt(const std::string& path);
+
 		// Where the project keeps its InputActions, beside its .loomproject in
 		// the same way. Empty for a folder with no project file.
 		std::string InputActionsFile() const;
@@ -500,9 +513,9 @@ namespace Loom
 		// OpenAsset's.
 		static bool OpenInShell(ImGuiContext* context, const char* path);
 
-		// Lets a file be dragged out of the Project panel, onto a field that
-		// names a file or a GameObject in the hierarchy, and a file or folder
-		// onto another folder.
+		// Lets a file be dragged out of the Project or Art panel, onto a field
+		// that names a file or a GameObject in the hierarchy, and a file or
+		// folder onto another folder.
 		void DragAsset(const AssetNode& node);
 
 		// Inside a drag and drop target, takes a file or folder dropped there
@@ -526,6 +539,10 @@ namespace Loom
 		// What the Scripts panel drags: a script type's name, or a folder's path.
 		static constexpr const char* script_payload = "LoomScript";
 		static constexpr const char* script_folder_payload = "LoomScriptFolder";
+
+		// What the Art panel drags for a folder. Its textures go as the Project
+		// panel's files do, so fields take them.
+		static constexpr const char* art_folder_payload = "LoomArtFolder";
 
 		// Takes a script dragged out of the Scripts panel onto a GameObject in
 		// the hierarchy, attaching it. Whether the drag was one.
@@ -705,7 +722,7 @@ namespace Loom
 		std::string m_selectedModel{ };
 		ModelPreview m_modelPreview;
 
-		// The project as it stood at the last scan.
+		// The project as it stood at the last scan, its textures aside.
 		AssetNode m_assets{ };
 		FolderWatch m_projectWatch;
 		std::string m_selectedAsset{ };
@@ -747,6 +764,17 @@ namespace Loom
 		// Where the Create prompt's script is filed once it is written.
 		std::string m_newScriptFolder{ };
 
+		// The Art panel's textures from the last scan, each by its path in the
+		// project, as fields name it.
+		std::vector<std::string> m_artFiles{ };
+		ArtFolders m_artFolders;
+		std::string m_selectedArt{ };
+		bool m_revealSelectedArt = false;
+		FolderTree m_artFolderTree;
+
+		// Where the Create prompt's texture is filed once it is written.
+		std::string m_newArtFolder{ };
+
 		// The scene a session opens with: what the settings file said last time,
 		// and then whichever one this session last made active.
 		std::string m_startupScene{ };
@@ -785,6 +813,8 @@ namespace Loom
 		bool m_showProject = true;
 		bool m_showScripts = true;
 		bool m_focusScripts = false;
+		bool m_showArt = true;
+		bool m_focusArt = false;
 		bool m_showHierarchy = true;
 		bool m_hierarchyFocused = false;
 		bool m_showInspector = true;

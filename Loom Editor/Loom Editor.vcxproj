@@ -101,7 +101,6 @@
     <ClCompile Include="Editor.cpp" />
     <ClCompile Include="HiddenProcess.cpp" />
     <ClCompile Include="ScriptLibrary.cpp" />
-    <ClCompile Include="ScriptFolders.cpp" />
     <ClCompile Include="VirtualFolders.cpp" />
     <ClCompile Include="FolderTree.cpp" />
     <ClCompile Include="FolderWatch.cpp" />
@@ -144,6 +143,7 @@
     <ClInclude Include="Editor.h" />
     <ClInclude Include="HiddenProcess.h" />
     <ClInclude Include="ScriptLibrary.h" />
+    <ClInclude Include="ArtFolders.h" />
     <ClInclude Include="ScriptFolders.h" />
     <ClInclude Include="VirtualFolders.h" />
     <ClInclude Include="FolderTree.h" />

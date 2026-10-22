@@ -1,5 +1,6 @@
 #include "doctest.h"
 
+#include "ArtFolders.h"
 #include "ScriptFolders.h"
 
 #include <filesystem>
@@ -138,5 +139,33 @@ TEST_SUITE("ScriptFolders")
 		loaded.Load(file.string());
 
 		CHECK(loaded.Build({ "Patrol" }).children.empty());
+	};
+
+	TEST_CASE("the Art panel's textures come back filed by their paths, and its file holds none of the Scripts panel's")
+	{
+		const std::filesystem::path art = std::filesystem::temp_directory_path() / "loom art folders.loomart";
+		const std::filesystem::path scripts = std::filesystem::temp_directory_path() / "loom art folders.loomscripts";
+
+		Loom::ArtFolders saved;
+		saved.Move("Assets/Units/Tank.png", "Units");
+
+		REQUIRE(saved.Save(art.string()));
+
+		ScriptFolders other;
+		other.Move("Patrol", "AI");
+
+		REQUIRE(other.Save(scripts.string()));
+
+		Loom::ArtFolders loaded;
+		loaded.Load(art.string());
+
+		CHECK(loaded.FolderOf("Assets/Units/Tank.png") == "Units");
+
+		loaded.Load(scripts.string());
+
+		CHECK(loaded.FolderOf("Patrol").empty());
+
+		std::filesystem::remove(art);
+		std::filesystem::remove(scripts);
 	};
 };

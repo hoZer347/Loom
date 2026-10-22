@@ -18,11 +18,10 @@ namespace Loom
 	struct ScriptFolders final : VirtualFolders
 	{
 		static constexpr const char* extension = ".loomscripts";
-		static constexpr const char* folder_key = "folder=";
 		static constexpr const char* script_prefix = "script.";
 
 		// Empty when the file is not there yet.
-		void Load(const std::string& file);
-		bool Save(const std::string& file) const;
+		void Load(const std::string& file) { VirtualFolders::Load(file, script_prefix); };
+		bool Save(const std::string& file) const { return VirtualFolders::Save(file, script_prefix); };
 	};
 };

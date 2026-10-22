@@ -12,14 +12,17 @@ namespace Loom
 	* Loom::VirtualFolders
 	* - A panel's folders: a tree its items are filed in, by name, apart from
 	*   wherever the items themselves live, so filing one moves nothing else.
-	*   The Scripts panel files script types in them, and the Key Bindings
-	*   panel actions
+	*   The Scripts panel files script types in them, the Art panel textures
+	*   and the Key Bindings panel actions
 	* - Folders are paths with '/' between nested ones. An item filed nowhere
 	*   is at the top
+	* - A panel that keeps them in a file writes folder=<path> and
+	*   <item_prefix><item>=<path> lines
 	*/
 	struct VirtualFolders
 	{
 		static constexpr char separator = '/';
+		static constexpr const char* folder_key = "folder=";
 
 		struct Node
 		{
@@ -34,6 +37,10 @@ namespace Loom
 		};
 
 		void Clear();
+
+		// Empty when the file is not there yet.
+		void Load(const std::string& file, const char* item_prefix);
+		bool Save(const std::string& file, const char* item_prefix) const;
 
 		// Every folder, each by its path.
 		const std::set<std::string>& Folders() const { return m_folders; };

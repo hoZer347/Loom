@@ -20,6 +20,7 @@ namespace Loom
 		constexpr const char* Prefab = "📦";
 		constexpr const char* Shader = "✨";
 		constexpr const char* Texture = "🖼";
+		constexpr const char* Art = "🎨";
 		constexpr const char* Sound = "🔊";
 		constexpr const char* Font = "🔤";
 		constexpr const char* Model = "🧊";
@@ -40,6 +41,7 @@ namespace Loom
 		constexpr const char* Hierarchy = "🌳 Hierarchy###Hierarchy";
 		constexpr const char* Project = "📁 Project###Project";
 		constexpr const char* Scripts = "🧩 Scripts###Scripts";
+		constexpr const char* Art = "🎨 Art###Art";
 		constexpr const char* Inspector = "🔍 Inspector###Inspector";
 		constexpr const char* Scene = "🎬 Scene###Scene";
 		constexpr const char* SceneId = "###Scene";

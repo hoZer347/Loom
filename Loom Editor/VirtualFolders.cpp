@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstring>
+#include <fstream>
 
 
 namespace Loom
@@ -65,6 +67,52 @@ namespace Loom
 		m_folders.clear();
 		m_items.clear();
 	};
+
+	void VirtualFolders::Load(const std::string& file, const char* item_prefix)
+	{
+		Clear();
+
+		std::ifstream in(file);
+		std::string line;
+
+		const size_t folder_length = std::strlen(folder_key);
+		const size_t item_length = std::strlen(item_prefix);
+
+		while (std::getline(in, line))
+		{
+			while (!line.empty() && line.back() == '\r')
+				line.pop_back();
+
+			if (line.rfind(folder_key, 0) == 0)
+			{
+				const std::string folder = line.substr(folder_length);
+
+				if (!folder.empty())
+					m_folders.insert(folder);
+
+				continue;
+			};
+
+			const size_t equals = line.find('=');
+
+			if (line.rfind(item_prefix, 0) == 0 && equals != std::string::npos)
+				Move(line.substr(item_length, equals - item_length), line.substr(equals + 1));
+		};
+	};
+
+	bool VirtualFolders::Save(const std::string& file, const char* item_prefix) const
+	{
+		std::ofstream out(file, std::ios::binary);
+
+		for (const std::string& folder : m_folders)
+			out << folder_key << folder << '\n';
+
+		for (const auto& [item, folder] : m_items)
+			out << item_prefix << item << '=' << folder << '\n';
+
+		return (bool)out;
+	};
+
 
 	std::string VirtualFolders::FolderOf(const std::string& item) const
 	{

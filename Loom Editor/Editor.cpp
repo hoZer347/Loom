@@ -414,7 +414,7 @@ namespace Loom
 		constexpr const char* prefab_light = "Prefab Light";
 
 		// Panels docked as a tab beside another, each with the one it goes beside.
-		constexpr std::pair<const char*, const char*> side_windows[] = { { EditorPanels::Scripts, EditorPanels::Project }, { EditorPanels::KeyBindings, EditorPanels::Console } };
+		constexpr std::pair<const char*, const char*> side_windows[] = { { EditorPanels::Scripts, EditorPanels::Project }, { EditorPanels::Art, EditorPanels::Project }, { EditorPanels::KeyBindings, EditorPanels::Console } };
 
 		// The ImGui settings entry that holds which panels are open.
 		constexpr const char* panel_settings = "LoomEditor";
@@ -863,6 +863,16 @@ namespace Loom
 		{
 			m_showScripts = true;
 			m_focusScripts = true;
+
+			return OpenProject(std::filesystem::absolute(path, code).parent_path().string(), open_scene);
+		};
+
+		// And the Art panel's.
+		if (std::filesystem::path(path).extension() == ArtFolders::extension &&
+			std::filesystem::is_regular_file(path, code))
+		{
+			m_showArt = true;
+			m_focusArt = true;
 
 			return OpenProject(std::filesystem::absolute(path, code).parent_path().string(), open_scene);
 		};
@@ -1753,6 +1763,7 @@ namespace Loom
 
 		if (m_showProject)		DrawProject();
 		if (m_showScripts)		DrawScripts();
+		if (m_showArt)			DrawArt();
 		if (m_showHierarchy)	DrawHierarchy();
 		if (m_showInspector)	DrawInspector();
 		if (m_showScene)		DrawScene();
@@ -1923,6 +1934,7 @@ namespace Loom
 		ImGui::DockBuilderDockWindow(EditorPanels::Hierarchy, left);
 		ImGui::DockBuilderDockWindow(EditorPanels::Project, left_bottom);
 		ImGui::DockBuilderDockWindow(EditorPanels::Scripts, left_bottom);
+		ImGui::DockBuilderDockWindow(EditorPanels::Art, left_bottom);
 		ImGui::DockBuilderDockWindow(EditorPanels::Inspector, right);
 		ImGui::DockBuilderDockWindow(EditorPanels::Console, bottom);
 		ImGui::DockBuilderDockWindow(EditorPanels::SceneData, bottom);
@@ -1941,6 +1953,7 @@ namespace Loom
 			{ EditorPanels::Hierarchy, &m_showHierarchy, true },
 			{ EditorPanels::Project, &m_showProject, true },
 			{ EditorPanels::Scripts, &m_showScripts, true },
+			{ EditorPanels::Art, &m_showArt, true },
 			{ EditorPanels::Inspector, &m_showInspector, true },
 			{ EditorPanels::Scene, &m_showScene, true },
 			{ EditorPanels::Game, &m_showGame, true },
@@ -3755,6 +3768,9 @@ namespace Loom
 		};
 
 		std::cout << "Copied " << file << " to " << copied << std::endl;
+
+		if (ProjectAssets::IsTextureFile(copied))
+			return RevealArt(copied);
 
 		m_selectedAsset = std::filesystem::path(copied).lexically_normal().string();
 		m_revealSelectedAsset = true;

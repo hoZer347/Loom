@@ -1,5 +1,6 @@
 #include "EditorIcons.h"
 
+#include "ArtFolders.h"
 #include "InputActions.h"
 #include "Prefab.h"
 #include "ProjectAssets.h"
@@ -38,6 +39,9 @@ namespace Loom
 
 		if (extension == ScriptFolders::extension)
 			return Script;
+
+		if (extension == ArtFolders::extension)
+			return Art;
 
 		if (extension == InputActions::extension)
 			return Bindings;

@@ -92,6 +92,12 @@ namespace Loom
 			return InfoOf(kind).appearsIn != nullptr;
 		};
 
+		// What the Art panel's Create menu makes, rather than the Project panel's.
+		bool IsArt(AssetKind kind)
+		{
+			return kind == AssetKind::Texture;
+		};
+
 		// Textures are uploaded bottom row first, so V is flipped.
 		const ImVec2 thumbnailTop(0.0f, 1.0f);
 		const ImVec2 thumbnailBottom(1.0f, 0.0f);
@@ -109,6 +115,12 @@ namespace Loom
 			const float longest = (float)(std::max)(texture.width, texture.height);
 
 			return ImVec2(side * texture.width / longest, side * texture.height / longest);
+		};
+
+		// Spaces as wide as the icon a thumbnail stands in for, to draw it over.
+		std::string ThumbnailSpaces()
+		{
+			return std::string((size_t)std::ceil(ImGui::CalcTextSize(EditorIcons::Texture).x / ImGui::CalcTextSize(" ").x), ' ');
 		};
 
 		// Over the icon's place in the tree node just drawn.
@@ -130,16 +142,18 @@ namespace Loom
 
 		// Folders first, then files, each alphabetically. Only files the game
 		// uses are assets, and dot-prefixed folders (.vs) and the build output
-		// are left out, as is a folder with nothing but scripts in it, which
-		// are the Scripts panel's. Whether there were scripts under folder.
+		// are left out. So are the scripts, which are the Scripts panel's, and
+		// the textures, which go in textures for the Art panel, along with any
+		// folder holding nothing else. Whether there were either under folder.
 		bool Scan(
 			const std::filesystem::path& folder,
 			const std::filesystem::path& skip,
 			AssetNode& node,
-			std::vector<std::string>& scenes)
+			std::vector<std::string>& scenes,
+			std::vector<std::string>& textures)
 		{
 			std::error_code code;
-			bool scripts = false;
+			bool elsewhere = false;
 
 			for (const auto& entry : std::filesystem::directory_iterator(folder, code))
 			{
@@ -152,7 +166,14 @@ namespace Loom
 				AssetNode child{ path.string(), name, entry.is_directory(code) };
 
 				if (!child.folder && ProjectAssets::IsScriptFile(name))
-					scripts = true;
+					elsewhere = true;
+
+				if (!child.folder && ProjectAssets::IsTextureFile(name))
+				{
+					textures.push_back(child.path);
+					elsewhere = true;
+					continue;
+				};
 
 				if (!child.folder && !ProjectAssets::IsGameFile(name) && !IsModelFile(name))
 					continue;
@@ -162,11 +183,11 @@ namespace Loom
 					if (path == skip)
 						continue;
 
-					const bool held_scripts = Scan(path, skip, child, scenes);
+					const bool held_elsewhere = Scan(path, skip, child, scenes, textures);
 
-					scripts = scripts || held_scripts;
+					elsewhere = elsewhere || held_elsewhere;
 
-					if (child.children.empty() && held_scripts)
+					if (child.children.empty() && held_elsewhere)
 						continue;
 				}
 				else if (path.extension() == SceneSerializer::extension)
@@ -186,7 +207,7 @@ namespace Loom
 					return _stricmp(a.name.c_str(), b.name.c_str()) < 0;
 				});
 
-			return scripts;
+			return elsewhere;
 		};
 
 		void Shell(const char* file, const std::string& parameters)
@@ -484,6 +505,7 @@ namespace Loom
 		RefreshScripts();
 
 		m_projectScenes.clear();
+		m_artFiles.clear();
 		m_noThumbnail.clear();
 		m_assets = AssetNode{ m_projectPath, "", true };
 
@@ -494,9 +516,14 @@ namespace Loom
 			? std::filesystem::path(m_scripts.GetLibrary()).parent_path().lexically_normal()
 			: std::filesystem::path();
 
-		Scan(m_projectPath, build, m_assets, m_projectScenes);
+		std::vector<std::string> textures{ };
+
+		Scan(m_projectPath, build, m_assets, m_projectScenes, textures);
 
 		std::sort(m_projectScenes.begin(), m_projectScenes.end());
+
+		for (const std::string& texture : textures)
+			m_artFiles.push_back(std::filesystem::path(texture).lexically_relative(m_projectPath).generic_string());
 	};
 
 	void Editor::DrawProject()
@@ -614,7 +641,7 @@ namespace Loom
 		const Texture* thumbnail = node.folder ? nullptr : Thumbnail(node.path);
 
 		const std::string icon = thumbnail != nullptr
-			? std::string((size_t)std::ceil(ImGui::CalcTextSize(EditorIcons::Texture).x / ImGui::CalcTextSize(" ").x), ' ')
+			? ThumbnailSpaces()
 			: node.folder ? EditorIcons::Folder : IconOf(node.path);
 
 		const bool open = ImGui::TreeNodeEx(node.path.c_str(), flags, "%s %s", icon.c_str(), node.name.c_str());
@@ -704,7 +731,7 @@ namespace Loom
 			return;
 
 		for (const AssetKindInfo& info : assetKinds)
-			if (!IsScript(info.kind) && ImGui::MenuItem((std::string(info.icon) + " " + info.label).c_str()))
+			if (!IsScript(info.kind) && !IsArt(info.kind) && ImGui::MenuItem((std::string(info.icon) + " " + info.label).c_str()))
 				AskForAsset(info.kind, folder);
 
 		ImGui::EndMenu();
@@ -747,6 +774,7 @@ namespace Loom
 		m_newAssetKind = kind;
 		m_newAssetFolder = folder;
 		m_newScriptFolder.clear();
+		m_newArtFolder.clear();
 		m_askForAsset = true;
 		m_focusAssetName = true;
 
@@ -927,6 +955,13 @@ namespace Loom
 			m_selectedScript = name;
 			m_revealSelectedScript = true;
 			m_focusScripts = true;
+		}
+		else if (IsArt(m_newAssetKind))
+		{
+			m_artFolders.Move(std::filesystem::path(path).lexically_relative(m_projectPath).generic_string(), m_newArtFolder);
+			SaveArtFolders();
+
+			RevealArt(path);
 		}
 		else
 		{
@@ -1129,10 +1164,38 @@ namespace Loom
 		m_shaders.Relocate(path, moved);
 		m_sprites.Relocate(path, moved);
 
-		m_selectedAsset = std::filesystem::path(moved).lexically_normal().string();
-		m_revealSelectedAsset = true;
+		// The Art panel files its textures by their paths, so they stay filed
+		// where they were.
+		bool refiled = false;
+
+		for (const std::string& file : m_artFiles)
+		{
+			const std::filesystem::path relocated = ProjectAssets::Relocate((std::filesystem::path(m_projectPath) / file).lexically_normal().string(), path, moved);
+			const std::string to = relocated.lexically_relative(m_projectPath).generic_string();
+
+			if (to == file)
+				continue;
+
+			const std::string folder = m_artFolders.FolderOf(file);
+
+			m_artFolders.Move(file, "");
+			m_artFolders.Move(to, folder);
+			refiled = true;
+
+			if (m_selectedArt == file)
+				m_selectedArt = to;
+		};
+
+		if (refiled)
+			SaveArtFolders();
 
 		RefreshProjectAssets();
+
+		if (ProjectAssets::IsTextureFile(moved))
+			return RevealArt(moved);
+
+		m_selectedAsset = std::filesystem::path(moved).lexically_normal().string();
+		m_revealSelectedAsset = true;
 	};
 
 	void Editor::DrawCreateAssetPrompt()
@@ -1417,6 +1480,27 @@ namespace Loom
 		ImGui::EndPopup();
 	};
 
+	std::string Editor::ArtFoldersFile() const
+	{
+		return m_projectFile.empty()
+			? ""
+			: std::filesystem::path(m_projectFile).replace_extension(ArtFolders::extension).string();
+	};
+
+	void Editor::SaveArtFolders()
+	{
+		if (const std::string file = ArtFoldersFile(); !m_artFolders.Save(file))
+			std::cerr << "Art: could not write the folders to " << file << std::endl;
+	};
+
+	void Editor::RevealArt(const std::string& path)
+	{
+		m_selectedArt = std::filesystem::path(path).lexically_normal().lexically_relative(m_projectPath).generic_string();
+		m_revealSelectedArt = true;
+		m_showArt = true;
+		m_focusArt = true;
+	};
+
 	FolderTree::Hooks Editor::ScriptFolderHooks()
 	{
 		FolderTree::Hooks hooks;
@@ -1427,6 +1511,172 @@ namespace Loom
 		hooks.create = [this](const std::string& folder) { DrawScriptsCreateMenu(folder); };
 		hooks.item = [this](const std::string& script) { DrawScriptEntry(script); };
 		hooks.changed = [this]() { SaveScriptFolders(); };
+
+		return hooks;
+	};
+
+	void Editor::DrawArt()
+	{
+		if (m_focusArt)
+		{
+			ImGui::SetNextWindowFocus();
+			m_focusArt = false;
+		};
+
+		if (ImGui::Begin(EditorPanels::Art, &m_showArt))
+		{
+			if (m_projectWatch.Changed())
+				RefreshProjectAssets();
+
+			ImGui::BeginChild("##art", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders);
+
+			const ArtFolders::Node root = m_artFolders.Build(m_artFiles);
+
+			if (m_projectPath.empty())
+				ImGui::TextDisabled("No project open.");
+			else if (root.children.empty() && root.items.empty())
+				ImGui::TextDisabled("No textures yet. Right-click to create one.");
+
+			const FolderTree::Hooks hooks = ArtFolderHooks();
+
+			for (const ArtFolders::Node& folder : root.children)
+				m_artFolderTree.Draw(m_artFolders, folder, hooks);
+
+			for (const std::string& file : root.items)
+				DrawArtEntry(file);
+
+			m_revealSelectedArt = false;
+
+			// A file from outside goes in the project folder.
+			if (!m_projectPath.empty())
+				TakeImportFolder(m_projectPath, ImGui::IsWindowHovered());
+
+			// Dropped anywhere else in the list, it goes to the top.
+			if (ImGui::BeginDragDropTargetCustom(ImGui::GetCurrentWindow()->InnerRect, ImGui::GetID("##art_top")))
+			{
+				FolderTree::Drop(m_artFolders, "", hooks);
+				ImGui::EndDragDropTarget();
+			};
+
+			if (!m_projectPath.empty() &&
+				ImGui::BeginPopupContextWindow(
+					"##art_create",
+					ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
+			{
+				DrawArtCreateMenu("");
+				ImGui::EndPopup();
+			};
+
+			ImGui::EndChild();
+		};
+
+		ImGui::End();
+	};
+
+	void Editor::DrawArtEntry(const std::string& file)
+	{
+		const AssetNode node{
+			(std::filesystem::path(m_projectPath) / file).lexically_normal().string(),
+			std::filesystem::path(file).filename().string() };
+
+		ImGuiTreeNodeFlags flags =
+			ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanAvailWidth;
+
+		if (file == m_selectedArt)
+			flags |= ImGuiTreeNodeFlags_Selected;
+
+		const Texture* thumbnail = Thumbnail(node.path);
+		const std::string icon = thumbnail != nullptr ? ThumbnailSpaces() : EditorIcons::Texture;
+
+		ImGui::TreeNodeEx(("art:" + file).c_str(), flags, "%s %s", icon.c_str(), node.name.c_str());
+
+		if (thumbnail != nullptr)
+			DrawThumbnail(*thumbnail);
+
+		if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+			m_selectedArt = file;
+
+		// On the release, so dragging one out to a field leaves the panel shut.
+		const ImGuiIO& io = ImGui::GetIO();
+		const float drag_threshold = io.MouseDragThreshold * io.MouseDragThreshold;
+
+		if (file == m_selectedArt &&
+			ImGui::IsItemHovered() &&
+			ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
+			io.MouseDragMaxDistanceSqr[ImGuiMouseButton_Left] < drag_threshold)
+			OpenSprite(node.path);
+
+		ImGui::SetItemTooltip("%s", file.c_str());
+
+		DragAsset(node);
+
+		if (!ImGui::BeginPopupContextItem())
+			return;
+
+		m_selectedArt = file;
+
+		const std::string folder = m_artFolders.FolderOf(file);
+
+		if (ImGui::MenuItem("Open"))
+			OpenSprite(node.path);
+
+		if (ImGui::MenuItem("Show in Explorer"))
+			ShowInExplorer(node.path);
+
+		if (!folder.empty() && ImGui::MenuItem("Move to Top"))
+		{
+			m_artFolders.Move(file, "");
+			SaveArtFolders();
+		};
+
+		ImGui::Separator();
+
+		DrawArtCreateMenu(folder);
+
+		ImGui::EndPopup();
+	};
+
+	void Editor::DrawArtCreateMenu(const std::string& folder)
+	{
+		if (!ImGui::BeginMenu("Create"))
+			return;
+
+		// Kept in the project file's .loomart, so not without one.
+		if (ImGui::MenuItem((std::string(EditorIcons::Folder) + " Folder").c_str(), nullptr, false, !m_projectFile.empty()))
+		{
+			constexpr const char* newFolder = "New Folder";
+
+			std::string path = m_artFolders.AddFolder(folder, newFolder);
+
+			for (int suffix = 1; path.empty() && suffix < maxDefaultNameSuffix; suffix++)
+				path = m_artFolders.AddFolder(folder, newFolder + std::to_string(suffix));
+
+			SaveArtFolders();
+
+			m_artFolderTree.Rename(path);
+		};
+
+		for (const AssetKindInfo& info : assetKinds)
+			if (IsArt(info.kind) && ImGui::MenuItem((std::string(info.icon) + " " + info.label).c_str()))
+			{
+				AskForAsset(info.kind, m_projectPath);
+				m_newArtFolder = folder;
+			};
+
+		ImGui::EndMenu();
+	};
+
+	FolderTree::Hooks Editor::ArtFolderHooks()
+	{
+		FolderTree::Hooks hooks;
+		hooks.item_payload = ASSET_PAYLOAD;
+		hooks.folder_payload = art_folder_payload;
+		hooks.takes = [this](const std::string& file) { return std::ranges::find(m_artFiles, file) != m_artFiles.end(); };
+		hooks.panel = "Art";
+		hooks.reveal = [this](const std::string& folder) { return m_revealSelectedArt && VirtualFolders::IsAtOrUnder(m_artFolders.FolderOf(m_selectedArt), folder); };
+		hooks.create = [this](const std::string& folder) { DrawArtCreateMenu(folder); };
+		hooks.item = [this](const std::string& file) { DrawArtEntry(file); };
+		hooks.changed = [this]() { SaveArtFolders(); };
 
 		return hooks;
 	};

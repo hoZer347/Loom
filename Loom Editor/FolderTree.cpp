@@ -79,9 +79,14 @@ namespace Loom
 
 	void FolderTree::Drop(VirtualFolders& folders, const std::string& folder, const Hooks& hooks)
 	{
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(hooks.item_payload))
+		const ImGuiPayload* held = ImGui::GetDragDropPayload();
+
+		if (held != nullptr &&
+			held->IsDataType(hooks.item_payload) &&
+			(!hooks.takes || hooks.takes((const char*)held->Data)) &&
+			ImGui::AcceptDragDropPayload(hooks.item_payload))
 		{
-			folders.Move((const char*)payload->Data, folder);
+			folders.Move((const char*)held->Data, folder);
 			hooks.changed();
 		};
 
