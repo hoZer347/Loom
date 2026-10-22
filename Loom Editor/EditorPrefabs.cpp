@@ -229,7 +229,7 @@ namespace Loom
 			root->GetGuid().ToString(),
 			Prefabs::Write(Prefabs::Retarget(*prefab, shown, Prefabs::TransformKeys(*root), Prefabs::Part::Whole)));
 
-		const Guid selected = m_selected && IsInHierarchy(m_prefabScene->GetRoot(), m_selected) ? m_selected->GetGuid() : Guid();
+		const Guid selected = IsSelectedIn(m_prefabScene->GetRoot()) ? m_selected->GetGuid() : Guid();
 
 		if (selected != Guid())
 			Select(nullptr);

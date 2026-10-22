@@ -316,7 +316,11 @@ namespace Loom
 	{
 		std::lock_guard lock{ mutex };
 
-		return by_id[ID];
+		const auto found = by_id.find(ID);
+
+		return found == by_id.end()
+			? nullptr
+			: found->second;
 	};
 
 	LoomObject* LoomObject::_GetByName(const std::string& name)

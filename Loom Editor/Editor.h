@@ -379,13 +379,24 @@ namespace Loom
 		// under it take the accent colour.
 		void DrawGameObjectNode(GameObject* gameObject, bool parent_disabled, bool parent_in_prefab);
 
+		// Only the rows in view are drawn, and the rest are stepped over, so the
+		// tree costs what is open and on screen rather than what the scenes hold.
+		void DrawChildNodes(GameObject& parent, bool disabled, bool in_prefab);
+		void DrawClosedRows(GameObject& parent, size_t from, size_t to, bool disabled, bool in_prefab);
+		static void SkipRows(size_t rows);
+
+		// Finds the open nodes still there, under their parents in order, and
+		// counts the rows each one's open subtree takes below its own.
+		void GatherOpenNodes();
+
+		// Whether node is drawn open. One that has gained a child since it was
+		// last drawn opens.
+		bool NodeOpen(const GameObject& node);
+		void SetNodeOpen(const GameObject& node, bool open);
+
 		// The eye at the right of the row just drawn, which disables or enables
 		// the object. Faded when an ancestor already disables it.
 		void DrawEnableToggle(GameObject* gameObject, bool parent_disabled, const ImRect& eye);
-
-		// Marks every node that has gained a child since the last frame, and the
-		// nodes above it, to be drawn open.
-		void ExpandGrownNodes(const std::vector<Scene*>& scenes);
 
 		// Takes a GameObject dropped on the tree node just drawn: on its top or
 		// bottom edge to sit before or after it, anywhere else to become its last
@@ -664,7 +675,13 @@ namespace Loom
 		// edits itself between frames, so both are checked for liveness once per
 		// frame rather than trusted.
 		void ValidateSelection();
+
+		// Walks up from target, which has to be alive.
 		static bool IsInHierarchy(const GameObject& root, const GameObject* target);
+
+		// Whether the selection is root or under it. False once the selection is
+		// gone, which can happen partway through a frame.
+		bool IsSelectedIn(const GameObject& root) const;
 
 		// The prefab as the file now has it, read again whenever the file
 		// changes. A change from outside the editor unlinks the prefab's
@@ -774,6 +791,7 @@ namespace Loom
 
 		Scene* m_activeScene = nullptr;
 		GameObject* m_selected = nullptr;
+		uint64_t m_selectedId = 0;
 		bool m_nodePressOpened = false;
 		std::string m_pendingSelection{ };
 		int m_selectionFramesLeft = 0;
@@ -1016,10 +1034,21 @@ namespace Loom
 
 		std::vector<QueuedClick> m_clicks{ };
 
-		// By GUID rather than pointer, here and in the Hierarchy's tree ids:
-		// undo rebuilds a scene into new objects that keep their GUIDs.
-		std::unordered_map<Guid, size_t> m_childCounts{ };
-		std::unordered_set<Guid> m_expand{ };
+		// The Hierarchy's open nodes, by m_ID so each copy of a scene opened
+		// twice has its own, and with their GUIDs: an undone delete and a
+		// prefab read again make new objects under the GUIDs they had. Scene
+		// roots start open, so those closed are kept instead.
+		std::unordered_map<uint64_t, Guid> m_openNodes{ };
+		std::unordered_set<uint64_t> m_closedRoots{ };
+
+		// This frame's open nodes under each node, with their sibling indices,
+		// and the rows below each one.
+		std::unordered_map<const GameObject*, std::vector<std::pair<size_t, const GameObject*>>> m_openUnder{ };
+		std::unordered_map<const GameObject*, size_t> m_rowsBelow{ };
+
+		// How many children each row had when drawn last frame, and this frame.
+		std::unordered_map<uint64_t, size_t> m_childCounts{ };
+		std::unordered_map<uint64_t, size_t> m_drawnCounts{ };
 		// Double-clicking the selection in the hierarchy edits its name in place,
 		// in the same buffer as the inspector's name box.
 		bool m_renaming = false;

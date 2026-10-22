@@ -1202,7 +1202,7 @@ namespace Loom
 		if (m_activeScene == scene)
 			m_activeScene = nullptr;
 
-		if (m_selected && IsInHierarchy(scene->GetRoot(), m_selected))
+		if (IsSelectedIn(scene->GetRoot()))
 			Select(nullptr);
 
 		m_scenePaths.erase(scene);
@@ -1289,7 +1289,7 @@ namespace Loom
 		if (m_prefabScene == nullptr)
 			return;
 
-		if (m_selected && IsInHierarchy(m_prefabScene->GetRoot(), m_selected))
+		if (IsSelectedIn(m_prefabScene->GetRoot()))
 			Select(nullptr);
 
 		// Deferred, as CloseScene's is, past whatever the frame still draws.
@@ -1312,6 +1312,7 @@ namespace Loom
 	void Editor::Select(GameObject* gameObject)
 	{
 		m_selected = gameObject;
+		m_selectedId = gameObject ? gameObject->m_ID : 0;
 		m_nameBufferOwner = nullptr;
 		m_selectedModel.clear();
 		m_renaming = false;
@@ -1462,14 +1463,19 @@ namespace Loom
 
 	bool Editor::IsInHierarchy(const GameObject& root, const GameObject* target)
 	{
-		if (&root == target)
-			return true;
-
-		for (const GameObject* child : root.GetChildren())
-			if (IsInHierarchy(*child, target))
+		for (const GameObject* at = target; at; at = at->GetParent())
+			if (at == &root)
 				return true;
 
 		return false;
+	};
+
+	bool Editor::IsSelectedIn(const GameObject& root) const
+	{
+		return
+			m_selected &&
+			LoomObject::GetByID(m_selectedId) == m_selected &&
+			IsInHierarchy(root, m_selected);
 	};
 
 	void Editor::RequestSelection(const std::string& name)
@@ -1516,10 +1522,10 @@ namespace Loom
 			return;
 
 		for (Scene* scene : scenes)
-			if (IsInHierarchy(scene->GetRoot(), m_selected))
+			if (IsSelectedIn(scene->GetRoot()))
 				return;
 
-		if (m_prefabScene && IsInHierarchy(m_prefabScene->GetRoot(), m_selected))
+		if (m_prefabScene && IsSelectedIn(m_prefabScene->GetRoot()))
 			return;
 
 		Select(nullptr);
@@ -2387,7 +2393,7 @@ namespace Loom
 			// list the engine hands out.
 			const std::vector<Scene*> scenes = Scene::GetScenes();
 
-			ExpandGrownNodes(scenes);
+			GatherOpenNodes();
 
 			// The tree ids are GUIDs, which a scene opened twice shares with
 			// its copy.
@@ -2401,6 +2407,9 @@ namespace Loom
 			};
 
 			DrawPrefabNode();
+
+			m_childCounts.swap(m_drawnCounts);
+			m_drawnCounts.clear();
 		};
 
 		ImGui::End();
@@ -2413,8 +2422,7 @@ namespace Loom
 		ImGuiTreeNodeFlags flags =
 			ImGuiTreeNodeFlags_OpenOnArrow |
 			ImGuiTreeNodeFlags_SpanAvailWidth |
-			ImGuiTreeNodeFlags_AllowOverlap |
-			ImGuiTreeNodeFlags_DefaultOpen;
+			ImGuiTreeNodeFlags_AllowOverlap;
 
 		if (m_selected == &root)
 			flags |= ImGuiTreeNodeFlags_Selected;
@@ -2427,8 +2435,8 @@ namespace Loom
 				ImGuiCol_Text,
 				root.IsDisabled() ? ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled) : EditorTheme::AccentText);
 
-		if (m_expand.contains(root.GetGuid()))
-			ImGui::SetNextItemOpen(true);
+		const bool was_open = NodeOpen(root);
+		ImGui::SetNextItemOpen(was_open);
 
 		const ImRect eye = EyeRect();
 
@@ -2439,6 +2447,9 @@ namespace Loom
 			EditorIcons::Scene,
 			scene->NameAndID().c_str(),
 			is_active ? "  [active]" : "");
+
+		if (open != was_open)
+			SetNodeOpen(root, open);
 
 		if (styled)
 			ImGui::PopStyleColor();
@@ -2474,10 +2485,7 @@ namespace Loom
 		if (!open)
 			return;
 
-		const std::vector<GameObject*> children = root.GetChildren();
-
-		for (GameObject* child : children)
-			DrawGameObjectNode(child, root.IsDisabled(), false);
+		DrawChildNodes(root, root.IsDisabled(), false);
 
 		ImGui::TreePop();
 	};
@@ -2489,14 +2497,16 @@ namespace Loom
 			ImGuiTreeNodeFlags_SpanAvailWidth |
 			ImGuiTreeNodeFlags_AllowOverlap;
 
-		if (gameObject->GetChildren().empty())
+		const bool leaf = gameObject->GetChildren().empty();
+
+		if (leaf)
 			flags |= ImGuiTreeNodeFlags_Leaf;
 
 		if (m_selected == gameObject)
 			flags |= ImGuiTreeNodeFlags_Selected;
 
-		if (m_expand.contains(gameObject->GetGuid()))
-			ImGui::SetNextItemOpen(true);
+		const bool was_open = NodeOpen(*gameObject);
+		ImGui::SetNextItemOpen(was_open);
 
 		const bool renaming = m_renaming && m_selected == gameObject;
 		const bool disabled = parent_disabled || gameObject->IsDisabled();
@@ -2519,6 +2529,10 @@ namespace Loom
 			flags,
 			"%s",
 			label.c_str());
+
+		// A leaf draws open whatever it is set to, so it keeps what it was.
+		if (!leaf && open != was_open)
+			SetNodeOpen(*gameObject, open);
 
 		if (disabled || in_prefab)
 			ImGui::PopStyleColor();
@@ -2585,12 +2599,167 @@ namespace Loom
 		if (!open)
 			return;
 
-		const std::vector<GameObject*> children = gameObject->GetChildren();
-
-		for (GameObject* child : children)
-			DrawGameObjectNode(child, disabled, in_prefab);
+		DrawChildNodes(*gameObject, disabled, in_prefab);
 
 		ImGui::TreePop();
+	};
+
+	void Editor::DrawChildNodes(GameObject& parent, bool disabled, bool in_prefab)
+	{
+		const float row = ImGui::GetTextLineHeightWithSpacing();
+		const ImRect& clip = ImGui::GetCurrentWindow()->ClipRect;
+
+		size_t from = 0;
+
+		if (const auto open = m_openUnder.find(&parent); open != m_openUnder.end())
+			for (const auto& [index, child] : open->second)
+			{
+				// What was gathered at the top of the frame may since have been
+				// moved or deleted, so the child is taken from where it now is.
+				if (index >= parent.GetChildren().size())
+					break;
+
+				DrawClosedRows(parent, from, index, disabled, in_prefab);
+				from = index + 1;
+
+				const size_t rows = 1 + m_rowsBelow.at(child);
+				const float top = ImGui::GetCursorScreenPos().y;
+				const bool renaming = m_renaming && IsInHierarchy(*parent.GetChildren()[index], m_selected);
+
+				if (renaming || (top < clip.Max.y && top + rows * row > clip.Min.y))
+					DrawGameObjectNode(parent.GetChildren()[index], disabled, in_prefab);
+				else
+					SkipRows(rows);
+			};
+
+		DrawClosedRows(parent, from, parent.GetChildren().size(), disabled, in_prefab);
+	};
+
+	void Editor::DrawClosedRows(GameObject& parent, size_t from, size_t to, bool disabled, bool in_prefab)
+	{
+		const float row = ImGui::GetTextLineHeightWithSpacing();
+		const ImRect& clip = ImGui::GetCurrentWindow()->ClipRect;
+		const float top = ImGui::GetCursorScreenPos().y;
+		const float count = (float)(to - from);
+
+		const size_t first = from + (size_t)std::clamp(std::floor((clip.Min.y - top) / row), 0.0f, count);
+		const size_t last = from + (size_t)std::clamp(std::ceil((clip.Max.y - top) / row), 0.0f, count);
+
+		// The row being renamed is drawn wherever it is, or its field would let
+		// go of the keyboard.
+		const size_t renamed = m_renaming && m_selected->GetParent() == &parent ? m_selected->GetSiblingIndex() : to;
+
+		size_t at = from;
+
+		const auto draw =
+			[&](size_t index)
+			{
+				SkipRows(index - at);
+				at = index + 1;
+
+				if (index < parent.GetChildren().size())
+					DrawGameObjectNode(parent.GetChildren()[index], disabled, in_prefab);
+			};
+
+		if (renamed >= from && renamed < first)
+			draw(renamed);
+
+		for (size_t index = (std::max)(first, at); index < last; index++)
+			draw(index);
+
+		if (renamed >= (std::max)(last, at) && renamed < to)
+			draw(renamed);
+
+		SkipRows(to - at);
+	};
+
+	void Editor::SkipRows(size_t rows)
+	{
+		if (rows == 0)
+			return;
+
+		// The spacing after the last row is the one Dummy adds itself.
+		ImGui::Dummy(ImVec2(0.0f, rows * ImGui::GetTextLineHeightWithSpacing() - ImGui::GetStyle().ItemSpacing.y));
+	};
+
+	void Editor::GatherOpenNodes()
+	{
+		std::unordered_map<uint64_t, Guid> open{ };
+
+		m_openUnder.clear();
+		m_rowsBelow.clear();
+
+		for (const auto& [id, guid] : m_openNodes)
+		{
+			const GameObject* node = dynamic_cast<const GameObject*>(LoomObject::GetByID(id));
+
+			if (node == nullptr)
+				node = LoomObject::GetByGuid<GameObject>(guid);
+
+			// Kept while it is gone, so the undo that brings it back has it open.
+			if (node == nullptr)
+			{
+				open.emplace(id, guid);
+				continue;
+			};
+
+			if (open.emplace(node->m_ID, guid).second && node->GetParent())
+				m_openUnder[node->GetParent()].emplace_back(node->GetSiblingIndex(), node);
+		};
+
+		m_openNodes = std::move(open);
+
+		const auto rows_below =
+			[this](const auto& self, const GameObject& node) -> size_t
+			{
+				if (const auto found = m_rowsBelow.find(&node); found != m_rowsBelow.end())
+					return found->second;
+
+				size_t rows = node.GetChildren().size();
+
+				if (const auto under = m_openUnder.find(&node); under != m_openUnder.end())
+					for (const auto& [index, child] : under->second)
+						rows += self(self, *child);
+
+				return m_rowsBelow[&node] = rows;
+			};
+
+		for (auto& [parent, children] : m_openUnder)
+		{
+			std::sort(children.begin(), children.end());
+
+			for (const auto& [index, child] : children)
+				rows_below(rows_below, *child);
+		};
+	};
+
+	bool Editor::NodeOpen(const GameObject& node)
+	{
+		const size_t count = node.GetChildren().size();
+
+		if (const auto last = m_childCounts.find(node.m_ID); last != m_childCounts.end() && count > last->second)
+			SetNodeOpen(node, true);
+
+		m_drawnCounts[node.m_ID] = count;
+
+		return node.GetParent() == nullptr
+			? !m_closedRoots.contains(node.m_ID)
+			: m_openNodes.contains(node.m_ID);
+	};
+
+	void Editor::SetNodeOpen(const GameObject& node, bool open)
+	{
+		if (node.GetParent() == nullptr)
+		{
+			if (open)
+				m_closedRoots.erase(node.m_ID);
+			else
+				m_closedRoots.insert(node.m_ID);
+		}
+		else if (open)
+			m_openNodes.emplace(node.m_ID, node.GetGuid());
+		else
+			m_openNodes.erase(node.m_ID);
 	};
 
 	void Editor::DrawEnableToggle(GameObject* gameObject, bool parent_disabled, const ImRect& eye)
@@ -2622,40 +2791,6 @@ namespace Loom
 			eye.GetWidth(),
 			enabled,
 			ImGui::GetColorU32(colour, parent_disabled ? eye_disabled_by_parent_alpha : 1.0f));
-	};
-
-	void Editor::ExpandGrownNodes(const std::vector<Scene*>& scenes)
-	{
-		std::unordered_map<Guid, size_t> counts{ };
-		std::unordered_set<Guid> seen{ };
-
-		m_expand.clear();
-
-		// A node seen for the first time has nothing to compare against, so
-		// opening a scene does not unfold everything in it.
-		const auto visit =
-			[&](const auto& self, const GameObject& node) -> void
-			{
-				const size_t count = node.GetChildren().size();
-				const auto last = m_childCounts.find(node.GetGuid());
-
-				if (last != m_childCounts.end() && count > last->second)
-					for (const GameObject* open = &node; open != nullptr; open = open->GetParent())
-						m_expand.insert(open->GetGuid());
-
-				counts[node.GetGuid()] = count;
-
-				for (const GameObject* child : node.GetChildren())
-					self(self, *child);
-			};
-
-		// A copy of a scene opened twice would be compared against the other
-		// copy every frame, so only the first is followed.
-		for (Scene* scene : scenes)
-			if (seen.insert(scene->GetGuid()).second)
-				visit(visit, scene->GetRoot());
-
-		m_childCounts = std::move(counts);
 	};
 
 	void Editor::DragAndDropNode(GameObject* gameObject, bool open)
@@ -3625,7 +3760,7 @@ namespace Loom
 		const bool ringed = outline && seen_through && m_selected && std::any_of(
 			scenes.begin(),
 			scenes.end(),
-			[this](const Scene* scene) { return IsInHierarchy(scene->GetRoot(), m_selected); });
+			[this](const Scene* scene) { return IsSelectedIn(scene->GetRoot()); });
 
 		// Rendering here is fine mid-frame: ImGui only records the texture id
 		// now and draws with it once the frame is submitted.
