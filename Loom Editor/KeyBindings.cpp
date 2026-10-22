@@ -260,7 +260,7 @@ namespace Loom
 	{
 		if (menu ? ImGui::MenuItem("Add Action") : ImGui::Button("Add Action"))
 		{
-			// Its name matches nothing yet.
+			// Its name may not match the search.
 			m_tree.ClearSearch();
 			edit.actions.push_back({ FreeName(edit.actions), { }, folder });
 			edit.changed = true;

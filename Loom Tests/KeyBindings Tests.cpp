@@ -299,12 +299,21 @@ TEST_SUITE("KeyBindings")
 
 	TEST_CASE("clearing the search leaves the folders open or closed as they were")
 	{
-		Driven driven(std::string(drawn) + search + "type pan\n" + drawn + "key ctrl+a\nkey delete\n" + drawn, filed, { "Camera" });
+		const std::string searched = std::string(drawn) + search + "type up\n" + drawn;
 
-		driven.Run();
+		Driven searching(searched, filed, { "Camera" });
 
-		CHECK_FALSE(driven.script->Failed());
-		CHECK(ActionRows(driven) == 2);
+		searching.Run();
+
+		CHECK_FALSE(searching.script->Failed());
+		CHECK(ActionRows(searching) == 1);
+
+		Driven cleared(searched + "key ctrl+a\nkey delete\n" + drawn, filed, { "Camera" });
+
+		cleared.Run();
+
+		CHECK_FALSE(cleared.script->Failed());
+		CHECK(ActionRows(cleared) == 2);
 	};
 
 	TEST_CASE("a folder closed during one search opens again for the next")

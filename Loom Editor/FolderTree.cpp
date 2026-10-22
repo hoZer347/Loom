@@ -143,7 +143,7 @@ namespace Loom
 
 	void FolderTree::Rename(const std::string& folder)
 	{
-		// A new folder's name matches nothing yet.
+		// The folder may not match the search under either name.
 		m_search.Clear();
 		m_renaming = folder;
 		snprintf(m_name, sizeof(m_name), "%s", VirtualFolders::NameOf(folder).c_str());
