@@ -448,7 +448,7 @@ TEST_SUITE("SpriteEditor")
 
 		Driven driven("loom sprite layers.tga", &sprite);
 
-		driven.Run("click \"Sprites\" \"+ Layer\"\nwait 2\ndrag \"Sprites\" \"Layer 2\" to \"Sprites\" \"Layer 1\"\nwait 2\n");
+		driven.Run("click \"Sprites\" \"+ Layer\"\nwait 2\ndrag \"Sprites\" \"##grip Layer 2\" to \"Sprites\" \"Layer 1\"\nwait 2\n");
 
 		SpriteAsset saved = driven.SavedSprite();
 
@@ -799,7 +799,7 @@ TEST_SUITE("SpriteEditor")
 		CHECK_FALSE(driven.SavedSprite().layers[0].outlined);
 	};
 
-	TEST_CASE("a layer dragged by its name past others takes their place, is the one painted, and Ctrl+Z puts it back in one step")
+	TEST_CASE("a layer dragged by its grip past others takes their place, is the one painted, and Ctrl+Z puts it back in one step")
 	{
 		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
 		sprite.AddLayer(1, "Layer 2");
@@ -807,7 +807,7 @@ TEST_SUITE("SpriteEditor")
 
 		Driven driven("loom sprite drag layer.tga", &sprite);
 
-		driven.Run("drag \"Sprites\" \"Layer 1\" to \"Sprites\" \"Layer 3\"\nwait 2\n");
+		driven.Run("drag \"Sprites\" \"##grip Layer 1\" to \"Sprites\" \"Layer 3\"\nwait 2\n");
 		driven.Stroke(middle, middle);
 
 		SpriteAsset saved = driven.SavedSprite();
@@ -825,6 +825,23 @@ TEST_SUITE("SpriteEditor")
 
 		CHECK(saved.layers[0].name == "Layer 1");
 		CHECK(saved.layers[2].name == "Layer 3");
+	};
+
+	TEST_CASE("a layer dragged by its name stays where it is")
+	{
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.AddLayer(1, "Layer 2");
+
+		Driven driven("loom sprite drag name.tga", &sprite);
+
+		driven.Run("drag \"Sprites\" \"Layer 1\" to \"Sprites\" \"Layer 2\"\nwait 2\n");
+		driven.Stroke(middle, middle);
+
+		const SpriteAsset saved = driven.SavedSprite();
+
+		REQUIRE(saved.layers.size() == 2);
+		CHECK(saved.layers[0].name == "Layer 1");
+		CHECK(saved.layers[1].name == "Layer 2");
 	};
 
 	TEST_CASE("a layer held over another sprite's tab leaves that tab behind")
@@ -863,7 +880,7 @@ TEST_SUITE("SpriteEditor")
 
 		ImGuiIO& io = ImGui::GetIO();
 
-		driven.Run("move \"Sprites\" \"Layer 1\"\nwait 2\n");
+		driven.Run("move \"Sprites\" \"##grip Layer 1\"\nwait 2\n");
 		io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
 		driven.Frame();
 		driven.Run("move " + std::to_string((int)other_tab.x) + " " + std::to_string((int)other_tab.y) + "\nwait " + std::to_string(held_frames) + "\n");
@@ -887,7 +904,7 @@ TEST_SUITE("SpriteEditor")
 		ImGuiIO& io = ImGui::GetIO();
 
 		// A third layer, between the two, for Ctrl+Z to take out.
-		driven.Run("click \"Sprites\" \"+ Layer\"\nwait 2\nmove \"Sprites\" \"Layer 2\"\nwait 2\n");
+		driven.Run("click \"Sprites\" \"+ Layer\"\nwait 2\nmove \"Sprites\" \"##grip Layer 2\"\nwait 2\n");
 		io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
 		driven.Frame();
 		driven.Run("move \"Sprites\" \"Layer 1\"\nwait 2\n");
@@ -924,7 +941,7 @@ TEST_SUITE("SpriteEditor")
 
 		// The bottom layer comes into sight at the foot of the rows, and the
 		// mouse holds it up by the buttons above them.
-		driven.Run("move \"Sprites\" \"Layer 4\"\nscroll " + std::to_string(scroll_to_bottom) + "\nwait 2\nmove \"Sprites\" \"Layer 1\"\nwait 2\n");
+		driven.Run("move \"Sprites\" \"Layer 4\"\nscroll " + std::to_string(scroll_to_bottom) + "\nwait 2\nmove \"Sprites\" \"##grip Layer 1\"\nwait 2\n");
 		io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
 		driven.Frame();
 		driven.Run("move \"Sprites\" \"+ Layer\"\nwait " + std::to_string(held_frames) + "\n");

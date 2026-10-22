@@ -79,6 +79,13 @@ namespace Loom
 		// bottom row.
 		constexpr float held_scroll_rows = 8.0f;
 
+		// The dots on the square a layer is dragged by, as braille's six, and
+		// their radius as a share of the line.
+		constexpr int grip_columns = 2;
+		constexpr int grip_rows = 3;
+		constexpr float grip_dot = 0.1f;
+		constexpr float half = 0.5f;
+
 		// A new palette starts with the sprite's own colours, as many as fit.
 		constexpr size_t seeded_colours = 64;
 
@@ -670,6 +677,58 @@ namespace Loom
 			ImGui::TableSetColumnIndex(0);
 			ImGui::PushID(layer);
 
+			// The grip, for dragging the layer up or down past the others,
+			// labelled by the layer for a UiScript to aim at.
+			const float box = ImGui::GetFrameHeight();
+
+			ImGui::InvisibleButton(("##grip " + row.name).c_str(), ImVec2(box, box));
+
+			if (ImGui::IsItemActivated())
+			{
+				document.layer = layer;
+				document.grabbed = layer;
+				document.grabMoved = false;
+			};
+
+			{
+				const ImVec2 min = ImGui::GetItemRectMin();
+				const ImVec2 max = ImGui::GetItemRectMax();
+				const ImVec2 centre((min.x + max.x) * half, (min.y + max.y) * half);
+				const float spacing = box / (grip_rows + 1);
+				const bool lit = document.grabbed == layer || ImGui::IsItemHovered();
+				const ImU32 colour = ImGui::GetColorU32(lit ? ImGuiCol_Text : ImGuiCol_TextDisabled);
+				ImDrawList* draw = ImGui::GetWindowDrawList();
+
+				draw->AddRectFilled(min, max, ImGui::GetColorU32(lit ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg), ImGui::GetStyle().FrameRounding);
+
+				for (int column = 0; column < grip_columns; column++)
+					for (int line = 0; line < grip_rows; line++)
+						draw->AddCircleFilled(
+							ImVec2(centre.x + (column - (grip_columns - 1) * half) * spacing, centre.y + (line - (grip_rows - 1) * half) * spacing),
+							font * grip_dot,
+							colour);
+			};
+
+			if (ImGui::IsItemHovered() && document.grabbed < 0)
+				ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+
+			ImGui::SetItemTooltip("Drag up or down to move the layer");
+
+			if (ImGui::IsItemVisible())
+			{
+				const float top = ImGui::GetItemRectMin().y;
+				const float bottom = ImGui::GetItemRectMax().y;
+
+				if (const float mouse_y = ImGui::GetIO().MousePos.y; mouse_y >= top && mouse_y < bottom)
+					under = layer;
+
+				if (!top_shown)
+					top_shown = ShownRow{ layer, top };
+
+				bottom_shown = ShownRow{ layer, bottom };
+			};
+
+			ImGui::SameLine();
 			bool visible = row.visible;
 
 			if (ImGui::Checkbox("##visible", &visible))
@@ -683,8 +742,6 @@ namespace Loom
 			ImGui::SameLine();
 
 			// A square drawn as the outline is, bright while it is on.
-			const float box = ImGui::GetFrameHeight();
-
 			if (ImGui::InvisibleButton("##outlined", ImVec2(box, box)))
 			{
 				Remember(document);
@@ -714,28 +771,7 @@ namespace Loom
 			if (ImGui::Selectable(row.name.c_str(), layer == document.layer))
 				document.layer = layer;
 
-			if (ImGui::IsItemActivated())
-			{
-				document.layer = layer;
-				document.grabbed = layer;
-				document.grabMoved = false;
-			};
-
-			ImGui::SetItemTooltip("Drag up or down to move it. Right-click to rename");
-
-			if (ImGui::IsItemVisible())
-			{
-				const float top = ImGui::GetItemRectMin().y;
-				const float bottom = ImGui::GetItemRectMax().y;
-
-				if (const float mouse_y = ImGui::GetIO().MousePos.y; mouse_y >= top && mouse_y < bottom)
-					under = layer;
-
-				if (!top_shown)
-					top_shown = ShownRow{ layer, top };
-
-				bottom_shown = ShownRow{ layer, bottom };
-			};
+			ImGui::SetItemTooltip("Right-click to rename");
 
 			if (ImGui::BeginPopupContextItem("##rename"))
 			{
@@ -1290,8 +1326,6 @@ namespace Loom
 	void SpriteEditor::Fit(Document& document, const ImVec2& size)
 	{
 		const SpriteAsset& sprite = document.sprite;
-
-		constexpr float half = 0.5f;
 
 		float zoom = (std::min)(size.x / sprite.width, size.y / sprite.height) * fit_share;
 
