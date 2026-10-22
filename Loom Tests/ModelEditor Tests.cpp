@@ -13,10 +13,13 @@
 
 #include "imgui.h"
 
+#include "glm/gtc/matrix_transform.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -38,9 +41,24 @@ namespace
 		return text.str();
 	};
 
-	// A prefab drawn with a mesh of the shape given, on its top object or on
-	// a child of it.
-	std::string WritePrefab(const std::string& name, const EditableMesh& shape, bool child = false)
+	void Draw(Loom::GameObject& object, const EditableMesh& shape)
+	{
+		object.Attach<Loom::Material>()->SetShaderPath("Assets/Shader.shader");
+
+		std::vector<float> positions{ };
+		std::vector<float> uvs{ };
+		std::vector<float> normals{ };
+		shape.ToTriangles(positions, uvs, normals);
+
+		Loom::Mesh* mesh = object.Attach<Loom::Mesh>(Loom::Mesh::Triangles);
+		mesh->m_vertices = positions;
+		mesh->m_textureCoordinates = uvs;
+		mesh->m_normals = normals;
+	};
+
+	// A prefab drawn with a mesh of the shape given on its top object, and
+	// any child's shape on a child of it.
+	std::string WritePrefab(const std::string& name, const EditableMesh* shape, const EditableMesh* child = nullptr)
 	{
 		const std::string path = (std::filesystem::temp_directory_path() / (name + ".loomprefab")).string();
 
@@ -48,18 +66,13 @@ namespace
 		LoomTests::Pump();
 
 		Loom::GameObject* top = source.AddChild("Crate");
-		Loom::GameObject* crate = child ? top->AddChild("Lid") : top;
-		crate->Attach<Loom::Material>()->SetShaderPath("Assets/Shader.shader");
 
-		std::vector<float> positions{ };
-		std::vector<float> uvs{ };
-		std::vector<float> normals{ };
-		shape.ToTriangles(positions, uvs, normals);
+		if (shape)
+			Draw(*top, *shape);
 
-		Loom::Mesh* mesh = crate->Attach<Loom::Mesh>(Loom::Mesh::Triangles);
-		mesh->m_vertices = positions;
-		mesh->m_textureCoordinates = uvs;
-		mesh->m_normals = normals;
+		if (child)
+			Draw(*top->AddChild("Lid"), *child);
+
 		LoomTests::Pump();
 
 		std::ofstream(path, std::ios::binary) << Loom::SceneSerializer::Serialize(*top);
@@ -77,8 +90,8 @@ namespace
 		// Enough for the panel to dock its tab, take focus and size its view.
 		static constexpr int opening_frames = 4;
 
-		explicit Driven(const std::string& name) :
-			path(WritePrefab(name, EditableMesh::Cube(1.0f)))
+		explicit Driven(const std::string& name, const EditableMesh* child = nullptr) :
+			path(WritePrefab(name, &cube, child))
 		{
 			constexpr float frame_time = 1.0f / 60.0f;
 
@@ -161,6 +174,8 @@ namespace
 			return *mesh;
 		};
 
+		const EditableMesh cube = EditableMesh::Cube(1.0f);
+
 		ImGuiContext* context = nullptr;
 		LoomTests::RecordingRenderer renderer;
 		std::string path;
@@ -181,7 +196,8 @@ TEST_CASE("The Model panel finds a mesh on a child of the prefab's top object")
 {
 	LoomTests::EngineFixture engine;
 
-	const std::string path = WritePrefab("model_child", EditableMesh::Cube(1.0f), true);
+	const EditableMesh cube = EditableMesh::Cube(1.0f);
+	const std::string path = WritePrefab("model_child", nullptr, &cube);
 
 	ModelEditor editor;
 	editor.Open(path);
@@ -192,6 +208,22 @@ TEST_CASE("The Model panel finds a mesh on a child of the prefab's top object")
 
 	std::error_code code;
 	std::filesystem::remove(path, code);
+};
+
+TEST_CASE("The Model panel goes on to edit the part whose face is clicked")
+{
+	// A lid floating a cube's height above it.
+	EditableMesh lid = EditableMesh::Plane(1.0f);
+	lid.Transform({ 0, 1, 2, 3 }, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
+
+	Driven driven("model_parts", &lid);
+	REQUIRE(driven.Mesh().faces.size() == 6);
+
+	driven.editor.SetPick(ModelEditor::Pick::Faces);
+	driven.Click(driven.Screen(glm::vec3(0.1f, 1.0f, 0.1f)));
+
+	CHECK(driven.Mesh().faces.size() == 1);
+	CHECK(driven.editor.Selected()->faces == std::set<uint32_t>{ 0 });
 };
 
 TEST_CASE("The Model panel picks the face clicked, and nothing when the click misses")
@@ -366,13 +398,14 @@ TEST_CASE("The Model panel reads a prefab changed elsewhere again, unless it has
 {
 	Driven driven("model_reload");
 
-	std::ofstream(driven.path, std::ios::binary) << ReadFile(WritePrefab("model_reload_plane", EditableMesh::Plane(1.0f)));
+	const EditableMesh plane = EditableMesh::Plane(1.0f);
+	std::ofstream(driven.path, std::ios::binary) << ReadFile(WritePrefab("model_reload_plane", &plane));
 	driven.Frame();
 
 	CHECK(driven.Mesh().faces.size() == 1);
 
 	driven.editor.Add(ModelEditor::Shape::Cube);
-	std::ofstream(driven.path, std::ios::binary) << ReadFile(WritePrefab("model_reload_cube", EditableMesh::Cube(1.0f)));
+	std::ofstream(driven.path, std::ios::binary) << ReadFile(WritePrefab("model_reload_cube", &driven.cube));
 	driven.Frame();
 
 	CHECK(driven.Mesh().faces.size() == 7);

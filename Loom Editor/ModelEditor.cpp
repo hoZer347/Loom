@@ -935,6 +935,8 @@ void main()
 				document.hoveredHandle->tool == Tool::Rotate ? "Drag round to turn what is picked." :
 				document.hoveredHandle->axis ? "Drag out along the arrow to make what is picked bigger, in to make it smaller." :
 				"Drag right or up to make what is picked bigger, left or down to make it smaller.";
+		else if (document.hoveredFace && document.hoveredPart != document.part)
+			hint = "Click to edit this part, picking this face.";
 		else if (document.hoveredVertex || document.hoveredEdge || document.hoveredFace)
 			hint = "Click to pick this. Shift + click adds it to, or takes it from, what is picked.";
 
@@ -1167,14 +1169,22 @@ void main()
 
 	void ModelEditor::Frame(Document& document)
 	{
-		const EditableMesh* mesh = document.parts.empty() ? nullptr : &document.parts[document.part].editing;
-		const glm::mat4 world = document.parts.empty() ? glm::mat4(1.0f) : document.parts[document.part].object->WorldMatrix();
+		// What is picked, or with nothing picked every part.
+		const std::set<uint32_t> picked = document.parts.empty() ? std::set<uint32_t>{ } : Moving(document);
+		std::vector<glm::vec3> framed{ };
 
-		std::set<uint32_t> framed = mesh ? Moving(document) : std::set<uint32_t>{ };
+		for (size_t i = 0; i < document.parts.size(); i++)
+		{
+			const Part& part = document.parts[i];
+			const glm::mat4 world = part.object->WorldMatrix();
 
-		if (mesh && framed.empty())
-			for (uint32_t vertex = 0; vertex < mesh->vertices.size(); vertex++)
-				framed.insert(vertex);
+			if (picked.empty())
+				for (const glm::vec3& vertex : part.editing.vertices)
+					framed.push_back(glm::vec3(world * glm::vec4(vertex, 1.0f)));
+			else if (i == document.part)
+				for (const uint32_t vertex : picked)
+					framed.push_back(glm::vec3(world * glm::vec4(part.editing.vertices[vertex], 1.0f)));
+		};
 
 		if (framed.empty())
 		{
@@ -1183,12 +1193,11 @@ void main()
 			return;
 		};
 
-		glm::vec3 low(world * glm::vec4(mesh->vertices[*framed.begin()], 1.0f));
+		glm::vec3 low = framed.front();
 		glm::vec3 high = low;
 
-		for (const uint32_t vertex : framed)
+		for (const glm::vec3& point : framed)
 		{
-			const glm::vec3 point(world * glm::vec4(mesh->vertices[vertex], 1.0f));
 			low = glm::min(low, point);
 			high = glm::max(high, point);
 		};
@@ -1355,11 +1364,23 @@ void main()
 			glm::vec3 direction;
 			Ray(view, mouse, origin, direction);
 
-			const glm::vec3 local_origin(view.local * glm::vec4(origin, 1.0f));
-			const glm::vec3 local_direction(view.local * glm::vec4(direction, 0.0f));
+			// Every part, nearest first, so a click on another goes on to edit
+			// it. Each is hit in its own space along the same ray, so how far
+			// along it compares across them.
+			std::optional<EditableMesh::Hit> nearest{ };
 
-			if (const std::optional<EditableMesh::Hit> hit = mesh.Raycast(local_origin, local_direction))
-				document.hoveredFace = hit->face;
+			for (size_t i = 0; i < document.parts.size(); i++)
+			{
+				const glm::mat4 local = glm::inverse(document.parts[i].object->WorldMatrix());
+				const std::optional<EditableMesh::Hit> hit = document.parts[i].editing.Raycast(glm::vec3(local * glm::vec4(origin, 1.0f)), glm::vec3(local * glm::vec4(direction, 0.0f)));
+
+				if (hit && (!nearest || hit->distance < nearest->distance))
+				{
+					nearest = hit;
+					document.hoveredFace = hit->face;
+					document.hoveredPart = i;
+				};
+			};
 
 			return;
 		};
@@ -1429,7 +1450,15 @@ void main()
 		else if (document.hoveredEdge)
 			toggle(selection.edges, *document.hoveredEdge);
 		else if (document.hoveredFace)
+		{
+			if (document.hoveredPart != document.part)
+			{
+				document.part = document.hoveredPart;
+				selection = { };
+			};
+
 			toggle(selection.faces, *document.hoveredFace);
+		}
 		else if (!adding)
 			selection = { };
 	};
@@ -1636,16 +1665,20 @@ void main()
 		for (const glm::vec3& vertex : mesh.vertices)
 			points.push_back(glm::vec3(view.world * glm::vec4(vertex, 1.0f)));
 
-		const auto fill = [&](const std::set<uint32_t>& faces)
+		// Of any part, so the face under the mouse lights up on a part not
+		// being edited too.
+		const auto fill = [&](const Part& part, const std::set<uint32_t>& faces)
 		{
+			const glm::mat4 world = part.object->WorldMatrix();
 			std::vector<glm::vec3> triangles{ };
 
 			for (const uint32_t face : faces)
 			{
-				const std::vector<EditableMesh::Corner>& corners = mesh.faces[face].corners;
+				const std::vector<EditableMesh::Corner>& corners = part.editing.faces[face].corners;
 
 				for (size_t i = 2; i < corners.size(); i++)
-					triangles.insert(triangles.end(), { points[corners[0].vertex], points[corners[i - 1].vertex], points[corners[i].vertex] });
+					for (const size_t corner : { (size_t)0, i - 1, i })
+						triangles.push_back(glm::vec3(world * glm::vec4(part.editing.vertices[corners[corner].vertex], 1.0f)));
 			};
 
 			return triangles;
@@ -1737,10 +1770,10 @@ void main()
 		const std::set<uint32_t> moving = Moving(document);
 		const std::set<EditableMesh::Edge> picked_edges = document.pick == Pick::Edges ? document.selection.edges : mesh.EdgesWithin(moving);
 
-		draw(fill(PickedFaces(document)), picked_fill);
+		draw(fill(document.parts[document.part], PickedFaces(document)), picked_fill);
 
 		if (document.hoveredFace)
-			draw(fill({ *document.hoveredFace }), hovered_fill);
+			draw(fill(document.parts[document.hoveredPart], { *document.hoveredFace }), hovered_fill);
 
 		draw(strips(mesh.Edges(), wire_half_width), wire_colour);
 		draw(strips({ picked_edges.begin(), picked_edges.end() }, picked_wire_half_width), picked_colour);

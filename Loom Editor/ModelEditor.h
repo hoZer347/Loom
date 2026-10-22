@@ -217,6 +217,9 @@ namespace Loom
 			std::optional<EditableMesh::Edge> hoveredEdge;
 			std::optional<uint32_t> hoveredFace;
 
+			// The part hoveredFace is a face of, which may not be the one edited.
+			size_t hoveredPart = 0;
+
 			// What the last action did, shown for a while from when it did it.
 			std::string message;
 			double messageTime = 0.0;
