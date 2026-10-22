@@ -53,6 +53,7 @@ namespace Loom
 		// This is what identifies a component in the editor's inspector.
 		const char* GetTypeName() const { return m_type_name; };
 		GameObject const* GetGameObject() const { return m_gameObject; };
+		GameObject* GetGameObject() { return m_gameObject; };
 
 		// Whether it overrides any of the collision or trigger callbacks.
 		bool HearsContacts() const { return m_hearsContacts; };

@@ -77,7 +77,7 @@ namespace Loom
 			return;
 		};
 
-		material->Apply(material->shader->id, &*variables);
+		material->Apply(material->shader->id, &*std::as_const(variables));
 
 		if (Camera::current)
 			Camera::current->Apply(material->shader->id);
@@ -255,6 +255,6 @@ namespace Loom
 			return;
 
 		ImGui::SeparatorText("Instance Variables");
-		DrawShaderVariables(declared, UniformScope::Instance, variables);
+		DrawShaderVariables(declared, UniformScope::Instance, *variables);
 	};
 };

@@ -479,9 +479,9 @@ namespace Loom
 		void RecordHistory();
 		bool CanStepHistory() const;
 
-		// The open scenes' text and then the Prefab panel's, as RecordHistory
-		// compares them.
-		std::vector<std::string> OpenSceneTexts() const;
+		// Undo or Redo, keeping the selection on its object when the step
+		// takes it out and makes it again.
+		void StepHistory(bool (SceneHistory::* step)(const std::vector<Scene*>&));
 
 		// Whether input in the window can change a scene, so the scenes are
 		// compared for the history after it, which takes long enough on a large
@@ -489,15 +489,6 @@ namespace Loom
 		// FilePanels only edit, file and open files: what is dragged out of
 		// them lands in another window.
 		bool CanEditScenes(const ImGuiWindow* window) const;
-
-		// Copies of one scene, opened twice and so sharing its guid, are one
-		// scene edited in several places: whichever has changed since the last
-		// call is written over the others.
-		void SyncSceneCopies();
-
-		// Swaps an owned scene for one built from text, in the same place: its
-		// file, whether it is active, and its slot among the owned scenes.
-		Scene* ReplaceScene(Scene* scene, const std::string& text);
 
 		// One open scene as the text it serializes to, so it can be put back
 		// after the code behind it is replaced or after a run is thrown away.
@@ -690,12 +681,18 @@ namespace Loom
 
 		// Run with the history: carries an edit made in the Prefab panel or to
 		// an instance to the file and every instance, and brings instances
-		// that do not know their prefab yet into line with it.
-		void SyncPrefabs();
+		// that do not know their prefab yet into line with it. Only the
+		// prefabs of instances changed, of files written and of the panel
+		// edited are looked at.
+		void SyncPrefabs(const std::unordered_set<GameObject*>& changed);
 
 		// Whether SyncPrefabs has work with no scene changed: a prefab file
-		// written from outside, or a Prefab panel still to agree with its file.
+		// written from outside, or a Prefab panel edited or still to agree
+		// with its file.
 		bool PrefabsNeedSync() const;
+
+		// The prefabs read so far whose files were written since.
+		std::vector<std::string> ChangedPrefabFiles() const;
 
 		// The Prefab panel's copy made the file's again, in place: the same
 		// guids, so the selection and the panel's focus stay where they are.
@@ -739,29 +736,26 @@ namespace Loom
 		std::string m_prefabBeforeBuild{ };
 
 		// Each prefab file read so far, by its path from the project folder,
-		// with when it was written as it was read, and the instances that
-		// agreed with that read on the last pass, which a pass with them as
-		// they were skips.
+		// with when it was written as it was read.
 		struct LoadedPrefab
 		{
 			Prefabs::ObjectNode tree;
 			std::filesystem::file_time_type written;
-			std::vector<Guid> settled{ };
 		};
 
 		std::map<std::string, LoadedPrefab> m_prefabs{ };
 
 		// Each instance as the last pass read it, by its GameObject's guid:
 		// parsing a model's vertices again on every edit is most of a pass.
-		// A scene open twice shares its entries, SyncSceneCopies having made
-		// the copies read the same.
-		struct ReadInstance
-		{
-			std::string text;
-			Prefabs::ObjectNode tree;
-		};
+		// Read again once it changes.
+		std::unordered_map<Guid, Prefabs::ObjectNode> m_readInstances{ };
 
-		std::unordered_map<Guid, ReadInstance> m_readInstances{ };
+		// The outermost instances of each prefab seen, by its path, as their
+		// scene and guid, checked against the scenes as they are when used.
+		std::map<std::string, std::set<std::pair<Scene*, Guid>>> m_instances{ };
+
+		// The Prefab panel's copy as the last pass left it.
+		std::string m_panelText{ };
 
 		// The instances known to agree with their prefab, by the guid of the
 		// Prefab component linking them and the path it names. One not in here
@@ -882,12 +876,6 @@ namespace Loom
 		std::vector<SceneSnapshot> m_playSnapshots{ };
 
 		SceneHistory m_history{ };
-
-		// Each scene open more than once, as its copies last agreed it was.
-		std::unordered_map<Guid, std::string> m_copyTexts{ };
-
-		// OpenSceneTexts as the last RecordHistory to sync left them.
-		std::vector<std::string> m_recordedTexts{ };
 
 		// Set when a click lands or a widget is let go of in a window that
 		// CanEditScenes, or a scene arrives; the scenes are compared on the first

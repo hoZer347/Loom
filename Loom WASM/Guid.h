@@ -37,6 +37,7 @@ namespace Loom
 
 		bool operator==(const Guid& rhs) const { return high == rhs.high && low == rhs.low; };
 		bool operator!=(const Guid& rhs) const { return !(*this == rhs); };
+		bool operator<(const Guid& rhs) const { return high != rhs.high ? high < rhs.high : low < rhs.low; };
 
 		uint64_t high = 0;
 		uint64_t low = 0;

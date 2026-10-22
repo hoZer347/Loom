@@ -25,28 +25,17 @@ namespace Loom
 		// Named after a GameObject whose name is no file name.
 		constexpr const char* unnamed_prefab = "Prefab";
 
-		struct Found
+		// The instance gameObject is part of, but none inside another, which
+		// is that one's content. Null when it is in none.
+		GameObject* OutermostInstance(GameObject& gameObject)
 		{
-			Scene* scene;
-			GameObject* root;
-			std::pair<std::string, std::string> link;
-			std::string text;
-			const Prefabs::ObjectNode* tree = nullptr;
-			bool reread = false;
-		};
+			GameObject* outermost = nullptr;
 
-		// Every instance under gameObject, but none inside another, which is
-		// that one's content.
-		void FindInstances(Scene& scene, GameObject& gameObject, std::vector<Found>& instances)
-		{
-			if (Prefab* link = Prefabs::LinkOf(gameObject))
-			{
-				instances.push_back(Found{ &scene, &gameObject, { link->GetGuid().ToString(), *link->path }, SceneSerializer::Serialize(gameObject) });
-				return;
-			};
+			for (GameObject* at = &gameObject; at; at = at->GetParent())
+				if (Prefabs::LinkOf(*at))
+					outermost = at;
 
-			for (GameObject* child : gameObject.GetChildren())
-				FindInstances(scene, *child, instances);
+			return outermost;
 		};
 	};
 
@@ -269,8 +258,17 @@ namespace Loom
 
 	bool Editor::PrefabsNeedSync() const
 	{
-		if (m_reshowPrefab || (GetPrefabRoot() && m_prefabShape.empty()))
+		if (m_reshowPrefab || !ChangedPrefabFiles().empty())
 			return true;
+
+		GameObject* root = GetPrefabRoot();
+
+		return root && (m_prefabShape.empty() || SceneSerializer::Serialize(*root) != m_panelText);
+	};
+
+	std::vector<std::string> Editor::ChangedPrefabFiles() const
+	{
+		std::vector<std::string> changed{ };
 
 		for (const auto& [path, loaded] : m_prefabs)
 		{
@@ -279,45 +277,35 @@ namespace Loom
 
 			// A prefab deleted or renamed away leaves SyncPrefabs nothing to load.
 			if (!code && written != loaded.written)
-				return true;
+				changed.push_back(path);
 		};
 
-		return false;
+		return changed;
 	};
 
-	void Editor::SyncPrefabs()
+	void Editor::SyncPrefabs(const std::unordered_set<GameObject*>& changed)
 	{
 		if (m_projectPath.empty())
 			return;
 
-		std::vector<Found> found{ };
+		const std::vector<std::string> written = ChangedPrefabFiles();
+		std::set<std::string> paths(written.begin(), written.end());
+		std::unordered_set<GameObject*> edited{ };
 
-		for (Scene* scene : m_ownedScenes)
-			FindInstances(*scene, scene->GetRoot(), found);
-
-		std::unordered_set<Guid> seen{ };
-
-		for (Found& instance : found)
+		for (GameObject* gameObject : changed)
 		{
-			ReadInstance& read = m_readInstances[instance.root->GetGuid()];
-			instance.reread = read.text != instance.text;
+			GameObject* instance = OutermostInstance(*gameObject);
+			Scene* scene = instance ? m_history.SceneOf(*instance) : nullptr;
 
-			// Left with no text when it fails, so the next pass tries again.
-			if (instance.reread)
-			{
-				read.tree = { };
-				read.text = Prefabs::Parse(instance.text, read.tree) ? std::move(instance.text) : std::string();
-			};
+			if (scene == nullptr)
+				continue;
 
-			if (!read.text.empty())
-			{
-				instance.tree = &read.tree;
-				seen.insert(instance.root->GetGuid());
-			};
+			const std::string& path = *Prefabs::LinkOf(*instance)->path;
+
+			edited.insert(instance);
+			m_instances[path].insert({ scene, instance->GetGuid() });
+			paths.insert(path);
 		};
-
-		std::erase_if(found, [](const Found& instance) { return instance.tree == nullptr; });
-		std::erase_if(m_readInstances, [&](const auto& read) { return !seen.contains(read.first); });
 
 		if (GetPrefabRoot())
 		{
@@ -328,29 +316,17 @@ namespace Loom
 		};
 
 		GameObject* root = GetPrefabRoot();
-		const GameObject* any = root ? root : found.empty() ? nullptr : found.front().root;
-
-		if (any == nullptr)
-			return;
-
-		const std::vector<std::string> keys = Prefabs::TransformKeys(*any);
-
 		Prefabs::ObjectNode shown;
-		const bool showing = root && Prefabs::Parse(SceneSerializer::Serialize(*root), shown);
+		const std::string panelText = root ? SceneSerializer::Serialize(*root) : std::string();
+		const bool showing = root && Prefabs::Parse(panelText, shown);
 
 		// A copy just shown agrees with its file as it now serializes.
 		if (showing && m_prefabShape.empty())
-			m_prefabShape = Prefabs::Shape(shown, keys, Prefabs::Part::Whole);
+			m_prefabShape = Prefabs::Shape(shown, Prefabs::TransformKeys(*root), Prefabs::Part::Whole);
 
-		std::set<std::string> paths{ };
-
-		for (const Found& instance : found)
-			paths.insert(instance.link.second);
-
-		if (showing)
+		if (showing && panelText != m_panelText)
 			paths.insert(m_prefabPath);
 
-		std::map<Scene*, std::string> texts{ };
 		bool reshow = false;
 
 		for (const std::string& path : paths)
@@ -360,63 +336,76 @@ namespace Loom
 			if (prefab == nullptr)
 				continue;
 
-			LoadedPrefab& loaded = m_prefabs.at(path);
 			const bool panel = showing && path == m_prefabPath;
 
-			std::vector<const Found*> mine{ };
-			std::vector<Guid> roots{ };
-			bool reread = false;
+			std::vector<GameObject*> mine{ };
+			std::vector<Prefabs::Instance> instances{ };
+			std::vector<std::pair<std::string, std::string>> links{ };
+			std::set<std::pair<Scene*, Guid>>& known = m_instances[path];
 
-			for (const Found& instance : found)
-				if (instance.link.second == path)
+			for (auto at = known.begin(); at != known.end();)
+			{
+				const auto [scene, guid] = *at;
+				const bool open = std::find(m_ownedScenes.begin(), m_ownedScenes.end(), scene) != m_ownedScenes.end();
+				GameObject* instance = open ? m_history.Find(*scene, guid) : nullptr;
+				const Prefab* link = instance ? Prefabs::LinkOf(*instance) : nullptr;
+				auto read = m_readInstances.find(guid);
+
+				if (link == nullptr || *link->path != path || OutermostInstance(*instance) != instance)
 				{
-					mine.push_back(&instance);
-					roots.push_back(instance.root->GetGuid());
-					reread = reread || instance.reread;
+					at = known.erase(at);
+					continue;
 				};
 
-			if (!panel && !reread && roots == loaded.settled)
+				at++;
+
+				// Left unread when it fails, so the next pass tries again.
+				if (read == m_readInstances.end() || edited.contains(instance))
+				{
+					Prefabs::ObjectNode tree;
+
+					if (!Prefabs::Parse(SceneSerializer::Serialize(*instance), tree))
+					{
+						m_readInstances.erase(guid);
+						continue;
+					};
+
+					read = m_readInstances.insert_or_assign(guid, std::move(tree)).first;
+				};
+
+				mine.push_back(instance);
+				links.push_back({ link->GetGuid().ToString(), path });
+				instances.push_back({ read->second, m_linkedInstances.contains(links.back()) });
+			};
+
+			const GameObject* any = panel ? root : mine.empty() ? nullptr : mine.front();
+
+			if (any == nullptr)
 				continue;
 
-			std::vector<Prefabs::Instance> instances{ };
-
-			for (const Found* instance : mine)
-				instances.push_back({ *instance->tree, m_linkedInstances.contains(instance->link) });
-
-			const Prefabs::Outcome outcome = Prefabs::Sync(*prefab, panel ? &shown : nullptr, m_prefabShape, instances, keys);
-			const bool changed = outcome.prefab || outcome.reshow ||
-				std::ranges::any_of(outcome.instances, [](const auto& instance) { return instance.has_value(); });
-
-			loaded.settled = !panel && !changed ? roots : std::vector<Guid>{ };
+			const Prefabs::Outcome outcome = Prefabs::Sync(*prefab, panel ? &shown : nullptr, m_prefabShape, instances, Prefabs::TransformKeys(*any));
 
 			if (outcome.prefab && WritePrefab(path, *outcome.prefab) && panel && !outcome.reshow)
-				m_prefabShape = Prefabs::Shape(shown, keys, Prefabs::Part::Whole);
+				m_prefabShape = Prefabs::Shape(shown, Prefabs::TransformKeys(*root), Prefabs::Part::Whole);
 
 			reshow = reshow || outcome.reshow;
 
 			for (size_t i = 0; i < mine.size(); i++)
 			{
-				m_linkedInstances.insert(mine[i]->link);
+				m_linkedInstances.insert(links[i]);
 
 				if (!outcome.instances[i])
 					continue;
 
-				const auto [text, first] = texts.try_emplace(mine[i]->scene);
-
-				if (first)
-					text->second = SceneSerializer::Serialize(*mine[i]->scene);
-
-				text->second = Prefabs::Splice(
-					text->second,
-					mine[i]->root->GetGuid().ToString(),
-					Prefabs::Write(*outcome.instances[i]));
+				m_readInstances.erase(mine[i]->GetGuid());
+				m_history.Rewrite(*mine[i], Prefabs::Write(*outcome.instances[i]));
 			};
 		};
 
-		for (const auto& [scene, text] : texts)
-			ReplaceScene(scene, text);
-
 		if (reshow)
 			ReshowPrefab();
+
+		root = GetPrefabRoot();
+		m_panelText = root ? SceneSerializer::Serialize(*root) : std::string();
 	};
 };

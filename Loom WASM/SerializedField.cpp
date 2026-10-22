@@ -277,6 +277,8 @@ namespace Loom
 	{
 		if (version != nullptr)
 			(*version)++;
+
+		SerialChanged(owner, type == FieldType::Reference);
 	};
 
 	bool SerializedField::Read(const std::string& text) const

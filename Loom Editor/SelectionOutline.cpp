@@ -14,6 +14,7 @@
 #include <iterator>
 #include <stdexcept>
 #include <typeinfo>
+#include <utility>
 
 
 namespace Loom
@@ -246,7 +247,7 @@ void main()
 
 				const uint32_t program = MeshMask(*mesh->material->shader);
 
-				mesh->material->Apply(program, &*mesh->variables);
+				mesh->material->Apply(program, &*std::as_const(mesh->variables));
 				camera.Apply(program);
 				mesh->Draw(program);
 				drew = true;

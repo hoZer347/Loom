@@ -43,6 +43,14 @@ namespace LoomTests
 		~EngineFixture() { Pump(); };
 	};
 
+	// Keeps LoomObject's journal, which SceneHistory reads, for as long as it
+	// lives.
+	struct Watching
+	{
+		Watching()  { Loom::LoomObject::Watch(true);  };
+		~Watching() { Loom::LoomObject::Watch(false); };
+	};
+
 
 	// A component that records every lifecycle callback the engine makes on it,
 	// so tests can assert on what ran and in what order.

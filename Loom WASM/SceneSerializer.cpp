@@ -5,6 +5,7 @@
 #include "GameObject.h"
 #include "Scene.h"
 
+#include <algorithm>
 #include <cstring>
 #include <filesystem>
 #include <functional>
@@ -77,7 +78,7 @@ namespace Loom
 				};
 		};
 
-		void WriteGameObject(std::string& text, GameObject& gameObject, int depth)
+		void WriteOwn(std::string& text, GameObject& gameObject, int depth)
 		{
 			text +=
 				Indent(depth) + SceneSerializer::gameobject_keyword +
@@ -94,9 +95,38 @@ namespace Loom
 
 				WriteFields(text, *component, depth + 2);
 			};
+		};
+
+		void WriteGameObject(std::string& text, GameObject& gameObject, int depth)
+		{
+			WriteOwn(text, gameObject, depth);
 
 			for (GameObject* child : gameObject.GetChildren())
 				WriteGameObject(text, *child, depth + 1);
+		};
+
+		// A field line read onto object in place: left alone when it already
+		// reads that way, and a reference by guid handed to pending.
+		void ReadOwnField(LoomObject& object, const std::string& content, SceneSerializer::PendingReferences& pending)
+		{
+			const size_t equals = content.find('=');
+			size_t index = 0;
+
+			if (equals == std::string::npos || !Index(Trim(content.substr(0, equals)), index) || index >= object.GetFields().size())
+				return;
+
+			const SerializedField& field = object.GetFields()[index];
+			const std::string value = Trim(content.substr(equals + 1));
+
+			if (field.Write() == value)
+				return;
+
+			Guid guid;
+
+			if (field.type == FieldType::Reference && Guid::TryParse(value, guid))
+				pending.emplace_back(&field, guid);
+			else if (field.Read(value))
+				object.OnFieldChanged(field);
 		};
 
 		// A component has no name of its own, so the type is what identifies it
@@ -375,6 +405,158 @@ namespace Loom
 		WriteGameObject(text, scene.GetRoot(), 1);
 
 		return text;
+	};
+
+	std::string SceneSerializer::SerializeOwn(GameObject& gameObject)
+	{
+		std::string text;
+
+		WriteOwn(text, gameObject, 0);
+
+		return text;
+	};
+
+	std::string SceneSerializer::SerializeHeader(Scene& scene)
+	{
+		std::string text =
+			scene.GetName() + '(' + scene.GetGuid().ToString() + "):\n";
+
+		WriteFields(text, scene, 1);
+
+		return text;
+	};
+
+	bool SceneSerializer::ReadOwn(GameObject& gameObject, const std::string& text, PendingReferences& pending)
+	{
+		// Each component as the text has it, with the fields under it.
+		struct Wanted
+		{
+			std::string type;
+			Guid guid;
+			std::vector<std::string> fields{ };
+		};
+
+		std::string name;
+		Guid guid;
+		std::vector<std::string> fields{ };
+		std::vector<Wanted> components{ };
+		bool started = false;
+		int line_number = 0;
+
+		const bool read = ReadLines(
+			text,
+			line_number,
+			[&](int depth, const std::string& content)
+			{
+				if (!started)
+				{
+					started = true;
+
+					return depth == 0 &&
+						content.rfind(gameobject_keyword, 0) == 0 &&
+						SplitNameAndGuid(content.substr(strlen(gameobject_keyword)), name, guid);
+				};
+
+				if (depth == 1 && content.rfind(component_keyword, 0) == 0)
+				{
+					Wanted& component = components.emplace_back();
+
+					return SplitNameAndGuid(content.substr(strlen(component_keyword)), component.type, component.guid);
+				};
+
+				if (depth == 1)
+					fields.push_back(content);
+				else if (depth == 2 && !components.empty())
+					components.back().fields.push_back(content);
+				else return false;
+
+				return true;
+			});
+
+		if (!read || !started)
+			return false;
+
+		if (gameObject.GetName() != name)
+			gameObject.SetName(name);
+
+		for (const std::string& field : fields)
+			ReadOwnField(gameObject, field, pending);
+
+		std::vector<ComponentBase*> kept{ };
+
+		for (const Wanted& wanted : components)
+		{
+			ComponentBase* component = nullptr;
+
+			for (ComponentBase* had : gameObject.GetComponents())
+				if (had->GetGuid() == wanted.guid && ComponentRegistry::NameOf(*had) == wanted.type)
+					component = had;
+
+			if (component == nullptr)
+			{
+				component = ComponentRegistry::Create(wanted.type, gameObject);
+
+				if (component == nullptr)
+				{
+					std::cerr
+						<< "Scene load: no component type named '" << wanted.type
+						<< "' is registered, skipping it" << std::endl;
+
+					continue;
+				};
+
+				component->SetGuid(wanted.guid);
+			};
+
+			kept.push_back(component);
+
+			for (const std::string& field : wanted.fields)
+				ReadOwnField(*component, field, pending);
+		};
+
+		for (ComponentBase* had : gameObject.GetComponents())
+			if (std::find(kept.begin(), kept.end(), had) == kept.end())
+				gameObject.DetachComponent(had);
+
+		if (kept != gameObject.GetComponents())
+			gameObject.OrderComponents(kept);
+
+		return true;
+	};
+
+	bool SceneSerializer::ReadHeader(Scene& scene, const std::string& text, PendingReferences& pending)
+	{
+		bool started = false;
+		int line_number = 0;
+
+		return ReadLines(
+			text,
+			line_number,
+			[&](int depth, const std::string& content)
+			{
+				if (started)
+				{
+					if (depth != 1)
+						return false;
+
+					ReadOwnField(scene, content, pending);
+
+					return true;
+				};
+
+				started = true;
+
+				std::string name;
+				Guid guid;
+
+				if (depth != 0 || content.back() != ':' || !SplitNameAndGuid(content.substr(0, content.size() - 1), name, guid))
+					return false;
+
+				if (scene.GetName() != name)
+					scene.SetName(name);
+
+				return true;
+			}) && started;
 	};
 
 	std::string SceneSerializer::Serialize(GameObject& gameObject)

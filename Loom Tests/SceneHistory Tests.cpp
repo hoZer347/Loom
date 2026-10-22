@@ -37,8 +37,8 @@ namespace
 		};
 	};
 
-	// Plays the editor's part: owns the open scenes, and swaps one for its
-	// rebuilt self when the history asks.
+	// Plays the editor's part: owns the open scenes, and watches the journal
+	// the history reads.
 	struct Editing : LoomTests::EngineFixture
 	{
 		~Editing()
@@ -59,35 +59,28 @@ namespace
 			return scene;
 		};
 
+		// The same scene opened again from what the first copy saves.
+		Loom::Scene* Copy(size_t index)
+		{
+			Loom::Scene* scene = Loom::SceneSerializer::Deserialize(Text(index));
+			Pump();
+
+			open.push_back(scene);
+
+			return scene;
+		};
+
 		void Close(Loom::Scene* scene)
 		{
 			std::erase(open, scene);
-			history.Forget(scene->GetGuid());
 
 			delete scene;
 			Pump();
 		};
 
-		Loom::SceneHistory::Rebuild Rebuild()
-		{
-			return
-				[this](Loom::Scene* scene, const std::string& text)
-				{
-					Loom::Scene* replacement = Loom::SceneHistory::Replace(scene, text);
-
-					const auto slot = std::find(open.begin(), open.end(), scene);
-
-					if (replacement)
-						*slot = replacement;
-					else open.erase(slot);
-
-					return replacement;
-				};
-		};
-
 		void Record() { history.Record(open); };
-		bool Undo() { return history.Undo(open, Rebuild()); };
-		bool Redo() { return history.Redo(open, Rebuild()); };
+		bool Undo() { return history.Undo(open); };
+		bool Redo() { return history.Redo(open); };
 
 		std::string Text(size_t index)
 		{
@@ -107,6 +100,7 @@ namespace
 			Root(index).GetChildren().front()->SetName(name);
 		};
 
+		LoomTests::Watching watching{ };
 		std::vector<Loom::Scene*> open{ };
 		Loom::SceneHistory history{ };
 	};
@@ -328,18 +322,6 @@ TEST_SUITE("SceneHistory")
 		CHECK(Root(0).GetChildren().front()->GetName() == "Edit " + std::to_string(extra));
 	};
 
-	TEST_CASE_FIXTURE(Editing, "a forgotten scene starts again from where it is")
-	{
-		Open("Forgotten");
-		Record();
-
-		Root(0).AddChild("Unseen");
-		history.Forget(open[0]->GetGuid());
-		Record();
-
-		CHECK_FALSE(history.CanUndo());
-	};
-
 	TEST_CASE_FIXTURE(Editing, "a scene rebuilt under the same guid keeps its history")
 	{
 		Open("Rebuilt");
@@ -441,31 +423,6 @@ TEST_SUITE("SceneHistory")
 		CHECK(std::find(scenes.begin(), scenes.end(), scene) == scenes.end());
 	};
 
-	TEST_CASE_FIXTURE(Editing, "a rebuild that fails uses the step up and lets the scene go")
-	{
-		Open("Failing");
-		Root(0).AddChild("Before");
-		Record();
-
-		Rename(0, "After");
-		Record();
-
-		const Loom::SceneHistory::Rebuild failing =
-			[this](Loom::Scene* scene, const std::string&) -> Loom::Scene*
-			{
-				std::erase(open, scene);
-				delete scene;
-				Pump();
-
-				return nullptr;
-			};
-
-		CHECK_FALSE(history.Undo(open, failing));
-		CHECK_FALSE(history.CanUndo());
-		CHECK_FALSE(history.CanRedo());
-		CHECK(open.empty());
-	};
-
 	TEST_CASE_FIXTURE(Editing, "undo and redo with nothing to step leave the scene alone")
 	{
 		Loom::Scene* scene = Open("Untouched");
@@ -505,5 +462,100 @@ TEST_SUITE("SceneHistory")
 		CHECK(Text(1) == to_after);
 		CHECK(Loom::LoomObject::GetByGuid<Loom::GameObject>(guid)->GetParent() == &Root(1));
 		CHECK_FALSE(history.CanRedo());
+	};
+
+	TEST_CASE_FIXTURE(Editing, "undo puts a step back in place, leaving the rest of the scene as it was")
+	{
+		Open("InPlace");
+		Loom::GameObject* kept = Root(0).AddChild("Kept");
+		Loom::GameObject* edited = Root(0).AddChild("Edited");
+		Pump();
+		Record();
+
+		Loom::Scene* scene = open[0];
+		const std::string before = Text(0);
+
+		edited->SetName("Renamed");
+		Record();
+
+		REQUIRE(Undo());
+		CHECK(open[0] == scene);
+		CHECK(Root(0).GetChildren().front() == kept);
+		CHECK(Root(0).GetChildren().back() == edited);
+		CHECK(Text(0) == before);
+	};
+
+	TEST_CASE_FIXTURE(Editing, "a scene open twice is one scene: an edit to either copy is made to both, and undone in both")
+	{
+		Open("Twice");
+		Root(0).AddChild("Original");
+		Pump();
+		Record();
+
+		Copy(0);
+		Record();
+
+		const std::string before = Text(0);
+		REQUIRE(Text(1) == before);
+
+		Rename(1, "Changed");
+		Record();
+
+		CHECK(Root(0).GetChildren().front()->GetName() == "Changed");
+		CHECK(Text(0) == Text(1));
+
+		REQUIRE(Undo());
+		CHECK(Text(0) == before);
+		CHECK(Text(1) == before);
+	};
+
+	TEST_CASE_FIXTURE(Editing, "a scene opened again after an edit is made the same as the copy already open")
+	{
+		Open("Stale");
+		Root(0).AddChild("Original");
+		Pump();
+		Record();
+
+		const std::string saved = Text(0);
+
+		Rename(0, "Edited");
+		Record();
+
+		Loom::Scene* stale = Loom::SceneSerializer::Deserialize(saved);
+		Pump();
+		open.push_back(stale);
+		Record();
+
+		CHECK(Text(1) == Text(0));
+		CHECK(Root(1).GetChildren().front()->GetName() == "Edited");
+	};
+
+	TEST_CASE_FIXTURE(Editing, "Rewrite makes an object what the text says, in place, as one undoable edit")
+	{
+		Open("Rewritten");
+		Loom::GameObject* holder = Root(0).AddChild("Holder");
+		Pump();
+		Loom::GameObject* inner = holder->AddChild("Inner");
+		Pump();
+
+		const std::string wanted = Loom::SceneSerializer::Serialize(*holder);
+
+		inner->SetName("Renamed");
+		holder->AddChild("Extra");
+		Pump();
+		Record();
+
+		const std::string edited = Text(0);
+
+		history.Rewrite(*holder, wanted);
+		Record();
+
+		CHECK(Loom::SceneSerializer::Serialize(*holder) == wanted);
+		REQUIRE(holder->GetChildren().size() == 1);
+		CHECK(holder->GetChildren().front() == inner);
+
+		REQUIRE(Undo());
+		CHECK(Text(0) == edited);
+		CHECK_FALSE(history.CanUndo());
 	};
 };

@@ -88,5 +88,24 @@ namespace Loom
 		// Each gets a new guid, so the same text can go in any number of times,
 		// and references between them follow them to their new guids.
 		static GameObject* Deserialize(const std::string& text, GameObject& parent, std::string* error = nullptr);
+
+		// One GameObject without its children: its line, its fields and its
+		// components, at the top level, as a scene writes it.
+		static std::string SerializeOwn(GameObject& gameObject);
+
+		// The scene's header and fields, without its root.
+		static std::string SerializeHeader(Scene& scene);
+
+		// Puts what SerializeOwn wrote back onto gameObject in place: its name,
+		// the fields that read differently, and its components, kept by guid
+		// and type, made, or detached and put in order. Every reference the
+		// text names by guid is left in pending, for the caller to resolve as
+		// it sees fit, and is OnFieldChanged's to report once it does; the
+		// other fields read are reported here. False when the text is not one
+		// GameObject.
+		static bool ReadOwn(GameObject& gameObject, const std::string& text, PendingReferences& pending);
+
+		// As ReadOwn, what SerializeHeader wrote back onto scene.
+		static bool ReadHeader(Scene& scene, const std::string& text, PendingReferences& pending);
 	};
 };

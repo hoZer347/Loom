@@ -260,14 +260,7 @@ TEST_SUITE("EditCommands")
 	{
 		std::vector<Loom::Scene*> open{ scene };
 		Loom::SceneHistory history;
-
-		const Loom::SceneHistory::Rebuild rebuild =
-			[&](Loom::Scene* old, const std::string& text)
-			{
-				scene = Loom::SceneHistory::Replace(old, text);
-				open = { scene };
-				return scene;
-			};
+		LoomTests::Watching watching;
 
 		history.Record(open);
 
@@ -284,12 +277,12 @@ TEST_SUITE("EditCommands")
 
 		history.Record(open);
 
-		REQUIRE(history.Undo(open, rebuild));
+		REQUIRE(history.Undo(open));
 
 		REQUIRE(scene->GetRoot().GetChildren().size() == 1);
 		CHECK(scene->GetRoot().GetChildren().front()->GetGuid() == original);
 
-		REQUIRE(history.Redo(open, rebuild));
+		REQUIRE(history.Redo(open));
 		CHECK(scene->GetRoot().GetChildren().size() == 2);
 	};
 
@@ -297,14 +290,7 @@ TEST_SUITE("EditCommands")
 	{
 		std::vector<Loom::Scene*> open{ scene };
 		Loom::SceneHistory history;
-
-		const Loom::SceneHistory::Rebuild rebuild =
-			[&](Loom::Scene* old, const std::string& text)
-			{
-				scene = Loom::SceneHistory::Replace(old, text);
-				open = { scene };
-				return scene;
-			};
+		LoomTests::Watching watching;
 
 		history.Record(open);
 
@@ -321,7 +307,7 @@ TEST_SUITE("EditCommands")
 
 		history.Record(open);
 
-		REQUIRE(history.Undo(open, rebuild));
+		REQUIRE(history.Undo(open));
 
 		Loom::GameObject* restored = Loom::LoomObject::GetByGuid<Loom::GameObject>(original);
 

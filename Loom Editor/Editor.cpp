@@ -951,6 +951,7 @@ namespace Loom
 		ClosePrefab();
 		m_prefabs.clear();
 		m_readInstances.clear();
+		m_instances.clear();
 		m_linkedInstances.clear();
 
 		m_projectPath = resolved;
@@ -1217,8 +1218,6 @@ namespace Loom
 			Select(nullptr);
 
 		m_scenePaths.erase(scene);
-		m_history.Forget(scene->GetGuid());
-		m_recordedTexts.clear();
 
 		// Deleting a scene mid-GUI would leave the rest of the frame walking a
 		// dangling pointer; deferring puts the delete (and the unregistering it
@@ -1385,22 +1384,35 @@ namespace Loom
 
 	void Editor::Undo()
 	{
-		if (CanStepHistory() &&
-			m_history.Undo(m_ownedScenes, [this](Scene* scene, const std::string& text) { return ReplaceScene(scene, text); }))
-		{
-			SyncSceneCopies();
-			m_recordedTexts.clear();
-		};
+		StepHistory(&SceneHistory::Undo);
 	};
 
 	void Editor::Redo()
 	{
-		if (CanStepHistory() &&
-			m_history.Redo(m_ownedScenes, [this](Scene* scene, const std::string& text) { return ReplaceScene(scene, text); }))
-		{
-			SyncSceneCopies();
-			m_recordedTexts.clear();
-		};
+		StepHistory(&SceneHistory::Redo);
+	};
+
+	void Editor::StepHistory(bool (SceneHistory::* step)(const std::vector<Scene*>&))
+	{
+		if (!CanStepHistory())
+			return;
+
+		Scene* scene = m_selected ? m_history.SceneOf(*m_selected) : nullptr;
+		const Guid selected = scene ? m_selected->GetGuid() : Guid();
+
+		if (!(m_history.*step)(m_ownedScenes))
+			return;
+
+		// The prefabs follow a step as they do an edit.
+		m_historyDirty = true;
+
+		if (scene == nullptr)
+			return;
+
+		GameObject* again = m_history.Find(*scene, selected);
+
+		if (again != m_selected)
+			Select(again);
 	};
 
 	bool Editor::CanStepHistory() const
@@ -1417,120 +1429,17 @@ namespace Loom
 		if (m_playing)
 			return;
 
-		// AddChild and Destroy defer; the text has to show where they land.
-		Engine::DoTasks();
+		m_history.Collect(m_ownedScenes);
 
-		if (OpenSceneTexts() == m_recordedTexts && !PrefabsNeedSync())
-			return;
+		const std::unordered_set<GameObject*> changed = m_history.TakeChanged();
 
-		SyncSceneCopies();
-		SyncPrefabs();
+		if (!changed.empty() || PrefabsNeedSync())
+			SyncPrefabs(changed);
+
 		m_history.Record(m_ownedScenes);
 
-		m_recordedTexts = OpenSceneTexts();
-	};
-
-	std::vector<std::string> Editor::OpenSceneTexts() const
-	{
-		std::vector<std::string> texts{ };
-
-		for (Scene* scene : m_ownedScenes)
-			texts.push_back(SceneSerializer::Serialize(*scene));
-
-		if (m_prefabScene)
-			texts.push_back(SceneSerializer::Serialize(*m_prefabScene));
-
-		return texts;
-	};
-
-	void Editor::SyncSceneCopies()
-	{
-		// AddChild and Destroy defer; the text has to show where they land.
-		Engine::DoTasks();
-
-		std::unordered_map<Guid, std::vector<Scene*>> copies{ };
-
-		for (Scene* scene : m_ownedScenes)
-			copies[scene->GetGuid()].push_back(scene);
-
-		std::erase_if(m_copyTexts,
-			[&](const auto& entry)
-			{
-				const auto open = copies.find(entry.first);
-
-				return open == copies.end() || open->second.size() < 2;
-			});
-
-		for (const auto& [guid, scenes] : copies)
-		{
-			if (scenes.size() < 2)
-				continue;
-
-			std::vector<std::string> texts{ };
-
-			for (Scene* scene : scenes)
-				texts.push_back(SceneSerializer::Serialize(*scene));
-
-			// A scene seen open twice for the first time has nothing to have
-			// changed from, so the copy opened first is the scene as it stands.
-			std::string& agreed = m_copyTexts[guid];
-
-			const auto edited = std::find_if(texts.begin(), texts.end(),
-				[&](const std::string& text) { return text != agreed; });
-
-			if (edited == texts.end())
-				continue;
-
-			agreed = *edited;
-
-			for (size_t i = 0; i < scenes.size(); i++)
-				if (texts[i] != agreed)
-					ReplaceScene(scenes[i], agreed);
-		};
-	};
-
-	Scene* Editor::ReplaceScene(Scene* scene, const std::string& text)
-	{
-		const auto slot = std::find(m_ownedScenes.begin(), m_ownedScenes.end(), scene);
-
-		// Looked for again under the replacement alone: another copy of this
-		// scene holds objects with the same guids, and a selection in one of
-		// those stays where it is.
-		const bool selected_here = m_selected && IsInHierarchy(scene->GetRoot(), m_selected);
-		const Guid selected = selected_here ? m_selected->GetGuid() : Guid();
-		const bool active = scene == m_activeScene;
-		const std::string path = m_scenePaths[scene];
-
-		m_scenePaths.erase(scene);
-
-		if (active)
-			m_activeScene = nullptr;
-
-		if (selected_here)
-			Select(nullptr);
-
-		std::string error;
-
-		Scene* replacement = SceneHistory::Replace(scene, text, &error);
-
-		if (replacement == nullptr)
-		{
-			m_ownedScenes.erase(slot);
-
-			std::cerr << "Could not put a scene back: " << error << std::endl;
-			return nullptr;
-		};
-
-		*slot = replacement;
-		m_scenePaths[replacement] = path;
-
-		if (active)
-			m_activeScene = replacement;
-
-		if (selected_here)
-			Select(FindByGuid(replacement->GetRoot(), selected));
-
-		return replacement;
+		// What the sync changed is its own doing, not an edit for it to carry.
+		m_history.TakeChanged();
 	};
 
 	void Editor::HandleShortcuts()
@@ -1638,6 +1547,9 @@ namespace Loom
 		};
 
 		ValidateSelection();
+
+		// A run changes the scenes every frame, and Stop puts them back.
+		LoomObject::Watch(!m_playing);
 
 		if (m_historyDirty && !ImGui::IsAnyItemActive() && !ImGui::IsAnyMouseDown())
 			RecordHistory();
@@ -3224,19 +3136,23 @@ namespace Loom
 		Transform& transform = gameObject->transform;
 
 		const auto row =
-			[column](const char* name, glm::vec3& value, float speed)
+			[column](const char* name, Serial<glm::vec3>& field, float speed)
 			{
 				ImGui::PushID(name);
 				Label(name, column);
-				AxisGui::DragFloatN("##value", glm::value_ptr(value), 3, speed, float_format);
+				glm::vec3 value = field;
+
+				if (AxisGui::DragFloatN("##value", glm::value_ptr(value), 3, speed, float_format))
+					field = value;
+
 				ImGui::PopID();
 			};
 
 		ImGui::PushItemWidth(-FLT_MIN);
 
-		row("Position", *transform.position, drag_speed);
-		row("Rotation", *transform.rotation, rotation_drag_speed);
-		row("Scale", *transform.scale, drag_speed);
+		row("Position", transform.position, drag_speed);
+		row("Rotation", transform.rotation, rotation_drag_speed);
+		row("Scale", transform.scale, drag_speed);
 
 		ImGui::PopItemWidth();
 	};

@@ -92,6 +92,7 @@ namespace Loom
 
 				delete component;
 				hierarchy_changes++;
+				Touch();
 			});
 	};
 
@@ -108,6 +109,7 @@ namespace Loom
 
 				delete child;
 				hierarchy_changes++;
+				Touch(true);
 			});
 	};
 
@@ -151,6 +153,7 @@ namespace Loom
 			{
 				m_children.emplace_back(gameObject);
 				hierarchy_changes++;
+				Touch(true);
 			});
 
 		return gameObject;
@@ -169,6 +172,7 @@ namespace Loom
 						return;
 
 				std::erase(parent->m_children, this);
+				parent->Touch(true);
 
 				parent = new_parent;
 
@@ -180,7 +184,28 @@ namespace Loom
 					this);
 
 				hierarchy_changes++;
+				parent->Touch(true);
+				Touch();
 			});
+	};
+
+	void GameObject::OrderComponents(const std::vector<ComponentBase*>& order)
+	{
+		auto placed = m_components.begin();
+
+		for (ComponentBase* component : order)
+		{
+			const auto found = std::find(placed, m_components.end(), component);
+
+			if (found == m_components.end())
+				continue;
+
+			std::rotate(placed, found, found + 1);
+			placed++;
+		};
+
+		hierarchy_changes++;
+		Touch();
 	};
 
 	glm::mat4 GameObject::LocalMatrix() const

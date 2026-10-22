@@ -23,9 +23,10 @@ namespace Loom
 	struct UniformValues;
 
 	// Hands a field to the last LoomObject whose constructor started on this
-	// thread. A Serial member is built as part of its owner, before that
-	// constructor has finished, which is what makes that object the right one.
-	LOOM_API void RegisterSerialField(
+	// thread, and returns that object. A Serial member is built as part of its
+	// owner, before that constructor has finished, which is what makes that
+	// object the right one.
+	LOOM_API LoomObject* RegisterSerialField(
 		FieldType type,
 		void* data,
 		LoomObject* (*get_reference)(void*),
@@ -33,6 +34,10 @@ namespace Loom
 		bool (*accepts_reference)(LoomObject*),
 		const char* name,
 		unsigned long long* version);
+
+	// After a field of owner changed, for the journal of what changed and,
+	// for a reference, the index of who points where.
+	LOOM_API void SerialChanged(LoomObject* owner, bool reference);
 
 	// Hands a button to the same object, with its name and what pressing it runs.
 	LOOM_API void RegisterButton(const char* name, const std::function<void()>* press);
@@ -92,7 +97,8 @@ namespace Loom
 	*   inspector draws
 	* - Declaring one is the whole declaration: it registers itself with the
 	*   object under construction on this thread and behaves as a T from then on,
-	*   through an implicit conversion for the value and -> for its members
+	*   through an implicit conversion for reading the value, assignment and
+	*   the arithmetic ones for changing it, and * and -> for reaching into it
 	* - The editor labels it after the member: Serial<float> m_speed reads
 	*   "Speed" in the inspector. Given a name, it reads that instead, and a
 	*   category before the name, with '/' between nested ones, groups it with
@@ -141,25 +147,42 @@ namespace Loom
 			requires (
 				!std::is_same_v<std::remove_cvref_t<U>, Serial> &&
 				std::is_assignable_v<T&, U&&>)
-		Serial& operator=(U&& value) { m_value = std::forward<U>(value); m_version++; return *this; };
+		Serial& operator=(U&& value) { m_value = std::forward<U>(value); Changed(); return *this; };
 
 		// A braced list deduces nothing above, and choosing between building a T
 		// out of it and building a Serial out of it is a tie the compiler will
 		// not break; taking the list itself is neither.
 		template <typename U>
 			requires std::is_assignable_v<T&, std::initializer_list<U>>
-		Serial& operator=(std::initializer_list<U> values) { m_value = values; m_version++; return *this; };
+		Serial& operator=(std::initializer_list<U> values) { m_value = values; Changed(); return *this; };
 
 		// And what is left: = { } and a braced list for an aggregate, neither of
 		// which deduces a U at all.
-		Serial& operator=(T value) { m_value = std::move(value); m_version++; return *this; };
+		Serial& operator=(T value) { m_value = std::move(value); Changed(); return *this; };
 
-		// Reaching into the value without const counts as changing it, since
-		// nothing says what is done with it after.
-		operator T& () { m_version++; return m_value; };
+		template <typename U> requires requires (T& value, U&& by) { value += std::forward<U>(by); }
+		Serial& operator+=(U&& by) { m_value += std::forward<U>(by); Changed(); return *this; };
+
+		template <typename U> requires requires (T& value, U&& by) { value -= std::forward<U>(by); }
+		Serial& operator-=(U&& by) { m_value -= std::forward<U>(by); Changed(); return *this; };
+
+		template <typename U> requires requires (T& value, U&& by) { value *= std::forward<U>(by); }
+		Serial& operator*=(U&& by) { m_value *= std::forward<U>(by); Changed(); return *this; };
+
+		template <typename U> requires requires (T& value, U&& by) { value /= std::forward<U>(by); }
+		Serial& operator/=(U&& by) { m_value /= std::forward<U>(by); Changed(); return *this; };
+
+		Serial& operator++() requires requires (T& value) { ++value; } { ++m_value; Changed(); return *this; };
+		Serial& operator--() requires requires (T& value) { --value; } { --m_value; Changed(); return *this; };
+		T operator++(int) requires requires (T& value) { value++; } { T before = m_value++; Changed(); return before; };
+		T operator--(int) requires requires (T& value) { value--; } { T before = m_value--; Changed(); return before; };
+
+		// Read like the plain member it replaces, without counting as a change
+		// however it is held. Changing it in place takes *, -> or one of the
+		// operators above, each of which counts.
 		operator const T& () const { return m_value; };
 
-		T& operator*() { m_version++; return m_value; };
+		T& operator*() requires (!std::is_pointer_v<T>) { Changed(); return m_value; };
 		const T& operator*() const { return m_value; };
 
 		// A Serial holding a pointer hands the pointer over, so a reference
@@ -170,7 +193,7 @@ namespace Loom
 				return m_value;
 			else
 			{
-				m_version++;
+				Changed();
 				return &m_value;
 			};
 		};
@@ -182,15 +205,22 @@ namespace Loom
 			else return &m_value;
 		};
 
-		// Goes up each time the value is changed: assigned, reached into
-		// without const, or written through its SerializedField. While it holds
-		// still, so does the value, so whatever is made from it, such as a
-		// mesh's vertices on the GPU, need not be made again. It starts where
-		// no other field's has, so a field made where another one was never
-		// passes for it. Read through a const Serial to look without counting.
+		// Goes up each time the value is changed: assigned, reached into with
+		// * or -> without const, or written through its SerializedField. While
+		// it holds still, so does the value, so whatever is made from it, such
+		// as a mesh's vertices on the GPU, need not be made again. It starts
+		// where no other field's has, so a field made where another one was
+		// never passes for it. Reach in through a const Serial to look without
+		// counting.
 		unsigned long long Version() const { return m_version; };
 
 	private:
+		void Changed()
+		{
+			m_version++;
+			SerialChanged(m_owner, std::is_pointer_v<T>);
+		};
+
 		void Register()
 		{
 			if constexpr (std::is_pointer_v<T>)
@@ -202,7 +232,7 @@ namespace Loom
 				// Generated here, where T is still known: the LoomObject part of
 				// a T is not necessarily at the front of it, so the field cannot
 				// do these casts through a LoomObject** of its own.
-				RegisterSerialField(
+				m_owner = RegisterSerialField(
 					FieldType::Reference,
 					&m_value,
 					[](void* data) -> LoomObject*
@@ -220,7 +250,7 @@ namespace Loom
 					name.value,
 					&m_version);
 			}
-			else RegisterSerialField(FieldTypeOf<T>(), Data(), nullptr, nullptr, nullptr, name.value, &m_version);
+			else m_owner = RegisterSerialField(FieldTypeOf<T>(), Data(), nullptr, nullptr, nullptr, name.value, &m_version);
 		};
 
 		// The vector types are written out of their components, so the field
@@ -239,5 +269,6 @@ namespace Loom
 
 		T m_value;
 		unsigned long long m_version = 0;
+		LoomObject* m_owner = nullptr;
 	};
 };

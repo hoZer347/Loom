@@ -79,6 +79,9 @@ namespace Loom
 		unsigned long long* version = nullptr;
 		void Changed() const;
 
+		// The object that declared the field.
+		LoomObject* owner = nullptr;
+
 		// The name the Serial was given, if any: "Display", or "Category/Display"
 		// with '/' between nested categories, a ".../" in front already put
 		// back to the category it stood for. Copied, so it outlives the module

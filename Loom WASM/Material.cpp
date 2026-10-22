@@ -161,7 +161,7 @@ namespace Loom
 			return;
 
 		DrawSettings();
-		DrawShaderVariables(shader->variables, UniformScope::Material, variables);
+		DrawShaderVariables(shader->variables, UniformScope::Material, *variables);
 		DrawDeclarations();
 	};
 

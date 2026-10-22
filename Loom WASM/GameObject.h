@@ -92,6 +92,7 @@ namespace Loom
 			// OnAttach reaching for another - are siblings as soon as they exist,
 			// not a frame later.
 			m_components.emplace_back(component);
+			Touch();
 
 			// What has to wait is the work that runs them: the update and render
 			// lists are walked mid-frame, and OnAttach expects the rest of the
@@ -168,6 +169,10 @@ namespace Loom
 		// Removes one component instance. By instance rather than by type: a
 		// GameObject is free to carry two of the same kind.
 		void DetachComponent(ComponentBase* component);
+
+		// Puts the components in the order given, those it does not name after
+		// them as they were.
+		void OrderComponents(const std::vector<ComponentBase*>& order);
 
 		void RemoveChild(GameObject* gameObject);
 

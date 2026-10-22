@@ -2,7 +2,6 @@
 
 #include "Engine.h"
 
-#include <algorithm>
 #include <atomic>
 #include <string>
 #include <iostream>
@@ -36,6 +35,8 @@ namespace Loom
 			by_name.erase(NameAndID());
 
 		by_name[NameAndID()] = this;
+
+		Touch();
 	};
 
 	void LoomObject::SetGuid(const Guid& guid)
@@ -61,6 +62,137 @@ namespace Loom
 
 		if (m_guid.IsValid())
 			by_guid[m_guid] = this;
+
+		Touch();
+	};
+
+	void LoomObject::Touch(bool children)
+	{
+		if (!watching)
+			return;
+
+		const unsigned char kinds = children ? touched_self | touched_children : touched_self;
+
+		// Already in for this: whoever takes the journal reads the object
+		// after taking it, so sees this change too.
+		if ((m_touched & kinds) == kinds)
+			return;
+
+		std::lock_guard lock{ journal_mutex };
+
+		if (m_touched == 0)
+		{
+			m_journalAt = journal.size();
+			journal.push_back(this);
+		};
+
+		m_touched |= kinds;
+	};
+
+	void LoomObject::Watch(bool watch)
+	{
+		std::lock_guard lock{ journal_mutex };
+
+		if (watch == watching)
+			return;
+
+		watching = watch;
+
+		if (watch)
+		{
+			watch_count++;
+
+			return;
+		};
+
+		for (LoomObject* object : journal)
+			object->m_touched = 0;
+
+		journal.clear();
+		destroyed.clear();
+	};
+
+	LoomObject::Journal LoomObject::TakeJournal()
+	{
+		std::lock_guard lock{ journal_mutex };
+
+		Journal taken{ };
+
+		taken.touched.reserve(journal.size());
+
+		for (LoomObject* object : journal)
+		{
+			taken.touched.emplace_back(object, (object->m_touched & touched_children) != 0);
+			object->m_touched = 0;
+		};
+
+		journal.clear();
+		taken.destroyed.swap(destroyed);
+
+		return taken;
+	};
+
+	void SerialChanged(LoomObject* owner, bool reference)
+	{
+		if (owner == nullptr)
+			return;
+
+		owner->Touch();
+
+		if (reference)
+			owner->ReferencesWritten();
+	};
+
+	void LoomObject::ReferencesWritten()
+	{
+		// Still waiting: Reindex clears this before it reads the fields, so it
+		// reads this write too.
+		if (m_referencesDirty)
+			return;
+
+		std::lock_guard lock{ mutex };
+
+		if (m_referencesDirty)
+			return;
+
+		m_referencesDirty = true;
+		m_dirtyAt = dirty_holders.size();
+		dirty_holders.push_back(this);
+	};
+
+	void LoomObject::Reindex()
+	{
+		std::lock_guard lock{ mutex };
+
+		for (LoomObject* holder : dirty_holders)
+		{
+			holder->m_referencesDirty = false;
+
+			for (const LoomObject* target : holder->m_referenced)
+			{
+				const auto entry = referrers.find(target);
+
+				entry->second.erase(holder);
+
+				if (entry->second.empty())
+					referrers.erase(entry);
+			};
+
+			holder->m_referenced.clear();
+
+			for (const SerializedField& field : holder->m_fields)
+			{
+				LoomObject* target = field.type == FieldType::Reference ? field.GetReference() : nullptr;
+
+				if (target == nullptr || target == holder)
+					continue;
+
+				if (referrers[target].insert(holder).second)
+					holder->m_referenced.push_back(target);
+			};
+		};
+
+		dirty_holders.clear();
 	};
 
 	uint64_t LoomObject::Initialize()
@@ -95,7 +227,7 @@ namespace Loom
 		return ID;
 	};
 
-	void RegisterSerialField(
+	LoomObject* RegisterSerialField(
 		FieldType type,
 		void* data,
 		LoomObject* (*get_reference)(void*),
@@ -119,11 +251,12 @@ namespace Loom
 				<< "A Serial field has no LoomObject under construction on this"
 				   " thread to belong to" << std::endl;
 
-			return;
+			return nullptr;
 		};
 
-		// Under the lock like the lookup tables: a destructor elsewhere walks the
-		// referencing list, and objects are made wherever their owner happens to run.
+		// Under the lock like the lookup tables: a destructor elsewhere reads
+		// the fields of whoever points at it, and objects are made wherever
+		// their owner happens to run.
 		std::lock_guard lock{ LoomObject::mutex };
 
 		SerializedField field;
@@ -134,17 +267,15 @@ namespace Loom
 		field.set_reference = set_reference;
 		field.accepts_reference = accepts_reference;
 		field.version = version;
+		field.owner = owner;
 		field.name = owner->TakeName(name);
 
-		// Listed once, however many reference fields the object goes on to declare.
-		if (type == FieldType::Reference && !owner->m_references)
-		{
-			owner->m_references = true;
-
-			LoomObject::referencing.push_back(owner);
-		};
-
 		owner->m_fields.push_back(field);
+
+		if (type == FieldType::Reference)
+			owner->ReferencesWritten();
+
+		return owner;
 	};
 
 	void RegisterButton(const char* name, const std::function<void()>* press)
@@ -230,19 +361,63 @@ namespace Loom
 		if (entry != by_guid.end() && entry->second == this)
 			by_guid.erase(entry);
 
+		{
+			std::lock_guard journalLock{ journal_mutex };
+
+			if (m_touched != 0)
+			{
+				LoomObject* last = journal.back();
+
+				journal[m_journalAt] = last;
+				last->m_journalAt = m_journalAt;
+				journal.pop_back();
+			};
+
+			if (watching)
+				destroyed.push_back(this);
+		};
+
+		if (m_referencesDirty)
+		{
+			LoomObject* last = dirty_holders.back();
+
+			dirty_holders[m_dirtyAt] = last;
+			last->m_dirtyAt = m_dirtyAt;
+			dirty_holders.pop_back();
+		};
+
+		// What this pointed at is taken out as it was indexed, since the
+		// fields that said so may be gone by now.
+		for (const LoomObject* target : m_referenced)
+		{
+			const auto entry = referrers.find(target);
+
+			entry->second.erase(this);
+
+			if (entry->second.empty())
+				referrers.erase(entry);
+		};
+
+		Reindex();
+
+		const auto holders = referrers.find(this);
+
+		if (holders == referrers.end())
+			return;
+
 		// Nobody may be left pointing here. A Reference field still holding this
 		// object would be read again next frame - by the serializer writing its
 		// guid, by the inspector drawing its name, or by whatever component owns
 		// the field - and by then the memory is gone.
-		for (LoomObject* holder : referencing)
-			if (holder != this)
-				for (const SerializedField& field : holder->m_fields)
-					if (field.type == FieldType::Reference && field.GetReference() == this)
-						field.SetReference(nullptr);
+		for (LoomObject* holder : std::unordered_set<LoomObject*>(std::move(holders->second)))
+		{
+			for (const SerializedField& field : holder->m_fields)
+				if (field.type == FieldType::Reference && field.GetReference() == this)
+					field.SetReference(nullptr);
 
-		if (m_references)
-			referencing.erase(
-				std::remove(referencing.begin(), referencing.end(), this),
-				referencing.end());
+			std::erase(holder->m_referenced, this);
+		};
+
+		referrers.erase(this);
 	};
 };

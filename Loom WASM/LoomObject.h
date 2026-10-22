@@ -6,10 +6,13 @@
 #include "Serial.h"
 #include "SerializedField.h"
 
+#include <atomic>
 #include <functional>
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include <mutex>
+#include <utility>
 #include <vector>
 
 
@@ -97,6 +100,30 @@ namespace Loom
 		// it does an enum's. Empty for a field that is just a number.
 		virtual std::vector<std::string> GetFieldChoices(const SerializedField& field) { return { }; };
 
+		// What may have changed of what the scene format writes, since it was
+		// last taken: the objects whose name, guid or fields were written, or
+		// for a GameObject its components, and whose children came or went,
+		// and the objects destroyed. Kept only while watched, so whoever looks
+		// at it looks at what changed rather than at every object.
+		struct Journal
+		{
+			// Each with whether its children were among what changed.
+			std::vector<std::pair<LoomObject*, bool>> touched{ };
+
+			// Gone by now: only for finding what was kept under the address.
+			std::vector<const LoomObject*> destroyed{ };
+		};
+
+		// Puts this object in the journal, while it is watched.
+		void Touch(bool children = false);
+
+		// Starting to watch again counts up WatchCount, since whatever was
+		// kept by address while nothing was watched may since be gone. Stopping
+		// throws away the journal.
+		static void Watch(bool watch);
+		static unsigned long long WatchCount() { return watch_count.load(); };
+		static Journal TakeJournal();
+
 	protected:
 		std::string m_name;
 		static inline std::recursive_mutex mutex;
@@ -104,14 +131,10 @@ namespace Loom
 		static inline std::unordered_map<std::string, LoomObject*> by_name{ };
 		static inline std::unordered_map<Guid, LoomObject*> by_guid{ };
 
-		// Only the objects that hold a Reference field, so a dying object has a
-		// short list to scrub rather than every object alive.
-		static inline std::vector<LoomObject*> referencing{ };
-
 		uint64_t Initialize();
 
 		// Declaring a Serial member is what fills these in.
-		friend LOOM_API void RegisterSerialField(
+		friend LOOM_API LoomObject* RegisterSerialField(
 			FieldType type,
 			void* data,
 			LoomObject* (*get_reference)(void*),
@@ -127,11 +150,34 @@ namespace Loom
 
 		std::vector<FieldButton> m_buttons{ };
 
-		// Whether any of them is a Reference, which is what puts this object in
-		// the referencing list and what a destructor has to undo.
-		bool m_references = false;
-
 	private:
+		friend LOOM_API void SerialChanged(LoomObject* owner, bool reference);
+
+		static inline std::atomic<bool> watching = false;
+		static inline std::atomic<unsigned long long> watch_count = 0;
+		static inline std::mutex journal_mutex{ };
+		static inline std::vector<LoomObject*> journal{ };
+		static inline std::vector<const LoomObject*> destroyed{ };
+
+		// Which of the journal's kinds of change this object is in it for, and
+		// where, so a destructor takes it out without looking.
+		static constexpr unsigned char touched_self = 1;
+		static constexpr unsigned char touched_children = 2;
+		std::atomic<unsigned char> m_touched = 0;
+		size_t m_journalAt = 0;
+
+		// Who points at whom, so a dying object scrubs only the fields that
+		// point at it. A holder whose references were written since is dirty
+		// and indexed again before the index is next used.
+		static inline std::unordered_map<const LoomObject*, std::unordered_set<LoomObject*>> referrers{ };
+		static inline std::vector<LoomObject*> dirty_holders{ };
+		std::vector<LoomObject*> m_referenced{ };
+		std::atomic<bool> m_referencesDirty = false;
+		size_t m_dirtyAt = 0;
+
+		void ReferencesWritten();
+		static void Reindex();
+
 		// A name as a Serial or Button was declared with, a ".../" in front put
 		// back to the category of the one declared before it.
 		std::string TakeName(const char* given) const;
