@@ -7,7 +7,7 @@
 #include "Shaders.h"
 #include "Material.h"
 #include "GameObject.h"
-#include "Light.h"
+#include "Scene.h"
 #include "Skin.h"
 #include "Utilities/Clock.h"
 
@@ -78,17 +78,7 @@ namespace Loom
 		};
 
 		material->Apply(material->shader->id, &*std::as_const(variables));
-
-		if (Camera::current)
-			Camera::current->Apply(material->shader->id);
-		// Without a camera, world space is what the screen shows.
-		else if (Renderer* renderer = Renderer::Get())
-			renderer->SetUniform(material->shader->id, "u_viewProjection", glm::mat4(1.0f));
-
-		if (Light::current)
-			Light::current->Apply(material->shader->id);
-		else Light::ApplyNone(material->shader->id);
-
+		Scene::ApplyView(material->shader->id);
 		Draw(material->shader->id);
 	};
 

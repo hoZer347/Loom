@@ -1,10 +1,9 @@
 #include "Sprite.h"
 
-#include "Camera.h"
 #include "GameObject.h"
-#include "Light.h"
 #include "Mesh.h"
 #include "Renderer.h"
+#include "Scene.h"
 #include "Shaders.h"
 #include "Textures.h"
 
@@ -229,13 +228,7 @@ void main()
 		if (!program)
 			return;
 
-		if (Camera::current)
-			Camera::current->Apply(program);
-
-		if (Light::current)
-			Light::current->Apply(program);
-		else Light::ApplyNone(program);
-
+		Scene::ApplyView(program);
 		DrawQuad(program);
 	};
 

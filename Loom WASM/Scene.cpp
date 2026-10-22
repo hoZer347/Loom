@@ -6,6 +6,7 @@
 #include "Light.h"
 #include "Mesh.h"
 #include "Profiler.h"
+#include "Renderer.h"
 
 #include <algorithm>
 #include <optional>
@@ -101,6 +102,10 @@ namespace Loom
 		Light::current = light;
 		Camera::current = seen;
 
+		// Programs drawn by the last pass, or between passes, hold another view.
+		s_viewed.clear();
+		s_drawing = true;
+
 		std::vector<Mesh*> transparent;
 		Mesh::transparent = &transparent;
 
@@ -116,8 +121,35 @@ namespace Loom
 			Mesh::DrawTransparent(transparent);
 		};
 
+		s_drawing = false;
+
 		Light::current = nullptr;
 		Camera::current = nullptr;
+	};
+
+	void Scene::ApplyView(uint32_t program)
+	{
+		Renderer* renderer = Renderer::Get();
+
+		if (!renderer)
+			return;
+
+		if (s_drawing)
+		{
+			if (std::ranges::find(s_viewed, program) != s_viewed.end())
+				return;
+
+			s_viewed.push_back(program);
+		};
+
+		if (Camera::current)
+			Camera::current->Apply(program);
+		// Without a camera, world space is what the screen shows.
+		else renderer->SetUniform(program, "u_viewProjection", glm::mat4(1.0f));
+
+		if (Light::current)
+			Light::current->Apply(program);
+		else Light::ApplyNone(program);
 	};
 
 	void Scene::MoveScene(Scene* scene, size_t index)

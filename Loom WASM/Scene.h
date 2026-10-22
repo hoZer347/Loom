@@ -49,6 +49,11 @@ namespace Loom
 		// the same view, that share its light.
 		void Render(Camera* camera = nullptr, const std::vector<Scene*>& drawn = allScenes);
 
+		// Gives the program the view of the scene being drawn: its camera, or
+		// world space without one, and its light. Once a pass while Render
+		// draws, since a program keeps its uniforms from one draw to the next.
+		static void ApplyView(uint32_t program);
+
 		// One physics step: runs OnPhysics through the hierarchy, which syncs
 		// every enabled collider into this scene's collider tree and gathers
 		// its rigid bodies, then moves them by FixedDeltaTime.
@@ -100,5 +105,9 @@ namespace Loom
 
 		static inline std::vector<Scene*> allScenes{ };
 		static inline std::recursive_mutex mutex{ };
+
+		// The programs ApplyView has given this pass's view, while Render draws.
+		static inline std::vector<uint32_t> s_viewed{ };
+		static inline bool s_drawing = false;
 	};
 };

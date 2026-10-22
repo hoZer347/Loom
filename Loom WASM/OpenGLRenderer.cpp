@@ -12,6 +12,7 @@
 
 #include "glm/gtc/type_ptr.hpp"
 
+#include <algorithm>
 #include <iostream>
 #include <stdexcept>
 #include <string_view>
@@ -374,7 +375,7 @@ namespace Loom
 			if ((GLuint)current == program)
 				glUseProgram(0);
 
-			m_units.erase(program);
+			m_programs.erase(program);
 			m_pixelated.erase(program);
 			glDeleteProgram(program);
 		};
@@ -382,32 +383,32 @@ namespace Loom
 		void SetUniform(uint32_t program, const char* name, float value) override
 		{
 			glUseProgram(program);
-			glUniform1f(glGetUniformLocation(program, name), value);
+			glUniform1f(Location(program, name), value);
 		};
 
 		void SetUniform(uint32_t program, const char* name, const glm::vec3& value) override
 		{
 			glUseProgram(program);
-			glUniform3fv(glGetUniformLocation(program, name), 1, glm::value_ptr(value));
+			glUniform3fv(Location(program, name), 1, glm::value_ptr(value));
 		};
 
 		void SetUniform(uint32_t program, const char* name, const glm::vec4& value) override
 		{
 			glUseProgram(program);
-			glUniform4fv(glGetUniformLocation(program, name), 1, glm::value_ptr(value));
+			glUniform4fv(Location(program, name), 1, glm::value_ptr(value));
 		};
 
 		void SetUniform(uint32_t program, const char* name, const glm::mat4& value) override
 		{
 			glUseProgram(program);
-			glUniformMatrix4fv(glGetUniformLocation(program, name), 1, GL_FALSE, glm::value_ptr(value));
+			glUniformMatrix4fv(Location(program, name), 1, GL_FALSE, glm::value_ptr(value));
 		};
 
 		void SetUniform(uint32_t program, const char* name, UniformType type, const void* components) override
 		{
 			glUseProgram(program);
 
-			const GLint location = glGetUniformLocation(program, name);
+			const GLint location = Location(program, name);
 			const GLfloat* floats = (const GLfloat*)components;
 			const GLint* ints = (const GLint*)components;
 			const GLuint* uints = (const GLuint*)components;
@@ -447,25 +448,58 @@ namespace Loom
 		{
 			// Each sampler a program names gets a unit of its own, in the order
 			// they are first set.
-			Units& units = m_units[program];
-			auto found = units.find(std::string_view(name));
+			Program& state = m_programs[program];
+			auto found = state.units.find(std::string_view(name));
 
-			if (found == units.end())
-				found = units.emplace(name, (GLint)units.size()).first;
+			if (found == state.units.end())
+			{
+				found = state.units.emplace(name, (GLint)state.textures.size()).first;
+				state.textures.push_back(0);
 
-			glUseProgram(program);
-			glActiveTexture(GL_TEXTURE0 + found->second);
-			glBindTexture(GL_TEXTURE_2D, texture);
+				glUseProgram(program);
+				glUniform1i(Location(program, name), found->second);
+			};
+
+			state.textures[found->second] = texture;
+		};
+
+		// Where the program's uniform is, asked of GL once.
+		GLint Location(uint32_t program, const char* name)
+		{
+			Locations& locations = m_programs[program].locations;
+			auto found = locations.find(std::string_view(name));
+
+			if (found == locations.end())
+				found = locations.emplace(name, glGetUniformLocation(program, name)).first;
+
+			return found->second;
+		};
+
+		// Binds the program's textures to their units, which every program
+		// shares, as Vulkan hands each draw its program's own.
+		void BindTextures(uint32_t program)
+		{
+			const auto found = m_programs.find(program);
+
+			if (found == m_programs.end())
+				return;
+
+			const std::vector<GLuint>& textures = found->second.textures;
+			const bool pixelated = m_pixelated.contains(program);
+
+			for (GLint unit = 0; unit < (GLint)textures.size(); unit++)
+			{
+				glActiveTexture(GL_TEXTURE0 + unit);
+				glBindTexture(GL_TEXTURE_2D, textures[unit]);
+
+				// A sampler object overrides all of a texture's sampling, a shadow
+				// map's comparison included, so shadow maps keep their own.
+				const auto target = m_targets.find(textures[unit]);
+				const bool shadow = target != m_targets.end() && target->second.compare;
+				glBindSampler(unit, pixelated && !shadow ? m_nearest : 0);
+			};
+
 			glActiveTexture(GL_TEXTURE0);
-
-			// A sampler object overrides all of a texture's sampling, a shadow
-			// map's comparison included, so shadow maps keep their own.
-			const auto target = m_targets.find(texture);
-			const bool shadow = target != m_targets.end() && target->second.compare;
-			const bool nearest = m_pixelated.contains(program) && !shadow;
-			glBindSampler(found->second, nearest ? m_nearest : 0);
-
-			glUniform1i(glGetUniformLocation(program, name), found->second);
 		};
 
 		void Draw(uint32_t program, uint32_t primitive, const float* vertices, size_t count, uint32_t usage, VertexFormat format) override
@@ -531,6 +565,7 @@ namespace Loom
 			const GLsizei stride = (GLsizei)(FloatsPerVertex(format) * sizeof(float));
 
 			glUseProgram(program);
+			BindTextures(program);
 
 			glBindBuffer(GL_ARRAY_BUFFER, buffer);
 
@@ -639,6 +674,10 @@ namespace Loom
 
 		void DestroyTexture(uint32_t texture) override
 		{
+			// GL names a texture anew once it is gone, so no program may still bind it.
+			for (auto& [program, state] : m_programs)
+				std::replace(state.textures.begin(), state.textures.end(), (GLuint)texture, 0u);
+
 			const auto found = m_targets.find(texture);
 
 			if (found == m_targets.end())
@@ -847,9 +886,18 @@ namespace Loom
 			size_t operator()(std::string_view name) const { return std::hash<std::string_view>{ }(name); };
 		};
 
-		typedef std::unordered_map<std::string, GLint, NameHash, std::equal_to<>> Units;
+		typedef std::unordered_map<std::string, GLint, NameHash, std::equal_to<>> Locations;
 
-		std::unordered_map<uint32_t, Units> m_units;
+		// What each program has been given: where its uniforms are, the unit
+		// each sampler has, and the texture set for each unit.
+		struct Program
+		{
+			Locations locations;
+			Locations units;
+			std::vector<GLuint> textures;
+		};
+
+		std::unordered_map<uint32_t, Program> m_programs;
 	};
 
 	std::unique_ptr<Renderer> CreateOpenGLRenderer()
