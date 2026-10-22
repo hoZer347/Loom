@@ -88,6 +88,12 @@
     <ClCompile Include="SpriteEditor Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="EditableMesh Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="ModelEditor Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="McpProtocol Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

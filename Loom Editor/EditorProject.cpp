@@ -822,6 +822,10 @@ namespace Loom
 		if (!node.folder && ImGui::MenuItem("Open"))
 			m_assetToOpen = node.path;
 
+		if (std::filesystem::path(node.path).extension() == Prefab::extension &&
+			ImGui::MenuItem((std::string(EditorIcons::Model) + " Edit Model").c_str()))
+			OpenModel(node.path);
+
 		if (ImGui::MenuItem("Show in Explorer"))
 			ShowInExplorer(node.path);
 
@@ -1149,6 +1153,12 @@ namespace Loom
 		m_showSprites = true;
 	};
 
+	void Editor::OpenModel(const std::string& path)
+	{
+		m_models.Open(std::filesystem::path(path).is_absolute() ? path : PrefabFile(path).string());
+		m_showModels = true;
+	};
+
 	bool Editor::OpenInShell(ImGuiContext*, const char* path)
 	{
 		std::error_code code;
@@ -1262,6 +1272,7 @@ namespace Loom
 
 		m_shaders.Relocate(path, moved);
 		m_sprites.Relocate(path, moved);
+		m_models.Relocate(path, moved);
 
 		// The 2D panel files its textures by their paths, so they stay filed
 		// where they were.

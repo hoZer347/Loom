@@ -15,6 +15,7 @@
 #include "EditorSettings.h"
 #include "ShaderEditor.h"
 #include "SpriteEditor.h"
+#include "ModelEditor.h"
 #include "ModelPreview.h"
 #include "Prefabs.h"
 #include "SelectionOutline.h"
@@ -189,6 +190,10 @@ namespace Loom
 		void ShowSaveLayoutPrompt();
 		// In a tab of the Sprites panel, which comes forward.
 		void OpenSprite(const std::string& path);
+
+		// A prefab, by its path in the project or on disk, in a tab of the
+		// Model panel, which comes forward.
+		void OpenModel(const std::string& path);
 
 		// The Inspector's Add Component menu, opened on the selection the next
 		// time it is drawn.
@@ -577,6 +582,10 @@ namespace Loom
 		// it now is.
 		void ReloadSavedSprites();
 
+		// Has the instances of a prefab the Model panel saved take it as it
+		// now is.
+		void TakeSavedModels();
+
 		// Where the Create prompt's asset would be written: the file for most,
 		// the source for a script, which goes under the scripts project even
 		// when asked for somewhere else.
@@ -869,6 +878,7 @@ namespace Loom
 		bool m_showConsole = true;
 		bool m_showShaders = false;
 		bool m_showSprites = false;
+		bool m_showModels = false;
 		bool m_showPrefab = false;
 		bool m_showStats = true;
 		bool m_showKeyBindings = true;
@@ -934,6 +944,7 @@ namespace Loom
 		KeyBindings m_keyBindings;
 		ShaderEditor m_shaders;
 		SpriteEditor m_sprites;
+		ModelEditor m_models;
 
 		char m_nameBuffer[128]{ };
 		const GameObject* m_nameBufferOwner = nullptr;

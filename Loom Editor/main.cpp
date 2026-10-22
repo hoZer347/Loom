@@ -170,6 +170,7 @@ namespace
 			<< "  --save-layout <name>           save the layout once the panels are drawn\n"
 			<< "  --save-layout-prompt           start with Layout > Save Layout... open\n"
 			<< "  --open-sprite <file>           open an image in the Sprites panel\n"
+			<< "  --open-model <prefab>          open a prefab in the Model panel\n"
 			<< "  --add-component-prompt         start with Add Component open on the selection\n"
 			<< "  --set-component-category <component> <category>\n"
 			<< "                                 file a component under a category in the\n"
@@ -596,6 +597,16 @@ int main(int argc, char** argv)
 				};
 
 				editor.OpenSprite(argv[++i]);
+			}
+			else if (argument == "--open-model")
+			{
+				if (i + 1 >= argc)
+				{
+					std::cerr << "--open-model needs a prefab" << std::endl;
+					return 1;
+				};
+
+				editor.OpenModel(argv[++i]);
 			}
 			else if (argument == "--add-component-prompt")
 				editor.ShowAddComponent();

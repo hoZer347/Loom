@@ -122,6 +122,8 @@
     <ClCompile Include="EditorLayouts.cpp" />
     <ClCompile Include="ShaderEditor.cpp" />
     <ClCompile Include="SpriteEditor.cpp" />
+    <ClCompile Include="ModelEditor.cpp" />
+    <ClCompile Include="EditableMesh.cpp" />
     <ClCompile Include="EditorSettings.cpp" />
     <ClCompile Include="EditorSettingsWindow.cpp" />
     <ClCompile Include="EditorTheme.cpp" />
@@ -168,6 +170,8 @@
     <ClInclude Include="EditorRefresh.h" />
     <ClInclude Include="ShaderEditor.h" />
     <ClInclude Include="SpriteEditor.h" />
+    <ClInclude Include="ModelEditor.h" />
+    <ClInclude Include="EditableMesh.h" />
     <ClInclude Include="EditorSettings.h" />
     <ClInclude Include="EditorTheme.h" />
     <ClInclude Include="EditorIcons.h" />

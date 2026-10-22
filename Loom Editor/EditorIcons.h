@@ -53,6 +53,7 @@ namespace Loom
 		constexpr const char* Console = "💬 Console###Console";
 		constexpr const char* Shaders = "✨ Shaders###Shaders";
 		constexpr const char* Sprites = "🖌 Sprites###Sprites";
+		constexpr const char* Model = "🧊 Model###Model";
 		constexpr const char* Stats = "📈 Stats###Stats";
 		constexpr const char* Settings = "⚙ Settings###Settings";
 		constexpr const char* KeyBindings = "⌨ Key Bindings###Key Bindings";

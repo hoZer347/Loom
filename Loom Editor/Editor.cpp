@@ -407,9 +407,9 @@ namespace Loom
 					glfwSetDropCallback((GLFWwindow*)viewport->PlatformHandle, callback);
 		};
 
-		// What is docked in the middle: the views, and the shader and sprite
-		// editors.
-		constexpr const char* centre_windows[] = { EditorPanels::SceneId, EditorPanels::Game, EditorPanels::Debug, EditorPanels::PrefabId, EditorPanels::Shaders, EditorPanels::Sprites };
+		// What is docked in the middle: the views, and the shader, sprite and
+		// model editors.
+		constexpr const char* centre_windows[] = { EditorPanels::SceneId, EditorPanels::Game, EditorPanels::Debug, EditorPanels::PrefabId, EditorPanels::Shaders, EditorPanels::Sprites, EditorPanels::Model };
 
 		// What lights the Prefab panel, which the Hierarchy leaves out.
 		constexpr const char* prefab_light = "Prefab Light";
@@ -1130,6 +1130,7 @@ namespace Loom
 
 		saved = m_shaders.SaveAll() && saved;
 		saved = m_sprites.SaveAll() && saved;
+		saved = m_models.SaveAll() && saved;
 
 		// An active scene saved for the first time just now is the one the
 		// next session starts on.
@@ -1509,6 +1510,9 @@ namespace Loom
 		if (m_showSprites && m_sprites.IsFocused())
 			return;
 
+		if (m_showModels && m_models.IsFocused())
+			return;
+
 		switch (EditCommands::FromShortcut(m_showHierarchy && m_hierarchyFocused))
 		{
 		case EditCommand::Undo:		Undo();				break;
@@ -1613,6 +1617,7 @@ namespace Loom
 		HandleShortcuts();
 		PollShaders();
 		ReloadSavedSprites();
+		TakeSavedModels();
 
 		// Panels come and go as OS windows, so the callback is put on whichever
 		// exist this frame.
@@ -1773,6 +1778,7 @@ namespace Loom
 		if (m_showConsole)		m_console.Draw(&m_showConsole);
 		if (m_showShaders)		m_shaders.Draw(&m_showShaders);
 		if (m_showSprites)		m_sprites.Draw(&m_showSprites);
+		if (m_showModels)		m_models.Draw(&m_showModels);
 		if (m_showStats)		DrawStats();
 
 		if (m_showKeyBindings && m_keyBindings.Draw(&m_showKeyBindings, !m_projectFile.empty()))
@@ -1961,6 +1967,7 @@ namespace Loom
 			{ EditorPanels::Console, &m_showConsole, true },
 			{ EditorPanels::Shaders, &m_showShaders, false },
 			{ EditorPanels::Sprites, &m_showSprites, false },
+			{ EditorPanels::Model, &m_showModels, false },
 			{ EditorPanels::Prefab, &m_showPrefab, false },
 			{ EditorPanels::Stats, &m_showStats, true },
 			{ EditorPanels::KeyBindings, &m_showKeyBindings, true } };
@@ -2894,6 +2901,13 @@ namespace Loom
 	{
 		for (const std::string& path : m_sprites.TakeSaved())
 			Texture::ReloadShared(path);
+	};
+
+	void Editor::TakeSavedModels()
+	{
+		// The next pass over the prefabs finds the file newer and hands it on.
+		if (!m_models.TakeSaved().empty())
+			m_historyDirty = true;
 	};
 
 	void Editor::DrawInspector()
