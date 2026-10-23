@@ -489,15 +489,20 @@ namespace Loom
 			ImGui::SameLine(left + column + ImGui::GetStyle().ItemInnerSpacing.x);
 		};
 
+		bool IsSpriteSource(const std::string& path)
+		{
+			return std::filesystem::path(path).extension() == SpriteAsset::extension || ProjectAssets::IsTextureFile(path);
+		};
+
 		// What a Sprite made from a texture or sprite file in the Project panel
-		// draws: the texture, or the image the sprite is flattened into. Empty
-		// for any other file.
+		// draws: the texture, or the image the sprite is flattened into, with
+		// forward slashes as every saved path has.
 		std::string SpriteImage(const std::string& path)
 		{
 			if (std::filesystem::path(path).extension() == SpriteAsset::extension)
-				return SpriteAsset::ImageOf(path);
+				return std::filesystem::path(SpriteAsset::ImageOf(path)).generic_string();
 
-			return ProjectAssets::IsTextureFile(path) ? path : "";
+			return path;
 		};
 
 		void DragSource(const LoomObject& object)
@@ -2410,8 +2415,12 @@ namespace Loom
 
 			DrawPrefabNode();
 
-			// The empty space under the rows takes a drop as the active
-			// scene's last.
+			// The empty space under the rows takes a drop as the last of the
+			// rows just above it: the open prefab's, or else the active scene's.
+			GameObject* last_rows = GetPrefabRoot();
+			if (last_rows == nullptr && m_activeScene)
+				last_rows = &m_activeScene->GetRoot();
+
 			const ImGuiWindow* window = ImGui::GetCurrentWindow();
 			const ImRect below(
 				window->InnerRect.Min.x,
@@ -2419,9 +2428,9 @@ namespace Loom
 				window->InnerRect.Max.x,
 				window->InnerRect.Max.y);
 
-			if (m_activeScene && below.GetHeight() > 0.0f && ImGui::BeginDragDropTargetCustom(below, window->ID))
+			if (last_rows && below.GetHeight() > 0.0f && ImGui::BeginDragDropTargetCustom(below, window->ID))
 			{
-				if (DropPlaced(m_activeScene->GetRoot(), true, Hierarchy::Zone::Into))
+				if (DropPlaced(*last_rows, true, Hierarchy::Zone::Into))
 					window->DrawList->AddLine(
 						below.Min,
 						ImVec2(below.Max.x, below.Min.y),
@@ -2888,14 +2897,13 @@ namespace Loom
 
 		return
 			IsModelFile(path) ||
-			!SpriteImage(path).empty() ||
+			IsSpriteSource(path) ||
 			ProjectAssets::IsSoundFile(path);
 	};
 
 	GameObject* Editor::PlaceAsset(const std::string& path, const Hierarchy::Placement& placement)
 	{
 		const std::string name = std::filesystem::path(path).stem().string();
-		const std::string image = SpriteImage(path);
 
 		GameObject* placed = nullptr;
 
@@ -2903,10 +2911,10 @@ namespace Loom
 			placed = Instantiate(path, *placement.parent);
 		else if (IsModelFile(path))
 			placed = ImportModel(path, *placement.parent);
-		else if (!image.empty())
+		else if (IsSpriteSource(path))
 		{
 			placed = placement.parent->AddChild(name);
-			placed->Attach<Sprite>()->texturePath = image;
+			placed->Attach<Sprite>()->texturePath = SpriteImage(path);
 		}
 		else
 		{

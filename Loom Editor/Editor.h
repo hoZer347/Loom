@@ -413,8 +413,9 @@ namespace Loom
 
 		// Takes a GameObject or an asset dropped on the tree node just drawn:
 		// on its top or bottom edge to sit before or after it, anywhere else to
-		// become its last child. A GameObject only moves within one scene, since
-		// undo keeps one scene per step.
+		// become its last child. A scene's row or a prefab's root takes drops
+		// only into it. A GameObject moves to another scene only when both are
+		// owned, since undo keeps the scenes it owns.
 		void DragAndDropNode(GameObject* gameObject, bool open);
 
 		// Takes the GameObject or asset being dragged to where a drop in zone

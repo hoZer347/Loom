@@ -11,7 +11,7 @@ namespace Loom::Hierarchy
 	namespace
 	{
 		// How much of a row, top and bottom, drops beside it rather than into it.
-		constexpr float sibling_edge = 0.25f;
+		constexpr float SIBLING_EDGE = 0.25f;
 	};
 
 	bool Contains(const GameObject& root, const GameObject* target)
@@ -154,7 +154,7 @@ namespace Loom::Hierarchy
 
 	Zone ZoneOf(float top, float bottom, float mouse, bool root)
 	{
-		const float edge = (bottom - top) * sibling_edge;
+		const float edge = (bottom - top) * SIBLING_EDGE;
 
 		if (root || (mouse > top + edge && mouse < bottom - edge))
 			return Zone::Into;
