@@ -8,6 +8,12 @@
 
 namespace Loom::Hierarchy
 {
+	namespace
+	{
+		// How much of a row, top and bottom, drops beside it rather than into it.
+		constexpr float sibling_edge = 0.25f;
+	};
+
 	bool Contains(const GameObject& root, const GameObject* target)
 	{
 		for (const GameObject* at = target; at; at = at->GetParent())
@@ -144,5 +150,40 @@ namespace Loom::Hierarchy
 		steps.push_back({ skip, nullptr });
 
 		return steps;
+	};
+
+	Zone ZoneOf(float top, float bottom, float mouse, bool root)
+	{
+		const float edge = (bottom - top) * sibling_edge;
+
+		if (root || (mouse > top + edge && mouse < bottom - edge))
+			return Zone::Into;
+
+		return mouse <= top + edge ? Zone::Above : Zone::Below;
+	};
+
+	Placement Place(GameObject& row, bool open, Zone zone, const GameObject* moving)
+	{
+		if (zone == Zone::Into)
+			return { &row, nullptr };
+
+		if (zone == Zone::Above)
+			return { row.GetParent(), &row };
+
+		const std::vector<GameObject*>& children = row.GetChildren();
+
+		// Below an open node is where its first child is drawn.
+		if (open && !children.empty())
+			return { &row, children.front() };
+
+		GameObject* parent = row.GetParent();
+
+		const std::vector<GameObject*>& siblings = parent->GetChildren();
+		auto next = std::find(siblings.begin(), siblings.end(), &row) + 1;
+
+		if (next != siblings.end() && *next == moving)
+			next++;
+
+		return { parent, next == siblings.end() ? nullptr : *next };
 	};
 };

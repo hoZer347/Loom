@@ -411,10 +411,15 @@ namespace Loom
 		// the object. Faded when an ancestor already disables it.
 		void DrawEnableToggle(GameObject* gameObject, bool parent_disabled, const ImRect& eye);
 
-		// Takes a GameObject dropped on the tree node just drawn: on its top or
-		// bottom edge to sit before or after it, anywhere else to become its last
-		// child. Only within one scene, since undo keeps one scene per step.
+		// Takes a GameObject or an asset dropped on the tree node just drawn:
+		// on its top or bottom edge to sit before or after it, anywhere else to
+		// become its last child. A GameObject only moves within one scene, since
+		// undo keeps one scene per step.
 		void DragAndDropNode(GameObject* gameObject, bool open);
+
+		// Takes the GameObject or asset being dragged to where a drop in zone
+		// of row puts it. Whether it would, so the caller marks where.
+		bool DropPlaced(GameObject& row, bool open, Hierarchy::Zone zone);
 
 		void DrawRenameField(GameObject* gameObject);
 
@@ -596,9 +601,14 @@ namespace Loom
 		// else, or a texture that will not load.
 		const Texture* Thumbnail(const std::string& path);
 
-		// Takes a prefab dragged out of the Project panel onto a GameObject in
-		// the hierarchy. Whether the drag was a file, taken or turned away.
-		bool DropAsset(GameObject* gameObject);
+		// Whether an asset dropped in the Hierarchy at path has a GameObject
+		// to become under parent: a prefab not already around parent, a
+		// model, a texture or sprite, or a sound.
+		bool CanPlace(const std::string& path, const GameObject& parent) const;
+
+		// The GameObject an asset CanPlace becomes, put and selected where
+		// placement says. Null when it fails to load.
+		GameObject* PlaceAsset(const std::string& path, const Hierarchy::Placement& placement);
 
 		// AcceptAssetDrop for a shader dragged out of the Scripts tab, which
 		// lists the shaders: path becomes the shader's path from the project.

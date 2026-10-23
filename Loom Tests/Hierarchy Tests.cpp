@@ -10,8 +10,10 @@
 #include <vector>
 
 using LoomTests::Pump;
+using Loom::Hierarchy::Placement;
 using Loom::Hierarchy::Step;
 using Loom::Hierarchy::View;
+using Loom::Hierarchy::Zone;
 
 
 namespace
@@ -175,5 +177,45 @@ TEST_SUITE("Hierarchy")
 		const std::vector<Step> steps = Loom::Hierarchy::Plan(scene.GetRoot(), &openUnder.at(&scene.GetRoot()), rowsBelow, View{ 0.0f, ROW, 0.0f, 100.0f }, nullptr);
 
 		CHECK(DrawnBy(steps) == Drawn{ { 0, children[0] }, { 0, children[1] }, { 0, children[2] }, { 0, children[3] }, { 0, nullptr } });
+	};
+
+	TEST_CASE("ZoneOf takes a quarter of the row at each end beside it, and all of a root's row into it")
+	{
+		CHECK(Loom::Hierarchy::ZoneOf(0.0f, ROW, 1.0f, false) == Zone::Above);
+		CHECK(Loom::Hierarchy::ZoneOf(0.0f, ROW, 2.5f, false) == Zone::Above);
+		CHECK(Loom::Hierarchy::ZoneOf(0.0f, ROW, 5.0f, false) == Zone::Into);
+		CHECK(Loom::Hierarchy::ZoneOf(0.0f, ROW, 7.5f, false) == Zone::Below);
+		CHECK(Loom::Hierarchy::ZoneOf(0.0f, ROW, 9.0f, false) == Zone::Below);
+		CHECK(Loom::Hierarchy::ZoneOf(0.0f, ROW, 1.0f, true) == Zone::Into);
+		CHECK(Loom::Hierarchy::ZoneOf(0.0f, ROW, 9.0f, true) == Zone::Into);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Place puts a drop before a row, last under it, or after it")
+	{
+		Loom::Scene scene("Place");
+		const std::vector<Loom::GameObject*> children = Children(scene.GetRoot(), 3);
+		const std::vector<Loom::GameObject*> grandchildren = Children(*children[1], 2);
+
+		Loom::GameObject* root = &scene.GetRoot();
+
+		CHECK(Loom::Hierarchy::Place(*children[1], false, Zone::Above, nullptr) == Placement{ root, children[1] });
+		CHECK(Loom::Hierarchy::Place(*children[1], false, Zone::Into, nullptr) == Placement{ children[1], nullptr });
+		CHECK(Loom::Hierarchy::Place(*children[0], false, Zone::Below, nullptr) == Placement{ root, children[1] });
+		CHECK(Loom::Hierarchy::Place(*children[2], false, Zone::Below, nullptr) == Placement{ root, nullptr });
+		CHECK(Loom::Hierarchy::Place(*root, true, Zone::Into, nullptr) == Placement{ root, nullptr });
+
+		// Below an open row is above its first child, and below a closed one
+		// is after the whole of it.
+		CHECK(Loom::Hierarchy::Place(*children[1], true, Zone::Below, nullptr) == Placement{ children[1], grandchildren[0] });
+		CHECK(Loom::Hierarchy::Place(*children[1], false, Zone::Below, nullptr) == Placement{ root, children[2] });
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Place steps over the object being moved when it is next after the row")
+	{
+		Loom::Scene scene("Place");
+		const std::vector<Loom::GameObject*> children = Children(scene.GetRoot(), 3);
+
+		CHECK(Loom::Hierarchy::Place(*children[0], false, Zone::Below, children[1]) == Placement{ &scene.GetRoot(), children[2] });
+		CHECK(Loom::Hierarchy::Place(*children[1], false, Zone::Below, children[2]) == Placement{ &scene.GetRoot(), nullptr });
 	};
 };

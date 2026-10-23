@@ -18,6 +18,7 @@
 #include "Profiler.h"
 #include "Scene.h"
 #include "SceneSerializer.h"
+#include "Sprite.h"
 #include "Textures.h"
 #include "Transform.h"
 #include "Ui.h"
@@ -34,6 +35,7 @@
 #include "ModelImporter.h"
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
+#include "SpriteAsset.h"
 #include "TextFit.h"
 #include "UiScript.h"
 
@@ -281,10 +283,6 @@ namespace Loom
 			return demos;
 		};
 
-		// How much of a Hierarchy row, top and bottom, drops beside it rather
-		// than into it.
-		constexpr float sibling_edge = 0.25f;
-
 		// A window docked on the frame it first appears only takes its tab on
 		// the one after.
 		constexpr int scene_focus_frames = 2;
@@ -489,6 +487,17 @@ namespace Loom
 				ImGui::SetTooltip("%s", text.c_str());
 
 			ImGui::SameLine(left + column + ImGui::GetStyle().ItemInnerSpacing.x);
+		};
+
+		// What a Sprite made from a texture or sprite file in the Project panel
+		// draws: the texture, or the image the sprite is flattened into. Empty
+		// for any other file.
+		std::string SpriteImage(const std::string& path)
+		{
+			if (std::filesystem::path(path).extension() == SpriteAsset::extension)
+				return SpriteAsset::ImageOf(path);
+
+			return ProjectAssets::IsTextureFile(path) ? path : "";
 		};
 
 		void DragSource(const LoomObject& object)
@@ -2401,6 +2410,26 @@ namespace Loom
 
 			DrawPrefabNode();
 
+			// The empty space under the rows takes a drop as the active
+			// scene's last.
+			const ImGuiWindow* window = ImGui::GetCurrentWindow();
+			const ImRect below(
+				window->InnerRect.Min.x,
+				(std::max)(ImGui::GetCursorScreenPos().y, window->InnerRect.Min.y),
+				window->InnerRect.Max.x,
+				window->InnerRect.Max.y);
+
+			if (m_activeScene && below.GetHeight() > 0.0f && ImGui::BeginDragDropTargetCustom(below, window->ID))
+			{
+				if (DropPlaced(m_activeScene->GetRoot(), true, Hierarchy::Zone::Into))
+					window->DrawList->AddLine(
+						below.Min,
+						ImVec2(below.Max.x, below.Min.y),
+						ImGui::GetColorU32(ImGuiCol_DragDropTarget));
+
+				ImGui::EndDragDropTarget();
+			};
+
 			m_childCounts.swap(m_drawnCounts);
 			m_drawnCounts.clear();
 		};
@@ -2730,86 +2759,82 @@ namespace Loom
 		if (!ImGui::BeginDragDropTarget())
 			return;
 
-		if (DropAsset(gameObject) || DropScript(gameObject))
-		{
-			ImGui::EndDragDropTarget();
-			return;
-		};
-
-		const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(
-			object_payload,
-			ImGuiDragDropFlags_AcceptBeforeDelivery |
-			ImGuiDragDropFlags_AcceptNoDrawDefaultRect);
-
-		GameObject* dragged = payload
-			? LoomObject::GetByGuid<GameObject>(*(const Guid*)payload->Data)
-			: nullptr;
-
-		if (dragged == nullptr || !EditCommands::CanMove(*dragged, *gameObject, m_ownedScenes))
-		{
-			ImGui::EndDragDropTarget();
-			return;
-		};
-
 		const ImVec2 min = ImGui::GetItemRectMin();
 		const ImVec2 max = ImGui::GetItemRectMax();
-		const float edge = (max.y - min.y) * sibling_edge;
-		const float mouse = ImGui::GetMousePos().y;
+		// Beside a prefab's root is outside the prefab, where nothing draws it.
+		const bool root = gameObject->GetParent() == nullptr || gameObject == GetPrefabRoot();
+		const Hierarchy::Zone zone = Hierarchy::ZoneOf(min.y, max.y, ImGui::GetMousePos().y, root);
 
-		ImDrawList* draw = ImGui::GetWindowDrawList();
-		const ImU32 colour = ImGui::GetColorU32(ImGuiCol_DragDropTarget);
-
-		const std::vector<GameObject*>& children = gameObject->GetChildren();
-
-		GameObject* parent = gameObject;
-		const GameObject* before = nullptr;
-
-		if (gameObject->GetParent() == nullptr || (mouse > min.y + edge && mouse < max.y - edge))
-			draw->AddRect(min, max, colour);
-		else if (mouse <= min.y + edge)
+		if (!DropScript(gameObject) && DropPlaced(*gameObject, open, zone))
 		{
-			draw->AddLine(min, ImVec2(max.x, min.y), colour);
+			ImDrawList* draw = ImGui::GetWindowDrawList();
+			const ImU32 colour = ImGui::GetColorU32(ImGuiCol_DragDropTarget);
 
-			parent = gameObject->GetParent();
-			before = gameObject;
-		}
-		else
-		{
-			draw->AddLine(ImVec2(min.x, max.y), max, colour);
-
-			// Below an open node is where its first child is drawn.
-			if (open && !children.empty())
-				before = children.front();
-			else
+			switch (zone)
 			{
-				parent = gameObject->GetParent();
-
-				const std::vector<GameObject*>& siblings = parent->GetChildren();
-				auto next = std::find(siblings.begin(), siblings.end(), gameObject) + 1;
-
-				if (next != siblings.end() && *next == dragged)
-					next++;
-
-				before = next == siblings.end() ? nullptr : *next;
+			case Hierarchy::Zone::Above:	draw->AddLine(min, ImVec2(max.x, min.y), colour);	break;
+			case Hierarchy::Zone::Into:		draw->AddRect(min, max, colour);					break;
+			case Hierarchy::Zone::Below:	draw->AddLine(ImVec2(min.x, max.y), max, colour);	break;
 			};
 		};
 
+		ImGui::EndDragDropTarget();
+	};
+
+	bool Editor::DropPlaced(GameObject& row, bool open, Hierarchy::Zone zone)
+	{
+		const ImGuiPayload* dragged = ImGui::GetDragDropPayload();
+
+		if (dragged == nullptr)
+			return false;
+
+		constexpr ImGuiDragDropFlags flags =
+			ImGuiDragDropFlags_AcceptBeforeDelivery |
+			ImGuiDragDropFlags_AcceptNoDrawDefaultRect;
+
+		if (dragged->IsDataType(ASSET_PAYLOAD))
+		{
+			const std::string path = (const char*)dragged->Data;
+			const Hierarchy::Placement placement = Hierarchy::Place(row, open, zone, nullptr);
+
+			if (!CanPlace(path, *placement.parent))
+				return false;
+
+			const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(ASSET_PAYLOAD, flags);
+
+			if (payload && payload->IsDelivery())
+				PlaceAsset(path, placement);
+
+			return payload != nullptr;
+		};
+
+		const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(object_payload, flags);
+
+		GameObject* moving = payload
+			? LoomObject::GetByGuid<GameObject>(*(const Guid*)payload->Data)
+			: nullptr;
+
+		if (moving == nullptr || !EditCommands::CanMove(*moving, row, m_ownedScenes))
+			return false;
+
 		if (payload->IsDelivery())
 		{
+			const Hierarchy::Placement placement = Hierarchy::Place(row, open, zone, moving);
+
 			// Each scene is seen through its own camera, so an object moved into
 			// another scene is followed there rather than vanishing from view.
-			Scene* destination = EditCommands::SceneOf(*gameObject);
+			Scene* destination = EditCommands::SceneOf(row);
 
-			if (destination != EditCommands::SceneOf(*dragged))
+			if (destination != EditCommands::SceneOf(*moving))
 				ShowInSceneView(destination);
 
-			dragged->SetParent(parent, before);
-			Select(dragged);
+			moving->SetParent(placement.parent, placement.before);
+			Select(moving);
 
 			m_historyDirty = true;
 		};
 
-		ImGui::EndDragDropTarget();
+		return true;
 	};
 
 	void Editor::DrawRenameField(GameObject* gameObject)
@@ -2855,22 +2880,49 @@ namespace Loom
 			!m_nodePressOpened;
 	};
 
-	bool Editor::DropAsset(GameObject* gameObject)
+	bool Editor::CanPlace(const std::string& path, const GameObject& parent) const
 	{
-		const ImGuiPayload* dragged = ImGui::GetDragDropPayload();
-
-		if (dragged == nullptr || !dragged->IsDataType(ASSET_PAYLOAD))
-			return false;
-
-		const std::string path = (const char*)dragged->Data;
-
 		// A prefab inside itself would take in its own every edit.
-		if (std::filesystem::path(path).extension() == Prefab::extension &&
-			!IsInPrefab(gameObject, path) &&
-			ImGui::AcceptDragDropPayload(ASSET_PAYLOAD))
-			Instantiate(path, *gameObject);
+		if (std::filesystem::path(path).extension() == Prefab::extension)
+			return !IsInPrefab(&parent, path);
 
-		return true;
+		return
+			IsModelFile(path) ||
+			!SpriteImage(path).empty() ||
+			ProjectAssets::IsSoundFile(path);
+	};
+
+	GameObject* Editor::PlaceAsset(const std::string& path, const Hierarchy::Placement& placement)
+	{
+		const std::string name = std::filesystem::path(path).stem().string();
+		const std::string image = SpriteImage(path);
+
+		GameObject* placed = nullptr;
+
+		if (std::filesystem::path(path).extension() == Prefab::extension)
+			placed = Instantiate(path, *placement.parent);
+		else if (IsModelFile(path))
+			placed = ImportModel(path, *placement.parent);
+		else if (!image.empty())
+		{
+			placed = placement.parent->AddChild(name);
+			placed->Attach<Sprite>()->texturePath = image;
+		}
+		else
+		{
+			placed = placement.parent->AddChild(name);
+			placed->Attach<AudioSource>()->clipPath = path;
+		};
+
+		if (placed == nullptr)
+			return nullptr;
+
+		placed->SetParent(placement.parent, placement.before);
+		Select(placed);
+
+		m_historyDirty = true;
+
+		return placed;
 	};
 
 	bool Editor::AcceptShaderDrop(std::string& path)
