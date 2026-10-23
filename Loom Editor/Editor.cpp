@@ -2418,6 +2418,7 @@ namespace Loom
 			// The empty space under the rows takes a drop as the last of the
 			// rows just above it: the open prefab's, or else the active scene's.
 			GameObject* last_rows = GetPrefabRoot();
+
 			if (last_rows == nullptr && m_activeScene)
 				last_rows = &m_activeScene->GetRoot();
 
