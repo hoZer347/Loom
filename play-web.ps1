@@ -29,7 +29,7 @@ param(
     [string] $Scene
 )
 
-# Native commands are judged by their exit codes: emcc writes ordinary notes to
+# Native commands are judged by their exit codes: em++ writes ordinary notes to
 # stderr, which PowerShell 5.1 would otherwise turn into terminating errors.
 $ErrorActionPreference = 'Continue'
 $root = $PSScriptRoot
@@ -40,8 +40,8 @@ $Project = (Resolve-Path -LiteralPath $Project -ErrorAction Stop).Path
 $Scene = (Resolve-Path -LiteralPath $Scene -ErrorAction Stop).Path
 $output = Split-Path -Parent $Scene
 
-$emcc = Find-Emcc
-$emrun = Join-Path (Split-Path -Parent $emcc) 'emrun.bat'
+$emxx = Find-Emxx
+$emrun = Get-EmscriptenTool $emxx 'emrun'
 
 # A path under the project as the page addresses it: from the root it is served from.
 function Get-UrlPath([string] $Path)
@@ -49,7 +49,7 @@ function Get-UrlPath([string] $Path)
     '/' + $Path.Substring($Project.Length).TrimStart('\').Replace('\', '/')
 }
 
-$library = Build-WebEngine $emcc
+$library = Build-WebEngine $emxx
 
 if (-not $library)
 {
@@ -105,7 +105,7 @@ if (Test-Stale $module $linkInputs)
     Write-Host "Linking $($scripts.Count) script file(s) into $module"
 
     # Scripts are headers compiled as their own translation units, as the
-    # Visual Studio project does. emcc will not take a header beside other
+    # Visual Studio project does. em++ will not take a header beside other
     # inputs, so each one is compiled on its own first.
     $scriptJobs = @()
 
@@ -114,7 +114,7 @@ if (Test-Stale $module $linkInputs)
         # The engine's header is precompiled and forced into each script, as
         # the Visual Studio project does. Only what changed since the last link
         # is compiled again, the emscripten that built it counting as a flag.
-        $version = (Get-Content -LiteralPath (Join-Path (Split-Path -Parent $emcc) 'emscripten-version.txt') -Raw).Trim()
+        $version = Get-EmscriptenVersion $emxx
 
         $header = [pscustomobject] @{
             Source = Join-Path $webWasm 'Loom.h'
@@ -124,11 +124,11 @@ if (Test-Stale $module $linkInputs)
 
         $headerFlags = @($webCompileFlags) + @($webIncludes) + @('-x', 'c++-header')
         $headerStamp = Join-Path $intermediate 'Loom.h.flags'
-        $headerStamped = @($headerFlags) + @($emcc, $version)
+        $headerStamped = @($headerFlags) + @($emxx, $version)
 
         if (@(Get-StaleJobs @($header) $headerStamped $headerStamp).Count -gt 0)
         {
-            if (-not (Invoke-Compile $emcc @($header) $headerFlags))
+            if (-not (Invoke-Compile $emxx @($header) $headerFlags))
             {
                 Write-Host 'The engine header failed to precompile.'
                 exit 1
@@ -140,12 +140,12 @@ if (Test-Stale $module $linkInputs)
         $scriptJobs = @(Get-CompileJobs $scripts $scriptDir $intermediate)
         $scriptFlags = @($webCompileFlags) + @($webIncludes) + @("-I$scriptDir", '-include-pch', $header.Object, '-Wno-pragma-once-outside-header', '-x', 'c++')
         $scriptStamp = Join-Path $intermediate 'scripts.flags'
-        $scriptStamped = @($scriptFlags) + @($emcc, $version)
+        $scriptStamped = @($scriptFlags) + @($emxx, $version)
         $stale = @(Get-StaleJobs $scriptJobs $scriptStamped $scriptStamp)
 
         if ($stale.Count -gt 0)
         {
-            if (-not (Invoke-Compile $emcc $stale $scriptFlags))
+            if (-not (Invoke-Compile $emxx $stale $scriptFlags))
             {
                 Write-Host 'The scripts failed to build.'
                 exit 1
@@ -158,13 +158,13 @@ if (Test-Stale $module $linkInputs)
     # The whole archive goes in because components register themselves from
     # static initialisers nothing else refers to. The page preloads the scene
     # through FS.
-    & $emcc @webCompileFlags @webLinkFlags @webIncludes '-sEXPORTED_RUNTIME_METHODS=FS' $player @($scriptJobs | ForEach-Object { $_.Object }) `
+    & $emxx @webCompileFlags @webLinkFlags @webIncludes '-sEXPORTED_RUNTIME_METHODS=FS' $player @($scriptJobs | ForEach-Object { $_.Object }) `
         '-Wl,--whole-archive' $library '-Wl,--no-whole-archive' `
         -o $module
 
     if ($LASTEXITCODE -ne 0)
     {
-        Write-Host "emcc failed with exit code $LASTEXITCODE"
+        Write-Host "em++ failed with exit code $LASTEXITCODE"
         exit $LASTEXITCODE
     }
 }

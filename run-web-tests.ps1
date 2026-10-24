@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Builds the Loom test suite for the web with emcc and runs it under node.
+    Builds the Loom test suite for the web with em++ and runs it under node.
 
 .DESCRIPTION
     The same test sources and the same engine sources the desktop build uses,
@@ -90,8 +90,8 @@ $output    = Join-Path $outputDir 'Loom Tests.js'
 
 if (-not $NoBuild)
 {
-    $emcc = Find-Emcc
-    Write-Host "Building the web test suite ($Configuration) with $emcc"
+    $emxx = Find-Emxx
+    Write-Host "Building the web test suite ($Configuration) with $emxx"
 
     $sources = Get-SourcesFromProject (Join-Path $root 'Loom Tests\Loom Tests.vcxproj')
 
@@ -154,8 +154,7 @@ if (-not $NoBuild)
     # Which emscripten built the objects counts as much as the flags it was
     # given: its own headers are not among those -MMD lists, so another
     # version's objects would otherwise be kept.
-    $version = Get-Content -LiteralPath (Join-Path (Split-Path -Parent $emcc) 'emscripten-version.txt') -Raw
-    $stamped = @($compileFlags) + @($emcc, $version.Trim())
+    $stamped = @($compileFlags) + @($emxx, (Get-EmscriptenVersion $emxx))
 
     $jobs = @(Get-CompileJobs $sources $root $objects)
     $stamp = Join-Path $objects 'flags.txt'
@@ -165,7 +164,7 @@ if (-not $NoBuild)
     {
         Write-Host "Compiling $($stale.Count) of $($jobs.Count) files"
 
-        if (-not (Invoke-Compile $emcc $stale $compileFlags))
+        if (-not (Invoke-Compile $emxx $stale $compileFlags))
         {
             Write-Error 'The web test suite failed to compile.'
             exit 1
@@ -175,11 +174,11 @@ if (-not $NoBuild)
     }
 
     # The link's arguments go in a response file, as the objects alone run
-    # past cmd's limit on a command line for a batch file like emcc. It is
+    # past cmd's limit on a command line for a batch file like em++. It is
     # rewritten only when they change, so its date says when they last did.
     $arguments = @($linkFlags) + @($jobs | ForEach-Object { $_.Object }) + @('-o', $output) |
         ForEach-Object { '"' + ($_ -replace '\\', '/') + '"' }
-    $response = Join-Path $outputDir 'emcc.rsp'
+    $response = Join-Path $outputDir 'em++.rsp'
     $link = $arguments -join "`r`n"
 
     if (-not (Test-Path -LiteralPath $response) -or [IO.File]::ReadAllText($response) -cne $link)
@@ -197,16 +196,16 @@ if (-not $NoBuild)
         Write-Host 'Linking the web test suite'
 
         # PowerShell 5.1 wraps a native command's stderr in a NativeCommandError,
-        # which the 'Stop' preference above would treat as fatal -- and emcc writes
+        # which the 'Stop' preference above would treat as fatal -- and em++ writes
         # ordinary notes there. Judge it by its exit code instead.
         $previous = $ErrorActionPreference
         $ErrorActionPreference = 'Continue'
-        try { & $emcc "@$response" }
+        try { & $emxx "@$response" }
         finally { $ErrorActionPreference = $previous }
 
         if ($LASTEXITCODE -ne 0)
         {
-            Write-Error "emcc failed with exit code $LASTEXITCODE"
+            Write-Error "em++ failed with exit code $LASTEXITCODE"
             exit $LASTEXITCODE
         }
     }
@@ -229,5 +228,9 @@ if (-not $node)
 # the engine (one test deliberately makes a queued task throw). The exit code is
 # what says whether the run passed.
 $ErrorActionPreference = 'Continue'
+
+# Emscripten 6 hands node's environment to the module, and Windows'
+# TEMP is a path its POSIX filesystem reads as relative.
+$env:TMPDIR = '/tmp'
 & $node.Source $output @TestArgs
 exit $LASTEXITCODE

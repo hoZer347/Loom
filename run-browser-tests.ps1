@@ -23,7 +23,7 @@
 [CmdletBinding()]
 param()
 
-# Native commands are judged by their exit codes: emcc writes ordinary notes to
+# Native commands are judged by their exit codes: em++ writes ordinary notes to
 # stderr, which PowerShell 5.1 would otherwise turn into terminating errors.
 $ErrorActionPreference = 'Continue'
 $root = $PSScriptRoot
@@ -62,8 +62,8 @@ if (-not $node)
     exit 1
 }
 
-$emcc = Find-Emcc
-$library = Build-WebEngine $emcc
+$emxx = Find-Emxx
+$library = Build-WebEngine $emxx
 
 if (-not $library)
 {
@@ -80,7 +80,7 @@ $flags = @($webCompileFlags) + @($webIncludes) + @(
 
 Write-Host "Building the browser suite ($($sources.Count) files)"
 
-if (-not (Invoke-Compile $emcc $jobs $flags))
+if (-not (Invoke-Compile $emxx $jobs $flags))
 {
     Write-Host 'The browser suite failed to build.'
     exit 1
@@ -88,13 +88,13 @@ if (-not (Invoke-Compile $emcc $jobs $flags))
 
 # The whole archive goes in because components register themselves from
 # static initialisers nothing else refers to.
-& $emcc @webCompileFlags @webLinkFlags '-sEXIT_RUNTIME=1' @($jobs | ForEach-Object { $_.Object }) `
+& $emxx @webCompileFlags @webLinkFlags '-sEXIT_RUNTIME=1' @($jobs | ForEach-Object { $_.Object }) `
     '-Wl,--whole-archive' $library '-Wl,--no-whole-archive' `
     -o (Join-Path $output 'tests.js')
 
 if ($LASTEXITCODE -ne 0)
 {
-    Write-Host "emcc failed with exit code $LASTEXITCODE"
+    Write-Host "em++ failed with exit code $LASTEXITCODE"
     exit $LASTEXITCODE
 }
 

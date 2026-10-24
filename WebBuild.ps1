@@ -36,26 +36,54 @@ $webLinkFlags = @(
     '-Wno-pthreads-mem-growth'
 )
 
-function Find-Emcc
+# The oldest emscripten whose emdawnwebgpu port the WebGPU renderer builds with.
+$minimumEmscripten = [version] '4.0.10'
+
+# Emscripten 4 launches its tools through .bat files and later ones through .exe.
+$emscriptenLaunchers = '.exe', '.bat'
+
+function Get-EmscriptenVersion([string] $Emxx)
 {
-    $candidates = @()
+    [version] (Get-Content -LiteralPath (Join-Path (Split-Path -Parent $Emxx) 'emscripten-version.txt') -Raw).Trim().Trim('"')
+}
 
-    if ($env:EMSDK) { $candidates += (Join-Path $env:EMSDK 'upstream\emscripten\emcc.bat') }
+# Another of emscripten's tools, launched the same way as em++.
+function Get-EmscriptenTool([string] $Emxx, [string] $Name)
+{
+    Join-Path (Split-Path -Parent $Emxx) ($Name + [IO.Path]::GetExtension($Emxx))
+}
 
-    $candidates += 'C:\emsdk\upstream\emscripten\emcc.bat'
-    $candidates += (Join-Path $webRoot 'External Libraries\emsdk\upstream\emscripten\emcc.bat')
+function Find-Emxx
+{
+    $roots = @()
 
-    foreach ($candidate in $candidates)
+    if ($env:EMSDK) { $roots += (Join-Path $env:EMSDK 'upstream\emscripten') }
+
+    $roots += 'C:\emsdk\upstream\emscripten'
+    $roots += (Join-Path $webRoot 'External Libraries\emsdk\upstream\emscripten')
+    $roots += Get-Command em++.exe, em++.bat -ErrorAction SilentlyContinue | ForEach-Object { Split-Path -Parent $_.Source }
+
+    $tooOld = @()
+
+    foreach ($root in $roots)
     {
-        if (Test-Path $candidate) { return $candidate }
+        foreach ($launcher in $emscriptenLaunchers)
+        {
+            $candidate = Join-Path $root ('em++' + $launcher)
+
+            if (-not (Test-Path -LiteralPath $candidate)) { continue }
+
+            if ((Get-EmscriptenVersion $candidate) -ge $minimumEmscripten) { return $candidate }
+
+            $tooOld += "$candidate is $(Get-EmscriptenVersion $candidate)"
+            break
+        }
     }
 
-    $onPath = Get-Command emcc.bat -ErrorAction SilentlyContinue
-    if ($onPath) { return $onPath.Source }
-
     throw @"
-Could not find emcc. Install the emscripten SDK and either set EMSDK, put it at
-C:\emsdk, or install the copy vendored at "External Libraries\emsdk":
+Could not find emscripten $minimumEmscripten or later.$(($tooOld | ForEach-Object { "`n    $_" }) -join '')
+Install the emscripten SDK and either set EMSDK, put it at C:\emsdk, or install
+the copy vendored at "External Libraries\emsdk":
 
     cd "External Libraries\emsdk"
     .\emsdk install latest
@@ -86,7 +114,7 @@ function Get-CompileJobs($Sources, [string] $Base, [string] $Directory)
     }
 }
 
-# The files a compile read, from the make rule emcc's -MMD wrote: the target, a
+# The files a compile read, from the make rule em++'s -MMD wrote: the target, a
 # colon, then paths separated by spaces, a space within a path escaped and long
 # lines continued with a backslash.
 function Read-Dependencies([string] $Path)
@@ -137,7 +165,7 @@ function Get-StaleJobs($Jobs, [string[]] $Flags, [string] $Stamp)
 
 # Runs the jobs a process per core at a time. Returns whether all of them
 # succeeded; the compiler has already said why when one did not.
-function Invoke-Compile([string] $Emcc, $Jobs, [string[]] $Flags)
+function Invoke-Compile([string] $Emxx, $Jobs, [string[]] $Flags)
 {
     $running = New-Object System.Collections.Generic.List[System.Diagnostics.Process]
     $failed = $false
@@ -155,7 +183,7 @@ function Invoke-Compile([string] $Emcc, $Jobs, [string[]] $Flags)
         $arguments = @($Flags) + @('-MMD', '-MF', $job.Depends, '-c', $job.Source, '-o', $job.Object) |
             ForEach-Object { '"' + $_ + '"' }
 
-        $process = Start-Process -FilePath $Emcc -ArgumentList $arguments -NoNewWindow -PassThru
+        $process = Start-Process -FilePath $Emxx -ArgumentList $arguments -NoNewWindow -PassThru
 
         # The exit code is only kept for a process whose handle was opened while it ran.
         $null = $process.Handle
@@ -174,7 +202,7 @@ function Invoke-Compile([string] $Emcc, $Jobs, [string[]] $Flags)
 # The engine as a static library under x64\WebPlayer, rebuilt only when an
 # engine source or header, or this file with its flags, is newer than it.
 # Returns its path, or nothing when it failed to build.
-function Build-WebEngine([string] $Emcc)
+function Build-WebEngine([string] $Emxx)
 {
     $directory = Join-Path $webRoot 'x64\WebPlayer'
     $library = Join-Path $directory 'Loom Engine.a'
@@ -204,14 +232,14 @@ function Build-WebEngine([string] $Emcc)
 
     $jobs = @(Get-CompileJobs $sources $webRoot $directory)
 
-    if (-not (Invoke-Compile $Emcc $jobs (@($webCompileFlags) + @($webIncludes))))
+    if (-not (Invoke-Compile $Emxx $jobs (@($webCompileFlags) + @($webIncludes))))
     {
         Write-Host 'The engine failed to build.'
         return
     }
 
     Remove-Item -LiteralPath $library -ErrorAction SilentlyContinue
-    & (Join-Path (Split-Path -Parent $Emcc) 'emar.bat') rcs $library @($jobs | ForEach-Object { $_.Object }) | Out-Host
+    & (Get-EmscriptenTool $Emxx 'emar') rcs $library @($jobs | ForEach-Object { $_.Object }) | Out-Host
 
     if ($LASTEXITCODE -ne 0)
     {
