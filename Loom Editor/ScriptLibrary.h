@@ -89,6 +89,13 @@ namespace Loom
 		// built to run inside it has to be built in too.
 		static const char* Configuration();
 
+		// Whether a line MSBuild prints is a warning, which is no failure,
+		// rather than an error.
+		static bool IsWarning(const std::string& line)
+		{
+			return line.find(": warning ") != std::string::npos;
+		};
+
 
 	private:
 		// Lets go of a build that is no longer wanted. MSBuild is still running

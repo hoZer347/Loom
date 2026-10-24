@@ -5,7 +5,6 @@
 
 #include <filesystem>
 #include <iostream>
-#include <vector>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -44,31 +43,22 @@ namespace Loom
 				CoUninitialize();
 		};
 
-		// Opens the page when the server comes up. What the script said is
-		// printed only if it ended first, unless it was stopped. Returns when
-		// everything holding the pipe has exited.
+		// Opens the page when the server comes up, and prints what the script
+		// said if it ended first. Returns when everything holding the pipe has
+		// exited.
 		void Read(HiddenProcess hidden, const std::string& page, const std::atomic<bool>* stopping)
 		{
-			std::vector<std::string> said{ };
-			bool serving = false;
+			WebPlayer::Output output(page);
 
 			hidden.ReadLines(
 				[&](const std::string& line)
 				{
-					if (serving || line.empty())
-						return;
-
-					if (const std::string url = WebPlayer::PageUrl(line, page); !url.empty())
-					{
-						serving = true;
+					if (const std::string url = output.Hear(line); !url.empty())
 						OpenInBrowser(url);
-					}
-					else said.push_back(line);
 				});
 
-			if (!serving && !*stopping)
-				for (const std::string& line : said)
-					std::cerr << prefix << line << std::endl;
+			for (const std::string& line : output.Ended(*stopping))
+				std::cerr << prefix << line << std::endl;
 		};
 	};
 

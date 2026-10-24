@@ -118,6 +118,7 @@
     <ClCompile Include="InputActions Tests.cpp" />
     <ClCompile Include="ComponentMenu Tests.cpp" />
     <ClCompile Include="ScriptFolders Tests.cpp" />
+    <ClCompile Include="ScriptLibrary Tests.cpp" />
     <ClCompile Include="EditorLayouts Tests.cpp" />
     <ClCompile Include="ShaderEditor Tests.cpp" />
     <ClCompile Include="SpriteAsset Tests.cpp" />

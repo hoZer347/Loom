@@ -332,8 +332,8 @@ namespace Loom
 					command,
 					[](const std::string& line)
 					{
-						// Only errors and warnings come through, and a warning is no failure.
-						if (line.find(": warning ") != std::string::npos)
+						// Only errors and warnings come through.
+						if (IsWarning(line))
 							std::cout << line << std::endl;
 						else if (!line.empty())
 							std::cerr << line << std::endl;

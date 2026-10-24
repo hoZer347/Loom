@@ -20,8 +20,8 @@ namespace Loom
 	*   FieldNames holds open, but both can be renamed. So they are moved aside
 	*   and copies put back where they were, which MSBuild either finds up to
 	*   date or links over
-	* - MSBuild runs on a worker thread, as the scripts' does, and its output
-	*   goes to the Console panel
+	* - MSBuild runs on a worker thread, as the scripts' does, and its errors
+	*   go to the Console panel
 	*/
 	struct EditorRefresh final
 	{
