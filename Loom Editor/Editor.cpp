@@ -1098,14 +1098,8 @@ namespace Loom
 
 	void Editor::SaveActiveScene()
 	{
-		if (m_activeScene == nullptr)
+		if (m_activeScene == nullptr || m_playing)
 			return;
-
-		if (m_playing)
-		{
-			std::cerr << "Stop playing before saving the scene" << std::endl;
-			return;
-		};
 
 		if (SaveToProject(m_activeScene))
 			RefreshProjectAssets();

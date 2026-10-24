@@ -79,9 +79,6 @@
     <ClCompile Include="ScriptFolders Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
-    <ClCompile Include="ScriptLibrary Tests.cpp">
-      <Filter>Tests</Filter>
-    </ClCompile>
     <ClCompile Include="EditorLayouts Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

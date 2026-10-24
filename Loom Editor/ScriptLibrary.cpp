@@ -332,11 +332,8 @@ namespace Loom
 					command,
 					[](const std::string& line)
 					{
-						// Only errors and warnings come through.
-						if (IsWarning(line))
-							std::cout << line << std::endl;
-						else if (!line.empty())
-							std::cerr << line << std::endl;
+						if (!line.empty())
+							std::cout << "  " << line << std::endl;
 					});
 				build->done = true;
 			});
@@ -425,9 +422,6 @@ namespace Loom
 		if (BuiltAgainstOlderEditor())
 		{
 			m_status = "Built against an older editor; needs recompiling.";
-
-			std::cerr << "Not loading " << m_library << ": it was built against an older editor." << std::endl;
-
 			return false;
 		};
 

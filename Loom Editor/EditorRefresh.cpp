@@ -81,8 +81,6 @@ namespace Loom
 
 		if (m_executable.empty())
 		{
-			std::cerr << "Full refresh: could not find this editor's executable." << std::endl;
-
 			finish(false);
 			return;
 		};
@@ -147,7 +145,7 @@ namespace Loom
 					[](const std::string& line)
 					{
 						if (!line.empty())
-							std::cerr << line << std::endl;
+							std::cout << "  " << line << std::endl;
 					});
 				build->done = true;
 			});

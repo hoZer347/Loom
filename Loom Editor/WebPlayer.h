@@ -1,9 +1,7 @@
 #pragma once
 
-#include <atomic>
 #include <string>
 #include <thread>
-#include <vector>
 
 
 namespace Loom
@@ -15,8 +13,7 @@ namespace Loom
 	*   page in the default browser once the server is listening
 	* - The script and everything it starts share a job object, so launching
 	*   again or closing the editor takes the server down with it
-	* - What the build says goes to the console, from a reader thread, only
-	*   when it stops before serving the page, unless it was stopped
+	* - A reader thread watches what the build says for the server's address
 	*/
 	struct WebPlayer final
 	{
@@ -60,49 +57,8 @@ namespace Loom
 			return "http://localhost:" + port + page;
 		};
 
-		// What the script says, a line at a time: the page once it is served,
-		// and what it said should it end before then.
-		struct Output final
-		{
-			explicit Output(const std::string& page) : m_page(page) { };
-
-			// The page's address from the line saying the server is listening,
-			// and empty for every other line, before or after it.
-			std::string Hear(const std::string& line)
-			{
-				if (m_serving || line.empty())
-					return "";
-
-				std::string url = PageUrl(line, m_page);
-
-				if (url.empty())
-					m_said.push_back(line);
-				else m_serving = true;
-
-				return url;
-			};
-
-			// What to print once the script has ended: nothing if it served
-			// the page or was stopped, and otherwise everything it said.
-			std::vector<std::string> Ended(bool stopped) const
-			{
-				if (m_serving || stopped)
-					return { };
-
-				return m_said;
-			};
-
-		private:
-			std::string m_page{ };
-			std::vector<std::string> m_said{ };
-			bool m_serving = false;
-		};
-
 	private:
 		void* m_job = nullptr;
 		std::thread m_reader{ };
-
-		// Set while Stop takes the script down, which is no failure of its own.
-		std::atomic<bool> m_stopping = false;
 	};
 };
