@@ -114,11 +114,12 @@ namespace Loom
 			return;
 
 		// From wherever it has been moved to since, unless that is under
-		// something on its way out, which takes it along.
+		// something on its way out, which takes it along. Found again by ID,
+		// since it may have been moved under one deleted ahead of it.
 		Engine::QueueTask(
-			[child]()
+			[child, id = child->m_ID]()
 			{
-				if (child->UnderRemoved())
+				if (LoomObject::GetByID(id) == nullptr || child->UnderRemoved())
 					return;
 
 				std::vector<GameObject*>& siblings = child->parent->m_children;
