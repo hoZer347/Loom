@@ -30,6 +30,7 @@
 #include <iostream>
 #include <map>
 #include <numbers>
+#include <span>
 #include <thread>
 #include <utility>
 
@@ -365,13 +366,14 @@ namespace Loom
 
 		using Microsoft::WRL::ComPtr;
 
-		// Calls an automation member by name, with at most one argument.
+		// Calls an automation member by name. IDispatch takes the arguments
+		// last first.
 		HRESULT Call(
 			IDispatch* object,
 			const wchar_t* member,
 			WORD kind,
 			VARIANT* result,
-			VARIANT* argument = nullptr)
+			std::span<VARIANT> arguments = { })
 		{
 			DISPID id = 0;
 			LPOLESTR name = const_cast<LPOLESTR>(member);
@@ -381,7 +383,7 @@ namespace Loom
 			if (FAILED(found))
 				return found;
 
-			DISPPARAMS parameters{ argument, nullptr, argument != nullptr ? 1u : 0u, 0 };
+			DISPPARAMS parameters{ arguments.data(), nullptr, (UINT)arguments.size(), 0 };
 
 			return object->Invoke(id, IID_NULL, LOCALE_USER_DEFAULT, kind, &parameters, result, nullptr, nullptr);
 		};
@@ -401,6 +403,31 @@ namespace Loom
 			result.Attach(value.pdispVal);
 
 			return result;
+		};
+
+		VARIANT Integer(int value)
+		{
+			VARIANT integer;
+			VariantInit(&integer);
+			integer.vt = VT_I4;
+			integer.lVal = value;
+
+			return integer;
+		};
+
+		// Puts the caret in the document a Visual Studio window shows at the
+		// line and column, the first column when none is given.
+		HRESULT GoTo(IDispatch* window, int line, int column)
+		{
+			const ComPtr<IDispatch> document = Property(window, L"Document");
+			const ComPtr<IDispatch> selection = document ? Property(document.Get(), L"Selection") : nullptr;
+
+			if (!selection)
+				return E_NOINTERFACE;
+
+			VARIANT position[]{ Integer(std::max(column, 1)), Integer(line) };
+
+			return Call(selection.Get(), L"MoveToLineAndOffset", DISPATCH_METHOD, nullptr, position);
 		};
 
 		// What a Visual Studio in the middle of a build or a modal dialog answers.
@@ -490,7 +517,9 @@ namespace Loom
 			Failed,
 		};
 
-		Handover OpenThroughAutomation(const std::string& solution, const std::string& file)
+		// The line and column count from one, and a line of zero leaves the
+		// caret where Visual Studio puts it.
+		Handover OpenThroughAutomation(const std::string& solution, const std::string& file, int line, int column)
 		{
 			DWORD process = 0;
 			bool busy = false;
@@ -512,8 +541,12 @@ namespace Loom
 			VariantInit(&opened);
 
 			const HRESULT result = operations
-				? Call(operations.Get(), L"OpenFile", DISPATCH_METHOD, &opened, &path)
+				? Call(operations.Get(), L"OpenFile", DISPATCH_METHOD, &opened, { &path, 1 })
 				: E_NOINTERFACE;
+
+			const HRESULT moved = SUCCEEDED(result) && line > 0 && opened.vt == VT_DISPATCH
+				? GoTo(opened.pdispVal, line, column)
+				: S_OK;
 
 			VariantClear(&opened);
 			VariantClear(&path);
@@ -530,6 +563,11 @@ namespace Loom
 				return Handover::Failed;
 			};
 
+			if (FAILED(moved))
+				std::cerr
+					<< "Visual Studio opened " << file << " but would not go to line " << line
+					<< " (error 0x" << std::hex << moved << std::dec << ')' << std::endl;
+
 			// The editor has the foreground, having just been clicked, and Windows
 			// only lets another process take it when the one holding it says so.
 			AllowSetForegroundWindow(process);
@@ -542,11 +580,11 @@ namespace Loom
 
 		// False when no Visual Studio has the solution open. The editor's thread
 		// does not keep COM up, so this brings it up for the length of the call.
-		bool OpenInRunningVisualStudio(const std::string& solution, const std::string& file)
+		bool OpenInRunningVisualStudio(const std::string& solution, const std::string& file, int line, int column)
 		{
 			const HRESULT com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
-			const Handover handover = OpenThroughAutomation(solution, file);
+			const Handover handover = OpenThroughAutomation(solution, file, line, column);
 
 			// A busy one may be the one with the solution, and starting another
 			// would open it twice.
@@ -567,10 +605,10 @@ namespace Loom
 		// solution, so the file is handed to it from a thread of its own once it
 		// says it has. Its command line could open the file too, but File.OpenFile
 		// through /Command fails with dialogs of its own.
-		void OpenOnceLoaded(const std::string& solution, const std::string& file)
+		void OpenOnceLoaded(const std::string& solution, const std::string& file, int line, int column)
 		{
 			std::thread(
-				[solution, file]()
+				[solution, file, line, column]()
 				{
 					const HRESULT com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
@@ -580,7 +618,7 @@ namespace Loom
 
 					while (std::chrono::steady_clock::now() < deadline)
 					{
-						handover = OpenThroughAutomation(solution, file);
+						handover = OpenThroughAutomation(solution, file, line, column);
 
 						if (handover == Handover::Opened || handover == Handover::Failed)
 							break;
@@ -1240,7 +1278,7 @@ namespace Loom
 		return path;
 	};
 
-	void Editor::OpenInVisualStudio(const std::string& path)
+	void Editor::OpenInVisualStudio(const std::string& path, int line, int column)
 	{
 		// A hand-written project need not have a solution beside it, even though
 		// every project the editor writes does.
@@ -1251,7 +1289,7 @@ namespace Loom
 		std::error_code code;
 		const bool has_solution = !solution.empty() && std::filesystem::exists(solution, code);
 
-		if (has_solution && OpenInRunningVisualStudio(solution, path))
+		if (has_solution && OpenInRunningVisualStudio(solution, path, line, column))
 			return;
 
 		const std::string& devenv = ScriptLibrary::FindVisualStudio();
@@ -1261,7 +1299,7 @@ namespace Loom
 		else if (has_solution)
 		{
 			Shell(devenv.c_str(), '"' + solution + '"');
-			OpenOnceLoaded(solution, path);
+			OpenOnceLoaded(solution, path, line, column);
 		}
 		else
 			Shell(devenv.c_str(), "/Edit \"" + path + '"');

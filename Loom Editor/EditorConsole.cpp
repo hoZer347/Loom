@@ -8,6 +8,7 @@
 #include "imgui_internal.h"
 
 #include <algorithm>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -44,7 +45,7 @@ namespace Loom
 		};
 	};
 
-	void EditorConsole::Draw(bool* open)
+	void EditorConsole::Draw(bool* open, const std::function<void(const EditorLog::Link&)>& follow)
 	{
 		if (ImGui::Begin(EditorPanels::Console, open))
 		{
@@ -85,6 +86,9 @@ namespace Loom
 				const float line_spacing = ImGui::GetTextLineHeightWithSpacing();
 				const float newline_width = ImGui::CalcTextSize(" ").x;
 				const ImU32 highlight = ImGui::GetColorU32(ImGuiCol_TextSelectedBg);
+				const ImU32 text_colour = ImGui::GetColorU32(ImGuiCol_Text);
+				const ImU32 error_colour = ImGui::GetColorU32(EditorTheme::ErrorText);
+				const ImU32 link_colour = ImGui::GetColorU32(ImGuiCol_TextLink);
 				ImDrawList* const draw_list = ImGui::GetWindowDrawList();
 
 				const Position first = std::min(m_anchor, m_caret);
@@ -98,10 +102,14 @@ namespace Loom
 				float text_width = visible.x;
 				std::string copied;
 				bool copying = false;
+				std::optional<Position> hovered_link{ };
+				EditorLog::Link hovered{ };
 
 				EditorLog::Get().ForEach(
-					[&](size_t id, const std::string& line, bool is_error)
+					[&](size_t id, const EditorLog::Line& entry)
 					{
+						const std::string& line = entry.text;
+
 						if (filter[0] && line.find(filter) == std::string::npos)
 							return;
 
@@ -121,7 +129,9 @@ namespace Loom
 						text_end = line_end;
 						text_bottom = at.y + line_height;
 
-						if (tracking && mouse.y >= at.y && mouse.y < at.y + line_spacing)
+						const bool on_line = tracking && mouse.y >= at.y && mouse.y < at.y + line_spacing;
+
+						if (on_line)
 						{
 							under_mouse = { id, TextOffsetAt(line, mouse.x - at.x) };
 							under_mouse_length = line.size();
@@ -153,15 +163,44 @@ namespace Loom
 							};
 						};
 
-						if (is_error)
-							ImGui::PushStyleColor(ImGuiCol_Text, EditorTheme::ErrorText);
+						const char* const text = line.c_str();
+						const ImVec2 size = ImGui::CalcTextSize(text, text + line.size());
 
-						ImGui::TextUnformatted(line.c_str());
+						ImGui::Dummy(size);
+						text_width = std::max(text_width, size.x);
 
-						if (is_error)
-							ImGui::PopStyleColor();
+						if (!ImGui::IsItemVisible())
+							return;
 
-						text_width = std::max(text_width, ImGui::GetItemRectSize().x);
+						const ImU32 colour = entry.is_error ? error_colour : text_colour;
+						float x = at.x;
+						size_t drawn = 0;
+
+						const auto run =
+							[&](size_t to, ImU32 run_colour)
+							{
+								draw_list->AddText(ImVec2(x, at.y), run_colour, text + drawn, text + to);
+								x += ImGui::CalcTextSize(text + drawn, text + to).x;
+								drawn = to;
+							};
+
+						for (const EditorLog::Link& link : entry.links)
+						{
+							run(link.start, colour);
+
+							const float left = x;
+
+							run(link.start + link.length, link_colour);
+
+							if (on_line && mouse.x >= left && mouse.x < x)
+							{
+								hovered_link = Position{ id, link.start };
+								hovered = link;
+								draw_list->AddLine(ImVec2(left, at.y + line_height), ImVec2(x, at.y + line_height), link_colour);
+							};
+						};
+
+						run(line.size(), colour);
 					});
 
 				if (any)
@@ -178,15 +217,18 @@ namespace Loom
 					ImGui::InvisibleButton("##select", ImVec2(text_width, std::max(text_bottom - origin.y, visible.y)));
 
 					if (ImGui::IsItemHovered())
-						ImGui::SetMouseCursor(ImGuiMouseCursor_TextInput);
+						ImGui::SetMouseCursor(hovered_link ? ImGuiMouseCursor_Hand : ImGuiMouseCursor_TextInput);
 
 					if (ImGui::IsItemActivated())
 					{
-						if (!ImGui::GetIO().KeyShift)
+						const bool extending = ImGui::GetIO().KeyShift;
+
+						if (!extending)
 							m_anchor = under_mouse;
 
 						m_caret = under_mouse;
 						m_dragging = true;
+						m_pressedLink = extending ? std::nullopt : hovered_link;
 					};
 
 					if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
@@ -195,6 +237,13 @@ namespace Loom
 						m_caret = { under_mouse.line, under_mouse_length };
 						m_dragging = false;
 					};
+
+					// A press that selected nothing, let go over the link it went down on.
+					if (ImGui::IsItemDeactivated() &&
+						std::exchange(m_pressedLink, std::nullopt) == hovered_link &&
+						hovered_link &&
+						m_anchor == m_caret)
+						follow(hovered);
 
 					if (!ImGui::IsItemActive())
 						m_dragging = false;

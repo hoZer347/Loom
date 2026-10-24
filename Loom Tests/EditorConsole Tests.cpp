@@ -9,6 +9,8 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <utility>
@@ -17,6 +19,60 @@
 namespace
 {
 	std::string clipboard;
+
+	// A project folder of the test's own, holding the files its lines name,
+	// that the log names files from while it lasts.
+	struct Project final
+	{
+		Project()
+		{
+			std::filesystem::remove_all(folder);
+
+			for (const char* file : files)
+			{
+				const std::filesystem::path path = folder / file;
+
+				std::filesystem::create_directories(path.parent_path());
+				std::ofstream(path) << file;
+			};
+
+			Loom::EditorLog::Get().Install();
+			Loom::EditorLog::Get().Clear();
+			Loom::EditorLog::Get().SetProject(folder.string());
+		};
+
+		~Project()
+		{
+			Loom::EditorLog::Get().SetProject("");
+			Loom::EditorLog::Get().Clear();
+			Loom::EditorLog::Get().Uninstall();
+
+			std::filesystem::remove_all(folder);
+		};
+
+		// A file in the folder as Windows names it.
+		std::string Path(const char* file) const
+		{
+			return (folder / file).make_preferred().string();
+		};
+
+		static std::vector<Loom::EditorLog::Line> Lines()
+		{
+			std::vector<Loom::EditorLog::Line> lines;
+			Loom::EditorLog::Get().ForEach([&](size_t, const Loom::EditorLog::Line& line) { lines.push_back(line); });
+
+			return lines;
+		};
+
+		// The text of a line that a link covers.
+		static std::string Linked(const Loom::EditorLog::Line& line, const Loom::EditorLog::Link& link)
+		{
+			return line.text.substr(link.start, link.length);
+		};
+
+		const std::filesystem::path folder = std::filesystem::temp_directory_path() / "Loom EditorLog Tests";
+		const std::vector<const char*> files{ "Scripts/Laser.hpp", "Assets/Overfull.loomsprite", "Assets/Some Models/Broken.ply" };
+	};
 
 	// An ImGui context of the test's own, with no window and no renderer, a
 	// console filling the display, and three lines in the log.
@@ -66,7 +122,7 @@ namespace
 			ImGui::NewFrame();
 			ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
 			ImGui::SetNextWindowSize(ImVec2(width, height));
-			console.Draw(&open);
+			console.Draw(&open, [this](const Loom::EditorLog::Link& link) { followed.push_back(link); });
 			ImGui::EndFrame();
 		};
 
@@ -215,6 +271,7 @@ namespace
 		const std::vector<const char*> lines{ "first line", "second line", "third line" };
 
 		Loom::EditorConsole console;
+		std::vector<Loom::EditorLog::Link> followed;
 		bool open = true;
 		ImGuiContext* context = nullptr;
 	};
@@ -366,6 +423,44 @@ TEST_SUITE("EditorConsole")
 
 		CHECK(clipboard == "first");
 	};
+
+	TEST_CASE_FIXTURE(Driven, "a click on a link follows it to its file, line and column")
+	{
+		const Project project;
+		std::cerr << project.Path("Scripts/Laser.hpp") << "(111,7): error C2059" << std::endl;
+		Frame();
+
+		Click(At(0, 3));
+
+		REQUIRE(followed.size() == 1);
+		CHECK(followed[0].path == project.Path("Scripts/Laser.hpp"));
+		CHECK(followed[0].line == 111);
+		CHECK(followed[0].column == 7);
+	};
+
+	TEST_CASE_FIXTURE(Driven, "a click beside a link, a drag from one and a shift-click on one select rather than follow")
+	{
+		constexpr int before_link = 2;
+		constexpr int in_link = 12;
+		constexpr int further_in_link = 20;
+		constexpr int extended_to = 25;
+
+		const Project project;
+		std::cerr << "In " << project.Path("Assets/Overfull.loomsprite") << " again" << std::endl;
+		Frame();
+
+		Click(At(0, before_link));
+		Drag(At(0, in_link), At(0, further_in_link));
+
+		ImGui::GetIO().AddKeyEvent(ImGuiMod_Shift, true);
+		Click(At(0, extended_to));
+		ImGui::GetIO().AddKeyEvent(ImGuiMod_Shift, false);
+
+		Chord(ImGuiKey_C);
+
+		CHECK(followed.empty());
+		CHECK(clipboard == "erfull.loomsp");
+	};
 };
 
 namespace
@@ -398,7 +493,7 @@ TEST_SUITE("EditorLog")
 		const bool still_good = std::cout.good();
 
 		std::vector<std::string> lines;
-		Loom::EditorLog::Get().ForEach([&](size_t, const std::string& text, bool) { lines.push_back(text); });
+		Loom::EditorLog::Get().ForEach([&](size_t, const Loom::EditorLog::Line& line) { lines.push_back(line.text); });
 
 		Loom::EditorLog::Get().Clear();
 		Loom::EditorLog::Get().Uninstall();
@@ -420,7 +515,7 @@ TEST_SUITE("EditorLog")
 		std::cerr << "C:\\Games\\Crash Demo2\\a.png, C:\\Games\\Crash Demo, C:\\Other\\a.png" << std::endl;
 
 		std::vector<std::string> lines;
-		Loom::EditorLog::Get().ForEach([&](size_t, const std::string& text, bool) { lines.push_back(text); });
+		Loom::EditorLog::Get().ForEach([&](size_t, const Loom::EditorLog::Line& line) { lines.push_back(line.text); });
 
 		Loom::EditorLog::Get().SetProject("");
 		Loom::EditorLog::Get().Clear();
@@ -431,5 +526,98 @@ TEST_SUITE("EditorLog")
 			"Import: Assets/Some Models/Broken.ply: Validation failed",
 			"a.png and b.png",
 			"C:\\Games\\Crash Demo2\\a.png, C:\\Games\\Crash Demo, C:\\Other\\a.png" });
+	};
+	TEST_CASE("a line naming a file in the project links to it, with the line and column after it")
+	{
+		const Project project;
+
+		std::cout << "  " << project.Path("Scripts/Laser.hpp") << "(111,1): error C2059: syntax error: 'this'" << std::endl;
+		std::cerr << "Sprites: " << project.Path("Assets/Overfull.loomsprite") << " is not a whole sprite" << std::endl;
+		std::cerr << "Import: " << project.folder.generic_string() << "/Assets/Some Models\\Broken.ply: Validation failed" << std::endl;
+		std::cerr << project.Path("Scripts/Laser.hpp") << "(12): warning C4100" << std::endl;
+
+		const std::vector<Loom::EditorLog::Line> lines = Project::Lines();
+
+		REQUIRE(lines.size() == 4);
+
+		for (const Loom::EditorLog::Line& line : lines)
+			REQUIRE(line.links.size() == 1);
+
+		CHECK(lines[0].text == "  Scripts/Laser.hpp(111,1): error C2059: syntax error: 'this'");
+		CHECK(Project::Linked(lines[0], lines[0].links[0]) == "Scripts/Laser.hpp(111,1)");
+		CHECK(lines[0].links[0].path == project.Path("Scripts/Laser.hpp"));
+		CHECK(lines[0].links[0].line == 111);
+		CHECK(lines[0].links[0].column == 1);
+
+		CHECK(Project::Linked(lines[1], lines[1].links[0]) == "Assets/Overfull.loomsprite");
+		CHECK(lines[1].links[0].path == project.Path("Assets/Overfull.loomsprite"));
+		CHECK(lines[1].links[0].line == 0);
+
+		CHECK(Project::Linked(lines[2], lines[2].links[0]) == "Assets/Some Models/Broken.ply");
+		CHECK(lines[2].links[0].path == project.Path("Assets/Some Models/Broken.ply"));
+
+		CHECK(Project::Linked(lines[3], lines[3].links[0]) == "Scripts/Laser.hpp(12)");
+		CHECK(lines[3].links[0].line == 12);
+		CHECK(lines[3].links[0].column == 0);
+	};
+
+	TEST_CASE("only a file that is in the project gets a link, and a line may name more than one")
+	{
+		const Project project;
+		const std::string sibling = project.folder.string() + " Two\\Scripts\\Laser.hpp";
+
+		std::cerr << project.Path("Scripts/Gone.hpp") << "(3,1): error C1083" << std::endl;
+		std::cerr << "Watching " << project.Path("Scripts") << " for changes" << std::endl;
+		std::cerr << "Opened " << project.folder.string() << std::endl;
+		std::cerr << sibling << "(3,1): error C1083" << std::endl;
+		std::cerr << project.Path("Scripts/Laser.hpp") << " and " << project.Path("Assets/Overfull.loomsprite") << std::endl;
+
+		const std::vector<Loom::EditorLog::Line> lines = Project::Lines();
+
+		REQUIRE(lines.size() == 5);
+		CHECK(lines[0].text == "Scripts/Gone.hpp(3,1): error C1083");
+		CHECK(lines[0].links.empty());
+		CHECK(lines[1].text == "Watching Scripts for changes");
+		CHECK(lines[1].links.empty());
+		CHECK(lines[2].links.empty());
+		CHECK(lines[3].text == sibling + "(3,1): error C1083");
+		CHECK(lines[3].links.empty());
+
+		REQUIRE(lines[4].links.size() == 2);
+		CHECK(Project::Linked(lines[4], lines[4].links[0]) == "Scripts/Laser.hpp");
+		CHECK(Project::Linked(lines[4], lines[4].links[1]) == "Assets/Overfull.loomsprite");
+	};
+
+	TEST_CASE("a location that is not a whole line, or line and column, is left out of the link")
+	{
+		const Project project;
+		const std::vector<std::string> after{ "(12,)", "(x)", "(0)", "(5", "(5,2" };
+
+		for (const std::string& location : after)
+			std::cerr << project.Path("Scripts/Laser.hpp") << location << std::endl;
+
+		const std::vector<Loom::EditorLog::Line> lines = Project::Lines();
+
+		REQUIRE(lines.size() == after.size());
+
+		for (const Loom::EditorLog::Line& line : lines)
+		{
+			REQUIRE(line.links.size() == 1);
+			CHECK(Project::Linked(line, line.links[0]) == "Scripts/Laser.hpp");
+			CHECK(line.links[0].line == 0);
+		};
+	};
+
+	TEST_CASE("without a project no line has a link")
+	{
+		const Project project;
+		Loom::EditorLog::Get().SetProject("");
+
+		std::cerr << project.Path("Scripts/Laser.hpp") << "(1,1): error C2059" << std::endl;
+
+		const std::vector<Loom::EditorLog::Line> lines = Project::Lines();
+
+		REQUIRE(lines.size() == 1);
+		CHECK(lines[0].links.empty());
 	};
 };

@@ -81,9 +81,8 @@ namespace Loom
 		// The name with what IsValidName refuses taken out.
 		static std::string UsableName(const std::string& name);
 
-		// A line of a scripts build as the editor shows it: a file in the
-		// project named from the project's folder, and without the .vcxproj
-		// MSBuild ends it with.
-		static std::string BuildLine(const std::string& line, const std::string& folder);
+		// A line of a scripts build as the editor shows it: without the
+		// indent and the .vcxproj MSBuild ends it with.
+		static std::string BuildLine(const std::string& line);
 	};
 };

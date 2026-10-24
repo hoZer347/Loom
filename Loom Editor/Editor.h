@@ -582,8 +582,9 @@ namespace Loom
 		// claims it.
 		void OpenAsset(const std::string& path);
 
-		// In the scripts project's solution when it has one.
-		void OpenInVisualStudio(const std::string& path);
+		// In the scripts project's solution when it has one, at the line and
+		// column when they are given, counting from one.
+		void OpenInVisualStudio(const std::string& path, int line = 0, int column = 0);
 
 		// ImGui's way of opening a link, which for a file in the project is
 		// OpenAsset's.

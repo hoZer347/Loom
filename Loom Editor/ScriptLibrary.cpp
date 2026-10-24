@@ -171,14 +171,13 @@ namespace Loom
 		m_abandoned.push_back(std::move(m_worker));
 	};
 
-	void ScriptLibrary::SetProject(const std::string& project, const std::string& library, const std::string& folder)
+	void ScriptLibrary::SetProject(const std::string& project, const std::string& library)
 	{
 		AbandonBuild();
 		Unload();
 
 		m_project = project;
 		m_library = library;
-		m_folder = folder;
 
 		// The cached answer belonged to the project being left behind, and the
 		// panel asks often enough that it would still be warm when the new one
@@ -199,7 +198,6 @@ namespace Loom
 
 		m_project.clear();
 		m_library.clear();
-		m_folder.clear();
 		m_staleCheckedAt = { };
 		m_status = "No script project.";
 	};
@@ -329,13 +327,13 @@ namespace Loom
 			" -p:Platform=x64 -nologo -v:m -m \"-clp:ErrorsOnly;WarningsOnly\"";
 
 		m_worker = std::thread(
-			[command, folder = m_folder, build = m_current]()
+			[command, build = m_current]()
 			{
 				build->succeeded = HiddenProcess::Run(
 					command,
-					[&folder](const std::string& line)
+					[](const std::string& line)
 					{
-						if (const std::string shown = ProjectTemplate::BuildLine(line, folder); !shown.empty())
+						if (const std::string shown = ProjectTemplate::BuildLine(line); !shown.empty())
 							std::cout << "  " << shown << std::endl;
 					});
 				build->done = true;

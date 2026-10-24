@@ -289,7 +289,7 @@ namespace Loom
 		{
 			size_t next = 0;
 
-			EditorLog::Get().ForEach([&next](size_t id, const std::string&, bool) { next = id + 1; });
+			EditorLog::Get().ForEach([&next](size_t id, const EditorLog::Line&) { next = id + 1; });
 
 			return next;
 		};
@@ -299,10 +299,10 @@ namespace Loom
 			std::vector<std::string> lines{ };
 
 			EditorLog::Get().ForEach(
-				[&](size_t id, const std::string& text, bool is_error)
+				[&](size_t id, const EditorLog::Line& line)
 				{
-					if (id >= first_id && (is_error || !errors_only))
-						lines.push_back(std::to_string(id) + (is_error ? "\terror\t" : "\t\t") + text);
+					if (id >= first_id && (line.is_error || !errors_only))
+						lines.push_back(std::to_string(id) + (line.is_error ? "\terror\t" : "\t\t") + line.text);
 				});
 
 			const size_t first = lines.size() > limit ? lines.size() - limit : 0;

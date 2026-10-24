@@ -2,8 +2,10 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <filesystem>
 #include <iostream>
+#include <optional>
 #include <string_view>
 
 
@@ -42,12 +44,92 @@ namespace Loom
 			return (size_t)(found - text.begin());
 		};
 
-		std::string Local(const std::string& text, const std::string& project)
+		// Where a file's name may end inside a run EndsPath has not cut short.
+		// A name may hold any of these, so the longest that is a file wins.
+		bool MayEndName(char c)
 		{
-			if (project.empty())
-				return text;
+			return std::string_view(" (),;'.").find(c) != std::string_view::npos;
+		};
 
-			std::string local;
+		// The longest name from start to the end of the text, or to where a
+		// name may end before that, that is a file in the project.
+		std::optional<EditorLog::Link> FileLink(const std::string& project, const std::string& text, size_t start)
+		{
+			std::error_code code;
+
+			for (size_t end = text.size(); end > start; end--)
+			{
+				if (end < text.size() && !MayEndName(text[end]))
+					continue;
+
+				std::filesystem::path path = std::filesystem::path(project) / text.substr(start, end - start);
+
+				if (std::filesystem::is_regular_file(path, code))
+					return EditorLog::Link{ start, end - start, path.make_preferred().string() };
+			};
+
+			return std::nullopt;
+		};
+
+		// A whole number at, moved past. Zero when there is none.
+		int Number(const std::string& text, size_t& at)
+		{
+			int value = 0;
+
+			const auto [end, error] = std::from_chars(text.data() + at, text.data() + text.size(), value);
+
+			if (error != std::errc{ } || value < 1)
+				return 0;
+
+			at = (size_t)(end - text.data());
+
+			return value;
+		};
+
+		// MSVC's "(line)" or "(line,column)" straight after a link, taken into it.
+		void ReadLocation(const std::string& text, EditorLog::Link& link)
+		{
+			size_t at = link.start + link.length;
+
+			if (at >= text.size() || text[at] != '(')
+				return;
+
+			at++;
+
+			const int line = Number(text, at);
+
+			if (!line)
+				return;
+
+			int column = 0;
+
+			if (at < text.size() && text[at] == ',')
+			{
+				at++;
+				column = Number(text, at);
+
+				if (!column)
+					return;
+			};
+
+			if (at >= text.size() || text[at] != ')')
+				return;
+
+			link.line = line;
+			link.column = column;
+			link.length = at + 1 - link.start;
+		};
+
+		EditorLog::Line Local(const std::string& text, const std::string& project, bool is_error)
+		{
+			EditorLog::Line local{ "", is_error, { } };
+
+			if (project.empty())
+			{
+				local.text = text;
+				return local;
+			};
+
 			size_t from = 0;
 			size_t at = Find(text, from, project);
 
@@ -62,15 +144,23 @@ namespace Loom
 					continue;
 				};
 
-				local.append(text, from, at - from);
+				local.text.append(text, from, at - from);
 				from = after + 1;
 				at = Find(text, from, project);
 
+				const size_t start = local.text.size();
+
 				for (; from < at && !EndsPath(text[from]); from++)
-					local += IsSeparator(text[from]) ? '/' : text[from];
+					local.text += IsSeparator(text[from]) ? '/' : text[from];
+
+				if (std::optional<EditorLog::Link> link = FileLink(project, local.text, start))
+					local.links.push_back(std::move(*link));
 			};
 
-			local.append(text, from);
+			local.text.append(text, from);
+
+			for (EditorLog::Link& link : local.links)
+				ReadLocation(local.text, link);
 
 			return local;
 		};
@@ -142,12 +232,12 @@ namespace Loom
 			project.pop_back();
 	};
 
-	void EditorLog::ForEach(const std::function<void(size_t, const std::string&, bool)>& visit) const
+	void EditorLog::ForEach(const std::function<void(size_t, const Line&)>& visit) const
 	{
 		std::scoped_lock lock(mutex);
 
 		for (size_t i = 0; i < lines.size(); i++)
-			visit(dropped + i, lines[i].text, lines[i].is_error);
+			visit(dropped + i, lines[i]);
 	};
 
 	void EditorLog::Sink::Put(char c)
@@ -157,7 +247,7 @@ namespace Loom
 
 		if (c == '\n')
 		{
-			log->lines.push_back({ Local(pending, log->project), is_error });
+			log->lines.push_back(Local(pending, log->project, is_error));
 
 			if (log->lines.size() > max_lines)
 			{

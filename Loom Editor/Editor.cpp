@@ -1771,7 +1771,7 @@ namespace Loom
 		if (m_showGame)			DrawGame();
 		if (m_showDebug)		DrawDebug();
 		if (m_showSceneData)	DrawSceneData();
-		if (m_showConsole)		m_console.Draw(&m_showConsole);
+		if (m_showConsole)		m_console.Draw(&m_showConsole, [this](const EditorLog::Link& link) { OpenInVisualStudio(link.path, link.line, link.column); });
 		if (m_showShaders)		m_shaders.Draw(&m_showShaders);
 		if (m_showModels)		m_models.Draw(&m_showModels);
 		if (m_showSprites)		m_sprites.Draw(&m_showSprites, &m_showPalette);

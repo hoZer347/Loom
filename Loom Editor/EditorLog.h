@@ -18,6 +18,28 @@ namespace Loom
 	*/
 	struct EditorLog final
 	{
+		// A file in the project that a line names, with where in it the line
+		// points when it says.
+		struct Link
+		{
+			// The bytes of the line's text it covers, the line and column with it.
+			size_t start = 0;
+			size_t length = 0;
+
+			std::string path;
+
+			// Counted from one, and zero when the line gives none.
+			int line = 0;
+			int column = 0;
+		};
+
+		struct Line
+		{
+			std::string text;
+			bool is_error = false;
+			std::vector<Link> links;
+		};
+
 		static EditorLog& Get();
 
 		void Install();
@@ -25,13 +47,14 @@ namespace Loom
 
 		void Clear();
 
-		// Lines that name a file inside this folder name it from the folder.
+		// Lines that name a file inside this folder name it from the folder,
+		// and link to it when it is there.
 		void SetProject(const std::string& folder);
 
 		// Walks the buffered lines under the lock, so the console can draw them
 		// without copying the whole buffer every frame. A line keeps its id
 		// while older lines are trimmed or cleared away.
-		void ForEach(const std::function<void(size_t id, const std::string&, bool is_error)>& visit) const;
+		void ForEach(const std::function<void(size_t id, const Line&)>& visit) const;
 
 	private:
 		EditorLog() = default;
@@ -56,12 +79,6 @@ namespace Loom
 			void Put(char c);
 
 			std::string pending;
-		};
-
-		struct Line
-		{
-			std::string text;
-			bool is_error;
 		};
 
 		static constexpr size_t max_lines = 2048;
