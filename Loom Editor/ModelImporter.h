@@ -15,6 +15,7 @@ namespace Loom
 	inline constexpr size_t model_floats_per_vertex = 3;
 	inline constexpr size_t model_vertices_per_triangle = 3;
 	inline constexpr size_t model_floats_per_uv = 2;
+	inline constexpr size_t model_floats_per_color = 4;
 
 	// What an imported model draws with, relative to the project folder,
 	// written there by the first import: lit and shadowed, its texture times

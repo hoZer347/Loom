@@ -49,7 +49,10 @@ function Get-SourcesFromProject
 
     $sources = New-Object System.Collections.Generic.List[string]
 
-    foreach ($node in $project.Project.ItemGroup.ClCompile)
+    # An ItemGroup labelled Desktop holds sources the desktop build alone can compile.
+    $groups = $project.Project.ItemGroup | Where-Object { $_.Label -ne 'Desktop' }
+
+    foreach ($node in $groups.ClCompile)
     {
         if (-not $node.Include) { continue }
 

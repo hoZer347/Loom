@@ -76,17 +76,17 @@ namespace Loom
 		constexpr uint32_t NO_NORMAL_BINDING = 1;
 		constexpr uint32_t INSTANCE_BINDING = 2;
 		constexpr uint32_t NO_COLOR_BINDING = 3;
-
-		bool HasNormals(VertexFormat format)
-		{
-			return format == VertexFormat::PositionUVNormal || format == VertexFormat::PositionUVNormalColor;
-		};
 		constexpr uint32_t INSTANCE_SIZE = Renderer::FloatsPerInstance * sizeof(float);
 		constexpr uint32_t INSTANCE_COLUMNS = 4;
 		constexpr uint32_t INSTANCE_COLUMN_SIZE = INSTANCE_COLUMNS * sizeof(float);
 
 		constexpr float FAR_DEPTH = 1.0f;
 		constexpr uint8_t WHITE = 0xFF;
+
+		bool HasNormals(VertexFormat format)
+		{
+			return format == VertexFormat::PositionUVNormal || format == VertexFormat::PositionUVNormalColor;
+		};
 
 		// The GL primitives Mesh serialises.
 		enum GLPrimitive : uint32_t

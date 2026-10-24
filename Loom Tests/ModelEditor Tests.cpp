@@ -573,6 +573,7 @@ TEST_CASE("The Model panel gives a prefab with no mesh one, drawn with a shader 
 	std::error_code code;
 	std::filesystem::remove_all(project, code);
 };
+
 TEST_CASE("The Model panel lists its project's shaders and saves the one chosen into the prefab, keeping its guids")
 {
 	const std::filesystem::path project = std::filesystem::temp_directory_path() / "model_shaders";

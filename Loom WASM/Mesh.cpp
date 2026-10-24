@@ -218,9 +218,11 @@ namespace Loom
 			}
 			else
 			{
-				const VertexFormat format = hasColors ? VertexFormat::PositionUVNormalColor
-					: hasNormals ? VertexFormat::PositionUVNormal
-					: VertexFormat::PositionUV;
+				const VertexFormat format = hasColors
+					? VertexFormat::PositionUVNormalColor
+					: hasNormals
+						? VertexFormat::PositionUVNormal
+						: VertexFormat::PositionUV;
 				constexpr float NO_NORMAL[NORMAL_COMPONENTS] = { };
 				std::vector<float> interleaved(count * FloatsPerVertex(format));
 				float* out = interleaved.data();

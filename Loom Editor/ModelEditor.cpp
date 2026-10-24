@@ -335,20 +335,6 @@ void main()
 				FindParts(*child, found, skipped);
 		};
 
-		// The shader another mesh of the prefab draws with, so a mesh added to
-		// it looks like the rest.
-		std::string ShaderOf(GameObject& object)
-		{
-			if (Material* material = object.GetComponent<Material>())
-				return material->GetShaderPath();
-
-			for (GameObject* child : object.GetChildren())
-				if (std::string found = ShaderOf(*child); !found.empty())
-					return found;
-
-			return "";
-		};
-
 		void MaterialsOf(GameObject& object, std::vector<Material*>& found)
 		{
 			if (Material* material = object.GetComponent<Material>())
@@ -392,6 +378,20 @@ void main()
 			std::sort(shaders.begin(), shaders.end());
 
 			return shaders;
+		};
+
+		// The shader another mesh of the prefab draws with, so a mesh added to
+		// it looks like the rest.
+		std::string ShaderOf(GameObject& object)
+		{
+			if (Material* material = object.GetComponent<Material>())
+				return material->GetShaderPath();
+
+			for (GameObject* child : object.GetChildren())
+				if (std::string found = ShaderOf(*child); !found.empty())
+					return found;
+
+			return "";
 		};
 
 		// Failing that, the shader a new project draws with, or else the first

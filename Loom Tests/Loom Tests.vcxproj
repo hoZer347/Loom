@@ -43,6 +43,7 @@
     <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenGL.props" />
     <Import Project="..\Property Files\Vulkan.props" />
+    <Import Project="..\Property Files\Assimp.props" />
     <Import Project="..\Property Files\UserMacros.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -54,6 +55,7 @@
     <Import Project="..\Property Files\Loom ImGui.props" />
     <Import Project="..\Property Files\OpenGL.props" />
     <Import Project="..\Property Files\Vulkan.props" />
+    <Import Project="..\Property Files\Assimp.props" />
     <Import Project="..\Property Files\UserMacros.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
@@ -124,6 +126,7 @@
     <ClCompile Include="SpriteEditor Tests.cpp" />
     <ClCompile Include="EditableMesh Tests.cpp" />
     <ClCompile Include="ModelEditor Tests.cpp" />
+    <ClCompile Include="ModelImporter Tests.cpp" />
     <ClCompile Include="McpProtocol Tests.cpp" />
     <ClCompile Include="UiScript Tests.cpp" />
     <ClCompile Include="EditCommands Tests.cpp" />
@@ -225,6 +228,10 @@
     <ClCompile Include="..\Loom Editor\LoadProgress.cpp" />
     <ClCompile Include="..\Loom Editor\WindowFullscreen.cpp" />
   </ItemGroup>
+  <!-- Built against Assimp, which the web build has no wasm copy of. -->
+  <ItemGroup Label="Desktop">
+    <ClCompile Include="..\Loom Editor\ModelImporter.cpp" />
+  </ItemGroup>
   <ItemGroup>
     <!-- ImGui is linked rather than recompiled: Component<T>::Gui and
          GameObject::Gui call into it, and it builds cleanly as a library. -->
@@ -243,5 +250,8 @@
           DestinationFolder="$(OutDir)"
           SkipUnchangedFiles="true"
           Condition="Exists('$(DevDirectory)\glew\bin\Release\x64\glew32.dll')" />
+    <Copy SourceFiles="$(DevDirectory)\assimp\bin\x64\assimp-vc143-mt.dll"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" />
   </Target>
 </Project>

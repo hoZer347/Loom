@@ -97,6 +97,9 @@
     <ClCompile Include="ModelEditor Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="ModelImporter Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="McpProtocol Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

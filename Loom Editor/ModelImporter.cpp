@@ -131,8 +131,14 @@ void main()
 
 				part.vertices.reserve((size_t)mesh.mNumFaces * model_vertices_per_triangle * model_floats_per_vertex);
 
+				if (mesh.HasTextureCoords(0))
+					part.uvs.reserve(part.vertices.capacity() / model_floats_per_vertex * model_floats_per_uv);
+
 				if (mesh.HasNormals())
 					part.normals.reserve(part.vertices.capacity());
+
+				if (mesh.HasVertexColors(0))
+					part.colors.reserve(part.vertices.capacity() / model_floats_per_vertex * model_floats_per_color);
 
 				for (unsigned int f = 0; f < mesh.mNumFaces; f++)
 				{
@@ -313,8 +319,8 @@ void main()
 
 			// Drawn by its glow's texture alone, as an unlit export is, it takes
 			// the glow's colour, its base colour being black.
-			const bool glows = material.GetTextureCount(aiTextureType_BASE_COLOR) + material.GetTextureCount(aiTextureType_DIFFUSE) == 0
-				&& material.GetTextureCount(aiTextureType_EMISSIVE) > 0;
+			const bool glows = material.GetTextureCount(aiTextureType_BASE_COLOR) + material.GetTextureCount(aiTextureType_DIFFUSE) == 0 &&
+				material.GetTextureCount(aiTextureType_EMISSIVE) > 0;
 
 			if (glows)
 				material.Get(AI_MATKEY_COLOR_EMISSIVE, base);
@@ -372,6 +378,7 @@ void main()
 			std::vector<float> vertices;
 			std::vector<float> uvs;
 			std::vector<float> normals;
+			std::vector<float> colors;
 			std::vector<std::string> joints;
 			std::vector<float> inverseBinds;
 			std::vector<float> influences;
@@ -431,6 +438,9 @@ void main()
 				if (mesh.HasNormals())
 					part.normals.insert(part.normals.end(), { mesh.mNormals[index].x, mesh.mNormals[index].y, mesh.mNormals[index].z });
 
+				if (mesh.HasVertexColors(0))
+					part.colors.insert(part.colors.end(), { mesh.mColors[0][index].r, mesh.mColors[0][index].g, mesh.mColors[0][index].b, mesh.mColors[0][index].a });
+
 				if (mesh.HasBones())
 					part.influences.insert(part.influences.end(), influences[index].begin(), influences[index].end());
 			};
@@ -477,6 +487,7 @@ void main()
 			drawing->m_vertices = std::move(part.vertices);
 			drawing->m_textureCoordinates = std::move(part.uvs);
 			drawing->m_normals = std::move(part.normals);
+			drawing->m_colors = std::move(part.colors);
 
 			if (part.joints.empty() && part.shapes.empty())
 				return;

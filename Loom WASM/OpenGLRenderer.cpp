@@ -608,21 +608,6 @@ namespace Loom
 			glVertexAttribPointer(UV_LOCATION, UV_COMPONENTS, GL_FLOAT, GL_FALSE, stride, (void*)uvOffset);
 			glEnableVertexAttribArray(UV_LOCATION);
 
-			if (hasColors)
-			{
-				glVertexAttribPointer(COLOR_LOCATION, COLOR_COMPONENTS, GL_FLOAT, GL_FALSE, stride, (void*)colorOffset);
-				glVertexAttribDivisor(COLOR_LOCATION, PER_VERTEX);
-			}
-			else
-			{
-				glBindBuffer(GL_ARRAY_BUFFER, m_noColor);
-				glVertexAttribPointer(COLOR_LOCATION, COLOR_COMPONENTS, GL_FLOAT, GL_FALSE, 0, (void*)0);
-				glVertexAttribDivisor(COLOR_LOCATION, PER_DRAW);
-				glBindBuffer(GL_ARRAY_BUFFER, buffer);
-			};
-
-			glEnableVertexAttribArray(COLOR_LOCATION);
-
 			if (hasNormals)
 			{
 				glVertexAttribPointer(NORMAL_LOCATION, NORMAL_COMPONENTS, GL_FLOAT, GL_FALSE, stride, (void*)normalOffset);
@@ -636,6 +621,21 @@ namespace Loom
 			};
 
 			glEnableVertexAttribArray(NORMAL_LOCATION);
+
+			// Read from buffer, still bound, since a format with colours has normals.
+			if (hasColors)
+			{
+				glVertexAttribPointer(COLOR_LOCATION, COLOR_COMPONENTS, GL_FLOAT, GL_FALSE, stride, (void*)colorOffset);
+				glVertexAttribDivisor(COLOR_LOCATION, PER_VERTEX);
+			}
+			else
+			{
+				glBindBuffer(GL_ARRAY_BUFFER, m_noColor);
+				glVertexAttribPointer(COLOR_LOCATION, COLOR_COMPONENTS, GL_FLOAT, GL_FALSE, 0, (void*)0);
+				glVertexAttribDivisor(COLOR_LOCATION, PER_DRAW);
+			};
+
+			glEnableVertexAttribArray(COLOR_LOCATION);
 
 			if (!instances)
 				glDrawArrays(primitive, 0, (GLsizei)count);
