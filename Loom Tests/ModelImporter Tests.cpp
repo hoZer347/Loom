@@ -212,49 +212,52 @@ namespace
 	};
 };
 
-TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an imported model draws each part in its material, still or rigged")
+TEST_SUITE("ModelImporter")
 {
-	const std::filesystem::path project = std::filesystem::temp_directory_path() / "model_import";
-	bool animated = false;
-
-	SUBCASE("still") { };
-	SUBCASE("rigged") { animated = true; };
-
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an imported model draws each part in its material, still or rigged")
 	{
-		const InFolder in(project);
-		WriteModel(project / "Swatch.gltf", animated);
+		const std::filesystem::path project = std::filesystem::temp_directory_path() / "model_import";
+		bool animated = false;
 
-		// No renderer compiles the shader the importer writes.
-		const LoomTests::Captured captured(std::cerr);
-		Loom::Scene scene("imported");
-		LoomTests::Pump();
+		SUBCASE("still") { };
+		SUBCASE("rigged") { animated = true; };
 
-		Loom::GameObject* model = Loom::ImportModel((project / "Swatch.gltf").string(), scene.GetRoot());
-		REQUIRE(model != nullptr);
-		LoomTests::Pump();
+		{
+			const InFolder in(project);
+			WriteModel(project / "Swatch.gltf", animated);
 
-		CHECK(std::filesystem::exists(Loom::model_shader_path));
-		CheckDressed(*model);
-		CHECK(captured.Says("No renderer to compile"));
+			// No renderer compiles the shader the importer writes.
+			const LoomTests::Captured captured(std::cerr);
+			Loom::Scene scene("imported");
+			LoomTests::Pump();
+
+			Loom::GameObject* model = Loom::ImportModel((project / "Swatch.gltf").string(), scene.GetRoot());
+			REQUIRE(model != nullptr);
+			LoomTests::Pump();
+
+			CHECK(std::filesystem::exists(Loom::model_shader_path));
+			CheckDressed(*model);
+			CHECK(captured.Says("No renderer to compile"));
+		};
+
+		std::error_code code;
+		std::filesystem::remove_all(project, code);
 	};
 
-	std::error_code code;
-	std::filesystem::remove_all(project, code);
-};
+	TEST_CASE("a model whose faces name vertices it does not have is refused, and one naming its own loads")
+	{
+		constexpr int last = 2;
+		constexpr int missing = 99;
 
-TEST_CASE("a model whose faces name vertices it does not have is refused, and one naming its own loads")
-{
-	constexpr int last = 2;
-	constexpr int missing = 99;
+		const std::vector<Loom::ModelPart> whole = Load(Triangle(last));
 
-	const std::vector<Loom::ModelPart> whole = Load(Triangle(last));
+		REQUIRE(whole.size() == 1);
+		CHECK(whole[0].vertices.size() == Loom::model_floats_per_vertex * Loom::model_vertices_per_triangle);
 
-	REQUIRE(whole.size() == 1);
-	CHECK(whole[0].vertices.size() == Loom::model_floats_per_vertex * Loom::model_vertices_per_triangle);
+		const LoomTests::Captured captured(std::cerr);
 
-	const LoomTests::Captured captured(std::cerr);
-
-	CHECK(Load(Triangle(missing)).empty());
-	CHECK(captured.Says("loom model.ply: Validation failed"));
+		CHECK(Load(Triangle(missing)).empty());
+		CHECK(captured.Says("loom model.ply: Validation failed"));
+	};
 };
 #endif

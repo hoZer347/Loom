@@ -226,479 +226,482 @@ namespace
 	};
 };
 
-TEST_CASE("The Model panel opens a prefab's mesh with its triangles welded back into quads")
+TEST_SUITE("ModelEditor")
 {
-	Driven driven("model_opens");
+	TEST_CASE("The Model panel opens a prefab's mesh with its triangles welded back into quads")
+	{
+		Driven driven("model_opens");
 
-	CHECK(driven.Mesh().vertices.size() == 8);
-	CHECK(driven.Mesh().faces.size() == 6);
-};
+		CHECK(driven.Mesh().vertices.size() == 8);
+		CHECK(driven.Mesh().faces.size() == 6);
+	};
 
-TEST_CASE("The Model panel finds a mesh on a child of the prefab's top object")
-{
-	LoomTests::EngineFixture engine;
-
-	const EditableMesh cube = EditableMesh::Cube(1.0f);
-	const std::string path = WritePrefab("model_child", nullptr, &cube);
-
-	ModelEditor editor;
-	editor.Open(path);
-	LoomTests::Pump();
-
-	REQUIRE(editor.Editing() != nullptr);
-	CHECK(editor.Editing()->faces.size() == 6);
-
-	std::error_code code;
-	std::filesystem::remove(path, code);
-};
-
-TEST_CASE("The Model panel opens a prefab not yet written, writes it where it was told to once saved, and goes by the file from then on")
-{
-	std::string text;
-	std::error_code code;
-
+	TEST_CASE("The Model panel finds a mesh on a child of the prefab's top object")
 	{
 		LoomTests::EngineFixture engine;
 
 		const EditableMesh cube = EditableMesh::Cube(1.0f);
-		const std::string source = WritePrefab("model_unwritten_source", &cube);
-		text = ReadFile(source);
+		const std::string path = WritePrefab("model_child", nullptr, &cube);
 
-		std::filesystem::remove(source, code);
-	};
-
-	const std::string path = (std::filesystem::temp_directory_path() / "model_unwritten.loomprefab").string();
-	std::filesystem::remove(path, code);
-
-	Driven driven("model_unwritten", nullptr, path, text);
-
-	CHECK(driven.Mesh().faces.size() == 6);
-	CHECK_FALSE(std::filesystem::exists(path));
-
-	REQUIRE(driven.editor.Save());
-	REQUIRE(std::filesystem::exists(path));
-
-	// Deleted once written, it is gone rather than back to the text it opened as.
-	const LoomTests::Captured captured(std::cerr);
-	std::filesystem::remove(path, code);
-
-	driven.Frame();
-	driven.Frame();
-
-	CHECK(driven.editor.Editing() == nullptr);
-	CHECK(captured.Says(path));
-};
-
-TEST_CASE("The Model panel goes on to edit the part whose face is clicked")
-{
-	// A lid floating a cube's height above it.
-	EditableMesh lid = EditableMesh::Plane(1.0f);
-	lid.Transform({ 0, 1, 2, 3 }, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
-
-	Driven driven("model_parts", &lid);
-	REQUIRE(driven.Mesh().faces.size() == 6);
-
-	driven.editor.SetPick(ModelEditor::Pick::Faces);
-	driven.Click(driven.Screen(glm::vec3(0.1f, 1.0f, 0.1f)));
-
-	CHECK(driven.Mesh().faces.size() == 1);
-	CHECK(driven.editor.Selected()->faces == std::set<uint32_t>{ 0 });
-};
-
-TEST_CASE("The Model panel's box leaves out corners another part hides")
-{
-	// A lid just above the cube and wider than it, which hides the cube's
-	// top from the camera looking down.
-	constexpr float lid_height = 0.6f;
-	constexpr float lid_size = 3.0f;
-
-	EditableMesh lid = EditableMesh::Plane(lid_size);
-	lid.Transform({ 0, 1, 2, 3 }, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, lid_height, 0.0f)));
-
-	Driven driven("model_hidden", &lid);
-	REQUIRE(driven.Mesh().faces.size() == 6);
-
-	driven.editor.SetPick(ModelEditor::Pick::Vertices);
-	driven.Drag(driven.Around(), driven.Around(true));
-
-	// The bottom corners the cube itself leaves in view are still picked.
-	REQUIRE_FALSE(driven.editor.Selected()->vertices.empty());
-
-	for (const uint32_t vertex : driven.editor.Selected()->vertices)
-		CHECK(driven.Mesh().vertices[vertex].y < 0.0f);
-};
-
-TEST_CASE("The Model panel picks the face clicked, and nothing when the click misses")
-{
-	Driven driven("model_click");
-
-	driven.editor.SetPick(ModelEditor::Pick::Faces);
-	driven.Click(driven.Screen(glm::vec3(0.1f, 0.5f, 0.1f)));
-
-	REQUIRE(driven.editor.Selected()->faces.size() == 1);
-
-	const uint32_t face = *driven.editor.Selected()->faces.begin();
-	CHECK(driven.Mesh().FaceNormal(face).y > 1.0f - TOLERANCE);
-
-	driven.Click(ImVec2(Driven::width - 10.0f, Driven::height - 40.0f));
-	CHECK(driven.editor.Selected()->faces.empty());
-};
-
-TEST_CASE("The Model panel's box picks the corners it covers that can be seen")
-{
-	Driven driven("model_box");
-
-	driven.editor.SetPick(ModelEditor::Pick::Vertices);
-	driven.Drag(driven.Around(), driven.Around(true));
-
-	// The camera looks down from the +X +Z side, so the far bottom corner is
-	// hidden behind the cube.
-	CHECK(driven.editor.Selected()->vertices.size() == 7);
-};
-
-TEST_CASE("The Model panel's move arrow lifts the picked face, and undo puts it back")
-{
-	Driven driven("model_move");
-
-	driven.editor.SetPick(ModelEditor::Pick::Faces);
-	driven.Click(driven.Screen(glm::vec3(0.1f, 0.5f, 0.1f)));
-	REQUIRE(driven.editor.Selected()->faces.size() == 1);
-
-	const uint32_t face = *driven.editor.Selected()->faces.begin();
-	const glm::vec3 centre = driven.Mesh().FaceCentre(face);
-
-	// Partway along the Y arrow, then further up the screen along it.
-	const ImVec2 middle = driven.Screen(centre);
-	const ImVec2 above = driven.Screen(centre + glm::vec3(0.0f, 0.1f, 0.0f));
-	const float reach = std::hypot(above.x - middle.x, above.y - middle.y);
-	const ImVec2 up((above.x - middle.x) / reach, (above.y - middle.y) / reach);
-
-	constexpr float grab = 60.0f;
-	constexpr float pull = 40.0f;
-
-	driven.Drag(ImVec2(middle.x + up.x * grab, middle.y + up.y * grab), ImVec2(middle.x + up.x * (grab + pull), middle.y + up.y * (grab + pull)));
-
-	const glm::vec3 moved = driven.Mesh().FaceCentre(face);
-	CHECK(moved.y > centre.y + TOLERANCE);
-	CHECK(std::abs(moved.x - centre.x) < TOLERANCE);
-	CHECK(std::abs(moved.z - centre.z) < TOLERANCE);
-
-	driven.editor.Undo();
-	CHECK(std::abs(driven.Mesh().FaceCentre(face).y - centre.y) < TOLERANCE);
-
-	driven.editor.Redo();
-	CHECK(std::abs(driven.Mesh().FaceCentre(face).y - moved.y) < TOLERANCE);
-};
-
-TEST_CASE("The Model panel's middle handles size and turn the picked face about its middle")
-{
-	// How far the middle handles are dragged, in screen pixels: right and up
-	// to size, and a quarter of the way round the outer ring to turn.
-	constexpr float pull = 40.0f;
-	constexpr float ring = 112.5f;
-
-	Driven driven("model_size_turn");
-
-	driven.editor.SetPick(ModelEditor::Pick::Faces);
-	driven.Click(driven.Screen(glm::vec3(0.1f, 0.5f, 0.1f)));
-	REQUIRE(driven.editor.Selected()->faces.size() == 1);
-
-	const uint32_t face = *driven.editor.Selected()->faces.begin();
-	const glm::vec3 centre = driven.Mesh().FaceCentre(face);
-	const auto side = [&]()
-	{
-		const std::vector<EditableMesh::Corner>& corners = driven.Mesh().faces[face].corners;
-		return glm::distance(driven.Mesh().vertices[corners[0].vertex], driven.Mesh().vertices[corners[1].vertex]);
-	};
-
-	const ImVec2 middle = driven.Screen(centre);
-
-	driven.editor.SetTool(ModelEditor::Tool::Scale);
-	driven.Drag(middle, ImVec2(middle.x + pull, middle.y - pull));
-
-	const float sized = side();
-	CHECK(sized > 1.5f);
-	CHECK(glm::distance(driven.Mesh().FaceCentre(face), centre) < TOLERANCE);
-
-	const glm::vec3 corner = driven.Mesh().vertices[driven.Mesh().faces[face].corners[0].vertex];
-
-	driven.editor.SetTool(ModelEditor::Tool::Rotate);
-	driven.Drag(ImVec2(middle.x + ring, middle.y), ImVec2(middle.x, middle.y - ring));
-
-	CHECK(std::abs(side() - sized) < TOLERANCE);
-	CHECK(glm::distance(driven.Mesh().FaceCentre(face), centre) < TOLERANCE);
-	CHECK(glm::distance(driven.Mesh().vertices[driven.Mesh().faces[face].corners[0].vertex], corner) > 0.1f);
-};
-
-TEST_CASE("The Model panel saves an extrusion into the prefab, keeping its guids")
-{
-	Driven driven("model_save");
-
-	Loom::Prefabs::ObjectNode before;
-	REQUIRE(Loom::Prefabs::Parse(ReadFile(driven.path), before));
-
-	driven.editor.SetPick(ModelEditor::Pick::Faces);
-	driven.Click(driven.Screen(glm::vec3(0.1f, 0.5f, 0.1f)));
-	REQUIRE(driven.editor.Selected()->faces.size() == 1);
-
-	driven.editor.Extrude();
-	REQUIRE(driven.editor.Save());
-
-	Loom::Prefabs::ObjectNode after;
-	REQUIRE(Loom::Prefabs::Parse(ReadFile(driven.path), after));
-	CHECK(after.guid == before.guid);
-	REQUIRE(after.components.size() == before.components.size());
-
-	for (size_t i = 0; i < after.components.size(); i++)
-		CHECK(after.components[i].guid == before.components[i].guid);
-
-	// Opened again, the extruded triangle stands above the cube's top.
-	ModelEditor reopened;
-	reopened.Open(driven.path);
-	LoomTests::Pump();
-
-	const EditableMesh* mesh = reopened.Editing();
-	REQUIRE(mesh != nullptr);
-	CHECK(mesh->Bounds().second.y > 0.5f + TOLERANCE);
-};
-
-TEST_CASE("The Model panel adds a shape, deletes what is picked, and steps back through both")
-{
-	Driven driven("model_add");
-
-	const size_t faces = driven.Mesh().faces.size();
-
-	driven.editor.Add(ModelEditor::Shape::Cylinder);
-	const size_t added = driven.editor.Selected()->faces.size();
-	CHECK(added > 0);
-	CHECK(driven.Mesh().faces.size() == faces + added);
-
-	driven.editor.Delete();
-	CHECK(driven.Mesh().faces.size() == faces);
-	CHECK(driven.Mesh().vertices.size() == 8);
-
-	driven.editor.Undo();
-	CHECK(driven.Mesh().faces.size() == faces + added);
-
-	driven.editor.Undo();
-	CHECK(driven.Mesh().faces.size() == faces);
-};
-
-TEST_CASE("The Model panel reads a prefab changed elsewhere again, unless it has edits of its own")
-{
-	Driven driven("model_reload");
-
-	const EditableMesh plane = EditableMesh::Plane(1.0f);
-	std::ofstream(driven.path, std::ios::binary) << ReadFile(WritePrefab("model_reload_plane", &plane));
-	driven.Frame();
-
-	CHECK(driven.Mesh().faces.size() == 1);
-
-	driven.editor.Add(ModelEditor::Shape::Cube);
-	std::ofstream(driven.path, std::ios::binary) << ReadFile(WritePrefab("model_reload_cube", &driven.cube));
-	driven.Frame();
-
-	CHECK(driven.Mesh().faces.size() == 7);
-};
-
-TEST_CASE("The Model panel's save keeps what it could not read of the prefab")
-{
-	Driven driven("model_keeps");
-
-	// A component no build has, as a script this editor has not loaded would be.
-	constexpr const char* MYSTERY = "\tComponent Mystery(6c1a4d55-0d3e-4b8e-9a31-6b2a1f0e7c42)\n\t\t0 = 1\n";
-
-	std::ofstream(driven.path, std::ios::binary | std::ios::app) << MYSTERY;
-	driven.Frame();
-
-	driven.editor.Add(ModelEditor::Shape::Cube);
-	REQUIRE(driven.editor.Save());
-
-	const std::string saved = ReadFile(driven.path);
-	CHECK(saved.find("Component Mystery(6c1a4d55-0d3e-4b8e-9a31-6b2a1f0e7c42)") != std::string::npos);
-
-	ModelEditor reopened;
-	reopened.Open(driven.path);
-	LoomTests::Pump();
-
-	REQUIRE(reopened.Editing() != nullptr);
-	CHECK(reopened.Editing()->faces.size() == 12);
-};
-
-TEST_CASE("The Model panel leaves animated meshes out")
-{
-	LoomTests::EngineFixture engine;
-
-	const EditableMesh cube = EditableMesh::Cube(1.0f);
-	const std::string path = WritePrefab("model_skinned", nullptr, &cube, true);
-
-	ModelEditor editor;
-	editor.Open(path);
-	LoomTests::Pump();
-
-	CHECK(editor.Editing() == nullptr);
-
-	std::error_code code;
-	std::filesystem::remove(path, code);
-};
-
-// The mesh's new material reads the project's shader, which the web build
-// fetches, and node cannot.
-#ifndef __EMSCRIPTEN__
-TEST_CASE("The Model panel gives a prefab with no mesh one, drawn with a shader its project has")
-{
-	const std::filesystem::path project = std::filesystem::temp_directory_path() / "model_add_mesh";
-	const std::filesystem::path prefab = project / "Assets" / "Prefabs" / "Empty.loomprefab";
-
-	std::filesystem::create_directories(prefab.parent_path());
-	std::ofstream(project / "Model.loomproject") << "name=Model\n";
-	std::ofstream(project / "Assets" / "Lit.shader") << "";
-	std::ofstream(prefab, std::ios::binary) << "GameObject Empty(5d0c6b7e-2f43-4a8e-9c1d-7a6e0b3f2c11)\n\t0 = 0\n\t1 = false\n\t2 = (0, 0, 0)\n\t3 = (0, 0, 0)\n\t4 = (1, 1, 1)\n\t5 = false\n";
-
-	{
-		// The shader is empty, so it does not compile.
-		const LoomTests::Captured captured(std::cerr);
-		Driven driven("model_add_mesh", nullptr, prefab.string());
-		CHECK(driven.editor.Editing() == nullptr);
-
-		driven.editor.AddMesh();
-		CHECK(driven.Mesh().faces.size() == 6);
-		REQUIRE(driven.editor.Save());
-
-		ModelEditor reopened;
-		reopened.Open(prefab.string());
+		ModelEditor editor;
+		editor.Open(path);
 		LoomTests::Pump();
 
-		REQUIRE(reopened.Editing() != nullptr);
-		CHECK(reopened.Editing()->faces.size() == 6);
-		CHECK(ReadFile(prefab.string()).find("\"Assets/Lit.shader\"") != std::string::npos);
-		CHECK(captured.Says("Lit.shader"));
+		REQUIRE(editor.Editing() != nullptr);
+		CHECK(editor.Editing()->faces.size() == 6);
+
+		std::error_code code;
+		std::filesystem::remove(path, code);
 	};
 
-	std::error_code code;
-	std::filesystem::remove_all(project, code);
-};
-
-TEST_CASE("The Model panel lists its project's shaders and saves the one chosen into the prefab, keeping its guids")
-{
-	const std::filesystem::path project = std::filesystem::temp_directory_path() / "model_shaders";
-	const std::filesystem::path prefab = project / "Assets" / "Prefabs" / "Crate.loomprefab";
-	const EditableMesh cube = EditableMesh::Cube(1.0f);
-
-	std::filesystem::create_directories(prefab.parent_path());
-	std::ofstream(project / "Model.loomproject") << "name=Model\n";
-	std::ofstream(project / "Assets" / "Lit.shader") << "";
-	std::ofstream(project / "Assets" / "Model.shader") << "";
-	std::ofstream(prefab, std::ios::binary) << ReadFile(WritePrefab("model_shaders_source", &cube, &cube));
-
+	TEST_CASE("The Model panel opens a prefab not yet written, writes it where it was told to once saved, and goes by the file from then on")
 	{
-		// The shaders are empty, so they do not compile.
+		std::string text;
+		std::error_code code;
+
+		{
+			LoomTests::EngineFixture engine;
+
+			const EditableMesh cube = EditableMesh::Cube(1.0f);
+			const std::string source = WritePrefab("model_unwritten_source", &cube);
+			text = ReadFile(source);
+
+			std::filesystem::remove(source, code);
+		};
+
+		const std::string path = (std::filesystem::temp_directory_path() / "model_unwritten.loomprefab").string();
+		std::filesystem::remove(path, code);
+
+		Driven driven("model_unwritten", nullptr, path, text);
+
+		CHECK(driven.Mesh().faces.size() == 6);
+		CHECK_FALSE(std::filesystem::exists(path));
+
+		REQUIRE(driven.editor.Save());
+		REQUIRE(std::filesystem::exists(path));
+
+		// Deleted once written, it is gone rather than back to the text it opened as.
 		const LoomTests::Captured captured(std::cerr);
-		Driven driven("model_shaders", nullptr, prefab.string());
-		CHECK(driven.editor.Shaders() == std::vector<std::string>{ "Assets/Lit.shader", "Assets/Model.shader" });
+		std::filesystem::remove(path, code);
+
+		driven.Frame();
+		driven.Frame();
+
+		CHECK(driven.editor.Editing() == nullptr);
+		CHECK(captured.Says(path));
+	};
+
+	TEST_CASE("The Model panel goes on to edit the part whose face is clicked")
+	{
+		// A lid floating a cube's height above it.
+		EditableMesh lid = EditableMesh::Plane(1.0f);
+		lid.Transform({ 0, 1, 2, 3 }, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
+
+		Driven driven("model_parts", &lid);
+		REQUIRE(driven.Mesh().faces.size() == 6);
+
+		driven.editor.SetPick(ModelEditor::Pick::Faces);
+		driven.Click(driven.Screen(glm::vec3(0.1f, 1.0f, 0.1f)));
+
+		CHECK(driven.Mesh().faces.size() == 1);
+		CHECK(driven.editor.Selected()->faces == std::set<uint32_t>{ 0 });
+	};
+
+	TEST_CASE("The Model panel's box leaves out corners another part hides")
+	{
+		// A lid just above the cube and wider than it, which hides the cube's
+		// top from the camera looking down.
+		constexpr float lid_height = 0.6f;
+		constexpr float lid_size = 3.0f;
+
+		EditableMesh lid = EditableMesh::Plane(lid_size);
+		lid.Transform({ 0, 1, 2, 3 }, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, lid_height, 0.0f)));
+
+		Driven driven("model_hidden", &lid);
+		REQUIRE(driven.Mesh().faces.size() == 6);
+
+		driven.editor.SetPick(ModelEditor::Pick::Vertices);
+		driven.Drag(driven.Around(), driven.Around(true));
+
+		// The bottom corners the cube itself leaves in view are still picked.
+		REQUIRE_FALSE(driven.editor.Selected()->vertices.empty());
+
+		for (const uint32_t vertex : driven.editor.Selected()->vertices)
+			CHECK(driven.Mesh().vertices[vertex].y < 0.0f);
+	};
+
+	TEST_CASE("The Model panel picks the face clicked, and nothing when the click misses")
+	{
+		Driven driven("model_click");
+
+		driven.editor.SetPick(ModelEditor::Pick::Faces);
+		driven.Click(driven.Screen(glm::vec3(0.1f, 0.5f, 0.1f)));
+
+		REQUIRE(driven.editor.Selected()->faces.size() == 1);
+
+		const uint32_t face = *driven.editor.Selected()->faces.begin();
+		CHECK(driven.Mesh().FaceNormal(face).y > 1.0f - TOLERANCE);
+
+		driven.Click(ImVec2(Driven::width - 10.0f, Driven::height - 40.0f));
+		CHECK(driven.editor.Selected()->faces.empty());
+	};
+
+	TEST_CASE("The Model panel's box picks the corners it covers that can be seen")
+	{
+		Driven driven("model_box");
+
+		driven.editor.SetPick(ModelEditor::Pick::Vertices);
+		driven.Drag(driven.Around(), driven.Around(true));
+
+		// The camera looks down from the +X +Z side, so the far bottom corner is
+		// hidden behind the cube.
+		CHECK(driven.editor.Selected()->vertices.size() == 7);
+	};
+
+	TEST_CASE("The Model panel's move arrow lifts the picked face, and undo puts it back")
+	{
+		Driven driven("model_move");
+
+		driven.editor.SetPick(ModelEditor::Pick::Faces);
+		driven.Click(driven.Screen(glm::vec3(0.1f, 0.5f, 0.1f)));
+		REQUIRE(driven.editor.Selected()->faces.size() == 1);
+
+		const uint32_t face = *driven.editor.Selected()->faces.begin();
+		const glm::vec3 centre = driven.Mesh().FaceCentre(face);
+
+		// Partway along the Y arrow, then further up the screen along it.
+		const ImVec2 middle = driven.Screen(centre);
+		const ImVec2 above = driven.Screen(centre + glm::vec3(0.0f, 0.1f, 0.0f));
+		const float reach = std::hypot(above.x - middle.x, above.y - middle.y);
+		const ImVec2 up((above.x - middle.x) / reach, (above.y - middle.y) / reach);
+
+		constexpr float grab = 60.0f;
+		constexpr float pull = 40.0f;
+
+		driven.Drag(ImVec2(middle.x + up.x * grab, middle.y + up.y * grab), ImVec2(middle.x + up.x * (grab + pull), middle.y + up.y * (grab + pull)));
+
+		const glm::vec3 moved = driven.Mesh().FaceCentre(face);
+		CHECK(moved.y > centre.y + TOLERANCE);
+		CHECK(std::abs(moved.x - centre.x) < TOLERANCE);
+		CHECK(std::abs(moved.z - centre.z) < TOLERANCE);
+
+		driven.editor.Undo();
+		CHECK(std::abs(driven.Mesh().FaceCentre(face).y - centre.y) < TOLERANCE);
+
+		driven.editor.Redo();
+		CHECK(std::abs(driven.Mesh().FaceCentre(face).y - moved.y) < TOLERANCE);
+	};
+
+	TEST_CASE("The Model panel's middle handles size and turn the picked face about its middle")
+	{
+		// How far the middle handles are dragged, in screen pixels: right and up
+		// to size, and a quarter of the way round the outer ring to turn.
+		constexpr float pull = 40.0f;
+		constexpr float ring = 112.5f;
+
+		Driven driven("model_size_turn");
+
+		driven.editor.SetPick(ModelEditor::Pick::Faces);
+		driven.Click(driven.Screen(glm::vec3(0.1f, 0.5f, 0.1f)));
+		REQUIRE(driven.editor.Selected()->faces.size() == 1);
+
+		const uint32_t face = *driven.editor.Selected()->faces.begin();
+		const glm::vec3 centre = driven.Mesh().FaceCentre(face);
+		const auto side = [&]()
+		{
+			const std::vector<EditableMesh::Corner>& corners = driven.Mesh().faces[face].corners;
+			return glm::distance(driven.Mesh().vertices[corners[0].vertex], driven.Mesh().vertices[corners[1].vertex]);
+		};
+
+		const ImVec2 middle = driven.Screen(centre);
+
+		driven.editor.SetTool(ModelEditor::Tool::Scale);
+		driven.Drag(middle, ImVec2(middle.x + pull, middle.y - pull));
+
+		const float sized = side();
+		CHECK(sized > 1.5f);
+		CHECK(glm::distance(driven.Mesh().FaceCentre(face), centre) < TOLERANCE);
+
+		const glm::vec3 corner = driven.Mesh().vertices[driven.Mesh().faces[face].corners[0].vertex];
+
+		driven.editor.SetTool(ModelEditor::Tool::Rotate);
+		driven.Drag(ImVec2(middle.x + ring, middle.y), ImVec2(middle.x, middle.y - ring));
+
+		CHECK(std::abs(side() - sized) < TOLERANCE);
+		CHECK(glm::distance(driven.Mesh().FaceCentre(face), centre) < TOLERANCE);
+		CHECK(glm::distance(driven.Mesh().vertices[driven.Mesh().faces[face].corners[0].vertex], corner) > 0.1f);
+	};
+
+	TEST_CASE("The Model panel saves an extrusion into the prefab, keeping its guids")
+	{
+		Driven driven("model_save");
 
 		Loom::Prefabs::ObjectNode before;
-		REQUIRE(Loom::Prefabs::Parse(ReadFile(prefab.string()), before));
+		REQUIRE(Loom::Prefabs::Parse(ReadFile(driven.path), before));
 
-		driven.editor.SetShader("Assets/Model.shader");
+		driven.editor.SetPick(ModelEditor::Pick::Faces);
+		driven.Click(driven.Screen(glm::vec3(0.1f, 0.5f, 0.1f)));
+		REQUIRE(driven.editor.Selected()->faces.size() == 1);
+
+		driven.editor.Extrude();
 		REQUIRE(driven.editor.Save());
 
-		const std::string saved = ReadFile(prefab.string());
-		const auto named = [&](size_t from) { return saved.find("\"Assets/Model.shader\"", from); };
-		REQUIRE(named(0) != std::string::npos);
-		CHECK(named(named(0) + 1) != std::string::npos);
-
 		Loom::Prefabs::ObjectNode after;
-		REQUIRE(Loom::Prefabs::Parse(saved, after));
+		REQUIRE(Loom::Prefabs::Parse(ReadFile(driven.path), after));
 		CHECK(after.guid == before.guid);
 		REQUIRE(after.components.size() == before.components.size());
 
 		for (size_t i = 0; i < after.components.size(); i++)
 			CHECK(after.components[i].guid == before.components[i].guid);
 
-		CHECK(captured.Says("Material: Assets/Model.shader: "));
+		// Opened again, the extruded triangle stands above the cube's top.
+		ModelEditor reopened;
+		reopened.Open(driven.path);
+		LoomTests::Pump();
+
+		const EditableMesh* mesh = reopened.Editing();
+		REQUIRE(mesh != nullptr);
+		CHECK(mesh->Bounds().second.y > 0.5f + TOLERANCE);
 	};
 
-	std::error_code code;
-	std::filesystem::remove_all(project, code);
-	std::filesystem::remove(std::filesystem::temp_directory_path() / "model_shaders_source.loomprefab", code);
-};
+	TEST_CASE("The Model panel adds a shape, deletes what is picked, and steps back through both")
+	{
+		Driven driven("model_add");
+
+		const size_t faces = driven.Mesh().faces.size();
+
+		driven.editor.Add(ModelEditor::Shape::Cylinder);
+		const size_t added = driven.editor.Selected()->faces.size();
+		CHECK(added > 0);
+		CHECK(driven.Mesh().faces.size() == faces + added);
+
+		driven.editor.Delete();
+		CHECK(driven.Mesh().faces.size() == faces);
+		CHECK(driven.Mesh().vertices.size() == 8);
+
+		driven.editor.Undo();
+		CHECK(driven.Mesh().faces.size() == faces + added);
+
+		driven.editor.Undo();
+		CHECK(driven.Mesh().faces.size() == faces);
+	};
+
+	TEST_CASE("The Model panel reads a prefab changed elsewhere again, unless it has edits of its own")
+	{
+		Driven driven("model_reload");
+
+		const EditableMesh plane = EditableMesh::Plane(1.0f);
+		std::ofstream(driven.path, std::ios::binary) << ReadFile(WritePrefab("model_reload_plane", &plane));
+		driven.Frame();
+
+		CHECK(driven.Mesh().faces.size() == 1);
+
+		driven.editor.Add(ModelEditor::Shape::Cube);
+		std::ofstream(driven.path, std::ios::binary) << ReadFile(WritePrefab("model_reload_cube", &driven.cube));
+		driven.Frame();
+
+		CHECK(driven.Mesh().faces.size() == 7);
+	};
+
+	TEST_CASE("The Model panel's save keeps what it could not read of the prefab")
+	{
+		Driven driven("model_keeps");
+
+		// A component no build has, as a script this editor has not loaded would be.
+		constexpr const char* MYSTERY = "\tComponent Mystery(6c1a4d55-0d3e-4b8e-9a31-6b2a1f0e7c42)\n\t\t0 = 1\n";
+
+		std::ofstream(driven.path, std::ios::binary | std::ios::app) << MYSTERY;
+		driven.Frame();
+
+		driven.editor.Add(ModelEditor::Shape::Cube);
+		REQUIRE(driven.editor.Save());
+
+		const std::string saved = ReadFile(driven.path);
+		CHECK(saved.find("Component Mystery(6c1a4d55-0d3e-4b8e-9a31-6b2a1f0e7c42)") != std::string::npos);
+
+		ModelEditor reopened;
+		reopened.Open(driven.path);
+		LoomTests::Pump();
+
+		REQUIRE(reopened.Editing() != nullptr);
+		CHECK(reopened.Editing()->faces.size() == 12);
+	};
+
+	TEST_CASE("The Model panel leaves animated meshes out")
+	{
+		LoomTests::EngineFixture engine;
+
+		const EditableMesh cube = EditableMesh::Cube(1.0f);
+		const std::string path = WritePrefab("model_skinned", nullptr, &cube, true);
+
+		ModelEditor editor;
+		editor.Open(path);
+		LoomTests::Pump();
+
+		CHECK(editor.Editing() == nullptr);
+
+		std::error_code code;
+		std::filesystem::remove(path, code);
+	};
+
+	// The mesh's new material reads the project's shader, which the web build
+	// fetches, and node cannot.
+#ifndef __EMSCRIPTEN__
+	TEST_CASE("The Model panel gives a prefab with no mesh one, drawn with a shader its project has")
+	{
+		const std::filesystem::path project = std::filesystem::temp_directory_path() / "model_add_mesh";
+		const std::filesystem::path prefab = project / "Assets" / "Prefabs" / "Empty.loomprefab";
+
+		std::filesystem::create_directories(prefab.parent_path());
+		std::ofstream(project / "Model.loomproject") << "name=Model\n";
+		std::ofstream(project / "Assets" / "Lit.shader") << "";
+		std::ofstream(prefab, std::ios::binary) << "GameObject Empty(5d0c6b7e-2f43-4a8e-9c1d-7a6e0b3f2c11)\n\t0 = 0\n\t1 = false\n\t2 = (0, 0, 0)\n\t3 = (0, 0, 0)\n\t4 = (1, 1, 1)\n\t5 = false\n";
+
+		{
+			// The shader is empty, so it does not compile.
+			const LoomTests::Captured captured(std::cerr);
+			Driven driven("model_add_mesh", nullptr, prefab.string());
+			CHECK(driven.editor.Editing() == nullptr);
+
+			driven.editor.AddMesh();
+			CHECK(driven.Mesh().faces.size() == 6);
+			REQUIRE(driven.editor.Save());
+
+			ModelEditor reopened;
+			reopened.Open(prefab.string());
+			LoomTests::Pump();
+
+			REQUIRE(reopened.Editing() != nullptr);
+			CHECK(reopened.Editing()->faces.size() == 6);
+			CHECK(ReadFile(prefab.string()).find("\"Assets/Lit.shader\"") != std::string::npos);
+			CHECK(captured.Says("Lit.shader"));
+		};
+
+		std::error_code code;
+		std::filesystem::remove_all(project, code);
+	};
+
+	TEST_CASE("The Model panel lists its project's shaders and saves the one chosen into the prefab, keeping its guids")
+	{
+		const std::filesystem::path project = std::filesystem::temp_directory_path() / "model_shaders";
+		const std::filesystem::path prefab = project / "Assets" / "Prefabs" / "Crate.loomprefab";
+		const EditableMesh cube = EditableMesh::Cube(1.0f);
+
+		std::filesystem::create_directories(prefab.parent_path());
+		std::ofstream(project / "Model.loomproject") << "name=Model\n";
+		std::ofstream(project / "Assets" / "Lit.shader") << "";
+		std::ofstream(project / "Assets" / "Model.shader") << "";
+		std::ofstream(prefab, std::ios::binary) << ReadFile(WritePrefab("model_shaders_source", &cube, &cube));
+
+		{
+			// The shaders are empty, so they do not compile.
+			const LoomTests::Captured captured(std::cerr);
+			Driven driven("model_shaders", nullptr, prefab.string());
+			CHECK(driven.editor.Shaders() == std::vector<std::string>{ "Assets/Lit.shader", "Assets/Model.shader" });
+
+			Loom::Prefabs::ObjectNode before;
+			REQUIRE(Loom::Prefabs::Parse(ReadFile(prefab.string()), before));
+
+			driven.editor.SetShader("Assets/Model.shader");
+			REQUIRE(driven.editor.Save());
+
+			const std::string saved = ReadFile(prefab.string());
+			const auto named = [&](size_t from) { return saved.find("\"Assets/Model.shader\"", from); };
+			REQUIRE(named(0) != std::string::npos);
+			CHECK(named(named(0) + 1) != std::string::npos);
+
+			Loom::Prefabs::ObjectNode after;
+			REQUIRE(Loom::Prefabs::Parse(saved, after));
+			CHECK(after.guid == before.guid);
+			REQUIRE(after.components.size() == before.components.size());
+
+			for (size_t i = 0; i < after.components.size(); i++)
+				CHECK(after.components[i].guid == before.components[i].guid);
+
+			CHECK(captured.Says("Material: Assets/Model.shader: "));
+		};
+
+		std::error_code code;
+		std::filesystem::remove_all(project, code);
+		std::filesystem::remove(std::filesystem::temp_directory_path() / "model_shaders_source.loomprefab", code);
+	};
 #endif
 
-TEST_CASE("The Model panel's Esc puts a dragged face back and keeps what redo would do")
-{
-	Driven driven("model_escape");
+	TEST_CASE("The Model panel's Esc puts a dragged face back and keeps what redo would do")
+	{
+		Driven driven("model_escape");
 
-	driven.editor.SetPick(ModelEditor::Pick::Faces);
-	driven.Click(driven.Screen(glm::vec3(0.1f, 0.5f, 0.1f)));
-	REQUIRE(driven.editor.Selected()->faces.size() == 1);
+		driven.editor.SetPick(ModelEditor::Pick::Faces);
+		driven.Click(driven.Screen(glm::vec3(0.1f, 0.5f, 0.1f)));
+		REQUIRE(driven.editor.Selected()->faces.size() == 1);
 
-	const uint32_t face = *driven.editor.Selected()->faces.begin();
-	const glm::vec3 centre = driven.Mesh().FaceCentre(face);
+		const uint32_t face = *driven.editor.Selected()->faces.begin();
+		const glm::vec3 centre = driven.Mesh().FaceCentre(face);
 
-	driven.editor.Flip();
-	driven.editor.Undo();
+		driven.editor.Flip();
+		driven.editor.Undo();
 
-	const ImVec2 middle = driven.Screen(centre);
-	const ImVec2 above = driven.Screen(centre + glm::vec3(0.0f, 0.1f, 0.0f));
-	const float reach = std::hypot(above.x - middle.x, above.y - middle.y);
-	const ImVec2 up((above.x - middle.x) / reach, (above.y - middle.y) / reach);
+		const ImVec2 middle = driven.Screen(centre);
+		const ImVec2 above = driven.Screen(centre + glm::vec3(0.0f, 0.1f, 0.0f));
+		const float reach = std::hypot(above.x - middle.x, above.y - middle.y);
+		const ImVec2 up((above.x - middle.x) / reach, (above.y - middle.y) / reach);
 
-	constexpr float grab = 60.0f;
-	constexpr float pull = 40.0f;
+		constexpr float grab = 60.0f;
+		constexpr float pull = 40.0f;
 
-	ImGuiIO& io = ImGui::GetIO();
-	io.AddMousePosEvent(middle.x + up.x * grab, middle.y + up.y * grab);
-	driven.Frame();
-	io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
-	driven.Frame();
-	io.AddMousePosEvent(middle.x + up.x * (grab + pull), middle.y + up.y * (grab + pull));
-	driven.Frame();
+		ImGuiIO& io = ImGui::GetIO();
+		io.AddMousePosEvent(middle.x + up.x * grab, middle.y + up.y * grab);
+		driven.Frame();
+		io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+		driven.Frame();
+		io.AddMousePosEvent(middle.x + up.x * (grab + pull), middle.y + up.y * (grab + pull));
+		driven.Frame();
 
-	REQUIRE(driven.Mesh().FaceCentre(face).y > centre.y + TOLERANCE);
+		REQUIRE(driven.Mesh().FaceCentre(face).y > centre.y + TOLERANCE);
 
-	driven.Key(ImGuiKey_Escape);
-	io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
-	driven.Frame();
+		driven.Key(ImGuiKey_Escape);
+		io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+		driven.Frame();
 
-	CHECK(std::abs(driven.Mesh().FaceCentre(face).y - centre.y) < TOLERANCE);
+		CHECK(std::abs(driven.Mesh().FaceCentre(face).y - centre.y) < TOLERANCE);
 
-	driven.editor.Redo();
-	CHECK(driven.Mesh().FaceNormal(face).y < -1.0f + TOLERANCE);
-};
+		driven.editor.Redo();
+		CHECK(driven.Mesh().FaceNormal(face).y < -1.0f + TOLERANCE);
+	};
 
-TEST_CASE("The Model panel's extrude of faces facing every way does nothing, and is no step")
-{
-	Driven driven("model_extrude_all");
+	TEST_CASE("The Model panel's extrude of faces facing every way does nothing, and is no step")
+	{
+		Driven driven("model_extrude_all");
 
-	driven.editor.Add(ModelEditor::Shape::Cube);
-	REQUIRE(driven.Mesh().faces.size() == 12);
+		driven.editor.Add(ModelEditor::Shape::Cube);
+		REQUIRE(driven.Mesh().faces.size() == 12);
 
-	driven.editor.SetPick(ModelEditor::Pick::Faces);
-	driven.editor.SelectAll();
-	driven.editor.Extrude();
-	CHECK(driven.Mesh().faces.size() == 12);
+		driven.editor.SetPick(ModelEditor::Pick::Faces);
+		driven.editor.SelectAll();
+		driven.editor.Extrude();
+		CHECK(driven.Mesh().faces.size() == 12);
 
-	driven.editor.Undo();
-	CHECK(driven.Mesh().faces.size() == 6);
-};
+		driven.editor.Undo();
+		CHECK(driven.Mesh().faces.size() == 6);
+	};
 
-TEST_CASE("The Model panel shows a prefab deleted from under it as one it cannot read")
-{
-	Driven driven("model_deleted");
-	const LoomTests::Captured captured(std::cerr);
+	TEST_CASE("The Model panel shows a prefab deleted from under it as one it cannot read")
+	{
+		Driven driven("model_deleted");
+		const LoomTests::Captured captured(std::cerr);
 
-	std::error_code code;
-	std::filesystem::remove(driven.path, code);
+		std::error_code code;
+		std::filesystem::remove(driven.path, code);
 
-	driven.Frame();
-	driven.Frame();
+		driven.Frame();
+		driven.Frame();
 
-	CHECK(driven.editor.Editing() == nullptr);
+		CHECK(driven.editor.Editing() == nullptr);
 
-	driven.editor.AddMesh();
-	driven.Frame();
+		driven.editor.AddMesh();
+		driven.Frame();
 
-	CHECK(driven.editor.Editing() == nullptr);
-	CHECK(captured.Says(driven.path));
+		CHECK(driven.editor.Editing() == nullptr);
+		CHECK(captured.Says(driven.path));
+	};
 };

@@ -154,12 +154,13 @@ int main(int argc, char** argv)
 // doctest.h's TEST_SUITE_END names the default suite, and a -ts= run would crash on it.
 TEST_SUITE("Loom Tests")
 {
-	TEST_CASE("every case is in a suite a -ts= filter can read")
+	TEST_CASE("every case is in a suite a -ts= filter can pick")
 	{
 		for (const doctest::detail::TestCase& test : doctest::detail::getRegisteredTests())
 		{
 			INFO(test.m_file, ":", test.m_line);
-			CHECK(test.m_test_suite != nullptr);
+			REQUIRE(test.m_test_suite != nullptr);
+			CHECK(*test.m_test_suite != '\0');
 		};
 	};
 
