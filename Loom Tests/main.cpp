@@ -150,9 +150,23 @@ int main(int argc, char** argv)
 	return context.run();
 };
 
-#ifndef __EMSCRIPTEN__
-TEST_CASE("the suite's temp files go in a folder of its own")
+// A case outside any TEST_SUITE here would register before doctest.h names the
+// file's suite, since init_seg(lib) runs it first, and a -ts= run would crash on it.
+TEST_SUITE("Loom Tests")
 {
-	CHECK(std::filesystem::equivalent(std::filesystem::temp_directory_path(), tempFolder.folder));
-};
+	TEST_CASE("every case is in a suite a -ts= filter can read")
+	{
+		for (const doctest::detail::TestCase& test : doctest::detail::getRegisteredTests())
+		{
+			INFO(test.m_file, ":", test.m_line);
+			CHECK(test.m_test_suite != nullptr);
+		};
+	};
+
+#ifndef __EMSCRIPTEN__
+	TEST_CASE("the suite's temp files go in a folder of its own")
+	{
+		CHECK(std::filesystem::equivalent(std::filesystem::temp_directory_path(), tempFolder.folder));
+	};
 #endif
+};
