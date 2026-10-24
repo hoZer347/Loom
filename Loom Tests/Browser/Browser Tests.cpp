@@ -9,6 +9,8 @@
 #include "Input.h"
 #include "OpenGL.h"
 #include "Page.h"
+#include "Renderer.h"
+#include "WebCanvas.h"
 #include "Utilities/DialogueInput.h"
 
 #include <emscripten.h>
@@ -88,6 +90,18 @@ TEST_SUITE("Browser")
 	TEST_CASE("the page is cross-origin isolated, which threads need")
 	{
 		CHECK(EM_ASM_INT({ return crossOriginIsolated ? 1 : 0; }) == 1);
+	};
+
+	// Ahead of any mouse move, which also tells Input the size.
+	TEST_CASE("Input has the canvas's size from the start, though the page announced it before the renderer listened")
+	{
+		OpenPage();
+
+		const glm::ivec2 size = Loom::WebCanvas::Size();
+
+		CHECK(size.x > 0);
+		CHECK(Loom::Input::screen_width == size.x);
+		CHECK(Loom::Input::screen_height == size.y);
 	};
 
 	TEST_CASE("a mouse move over the canvas reaches Input")
@@ -205,5 +219,16 @@ TEST_SUITE("Browser")
 
 		Request("wheel:10");
 		CHECK(Turned() == doctest::Approx(-tenth_of_a_notch));
+	};
+
+	TEST_CASE("in a browser without WebGPU, the WebGPU renderer declines to attach, so the engine falls back to WebGL")
+	{
+		OpenPage();
+
+		emscripten_run_script("Module.loomGpu = Object.getOwnPropertyDescriptor(Navigator.prototype, 'gpu'); Object.defineProperty(Navigator.prototype, 'gpu', { get: () => undefined, configurable: true });");
+		const bool attached = Loom::Renderer::Create(Loom::Backend::WebGPU)->Attach(Loom::Engine::window);
+		emscripten_run_script("Object.defineProperty(Navigator.prototype, 'gpu', Module.loomGpu);");
+
+		CHECK_FALSE(attached);
 	};
 };

@@ -189,8 +189,11 @@ namespace Loom
 			return Backend::WebGPU;
 		};
 
-		bool Attach(GLFWwindow*) override
+		bool Attach(GLFWwindow* window) override
 		{
+			if (!WebCanvas::HasWebGPU())
+				return false;
+
 			const wgpu::InstanceFeatureName features[] = { wgpu::InstanceFeatureName::TimedWaitAny };
 
 			wgpu::InstanceDescriptor instance;
@@ -260,7 +263,7 @@ namespace Loom
 			if (m_surfaceFormat == wgpu::TextureFormat::Undefined)
 				return false;
 
-			WebCanvas::FollowResizes();
+			WebCanvas::FollowResizes(window);
 
 			m_linear = CreateSampler(wgpu::FilterMode::Linear, false);
 			m_nearest = CreateSampler(wgpu::FilterMode::Nearest, false);

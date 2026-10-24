@@ -2,7 +2,6 @@
 
 #include "WebCanvas.h"
 
-#include "Engine.h"
 #include "Input.h"
 
 #include <GLFW/glfw3.h>
@@ -18,7 +17,19 @@ namespace Loom::WebCanvas
 
 	namespace
 	{
+		GLFWwindow* followed = nullptr;
 		void (*onResized)(int, int) = nullptr;
+
+		void Resized()
+		{
+			const glm::ivec2 size = Size();
+
+			glfwSetWindowSize(followed, size.x, size.y);
+			Input::OnResize(size.x, size.y);
+
+			if (onResized)
+				onResized(size.x, size.y);
+		};
 	};
 
 	glm::ivec2 Size()
@@ -31,8 +42,14 @@ namespace Loom::WebCanvas
 		return glm::ivec2(width, height);
 	};
 
-	void FollowResizes(void (*resized)(int width, int height))
+	bool HasWebGPU()
 	{
+		return emscripten_run_script_int("!!navigator.gpu") != 0;
+	};
+
+	void FollowResizes(GLFWwindow* window, void (*resized)(int width, int height))
+	{
+		followed = window;
 		onResized = resized;
 
 		emscripten_set_resize_callback(
@@ -41,14 +58,7 @@ namespace Loom::WebCanvas
 			EM_TRUE,
 			[](int, const EmscriptenUiEvent*, void*) -> EM_BOOL
 			{
-				const glm::ivec2 size = Size();
-
-				glfwSetWindowSize(Engine::window, size.x, size.y);
-				Input::OnResize(size.x, size.y);
-
-				if (onResized)
-					onResized(size.x, size.y);
-
+				Resized();
 				return EM_TRUE;
 			});
 	};
@@ -56,6 +66,11 @@ namespace Loom::WebCanvas
 	void InstallImGui(GLFWwindow* window)
 	{
 		ImGui_ImplGlfw_InstallEmscriptenCallbacks(window, SELECTOR);
+
+		// That sizes the canvas to its box without a resize event, and the
+		// page may have sent its own while WebGPU's adapter was awaited,
+		// before anyone listened.
+		Resized();
 
 		emscripten_run_script(R"JS(
 			(function(){

@@ -170,7 +170,7 @@ namespace Loom
 					glViewport(0, 0, width, height);
 				});
 #else
-			WebCanvas::FollowResizes([](int width, int height) { glViewport(0, 0, width, height); });
+			WebCanvas::FollowResizes(window, [](int width, int height) { glViewport(0, 0, width, height); });
 #endif
 
 			glEnable(GL_DEPTH_TEST);

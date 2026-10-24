@@ -21,9 +21,13 @@ namespace Loom
 
 		glm::ivec2 Size();
 
+		// Whether the browser offers WebGPU at all, as one without it throws
+		// rather than refusing an adapter.
+		bool HasWebGPU();
+
 		// Keeps the window and Input at the canvas's size as the page resizes,
 		// then hands the size to resized.
-		void FollowResizes(void (*resized)(int width, int height) = nullptr);
+		void FollowResizes(GLFWwindow* window, void (*resized)(int width, int height) = nullptr);
 
 		// ImGui's input from the canvas, which takes the focus, and keeps the
 		// browser from handling its right clicks and wheel itself.
