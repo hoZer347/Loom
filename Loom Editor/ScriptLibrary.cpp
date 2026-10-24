@@ -22,7 +22,9 @@ namespace Loom
 {
 	namespace
 	{
-#ifdef _DEBUG
+#if defined(LOOM_FINAL)
+		const char* const configuration = "Final";
+#elif defined(_DEBUG)
 		const char* const configuration = "Debug";
 #else
 		const char* const configuration = "Release";

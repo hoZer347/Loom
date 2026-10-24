@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <limits>
 #include <memory>
@@ -120,6 +121,8 @@ namespace Loom
 			return registry;
 		};
 
+		std::atomic<bool> s_recording{ false };
+
 		thread_local Log* t_log = nullptr;
 		thread_local std::vector<const char*> t_open{ };
 
@@ -204,13 +207,20 @@ namespace Loom
 	};
 
 	Profiler::Stage::Stage(const char* name) :
-		m_start(Now())
+		m_open(s_recording.load(std::memory_order_relaxed))
 	{
+		if (!m_open)
+			return;
+
+		m_start = Now();
 		t_open.push_back(name);
 	};
 
 	Profiler::Stage::~Stage()
 	{
+		if (!m_open)
+			return;
+
 		const double end = Now();
 		const char* const name = t_open.back();
 
@@ -232,6 +242,16 @@ namespace Loom
 		log.order = order;
 	};
 
+	void Profiler::SetRecording(bool recording)
+	{
+		s_recording.store(recording, std::memory_order_relaxed);
+	};
+
+	bool Profiler::Recording()
+	{
+		return s_recording.load(std::memory_order_relaxed);
+	};
+
 	const char* Profiler::Current()
 	{
 		return t_open.empty() ? nullptr : t_open.back();
@@ -243,6 +263,30 @@ namespace Loom
 		const double now = Now();
 
 		std::lock_guard<std::mutex> lock(shared.mutex);
+
+		if (!Recording())
+		{
+			// Stages still open as recording stopped close into this.
+			for (const std::unique_ptr<Log>& log : shared.logs)
+			{
+				std::lock_guard<std::mutex> named(log->mutex);
+				log->recorded.clear();
+			};
+
+			if (shared.frame != 0)
+			{
+				for (const std::unique_ptr<Log>& log : shared.logs)
+					log->root = Node{ };
+
+				shared.threads.clear();
+				shared.frameLengths.fill(0.0);
+				shared.frameLength = 0.0;
+				shared.frame = 0;
+			};
+
+			shared.frameStart = now;
+			return;
+		};
 
 		shared.frameLengths[shared.frame % Window] = now - shared.frameStart;
 		shared.frameLength = 0.0;

@@ -12,7 +12,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Debug', 'Release')]
+    [ValidateSet('Debug', 'Release', 'Final')]
     [string] $Configuration = 'Debug',
 
     [switch] $NoBuild,

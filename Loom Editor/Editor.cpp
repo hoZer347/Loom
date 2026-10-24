@@ -428,6 +428,30 @@ namespace Loom
 
 		constexpr float drag_speed = 0.01f;
 
+		// The thinnest a stage's bar or graph is drawn.
+		constexpr float stage_narrowest_bar = 1.0f;
+
+		// Each stage keeps its colour on every thread, a soft one under dark
+		// text. Hues step round the wheel by the golden ratio as stages are
+		// first seen, so those seen together stay far apart.
+		ImU32 StageColour(const std::string& name)
+		{
+			constexpr float hue_step = 0.618034f;
+			constexpr float saturation = 0.45f;
+			constexpr float value = 0.9f;
+
+			static std::unordered_map<std::string, int> seen{ };
+
+			const int order = seen.try_emplace(name, (int)seen.size()).first->second;
+			float r = 0.0f;
+			float g = 0.0f;
+			float b = 0.0f;
+
+			ImGui::ColorConvertHSVtoRGB(std::fmod(hue_step * (float)order, 1.0f), saturation, value, r, g, b);
+
+			return ImGui::GetColorU32(ImVec4(r, g, b, 1.0f));
+		};
+
 		// Cut to max_label_chars, ellipsis included, then further until it fits in width.
 		std::string Shortened(const std::string& text, float width)
 		{
@@ -1609,6 +1633,7 @@ namespace Loom
 		m_gamePanelFocused = false;
 		m_gamePanelHovered = false;
 		m_flyingView = false;
+		m_stagesShown = false;
 
 		if (ImGui::IsKeyPressed(ImGuiKey_F11, false))
 			m_fullscreen ? LeaveFullscreen() : EnterFullscreen(m_lastView);
@@ -1620,6 +1645,7 @@ namespace Loom
 
 		DrawLoading();
 
+		Profiler::SetRecording(m_stagesShown);
 		Input::SetFocused(m_gameFocus.Update(m_gamePanelFocused, m_gamePanelHovered, AnyMouseClicked(), ImGui::IsAnyMouseDown() || AnyMouseReleased()));
 
 		ImportQueued();
@@ -3631,6 +3657,11 @@ namespace Loom
 			Input::SetView((int)(corner.x - origin.x), (int)(corner.y - origin.y), (int)available.x, (int)available.y);
 			DrawView(m_gameView, Scene::GetScenes(), nullptr);
 
+#ifndef LOOM_FINAL
+			if (IsPlaying())
+				DrawStageOverlay(corner, available);
+#endif
+
 			if (m_activeScene)
 				TakeImportTarget(&m_activeScene->GetRoot());
 		};
@@ -4013,47 +4044,73 @@ namespace Loom
 			}
 			else ImGui::TextDisabled("No active scene");
 
-			DrawStages();
+#ifndef LOOM_FINAL
+			if (ImGui::CollapsingHeader("Frame stages"))
+			{
+				m_stagesShown = true;
+				DrawStages();
+			};
+#endif
 		};
 
 		ImGui::End();
 	};
 
-	void Editor::DrawStages()
+	void Editor::DrawStageOverlay(const ImVec2& corner, const ImVec2& available)
+	{
+		constexpr const char* label = "Stage timing";
+
+		// How far in from the view's corner it sits, how much of the view's
+		// width it takes while open, and how much of the game shows through.
+		constexpr float inset = 8.0f;
+		constexpr float open_share = 0.4f;
+		constexpr float opacity = 0.85f;
+
+		const ImGuiStyle& style = ImGui::GetStyle();
+		const float closed_width = ImGui::GetFrameHeight() + style.ItemSpacing.x + ImGui::CalcTextSize(label).x + style.WindowPadding.x * 2.0f;
+
+		ImVec4 background = style.Colors[ImGuiCol_WindowBg];
+		background.w = opacity;
+
+		ImGui::SetCursorScreenPos(ImVec2(corner.x + inset, corner.y + inset));
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, background);
+
+		const float width = m_stageOverlayOpen ? (std::max)(available.x * open_share, closed_width) : closed_width;
+
+		if (ImGui::BeginChild("##stage timing", ImVec2(width, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings))
+		{
+			if (ImGui::ArrowButton("##open", m_stageOverlayOpen ? ImGuiDir_Down : ImGuiDir_Right))
+				m_stageOverlayOpen = !m_stageOverlayOpen;
+
+			ImGui::SameLine();
+			ImGui::TextUnformatted(label);
+
+			if (m_stageOverlayOpen)
+			{
+				m_stagesShown = true;
+				DrawStageLanes();
+			};
+
+			// A press on it is its own, not the game's.
+			if (ImGui::IsWindowHovered())
+				m_gamePanelHovered = false;
+		};
+
+		ImGui::EndChild();
+		ImGui::PopStyleColor();
+	};
+
+	void Editor::DrawStageLanes()
 	{
 		const std::vector<Profiler::Thread>& threads = Profiler::Threads();
 
 		if (threads.empty())
 			return;
 
-		// Each stage keeps its colour on every thread, a soft one under dark
-		// text. Hues step round the wheel by the golden ratio as stages are
-		// first seen, so those seen together stay far apart.
-		constexpr float hue_step = 0.618034f;
-		constexpr float saturation = 0.45f;
-		constexpr float value = 0.9f;
-
 		// A lane for each depth, a little short of a line so lanes stand apart.
 		constexpr float lane_lines = 1.1f;
 		constexpr float lane_gap = 1.0f;
-		constexpr float narrowest_bar = 1.0f;
 		constexpr float label_padding = 2.0f;
-
-		static std::unordered_map<std::string, int> seen{ };
-
-		const auto colour = [](const std::string& name)
-		{
-			const int order = seen.try_emplace(name, (int)seen.size()).first->second;
-			float r = 0.0f;
-			float g = 0.0f;
-			float b = 0.0f;
-
-			ImGui::ColorConvertHSVtoRGB(std::fmod(hue_step * (float)order, 1.0f), saturation, value, r, g, b);
-
-			return ImGui::GetColorU32(ImVec4(r, g, b, 1.0f));
-		};
-
-		ImGui::SeparatorText("Frame stages");
 
 		const double frame = Profiler::FrameLength();
 		const float lane = ImGui::GetTextLineHeight() * lane_lines;
@@ -4076,7 +4133,7 @@ namespace Loom
 
 			const ImVec2 corner = ImGui::GetCursorScreenPos();
 			const float left = corner.x + label_width;
-			const float width = (std::max)(ImGui::GetContentRegionAvail().x - label_width, narrowest_bar);
+			const float width = (std::max)(ImGui::GetContentRegionAvail().x - label_width, stage_narrowest_bar);
 
 			ImGui::PushID(thread.name.c_str());
 			ImGui::TextUnformatted(thread.name.c_str());
@@ -4093,11 +4150,11 @@ namespace Loom
 					continue;
 
 				const float from = left + width * (float)std::clamp(row.start / frame, 0.0, 1.0);
-				const float to = (std::max)(from + narrowest_bar, left + width * (float)std::clamp((row.start + row.average) / frame, 0.0, 1.0));
+				const float to = (std::max)(from + stage_narrowest_bar, left + width * (float)std::clamp((row.start + row.average) / frame, 0.0, 1.0));
 				const ImVec2 low(from, corner.y + lane * (float)row.depth);
 				const ImVec2 high(to, low.y + lane - lane_gap);
 
-				draw->AddRectFilled(low, high, colour(row.name));
+				draw->AddRectFilled(low, high, StageColour(row.name));
 
 				if (ImGui::CalcTextSize(row.name.c_str()).x + label_padding * 2.0f <= to - from)
 					draw->AddText(ImVec2(from + label_padding, low.y), IM_COL32_BLACK, row.name.c_str());
@@ -4110,6 +4167,20 @@ namespace Loom
 			if (under)
 				ImGui::SetTooltip("%s: %.3f ms average, %.3f ms peak", under->name.c_str(), under->average, under->peak);
 		};
+	};
+
+	void Editor::DrawStages()
+	{
+		const std::vector<Profiler::Thread>& threads = Profiler::Threads();
+
+		if (threads.empty())
+			return;
+
+		DrawStageLanes();
+
+		const double frame = Profiler::FrameLength();
+		const ImVec2 mouse = ImGui::GetIO().MousePos;
+		ImDrawList* const draw = ImGui::GetWindowDrawList();
 
 		// Each thread's stages stacked a point every Bucket frames, the oldest
 		// on the left.
@@ -4150,7 +4221,7 @@ namespace Loom
 			ImGui::TextDisabled("Up to %.2f ms", highest);
 
 			const ImVec2 corner = ImGui::GetCursorScreenPos();
-			const ImVec2 size((std::max)(ImGui::GetContentRegionAvail().x, narrowest_bar), ImGui::GetTextLineHeight() * graph_lines);
+			const ImVec2 size((std::max)(ImGui::GetContentRegionAvail().x, stage_narrowest_bar), ImGui::GetTextLineHeight() * graph_lines);
 			const float step = size.x / (float)(Profiler::Trend - 1);
 
 			ImGui::InvisibleButton("##graph", size);
@@ -4171,7 +4242,7 @@ namespace Loom
 				if (row.depth != 0 || highest <= 0.0)
 					continue;
 
-				const ImU32 fill = colour(row.name);
+				const ImU32 fill = StageColour(row.name);
 
 				for (int age = 0; age + 1 < Profiler::Trend; age++)
 				{
@@ -4219,7 +4290,7 @@ namespace Loom
 				ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetStyle().IndentSpacing * (float)row.depth);
 
 				const ImVec2 at = ImGui::GetCursorScreenPos();
-				ImGui::GetWindowDrawList()->AddRectFilled(at, ImVec2(at.x + swatch, at.y + swatch), colour(row.name));
+				ImGui::GetWindowDrawList()->AddRectFilled(at, ImVec2(at.x + swatch, at.y + swatch), StageColour(row.name));
 				ImGui::Dummy(ImVec2(swatch, swatch));
 				ImGui::SameLine();
 				ImGui::TextUnformatted(row.name.c_str());

@@ -8,8 +8,8 @@
 #include <string>
 
 
-// A release build records no stages, so there is nothing to look at.
-#ifndef NDEBUG
+// A final build records no stages, so there is nothing to look at.
+#ifndef LOOM_FINAL
 namespace
 {
 	constexpr std::chrono::milliseconds BUSY_FOR{ 2 };
@@ -42,13 +42,19 @@ namespace
 		return { };
 	};
 
-	// Starts each test on a frame of its own, since tests before may have
-	// filled the last with stages of theirs.
+	// Starts each test recording, on a frame of its own, since tests before
+	// may have filled the last with stages of theirs.
 	struct NewFrame
 	{
 		NewFrame()
 		{
+			Loom::Profiler::SetRecording(true);
 			Loom::Profiler::EndFrame();
+		};
+
+		~NewFrame()
+		{
+			Loom::Profiler::SetRecording(false);
 		};
 	};
 };
@@ -214,6 +220,66 @@ TEST_SUITE("Profiler")
 
 		CHECK(Loom::Profiler::Current() == nullptr);
 		Loom::Profiler::EndFrame();
+	};
+
+	TEST_CASE_FIXTURE(NewFrame, "nothing is recorded while recording is off, and what was is forgotten")
+	{
+		{
+			LOOM_STAGE("Profiler before");
+		};
+
+		Loom::Profiler::EndFrame();
+		REQUIRE(FindRow("Profiler before").thread);
+
+		Loom::Profiler::SetRecording(false);
+
+		{
+			LOOM_STAGE("Profiler unwatched");
+			CHECK(Loom::Profiler::Current() == nullptr);
+		};
+
+		Loom::Profiler::EndFrame();
+
+		CHECK(Loom::Profiler::Threads().empty());
+		CHECK(Loom::Profiler::FrameLength() == 0.0);
+
+		Loom::Profiler::SetRecording(true);
+		Loom::Profiler::EndFrame();
+
+		CHECK_FALSE(FindRow("Profiler before").thread);
+		CHECK_FALSE(FindRow("Profiler unwatched").thread);
+	};
+
+	TEST_CASE_FIXTURE(NewFrame, "a stage open as recording turns off or on closes as it began")
+	{
+		{
+			LOOM_STAGE("Profiler stopped inside");
+			Loom::Profiler::SetRecording(false);
+		};
+
+		CHECK(Loom::Profiler::Current() == nullptr);
+		Loom::Profiler::EndFrame();
+		CHECK(Loom::Profiler::Threads().empty());
+
+		{
+			LOOM_STAGE("Profiler started inside");
+			Loom::Profiler::SetRecording(true);
+			CHECK(Loom::Profiler::Current() == nullptr);
+
+			{
+				LOOM_STAGE("Profiler after start");
+				CHECK(std::strcmp(Loom::Profiler::Current(), "Profiler after start") == 0);
+			};
+		};
+
+		CHECK(Loom::Profiler::Current() == nullptr);
+		Loom::Profiler::EndFrame();
+
+		const Found after = FindRow("Profiler after start");
+		REQUIRE(after.thread);
+		CHECK(after.thread->rows[after.row].depth == 0);
+		CHECK_FALSE(FindRow("Profiler stopped inside").thread);
+		CHECK_FALSE(FindRow("Profiler started inside").thread);
 	};
 
 	TEST_CASE_FIXTURE(NewFrame, "a worker's share of a For counts towards the stage it was started in")

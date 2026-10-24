@@ -170,6 +170,10 @@ namespace {NAME}Scripts
       <Configuration>Release</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Final|x64">
+      <Configuration>Final</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>
@@ -187,6 +191,12 @@ namespace {NAME}Scripts
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)'=='Release'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Final'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
@@ -235,6 +245,11 @@ namespace {NAME}Scripts
       <IntrinsicFunctions>true</IntrinsicFunctions>
     </ClCompile>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Final'">
+    <ClCompile>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <!-- Each component is a header, compiled on its own so that a new one is
        built (and registers itself) without being listed here. The engine's
        header is precompiled once and forced into each of them. -->
@@ -243,6 +258,7 @@ namespace {NAME}Scripts
       <CompileAs>CompileAsCpp</CompileAs>
     </ClCompile>
   </ItemGroup>
+  <Import Project="{ENGINE}\Property Files\Final.props" Condition="'$(Configuration)'=='Final'" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
 )";
@@ -264,12 +280,15 @@ Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
 		Release|x64 = Release|x64
+		Final|x64 = Final|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{PROJECT_GUID}.Debug|x64.ActiveCfg = Debug|x64
 		{PROJECT_GUID}.Debug|x64.Build.0 = Debug|x64
 		{PROJECT_GUID}.Release|x64.ActiveCfg = Release|x64
 		{PROJECT_GUID}.Release|x64.Build.0 = Release|x64
+		{PROJECT_GUID}.Final|x64.ActiveCfg = Final|x64
+		{PROJECT_GUID}.Final|x64.Build.0 = Final|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

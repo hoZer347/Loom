@@ -38,6 +38,7 @@
 
 *Property Files:*
 - Various .prop files for easily importing libraries / projects into each other
+- Final.props makes the Final configuration: Release with every optimisation on and no stage timing (`LOOM_FINAL`)
 
 
 ### Bugs To Fix:

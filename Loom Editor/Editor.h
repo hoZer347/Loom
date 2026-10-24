@@ -492,10 +492,16 @@ namespace Loom
 		void DrawSceneData();
 		void DrawStats();
 
-		// What each thread spent on each stage of the frame, in a debug build:
-		// an average frame of the window laid out in time, then for each thread
-		// its stages stacked over the trend and each one's average and peak.
+		// What each thread spent on each stage of the frame, in any build but
+		// a final one: an average frame of the window laid out in time, then
+		// for each thread its stages stacked over the trend and each one's
+		// average and peak.
 		void DrawStages();
+		void DrawStageLanes();
+
+		// Over the corner of the Game view while it plays: a button that opens
+		// the lanes of DrawStages.
+		void DrawStageOverlay(const ImVec2& corner, const ImVec2& available);
 
 		// The first-run "where are your scenes?" prompt, the new project dialog,
 		// and the browsers behind every Browse... button.
@@ -994,6 +1000,11 @@ namespace Loom
 		bool m_showPalette = false;
 		bool m_showPrefab = false;
 		bool m_showStats = true;
+		bool m_stageOverlayOpen = false;
+
+		// Whether this frame drew the stages, so the profiler records them,
+		// and only then.
+		bool m_stagesShown = false;
 		bool m_showKeyBindings = true;
 		bool m_showImGuiDemo = false;
 		bool m_showSettings = false;

@@ -8,8 +8,8 @@
 
 
 // Times the rest of the block as a stage of the frame on the thread it runs
-// on. Nothing in a release build, where name is not even evaluated.
-#ifdef NDEBUG
+// on. Nothing in a final build, where name is not even evaluated.
+#ifdef LOOM_FINAL
 #define LOOM_STAGE(name)
 #else
 #define LOOM_STAGE_JOIN(a, b) a##b
@@ -23,8 +23,10 @@ namespace Loom
 	/**
 	* Loom::Profiler
 	* - How long each stage of the frame took on each thread that worked on
-	*   it, in debug builds only: LOOM_STAGE is nothing in a release build, so
-	*   nothing is recorded there and Threads stays empty
+	*   it, while something is looking: a stage costs a check and no more
+	*   until SetRecording turns it on, and turning it off forgets it all
+	* - LOOM_STAGE is nothing in a final build, so nothing is recorded there
+	*   and Threads stays empty
 	* - A stage runs from its LOOM_STAGE to the end of the block, and the
 	*   stages begun inside it are its parts
 	* - The share of a Jobs::For each worker takes counts, on that worker,
@@ -87,8 +89,17 @@ namespace Loom
 			Stage& operator=(const Stage&) = delete;
 
 		private:
-			double m_start;
+			double m_start = 0.0;
+
+			// Whether recording was on as it opened, so a stage open across
+			// SetRecording still closes as it began.
+			bool m_open;
 		};
+
+		// Off until turned on. The frame that ends after turning it on is the
+		// first recorded.
+		static void SetRecording(bool recording);
+		static bool Recording();
 
 		// What the calling thread is listed as, and where: by order, then by
 		// when each first recorded. One never named is listed last as
