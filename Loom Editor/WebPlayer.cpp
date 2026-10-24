@@ -43,16 +43,22 @@ namespace Loom
 				CoUninitialize();
 		};
 
-		// Opens the page when the server comes up. Returns when everything
-		// holding the pipe has exited.
-		void Read(HiddenProcess hidden, const std::string& page)
+		// Opens the page when the server comes up, and prints what the script
+		// said if it ended first. Returns when everything holding the pipe has
+		// exited.
+		void Read(HiddenProcess hidden, const std::string& page, const std::atomic<bool>* stopping)
 		{
+			WebPlayer::Output output(page);
+
 			hidden.ReadLines(
 				[&](const std::string& line)
 				{
-					if (const std::string url = WebPlayer::PageUrl(line, page); !url.empty())
+					if (const std::string url = output.Hear(line); !url.empty())
 						OpenInBrowser(url);
 				});
+
+			for (const std::string& line : output.Ended(*stopping))
+				std::cout << prefix << line << std::endl;
 		};
 	};
 
@@ -98,13 +104,15 @@ namespace Loom
 
 		std::cout << prefix << "Building " << project << " for the web" << std::endl;
 
-		m_reader = std::thread(Read, hidden, page);
+		m_reader = std::thread(Read, hidden, page, &m_stopping);
 
 		return true;
 	};
 
 	void WebPlayer::Stop()
 	{
+		m_stopping = true;
+
 		// The last handle to the job: closing it kills everything in it, and
 		// the reader runs out of pipe.
 		if (m_job != nullptr)
@@ -115,5 +123,7 @@ namespace Loom
 
 		if (m_reader.joinable())
 			m_reader.join();
+
+		m_stopping = false;
 	};
 };
