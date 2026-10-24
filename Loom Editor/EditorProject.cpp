@@ -595,6 +595,31 @@ namespace Loom
 						CoUninitialize();
 				}).detach();
 		};
+
+		// The model as a prefab of it holds it, empty when it cannot be read.
+		// Imported into a scene of its own, deleted as a closed scene is.
+		std::string ImportedPrefab(const std::string& path)
+		{
+			Scene* scene = new Scene(std::filesystem::path(path).stem().string());
+			Scene::Unlist(scene);
+
+			std::string text;
+
+			if (GameObject* model = ImportModel(path, scene->GetRoot()))
+			{
+				// Children join their parents through the queue.
+				Engine::DoTasks();
+
+				Prefabs::ObjectNode prefab;
+
+				if (Prefabs::Parse(SceneSerializer::Serialize(*model), prefab))
+					text = Prefabs::Write(Prefabs::Isolated(prefab));
+			};
+
+			Engine::QueueTask([scene]() { delete scene; });
+
+			return text;
+		};
 	};
 
 	void Editor::RefreshProjectAssets()
@@ -1418,6 +1443,12 @@ namespace Loom
 
 	void Editor::OpenAsset(const std::string& path)
 	{
+		if (IsModelFile(path))
+		{
+			OpenModel(path);
+			return;
+		};
+
 		const std::string scripts_folder = m_scripts.HasProject()
 			? std::filesystem::path(m_scripts.GetProject()).parent_path().string()
 			: "";
@@ -1470,7 +1501,18 @@ namespace Loom
 
 	void Editor::OpenModel(const std::string& path)
 	{
-		m_models.Open(std::filesystem::path(path).is_absolute() ? path : PrefabFile(path).string());
+		const std::string file = std::filesystem::path(path).is_absolute() ? path : PrefabFile(path).string();
+		const std::string prefab = std::filesystem::path(file).replace_extension(Prefab::extension).string();
+
+		std::error_code code;
+
+		if (!IsModelFile(file))
+			m_models.Open(file);
+		else if (std::filesystem::exists(prefab, code))
+			m_models.Open(prefab);
+		else if (const std::string text = ImportedPrefab(file); !text.empty())
+			m_models.Open(prefab, text);
+
 		m_showModels = true;
 	};
 

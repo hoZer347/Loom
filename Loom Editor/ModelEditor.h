@@ -82,6 +82,10 @@ namespace Loom
 		// the panel with it.
 		void Open(const std::string& path);
 
+		// Opens text, a prefab not yet written, in a tab that writes it to path
+		// when saved. The file at path is read instead once there is one.
+		void Open(const std::string& path, const std::string& text);
+
 		void Draw(bool* open);
 
 		// Keeps the tabs of prefabs that were moved saving to where they are now.
@@ -198,6 +202,9 @@ namespace Loom
 			// a change made to it elsewhere is read in again.
 			std::filesystem::file_time_type written{ };
 			std::string text;
+
+			// What a tab opened before its file was written holds until it is.
+			std::string unwritten;
 
 			// The camera turns about target, distance away.
 			glm::vec3 target{ 0.0f };

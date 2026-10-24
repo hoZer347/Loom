@@ -249,6 +249,42 @@ TEST_CASE("The Model panel finds a mesh on a child of the prefab's top object")
 	std::filesystem::remove(path, code);
 };
 
+TEST_CASE("The Model panel opens a prefab not yet written, and writes it where it was told to once saved")
+{
+	LoomTests::EngineFixture engine;
+	ImGuiContext* context = ImGui::CreateContext();
+
+	const EditableMesh cube = EditableMesh::Cube(1.0f);
+	const std::string source = WritePrefab("model_unwritten_source", &cube);
+	const std::string text = ReadFile(source);
+	const std::string path = (std::filesystem::temp_directory_path() / "model_unwritten.loomprefab").string();
+
+	std::error_code code;
+	std::filesystem::remove(source, code);
+	std::filesystem::remove(path, code);
+
+	ModelEditor editor;
+	editor.Open(path, text);
+	LoomTests::Pump();
+
+	REQUIRE(editor.Editing() != nullptr);
+	CHECK(editor.Editing()->faces.size() == 6);
+	CHECK_FALSE(std::filesystem::exists(path));
+
+	REQUIRE(editor.Save());
+	REQUIRE(std::filesystem::exists(path));
+
+	ModelEditor reopened;
+	reopened.Open(path);
+	LoomTests::Pump();
+
+	REQUIRE(reopened.Editing() != nullptr);
+	CHECK(reopened.Editing()->faces.size() == 6);
+
+	ImGui::DestroyContext(context);
+	std::filesystem::remove(path, code);
+};
+
 TEST_CASE("The Model panel goes on to edit the part whose face is clicked")
 {
 	// A lid floating a cube's height above it.

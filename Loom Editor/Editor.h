@@ -201,7 +201,8 @@ namespace Loom
 		void OpenSprite(const std::string& path);
 
 		// A prefab, by its path in the project or on disk, in a tab of the
-		// Model panel, which comes forward.
+		// Model panel, which comes forward. A model opens as the prefab named
+		// after it beside it, imported afresh until that is saved.
 		void OpenModel(const std::string& path);
 
 		// In the Palette panel, which comes forward, for the sprite in front.
@@ -574,9 +575,10 @@ namespace Loom
 		// the scenes in it, the shaders and each FileTab's files.
 		void RefreshProjectAssets();
 
-		// Where ProjectAssets::OpenerOf says; the shell's opener is whatever
-		// Windows opens that kind of file with, and the text editor when
-		// nothing claims it.
+		// A model in the Model panel, anything else where
+		// ProjectAssets::OpenerOf says; the shell's opener is whatever Windows
+		// opens that kind of file with, and the text editor when nothing
+		// claims it.
 		void OpenAsset(const std::string& path);
 
 		// In the scripts project's solution when it has one.

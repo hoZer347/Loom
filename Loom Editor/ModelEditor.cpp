@@ -251,6 +251,20 @@ void main()
 			return std::filesystem::last_write_time(path, code);
 		};
 
+		// The prefab's file, or until there is one, the text its tab was opened
+		// with, which is dropped once the file is found.
+		std::string PrefabText(const std::string& path, std::string& unwritten)
+		{
+			std::error_code code;
+
+			if (!std::filesystem::exists(path, code))
+				return unwritten;
+
+			unwritten.clear();
+
+			return ProjectAssets::ReadText(path);
+		};
+
 		// Writes the meshes' geometry into the file's own tree rather than this
 		// copy over it, so the file keeps its guids, and any component this
 		// build could not read stays as it was. Components pair up as the nth
@@ -394,6 +408,11 @@ void main()
 
 	void ModelEditor::Open(const std::string& path)
 	{
+		Open(path, "");
+	};
+
+	void ModelEditor::Open(const std::string& path, const std::string& text)
+	{
 		// Absolute, since opening a project moves the working directory.
 		std::error_code code;
 		const std::string normal = std::filesystem::absolute(path, code).lexically_normal().string();
@@ -409,6 +428,7 @@ void main()
 
 		std::unique_ptr<Document> document = std::make_unique<Document>();
 		document->path = normal;
+		document->unwritten = text;
 
 		if (!Load(*document))
 			return;
@@ -418,7 +438,7 @@ void main()
 
 	bool ModelEditor::Load(Document& document)
 	{
-		const std::string text = ProjectAssets::ReadText(document.path);
+		const std::string text = PrefabText(document.path, document.unwritten);
 		Prefabs::ObjectNode prefab;
 		std::string error;
 
@@ -527,7 +547,7 @@ void main()
 		std::string error;
 
 		if (document.root == nullptr ||
-			!Prefabs::Parse(ProjectAssets::ReadText(document.path), file, &error) ||
+			!Prefabs::Parse(PrefabText(document.path, document.unwritten), file, &error) ||
 			!Prefabs::Parse(SceneSerializer::Serialize(*document.root), shown, &error))
 		{
 			std::cerr << "Model panel: could not save " << document.path << ": " << error << std::endl;

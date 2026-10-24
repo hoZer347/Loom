@@ -619,7 +619,7 @@ int main(int argc, char** argv)
 			{
 				if (i + 1 >= argc)
 				{
-					std::cerr << "--open-model needs a prefab" << std::endl;
+					std::cerr << "--open-model needs a prefab or a model" << std::endl;
 					return 1;
 				};
 
