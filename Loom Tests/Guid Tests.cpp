@@ -97,6 +97,10 @@ TEST_SUITE("Guid")
 			"0f8e1b3a-2c4d-5e6f",                       // too short
 			"0f8e1b3a-2c4d-4e6f-8a1b-2c3d4e5f6a7b8c",   // too long
 			"gggggggg-2c4d-4e6f-8a1b-2c3d4e5f6a7b",     // not hex
+			"0f8e1b3a2c4d-4e6f-8a1b-2c3d4e5f6a7b",      // a dash missing
+			"0f8e1b3a-2c4d-4e6f-8a1b-2c3d4e5f6a7b-",    // a dash too many
+			"0f8e-1b3a2c4d-4e6f-8a1b-2c3d4e5f6a7b",     // a dash out of place
+			"--0f8e1b3a2c4d4e6f8a1b2c3d4e5f6a7b",       // dashes before bare hex
 		};
 
 		const Loom::Guid untouched = parsed;

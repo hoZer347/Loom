@@ -1,8 +1,10 @@
 #include "Guid.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
+#include <iterator>
 #include <mutex>
 #include <random>
 
@@ -49,23 +51,35 @@ namespace Loom
 
 	bool Guid::TryParse(const std::string& text, Guid& out)
 	{
-		// Accept the dashed form or bare hex; anything else is not a guid.
-		std::string hex;
-		hex.reserve(32);
+		// The dashed form, 8-4-4-4-12, or the same digits bare.
+		constexpr size_t digits = 32;
+		constexpr size_t dashes[] = { 8, 13, 18, 23 };
 
-		for (const char c : text)
+		const bool dashed = text.size() == digits + std::size(dashes);
+
+		if (!dashed && text.size() != digits)
+			return false;
+
+		std::string hex;
+		hex.reserve(digits);
+
+		for (size_t at = 0; at < text.size(); at++)
 		{
-			if (c == '-')
+			const char c = text[at];
+
+			if (dashed && std::find(std::begin(dashes), std::end(dashes), at) != std::end(dashes))
+			{
+				if (c != '-')
+					return false;
+
 				continue;
+			};
 
 			if (!isxdigit((unsigned char)c))
 				return false;
 
 			hex += c;
 		};
-
-		if (hex.size() != 32)
-			return false;
 
 		out = Guid(
 			strtoull(hex.substr(0, 16).c_str(), nullptr, 16),

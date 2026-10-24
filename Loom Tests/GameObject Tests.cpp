@@ -10,6 +10,9 @@
 
 #include <algorithm>
 #include <atomic>
+#include <iostream>
+#include <sstream>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -43,6 +46,11 @@ namespace
 
 		std::thread::id thread{ };
 		int updates = 0;
+	};
+
+	struct Thrower final : Loom::Component<Thrower>
+	{
+		void OnUpdate() override { throw std::runtime_error("thrown in OnUpdate"); };
 	};
 
 	// An object of its own with a ThreadProbe on it, set to thread.
@@ -893,6 +901,42 @@ TEST_SUITE("GameObject")
 
 		for (const ThreadProbe* probe : { onFirst, wrapped, farOut })
 			CHECK(probe->updates == 1);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an OnUpdate that throws, on the caller or on a lane, is logged and the rest still update")
+	{
+		Loom::Scene scene("throwing");
+		Pump();
+
+		for (const int thread : { 0, 1 })
+		{
+			Loom::GameObject* object = scene.AddChild("Thrower");
+			Pump();
+
+			object->SetThreadID(thread);
+			object->Attach<Thrower>();
+			Pump();
+		};
+
+		ThreadProbe* onCaller = ProbeOn(scene, 0);
+		ThreadProbe* onLane = ProbeOn(scene, 1);
+
+		std::ostringstream captured;
+		std::streambuf* const previous = std::cerr.rdbuf(captured.rdbuf());
+
+		CHECK_NOTHROW(scene.Update());
+
+		std::cerr.rdbuf(previous);
+
+		CHECK(onCaller->updates == 1);
+		CHECK(onLane->updates == 1);
+
+		const std::string log = captured.str();
+		const std::string thrown = "thrown in OnUpdate";
+		const size_t once = log.find(thrown);
+
+		REQUIRE(once != std::string::npos);
+		CHECK(log.find(thrown, once + 1) != std::string::npos);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the caller's thread drains the task queue only once the lanes are done")

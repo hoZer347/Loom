@@ -260,6 +260,26 @@ TEST_SUITE("EditorConsole")
 		CHECK(clipboard == "second line");
 	};
 
+	TEST_CASE_FIXTURE(Driven, "a double-click below the text selects the last line, however long the first")
+	{
+		Loom::EditorLog::Get().Clear();
+		std::cout << "a first line far longer than the last" << std::endl;
+		std::cout << "last" << std::endl;
+		Frame();
+
+		const ImVec2 below = At(2, 0);
+
+		Press(below);
+		Release(below);
+		Press(below);
+		Release(below);
+
+		const auto [left, right] = Highlighted();
+
+		CHECK(left == doctest::Approx(At(1, 0).x));
+		CHECK(right == doctest::Approx(At(1, 4).x));
+	};
+
 	TEST_CASE_FIXTURE(Driven, "Ctrl+A copies every line")
 	{
 		Drag(At(0, 0), At(0, 0));

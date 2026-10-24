@@ -2,6 +2,7 @@
 
 #include "Camera.h"
 #include "Collider.h"
+#include "ComponentRegistry.h"
 #include "Engine.h"
 #include "Jobs.h"
 #include "Lane.h"
@@ -11,6 +12,8 @@
 #include "Renderer.h"
 
 #include <algorithm>
+#include <exception>
+#include <iostream>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -55,8 +58,18 @@ namespace Loom
 		{
 			LOOM_STAGE("Scene::Update");
 
+			// A script's throw is its own: the rest still update, and the lane
+			// it ran on is still waited for.
 			for (ComponentBase* updateable : updates)
-				updateable->OnUpdate();
+				try { updateable->OnUpdate(); }
+				catch (const std::exception& e)
+				{
+					std::cerr << ComponentRegistry::NameOf(*updateable) << " OnUpdate threw: " << e.what() << std::endl;
+				}
+				catch (...)
+				{
+					std::cerr << ComponentRegistry::NameOf(*updateable) << " OnUpdate threw an unknown exception" << std::endl;
+				};
 		};
 	};
 

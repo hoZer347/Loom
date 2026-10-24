@@ -167,7 +167,10 @@ namespace Loom
 				if (any)
 				{
 					if (mouse.y >= text_bottom)
+					{
 						under_mouse = text_end;
+						under_mouse_length = text_end.offset;
+					};
 
 					// One item over all the text, so a drag selects rather than
 					// moving the window, and the selection has a context menu.
