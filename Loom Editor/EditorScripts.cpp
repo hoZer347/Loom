@@ -16,6 +16,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <utility>
 
 
@@ -221,6 +222,25 @@ namespace Loom
 
 		if (m_scripts.LastBuildSucceeded())
 			m_scripts.Load();
+
+		// What was opened while the scripts built holds their components as
+		// MissingComponents, so it goes out as text beside what the build took
+		// down and is read again on the library just loaded.
+		FinishOpening();
+
+		std::vector<SceneSnapshot> opened = TakeSnapshots();
+
+		if (!opened.empty())
+		{
+			m_snapshots.insert(m_snapshots.end(), std::make_move_iterator(opened.begin()), std::make_move_iterator(opened.end()));
+			m_selectedBeforeBuild = m_selected ? m_selected->GetGuid() : Guid();
+		};
+
+		if (!m_prefabPath.empty())
+			m_prefabBeforeBuild = m_prefabPath;
+
+		ClosePrefab();
+		CloseAllScenes();
 
 		RestoreAfterBuild();
 

@@ -1028,11 +1028,6 @@ namespace Loom
 	{
 		std::string error;
 
-		if (m_scripts.IsBuilding())
-			std::cerr
-				<< "Opening a scene while the scripts are compiling: any component "
-				   "from them will be missing until it is opened again." << std::endl;
-
 		Scene* scene = SceneSerializer::LoadFromFile(path, &error);
 
 		if (scene == nullptr)
