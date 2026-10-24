@@ -145,6 +145,9 @@
     <ClCompile Include="Contacts Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="DialogueArgs Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="Jobs Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

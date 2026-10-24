@@ -2,8 +2,11 @@
 
 #include "Loom API.h"
 
+#include <cmath>
+#include <limits>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 
@@ -52,7 +55,7 @@ namespace Loom
 			{
 				long long value = 0;
 
-				if (!TryInteger(trimmed, value))
+				if (!TryInteger(trimmed, value) || !std::in_range<_Type>(value))
 					return false;
 
 				out = static_cast<_Type>(value);
@@ -65,7 +68,7 @@ namespace Loom
 
 				// A suffixed literal (0.1f, 2d) is still a number, and a script author
 				// has no reason to know what is reading it.
-				if (!TryNumber(StripNumericSuffix(trimmed), value))
+				if (!TryNumber(StripNumericSuffix(trimmed), value) || std::abs(value) > std::numeric_limits<_Type>::max())
 					return false;
 
 				out = static_cast<_Type>(value);

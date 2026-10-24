@@ -1,6 +1,8 @@
 #include "DialogueArgs.h"
 
 #include <cctype>
+#include <cerrno>
+#include <cmath>
 #include <cstdlib>
 
 
@@ -103,11 +105,13 @@ namespace Loom
 			return false;
 
 		char* end = nullptr;
+		errno = 0;
 		const long long value = std::strtoll(token.c_str(), &end, 10);
 
 		// The whole token has to be the number. "3 apples" is not a 3 -- it is a script
-		// with a typo in it, and reading it as 3 hides the typo.
-		if (end == nullptr || *end != '\0')
+		// with a typo in it, and reading it as 3 hides the typo. Nor is a number too
+		// big to hold, which would read as the most there is.
+		if (end == nullptr || *end != '\0' || errno == ERANGE)
 			return false;
 
 		out = value;
@@ -123,7 +127,8 @@ namespace Loom
 		char* end = nullptr;
 		const double value = std::strtod(token.c_str(), &end);
 
-		if (end == nullptr || *end != '\0')
+		// nan and inf read as numbers, but no script means one by them.
+		if (end == nullptr || *end != '\0' || !std::isfinite(value))
 			return false;
 
 		out = value;
