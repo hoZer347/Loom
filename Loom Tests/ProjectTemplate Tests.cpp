@@ -144,6 +144,9 @@ TEST_SUITE("ProjectTemplate")
 		CHECK(vcxproj.find("<ObjectFileName>$(IntDir)Loom.h.obj</ObjectFileName>") != std::string::npos);
 		CHECK(vcxproj.find("{PCH_") == std::string::npos);
 		CHECK(vcxproj.find("{HEADERS}") == std::string::npos);
+		CHECK(vcxproj.find("<ProjectConfiguration Include=\"Final|x64\">") != std::string::npos);
+		CHECK(vcxproj.find("<Import Project=\"" + Loom::ProjectTemplate::EngineRoot() + "\\Property Files\\Final.props\"") != std::string::npos);
+		CHECK(ReadAll(project.path / "Scripts" / "MyGameScripts.sln").find("Final|x64 = Final|x64") != std::string::npos);
 		CHECK(ReadAll(project.path / "Scripts" / "SpinningTriangle.hpp").find("#include \"Loom.h\"") != std::string::npos);
 
 		const std::string file = ReadAll(project.path / "MyGame.loomproject");

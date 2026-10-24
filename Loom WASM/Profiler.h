@@ -23,10 +23,11 @@ namespace Loom
 	/**
 	* Loom::Profiler
 	* - How long each stage of the frame took on each thread that worked on
-	*   it, while something is looking: a stage costs a check and no more
-	*   until SetRecording turns it on, and turning it off forgets it all
-	* - LOOM_STAGE is nothing in a final build, so nothing is recorded there
-	*   and Threads stays empty
+	*   it, while something is looking: a stage and the end of a frame cost
+	*   a check and no more until SetRecording turns it on, and turning it
+	*   off forgets it all
+	* - Not in a final build, where LOOM_STAGE is nothing and what the
+	*   engine calls does nothing
 	* - A stage runs from its LOOM_STAGE to the end of the block, and the
 	*   stages begun inside it are its parts
 	* - The share of a Jobs::For each worker takes counts, on that worker,
@@ -78,6 +79,11 @@ namespace Loom
 			std::vector<Row> rows{ };
 		};
 
+#ifdef LOOM_FINAL
+		static void NameThread(const std::string&, int) { };
+		static const char* Current() { return nullptr; };
+		static void EndFrame() { };
+#else
 		// Opens a stage, which closes when it goes. name is copied as the
 		// stage closes, so it need only last that long.
 		struct LOOM_API Stage final
@@ -92,12 +98,13 @@ namespace Loom
 			double m_start = 0.0;
 
 			// Whether recording was on as it opened, so a stage open across
-			// SetRecording still closes as it began.
+			// SetRecording still closes as it began. One still open as it
+			// stops is not recorded.
 			bool m_open;
 		};
 
 		// Off until turned on. The frame that ends after turning it on is the
-		// first recorded.
+		// first recorded, and turning it off forgets what was.
 		static void SetRecording(bool recording);
 		static bool Recording();
 
@@ -118,5 +125,6 @@ namespace Loom
 		// In milliseconds from one EndFrame to the next, averaged over the
 		// window.
 		static double FrameLength();
+#endif
 	};
 };

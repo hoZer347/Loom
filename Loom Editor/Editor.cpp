@@ -428,6 +428,7 @@ namespace Loom
 
 		constexpr float drag_speed = 0.01f;
 
+#ifndef LOOM_FINAL
 		// The thinnest a stage's bar or graph is drawn.
 		constexpr float stage_narrowest_bar = 1.0f;
 
@@ -451,6 +452,7 @@ namespace Loom
 
 			return ImGui::GetColorU32(ImVec4(r, g, b, 1.0f));
 		};
+#endif
 
 		// Cut to max_label_chars, ellipsis included, then further until it fits in width.
 		std::string Shortened(const std::string& text, float width)
@@ -1633,7 +1635,9 @@ namespace Loom
 		m_gamePanelFocused = false;
 		m_gamePanelHovered = false;
 		m_flyingView = false;
+#ifndef LOOM_FINAL
 		m_stagesShown = false;
+#endif
 
 		if (ImGui::IsKeyPressed(ImGuiKey_F11, false))
 			m_fullscreen ? LeaveFullscreen() : EnterFullscreen(m_lastView);
@@ -1645,7 +1649,9 @@ namespace Loom
 
 		DrawLoading();
 
+#ifndef LOOM_FINAL
 		Profiler::SetRecording(m_stagesShown);
+#endif
 		Input::SetFocused(m_gameFocus.Update(m_gamePanelFocused, m_gamePanelHovered, AnyMouseClicked(), ImGui::IsAnyMouseDown() || AnyMouseReleased()));
 
 		ImportQueued();
@@ -4056,6 +4062,7 @@ namespace Loom
 		ImGui::End();
 	};
 
+#ifndef LOOM_FINAL
 	void Editor::DrawStageOverlay(const ImVec2& corner, const ImVec2& available)
 	{
 		constexpr const char* label = "Stage timing";
@@ -4306,4 +4313,5 @@ namespace Loom
 			ImGui::PopID();
 		};
 	};
+#endif
 };

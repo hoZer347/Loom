@@ -1,5 +1,7 @@
 #include "Profiler.h"
 
+#ifndef LOOM_FINAL
+
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -226,6 +228,9 @@ namespace Loom
 
 		t_open.pop_back();
 
+		if (!Recording())
+			return;
+
 		Log& log = ThisThread();
 		std::lock_guard<std::mutex> lock(log.mutex);
 
@@ -244,7 +249,33 @@ namespace Loom
 
 	void Profiler::SetRecording(bool recording)
 	{
-		s_recording.store(recording, std::memory_order_relaxed);
+		if (s_recording.exchange(recording, std::memory_order_relaxed) == recording)
+			return;
+
+		Registry& shared = Shared();
+		std::lock_guard<std::mutex> lock(shared.mutex);
+
+		// A stage that saw recording on as it went off may close into its
+		// log after, so each is emptied as recording starts again.
+		for (const std::unique_ptr<Log>& log : shared.logs)
+		{
+			std::lock_guard<std::mutex> named(log->mutex);
+			log->recorded.clear();
+
+			if (!recording)
+				log->root = Node{ };
+		};
+
+		if (recording)
+		{
+			shared.frameStart = Now();
+			return;
+		};
+
+		shared.threads.clear();
+		shared.frameLengths.fill(0.0);
+		shared.frameLength = 0.0;
+		shared.frame = 0;
 	};
 
 	bool Profiler::Recording()
@@ -259,34 +290,13 @@ namespace Loom
 
 	void Profiler::EndFrame()
 	{
+		if (!Recording())
+			return;
+
 		Registry& shared = Shared();
 		const double now = Now();
 
 		std::lock_guard<std::mutex> lock(shared.mutex);
-
-		if (!Recording())
-		{
-			// Stages still open as recording stopped close into this.
-			for (const std::unique_ptr<Log>& log : shared.logs)
-			{
-				std::lock_guard<std::mutex> named(log->mutex);
-				log->recorded.clear();
-			};
-
-			if (shared.frame != 0)
-			{
-				for (const std::unique_ptr<Log>& log : shared.logs)
-					log->root = Node{ };
-
-				shared.threads.clear();
-				shared.frameLengths.fill(0.0);
-				shared.frameLength = 0.0;
-				shared.frame = 0;
-			};
-
-			shared.frameStart = now;
-			return;
-		};
 
 		shared.frameLengths[shared.frame % Window] = now - shared.frameStart;
 		shared.frameLength = 0.0;
@@ -362,3 +372,4 @@ namespace Loom
 		return Shared().frameLength;
 	};
 };
+#endif
