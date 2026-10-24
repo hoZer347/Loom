@@ -81,8 +81,8 @@ namespace ComputeScripts
 		{
 			if (!m_step)
 			{
-				m_step = std::make_unique<Loom::Shader>(*m_step_path);
-				m_draw = std::make_unique<Loom::Shader>(*m_draw_path);
+				m_step = std::make_unique<Loom::Shader>(*m_stepPath);
+				m_draw = std::make_unique<Loom::Shader>(*m_drawPath);
 			};
 
 			if (!m_step->id || !m_step->compute || !m_draw->id || *m_groups < 1)
@@ -116,10 +116,9 @@ namespace ComputeScripts
 			return m_particles != 0;
 		};
 
-		Loom::Serial<std::string> m_step_path = std::string("Assets/Swarm.shader");
-		Loom::Serial<std::string> m_draw_path = std::string("Assets/Particle.shader");
+		Loom::Serial<std::string> m_stepPath = std::string("Assets/Swarm.shader");
+		Loom::Serial<std::string> m_drawPath = std::string("Assets/Particle.shader");
 
-		// Of 64 particles each.
 		Loom::Serial<int> m_groups = 256;
 
 		std::unique_ptr<Loom::Shader> m_step;

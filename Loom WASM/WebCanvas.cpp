@@ -13,7 +13,7 @@
 
 namespace Loom::WebCanvas
 {
-	const char* const SELECTOR = "#canvas";
+	const char* const Selector = "#canvas";
 
 	namespace
 	{
@@ -37,7 +37,7 @@ namespace Loom::WebCanvas
 		int width = 0;
 		int height = 0;
 
-		emscripten_get_canvas_element_size(SELECTOR, &width, &height);
+		emscripten_get_canvas_element_size(Selector, &width, &height);
 
 		return glm::ivec2(width, height);
 	};
@@ -65,7 +65,7 @@ namespace Loom::WebCanvas
 
 	void InstallImGui(GLFWwindow* window)
 	{
-		ImGui_ImplGlfw_InstallEmscriptenCallbacks(window, SELECTOR);
+		ImGui_ImplGlfw_InstallEmscriptenCallbacks(window, Selector);
 
 		// That sizes the canvas to its box without a resize event, and the
 		// page may have sent its own while WebGPU's adapter was awaited,

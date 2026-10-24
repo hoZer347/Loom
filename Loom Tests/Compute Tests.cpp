@@ -82,14 +82,14 @@ namespace
 		"void loom_main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }\n"
 		"void main() { loom_main(); v_tint = tint; }\n";
 
+	// Covers the window from gl_VertexID, so it draws with no vertices too.
 	const std::string COLORED =
-		"layout(location = 0) in vec3 aPos;\n"
 		"layout(location = 3) in vec4 aColor;\n"
 		"flat out vec4 v_tint;\n"
-		"void main() { v_tint = aColor; gl_Position = vec4(aPos, 1.0); }\n";
+		"void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); v_tint = aColor; gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }\n";
 
-	// A triangle over the whole window, as positions alone and with a UV, a
-	// normal and a green colour at each vertex.
+	// A triangle's vertices as positions alone, and with a UV, a normal and a
+	// green colour each.
 	constexpr float COVERING[] =
 	{
 		-1.0f, -1.0f, 0.0f,
@@ -407,14 +407,16 @@ TEST_SUITE("Compute")
 		});
 	};
 
-	TEST_CASE("a vertex stage reads each vertex's colour, and white from vertices without one")
+	TEST_CASE("a vertex stage reads each vertex's colour, and white from vertices without one or none at all")
 	{
 		OnEachBackend([](Gpu& gpu)
 		{
 			Loom::Renderer& renderer = *gpu.renderer;
 			const uint32_t program = renderer.CreateProgram("colored", COLORED, FLAT);
-
 			CHECK(Near(gpu.Capture([&]() { renderer.Draw(program, GL_TRIANGLES, COVERING_GREEN, FULLSCREEN_VERTICES, GL_STREAM_DRAW, Loom::VertexFormat::PositionUVNormalColor); }), 0, FULL, 0));
+
+			// Straight after the coloured draw, whose state a backend may keep.
+			CHECK(Near(gpu.Capture([&]() { renderer.Draw(program, GL_TRIANGLES, nullptr, FULLSCREEN_VERTICES, GL_STREAM_DRAW); }), FULL, FULL, FULL));
 			CHECK(Near(gpu.Capture([&]() { renderer.Draw(program, GL_TRIANGLES, COVERING, FULLSCREEN_VERTICES, GL_STREAM_DRAW); }), FULL, FULL, FULL));
 
 			renderer.DeleteProgram(program);

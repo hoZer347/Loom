@@ -17,7 +17,7 @@ namespace Loom
 	namespace WebCanvas
 	{
 		// The canvas's element, as a CSS selector.
-		extern const char* const SELECTOR;
+		extern const char* const Selector;
 
 		glm::ivec2 Size();
 

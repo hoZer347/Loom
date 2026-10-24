@@ -29,6 +29,9 @@ namespace Loom
 	{
 		constexpr int LOG_SIZE = 512;
 
+		constexpr GLuint COLOR_LOCATION = 3;
+		constexpr float NO_COLOR[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+
 #ifdef __EMSCRIPTEN__
 		// GLSL ES gives a fragment shader no default float precision. Desktop
 		// GLSL does, so a shader written in the editor would otherwise only
@@ -210,7 +213,6 @@ namespace Loom
 			glBindBuffer(GL_ARRAY_BUFFER, m_noNormal);
 			glBufferData(GL_ARRAY_BUFFER, sizeof(NO_NORMAL), NO_NORMAL, GL_STATIC_DRAW);
 
-			constexpr float NO_COLOR[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 			glGenBuffers(1, &m_noColor);
 			glBindBuffer(GL_ARRAY_BUFFER, m_noColor);
 			glBufferData(GL_ARRAY_BUFFER, sizeof(NO_COLOR), NO_COLOR, GL_STATIC_DRAW);
@@ -660,9 +662,7 @@ namespace Loom
 		};
 
 		// Binds the program's storage blocks and images. False when any is
-		// unset, which a draw or dispatch is skipped for.
-		// Whether the program is the kind asked for and has all its storage,
-		// which it is then bound to.
+		// unset, or the program is not the kind asked for.
 		bool BindStorage(uint32_t program, bool compute = false)
 		{
 #ifndef __EMSCRIPTEN__
@@ -691,7 +691,7 @@ namespace Loom
 		{
 			if (!vertices)
 			{
-				constexpr GLuint VERTEX_LOCATIONS = 3;
+				constexpr GLuint VERTEX_LOCATIONS = COLOR_LOCATION + 1;
 
 				glUseProgram(program);
 				BindTextures(program);
@@ -699,8 +699,11 @@ namespace Loom
 				if (!BindStorage(program))
 					return;
 
+				// A disabled array reads the location's constant value instead.
 				for (GLuint location = 0; location < VERTEX_LOCATIONS; location++)
 					glDisableVertexAttribArray(location);
+
+				glVertexAttrib4fv(COLOR_LOCATION, NO_COLOR);
 
 				glDrawArrays(primitive, 0, (GLsizei)count);
 				return;
@@ -769,7 +772,6 @@ namespace Loom
 			constexpr GLuint POSITION_LOCATION = 0;
 			constexpr GLuint UV_LOCATION = 1;
 			constexpr GLuint NORMAL_LOCATION = 2;
-			constexpr GLuint COLOR_LOCATION = 3;
 
 			// A divisor no instance count reaches reads the first value for
 			// every vertex of every instance.

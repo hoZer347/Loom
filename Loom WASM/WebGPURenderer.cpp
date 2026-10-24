@@ -13,7 +13,6 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_wgpu.h"
 
-
 #include "glm/gtc/type_ptr.hpp"
 
 #include <algorithm>
@@ -251,7 +250,7 @@ namespace Loom
 			// Only now that WebGPU is sure to run, since a canvas that has given
 			// out a WebGPU context cannot give out WebGL's to the fallback.
 			wgpu::EmscriptenSurfaceSourceCanvasHTMLSelector canvas;
-			canvas.selector = WebCanvas::SELECTOR;
+			canvas.selector = WebCanvas::Selector;
 
 			wgpu::SurfaceDescriptor surface;
 			surface.nextInChain = &canvas;
