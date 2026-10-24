@@ -130,13 +130,17 @@ namespace Loom
 			if (at >= keys.size() || known == std::end(PROPERTIES))
 				break;
 
-			channel.property = *known;
-			channel.keys = (size_t)keys[at];
-			channel.first = at + 1;
-			at = channel.first + channel.keys * (1 + ValueFloats(channel.property));
+			const float count = keys[at];
+			const size_t stride = 1 + ValueFloats(*known);
 
-			if (at > keys.size())
+			// Not a count, or more keys than follow it.
+			if (!(count >= 0.0f && count <= (float)keys.size()) || (size_t)count > (keys.size() - at - 1) / stride)
 				break;
+
+			channel.property = *known;
+			channel.keys = (size_t)count;
+			channel.first = at + 1;
+			at = channel.first + channel.keys * stride;
 
 			if (channel.property != Property::Weight)
 			{

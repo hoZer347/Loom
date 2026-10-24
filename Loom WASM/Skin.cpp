@@ -93,8 +93,17 @@ namespace Loom
 		const std::vector<float>& offsets = *m_shapeOffsets;
 		std::vector<size_t> starts;
 
-		for (size_t at = 0; at < offsets.size(); at += 1 + (size_t)offsets[at] * FLOATS_PER_OFFSET)
+		for (size_t at = 0; at < offsets.size(); )
+		{
+			const float count = offsets[at];
+
+			// Not a count, or more offsets than follow it, ends the shapes.
+			if (!(count >= 0.0f && count <= (float)offsets.size()) || (size_t)count > (offsets.size() - at - 1) / FLOATS_PER_OFFSET)
+				break;
+
 			starts.push_back(at);
+			at += 1 + (size_t)count * FLOATS_PER_OFFSET;
+		};
 
 		return starts;
 	};

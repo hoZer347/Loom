@@ -12,6 +12,7 @@
 #include "glm/gtc/epsilon.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
+#include <limits>
 #include <sstream>
 
 using LoomTests::Pump;
@@ -193,6 +194,22 @@ TEST_SUITE("Skin")
 		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(0.0f), CLOSE)));
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shape key counting more offsets than it has, or no number of them, moves nothing")
+	{
+		Rig rig;
+		rig.skin->m_joints = "";
+		rig.mesh->m_vertices = { 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f };
+		rig.skin->m_shapes = "Smile\n";
+		rig.skin->m_shapeWeights = { 1.0f };
+
+		for (const float count : { 2.0f, -1.0f, std::numeric_limits<float>::quiet_NaN() })
+		{
+			rig.skin->m_shapeOffsets = { count, 1.0f, 0.0f, 1.0f, 0.0f };
+
+			CHECK(glm::all(glm::epsilonEqual(rig.Bent(1), glm::vec3(1.0f, 0.0f, 0.0f), CLOSE)));
+		};
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh whose Skin is taken off draws its own vertices again")
 	{
 		RecordingRenderer renderer;
@@ -286,6 +303,27 @@ TEST_SUITE("Animator")
 		};
 
 		glm::vec3 Position() const { return rig.bone->transform.position; };
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a channel counting more keys than there are, or no number of them, is dropped")
+	{
+		// So large that its keys' floats, counted in a size_t, wrap round to few.
+		constexpr float wrapping = 4.6116860184273879e18f;
+
+		for (const float count : { wrapping, 2.0f, -1.0f, std::numeric_limits<float>::quiet_NaN() })
+		{
+			Rig rig;
+			Loom::Animator* animator = rig.scene.GetRoot().Attach<Loom::Animator>();
+			Pump();
+
+			animator->m_clips = "Slide\t1\n";
+			animator->m_channels = "0\ttranslation\tBone\n";
+			animator->m_keys = { count, 1.0f, 2.0f, 0.0f, 0.0f };
+			animator->OnUpdate();
+			animator->Pose(0.5f);
+
+			CHECK(*rig.bone->transform.position == glm::vec3(0.0f));
+		};
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a clip's keys are blended between: positions straight, rotations along the arc, weights straight")
