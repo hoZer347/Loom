@@ -52,6 +52,7 @@ namespace Loom
 			return static_cast<T*>(_GetByID(ID));
 		};
 
+		// One of the live objects called name, any one when several are.
 		template <typename T = LoomObject>
 		constexpr static T* GetByName(const std::string& name)
 		{
@@ -136,7 +137,7 @@ namespace Loom
 		std::string m_name;
 		static inline std::recursive_mutex mutex;
 		static inline std::unordered_map<uint64_t, LoomObject*> by_id{ };
-		static inline std::unordered_map<std::string, LoomObject*> by_name{ };
+		static inline std::unordered_map<std::string, std::unordered_set<LoomObject*>> by_name{ };
 		static inline std::unordered_map<Guid, LoomObject*> by_guid{ };
 
 		uint64_t Initialize();
@@ -192,6 +193,9 @@ namespace Loom
 
 		static LoomObject* _GetByID(const uint64_t& ID);
 		static LoomObject* _GetByName(const std::string& name);
+
+		// Takes this object out from under its name, holding mutex.
+		void Unname();
 		static LoomObject* _GetByGuid(const Guid& guid);
 	};
 };

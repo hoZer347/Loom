@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <thread>
 #include <vector>
@@ -66,6 +67,34 @@ TEST_SUITE("Jobs")
 		{
 			CAPTURE(count);
 			CHECK(Tally(count).EachOnce());
+		};
+	};
+
+	TEST_CASE("a grain of zero gives out one item a chunk, and a huge grain one chunk")
+	{
+		constexpr size_t count = 10;
+
+		CHECK(Loom::Jobs::Chunks(0, 0) == 0);
+		CHECK(Loom::Jobs::Chunks(count, 0) == count);
+		CHECK(Loom::Jobs::Chunks(count, SIZE_MAX) == 1);
+
+		for (size_t grain : { size_t(0), SIZE_MAX })
+		{
+			CAPTURE(grain);
+
+			std::vector<std::atomic<int>> seen(count);
+
+			Loom::Jobs::For(
+				count,
+				grain,
+				[&](size_t, size_t begin, size_t end)
+				{
+					for (size_t i = begin; i < end; i++)
+						seen[i]++;
+				});
+
+			for (const std::atomic<int>& times : seen)
+				CHECK(times == 1);
 		};
 	};
 

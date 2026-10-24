@@ -208,6 +208,9 @@ namespace Loom
 
 	void Jobs::For(size_t count, size_t grain, const Work& work)
 	{
+		if (grain == 0)
+			grain = 1;
+
 		const size_t chunks = Chunks(count, grain);
 		Pool& pool = Workers();
 

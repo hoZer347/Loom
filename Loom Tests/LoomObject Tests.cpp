@@ -106,6 +106,66 @@ TEST_SUITE("LoomObject")
 		Pump();
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "GetByName finds an object by its name, before and after the queue drains")
+	{
+		Thing thing;
+		thing.SetName("Player");
+
+		CHECK(Loom::LoomObject::GetByName("Player") == &thing);
+
+		Pump();
+
+		CHECK(Loom::LoomObject::GetByName("Player") == &thing);
+		CHECK(Loom::LoomObject::GetByName("Nobody") == nullptr);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "renaming an object lets its old name go")
+	{
+		Thing thing;
+		thing.SetName("Before");
+		Pump();
+
+		thing.SetName("After");
+
+		CHECK(Loom::LoomObject::GetByName("Before") == nullptr);
+		CHECK(Loom::LoomObject::GetByName("After") == &thing);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an object destroyed before the queue drains leaves nothing found under its name")
+	{
+		{
+			Thing brief;
+			brief.SetName("Brief");
+		};
+
+		Pump();
+
+		CHECK(Loom::LoomObject::GetByName("Brief") == nullptr);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "destroying one of two objects with a name leaves the other found by it")
+	{
+		Thing kept;
+		kept.SetName("Twin");
+
+		{
+			Thing gone;
+			gone.SetName("Twin");
+			Pump();
+		};
+
+		CHECK(Loom::LoomObject::GetByName("Twin") == &kept);
+
+		{
+			Thing gone;
+			Pump();
+
+			gone.SetName("Twin");
+		};
+
+		CHECK(Loom::LoomObject::GetByName("Twin") == &kept);
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "GetByID returns null for an ID that was never issued")
 	{
 		CHECK(Loom::LoomObject::GetByID(~Loom::uint64_t(0)) == nullptr);

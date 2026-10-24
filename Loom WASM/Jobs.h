@@ -26,10 +26,16 @@ namespace Loom
 	{
 		typedef std::function<void(size_t chunk, size_t begin, size_t end)> Work;
 
-		// Runs work over [0, count) in chunks of grain, the last one shorter.
+		// Runs work over [0, count) in chunks of grain, the last one shorter. A
+		// grain of 0 is taken as 1.
 		static void For(size_t count, size_t grain, const Work& work);
 
-		static size_t Chunks(size_t count, size_t grain) { return (count + grain - 1) / grain; };
+		static size_t Chunks(size_t count, size_t grain)
+		{
+			const size_t step = grain == 0 ? 1 : grain;
+
+			return count / step + (count % step != 0 ? 1 : 0);
+		};
 
 		// Spins a while, then sleeps, until counter reaches at least value,
 		// for work split so its pieces wait on the few they follow rather than

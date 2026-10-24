@@ -29,12 +29,9 @@ namespace Loom
 	{
 		std::lock_guard lock{ mutex };
 
-		this->m_name = name;
-
-		if (by_name.contains(NameAndID()))
-			by_name.erase(NameAndID());
-
-		by_name[NameAndID()] = this;
+		Unname();
+		m_name = name;
+		by_name[m_name].insert(this);
 
 		Touch();
 	};
@@ -213,17 +210,6 @@ namespace Loom
 			by_guid[m_guid] = this;
 		};
 
-		Engine::QueueTask(
-			[this]()
-			{
-				std::lock_guard lock{ mutex };
-
-				if (by_name.contains(NameAndID()))
-					return;
-
-				by_name.emplace(m_name, this);
-			});
-
 		return ID;
 	};
 
@@ -327,7 +313,24 @@ namespace Loom
 	{
 		std::lock_guard lock{ mutex };
 
-		return by_name[name];
+		const auto found = by_name.find(name);
+
+		return found == by_name.end()
+			? nullptr
+			: *found->second.begin();
+	};
+
+	void LoomObject::Unname()
+	{
+		const auto found = by_name.find(m_name);
+
+		if (found == by_name.end())
+			return;
+
+		found->second.erase(this);
+
+		if (found->second.empty())
+			by_name.erase(found);
 	};
 
 	LoomObject* LoomObject::_GetByGuid(const Guid& guid)
@@ -356,7 +359,7 @@ namespace Loom
 			constructing = nullptr;
 
 		by_id.erase(m_ID);
-		by_name.erase(m_name);
+		Unname();
 
 		// Only while it is still ours: SetGuid hands a guid over to whoever
 		// loads a scene that claims it, and that object outlives this one.
