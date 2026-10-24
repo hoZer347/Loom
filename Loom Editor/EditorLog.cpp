@@ -1,10 +1,75 @@
 #include "EditorLog.h"
 
+#include <algorithm>
+#include <cctype>
+#include <filesystem>
 #include <iostream>
+#include <string_view>
 
 
 namespace Loom
 {
+	namespace
+	{
+		bool IsSeparator(char c)
+		{
+			return c == '/' || c == '\\';
+		};
+
+		// Windows paths compare without case, and either separator.
+		char Folded(char c)
+		{
+			return IsSeparator(c) ? '/' : (char)std::tolower((unsigned char)c);
+		};
+
+		// Where a path inside the project ends: at a character no file name
+		// holds, so a name with spaces in it is kept whole.
+		bool EndsPath(char c)
+		{
+			return std::string_view("<>:\"|?*").find(c) != std::string_view::npos;
+		};
+
+		// The size of the text when the folder is not in it.
+		size_t Find(const std::string& text, size_t from, const std::string& folder)
+		{
+			return (size_t)(std::search(text.begin() + from, text.end(), folder.begin(), folder.end(),
+				[](char a, char b) { return Folded(a) == Folded(b); }) - text.begin());
+		};
+
+		std::string Local(const std::string& text, const std::string& project)
+		{
+			if (project.empty())
+				return text;
+
+			std::string local;
+			size_t from = 0;
+			size_t at = Find(text, from, project);
+
+			while (at < text.size())
+			{
+				const size_t after = at + project.size();
+
+				// The folder itself, or another whose name starts with it.
+				if (after >= text.size() || !IsSeparator(text[after]))
+				{
+					at = Find(text, after, project);
+					continue;
+				};
+
+				local.append(text, from, at - from);
+				from = after + 1;
+				at = Find(text, from, project);
+
+				for (; from < at && !EndsPath(text[from]); from++)
+					local += IsSeparator(text[from]) ? '/' : text[from];
+			};
+
+			local.append(text, from);
+
+			return local;
+		};
+	};
+
 	EditorLog& EditorLog::Get()
 	{
 		static EditorLog log;
@@ -61,6 +126,16 @@ namespace Loom
 		lines.clear();
 	};
 
+	void EditorLog::SetProject(const std::string& folder)
+	{
+		std::scoped_lock lock(mutex);
+
+		project = std::filesystem::path(folder).lexically_normal().generic_string();
+
+		while (!project.empty() && IsSeparator(project.back()))
+			project.pop_back();
+	};
+
 	void EditorLog::ForEach(const std::function<void(size_t, const std::string&, bool)>& visit) const
 	{
 		std::scoped_lock lock(mutex);
@@ -76,7 +151,7 @@ namespace Loom
 
 		if (c == '\n')
 		{
-			log->lines.push_back({ pending, is_error });
+			log->lines.push_back({ Local(pending, log->project), is_error });
 
 			if (log->lines.size() > max_lines)
 			{

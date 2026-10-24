@@ -25,6 +25,9 @@ namespace Loom
 
 		void Clear();
 
+		// Lines that name a file inside this folder name it from the folder.
+		void SetProject(const std::string& folder);
+
 		// Walks the buffered lines under the lock, so the console can draw them
 		// without copying the whole buffer every frame. A line keeps its id
 		// while older lines are trimmed or cleared away.
@@ -66,6 +69,7 @@ namespace Loom
 		mutable std::recursive_mutex mutex;
 		std::vector<Line> lines;
 		size_t dropped = 0;
+		std::string project;
 
 		Sink out_sink, err_sink;
 		std::streambuf* previous_out = nullptr;

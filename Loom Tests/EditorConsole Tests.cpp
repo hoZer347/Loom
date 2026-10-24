@@ -407,4 +407,29 @@ TEST_SUITE("EditorLog")
 		CHECK(still_good);
 		CHECK(lines == std::vector<std::string>{ "first", "second", "third" });
 	};
+
+	TEST_CASE("a line naming a file in the project names it from the project's folder, and others are left as written")
+	{
+		Loom::EditorLog::Get().Install();
+		Loom::EditorLog::Get().Clear();
+		Loom::EditorLog::Get().SetProject("C:\\Games\\Crash Demo\\");
+
+		std::cerr << "Sprites: C:\\Games\\Crash Demo\\Assets\\Overfull.loomsprite is not a whole sprite" << std::endl;
+		std::cerr << "Import: c:/games/crash demo/Assets/Some Models\\Broken.ply: Validation failed" << std::endl;
+		std::cerr << "C:\\Games\\Crash Demo\\a.png and C:\\Games\\Crash Demo\\b.png" << std::endl;
+		std::cerr << "C:\\Games\\Crash Demo2\\a.png, C:\\Games\\Crash Demo, C:\\Other\\a.png" << std::endl;
+
+		std::vector<std::string> lines;
+		Loom::EditorLog::Get().ForEach([&](size_t, const std::string& text, bool) { lines.push_back(text); });
+
+		Loom::EditorLog::Get().SetProject("");
+		Loom::EditorLog::Get().Clear();
+		Loom::EditorLog::Get().Uninstall();
+
+		CHECK(lines == std::vector<std::string>{
+			"Sprites: Assets/Overfull.loomsprite is not a whole sprite",
+			"Import: Assets/Some Models/Broken.ply: Validation failed",
+			"a.png and b.png",
+			"C:\\Games\\Crash Demo2\\a.png, C:\\Games\\Crash Demo, C:\\Other\\a.png" });
+	};
 };

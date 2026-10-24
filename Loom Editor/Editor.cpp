@@ -980,6 +980,7 @@ namespace Loom
 		m_linkedInstances.clear();
 
 		m_projectPath = resolved;
+		EditorLog::Get().SetProject(m_projectPath);
 
 		// Asset paths in scenes and scripts are relative to the project, so the
 		// project is where the process works from.
