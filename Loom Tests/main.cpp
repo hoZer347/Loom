@@ -65,5 +65,6 @@ namespace
 #ifndef __EMSCRIPTEN__
 TEST_CASE("the suite's temp files go in a folder of its own")
 {
-	CHECK(std::filesystem::equivalent(std::filesystem::temp_directory_path(), tempFolder.folder));};
+	CHECK(std::filesystem::equivalent(std::filesystem::temp_directory_path(), tempFolder.folder));
+};
 #endif
