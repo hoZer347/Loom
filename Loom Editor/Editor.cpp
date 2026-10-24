@@ -968,6 +968,10 @@ namespace Loom
 		LoadProjectFile();
 
 		RefreshProjectAssets();
+
+		m_showDebug = true;
+		m_debugFocusFrames = scene_focus_frames;
+
 		SaveSettings();
 
 		std::cout
@@ -3596,6 +3600,12 @@ namespace Loom
 
 	void Editor::DrawGame()
 	{
+		if (m_gameFocusFrames > 0)
+		{
+			m_gameFocusFrames--;
+			ImGui::SetNextWindowFocus();
+		};
+
 		// While it plays, the keys are the game's, not a way round the panel's buttons.
 		if (ImGui::Begin(EditorPanels::Game, &m_showGame, m_playing ? view_flags | ImGuiWindowFlags_NoNavInputs : view_flags))
 		{
@@ -3635,11 +3645,22 @@ namespace Loom
 
 	void Editor::DrawDebug()
 	{
+		if (m_debugFocusFrames > 0)
+		{
+			m_debugFocusFrames--;
+			ImGui::SetNextWindowFocus();
+		};
+
 		if (ImGui::Begin(EditorPanels::Debug, &m_showDebug, view_flags))
 		{
 			Watch(View::Debug);
 
-			DrawToolbar();
+			if (DrawToolbar())
+			{
+				m_showGame = true;
+				m_gameFocusFrames = scene_focus_frames;
+			};
+
 			DrawDebugView();
 		};
 
@@ -3661,7 +3682,7 @@ namespace Loom
 		};
 	};
 
-	void Editor::DrawToolbar()
+	bool Editor::DrawToolbar()
 	{
 		constexpr const char* play_label = "Play";
 		constexpr const char* pause_label = "Pause";
@@ -3679,7 +3700,9 @@ namespace Loom
 
 		ImGui::BeginDisabled(Engine::updateScenes || m_playAfterCompile);
 
-		if (ImGui::Button(play_label, play_button_size))
+		const bool played = ImGui::Button(play_label, play_button_size);
+
+		if (played)
 			TogglePlay();
 
 		ImGui::EndDisabled();
@@ -3718,6 +3741,8 @@ namespace Loom
 			ImGuiColorEditFlags_NoInputs);
 
 		ImGui::Separator();
+
+		return played;
 	};
 
 	void Editor::DrawView(EditorViewport& view, const std::vector<Scene*>& scenes, EditorCamera* camera, SelectionOutline* outline)

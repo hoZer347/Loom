@@ -481,8 +481,9 @@ namespace Loom
 		void EnterFullscreen(View view);
 		void LeaveFullscreen();
 
-		// The bar along the top of the Game and Debug panels.
-		void DrawToolbar();
+		// The bar along the top of the Game and Debug panels. True when its
+		// Play was pressed.
+		bool DrawToolbar();
 
 		// Fills the rest of the panel with the scenes, seen through camera, or
 		// through each scene's own when there is none. Only a view with a
@@ -1117,8 +1118,10 @@ namespace Loom
 		bool m_renaming = false;
 		bool m_focusRename = false;
 
-		// Frames left in which the Scene view asks for focus.
+		// Frames left in which the Scene, Debug and Game views ask for focus.
 		int m_sceneFocusFrames = 0;
+		int m_debugFocusFrames = 0;
+		int m_gameFocusFrames = 0;
 
 		std::string m_screenshotPath{ };
 		std::string m_screenshotWindow{ };
