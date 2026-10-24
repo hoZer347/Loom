@@ -458,6 +458,29 @@ TEST_SUITE("UiScript")
 		CHECK(presses == 1);
 	};
 
+	TEST_CASE("a line of only a vertical tab or form feed is blank")
+	{
+		ScriptedUi ui("\v\n\f\nquit\n");
+
+		ui.Run([]() { });
+
+		CHECK(ui.script->Finished());
+		CHECK_FALSE(ui.script->Failed());
+	};
+
+	TEST_CASE("a wait of no finite number of frames, or more than an int counts, fails the script")
+	{
+		CapturedErrors errors;
+
+		for (const char* text : { "wait nan\n", "wait inf\n", "wait 3e9\n", "scroll nan\n" })
+		{
+			ScriptedUi ui(text);
+			ui.Run([]() { });
+
+			CHECK(ui.script->Failed());
+		};
+	};
+
 	TEST_CASE("Run after quit or a failure runs only the new commands")
 	{
 		CapturedErrors errors;

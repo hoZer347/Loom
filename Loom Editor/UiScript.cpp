@@ -5,10 +5,12 @@
 #include "OpenGL.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <unordered_map>
 
@@ -118,7 +120,7 @@ namespace Loom
 			char* end = nullptr;
 			*value = strtof(token.c_str(), &end);
 
-			return *end == '\0';
+			return *end == '\0' && std::isfinite(*value);
 		};
 
 		ImGuiKey KeyNamed(const std::string& name)
@@ -277,12 +279,10 @@ namespace Loom
 
 	bool UiScript::Parse(const std::string& line)
 	{
-		const size_t start = line.find_first_not_of(" \t");
-
-		if (start == std::string::npos || line[start] == '#')
-			return true;
-
 		const std::vector<std::string> tokens = Tokens(line);
+
+		if (tokens.empty() || tokens[0][0] == '#')
+			return true;
 
 		const std::string& verb = tokens[0];
 		ImGuiIO& io = ImGui::GetIO();
@@ -321,7 +321,8 @@ namespace Loom
 		{
 			float frames = 0.0f;
 
-			if (tokens.size() != 2 || !Number(tokens[1], &frames) || frames < 1.0f)
+			// The float nearest the most an int holds is one past it.
+			if (tokens.size() != 2 || !Number(tokens[1], &frames) || frames < 1.0f || frames >= (float)std::numeric_limits<int>::max())
 			{
 				Fail("wait takes a number of frames");
 				return false;
