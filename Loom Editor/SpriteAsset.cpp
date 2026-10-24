@@ -406,7 +406,9 @@ namespace Loom
 
 				if (between == std::string_view::npos ||
 					!ParseInt(value.substr(0, between), loaded.width) ||
-					!ParseInt(value.substr(between + 1), loaded.height))
+					!ParseInt(value.substr(between + 1), loaded.height) ||
+					loaded.width <= 0 || loaded.width > maxSide ||
+					loaded.height <= 0 || loaded.height > maxSide)
 					loaded.width = loaded.height = 0;
 			}
 			else if (key == frame_key)

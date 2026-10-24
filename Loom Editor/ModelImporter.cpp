@@ -36,7 +36,8 @@ namespace Loom
 	{
 		constexpr unsigned int import_flags =
 			aiProcess_Triangulate |
-			aiProcess_SortByPType;
+			aiProcess_SortByPType |
+			aiProcess_ValidateDataStructure;
 
 		// Four joints a vertex is what Skin bends by.
 		constexpr unsigned int rigged_import_flags = import_flags | aiProcess_LimitBoneWeights;

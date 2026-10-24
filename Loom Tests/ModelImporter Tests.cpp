@@ -176,6 +176,40 @@ namespace
 
 		~InFolder() { std::filesystem::current_path(was); };
 	};
+
+	// One triangle whose last corner is the vertex given.
+	std::string Triangle(int last)
+	{
+		return
+			"ply\n"
+			"format ascii 1.0\n"
+			"element vertex 3\n"
+			"property float x\n"
+			"property float y\n"
+			"property float z\n"
+			"element face 1\n"
+			"property list uchar int vertex_indices\n"
+			"end_header\n"
+			"0 0 0\n"
+			"1 0 0\n"
+			"0 1 0\n"
+			"3 0 1 " + std::to_string(last) + "\n";
+	};
+
+	std::vector<Loom::ModelPart> Load(const std::string& text)
+	{
+		const std::string path = (std::filesystem::temp_directory_path() / "loom model.ply").string();
+
+		{
+			std::ofstream file(path);
+			file << text;
+		};
+
+		std::vector<Loom::ModelPart> parts = Loom::LoadModel(path);
+		std::filesystem::remove(path);
+
+		return parts;
+	};
 };
 
 TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an imported model draws each part in its material, still or rigged")
@@ -203,5 +237,18 @@ TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an imported model draws each part i
 
 	std::error_code code;
 	std::filesystem::remove_all(project, code);
+};
+
+TEST_CASE("a model whose faces name vertices it does not have is refused, and one naming its own loads")
+{
+	constexpr int last = 2;
+	constexpr int missing = 99;
+
+	const std::vector<Loom::ModelPart> whole = Load(Triangle(last));
+
+	REQUIRE(whole.size() == 1);
+	CHECK(whole[0].vertices.size() == Loom::model_floats_per_vertex * Loom::model_vertices_per_triangle);
+
+	CHECK(Load(Triangle(missing)).empty());
 };
 #endif

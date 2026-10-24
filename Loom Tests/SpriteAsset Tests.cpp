@@ -205,6 +205,33 @@ TEST_SUITE("SpriteAsset")
 		std::filesystem::remove(path);
 	};
 
+	TEST_CASE("a sprite of no size, or wider than a texture, does not load")
+	{
+		const std::string path = Temp("loom sprite sized.loomsprite").string();
+
+		const std::string sizes[] =
+		{
+			"-2x3",
+			"0x4",
+			std::to_string(SpriteAsset::maxSide + 1) + "x1",
+		};
+
+		for (const std::string& size : sizes)
+		{
+			{
+				std::ofstream file(path);
+				file << "size=" << size << "\nframe=100\nlayer=Only\ncel=\n";
+			};
+
+			SpriteAsset sprite;
+			SpriteAsset::Links links;
+
+			CHECK_NOTHROW(CHECK_FALSE(SpriteAsset::Load(path, sprite, links)));
+		};
+
+		std::filesystem::remove(path);
+	};
+
 	TEST_CASE("a frame's milliseconds are held to what a frame may last")
 	{
 		const std::string path = Temp("loom sprite durations.loomsprite").string();
