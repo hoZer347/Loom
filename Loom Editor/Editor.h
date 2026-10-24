@@ -712,9 +712,12 @@ namespace Loom
 		// active one.
 		void AdoptScene(Scene* scene, const std::string& path);
 
-		// What a view holds with no scene in it: how far the project, the scene
-		// on its way or the scripts it waits for have got, or else the
-		// project's scenes to pick from.
+		// How far the project, the scene on its way or the scripts it waits for
+		// have got, centred over the whole editor.
+		void DrawLoading();
+
+		// What a view holds with no scene in it: nothing while DrawLoading
+		// shows, or else the project's scenes to pick from.
 		void DrawNoScene();
 
 		// Selection and the active scene are raw pointers into a hierarchy that

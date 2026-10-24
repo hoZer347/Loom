@@ -1616,6 +1616,8 @@ namespace Loom
 		else
 			DrawWorkspace();
 
+		DrawLoading();
+
 		Input::SetFocused(m_gameFocus.Update(m_gamePanelFocused, m_gamePanelHovered, AnyMouseClicked(), ImGui::IsAnyMouseDown() || AnyMouseReleased()));
 
 		ImportQueued();

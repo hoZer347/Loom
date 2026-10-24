@@ -1283,8 +1283,68 @@ namespace Loom
 		else AdoptScene(scene, path);
 	};
 
+	void Editor::DrawLoading()
+	{
+		if (!m_opening && (m_scripts.IsIdle() || m_activeScene != nullptr))
+			return;
+
+		constexpr float half = 0.5f;
+		constexpr float sides = 2.0f;
+
+		constexpr ImGuiWindowFlags flags =
+			ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
+			ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
+			ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
+
+		const ImGuiViewport* viewport = ImGui::GetMainViewport();
+		const std::string step = m_opening
+			? "Opening " + std::filesystem::path(m_openingPath).stem().string()
+			: std::string("Compiling scripts");
+
+		// A negative fraction is ImGui's for a bar that sweeps with no end
+		// in sight.
+		float fraction = m_opening
+			? m_opening->Progress()
+			: m_scripts.BuildProgress().value_or(-(float)ImGui::GetTime());
+
+		if (m_projectLoad && fraction >= 0.0f)
+			fraction = m_projectLoad->Fraction(m_opening != nullptr, fraction);
+
+		const float width = (std::min)(
+			viewport->WorkSize.x - ImGui::GetStyle().WindowPadding.x * sides,
+			ImGui::GetFontSize() * OPENING_BAR_LINES);
+
+		ImGui::SetNextWindowPos(viewport->GetWorkCenter(), ImGuiCond_Always, ImVec2(half, half));
+		ImGui::SetNextWindowViewport(viewport->ID);
+
+		if (ImGui::Begin("##Loading", nullptr, flags))
+		{
+			// Docked panels drawn after it would otherwise cover it.
+			ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+
+			// A project's name goes above its bar and the step below.
+			if (m_projectLoad)
+			{
+				ImGui::Text("Loading %s", m_projectName.c_str());
+				ImGui::ProgressBar(fraction, ImVec2(width, 0.0f));
+				ImGui::TextDisabled("%s", step.c_str());
+			}
+			else
+			{
+				ImGui::TextUnformatted(step.c_str());
+				ImGui::ProgressBar(fraction, ImVec2(width, 0.0f));
+			};
+		};
+
+		ImGui::End();
+	};
+
 	void Editor::DrawNoScene()
 	{
+		// The bar over the whole editor stands in for what the view holds.
+		if (m_opening || !m_scripts.IsIdle())
+			return;
+
 		constexpr float half = 0.5f;
 
 		const ImGuiStyle& style = ImGui::GetStyle();
@@ -1299,48 +1359,6 @@ namespace Loom
 					corner.x + (std::max)(0.0f, (available.x - width) * half),
 					corner.y + (std::max)(0.0f, (available.y - height) * half)));
 			};
-
-		if (m_opening || !m_scripts.IsIdle())
-		{
-			const std::string step = m_opening
-				? "Opening " + std::filesystem::path(m_openingPath).stem().string()
-				: std::string("Compiling scripts");
-
-			// A negative fraction is ImGui's for a bar that sweeps with no end
-			// in sight.
-			float fraction = m_opening
-				? m_opening->Progress()
-				: m_scripts.BuildProgress().value_or(-(float)ImGui::GetTime());
-
-			if (m_projectLoad && fraction >= 0.0f)
-				fraction = m_projectLoad->Fraction(m_opening != nullptr, fraction);
-
-			// A project's name goes above its bar and the step below.
-			constexpr float project_lines = 2.0f;
-
-			const float width = (std::min)(available.x, ImGui::GetFontSize() * OPENING_BAR_LINES);
-			const float lines = m_projectLoad ? project_lines : 1.0f;
-
-			centre(width, lines * ImGui::GetTextLineHeightWithSpacing() + ImGui::GetFrameHeight());
-
-			ImGui::BeginGroup();
-
-			if (m_projectLoad)
-			{
-				ImGui::Text("Loading %s", m_projectName.c_str());
-				ImGui::ProgressBar(fraction, ImVec2(width, 0.0f));
-				ImGui::TextDisabled("%s", step.c_str());
-			}
-			else
-			{
-				ImGui::TextUnformatted(step.c_str());
-				ImGui::ProgressBar(fraction, ImVec2(width, 0.0f));
-			};
-
-			ImGui::EndGroup();
-
-			return;
-		};
 
 		if (m_projectPath.empty())
 		{
