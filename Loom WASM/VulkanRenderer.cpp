@@ -12,7 +12,6 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
 
-#include "spirv_reflect.h"
 
 #include "glm/gtc/type_ptr.hpp"
 
@@ -210,6 +209,12 @@ namespace Loom
 
 				for (auto& [handle, kept] : m_kept)
 					DestroyBuffer(kept.buffer, kept.memory);
+
+				for (auto& [handle, storage] : m_buffers)
+					DestroyBuffer(storage.buffer, storage.memory);
+
+				for (Read& read : m_reads)
+					DestroyBuffer(read.buffer, read.memory);
 
 				for (Frame& frame : m_frames)
 				{
@@ -457,11 +462,13 @@ namespace Loom
 					m_swapchainDirty = true;
 			};
 
-			if (m_capture)
-			{
+			if (m_capture || !m_reads.empty())
 				vkWaitForFences(m_device, 1, &frame.fence, VK_TRUE, UINT64_MAX);
+
+			if (m_capture)
 				DeliverReadback(readback);
-			};
+
+			DeliverReads();
 
 			m_frameIndex = (m_frameIndex + 1) % FRAMES_IN_FLIGHT;
 		};
@@ -473,52 +480,7 @@ namespace Loom
 
 		uint32_t CreateProgram(const std::string& name, const std::string& vertex, const std::string& fragment) override
 		{
-			const Glsl::Program compiled = Glsl::Compile(vertex, fragment);
-
-			if (!compiled.compiled)
-				throw std::runtime_error("Shader compile error in " + name + ":\n" + compiled.log);
-
-			const std::array<std::vector<uint32_t>, Glsl::STAGES>& spirv = compiled.spirv;
-
-			Program program;
-			program.name = name;
-
-			for (const std::vector<uint32_t>& code : spirv)
-				Reflect(program, code);
-
-			for (size_t i = 0; i < spirv.size(); i++)
-			{
-				VkShaderModuleCreateInfo info{ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
-				info.codeSize = spirv[i].size() * sizeof(uint32_t);
-				info.pCode = spirv[i].data();
-				vkCreateShaderModule(m_device, &info, nullptr, &program.modules[i]);
-			};
-
-			std::vector<VkDescriptorSetLayoutBinding> bindings;
-
-			if (program.blockSize)
-				bindings.push_back({ Glsl::DEFAULT_BLOCK_BINDING, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL_GRAPHICS, nullptr });
-
-			for (const auto& [samplerName, sampler] : program.samplers)
-				bindings.push_back({ sampler.binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL_GRAPHICS, nullptr });
-
-			VkDescriptorSetLayoutCreateInfo set{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-			set.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
-			set.bindingCount = (uint32_t)bindings.size();
-			set.pBindings = bindings.data();
-			vkCreateDescriptorSetLayout(m_device, &set, nullptr, &program.setLayout);
-
-			VkPipelineLayoutCreateInfo layout{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-			layout.setLayoutCount = 1;
-			layout.pSetLayouts = &program.setLayout;
-			vkCreatePipelineLayout(m_device, &layout, nullptr, &program.layout);
-
-			program.block.assign(program.blockSize, 0);
-
-			const uint32_t handle = m_nextHandle++;
-			m_programs.emplace(handle, std::move(program));
-
-			return handle;
+			return AddProgram(name, Glsl::Compile(vertex, fragment), VK_SHADER_STAGE_ALL_GRAPHICS);
 		};
 
 		void DeleteProgram(uint32_t handle) override
@@ -594,6 +556,182 @@ namespace Loom
 				sampler->second.texture = texture;
 		};
 
+		bool SupportsCompute() const override
+		{
+			return true;
+		};
+
+		uint32_t CreateComputeProgram(const std::string& name, const std::string& compute) override
+		{
+			return AddProgram(name, Glsl::CompileCompute(compute), VK_SHADER_STAGE_COMPUTE_BIT);
+		};
+
+		void Dispatch(uint32_t handle, uint32_t x, uint32_t y, uint32_t z) override
+		{
+			const auto found = m_programs.find(handle);
+
+			if (found == m_programs.end() || !found->second.compute || !Ready(found->second))
+				return;
+
+			const Program& program = found->second;
+
+			Run([&](VkCommandBuffer command)
+			{
+				vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, program.compute);
+				PushDescriptors(command, program, VK_PIPELINE_BIND_POINT_COMPUTE);
+				Barrier(command);
+				vkCmdDispatch(command, x, y, z);
+				Barrier(command);
+			});
+		};
+
+		uint32_t CreateBuffer(size_t size) override
+		{
+			StorageBuffer storage;
+			storage.size = size;
+
+			if (!size || !CreateBuffer(size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+				storage.buffer, storage.memory, nullptr, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+				return 0;
+
+			Run([&](VkCommandBuffer command)
+			{
+				vkCmdFillBuffer(command, storage.buffer, 0, VK_WHOLE_SIZE, 0);
+				Barrier(command);
+			});
+
+			const uint32_t handle = m_nextHandle++;
+			m_buffers.emplace(handle, storage);
+
+			return handle;
+		};
+
+		void SetBufferData(uint32_t handle, const void* data, size_t size, size_t offset) override
+		{
+			const auto found = m_buffers.find(handle);
+
+			if (found == m_buffers.end() || !size || offset + size > found->second.size)
+				return;
+
+			const Allocation staging = Allocate(size, 1);
+			memcpy(staging.mapped, data, size);
+
+			const VkBuffer buffer = found->second.buffer;
+
+			Run([&](VkCommandBuffer command)
+			{
+				const VkBufferCopy copy{ staging.offset, offset, size };
+
+				Barrier(command);
+				vkCmdCopyBuffer(command, staging.buffer, buffer, 1, &copy);
+				Barrier(command);
+			});
+		};
+
+		void ReadBuffer(uint32_t handle, const BufferHandler& handler) override
+		{
+			const auto found = m_buffers.find(handle);
+
+			if (found == m_buffers.end())
+				return;
+
+			Read read;
+			read.size = found->second.size;
+			read.handler = handler;
+
+			void* mapped = nullptr;
+
+			if (!CreateBuffer(read.size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, read.buffer, read.memory, &mapped))
+				return;
+
+			read.mapped = (const uint8_t*)mapped;
+
+			const VkBuffer buffer = found->second.buffer;
+
+			Run([&](VkCommandBuffer command)
+			{
+				const VkBufferCopy copy{ 0, 0, read.size };
+
+				Barrier(command);
+				vkCmdCopyBuffer(command, buffer, read.buffer, 1, &copy);
+
+				VkMemoryBarrier copied{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+				copied.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+				copied.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+
+				vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 1, &copied, 0, nullptr, 0, nullptr);
+			});
+
+			m_reads.push_back(std::move(read));
+		};
+
+		void DestroyBuffer(uint32_t handle) override
+		{
+			const auto found = m_buffers.find(handle);
+
+			if (found == m_buffers.end())
+				return;
+
+			Defer([this, storage = found->second]() { DestroyBuffer(storage.buffer, storage.memory); });
+			m_buffers.erase(found);
+		};
+
+		void SetBuffer(uint32_t handle, const char* block, uint32_t buffer) override
+		{
+			const auto found = m_programs.find(handle);
+
+			if (found == m_programs.end())
+				return;
+
+			const auto binding = found->second.buffers.find(std::string_view(block));
+
+			if (binding != found->second.buffers.end())
+				binding->second.resource = buffer;
+		};
+
+		uint32_t CreateStorageTexture(int width, int height) override
+		{
+			Texture texture;
+			texture.width = width;
+			texture.height = height;
+			texture.storage = true;
+
+			if (!CreateAttachment(texture.color, COLOR_TARGET_FORMAT, width, height,
+				VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT))
+				return 0;
+
+			texture.sampler = CreateSampler(false);
+
+			// Zeroed, as WebGPU's start.
+			Immediately([&](VkCommandBuffer command)
+			{
+				Transition(command, texture.color.image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
+				const VkClearColorValue zero{ };
+				const VkImageSubresourceRange range = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+				vkCmdClearColorImage(command, texture.color.image, VK_IMAGE_LAYOUT_GENERAL, &zero, 1, &range);
+
+				Barrier(command);
+			});
+
+			texture.color.layout = VK_IMAGE_LAYOUT_GENERAL;
+
+			return Add(std::move(texture));
+		};
+
+		void SetImage(uint32_t handle, const char* name, uint32_t texture) override
+		{
+			const auto found = m_programs.find(handle);
+
+			if (found == m_programs.end())
+				return;
+
+			const auto image = found->second.images.find(std::string_view(name));
+
+			if (image != found->second.images.end())
+				image->second.resource = texture;
+		};
+
 		void SetPixelated(uint32_t handle, bool pixelated) override
 		{
 			const auto found = m_programs.find(handle);
@@ -615,10 +753,17 @@ namespace Loom
 		void BindStreamed(VkCommandBuffer command, const float* vertices, size_t count, size_t drawn, size_t stride)
 		{
 			const Allocation vertexData = Allocate(drawn * stride, sizeof(float));
-			memcpy(vertexData.mapped, vertices, count * stride);
 
-			if (drawn > count)
-				memcpy(vertexData.mapped + count * stride, vertices, stride);
+			// None reads zeros, as GL does with its arrays off.
+			if (!vertices)
+				memset(vertexData.mapped, 0, drawn * stride);
+			else
+			{
+				memcpy(vertexData.mapped, vertices, count * stride);
+
+				if (drawn > count)
+					memcpy(vertexData.mapped + count * stride, vertices, stride);
+			};
 
 			vkCmdBindVertexBuffers(command, VERTEX_BINDING, 1, &vertexData.buffer, &vertexData.offset);
 		};
@@ -724,7 +869,7 @@ namespace Loom
 			Program& program = found->second;
 			const uint32_t target = m_stack.back();
 
-			if (target == WINDOW && !m_haveImage)
+			if ((target == WINDOW && !m_haveImage) || program.stages != VK_SHADER_STAGE_ALL_GRAPHICS || !Ready(program))
 				return;
 
 			EnsureRendering(target);
@@ -765,47 +910,7 @@ namespace Loom
 				vkCmdBindVertexBuffers(command, NO_COLOR_BINDING, 1, &noColor.buffer, &noColor.offset);
 			};
 
-			// Members, so a draw allocates nothing; reserved, so the writes'
-			// pointers into images stay put.
-			std::vector<VkWriteDescriptorSet>& writes = m_writes;
-			std::vector<VkDescriptorImageInfo>& images = m_images;
-			writes.clear();
-			images.clear();
-			images.reserve(program.samplers.size());
-
-			VkDescriptorBufferInfo block{ };
-
-			if (program.blockSize)
-			{
-				const Allocation uniforms = Allocate(program.blockSize, m_uniformAlignment);
-				memcpy(uniforms.mapped, program.block.data(), program.blockSize);
-
-				block = { uniforms.buffer, uniforms.offset, program.blockSize };
-
-				VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-				write.dstBinding = Glsl::DEFAULT_BLOCK_BINDING;
-				write.descriptorCount = 1;
-				write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				write.pBufferInfo = &block;
-				writes.push_back(write);
-			};
-
-			for (const auto& [name, sampler] : program.samplers)
-			{
-				const Texture& texture = SampledTexture(sampler);
-				const VkSampler sampling = program.pixelated && !sampler.shadow ? m_nearestSampler : texture.sampler;
-				images.push_back({ sampling, texture.Sampled().view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
-
-				VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-				write.dstBinding = sampler.binding;
-				write.descriptorCount = 1;
-				write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-				write.pImageInfo = &images.back();
-				writes.push_back(write);
-			};
-
-			if (!writes.empty())
-				m_pushDescriptorSet(command, VK_PIPELINE_BIND_POINT_GRAPHICS, program.layout, 0, (uint32_t)writes.size(), writes.data());
+			PushDescriptors(command, program, VK_PIPELINE_BIND_POINT_GRAPHICS);
 
 			vkCmdDraw(command, (uint32_t)drawn, (uint32_t)instances, 0, 0);
 		};
@@ -927,7 +1032,9 @@ namespace Loom
 		void PushTarget(uint32_t target) override
 		{
 			EndRendering();
-			m_stack.push_back(m_textures.contains(target) ? target : WINDOW);
+
+			const auto found = m_textures.find(target);
+			m_stack.push_back(found != m_textures.end() && !found->second.storage ? target : WINDOW);
 		};
 
 		void PopTarget() override
@@ -1015,7 +1122,7 @@ namespace Loom
 			Texture& texture = found->second;
 
 			if (!texture.imgui)
-				texture.imgui = ImGui_ImplVulkan_AddTexture(texture.sampler, texture.Sampled().view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+				texture.imgui = ImGui_ImplVulkan_AddTexture(texture.sampler, texture.Sampled().view, texture.SampledLayout());
 
 			return (void*)texture.imgui;
 		};
@@ -1053,20 +1160,16 @@ namespace Loom
 			Pending pending;
 			VkDescriptorSet imgui = VK_NULL_HANDLE;
 
+			// CreateStorageTexture's, which compute writes and samples in the one
+			// layout, and nothing draws into.
+			bool storage = false;
+
 			const Attachment& Sampled() const { return color.image ? color : depth; };
+			VkImageLayout SampledLayout() const { return storage ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; };
 		};
 
 		struct Program
 		{
-			struct Member
-			{
-				uint32_t offset;
-				uint32_t size;
-
-				// Between a matrix's columns, which std140 pads to a vec4 each.
-				uint32_t matrixStride;
-			};
-
 			struct Sampler
 			{
 				uint32_t binding;
@@ -1074,10 +1177,21 @@ namespace Loom
 				uint32_t texture = 0;
 			};
 
+			// A storage block or image, and the buffer or texture set for it.
+			struct Storage
+			{
+				uint32_t binding;
+				uint32_t resource = 0;
+			};
+
 			std::string name;
-			std::array<VkShaderModule, Glsl::STAGES> modules{ };
+
+			// The graphics stages, or compute.
+			VkShaderStageFlags stages = 0;
+			std::vector<VkShaderModule> modules;
 			VkDescriptorSetLayout setLayout = VK_NULL_HANDLE;
 			VkPipelineLayout layout = VK_NULL_HANDLE;
+			VkPipeline compute = VK_NULL_HANDLE;
 
 			bool hasPosition = false;
 			bool hasUV = false;
@@ -1087,12 +1201,31 @@ namespace Loom
 			bool pixelated = false;
 			uint32_t blockSize = 0;
 			std::vector<uint8_t> block;
-			ByName<Member> members;
+			ByName<Glsl::Layout::Member> members;
 			ByName<Sampler> samplers;
+			ByName<Storage> buffers;
+			ByName<Storage> images;
 
 			// By topology, attachment formats, whether the viewport is flipped
 			// and the vertex format.
 			std::unordered_map<uint64_t, VkPipeline> pipelines;
+		};
+
+		struct StorageBuffer
+		{
+			VkBuffer buffer = VK_NULL_HANDLE;
+			VkDeviceMemory memory = VK_NULL_HANDLE;
+			VkDeviceSize size = 0;
+		};
+
+		// What ReadBuffer copied a buffer into, handed over once the frame is done.
+		struct Read
+		{
+			VkBuffer buffer = VK_NULL_HANDLE;
+			VkDeviceMemory memory = VK_NULL_HANDLE;
+			const uint8_t* mapped = nullptr;
+			VkDeviceSize size = 0;
+			BufferHandler handler;
 		};
 
 		struct Chunk
@@ -1734,7 +1867,7 @@ namespace Loom
 			specialization.dataSize = sizeof(flip);
 			specialization.pData = &flip;
 
-			VkPipelineShaderStageCreateInfo stages[Glsl::STAGES] = { { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO }, { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO } };
+			VkPipelineShaderStageCreateInfo stages[] = { { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO }, { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO } };
 			stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
 			stages[0].module = program.modules[0];
 			stages[0].pName = "main";
@@ -1878,67 +2011,205 @@ namespace Loom
 			return pipeline;
 		};
 
-		// Takes one stage's uniforms, samplers and inputs into the program.
-		void Reflect(Program& program, const std::vector<uint32_t>& code)
+		// Builds a program from its compiled stages, whose descriptors are for
+		// stages.
+		uint32_t AddProgram(const std::string& name, const Glsl::Program& compiled, VkShaderStageFlags stages)
 		{
-			SpvReflectShaderModule module;
+			if (!compiled.compiled)
+				throw std::runtime_error("Shader compile error in " + name + ":\n" + compiled.log);
 
-			if (spvReflectCreateShaderModule(code.size() * sizeof(uint32_t), code.data(), &module) != SPV_REFLECT_RESULT_SUCCESS)
-				throw std::runtime_error("Could not reflect " + program.name);
+			const Glsl::Layout layout = Glsl::Reflect(name, compiled);
 
-			uint32_t count = 0;
-			spvReflectEnumerateDescriptorBindings(&module, &count, nullptr);
+			Program program;
+			program.name = name;
+			program.stages = stages;
+			program.blockSize = layout.blockSize;
+			program.block.assign(layout.blockSize, 0);
+			program.members.insert(layout.members.begin(), layout.members.end());
 
-			std::vector<SpvReflectDescriptorBinding*> bindings(count);
-			spvReflectEnumerateDescriptorBindings(&module, &count, bindings.data());
+			for (const auto& [samplerName, sampler] : layout.samplers)
+				program.samplers[samplerName] = { sampler.binding, sampler.shadow };
 
-			for (const SpvReflectDescriptorBinding* binding : bindings)
+			for (const auto& [block, buffer] : layout.buffers)
+				program.buffers[block] = { buffer.binding };
+
+			for (const auto& [image, binding] : layout.images)
+				program.images[image] = { binding.binding };
+
+			for (const uint32_t location : layout.inputs)
 			{
-				// One the stage never reads is left without a binding of its own, so
-				// it can share one with what it does read.
-				if (!binding->accessed)
-					continue;
-
-				if (binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER && binding->binding == Glsl::DEFAULT_BLOCK_BINDING)
-				{
-					program.blockSize = std::max(program.blockSize, binding->block.padded_size);
-
-					for (uint32_t i = 0; i < binding->block.member_count; i++)
-					{
-						const SpvReflectBlockVariable& member = binding->block.members[i];
-						program.members[member.name] = { member.offset, member.size, member.numeric.matrix.stride };
-					};
-				}
-				else if (binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-					program.samplers[binding->name] = { binding->binding, binding->image.depth == 1 };
-				else
-				{
-					spvReflectDestroyShaderModule(&module);
-					throw std::runtime_error("Shader error in " + program.name + ": " + (binding->name ? binding->name : "a resource") + " is a kind of uniform Loom does not set");
-				};
+				program.hasPosition |= location == POSITION_LOCATION;
+				program.hasUV |= location == UV_LOCATION;
+				program.hasNormal |= location == NORMAL_LOCATION;
+				program.hasColor |= location == COLOR_LOCATION;
+				program.hasInstance |= location >= InstanceModelLocation && location <= InstanceColorLocation;
 			};
 
-			if (module.shader_stage == SPV_REFLECT_SHADER_STAGE_VERTEX_BIT)
+			for (const std::vector<uint32_t>& code : compiled.spirv)
 			{
-				spvReflectEnumerateInputVariables(&module, &count, nullptr);
-
-				std::vector<SpvReflectInterfaceVariable*> inputs(count);
-				spvReflectEnumerateInputVariables(&module, &count, inputs.data());
-
-				for (const SpvReflectInterfaceVariable* variable : inputs)
-				{
-					if (variable->decoration_flags & SPV_REFLECT_DECORATION_BUILT_IN)
-						continue;
-
-					program.hasPosition |= variable->location == POSITION_LOCATION;
-					program.hasUV |= variable->location == UV_LOCATION;
-					program.hasNormal |= variable->location == NORMAL_LOCATION;
-					program.hasColor |= variable->location == COLOR_LOCATION;
-					program.hasInstance |= variable->location >= InstanceModelLocation && variable->location <= InstanceColorLocation;
-				};
+				VkShaderModuleCreateInfo info{ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+				info.codeSize = code.size() * sizeof(uint32_t);
+				info.pCode = code.data();
+				vkCreateShaderModule(m_device, &info, nullptr, &program.modules.emplace_back());
 			};
 
-			spvReflectDestroyShaderModule(&module);
+			std::vector<VkDescriptorSetLayoutBinding> bindings;
+
+			if (program.blockSize)
+				bindings.push_back({ Glsl::DEFAULT_BLOCK_BINDING, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, stages, nullptr });
+
+			for (const auto& [samplerName, sampler] : program.samplers)
+				bindings.push_back({ sampler.binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, stages, nullptr });
+
+			for (const auto& [block, buffer] : program.buffers)
+				bindings.push_back({ buffer.binding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, nullptr });
+
+			for (const auto& [image, binding] : program.images)
+				bindings.push_back({ binding.binding, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, stages, nullptr });
+
+			VkDescriptorSetLayoutCreateInfo set{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+			set.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
+			set.bindingCount = (uint32_t)bindings.size();
+			set.pBindings = bindings.data();
+			vkCreateDescriptorSetLayout(m_device, &set, nullptr, &program.setLayout);
+
+			VkPipelineLayoutCreateInfo pipelineLayout{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+			pipelineLayout.setLayoutCount = 1;
+			pipelineLayout.pSetLayouts = &program.setLayout;
+			vkCreatePipelineLayout(m_device, &pipelineLayout, nullptr, &program.layout);
+
+			if (stages == VK_SHADER_STAGE_COMPUTE_BIT)
+			{
+				VkComputePipelineCreateInfo info{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+				info.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+				info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+				info.stage.module = program.modules.front();
+				info.stage.pName = "main";
+				info.layout = program.layout;
+
+				if (!Succeeded(vkCreateComputePipelines(m_device, VK_NULL_HANDLE, 1, &info, nullptr, &program.compute), ("creating a pipeline for " + name).c_str()))
+					program.compute = VK_NULL_HANDLE;
+			};
+
+			const uint32_t handle = m_nextHandle++;
+			m_programs.emplace(handle, std::move(program));
+
+			return handle;
+		};
+
+		// Whether every storage block and image the program has is set to a
+		// buffer or storage texture that is still there.
+		bool Ready(const Program& program) const
+		{
+			for (const auto& [block, buffer] : program.buffers)
+				if (!m_buffers.contains(buffer.resource))
+					return false;
+
+			for (const auto& [name, image] : program.images)
+			{
+				const auto found = m_textures.find(image.resource);
+
+				if (found == m_textures.end() || !found->second.storage)
+					return false;
+			};
+
+			return true;
+		};
+
+		// Hands the program its uniforms, textures, buffers and images. Into
+		// members, so nothing is allocated, reserved so the writes' pointers
+		// into them stay put.
+		void PushDescriptors(VkCommandBuffer command, const Program& program, VkPipelineBindPoint point)
+		{
+			m_writes.clear();
+			m_images.clear();
+			m_bufferInfos.clear();
+			m_images.reserve(program.samplers.size() + program.images.size());
+			m_bufferInfos.reserve(program.buffers.size() + 1);
+
+			const auto write = [this](uint32_t binding, VkDescriptorType type, const VkDescriptorBufferInfo* buffer, const VkDescriptorImageInfo* image)
+			{
+				VkWriteDescriptorSet descriptor{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+				descriptor.dstBinding = binding;
+				descriptor.descriptorCount = 1;
+				descriptor.descriptorType = type;
+				descriptor.pBufferInfo = buffer;
+				descriptor.pImageInfo = image;
+				m_writes.push_back(descriptor);
+			};
+
+			if (program.blockSize)
+			{
+				const Allocation uniforms = Allocate(program.blockSize, m_uniformAlignment);
+				memcpy(uniforms.mapped, program.block.data(), program.blockSize);
+
+				m_bufferInfos.push_back({ uniforms.buffer, uniforms.offset, program.blockSize });
+				write(Glsl::DEFAULT_BLOCK_BINDING, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, &m_bufferInfos.back(), nullptr);
+			};
+
+			for (const auto& [name, sampler] : program.samplers)
+			{
+				const Texture& texture = SampledTexture(sampler);
+				const VkSampler sampling = program.pixelated && !sampler.shadow ? m_nearestSampler : texture.sampler;
+
+				m_images.push_back({ sampling, texture.Sampled().view, texture.SampledLayout() });
+				write(sampler.binding, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, nullptr, &m_images.back());
+			};
+
+			for (const auto& [block, buffer] : program.buffers)
+			{
+				m_bufferInfos.push_back({ m_buffers.at(buffer.resource).buffer, 0, VK_WHOLE_SIZE });
+				write(buffer.binding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, &m_bufferInfos.back(), nullptr);
+			};
+
+			for (const auto& [name, image] : program.images)
+			{
+				m_images.push_back({ VK_NULL_HANDLE, m_textures.at(image.resource).color.view, VK_IMAGE_LAYOUT_GENERAL });
+				write(image.binding, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, nullptr, &m_images.back());
+			};
+
+			if (!m_writes.empty())
+				m_pushDescriptorSet(command, point, program.layout, 0, (uint32_t)m_writes.size(), m_writes.data());
+		};
+
+		// Everything before against everything after, for what compute and
+		// the buffer copies write.
+		static void Barrier(VkCommandBuffer command)
+		{
+			VkMemoryBarrier barrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+			barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+			barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+
+			vkCmdPipelineBarrier(command, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1, &barrier, 0, nullptr, 0, nullptr);
+		};
+
+		// Records commands into the frame, between its passes, or outside one
+		// runs them at once.
+		template<typename Commands>
+		void Run(const Commands& commands)
+		{
+			if (!m_recording)
+			{
+				Immediately(commands);
+				return;
+			};
+
+			EndRendering();
+			commands(Command());
+		};
+
+		void DeliverReads()
+		{
+			std::vector<Read> reads = std::move(m_reads);
+			m_reads.clear();
+
+			for (const Read& read : reads)
+			{
+				const std::vector<uint8_t> data(read.mapped, read.mapped + read.size);
+
+				DestroyBuffer(read.buffer, read.memory);
+				read.handler(data);
+			};
 		};
 
 		void Write(uint32_t handle, const char* name, const void* data, uint32_t size)
@@ -1997,7 +2268,7 @@ namespace Loom
 			chunk.size = std::max(CHUNK_SIZE, size);
 
 			void* mapped = nullptr;
-			CreateBuffer(chunk.size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, chunk.buffer, chunk.memory, &mapped);
+			CreateBuffer(chunk.size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, chunk.buffer, chunk.memory, &mapped);
 
 			chunk.mapped = (uint8_t*)mapped;
 			chunk.used = size;
@@ -2164,6 +2435,9 @@ namespace Loom
 			for (auto& [key, pipeline] : program.pipelines)
 				if (pipeline)
 					vkDestroyPipeline(m_device, pipeline, nullptr);
+
+			if (program.compute)
+				vkDestroyPipeline(m_device, program.compute, nullptr);
 
 			for (VkShaderModule module : program.modules)
 				if (module)
@@ -2383,6 +2657,7 @@ namespace Loom
 
 		std::vector<VkWriteDescriptorSet> m_writes;
 		std::vector<VkDescriptorImageInfo> m_images;
+		std::vector<VkDescriptorBufferInfo> m_bufferInfos;
 
 		float m_biasSlope = 0.0f;
 		float m_biasConstant = 0.0f;
@@ -2401,6 +2676,8 @@ namespace Loom
 		VkSampler m_nearestSampler = VK_NULL_HANDLE;
 		std::unordered_map<uint32_t, Texture> m_textures;
 		std::unordered_map<uint32_t, Kept> m_kept;
+		std::unordered_map<uint32_t, StorageBuffer> m_buffers;
+		std::vector<Read> m_reads;
 		uint32_t m_nextKept = 1;
 		unsigned long long m_framesBegun = 0;
 		uint32_t m_fallbackColor = 0;

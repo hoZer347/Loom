@@ -112,7 +112,7 @@ namespace LoomTests
 
 	// Stands in for the Engine's renderer while it lives, which a test has no
 	// window to open. It hands out handles, records what it is given, and
-	// compiles anything but a fragment stage that says BROKEN. The window is
+	// compiles anything but a fragment or compute stage that says BROKEN. The window is
 	// windowSize, and a colour target the size it was made.
 	struct RecordingRenderer final : Loom::Renderer
 	{
@@ -177,11 +177,35 @@ namespace LoomTests
 
 		void SetTexture(uint32_t, const char* name, uint32_t texture) override { textures[name] = texture; };
 
+		bool SupportsCompute() const override { return true; };
+
+		uint32_t CreateComputeProgram(const std::string& name, const std::string& compute) override
+		{
+			if (compute.find(BROKEN) != std::string::npos)
+				throw std::runtime_error("Shader compile error in " + name);
+
+			computes[name] = compute;
+			return programs[name] = ++m_handles;
+		};
+
+		void Dispatch(uint32_t program, uint32_t, uint32_t, uint32_t) override { dispatched.push_back(program); };
+
+		uint32_t CreateBuffer(size_t size) override { return size ? ++m_handles : 0; };
+		void SetBufferData(uint32_t, const void*, size_t, size_t) override { };
+		void ReadBuffer(uint32_t, const BufferHandler&) override { };
+		void DestroyBuffer(uint32_t) override { };
+		void SetBuffer(uint32_t, const char*, uint32_t) override { };
+		uint32_t CreateStorageTexture(int, int) override { return ++m_handles; };
+		void SetImage(uint32_t, const char*, uint32_t) override { };
+
 		void Draw(uint32_t program, uint32_t, const float* vertices, size_t count, uint32_t, Loom::VertexFormat format) override
 		{
 			drawn.push_back(program);
 			drawnInto.push_back(m_targets.empty() ? WINDOW : m_targets.back());
-			lastVertices.assign(vertices, vertices + count * Loom::FloatsPerVertex(format));
+			lastVertices.assign(count * Loom::FloatsPerVertex(format), 0.0f);
+
+			if (vertices)
+				std::copy_n(vertices, lastVertices.size(), lastVertices.begin());
 			lastFormat = format;
 
 			const auto color = vec4s.find("u_color");
@@ -269,6 +293,10 @@ namespace LoomTests
 		std::vector<uint32_t> deleted;
 		std::vector<uint32_t> destroyedTextures;
 		std::vector<uint32_t> drawn;
+		std::vector<uint32_t> dispatched;
+
+		// Each compute program's stage, by name.
+		std::map<std::string, std::string> computes;
 
 		// Each program given u_viewProjection, as often as it was given it.
 		std::vector<uint32_t> viewed;

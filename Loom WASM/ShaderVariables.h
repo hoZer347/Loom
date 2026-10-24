@@ -16,12 +16,14 @@
 namespace Loom
 {
 	// The lines that split a shader file into its sections. COMMON goes in
-	// front of both stages. SETTINGS is not GLSL: it holds the lines
-	// ShaderSettings reads.
+	// front of every stage. SETTINGS is not GLSL: it holds the lines
+	// ShaderSettings reads. A file with COMPUTE is a compute program, with no
+	// VERTEX or FRAGMENT.
 	inline constexpr const char* COMMON_SECTION = "===COMMON===";
 	inline constexpr const char* VERTEX_SECTION = "===VERTEX===";
 	inline constexpr const char* FRAGMENT_SECTION = "===FRAGMENT===";
 	inline constexpr const char* SETTINGS_SECTION = "===SETTINGS===";
+	inline constexpr const char* COMPUTE_SECTION = "===COMPUTE===";
 
 	/**
 	* Loom::ShaderSettings

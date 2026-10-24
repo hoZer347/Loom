@@ -375,7 +375,7 @@ bool LoomDitheredOut(float alpha)
 		};
 	};
 
-	enum class ShaderType { NONE, COMMON, VERTEX, FRAGMENT, SETTINGS };
+	enum class ShaderType { NONE, COMMON, VERTEX, FRAGMENT, SETTINGS, COMPUTE };
 
 	uint32_t Shader::CompileSource(const std::string& file_path)
 	{
@@ -444,6 +444,7 @@ bool LoomDitheredOut(float alpha)
 	uint32_t Shader::Cached(const Programs& programs)
 	{
 		settings = programs.settings;
+		compute = programs.compute;
 		shadow_id = programs.shadow;
 		instanced_id = programs.instanced;
 		shadow_instanced_id = programs.shadowInstanced;
@@ -489,6 +490,8 @@ bool LoomDitheredOut(float alpha)
 				current = ShaderType::COMMON;
 			else if (line.find(SETTINGS_SECTION) != std::string::npos)
 				current = ShaderType::SETTINGS;
+			else if (line.find(COMPUTE_SECTION) != std::string::npos)
+				current = ShaderType::COMPUTE;
 			else
 			{
 				if (current != ShaderType::NONE)
@@ -505,6 +508,16 @@ bool LoomDitheredOut(float alpha)
 
 		const ShaderSettings& settings = stages.settings;
 		const std::string common = sections[ShaderType::COMMON].str();
+
+		if (sections.contains(ShaderType::COMPUTE))
+		{
+			if (has_vertex || sections.contains(ShaderType::FRAGMENT))
+				throw std::runtime_error(std::string("A shader with ") + COMPUTE_SECTION + " has no " + VERTEX_SECTION + " or " + FRAGMENT_SECTION);
+
+			stages.compute = common + sections[ShaderType::COMPUTE].str();
+			return stages;
+		};
+
 		const std::string vertex = common + (has_vertex ? sections[ShaderType::VERTEX].str() : EngineCode(DEFAULT_VERTEX));
 		const std::string fragment = common + sections[ShaderType::FRAGMENT].str();
 
@@ -543,6 +556,18 @@ bool LoomDitheredOut(float alpha)
 
 		Programs programs;
 		programs.settings = stages.settings;
+
+		if (!stages.compute.empty())
+		{
+			programs.compute = true;
+			programs.id = renderer->CreateComputeProgram(name, stages.compute);
+
+			variables = ParseShaderVariables(text);
+			shaders[name] = programs;
+
+			return Cached(programs);
+		};
+
 		programs.vertex = stages.vertex;
 		programs.id = renderer->CreateProgram(name, stages.vertex, stages.fragment);
 		renderer->SetPixelated(programs.id, stages.settings.pixelated);
@@ -585,12 +610,38 @@ bool LoomDitheredOut(float alpha)
 			return { ShaderMessage{ 0, true, e.what() } };
 		};
 
-		std::string log = Glsl::Compile(stages.vertex, stages.fragment).log;
+		std::vector<Glsl::Program> programs;
 
-		if (stages.settings.shadows)
-			log += Glsl::Compile(stages.shadowVertex, stages.shadowFragment).log;
+		if (!stages.compute.empty())
+			programs.push_back(Glsl::CompileCompute(stages.compute));
+		else
+		{
+			programs.push_back(Glsl::Compile(stages.vertex, stages.fragment));
 
-		return ParseMessages(log);
+			if (stages.settings.shadows)
+				programs.push_back(Glsl::Compile(stages.shadowVertex, stages.shadowFragment));
+		};
+
+		std::string log;
+
+		for (const Glsl::Program& program : programs)
+			log += program.log;
+
+		std::vector<ShaderMessage> messages = ParseMessages(log);
+
+		// What compiles can still bind what no backend sets.
+		for (const Glsl::Program& program : programs)
+			if (program.compiled)
+				try
+				{
+					Glsl::Reflect("the shader", program);
+				}
+				catch (const std::runtime_error& e)
+				{
+					messages.push_back({ 0, true, e.what() });
+				};
+
+		return messages;
 	};
 #endif
 

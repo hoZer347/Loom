@@ -18,7 +18,7 @@ struct ImDrawData;
 
 namespace Loom
 {
-	enum class Backend { OpenGL, Vulkan };
+	enum class Backend { OpenGL, Vulkan, WebGPU };
 
 	// What each vertex handed to Renderer::Draw holds, its floats one after
 	// another: a position at location 0 (aPos), with PositionUV a texture
@@ -33,8 +33,10 @@ namespace Loom
 	/**
 	* Loom::Renderer
 	* - The graphics API behind everything the engine draws, picked once when
-	*   the Engine opens its window (Engine::backend). OpenGL is the only one on
-	*   the web; desktop builds can also run on Vulkan
+	*   the Engine opens its window (Engine::backend). Desktop builds run on
+	*   Vulkan or OpenGL, and the web on WebGPU or WebGL2
+	* - Compute runs the same GLSL everywhere it is supported, which is every
+	*   backend but WebGL2 and a desktop GL older than 4.3
 	* - Behaves like GL whichever is underneath: shaders are the same GLSL with
 	*   loose uniforms, clip space is GL's, and a target reads back bottom row
 	*   first. A scene, a script or a shader cannot tell which it is running on
@@ -45,6 +47,9 @@ namespace Loom
 	{
 		// The pixels of a finished frame, red first and bottom row first.
 		typedef std::function<void(int width, int height, const std::vector<uint8_t>& rgb)> CaptureHandler;
+
+		// A storage buffer's bytes.
+		typedef std::function<void(const std::vector<uint8_t>& data)> BufferHandler;
 
 		// Builds the renderer for a backend and sets the window hints it needs,
 		// which is why it comes before the window does.
@@ -59,7 +64,7 @@ namespace Loom
 		virtual Backend GetBackend() const = 0;
 
 		// Takes the window over. False when the API cannot run on it, which for
-		// Vulkan means the Engine falls back to OpenGL.
+		// Vulkan or WebGPU means the Engine falls back to OpenGL.
 		virtual bool Attach(GLFWwindow* window) = 0;
 
 		virtual void InitImGui(GLFWwindow* window) = 0;
@@ -97,11 +102,47 @@ namespace Loom
 		virtual void SetUniform(uint32_t program, const char* name, UniformType type, const void* components) = 0;
 		virtual void SetTexture(uint32_t program, const char* name, uint32_t texture) = 0;
 
+		virtual bool SupportsCompute() const = 0;
+
+		// Compiles a compute stage, which carries no #version line. Throws
+		// std::runtime_error with the compiler's log when it fails, or when the
+		// backend has no compute. Deleted with DeleteProgram, and handed its
+		// uniforms and samplers as a draw program is.
+		virtual uint32_t CreateComputeProgram(const std::string& name, const std::string& compute) = 0;
+
+		// Runs the program over that many work groups in each dimension. What it
+		// writes is there for everything recorded after it.
+		virtual void Dispatch(uint32_t program, uint32_t x, uint32_t y, uint32_t z) = 0;
+
+		// A std430 storage buffer of size bytes, zeroed, or 0 for none.
+		virtual uint32_t CreateBuffer(size_t size) = 0;
+		virtual void SetBufferData(uint32_t buffer, const void* data, size_t size, size_t offset = 0) = 0;
+
+		// Hands the buffer's bytes as they are at the call, once the frame ends.
+		virtual void ReadBuffer(uint32_t buffer, const BufferHandler& handler) = 0;
+		virtual void DestroyBuffer(uint32_t buffer) = 0;
+
+		// Binds a buffer to the program's storage block of that type name, for
+		// a draw program as for a compute one. A vertex stage's blocks must be
+		// readonly, since WebGPU writes none from there. A draw or dispatch
+		// with a block or image not set to a buffer or storage texture that is
+		// still there does nothing, as does Dispatch with a draw program or a
+		// draw with a compute one.
+		virtual void SetBuffer(uint32_t program, const char* block, uint32_t buffer) = 0;
+
+		// An RGBA8 texture a compute program writes through a writeonly rgba8
+		// image2D and a draw program samples. imageStore at (x, y) lands where
+		// texture() reads ((x + 0.5) / width, (y + 0.5) / height). Freed with
+		// DestroyTexture.
+		virtual uint32_t CreateStorageTexture(int width, int height) = 0;
+		virtual void SetImage(uint32_t program, const char* name, uint32_t texture) = 0;
+
 		// Draws vertices laid out as format says as the GL primitive given
 		// (GL_TRIANGLES and the rest). usage is the GL buffer usage hint. A
 		// program that reads aUV from vertices without one reads the position's
 		// x and y, and one that reads aNormal from vertices without one reads
-		// none, all zeros.
+		// none, all zeros. Null vertices draws count with no vertex data, for a
+		// vertex stage that reads gl_VertexID.
 		virtual void Draw(
 			uint32_t program,
 			uint32_t primitive,

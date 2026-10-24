@@ -1,6 +1,7 @@
 #include "Renderer.h"
 
 #include "Engine.h"
+#include "GlslCompiler.h"
 #include "Input.h"
 #include "OpenGL.h"
 #include "Profiler.h"
@@ -27,6 +28,17 @@ namespace Loom
 	namespace
 	{
 		constexpr int LOG_SIZE = 512;
+
+#ifdef __EMSCRIPTEN__
+		// GLSL ES gives a fragment shader no default float precision. Desktop
+		// GLSL does, so a shader written in the editor would otherwise only
+		// compile there.
+		const char* const VERSION = "#version 300 es\nprecision highp float;\n";
+#else
+		// Storage blocks lay out as they do under Vulkan and WebGPU, and #line
+		// keeps the compiler's line numbers where they were without it.
+		const char* const VERSION = "#version 460 core\nlayout(std430) buffer;\n#line 2\n";
+#endif
 
 		// Clamps the shadow sampler's reads to the map, and compares rather than
 		// returns depth: linear filtering on a compared texture is a free 2x2 PCF.
@@ -125,6 +137,12 @@ namespace Loom
 
 			for (const auto& [buffer, kept] : m_kept)
 				glDeleteBuffers(1, &buffer);
+
+			for (const auto& [buffer, size] : m_buffers)
+				glDeleteBuffers(1, &buffer);
+
+			for (const Read& read : m_reads)
+				glDeleteBuffers(1, &read.staging);
 
 			if (m_nearest)
 				glDeleteSamplers(1, &m_nearest);
@@ -226,6 +244,8 @@ namespace Loom
 #ifndef __EMSCRIPTEN__
 			glGenVertexArrays(1, &m_vao);
 			glBindVertexArray(m_vao);
+
+			m_compute = GLEW_VERSION_4_3;
 #endif
 
 			return true;
@@ -289,6 +309,8 @@ namespace Loom
 
 		void EndFrame() override
 		{
+			DeliverReads();
+
 			if (m_capture)
 			{
 				ReadBack(m_capture);
@@ -331,21 +353,12 @@ namespace Loom
 
 		uint32_t CreateProgram(const std::string& name, const std::string& vertex, const std::string& fragment) override
 		{
-#ifdef __EMSCRIPTEN__
-			// GLSL ES gives a fragment shader no default float precision. Desktop
-			// GLSL does, so a shader written in the editor would otherwise only
-			// compile there.
-			const std::string version = "#version 300 es\nprecision highp float;\n";
-#else
-			const std::string version = "#version 460 core\n";
-#endif
-
-			const GLuint vertexShader = CompileStage(GL_VERTEX_SHADER, "VERTEX", version + vertex);
+			const GLuint vertexShader = CompileStage(GL_VERTEX_SHADER, "VERTEX", VERSION + vertex);
 			GLuint fragmentShader = 0;
 
 			try
 			{
-				fragmentShader = CompileStage(GL_FRAGMENT_SHADER, "FRAGMENT", version + fragment);
+				fragmentShader = CompileStage(GL_FRAGMENT_SHADER, "FRAGMENT", VERSION + fragment);
 			}
 			catch (...)
 			{
@@ -353,26 +366,166 @@ namespace Loom
 				throw;
 			};
 
-			const GLuint program = glCreateProgram();
-			glAttachShader(program, vertexShader);
-			glAttachShader(program, fragmentShader);
-			glLinkProgram(program);
+			const GLuint program = Link(name, { vertexShader, fragmentShader });
 
-			glDeleteShader(vertexShader);
-			glDeleteShader(fragmentShader);
+#ifndef __EMSCRIPTEN__
+			// GL lets a vertex stage write a storage block, which WebGPU does not,
+			// so a program with any is held to the same rules as elsewhere.
+			GLint blocks = 0;
 
-			GLint success = 0;
-			glGetProgramiv(program, GL_LINK_STATUS, &success);
+			if (m_compute)
+				glGetProgramInterfaceiv(program, GL_SHADER_STORAGE_BLOCK, GL_ACTIVE_RESOURCES, &blocks);
 
-			if (!success)
+			if (blocks)
 			{
-				char log[LOG_SIZE];
-				glGetProgramInfoLog(program, LOG_SIZE, nullptr, log);
-				glDeleteProgram(program);
-				throw std::runtime_error("Shader link error in " + name + ":\n" + log);
+				try
+				{
+					AssignStorage(program, Validate(name, Glsl::Compile(vertex, fragment)));
+				}
+				catch (...)
+				{
+					glDeleteProgram(program);
+					throw;
+				};
 			};
+#endif
 
 			return program;
+		};
+
+		bool SupportsCompute() const override
+		{
+			return m_compute;
+		};
+
+		uint32_t CreateComputeProgram(const std::string& name, const std::string& compute) override
+		{
+#ifdef __EMSCRIPTEN__
+			throw std::runtime_error("Shader compile error in " + name + ":\nWebGL2 has no compute shaders");
+#else
+			if (!m_compute)
+				throw std::runtime_error("Shader compile error in " + name + ":\nOpenGL " + (const char*)glGetString(GL_VERSION) + " has no compute shaders");
+
+			const Glsl::Layout layout = Validate(name, Glsl::CompileCompute(compute));
+			const GLuint program = Link(name, { CompileStage(GL_COMPUTE_SHADER, "COMPUTE", VERSION + compute) });
+
+			AssignStorage(program, layout);
+
+			return program;
+#endif
+		};
+
+		void Dispatch(uint32_t program, uint32_t x, uint32_t y, uint32_t z) override
+		{
+#ifndef __EMSCRIPTEN__
+			glUseProgram(program);
+			BindTextures(program);
+
+			if (!BindStorage(program))
+				return;
+
+			glDispatchCompute(x, y, z);
+			glMemoryBarrier(GL_ALL_BARRIER_BITS);
+#endif
+		};
+
+		uint32_t CreateBuffer(size_t size) override
+		{
+			GLuint buffer = 0;
+#ifndef __EMSCRIPTEN__
+			if (!size)
+				return 0;
+
+			glGenBuffers(1, &buffer);
+			glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+			glBufferData(GL_COPY_WRITE_BUFFER, size, nullptr, GL_DYNAMIC_DRAW);
+			glClearBufferData(GL_COPY_WRITE_BUFFER, GL_R8, GL_RED, GL_UNSIGNED_BYTE, nullptr);
+			glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+
+			m_buffers[buffer] = size;
+#endif
+			return buffer;
+		};
+
+		void SetBufferData(uint32_t buffer, const void* data, size_t size, size_t offset) override
+		{
+			if (!m_buffers.contains(buffer))
+				return;
+
+			glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+			glBufferSubData(GL_COPY_WRITE_BUFFER, offset, size, data);
+			glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+		};
+
+		void ReadBuffer(uint32_t buffer, const BufferHandler& handler) override
+		{
+			const auto found = m_buffers.find(buffer);
+
+			if (found == m_buffers.end())
+				return;
+
+			Read read{ 0, found->second, handler };
+			glGenBuffers(1, &read.staging);
+
+			glBindBuffer(GL_COPY_READ_BUFFER, buffer);
+			glBindBuffer(GL_COPY_WRITE_BUFFER, read.staging);
+			glBufferData(GL_COPY_WRITE_BUFFER, read.size, nullptr, GL_STREAM_READ);
+			glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, read.size);
+			glBindBuffer(GL_COPY_READ_BUFFER, 0);
+			glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+
+			m_reads.push_back(std::move(read));
+		};
+
+		void DestroyBuffer(uint32_t buffer) override
+		{
+			if (!m_buffers.erase(buffer))
+				return;
+
+			for (auto& [program, state] : m_programs)
+				std::replace(state.buffers.begin(), state.buffers.end(), (GLuint)buffer, 0u);
+
+			glDeleteBuffers(1, &buffer);
+		};
+
+		void SetBuffer(uint32_t program, const char* block, uint32_t buffer) override
+		{
+			Program& state = m_programs[program];
+			const auto found = state.slots.find(std::string_view(block));
+
+			if (found != state.slots.end())
+				state.buffers[found->second] = buffer;
+		};
+
+		uint32_t CreateStorageTexture(int width, int height) override
+		{
+			GLuint texture = 0;
+#ifndef __EMSCRIPTEN__
+			const GLuint bound = BoundTexture();
+
+			glGenTextures(1, &texture);
+			glBindTexture(GL_TEXTURE_2D, texture);
+			glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, width, height);
+
+			// Zeroed, as WebGPU's start.
+			const std::vector<uint8_t> zeros((size_t)width * height * sizeof(uint32_t));
+			glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, zeros.data());
+
+			SetColorSampling();
+			glBindTexture(GL_TEXTURE_2D, bound);
+
+			m_storage.insert(texture);
+#endif
+			return texture;
+		};
+
+		void SetImage(uint32_t program, const char* name, uint32_t texture) override
+		{
+			Program& state = m_programs[program];
+			const auto found = state.imageUnits.find(std::string_view(name));
+
+			if (found != state.imageUnits.end())
+				state.images[found->second] = texture;
 		};
 
 		void DeleteProgram(uint32_t program) override
@@ -513,8 +666,79 @@ namespace Loom
 			glActiveTexture(GL_TEXTURE0);
 		};
 
+		// Gives each of the program's storage blocks a binding point and each
+		// image a unit, in the order the layout names them.
+		void AssignStorage(GLuint program, const Glsl::Layout& layout)
+		{
+#ifndef __EMSCRIPTEN__
+			Program& state = m_programs[program];
+
+			for (const auto& [block, binding] : layout.buffers)
+			{
+				const GLuint slot = (GLuint)state.buffers.size();
+
+				state.slots.emplace(block, (GLint)slot);
+				state.buffers.push_back(0);
+				glShaderStorageBlockBinding(program, glGetProgramResourceIndex(program, GL_SHADER_STORAGE_BLOCK, block.c_str()), slot);
+			};
+
+			glUseProgram(program);
+
+			for (const auto& [image, binding] : layout.images)
+			{
+				const GLint unit = (GLint)state.images.size();
+
+				state.imageUnits.emplace(image, unit);
+				state.images.push_back(0);
+				glUniform1i(Location(program, image.c_str()), unit);
+			};
+#endif
+		};
+
+		// Binds the program's storage blocks and images. False when any is
+		// unset, which a draw or dispatch is skipped for.
+		bool BindStorage(uint32_t program)
+		{
+#ifndef __EMSCRIPTEN__
+			const auto found = m_programs.find(program);
+
+			if (found == m_programs.end())
+				return true;
+
+			const Program& state = found->second;
+
+			if (std::find(state.buffers.begin(), state.buffers.end(), 0u) != state.buffers.end()
+				|| !std::all_of(state.images.begin(), state.images.end(), [this](GLuint image) { return m_storage.contains(image); }))
+				return false;
+
+			for (GLuint slot = 0; slot < (GLuint)state.buffers.size(); slot++)
+				glBindBufferBase(GL_SHADER_STORAGE_BUFFER, slot, state.buffers[slot]);
+
+			for (GLuint unit = 0; unit < (GLuint)state.images.size(); unit++)
+				glBindImageTexture(unit, state.images[unit], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+#endif
+			return true;
+		};
+
 		void Draw(uint32_t program, uint32_t primitive, const float* vertices, size_t count, uint32_t usage, VertexFormat format) override
 		{
+			if (!vertices)
+			{
+				constexpr GLuint VERTEX_LOCATIONS = 3;
+
+				glUseProgram(program);
+				BindTextures(program);
+
+				if (!BindStorage(program))
+					return;
+
+				for (GLuint location = 0; location < VERTEX_LOCATIONS; location++)
+					glDisableVertexAttribArray(location);
+
+				glDrawArrays(primitive, 0, (GLsizei)count);
+				return;
+			};
+
 			glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
 			glBufferData(GL_ARRAY_BUFFER, count * FloatsPerVertex(format) * sizeof(float), vertices, usage);
 
@@ -589,6 +813,9 @@ namespace Loom
 
 			glUseProgram(program);
 			BindTextures(program);
+
+			if (!BindStorage(program))
+				return;
 
 			glBindBuffer(GL_ARRAY_BUFFER, buffer);
 
@@ -755,7 +982,12 @@ namespace Loom
 		{
 			// GL names a texture anew once it is gone, so no program may still bind it.
 			for (auto& [program, state] : m_programs)
+			{
 				std::replace(state.textures.begin(), state.textures.end(), (GLuint)texture, 0u);
+				std::replace(state.images.begin(), state.images.end(), (GLuint)texture, 0u);
+			};
+
+			m_storage.erase(texture);
 
 			const auto found = m_targets.find(texture);
 
@@ -900,6 +1132,63 @@ namespace Loom
 			return (GLuint)framebuffer;
 		};
 
+		// Links the stages into a program, deleting them either way.
+		static GLuint Link(const std::string& name, std::initializer_list<GLuint> stages)
+		{
+			const GLuint program = glCreateProgram();
+
+			for (const GLuint stage : stages)
+				glAttachShader(program, stage);
+
+			glLinkProgram(program);
+
+			for (const GLuint stage : stages)
+				glDeleteShader(stage);
+
+			GLint success = 0;
+			glGetProgramiv(program, GL_LINK_STATUS, &success);
+
+			if (!success)
+			{
+				char log[LOG_SIZE];
+				glGetProgramInfoLog(program, LOG_SIZE, nullptr, log);
+				glDeleteProgram(program);
+				throw std::runtime_error("Shader link error in " + name + ":\n" + log);
+			};
+
+			return program;
+		};
+
+		// Fails a program as the other backends would.
+		static Glsl::Layout Validate(const std::string& name, const Glsl::Program& compiled)
+		{
+			if (!compiled.compiled)
+				throw std::runtime_error("Shader compile error in " + name + ":\n" + compiled.log);
+
+			return Glsl::Reflect(name, compiled);
+		};
+
+		// The buffers ReadBuffer copied out, handed over as the frame ends.
+		void DeliverReads()
+		{
+			std::vector<Read> reads = std::move(m_reads);
+			m_reads.clear();
+
+			for (const Read& read : reads)
+			{
+				std::vector<uint8_t> data(read.size);
+
+				glBindBuffer(GL_COPY_READ_BUFFER, read.staging);
+#ifndef __EMSCRIPTEN__
+				glGetBufferSubData(GL_COPY_READ_BUFFER, 0, read.size, data.data());
+#endif
+				glBindBuffer(GL_COPY_READ_BUFFER, 0);
+				glDeleteBuffers(1, &read.staging);
+
+				read.handler(data);
+			};
+		};
+
 		// Creating a target binds its framebuffer, so whatever was being drawn
 		// into is bound again after.
 		uint32_t Complete(Target& target, int width, int height, GLuint previous)
@@ -931,8 +1220,24 @@ namespace Loom
 
 		GLFWwindow* m_window = nullptr;
 		const char* m_glslVersion = nullptr;
+		bool m_compute = false;
 
 		CaptureHandler m_capture;
+
+		// What CreateBuffer handed out, by GL name, and how big each is.
+		std::unordered_map<GLuint, size_t> m_buffers;
+
+		// What CreateStorageTexture handed out, the only textures an image binds.
+		std::unordered_set<GLuint> m_storage;
+
+		struct Read
+		{
+			GLuint staging = 0;
+			size_t size = 0;
+			BufferHandler handler;
+		};
+
+		std::vector<Read> m_reads;
 
 		GLuint m_vbo = 0;
 		GLuint m_vao = 0;
@@ -974,12 +1279,17 @@ namespace Loom
 		typedef std::unordered_map<std::string, GLint, NameHash, std::equal_to<>> Locations;
 
 		// What each program has been given: where its uniforms are, the unit
-		// each sampler has, and the texture set for each unit.
+		// each sampler has and the texture set for each unit, and the same for
+		// its storage blocks and images.
 		struct Program
 		{
 			Locations locations;
 			Locations units;
 			std::vector<GLuint> textures;
+			Locations slots;
+			std::vector<GLuint> buffers;
+			Locations imageUnits;
+			std::vector<GLuint> images;
 		};
 
 		std::unordered_map<uint32_t, Program> m_programs;

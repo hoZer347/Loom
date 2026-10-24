@@ -40,7 +40,7 @@ namespace Loom
 
 		// What a shader file compiles to: its stages with the engine's
 		// sections added as its settings ask, and the shadow pass's stages,
-		// empty unless shadows are on.
+		// empty unless shadows are on. A compute shader has compute alone.
 		struct Stages
 		{
 			ShaderSettings settings;
@@ -48,10 +48,12 @@ namespace Loom
 			std::string fragment;
 			std::string shadowVertex;
 			std::string shadowFragment;
+			std::string compute;
 		};
 
-		// Throws std::runtime_error at a setting it does not know, or a stage
-		// the sections it asks for have nothing to add to.
+		// Throws std::runtime_error at a setting it does not know, a stage
+		// the sections it asks for have nothing to add to, or a COMPUTE
+		// section beside a VERTEX or FRAGMENT one.
 		static Stages Assemble(const std::string& source);
 
 		// Compiles the file again, for after it has been edited, and swaps the
@@ -74,6 +76,10 @@ namespace Loom
 		// before id, which is what fills them in.
 		std::vector<ShaderVariable> variables;
 		ShaderSettings settings;
+
+		// Whether id is a compute program, which Renderer::Dispatch runs.
+		// Declared before id, which is what fills it in.
+		bool compute = false;
 
 		// The program the light draws the shadow map with, or 0 when shadows
 		// are off. Declared before id, which is what fills it in.
@@ -104,6 +110,7 @@ namespace Loom
 			uint32_t shadow = 0;
 			uint32_t instanced = 0;
 			uint32_t shadowInstanced = 0;
+			bool compute = false;
 			ShaderSettings settings;
 			std::string vertex;
 		};
