@@ -500,13 +500,13 @@ namespace Loom
 		// The first-run "where are your scenes?" prompt, the new project dialog,
 		// and the browsers behind every Browse... button.
 		void DrawFolderPrompt();
+		void DrawNewProjectPrompt();
+		void DrawFileDialogs();
 
 		// Writes the active scene, as it was when Play was pressed if it is
 		// running, into that folder for a player, giving its path, or empty
 		// when it could not.
 		std::filesystem::path WritePlayScene(const std::filesystem::path& folder) const;
-		void DrawNewProjectPrompt();
-		void DrawFileDialogs();
 
 		void HandleShortcuts();
 

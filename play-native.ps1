@@ -9,7 +9,8 @@
     first when they are out of date. The build says nothing unless it fails.
 
     The program runs from the project folder, as the editor does, and this
-    waits for it to end, so whatever ends this ends the game with it.
+    waits for it to end, so whatever ends this ends the game with it. Should
+    it fail, this says so with its exit code.
 
 .EXAMPLE
     .\play-native.ps1 -Project "C:\Games\MyGame" -Scene "C:\Games\MyGame\Build\Release\Scene.loomscene" -Configuration Release
@@ -88,5 +89,11 @@ $game = Join-Path $build "$Configuration\$name.exe"
 $arguments = @($Scene) + $GameArgs | ForEach-Object { '"' + $_ + '"' }
 
 $process = Start-Process -FilePath $game -ArgumentList $arguments -WorkingDirectory $Project -PassThru -Wait
+
+# The game has no console, so whatever it wrote of why is lost.
+if ($process.ExitCode -ne 0)
+{
+    Write-Output "$name ended with exit code $($process.ExitCode)."
+}
 
 exit $process.ExitCode

@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -41,6 +42,17 @@ namespace Loom
 
 			return ImGui::GetColorU32(ImVec4(r, g, b, 1.0f));
 		};
+
+		// What heads the lanes: the frame they average, in milliseconds.
+		std::string AverageFrame(double frame)
+		{
+			constexpr size_t longest = 64;
+
+			char text[longest];
+			std::snprintf(text, longest, "An average frame of the last %d, %.2f ms", Profiler::Window, frame);
+
+			return text;
+		};
 	};
 
 	void StageTiming::Lanes()
@@ -65,7 +77,7 @@ namespace Loom
 		const ImVec2 mouse = ImGui::GetIO().MousePos;
 		ImDrawList* const draw = ImGui::GetWindowDrawList();
 
-		ImGui::TextDisabled("An average frame of the last %d, %.2f ms", Profiler::Window, frame);
+		ImGui::TextDisabled("%s", AverageFrame(frame).c_str());
 
 		for (const Profiler::Thread& thread : threads)
 		{
@@ -258,11 +270,17 @@ namespace Loom
 		constexpr float width_share = 0.4f;
 		constexpr float opacity = 0.85f;
 
+		// The longest a frame's length runs to in the header, so a slow frame
+		// widens nothing.
+		constexpr double widest_frame = 999.99;
+
 		const ImGuiViewport* viewport = ImGui::GetMainViewport();
 
 		// A height of none fits it to what it holds, frame by frame.
 		ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + inset, viewport->WorkPos.y + inset), ImGuiCond_FirstUseEver);
-		ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x * width_share, 0.0f), ImGuiCond_Always);
+		const float header_width = ImGui::CalcTextSize(AverageFrame(widest_frame).c_str()).x + ImGui::GetStyle().WindowPadding.x * 2.0f;
+
+		ImGui::SetNextWindowSize(ImVec2((std::max)(viewport->WorkSize.x * width_share, header_width), 0.0f), ImGuiCond_Always);
 		ImGui::SetNextWindowBgAlpha(opacity);
 
 		// A window sizing itself on its first frame draws even collapsed.

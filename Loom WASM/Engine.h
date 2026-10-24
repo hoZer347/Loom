@@ -113,7 +113,10 @@ namespace Loom
 
 	private:
 		static void InitImGui();
-		static void RenderImGui();
+		// The frame's GUI, built while physics steps and drawn once the
+		// scenes have been.
+		static void BuildImGui();
+		static void DrawImGui();
 
 		// A window with a renderer attached, or null if the API cannot run.
 		static GLFWwindow* OpenWindow(Backend api);

@@ -131,9 +131,9 @@ namespace Loom
 		renderer->InitImGui(Engine::window);
 	};
 
-	void Engine::RenderImGui()
+	void Engine::BuildImGui()
 	{
-		LOOM_STAGE("Engine::RenderImGui");
+		LOOM_STAGE("Engine::BuildImGui");
 
 		{
 			LOOM_STAGE("Renderer::NewImGuiFrame");
@@ -172,6 +172,11 @@ namespace Loom
 			LOOM_STAGE("ImGui::Render");
 			ImGui::Render();
 		};
+	};
+
+	void Engine::DrawImGui()
+	{
+		LOOM_STAGE("Engine::DrawImGui");
 
 		{
 			LOOM_STAGE("Renderer::RenderImGui");
@@ -262,7 +267,7 @@ namespace Loom
 			s_physicsTime = std::min(s_physicsTime, Physics::FixedDeltaTime());
 
 			// All but the last whole, and the last solved on its own thread
-			// while the GUI is drawn.
+			// while the GUI is built.
 			for (int step = 1; step < steps; step++)
 				for (auto& scene : Scene::allScenes)
 					scene->Physics();
@@ -273,7 +278,7 @@ namespace Loom
 		};
 
 #ifndef __EMSCRIPTEN__
-		RenderImGui();
+		BuildImGui();
 #endif
 
 		{
@@ -307,6 +312,11 @@ namespace Loom
 			LOOM_STAGE("Ui::DrawOverlay");
 			Ui::DrawOverlay();
 		};
+
+		// Over the scenes, which a game draws to the window itself.
+#ifndef __EMSCRIPTEN__
+		DrawImGui();
+#endif
 
 		{
 			LOOM_STAGE("Renderer::EndFrame");

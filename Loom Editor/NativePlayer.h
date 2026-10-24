@@ -17,8 +17,8 @@ namespace Loom
 	* - Plays a scene as a program of its own: runs play-native.ps1 from the
 	*   engine folder, which builds the project's scripts with the engine in
 	*   the configuration asked for and runs what it built
-	* - What the script says is only ever why the build failed, and goes to
-	*   the console as it comes
+	* - What the script says is only ever that the build or the game failed,
+	*   and goes to the console as it comes
 	*/
 	struct NativePlayer final
 	{

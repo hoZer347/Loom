@@ -115,7 +115,7 @@ int main(int argc, char** argv)
 		Engine::SetUpdateFunction(
 			[screenshot, frames, frame = 0]() mutable
 			{
-				if (++frame != frames)
+				if (++frame < frames)
 					return;
 
 				Engine::CaptureFrame(screenshot);
