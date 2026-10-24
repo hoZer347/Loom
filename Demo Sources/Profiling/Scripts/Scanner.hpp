@@ -5,12 +5,11 @@
 #include "Material.h"
 #include "Mesh.h"
 #include "Physics.h"
+#include "Profiler.h"
 #include "Scene.h"
 
 #include "glm/glm.hpp"
 
-#include <chrono>
-#include <iostream>
 #include <string>
 #include <vector>
 
@@ -19,9 +18,9 @@ namespace ProfilingScripts
 {
 	// Sweeps a grid of rays out through the scene's camera, a row a frame,
 	// and draws a short tick along the surface normal at every hit, so the
-	// colliders show as a cloud. Each full sweep is timed and written to the
-	// console. Lives on a GameObject that has not been moved: the ticks are
-	// in world space.
+	// colliders show as a cloud. Its share of the frame shows in the Stats
+	// panel. Lives on a GameObject that has not been moved: the ticks are in
+	// world space.
 	struct Scanner : Loom::Component<Scanner>
 	{
 		void OnAttach() override
@@ -46,6 +45,8 @@ namespace ProfilingScripts
 
 		void OnUpdate() override
 		{
+			LOOM_STAGE("Scanner::OnUpdate");
+
 			Loom::Scene* scene = Own();
 			Loom::Camera* camera = scene ? scene->GetRoot().FindComponent<Loom::Camera>() : nullptr;
 
@@ -71,8 +72,6 @@ namespace ProfilingScripts
 			std::vector<float>& ticks = m_ticks[m_row];
 			ticks.clear();
 
-			const auto start = std::chrono::steady_clock::now();
-
 			for (int column = 0; column < m_columns; column++)
 			{
 				const float x = NDC_SPAN * (column + HALF) / m_columns - 1.0f;
@@ -88,27 +87,13 @@ namespace ProfilingScripts
 				ticks.insert(ticks.end(), { hit.point.x, hit.point.y, hit.point.z, tip.x, tip.y, tip.z });
 			};
 
-			m_sweepTime += std::chrono::steady_clock::now() - start;
-
 			std::vector<float> lines{ };
 
 			for (const std::vector<float>& row : m_ticks)
 				lines.insert(lines.end(), row.begin(), row.end());
 
 			m_mesh->m_vertices = lines;
-
-			if (++m_row < m_rows)
-				return;
-
-			const double milliseconds = std::chrono::duration<double, std::milli>(m_sweepTime).count();
-			const int rays = m_rows * m_columns;
-
-			std::cout << "Swept " << rays << " rays among " << scene->GetColliders().Size()
-				<< " colliders in " << milliseconds << " ms, "
-				<< milliseconds * MICROSECONDS_PER_MILLISECOND / rays << " us a ray" << std::endl;
-
-			m_row = 0;
-			m_sweepTime = { };
+			m_row++;
 		};
 
 	private:
@@ -117,7 +102,6 @@ namespace ProfilingScripts
 
 		// Clip space runs from -1 to 1 across the view.
 		static constexpr float NDC_SPAN = 2.0f;
-		static constexpr double MICROSECONDS_PER_MILLISECOND = 1000.0;
 
 		// The scene this is in, found by its root.
 		Loom::Scene* Own() const
@@ -143,6 +127,5 @@ namespace ProfilingScripts
 		Loom::Mesh* m_mesh = nullptr;
 		std::vector<std::vector<float>> m_ticks{ };
 		int m_row = 0;
-		std::chrono::steady_clock::duration m_sweepTime{ };
 	};
 };

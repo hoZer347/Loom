@@ -398,7 +398,7 @@ bool LoomDitheredOut(float alpha)
 #else
 		std::ifstream file(file_path);
 		if (!file)
-			throw std::runtime_error("Could not open shader file: " + file_path);
+			throw std::runtime_error("could not open the file");
 
 		std::error_code code;
 		m_written = std::filesystem::last_write_time(file_path, code);
@@ -623,7 +623,6 @@ bool LoomDitheredOut(float alpha)
 		{
 			auto* fetchData = reinterpret_cast<std::pair<std::string*, bool*>*>(fetch->userData);
 			*fetchData->second = true; // Mark fetch as complete (even on error)
-			std::cerr << "Failed to fetch: " << fetch->url << std::endl;
 			emscripten_fetch_close(fetch);
 			delete fetchData;
 		};
@@ -636,8 +635,10 @@ bool LoomDitheredOut(float alpha)
 		while (!fetchComplete)
 			emscripten_sleep(10); // Yield control to the browser (non-blocking wait)
 
+		// Thrown like a file that will not open, so whoever asked reports it
+		// once, with the path.
 		if (shader_source.empty())
-			std::cerr << "Error: Fetch failed or returned no data." << std::endl;
+			throw std::runtime_error("could not fetch the file");
 	};
 #endif
 };

@@ -158,7 +158,7 @@ namespace Loom
 	{
 		if (parent == nullptr)
 		{
-			std::cerr << "Tried to destroy root GameObject" << std::endl;
+			std::cerr << "GameObject: the root cannot be destroyed" << std::endl;
 			return;
 		};
 

@@ -234,10 +234,7 @@ namespace Loom
 			// Asked before any Vulkan call, so a machine without a Vulkan driver
 			// never needs the loader the engine is linked against.
 			if (!glfwVulkanSupported())
-			{
-				std::cerr << "Vulkan is not available on this machine" << std::endl;
 				return false;
-			};
 
 			if (!CreateInstance()
 				|| !Succeeded(glfwCreateWindowSurface(m_instance, window, nullptr, &m_surface), "creating the window surface")
@@ -263,12 +260,6 @@ namespace Loom
 			vkGetPhysicalDeviceProperties(m_physicalDevice, &properties);
 			m_uniformAlignment = properties.limits.minUniformBufferOffsetAlignment;
 			m_maxTextureSize = (int)properties.limits.maxImageDimension2D;
-
-			std::cout << "Vulkan Version: "
-				<< VK_API_VERSION_MAJOR(properties.apiVersion) << '.'
-				<< VK_API_VERSION_MINOR(properties.apiVersion) << '.'
-				<< VK_API_VERSION_PATCH(properties.apiVersion) << std::endl;
-			std::cout << "Vulkan Device: " << properties.deviceName << std::endl;
 
 			return m_fallbackColor && m_fallbackDepth;
 		};
@@ -848,7 +839,7 @@ namespace Loom
 				VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 				VK_IMAGE_ASPECT_DEPTH_BIT))
 			{
-				std::cerr << "A " << size << " square depth target could not be allocated" << std::endl;
+				std::cerr << "Vulkan: a " << size << " square depth target could not be allocated" << std::endl;
 				return 0;
 			};
 
@@ -883,7 +874,7 @@ namespace Loom
 				|| !CreateAttachment(texture.depth, DEPTH_FORMAT, width, height,
 					VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_ASPECT_DEPTH_BIT))
 			{
-				std::cerr << "A " << width << 'x' << height << " render target could not be allocated" << std::endl;
+				std::cerr << "Vulkan: a " << width << 'x' << height << " render target could not be allocated" << std::endl;
 				DestroyTextureNow(texture);
 				return 0;
 			};

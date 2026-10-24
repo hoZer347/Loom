@@ -5,7 +5,6 @@
 #include "OpenGL.h"
 
 #include <array>
-#include <iostream>
 #include <optional>
 #include <utility>
 
@@ -463,13 +462,12 @@ namespace Loom
 			double cssWidth = 0.0;
 			double cssHeight = 0.0;
 
+			// Asked on every move, so a failure is left to the next one rather
+			// than reported once a move.
 			if (emscripten_get_canvas_element_size("#canvas", &width, &height) != EMSCRIPTEN_RESULT_SUCCESS ||
 				emscripten_get_element_css_size("#canvas", &cssWidth, &cssHeight) != EMSCRIPTEN_RESULT_SUCCESS ||
 				cssWidth <= 0.0 || cssHeight <= 0.0)
-			{
-				std::cerr << "Failed to get the canvas's size!" << std::endl;
 				return EM_FALSE;
-			};
 
 			Input::OnMouseMove((int)(e->clientX * width / cssWidth), (int)(e->clientY * height / cssHeight), width, height);
 		};
@@ -531,8 +529,6 @@ namespace Loom
 	void Input::Init()
 	{
 #if __EMSCRIPTEN__
-		printf("Registering Emscripten callbacks globally...\n");
-
 		// Register mouse move callback for global window events
 		emscripten_set_mousemove_callback(
 			EMSCRIPTEN_EVENT_TARGET_WINDOW, // Attach to the global window

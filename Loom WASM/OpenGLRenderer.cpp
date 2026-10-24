@@ -150,7 +150,7 @@ namespace Loom
 
 			if (glewInit())
 			{
-				std::cerr << "Glew failed to init" << std::endl;
+				std::cerr << "OpenGL: GLEW could not start" << std::endl;
 				return false;
 			};
 
@@ -181,12 +181,13 @@ namespace Loom
 #if !defined(__EMSCRIPTEN__) && !defined(NDEBUG)
 			glEnable(GL_DEBUG_OUTPUT);
 			glDebugMessageCallback(
-				[](GLenum, GLenum, GLuint, GLenum severity, GLsizei, const GLchar* message, const void*)
+				[](GLenum, GLenum type, GLuint, GLenum severity, GLsizei, const GLchar* message, const void*)
 				{
-					// Notifications are per-buffer-upload chatter from the driver;
-					// they drown out anything worth reading (the editor console in
-					// particular) without ever saying anything actionable.
-					if (severity == GL_DEBUG_SEVERITY_NOTIFICATION)
+					// Notifications are per-buffer-upload chatter from the driver,
+					// and performance warnings are its guesses about state changes
+					// and read-backs the engine makes on purpose. Neither ever says
+					// anything actionable, and both drown out what is.
+					if (severity == GL_DEBUG_SEVERITY_NOTIFICATION || type == GL_DEBUG_TYPE_PERFORMANCE)
 						return;
 
 					std::cerr << "OpenGL Debug: " << message << std::endl;
@@ -201,9 +202,6 @@ namespace Loom
 				std::cerr << "OpenGL error: " << error << std::endl;
 				return false;
 			};
-
-			std::cout << "OpenGL Version: " << glGetString(GL_VERSION) << std::endl;
-			std::cout << "GLSL Version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
 
 			glGenBuffers(1, &m_vbo);
 			glGenBuffers(1, &m_instances);
@@ -883,7 +881,7 @@ namespace Loom
 
 			if (!complete)
 			{
-				std::cerr << "A " << width << 'x' << height << " render target is incomplete" << std::endl;
+				std::cerr << "OpenGL: a " << width << 'x' << height << " render target is incomplete" << std::endl;
 				DeleteTarget(target);
 				return 0;
 			};

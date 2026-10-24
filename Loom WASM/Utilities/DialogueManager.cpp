@@ -147,7 +147,7 @@ namespace Loom
 
 		if (_script.empty())
 		{
-			std::cerr << "[Dialogue] - Script is not assigned." << std::endl;
+			std::cerr << "[Dialogue] Script is not assigned." << std::endl;
 
 			Disable();
 

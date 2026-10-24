@@ -435,7 +435,7 @@ namespace Loom
 	Engine::Engine()
 	{
 		if (!glfwInit())
-			std::cerr << "GLFW failed to init" << std::endl;
+			std::cerr << "Engine: GLFW could not start" << std::endl;
 
 		window = OpenWindow(backend);
 
@@ -443,14 +443,14 @@ namespace Loom
 		// a window made for one API cannot be handed to the other.
 		if (!window && backend == Backend::Vulkan)
 		{
-			std::cerr << "Falling back to OpenGL" << std::endl;
+			std::cerr << "Engine: Vulkan could not start, so this runs on OpenGL" << std::endl;
 			backend = Backend::OpenGL;
 			window = OpenWindow(backend);
 		};
 
 		if (!window)
 		{
-			std::cerr << "Failed to create a window" << std::endl;
+			std::cerr << "Engine: could not open a window" << std::endl;
 			return;
 		};
 
