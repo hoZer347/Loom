@@ -20,11 +20,11 @@
 
 #include "imgui.h"
 
-#include <GLFW/glfw3.h>
-
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
+
+#include <GLFW/glfw3.h>
 
 #include <cctype>
 #include <cstdlib>
@@ -104,6 +104,7 @@ int main(int argc, char** argv)
 	std::string screenshot;
 	int frames = default_frames;
 	bool collapsed = false;
+	std::string unknown;
 
 	for (int i = given ? 2 : 1; i < argc; i++)
 	{
@@ -118,9 +119,13 @@ int main(int argc, char** argv)
 		}
 		else if (argument == "--collapsed")
 			collapsed = true;
-		else
-			return Fail(program, argument + " is not an option", screenshot.empty());
+		else if (unknown.empty())
+			unknown = argument;
 	};
+
+	// After every option, so a --screenshot run is never held by the box.
+	if (!unknown.empty())
+		return Fail(program, unknown + " is not an option", screenshot.empty());
 
 	if (!given)
 	{

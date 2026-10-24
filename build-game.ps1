@@ -124,10 +124,18 @@ if ($Output.StartsWith("$Project\", [System.StringComparison]::OrdinalIgnoreCase
 $game = Join-Path $Output "$name.exe"
 $running = Get-Process -Name $name -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $game }
 
+$closeSeconds = 10
+
 if ($running)
 {
-    $running | Stop-Process -Force
-    $running | Wait-Process
+    $running | Stop-Process -Force -ErrorAction SilentlyContinue
+    $running | Wait-Process -Timeout $closeSeconds -ErrorAction SilentlyContinue
+
+    if ($running | Where-Object { -not $_.HasExited })
+    {
+        Write-Output "$game is running and could not be closed."
+        exit 1
+    }
 }
 
 # Below 8, robocopy's exit code says what it copied rather than that it failed.
