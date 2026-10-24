@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Builds a Loom project into a game of its own, in a folder of its own. The editor's Build Settings window runs this.
+    Builds a Loom project into a game of its own, in a folder of its own. The editor's Build Settings tab runs this.
 
 .DESCRIPTION
     Loom Player\Loom Player.vcxproj compiles the project's scripts with the
@@ -13,16 +13,11 @@
 
     The output folder is mirrored, so whatever else is in it goes. A folder
     that is not empty and holds no earlier build is left alone, and so is
-    one the project is in.
-
-    Run starts the game from its folder once it is built, without waiting
-    for it, and hands it GameArgs.
+    one the project is in. An earlier build still running from it is closed,
+    since it holds its program open.
 
 .EXAMPLE
     .\build-game.ps1 -Project "C:\Games\MyGame" -Scene "C:\Games\MyGame\Scenes\Start.loomscene" -Configuration Release -Output "C:\Games\MyGame Build"
-
-.EXAMPLE
-    .\build-game.ps1 -Project "C:\Games\MyGame" -Scene "C:\Games\MyGame\Scenes\Start.loomscene" -Configuration Final -Output "C:\Games\MyGame Build" -Run -GameArgs '--screenshot','C:\Temp\game.bmp','300'
 #>
 [CmdletBinding()]
 param(
@@ -36,11 +31,7 @@ param(
     [string] $Configuration = 'Release',
 
     [Parameter(Mandatory = $true)]
-    [string] $Output,
-
-    [switch] $Run,
-
-    [string[]] $GameArgs = @()
+    [string] $Output
 )
 
 # Native commands are judged by their exit codes: MSBuild's stderr would
@@ -130,6 +121,15 @@ if ($Output.StartsWith("$Project\", [System.StringComparison]::OrdinalIgnoreCase
     $folders += $Output
 }
 
+$game = Join-Path $Output "$name.exe"
+$running = Get-Process -Name $name -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $game }
+
+if ($running)
+{
+    $running | Stop-Process -Force
+    $running | Wait-Process
+}
+
 # Below 8, robocopy's exit code says what it copied rather than that it failed.
 $robocopyFailed = 8
 
@@ -143,7 +143,6 @@ if ($LASTEXITCODE -ge $robocopyFailed)
 }
 
 $program = Join-Path $build "Player\$Configuration"
-$game = Join-Path $Output "$name.exe"
 
 try
 {
@@ -157,21 +156,6 @@ catch
 {
     Write-Output "Could not put $name in ${Output}: $($_.Exception.Message)"
     exit 1
-}
-
-if ($Run)
-{
-    # Start-Process joins its arguments with spaces and quotes none of them.
-    $arguments = $GameArgs | ForEach-Object { '"' + $_ + '"' }
-
-    if ($arguments)
-    {
-        Start-Process -FilePath $game -ArgumentList $arguments -WorkingDirectory $Output
-    }
-    else
-    {
-        Start-Process -FilePath $game -WorkingDirectory $Output
-    }
 }
 
 exit 0

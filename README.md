@@ -31,7 +31,7 @@
 - Uses modern C++ features such as modules and std::barrier
 
 *Loom Player:*
-- A game on its own: the engine and a project's scripts linked into one program, in Debug, Release or Final. The editor's File > Build Settings window picks the configuration, the scene it starts on and the folder it goes in, beside the project folder as `<Game> Build` unless another is chosen, and runs `./build-game.ps1`, which builds the program there with a copy of the project's files and, asked to, starts it
+- A game on its own: the engine and a project's scripts linked into one program, in Debug, Release or Final. The editor's Build Settings tab picks the configuration, the scene it starts on and the folder it goes in, beside the project folder as `<Game> Build` unless another is chosen, and runs `./build-game.ps1`, which builds the program there with a copy of the project's files. Build and Run then starts it apart from the editor
 - Debug and Release show the stage timing in a window over the game, which records nothing while it is collapsed. Final has none
 
 *Loom ImGui:*

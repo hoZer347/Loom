@@ -17,8 +17,7 @@ namespace Loom
 	*   the scene it starts on and the folder it goes in, away from the
 	*   project's own Build folder that the editor builds its scripts into
 	* - Kept as key=value lines beside the project file, and changed in the
-	*   Build Settings window, whose buttons hand build-game.ps1 its command
-	*   line
+	*   Build Settings tab, whose buttons hand build-game.ps1 its command line
 	*/
 	struct BuildSettings final
 	{
@@ -48,12 +47,15 @@ namespace Loom
 		// folder named after the game.
 		std::filesystem::path Output(const std::string& project, const std::string& name) const;
 
-		// What build-game.ps1 is handed, Run asking it to start the game once
-		// it is built.
-		std::string Arguments(const std::string& project, const std::string& name, bool run) const;
+		// The game build-game.ps1 puts in Output.
+		std::filesystem::path Program(const std::string& project, const std::string& name) const;
 
-		// The window, which lists the project's scenes each time its list opens,
-		// and holds back another build while one is under way.
+		// What build-game.ps1 is handed.
+		std::string Arguments(const std::string& project, const std::string& name) const;
+
+		// The tab, which lists the project's scenes each time its list opens,
+		// holds back another build while one is under way, and with no project
+		// open has nothing to build.
 		Action Draw(
 			bool* open,
 			const std::string& project,

@@ -482,8 +482,14 @@ namespace Loom
 
 	void Editor::DrawBuildSettings()
 	{
+		if (m_focusBuildSettings)
+		{
+			ImGui::SetNextWindowFocus();
+			m_focusBuildSettings = false;
+		};
+
 		// Starting on the scene being edited, until another is chosen.
-		if (m_buildSettings.scene.empty())
+		if (m_buildSettings.scene.empty() && !m_projectPath.empty())
 			if (const auto path = m_scenePaths.find(m_activeScene); path != m_scenePaths.end() && !path->second.empty())
 				m_buildSettings.scene = std::filesystem::path(path->second).lexically_relative(m_projectPath).generic_string();
 
@@ -525,7 +531,9 @@ namespace Loom
 	{
 		SaveBuildSettings();
 
-		m_gameBuilder.Launch(m_buildSettings.Arguments(m_projectPath, m_projectName, run));
+		m_gameBuilder.Launch(
+			m_buildSettings.Arguments(m_projectPath, m_projectName),
+			run ? m_buildSettings.Program(m_projectPath, m_projectName) : std::filesystem::path());
 	};
 
 	void Editor::DrawNewProjectPrompt()

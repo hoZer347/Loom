@@ -388,7 +388,7 @@ namespace Loom
 		std::string InputActionsFile() const;
 		void SaveInputActions();
 
-		// The Build Settings window, and the game built from it.
+		// The Build Settings tab, and the game built from it.
 		std::string BuildSettingsFile() const;
 		void SaveBuildSettings();
 		std::vector<std::string> BuildScenes() const;
@@ -1003,7 +1003,8 @@ namespace Loom
 		bool m_showKeyBindings = true;
 		bool m_showImGuiDemo = false;
 		bool m_showSettings = false;
-		bool m_showBuildSettings = false;
+		bool m_showBuildSettings = true;
+		bool m_focusBuildSettings = false;
 
 #ifndef LOOM_FINAL
 		// Whether this frame drew the stages, so the profiler records them,

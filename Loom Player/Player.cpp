@@ -1,6 +1,6 @@
 // Loom Player
 // -----------
-// What the editor's Build Settings window builds: the engine and a project's
+// What the editor's Build Settings tab builds: the engine and a project's
 // scripts in one program, which runs from its own folder beside a copy of the
 // project's files, starting on the scene its <Game>.loomgame names. Given a
 // scene, it runs that from the folder it was started in instead. Debug and
@@ -9,7 +9,8 @@
 //   <Game>.exe [scene] [--screenshot <file> [frames]] [--collapsed]
 //
 // --screenshot runs it hidden, writes the frame once that many have been
-// drawn, and ends. --collapsed starts the stage timing collapsed.
+// drawn, and ends. --collapsed starts the stage timing collapsed. Started from
+// Explorer it has no console, so what stops it starting is shown in a box too.
 
 #include "Audio.h"
 #include "Engine.h"
@@ -38,6 +39,9 @@ using namespace Loom;
 // Enough for a scene to have loaded and been ticked before it is captured.
 static constexpr int default_frames = 240;
 
+// Beside the program, naming the scene a build starts on.
+static constexpr const char* game_extension = ".loomgame";
+
 
 static std::filesystem::path Program()
 {
@@ -53,7 +57,6 @@ static std::filesystem::path Program()
 static std::string StartScene(const std::filesystem::path& program)
 {
 	constexpr std::string_view scene_key = "scene=";
-	constexpr const char* game_extension = ".loomgame";
 
 	std::ifstream in(std::filesystem::path(program).replace_extension(game_extension));
 	std::string line;
@@ -82,25 +85,21 @@ static std::string InputActionsFile()
 	return "";
 };
 
+static int Fail(const std::filesystem::path& program, const std::string& message, bool shown)
+{
+	std::cerr << "Loom Player: " << message << std::endl;
+
+	if (shown)
+		MessageBoxW(nullptr, std::filesystem::path(message).wstring().c_str(), program.stem().wstring().c_str(), MB_OK | MB_ICONERROR);
+
+	return EXIT_FAILURE;
+};
+
 int main(int argc, char** argv)
 {
 	const std::filesystem::path program = Program();
 	const bool given = argc > 1 && !std::string_view(argv[1]).starts_with("--");
 	std::string scene = given ? argv[1] : "";
-
-	if (!given)
-	{
-		std::error_code code;
-		std::filesystem::current_path(program.parent_path(), code);
-
-		scene = StartScene(program);
-	};
-
-	if (scene.empty())
-	{
-		std::cerr << "Loom Player: no scene to load" << std::endl;
-		return EXIT_FAILURE;
-	};
 
 	std::string screenshot;
 	int frames = default_frames;
@@ -120,11 +119,19 @@ int main(int argc, char** argv)
 		else if (argument == "--collapsed")
 			collapsed = true;
 		else
-		{
-			std::cerr << "Loom Player: " << argument << " is not an option" << std::endl;
-			return EXIT_FAILURE;
-		};
+			return Fail(program, argument + " is not an option", screenshot.empty());
 	};
+
+	if (!given)
+	{
+		std::error_code code;
+		std::filesystem::current_path(program.parent_path(), code);
+
+		scene = StartScene(program);
+	};
+
+	if (scene.empty())
+		return Fail(program, "No scene to start on: " + std::filesystem::path(program).replace_extension(game_extension).string() + " names none.", screenshot.empty());
 
 	// Nobody is watching an automated run, nor listening to it.
 	Engine::showWindow = screenshot.empty();
@@ -143,10 +150,7 @@ int main(int argc, char** argv)
 	std::string error;
 
 	if (SceneSerializer::LoadFromFile(scene, &error) == nullptr)
-	{
-		std::cerr << "Loom Player: " << error << std::endl;
-		return EXIT_FAILURE;
-	};
+		return Fail(program, error, Engine::showWindow);
 
 #ifdef LOOM_FINAL
 	Engine::doGUI = false;

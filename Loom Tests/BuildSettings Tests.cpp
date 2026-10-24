@@ -79,10 +79,18 @@ TEST_SUITE("BuildSettings")
 		settings.scene = "Scenes/Start.loomscene";
 
 		CHECK(
-			settings.Arguments("C:\\My Game", "Space", false) ==
+			settings.Arguments("C:\\My Game", "Space") ==
 			"-Project \"C:\\My Game\" -Scene \"C:\\My Game\\Scenes\\Start.loomscene\" -Configuration Debug -Output \"C:\\Space Build\"");
+	};
 
-		CHECK(settings.Arguments("C:\\My Game", "Space", true).ends_with(" -Run"));
+	TEST_CASE("the game is the program named after it in the folder it is built in")
+	{
+		Loom::BuildSettings settings;
+
+		CHECK(settings.Program("C:/Games/MyGame", "Space") == std::filesystem::path("C:/Games/Space Build/Space.exe"));
+
+		settings.folder = "D:/Out";
+		CHECK(settings.Program("C:/Games/MyGame", "Space") == std::filesystem::path("D:/Out/Space.exe"));
 	};
 
 	TEST_CASE("only the player's own configurations are ones to build")

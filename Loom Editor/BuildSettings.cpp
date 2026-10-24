@@ -25,6 +25,8 @@ namespace Loom
 		// Beside the project folder, as "<game> Build".
 		const char* const folder_suffix = " Build";
 
+		const char* const program_extension = ".exe";
+
 		constexpr ImVec2 window_size = ImVec2(640.0f, 0.0f);
 	};
 
@@ -79,7 +81,12 @@ namespace Loom
 		return (chosen.is_absolute() ? chosen : std::filesystem::path(project) / chosen).lexically_normal();
 	};
 
-	std::string BuildSettings::Arguments(const std::string& project, const std::string& name, bool run) const
+	std::filesystem::path BuildSettings::Program(const std::string& project, const std::string& name) const
+	{
+		return Output(project, name) / (name + program_extension);
+	};
+
+	std::string BuildSettings::Arguments(const std::string& project, const std::string& name) const
 	{
 		const std::filesystem::path start = std::filesystem::path(scene).is_absolute()
 			? std::filesystem::path(scene)
@@ -88,8 +95,7 @@ namespace Loom
 		return "-Project " + ScriptRun::Quote(project) +
 			" -Scene " + ScriptRun::Quote(start.lexically_normal().string()) +
 			" -Configuration " + configuration +
-			" -Output " + ScriptRun::Quote(Output(project, name).string()) +
-			(run ? " -Run" : "");
+			" -Output " + ScriptRun::Quote(Output(project, name).string());
 	};
 
 	BuildSettings::Action BuildSettings::Draw(
@@ -109,6 +115,8 @@ namespace Loom
 			ImGui::End();
 			return action;
 		};
+
+		ImGui::BeginDisabled(project.empty());
 
 		if (ImGui::BeginCombo("Configuration", configuration.c_str()))
 		{
@@ -148,7 +156,9 @@ namespace Loom
 
 		ImGui::SetNextItemWidth(ImGui::CalcItemWidth() - browse_width - ImGui::GetStyle().ItemInnerSpacing.x);
 
-		if (ImGui::InputTextWithHint("##Folder", DefaultOutput(project, name).string().c_str(), m_folder, sizeof(m_folder)))
+		const std::string hint = project.empty() ? "" : DefaultOutput(project, name).string();
+
+		if (ImGui::InputTextWithHint("##Folder", hint.c_str(), m_folder, sizeof(m_folder)))
 			folder = m_folder;
 
 		if (ImGui::IsItemDeactivatedAfterEdit())
@@ -174,6 +184,7 @@ namespace Loom
 		if (ImGui::Button("Build and Run"))
 			action = Action::BuildAndRun;
 
+		ImGui::EndDisabled();
 		ImGui::EndDisabled();
 
 		if (!status.empty())

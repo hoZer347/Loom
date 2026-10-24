@@ -404,7 +404,7 @@ namespace Loom
 		constexpr const char* prefab_light = "Prefab Light";
 
 		// Panels docked as a tab beside another, each with the one it goes beside.
-		constexpr std::pair<const char*, const char*> side_windows[] = { { EditorPanels::KeyBindings, EditorPanels::Console }, { EditorPanels::Palette, EditorPanels::Inspector } };
+		constexpr std::pair<const char*, const char*> side_windows[] = { { EditorPanels::KeyBindings, EditorPanels::Console }, { EditorPanels::BuildSettings, EditorPanels::Console }, { EditorPanels::Palette, EditorPanels::Inspector } };
 
 		// The ImGui settings entry that holds which panels are open.
 		constexpr const char* panel_settings = "LoomEditor";
@@ -1955,6 +1955,7 @@ namespace Loom
 		ImGui::DockBuilderDockWindow(EditorPanels::SceneData, bottom);
 		ImGui::DockBuilderDockWindow(EditorPanels::Stats, bottom);
 		ImGui::DockBuilderDockWindow(EditorPanels::KeyBindings, bottom);
+		ImGui::DockBuilderDockWindow(EditorPanels::BuildSettings, bottom);
 
 		for (const char* window : centre_windows)
 			ImGui::DockBuilderDockWindow(window, centre);
@@ -1979,7 +1980,8 @@ namespace Loom
 			{ EditorPanels::Palette, &m_showPalette, false },
 			{ EditorPanels::Prefab, &m_showPrefab, false },
 			{ EditorPanels::Stats, &m_showStats, true },
-			{ EditorPanels::KeyBindings, &m_showKeyBindings, true } };
+			{ EditorPanels::KeyBindings, &m_showKeyBindings, true },
+			{ EditorPanels::BuildSettings, &m_showBuildSettings, true } };
 	};
 
 	void Editor::AddPanelSettings()
@@ -2148,7 +2150,11 @@ namespace Loom
 
 			ImGui::Separator();
 
-			ImGui::MenuItem("Build Settings...", nullptr, &m_showBuildSettings, !m_projectFile.empty());
+			if (ImGui::MenuItem("Build Settings...", nullptr, false, !m_projectFile.empty()))
+			{
+				m_showBuildSettings = true;
+				m_focusBuildSettings = true;
+			};
 
 			ImGui::Separator();
 
