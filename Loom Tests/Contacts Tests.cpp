@@ -6,6 +6,7 @@
 #include "glm/gtc/constants.hpp"
 
 #include <cmath>
+#include <limits>
 #include <vector>
 
 
@@ -75,5 +76,19 @@ TEST_SUITE("Contacts")
 		lower.box.axes[Z] = -lower.box.axes[Z];
 
 		CHECK(NormalBetween(lower, upper).y > UPRIGHT);
+	};
+
+	TEST_CASE("a box of no finite size touches nothing")
+	{
+		Loom::Contacts::Shape broken = Cube(glm::vec3(0.0f), 0);
+		broken.box.half = glm::vec3(std::numeric_limits<float>::quiet_NaN());
+
+		const Loom::Contacts::Shape whole = Cube(glm::vec3(0.0f), 0);
+
+		std::vector<Loom::Contacts::Manifold> manifolds;
+		Loom::Contacts::Collide(broken, whole, 0.0f, manifolds);
+		Loom::Contacts::Collide(whole, broken, 0.0f, manifolds);
+
+		CHECK(manifolds.empty());
 	};
 };

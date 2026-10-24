@@ -5,6 +5,7 @@
 #include "OpenGL.h"
 
 #include <chrono>
+#include <limits>
 #include <thread>
 
 
@@ -48,6 +49,15 @@ TEST_SUITE("Clock")
 
 		CHECK(Loom::Time::DeltaTime() == 0.0f);
 		CHECK(Loom::Time::UnscaledDeltaTime() > 0.0f);
+	};
+
+	TEST_CASE_FIXTURE(RunningClock, "a scale that is not a number stops the clock")
+	{
+		Loom::Time::SetScale(std::numeric_limits<float>::quiet_NaN());
+		Frame(frame_length);
+
+		CHECK(Loom::Time::GetScale() == 0.0f);
+		CHECK(Loom::Time::DeltaTime() == 0.0f);
 	};
 
 	TEST_CASE_FIXTURE(RunningClock, "the scale multiplies the frame and leaves the unscaled one alone")

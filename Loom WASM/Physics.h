@@ -108,7 +108,8 @@ namespace Loom
 		LOOM_API glm::vec3 GetGravity();
 		LOOM_API void SetGravity(const glm::vec3& gravity);
 
-		// Seconds a physics step covers.
+		// Seconds a physics step covers. One that is not above zero and finite
+		// is refused.
 		LOOM_API float FixedDeltaTime();
 		LOOM_API void SetFixedDeltaTime(float seconds);
 

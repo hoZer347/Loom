@@ -27,7 +27,8 @@ namespace Loom
 		/// Frames ticked so far. Cheap way for anything to ask "have I already run this frame".
 		static unsigned long long FrameCount();
 
-		/// Multiplies DeltaTime. Zero freezes everything driven by this clock.
+		/// Multiplies DeltaTime. Zero freezes everything driven by this clock, as
+		/// does a scale below it or not a number.
 		static void SetScale(float scale);
 		static float GetScale();
 

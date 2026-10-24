@@ -645,8 +645,9 @@ namespace Loom
 			rigidbody.angularVelocity += (body.inverseInertia * rigidbody.m_torque + rigidbody.m_spin) * seconds
 				+ body.inverseInertia * rigidbody.m_angularImpulse;
 
-			rigidbody.velocity /= 1.0f + seconds * rigidbody.drag;
-			rigidbody.angularVelocity /= 1.0f + seconds * rigidbody.angularDrag;
+			// No drag below none, which would speed it up or divide by zero.
+			rigidbody.velocity /= 1.0f + seconds * std::max(0.0f, (float)rigidbody.drag);
+			rigidbody.angularVelocity /= 1.0f + seconds * std::max(0.0f, (float)rigidbody.angularDrag);
 		};
 
 		rigidbody.m_force = glm::vec3(0.0f);

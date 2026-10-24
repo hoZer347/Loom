@@ -15,6 +15,7 @@
 #include "glm/glm.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -122,6 +123,38 @@ namespace
 
 TEST_SUITE("Rigidbody")
 {
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "drag below none is taken as none")
+	{
+		Loom::Scene scene("dragging");
+		Pump();
+
+		Loom::GameObject* object = Spawn(scene, "Dragged", glm::vec3(0.0f));
+		Loom::Rigidbody* dragged = object->Attach<Loom::Rigidbody>();
+
+		// Enough below none that a step's share of it cancels the one it divides by.
+		dragged->drag = -(float)SECOND;
+		dragged->angularDrag = -(float)SECOND;
+		dragged->angularVelocity = glm::vec3(1.0f);
+		Pump();
+
+		scene.Physics();
+
+		CHECK(dragged->velocity.y == doctest::Approx(-Gravity() / SECOND));
+		CHECK(dragged->angularVelocity == glm::vec3(1.0f));
+	};
+
+	TEST_CASE("a fixed step that is not above zero and finite is refused")
+	{
+		const float step = Loom::Physics::FixedDeltaTime();
+
+		for (const float refused : { 0.0f, -1.0f, std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity() })
+		{
+			Loom::Physics::SetFixedDeltaTime(refused);
+
+			CHECK(Loom::Physics::FixedDeltaTime() == step);
+		};
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a rigidbody is a component the editor can add by name")
 	{
 		Loom::Scene scene("rigidbody by name");

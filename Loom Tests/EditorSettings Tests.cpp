@@ -77,6 +77,15 @@ TEST_SUITE("EditorSettings")
 		CHECK(read.scale == doctest::Approx(defaults.scale));
 	};
 
+	TEST_CASE("a size that is not a number leaves the default")
+	{
+		const Loom::EditorSettings defaults;
+		const Loom::EditorSettings read = ReadAll("font_size=nan\nui_scale=nan\n");
+
+		CHECK(read.fontSize == doctest::Approx(defaults.fontSize));
+		CHECK(read.scale == doctest::Approx(defaults.scale));
+	};
+
 	TEST_CASE("lines that are not settings are ignored")
 	{
 		const Loom::EditorSettings defaults;

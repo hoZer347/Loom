@@ -63,7 +63,11 @@ namespace Loom
 		void SetGravity(const glm::vec3& gravity) { s_gravity = gravity; };
 
 		float FixedDeltaTime() { return s_fixedDeltaTime; };
-		void SetFixedDeltaTime(float seconds) { s_fixedDeltaTime = seconds; };
+		void SetFixedDeltaTime(float seconds)
+		{
+			if (seconds > 0.0f && std::isfinite(seconds))
+				s_fixedDeltaTime = seconds;
+		};
 
 		bool Raycast(const Ray& ray, RaycastHit& hit, float maxDistance)
 		{

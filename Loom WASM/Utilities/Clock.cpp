@@ -26,7 +26,7 @@ namespace Loom
 
 	unsigned long long Time::FrameCount() { return s_frames; };
 
-	void Time::SetScale(float scale) { s_scale = scale < 0.0f ? 0.0f : scale; };
+	void Time::SetScale(float scale) { s_scale = scale > 0.0f ? scale : 0.0f; };
 
 	float Time::GetScale() { return s_scale; };
 

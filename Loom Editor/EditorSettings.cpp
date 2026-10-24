@@ -1,6 +1,7 @@
 #include "EditorSettings.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 
 
@@ -32,7 +33,7 @@ namespace Loom
 			char* end = nullptr;
 			const float value = std::strtof(text.c_str(), &end);
 
-			return end != text.c_str() ? std::clamp(value, min, max) : fallback;
+			return end != text.c_str() && !std::isnan(value) ? std::clamp(value, min, max) : fallback;
 		};
 	};
 

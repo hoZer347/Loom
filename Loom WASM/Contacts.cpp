@@ -503,6 +503,10 @@ namespace Contacts
 						return;
 				};
 
+			// No axis compared, as for a box of no finite size.
+			if (best < 0)
+				return;
+
 			Manifold manifold;
 			manifold.normal = bestAxis;
 
@@ -680,6 +684,10 @@ namespace Contacts
 					if (!test(axis, length, FACES + i * CORNERS + j, [&]() { return box.axes[0] * axis.x + box.axes[1] * axis.y + box.axes[2] * axis.z; }))
 						return;
 				};
+
+			// No axis compared, as for a box of no finite size.
+			if (best < 0)
+				return;
 
 			Manifold manifold;
 			manifold.normal = bestAxis;
