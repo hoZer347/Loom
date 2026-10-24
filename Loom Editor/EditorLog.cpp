@@ -32,8 +32,14 @@ namespace Loom
 		// The size of the text when the folder is not in it.
 		size_t Find(const std::string& text, size_t from, const std::string& folder)
 		{
-			return (size_t)(std::search(text.begin() + from, text.end(), folder.begin(), folder.end(),
-				[](char a, char b) { return Folded(a) == Folded(b); }) - text.begin());
+			const auto found = std::search(
+				text.begin() + from,
+				text.end(),
+				folder.begin(),
+				folder.end(),
+				[](char a, char b) { return Folded(a) == Folded(b); });
+
+			return (size_t)(found - text.begin());
 		};
 
 		std::string Local(const std::string& text, const std::string& project)
