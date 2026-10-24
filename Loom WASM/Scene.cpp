@@ -15,7 +15,9 @@
 #include <exception>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <optional>
+#include <unordered_set>
 #include <vector>
 #include <string>
 
@@ -54,6 +56,20 @@ namespace Loom
 		// asks for it.
 		std::vector<std::unique_ptr<Lane>> s_lanes{ };
 
+		// Components whose OnUpdate has thrown, each reported the first time
+		// rather than every frame. Lanes report under the lock, so their lines
+		// do not interleave.
+		std::mutex s_threwMutex;
+		std::unordered_set<uint64_t> s_threw;
+
+		void ReportThrow(const ComponentBase& component, const std::string& what)
+		{
+			std::lock_guard lock(s_threwMutex);
+
+			if (s_threw.insert(component.m_ID).second)
+				std::cerr << ComponentRegistry::NameOf(component) << " OnUpdate threw" << what << std::endl;
+		};
+
 		void RunUpdates(const std::vector<ComponentBase*>& updates)
 		{
 			LOOM_STAGE("Scene::Update");
@@ -64,11 +80,11 @@ namespace Loom
 				try { updateable->OnUpdate(); }
 				catch (const std::exception& e)
 				{
-					std::cerr << ComponentRegistry::NameOf(*updateable) << " OnUpdate threw: " << e.what() << std::endl;
+					ReportThrow(*updateable, std::string(": ") + e.what());
 				}
 				catch (...)
 				{
-					std::cerr << ComponentRegistry::NameOf(*updateable) << " OnUpdate threw an unknown exception" << std::endl;
+					ReportThrow(*updateable, " an unknown exception");
 				};
 		};
 	};

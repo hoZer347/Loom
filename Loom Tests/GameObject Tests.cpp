@@ -938,8 +938,11 @@ TEST_SUITE("GameObject")
 			CHECK(probe->updates == 1);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an OnUpdate that throws, on the caller or on a lane, is logged and the rest still update")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an OnUpdate that throws, on the caller or on a lane, is logged once on a line of its own and the rest still update")
 	{
+		constexpr int updates = 2;
+		constexpr size_t throwers = 2;
+
 		Loom::Scene scene("throwing");
 		Pump();
 
@@ -959,19 +962,23 @@ TEST_SUITE("GameObject")
 		SharedText captured;
 		std::streambuf* const previous = std::cerr.rdbuf(&captured);
 
-		CHECK_NOTHROW(scene.Update());
+		for (int update = 0; update < updates; update++)
+			CHECK_NOTHROW(scene.Update());
 
 		std::cerr.rdbuf(previous);
 
-		CHECK(onCaller->updates == 1);
-		CHECK(onLane->updates == 1);
+		CHECK(onCaller->updates == updates);
+		CHECK(onLane->updates == updates);
 
 		const std::string log = captured.Text();
-		const std::string thrown = "thrown in OnUpdate";
-		const size_t once = log.find(thrown);
+		const std::string thrown = "thrown in OnUpdate\n";
+		size_t reported = 0;
 
-		REQUIRE(once != std::string::npos);
-		CHECK(log.find(thrown, once + 1) != std::string::npos);
+		for (size_t at = log.find(thrown); at != std::string::npos; at = log.find(thrown, at + 1))
+			reported++;
+
+		CHECK(reported == throwers);
+		CHECK((size_t)std::count(log.begin(), log.end(), '\n') == throwers);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the caller's thread drains the task queue only once the lanes are done")
