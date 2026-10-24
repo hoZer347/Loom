@@ -96,7 +96,7 @@ if (-not (Test-Path -LiteralPath $scriptList) -or [string](Get-Content -LiteralP
 }
 
 $linkInputs = @(
-    Get-Item -LiteralPath $library, $player, $PSCommandPath, (Join-Path $root 'WebBuild.ps1'), $scriptList
+    Get-Item -LiteralPath $library.Engine, $player, $PSCommandPath, (Join-Path $root 'WebBuild.ps1'), $scriptList
     $scripts | ForEach-Object { Get-Item -LiteralPath $_ }
 )
 
@@ -159,7 +159,7 @@ if (Test-Stale $module $linkInputs)
     # static initialisers nothing else refers to. The page preloads the scene
     # through FS.
     & $emxx @webCompileFlags @webLinkFlags @webIncludes '-sEXPORTED_RUNTIME_METHODS=FS' $player @($scriptJobs | ForEach-Object { $_.Object }) `
-        '-Wl,--whole-archive' $library '-Wl,--no-whole-archive' `
+        '-Wl,--whole-archive' $library.Engine '-Wl,--no-whole-archive' @($library.Tools) `
         -o $module
 
     if ($LASTEXITCODE -ne 0)

@@ -43,6 +43,20 @@ namespace Loom::Glsl
 			"#define dFdyFine(p) (loom_FlipY * dFdyFine(p))\n"
 			"#define dFdyCoarse(p) (loom_FlipY * dFdyCoarse(p))\n";
 
+#ifdef __EMSCRIPTEN__
+		// WebGPU's clip space has y up only where its rows run top first, and
+		// depth from 0, so the vertex stage ends by meeting it: y flipped for a
+		// target, which keeps GL's rows bottom first, and z remapped.
+		const char* const VERTEX_START = "#define main loom_clip_main\n";
+		const char* const VERTEX_END =
+			"\n#undef main\n"
+			"layout(constant_id = 1) const float loom_ClipFlipY = 1.0;\n"
+			"void main() { loom_clip_main(); gl_Position.y *= loom_ClipFlipY; gl_Position.z = (gl_Position.z + gl_Position.w) * 0.5; }\n";
+#else
+		const char* const VERTEX_START = "";
+		const char* const VERTEX_END = "";
+#endif
+
 		// glslang wants this once before anything else and once after.
 		struct Process
 		{
@@ -216,7 +230,7 @@ namespace Loom::Glsl
 	{
 		return Build(
 		{
-			{ EShLangVertex, PRELUDE + std::string(LINE_RESET) + vertex },
+			{ EShLangVertex, PRELUDE + std::string(VERTEX_START) + LINE_RESET + vertex + VERTEX_END },
 			{ EShLangFragment, PRELUDE + std::string(FRAGMENT_PRELUDE) + LINE_RESET + fragment },
 		});
 	};

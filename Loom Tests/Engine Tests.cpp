@@ -163,8 +163,14 @@ TEST_SUITE("Engine")
 	TEST_CASE("there is no renderer before an engine opens a window")
 	{
 		// Engine's constructor is what creates one, on the backend asked for.
+#ifdef __EMSCRIPTEN__
+		constexpr Loom::Backend DEFAULT_BACKEND = Loom::Backend::WebGPU;
+#else
+		constexpr Loom::Backend DEFAULT_BACKEND = Loom::Backend::OpenGL;
+#endif
+
 		CHECK(Loom::Renderer::Get() == nullptr);
-		CHECK(Loom::Engine::backend == Loom::Backend::OpenGL);
+		CHECK(Loom::Engine::backend == DEFAULT_BACKEND);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "SetUpdateFunction registers a per-frame callback")

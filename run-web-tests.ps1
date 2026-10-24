@@ -106,8 +106,16 @@ if (-not $NoBuild)
         (Join-Path $imgui 'imgui_widgets.cpp')
         (Join-Path $imgui 'imgui_impl_glfw.cpp')
         (Join-Path $imgui 'imgui_impl_opengl3.cpp')
+        (Join-Path $imgui 'imgui_impl_wgpu.cpp')
         (Join-Path $imgui 'ImGuiItemHooks.cpp')
     )
+
+    $shaderTools = @(Build-WebShaderTools $emxx)
+
+    if (-not $shaderTools)
+    {
+        exit 1
+    }
 
     $includes = @(
         (Join-Path $root 'External Libraries\doctest')
@@ -121,6 +129,8 @@ if (-not $NoBuild)
         $imgui
     ) | ForEach-Object { "-I$_" }
 
+    $includes += $webShaderIncludes
+
     $optimisation = if ($Configuration -eq 'Release') { '-O2' } else { '-O0' }
 
     # What both the compile and the link need.
@@ -129,6 +139,7 @@ if (-not $NoBuild)
         $optimisation
         '-fexceptions'                  # doctest reports throwing tests, and Shader throws.
         '-pthread'                      # Same threading the site build ships with.
+        '--use-port=emdawnwebgpu'       # The WebGPU renderer's headers and bindings.
     )
 
     $compileFlags = @($languageFlags) + @($includes)
@@ -141,6 +152,7 @@ if (-not $NoBuild)
         '-sAUDIO_WORKLET=1'             # Audio mixes in an AudioWorklet, as the site build's does...
         '-sWASM_WORKERS=1'              # ...which runs on a Wasm Worker.
         '-sALLOW_MEMORY_GROWTH=1'
+        '-sSTACK_SIZE=1MB'              # The site build's, which Tint needs.
         '-sPTHREAD_POOL_SIZE=2*navigator.hardwareConcurrency'  # Pre-spawned, since a later one cannot start while main blocks: the job workers, the physics thread and an update lane for each thread ID the editor offers.
         '-Wno-pthreads-mem-growth'
         '-sEXIT_RUNTIME=1'              # So the process exit code is the test result.
@@ -176,7 +188,7 @@ if (-not $NoBuild)
     # The link's arguments go in a response file, as the objects alone run
     # past cmd's limit on a command line for a batch file like em++. It is
     # rewritten only when they change, so its date says when they last did.
-    $arguments = @($linkFlags) + @($jobs | ForEach-Object { $_.Object }) + @('-o', $output) |
+    $arguments = @($linkFlags) + @($jobs | ForEach-Object { $_.Object }) + $shaderTools + @('-o', $output) |
         ForEach-Object { '"' + ($_ -replace '\\', '/') + '"' }
     $response = Join-Path $outputDir 'em++.rsp'
     $link = $arguments -join "`r`n"
@@ -186,7 +198,7 @@ if (-not $NoBuild)
         [IO.File]::WriteAllText($response, $link)
     }
 
-    $linkInputs = @(Get-Item -LiteralPath $response) + @($jobs | ForEach-Object { Get-Item -LiteralPath $_.Object })
+    $linkInputs = @(Get-Item -LiteralPath $response) + @($jobs | ForEach-Object { Get-Item -LiteralPath $_.Object }) + @(Get-Item -LiteralPath $shaderTools)
 
     # The link writes the module and its loader both; a link cut short can leave one behind the other.
     $module = [IO.Path]::ChangeExtension($output, '.wasm')

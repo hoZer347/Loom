@@ -29,6 +29,10 @@ namespace Loom
 		// flipped viewport for dFdy.
 		constexpr uint32_t FLIP_CONSTANT_ID = 0;
 
+		// The vertex stage's specialisation constant under WebGPU that flips
+		// clip space y for a target.
+		constexpr uint32_t CLIP_FLIP_CONSTANT_ID = 1;
+
 		// Which stages read a resource, a bit each.
 		constexpr uint32_t VERTEX_STAGE = 1;
 		constexpr uint32_t FRAGMENT_STAGE = 2;

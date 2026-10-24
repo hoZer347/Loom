@@ -13,10 +13,20 @@
 #include <vector>
 
 
-// The web's backends run in the browser suite, which needs WebGPU.
-#ifndef __EMSCRIPTEN__
+// On the web these run in the browser suite alone, which has a canvas for WebGPU.
+#if !defined(__EMSCRIPTEN__) || defined(LOOM_BROWSER_SUITE)
+#ifdef __EMSCRIPTEN__
+#include "Browser/Page.h"
+#endif
+
 namespace
 {
+#ifdef __EMSCRIPTEN__
+	constexpr Loom::Backend BACKENDS[] = { Loom::Backend::WebGPU };
+#else
+	constexpr Loom::Backend BACKENDS[] = { Loom::Backend::OpenGL, Loom::Backend::Vulkan };
+#endif
+
 	constexpr int WINDOW_SIZE = 64;
 	constexpr int IMAGE_SIZE = 4;
 	constexpr int CHANNELS = 3;
@@ -65,6 +75,13 @@ namespace
 		"out vec4 FragColor;\n"
 		"void main() { FragColor = v_tint; }\n";
 
+	// Shading renames a stage's main and calls it from one of its own.
+	const std::string WRAPPED =
+		"layout(std430) readonly buffer Tint { vec4 tint; };\n"
+		"flat out vec4 v_tint;\n"
+		"void loom_main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }\n"
+		"void main() { loom_main(); v_tint = tint; }\n";
+
 	const std::string BROKEN = "void main() { nothing; }\n";
 
 	const std::vector<uint32_t> VALUES = { 1, 2, 3, 4 };
@@ -79,10 +96,23 @@ namespace
 		return doubled;
 	};
 
-	// A hidden window on a backend, as Engine::OpenWindow opens one. renderer
-	// is null where the machine cannot run it.
+	// A hidden window on a backend, as Engine::OpenWindow opens one, or on the
+	// web the page's, which its engine already draws into. renderer is null
+	// where the machine cannot run it.
 	struct Gpu
 	{
+#ifdef __EMSCRIPTEN__
+		Loom::Renderer* renderer = nullptr;
+
+		explicit Gpu(Loom::Backend backend)
+		{
+			OpenPage();
+			renderer = Loom::Renderer::Get();
+
+			if (renderer && (renderer->GetBackend() != backend || !renderer->SupportsCompute()))
+				renderer = nullptr;
+		};
+#else
 		GLFWwindow* window = nullptr;
 		std::unique_ptr<Loom::Renderer> renderer;
 
@@ -107,6 +137,7 @@ namespace
 
 			glfwTerminate();
 		};
+#endif
 
 		std::vector<uint32_t> Read(uint32_t buffer)
 		{
@@ -156,14 +187,24 @@ namespace
 		return true;
 	};
 
-	// Runs check on each desktop backend the machine has, one after another,
-	// so a check can compare them.
+	const char* NameOf(Loom::Backend backend)
+	{
+		switch (backend)
+		{
+		case Loom::Backend::Vulkan:	return "Vulkan";
+		case Loom::Backend::WebGPU:	return "WebGPU";
+		default:					return "OpenGL";
+		};
+	};
+
+	// Runs check on each backend with compute the machine has, one after
+	// another, so a check can compare them.
 	template<typename Check>
 	void OnEachBackend(const Check& check)
 	{
-		for (const Loom::Backend backend : { Loom::Backend::OpenGL, Loom::Backend::Vulkan })
+		for (const Loom::Backend backend : BACKENDS)
 		{
-			const char* name = backend == Loom::Backend::OpenGL ? "OpenGL" : "Vulkan";
+			const std::string name = NameOf(backend);
 			INFO(name);
 			Gpu gpu(backend);
 
@@ -321,6 +362,23 @@ TEST_SUITE("Compute")
 
 			renderer.SetBuffer(program, "Tint", tint);
 			CHECK(Near(gpu.Capture(frame), 0, FULL, 0));
+
+			renderer.DestroyBuffer(tint);
+			renderer.DeleteProgram(program);
+		});
+	};
+
+	TEST_CASE("a vertex stage that calls its own main by another name, as Shading makes one, draws")
+	{
+		OnEachBackend([](Gpu& gpu)
+		{
+			Loom::Renderer& renderer = *gpu.renderer;
+			const uint32_t program = renderer.CreateProgram("wrapped", WRAPPED, FLAT);
+			const uint32_t tint = renderer.CreateBuffer(sizeof(GREEN));
+			renderer.SetBufferData(tint, GREEN, sizeof(GREEN));
+			renderer.SetBuffer(program, "Tint", tint);
+
+			CHECK(Near(gpu.Capture([&]() { renderer.Draw(program, GL_TRIANGLES, nullptr, FULLSCREEN_VERTICES, GL_STREAM_DRAW); }), 0, FULL, 0));
 
 			renderer.DestroyBuffer(tint);
 			renderer.DeleteProgram(program);

@@ -24,13 +24,18 @@ namespace Loom
 	};
 
 	std::unique_ptr<Renderer> CreateOpenGLRenderer();
-#ifndef __EMSCRIPTEN__
+#ifdef __EMSCRIPTEN__
+	std::unique_ptr<Renderer> CreateWebGPURenderer();
+#else
 	std::unique_ptr<Renderer> CreateVulkanRenderer();
 #endif
 
 	std::unique_ptr<Renderer> Renderer::Create(Backend backend)
 	{
-#ifndef __EMSCRIPTEN__
+#ifdef __EMSCRIPTEN__
+		if (backend == Backend::WebGPU)
+			return CreateWebGPURenderer();
+#else
 		if (backend == Backend::Vulkan)
 			return CreateVulkanRenderer();
 #endif

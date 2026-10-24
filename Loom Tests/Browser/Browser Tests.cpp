@@ -8,6 +8,7 @@
 #include "Engine.h"
 #include "Input.h"
 #include "OpenGL.h"
+#include "Page.h"
 #include "Utilities/DialogueInput.h"
 
 #include <emscripten.h>
@@ -30,12 +31,6 @@ namespace
 	constexpr int right_button = 1;
 	constexpr int middle_button = 2;
 	constexpr int w_key = 'W';
-
-	// Every case shares the page's one canvas, so the engine is made once.
-	void OpenPage()
-	{
-		static Loom::Engine engine;
-	};
 
 	// Asks run.mjs for one piece of input. It polls for this, sends it, and
 	// clears it.

@@ -76,6 +76,12 @@
     <ClCompile Include="VulkanRenderer.cpp">
       <Filter>Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="WebGPURenderer.cpp">
+      <Filter>Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="WebCanvas.cpp">
+      <Filter>Renderer</Filter>
+    </ClCompile>
     <ClCompile Include="$(VulkanSdk)\Source\SPIRV-Reflect\spirv_reflect.c">
       <Filter>Renderer</Filter>
     </ClCompile>
@@ -337,6 +343,9 @@
       <Filter>Mesh</Filter>
     </ClInclude>
     <ClInclude Include="Renderer.h">
+      <Filter>Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="WebCanvas.h">
       <Filter>Renderer</Filter>
     </ClInclude>
     <ClInclude Include="Light.h">

@@ -71,10 +71,14 @@ namespace Loom
 		static inline bool updateScenes = true;
 		static inline bool renderScenes = true;
 
-		// The graphics API the window is opened on. Set before the Engine is
-		// constructed; if Vulkan cannot run here it falls back to OpenGL, and
-		// this says which one it ended up on.
+		// The graphics API the window is opened on, WebGPU by default on the
+		// web. Set before the Engine is constructed; if Vulkan or WebGPU cannot
+		// run here it falls back to OpenGL, and this says which one it ended up on.
+#ifdef __EMSCRIPTEN__
+		static inline Backend backend = Backend::WebGPU;
+#else
 		static inline Backend backend = Backend::OpenGL;
+#endif
 
 		// Whether a frame waits for the display to be ready for it, holding the
 		// frame rate to the display's. Set before the Engine is constructed. An

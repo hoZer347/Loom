@@ -1,0 +1,3 @@
+name=Compute
+scripts=Scripts/ComputeScripts.vcxproj
+library=Build/ComputeScripts.dll

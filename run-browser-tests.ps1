@@ -4,10 +4,11 @@
 
 .DESCRIPTION
     The cases that need a real page and not node: input sent through Chrome's
-    own pipeline to the canvas, and threads in a cross-origin isolated page.
-    They are built with the engine library Play Web uses, together with the
-    Input and Threading suites, which run here a third time against the
-    browser's own threads.
+    own pipeline to the canvas, threads in a cross-origin isolated page, and
+    compute on WebGPU. They are built with the engine library Play Web uses,
+    together with the Input and Threading suites, which run here a third time
+    against the browser's own threads, and the Compute suite, which runs here
+    on WebGPU rather than the desktop's backends.
 
     Loom Tests\Browser\run.mjs serves the build, drives Chrome over the
     DevTools protocol, and answers each case's request for input. Chrome runs
@@ -39,6 +40,7 @@ $sources = @(
     (Join-Path $browser 'main.cpp')
     (Join-Path $tests 'Input Tests.cpp')
     (Join-Path $tests 'Threading Tests.cpp')
+    (Join-Path $tests 'Compute Tests.cpp')
     (Join-Path $browser 'Browser Tests.cpp')
 )
 
@@ -76,6 +78,7 @@ $jobs = @(Get-CompileJobs $sources $root $intermediate)
 $flags = @($webCompileFlags) + @($webIncludes) + @(
     "-I$(Join-Path $root 'External Libraries\doctest')"
     "-I$tests"
+    '-DLOOM_BROWSER_SUITE'
 )
 
 Write-Host "Building the browser suite ($($sources.Count) files)"
@@ -89,7 +92,7 @@ if (-not (Invoke-Compile $emxx $jobs $flags))
 # The whole archive goes in because components register themselves from
 # static initialisers nothing else refers to.
 & $emxx @webCompileFlags @webLinkFlags '-sEXIT_RUNTIME=1' @($jobs | ForEach-Object { $_.Object }) `
-    '-Wl,--whole-archive' $library '-Wl,--no-whole-archive' `
+    '-Wl,--whole-archive' $library.Engine '-Wl,--no-whole-archive' @($library.Tools) `
     -o (Join-Path $output 'tests.js')
 
 if ($LASTEXITCODE -ne 0)

@@ -449,9 +449,10 @@ namespace Loom
 
 		window = OpenWindow(backend);
 
-		// Vulkan needs a driver and features an OpenGL machine may not have, and
-		// a window made for one API cannot be handed to the other.
-		if (!window && backend == Backend::Vulkan)
+		// Vulkan and WebGPU need a driver and features an OpenGL machine or
+		// browser may not have, and a window made for one API cannot be handed
+		// to another.
+		if (!window && backend != Backend::OpenGL)
 		{
 			std::cerr << "Engine: Vulkan could not start, so this runs on OpenGL" << std::endl;
 			backend = Backend::OpenGL;

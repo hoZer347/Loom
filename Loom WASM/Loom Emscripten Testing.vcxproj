@@ -186,6 +186,8 @@
     <ClCompile Include="ShaderVariables.cpp" />
     <ClCompile Include="EditorGui.cpp" />
     <ClCompile Include="VulkanRenderer.cpp" />
+    <ClCompile Include="WebGPURenderer.cpp" />
+    <ClCompile Include="WebCanvas.cpp" />
     <ClCompile Include="$(VulkanSdk)\Source\SPIRV-Reflect\spirv_reflect.c" />
     <ClCompile Include="Utilities\AttributeFields.cpp" />
     <ClCompile Include="Utilities\AttributeGui.cpp" />
@@ -240,6 +242,7 @@
     <ClInclude Include="Animator.h" />
     <ClInclude Include="OpenGL.h" />
     <ClInclude Include="Renderer.h" />
+    <ClInclude Include="WebCanvas.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="Serial.h" />
     <ClInclude Include="SerializedField.h" />

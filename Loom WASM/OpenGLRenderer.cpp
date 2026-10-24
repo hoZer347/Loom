@@ -2,10 +2,10 @@
 
 #include "Engine.h"
 #include "GlslCompiler.h"
-#include "Input.h"
 #include "OpenGL.h"
 #include "Profiler.h"
 #include "RenderMath.h"
+#include "WebCanvas.h"
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -89,20 +89,6 @@ namespace Loom
 
 			return shader;
 		};
-
-#ifdef __EMSCRIPTEN__
-		void ResizeCanvas()
-		{
-			int width, height;
-
-			emscripten_get_canvas_element_size("#canvas", &width, &height);
-			glfwSetWindowSize(Engine::window, width, height);
-
-			Input::OnResize(width, height);
-
-			glViewport(0, 0, width, height);
-		};
-#endif
 	};
 
 	struct OpenGLRenderer final : Renderer
@@ -184,15 +170,7 @@ namespace Loom
 					glViewport(0, 0, width, height);
 				});
 #else
-			emscripten_set_resize_callback(
-				EMSCRIPTEN_EVENT_TARGET_WINDOW,
-				nullptr,
-				EM_TRUE,
-				[](int, const EmscriptenUiEvent*, void*) -> EM_BOOL
-				{
-					ResizeCanvas();
-					return EM_TRUE;
-				});
+			WebCanvas::FollowResizes([](int width, int height) { glViewport(0, 0, width, height); });
 #endif
 
 			glEnable(GL_DEPTH_TEST);
@@ -254,24 +232,9 @@ namespace Loom
 		void InitImGui(GLFWwindow* window) override
 		{
 #ifdef __EMSCRIPTEN__
-			// Emscripten: avoid double-callback wiring
+			// The canvas's callbacks stand in for the window's.
 			ImGui_ImplGlfw_InitForOpenGL(window, false);
-			ImGui_ImplGlfw_InstallEmscriptenCallbacks(window, "#canvas");
-
-			// Make canvas focusable + stop browser stealing input
-			emscripten_run_script(R"JS(
-			(function(){
-				var c = Module['canvas'];
-				if (!c) return;
-				c.tabIndex = 0;
-				c.style.outline = 'none';
-				c.style.touchAction = 'none';
-				c.focus();
-				c.addEventListener('click', () => c.focus());
-				c.addEventListener('contextmenu', e => e.preventDefault());
-				c.addEventListener('wheel', e => e.preventDefault(), { passive: false });
-			})();
-		)JS");
+			WebCanvas::InstallImGui(window);
 #else
 			ImGui_ImplGlfw_InitForOpenGL(window, true);
 #endif

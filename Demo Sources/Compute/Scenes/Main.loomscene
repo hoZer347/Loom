@@ -1,0 +1,21 @@
+Main(6f1d2a4e-8c3b-4f57-9a1e-2b7d5c9e0f13):
+	GameObject Root(3a9e4c1b-7d2f-4e86-b0a5-c4f81e6d2973)
+		0 = 0
+		1 = false
+		GameObject Camera(c2b7f9e1-5a4d-4c3e-8f61-d09a7b3e5f24)
+			0 = 0
+			1 = false
+			2 = (0, 5, 12)
+			Component Camera(9e4a1c7d-3b2f-4a85-bc16-7f0d2e9a4b38)
+				0 = true
+				1 = (0, 0, 0)
+				2 = 45
+				3 = 0.1
+				4 = 100
+		GameObject Swarm(51d8e3a7-2c9b-4f04-a6e7-b3c0f9d1e852)
+			0 = 0
+			1 = false
+			Component Swarm(e7c2a9f4-6b1d-4e38-9d5a-0f8b3c7e2a61)
+				0 = "Assets/Swarm.shader"
+				1 = "Assets/Particle.shader"
+				2 = 256
