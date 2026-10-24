@@ -224,6 +224,8 @@ TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an imported model draws each part i
 		const InFolder in(project);
 		WriteModel(project / "Swatch.gltf", animated);
 
+		// No renderer compiles the shader the importer writes.
+		const LoomTests::Captured captured(std::cerr);
 		Loom::Scene scene("imported");
 		LoomTests::Pump();
 
@@ -233,6 +235,7 @@ TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an imported model draws each part i
 
 		CHECK(std::filesystem::exists(Loom::model_shader_path));
 		CheckDressed(*model);
+		CHECK(captured.Says("No renderer to compile"));
 	};
 
 	std::error_code code;
@@ -249,6 +252,9 @@ TEST_CASE("a model whose faces name vertices it does not have is refused, and on
 	REQUIRE(whole.size() == 1);
 	CHECK(whole[0].vertices.size() == Loom::model_floats_per_vertex * Loom::model_vertices_per_triangle);
 
+	const LoomTests::Captured captured(std::cerr);
+
 	CHECK(Load(Triangle(missing)).empty());
+	CHECK(captured.Says("loom model.ply: Validation failed"));
 };
 #endif

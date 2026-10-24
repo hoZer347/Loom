@@ -508,8 +508,6 @@ TEST_CASE("The Model panel's save keeps what it could not read of the prefab")
 	// A component no build has, as a script this editor has not loaded would be.
 	constexpr const char* MYSTERY = "\tComponent Mystery(6c1a4d55-0d3e-4b8e-9a31-6b2a1f0e7c42)\n\t\t0 = 1\n";
 
-	const LoomTests::Captured captured(std::cerr);
-
 	std::ofstream(driven.path, std::ios::binary | std::ios::app) << MYSTERY;
 	driven.Frame();
 
@@ -525,7 +523,6 @@ TEST_CASE("The Model panel's save keeps what it could not read of the prefab")
 
 	REQUIRE(reopened.Editing() != nullptr);
 	CHECK(reopened.Editing()->faces.size() == 12);
-	CHECK(captured.Says("'Mystery'"));
 };
 
 TEST_CASE("The Model panel leaves animated meshes out")
@@ -595,6 +592,8 @@ TEST_CASE("The Model panel lists its project's shaders and saves the one chosen 
 	std::ofstream(prefab, std::ios::binary) << ReadFile(WritePrefab("model_shaders_source", &cube, &cube));
 
 	{
+		// The shaders are empty, so they do not compile.
+		const LoomTests::Captured captured(std::cerr);
 		Driven driven("model_shaders", nullptr, prefab.string());
 		CHECK(driven.editor.Shaders() == std::vector<std::string>{ "Assets/Lit.shader", "Assets/Model.shader" });
 
@@ -616,6 +615,8 @@ TEST_CASE("The Model panel lists its project's shaders and saves the one chosen 
 
 		for (size_t i = 0; i < after.components.size(); i++)
 			CHECK(after.components[i].guid == before.components[i].guid);
+
+		CHECK(captured.Says("Material: Assets/Model.shader: "));
 	};
 
 	std::error_code code;

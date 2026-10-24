@@ -325,8 +325,8 @@ TEST_SUITE("EditorConsole")
 	TEST_CASE_FIXTURE(Driven, "a double-click below the text selects the last line, however long the first")
 	{
 		Loom::EditorLog::Get().Clear();
-		std::cout << "a first line far longer than the last" << std::endl;
-		std::cout << "last" << std::endl;
+		std::cerr << "a first line far longer than the last" << std::endl;
+		std::cerr << "last" << std::endl;
 		Frame();
 
 		const ImVec2 below = At(2, 0);
@@ -510,6 +510,7 @@ TEST_SUITE("EditorLog")
 
 	TEST_CASE("a line naming a file in the project names it from the project's folder, and others are left as written")
 	{
+		const LoomTests::Captured passedOn(std::cerr);
 		Loom::EditorLog::Get().Install();
 		Loom::EditorLog::Get().Clear();
 		Loom::EditorLog::Get().SetProject("C:\\Games\\Crash Demo\\");
@@ -535,9 +536,10 @@ TEST_SUITE("EditorLog")
 
 	TEST_CASE("a line naming a file in the project links to it, with the line and column after it")
 	{
+		const LoomTests::Captured passedOn(std::cerr);
 		const Project project;
 
-		std::cout << "  " << project.Path("Scripts/Laser.hpp") << "(111,1): error C2059: syntax error: 'this'" << std::endl;
+		std::cerr << "  " << project.Path("Scripts/Laser.hpp") << "(111,1): error C2059: syntax error: 'this'" << std::endl;
 		std::cerr << "Sprites: " << project.Path("Assets/Overfull.loomsprite") << " is not a whole sprite" << std::endl;
 		std::cerr << "Import: " << project.folder.generic_string() << "/Assets/Some Models\\Broken.ply: Validation failed" << std::endl;
 		std::cerr << project.Path("Scripts/Laser.hpp") << "(12): warning C4100" << std::endl;
@@ -569,6 +571,7 @@ TEST_SUITE("EditorLog")
 
 	TEST_CASE("only a file that is in the project gets a link, and a line may name more than one")
 	{
+		const LoomTests::Captured passedOn(std::cerr);
 		const Project project;
 		const std::string sibling = project.folder.string() + " Two\\Scripts\\Laser.hpp";
 
@@ -596,6 +599,7 @@ TEST_SUITE("EditorLog")
 
 	TEST_CASE("a location that is not a whole line, or line and column, is left out of the link")
 	{
+		const LoomTests::Captured passedOn(std::cerr);
 		const Project project;
 		const std::vector<std::string> after{ "(12,)", "(x)", "(0)", "(5", "(5,2" };
 
@@ -616,6 +620,7 @@ TEST_SUITE("EditorLog")
 
 	TEST_CASE("without a project no line has a link")
 	{
+		const LoomTests::Captured passedOn(std::cerr);
 		const Project project;
 		Loom::EditorLog::Get().SetProject("");
 

@@ -229,10 +229,12 @@ TEST_SUITE("SpriteAsset")
 				file << text;
 			};
 
+			const LoomTests::Captured captured(std::cerr);
 			SpriteAsset sprite;
 			SpriteAsset::Links links;
 
 			CHECK_NOTHROW(CHECK_FALSE(SpriteAsset::Load(path, sprite, links)));
+			CHECK(captured.Says(path + " is not a whole sprite"));
 		};
 
 		std::filesystem::remove(path);
