@@ -17,8 +17,10 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <map>
 #include <set>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -317,6 +319,59 @@ namespace LoomTests
 		Renderer* m_previous;
 		uint32_t m_handles = 0;
 		std::vector<uint32_t> m_targets;
+	};
+
+
+	// Takes what is written to a stream for as long as it lives, so a test
+	// that makes the engine complain on purpose keeps it off the console and
+	// can check it was said. doctest reports on std::cout, so a capture of
+	// std::cout ends before the checks that follow it.
+	struct Captured final
+	{
+		explicit Captured(std::ostream& stream) :
+			m_stream(stream),
+			m_previous(stream.rdbuf(m_text.rdbuf()))
+		{ };
+
+		~Captured() { m_stream.rdbuf(m_previous); };
+
+		Captured(const Captured&) = delete;
+		Captured& operator=(const Captured&) = delete;
+
+		std::string Text() const { return m_text.str(); };
+
+		// How many times part was written.
+		size_t Count(const std::string& part) const
+		{
+			if (part.empty())
+				return 0;
+
+			const std::string text = Text();
+			size_t count = 0;
+
+			for (size_t at = text.find(part); at != std::string::npos; at = text.find(part, at + part.size()))
+				count++;
+
+			return count;
+		};
+
+		bool Says(const std::string& part) const { return Count(part) > 0; };
+
+	private:
+		std::ostream& m_stream;
+		std::ostringstream m_text;
+		std::streambuf* m_previous;
+	};
+
+	// What the ComponentRegistry suite's two Clash types say when they first
+	// register, before main. main.cpp holds that line back from std::cerr and
+	// counts it in StartupClashes; all else said then goes through.
+	constexpr const char* STARTUP_CLASH = "Two component types are called Clash;";
+
+	inline size_t& StartupClashes()
+	{
+		static size_t count = 0;
+		return count;
 	};
 
 

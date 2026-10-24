@@ -543,7 +543,13 @@ TEST_SUITE("SpriteEditor")
 			Driven driven("loom sprite taken in.tga", &sprite, &changed);
 
 			driven.Stroke(middle, middle);
-			CHECK_FALSE(driven.editor.SaveAll());
+
+			{
+				const LoomTests::Captured captured(std::cerr);
+
+				CHECK_FALSE(driven.editor.SaveAll());
+				CHECK(captured.Says("loom sprite taken in.tga changed outside the sprite"));
+			};
 
 			driven.Run("click \"Sprites\" \"Take It In\"\nwait 2\n");
 
@@ -614,10 +620,13 @@ TEST_SUITE("SpriteEditor")
 		const std::string other = LoomTests::WriteTga("loom sprite other.tga", Driven::side, Driven::side, SpriteAsset::Image::Blank(Driven::side, Driven::side).pixels);
 		REQUIRE(SpriteAsset::Save(SpriteAsset::For(other), sprite, { driven.path, "" }));
 
+		const LoomTests::Captured captured(std::cerr);
+
 		driven.editor.Open(other);
 		driven.Frame();
 
 		CHECK(Driven::Tabs() == 1);
+		CHECK(captured.Says(SpriteAsset::For(other)));
 
 		std::filesystem::remove(other);
 		std::filesystem::remove(SpriteAsset::For(other));

@@ -279,12 +279,14 @@ TEST_CASE("The Model panel opens a prefab not yet written, writes it where it wa
 	REQUIRE(std::filesystem::exists(path));
 
 	// Deleted once written, it is gone rather than back to the text it opened as.
+	const LoomTests::Captured captured(std::cerr);
 	std::filesystem::remove(path, code);
 
 	driven.Frame();
 	driven.Frame();
 
 	CHECK(driven.editor.Editing() == nullptr);
+	CHECK(captured.Says(path));
 };
 
 TEST_CASE("The Model panel goes on to edit the part whose face is clicked")
@@ -506,6 +508,8 @@ TEST_CASE("The Model panel's save keeps what it could not read of the prefab")
 	// A component no build has, as a script this editor has not loaded would be.
 	constexpr const char* MYSTERY = "\tComponent Mystery(6c1a4d55-0d3e-4b8e-9a31-6b2a1f0e7c42)\n\t\t0 = 1\n";
 
+	const LoomTests::Captured captured(std::cerr);
+
 	std::ofstream(driven.path, std::ios::binary | std::ios::app) << MYSTERY;
 	driven.Frame();
 
@@ -521,6 +525,7 @@ TEST_CASE("The Model panel's save keeps what it could not read of the prefab")
 
 	REQUIRE(reopened.Editing() != nullptr);
 	CHECK(reopened.Editing()->faces.size() == 12);
+	CHECK(captured.Says("'Mystery'"));
 };
 
 TEST_CASE("The Model panel leaves animated meshes out")
@@ -554,6 +559,8 @@ TEST_CASE("The Model panel gives a prefab with no mesh one, drawn with a shader 
 	std::ofstream(prefab, std::ios::binary) << "GameObject Empty(5d0c6b7e-2f43-4a8e-9c1d-7a6e0b3f2c11)\n\t0 = 0\n\t1 = false\n\t2 = (0, 0, 0)\n\t3 = (0, 0, 0)\n\t4 = (1, 1, 1)\n\t5 = false\n";
 
 	{
+		// The shader is empty, so it does not compile.
+		const LoomTests::Captured captured(std::cerr);
 		Driven driven("model_add_mesh", nullptr, prefab.string());
 		CHECK(driven.editor.Editing() == nullptr);
 
@@ -568,6 +575,7 @@ TEST_CASE("The Model panel gives a prefab with no mesh one, drawn with a shader 
 		REQUIRE(reopened.Editing() != nullptr);
 		CHECK(reopened.Editing()->faces.size() == 6);
 		CHECK(ReadFile(prefab.string()).find("\"Assets/Lit.shader\"") != std::string::npos);
+		CHECK(captured.Says("Lit.shader"));
 	};
 
 	std::error_code code;
@@ -677,6 +685,7 @@ TEST_CASE("The Model panel's extrude of faces facing every way does nothing, and
 TEST_CASE("The Model panel shows a prefab deleted from under it as one it cannot read")
 {
 	Driven driven("model_deleted");
+	const LoomTests::Captured captured(std::cerr);
 
 	std::error_code code;
 	std::filesystem::remove(driven.path, code);
@@ -690,4 +699,5 @@ TEST_CASE("The Model panel shows a prefab deleted from under it as one it cannot
 	driven.Frame();
 
 	CHECK(driven.editor.Editing() == nullptr);
+	CHECK(captured.Says(driven.path));
 };

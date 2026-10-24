@@ -1,5 +1,7 @@
 #include "doctest.h"
 
+#include "Test Support.h"
+
 #include "SpriteAsset.h"
 
 #include <filesystem>
@@ -138,9 +140,11 @@ TEST_SUITE("SpriteAsset")
 
 	TEST_CASE("a file that will not decode does not open")
 	{
+		const LoomTests::Captured captured(std::cerr);
 		SpriteAsset::Image image;
 
 		CHECK_FALSE(SpriteAsset::LoadImage("no such sprite.png", image));
+		CHECK(captured.Says("no such sprite.png"));
 	};
 
 	TEST_CASE("an opaque pixel covers what is under it, and a see-through one blends with it")
@@ -198,9 +202,11 @@ TEST_SUITE("SpriteAsset")
 			file << "image=broken.png\nsize=2x2\nframe=100\nframe=100\nlayer=Only\ncel=\n";
 		};
 
+		const LoomTests::Captured captured(std::cerr);
 		SpriteAsset sprite;
 		SpriteAsset::Links links;
 		CHECK_FALSE(SpriteAsset::Load(path, sprite, links));
+		CHECK(captured.Says(path));
 
 		std::filesystem::remove(path);
 	};
@@ -267,9 +273,11 @@ TEST_SUITE("SpriteAsset")
 				file << "cel=\n";
 		};
 
+		const LoomTests::Captured captured(std::cerr);
 		SpriteAsset sprite;
 		SpriteAsset::Links links;
 		CHECK_FALSE(SpriteAsset::Load(path, sprite, links));
+		CHECK(captured.Says(path));
 
 		std::filesystem::remove(path);
 	};

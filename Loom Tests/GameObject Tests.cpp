@@ -657,9 +657,12 @@ TEST_SUITE("GameObject")
 		Loom::GameObject* child = scene.GetRoot().AddChild("Survivor");
 		Pump();
 
+		const LoomTests::Captured captured(std::cerr);
+
 		scene.GetRoot().Destroy();
 		Pump();
 
+		CHECK(captured.Says("root"));
 		CHECK(scene.GetRoot().GetChildren().size() == 1);
 		CHECK(scene.GetRoot().GetChildren()[0] == child);
 	};

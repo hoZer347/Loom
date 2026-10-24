@@ -9,7 +9,6 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <sstream>
 #include <string>
 #include <type_traits>
 
@@ -169,8 +168,7 @@ TEST_SUITE("Material")
 	// browser to fail in.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader that failed to compile is tried again")
 	{
-		std::ostringstream captured;
-		std::streambuf* previous = std::cerr.rdbuf(captured.rdbuf());
+		const LoomTests::Captured captured(std::cerr);
 
 		{
 			Loom::Scene scene("first attempt");
@@ -188,18 +186,9 @@ TEST_SUITE("Material")
 			Pump();
 		};
 
-		std::cerr.rdbuf(previous);
-
 		// Two materials, two attempts: the second one did not get a remembered
 		// failure handed back to it.
-		size_t attempts = 0;
-
-		for (size_t at = captured.str().find("Material: no such shader.shader:");
-			at != std::string::npos;
-			at = captured.str().find("Material: no such shader.shader:", at + 1))
-			attempts++;
-
-		CHECK(attempts == 2);
+		CHECK(captured.Count("Material: no such shader.shader:") == 2);
 	};
 
 	// Fixing the file then needs no reload: the editor's poll compiles it
@@ -211,18 +200,8 @@ TEST_SUITE("Material")
 
 		const std::string failure = "Material: " + path.string() + ":";
 
-		std::ostringstream captured;
-		std::streambuf* previous = std::cerr.rdbuf(captured.rdbuf());
-
-		const auto attempts = [&]()
-		{
-			size_t count = 0;
-
-			for (size_t at = captured.str().find(failure); at != std::string::npos; at = captured.str().find(failure, at + 1))
-				count++;
-
-			return count;
-		};
+		const LoomTests::Captured captured(std::cerr);
+		const auto attempts = [&]() { return captured.Count(failure); };
 
 		Loom::Scene scene("polled");
 		Pump();
@@ -240,7 +219,6 @@ TEST_SUITE("Material")
 		Loom::Material::ReloadChangedShaders();
 		const size_t changed = attempts();
 
-		std::cerr.rdbuf(previous);
 		std::filesystem::remove(path);
 
 		CHECK(attached == 1);

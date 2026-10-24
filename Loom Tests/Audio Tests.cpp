@@ -136,13 +136,20 @@ TEST_SUITE("Audio")
 
 		Loom::Audio::Unload();
 		CHECK(Loom::Audio::PlayingCount() == 0);
+
+		const LoomTests::Captured captured(std::cerr);
+
 		CHECK_FALSE(Loom::Audio::Play(clip));
+		CHECK(captured.Says("could not load " + clip));
 	};
 
 	TEST_CASE_FIXTURE(AudioFixture, "a file that will not load plays nothing")
 	{
+		const LoomTests::Captured captured(std::cerr);
+
 		CHECK_FALSE(Loom::Audio::PlayAt("no such sound.wav", glm::vec3(0.0f)));
 		CHECK(Loom::Audio::PlayingCount() == 0);
+		CHECK(captured.Says("could not load no such sound.wav"));
 	};
 
 	TEST_CASE_FIXTURE(AudioFixture, "an AudioSource plays on its first update, and only then")
@@ -224,9 +231,12 @@ TEST_SUITE("Audio")
 		scene.Update();
 		CHECK(source->IsPlaying());
 
+		const LoomTests::Captured captured(std::cerr);
+
 		source->clipPath = "no such sound.wav";
 		scene.Update();
 		CHECK_FALSE(source->IsPlaying());
+		CHECK(captured.Says("could not load no such sound.wav"));
 
 		source->Play();
 		CHECK_FALSE(source->IsPlaying());

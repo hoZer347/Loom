@@ -143,6 +143,14 @@ and letting that fire after the object has gone runs it against freed memory.
 4. Guard anything platform-specific with `#ifdef __EMSCRIPTEN__` and say why.
 5. `main.cpp` is the only file that defines doctest's implementation — do not
    define `DOCTEST_CONFIG_IMPLEMENT*` anywhere else.
+6. A passing run prints only doctest's summary. A case that makes the engine or
+   editor complain on purpose holds a `LoomTests::Captured` on `std::cerr` and
+   checks the complaint with `Says`. Before `main`, while the component types
+   register, `main.cpp` holds back only the ComponentRegistry suite's expected
+   `STARTUP_CLASH` line, so anything else said then still shows. A case that
+   runs by default reports measurements with `INFO`, which shows only on a
+   failure; the skipped `Performance` and `Benchmark` cases keep `MESSAGE`,
+   since their numbers are the point.
 
 ## Not covered
 

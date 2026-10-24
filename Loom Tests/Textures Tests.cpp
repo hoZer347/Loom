@@ -80,7 +80,10 @@ TEST_SUITE("Texture")
 
 	TEST_CASE("Shared answers null for a file that will not load")
 	{
+		const LoomTests::Captured captured(std::cerr);
+
 		CHECK(Loom::Texture::Shared("no such shared texture.png") == nullptr);
+		CHECK(captured.Says("no such shared texture.png"));
 	};
 
 	TEST_CASE("ReloadShared decodes the file again into the texture already handed out")

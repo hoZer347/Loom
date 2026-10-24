@@ -1,5 +1,7 @@
 #include "doctest.h"
 
+#include "Test Support.h"
+
 #include "EditorConsole.h"
 #include "EditorIcons.h"
 #include "EditorLog.h"
@@ -104,7 +106,7 @@ namespace
 			Loom::EditorLog::Get().Clear();
 
 			for (const char* line : lines)
-				std::cout << line << std::endl;
+				std::cerr << line << std::endl;
 
 			Frame();
 		};
@@ -270,6 +272,9 @@ namespace
 
 		const std::vector<const char*> lines{ "first line", "second line", "third line" };
 
+		// The log passes its lines on to here rather than the test's output.
+		// Not std::cout, which doctest reports on.
+		const LoomTests::Captured passedOn{ std::cerr };
 		Loom::EditorConsole console;
 		std::vector<Loom::EditorLog::Link> followed;
 		bool open = true;
@@ -359,7 +364,7 @@ TEST_SUITE("EditorConsole")
 	{
 		Drag(At(0, 0), At(0, 5));
 		Loom::EditorLog::Get().Clear();
-		std::cout << "fresh line" << std::endl;
+		std::cerr << "fresh line" << std::endl;
 		Frame();
 		Chord(ImGuiKey_C);
 

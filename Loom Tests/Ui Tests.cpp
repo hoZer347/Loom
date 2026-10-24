@@ -557,6 +557,10 @@ TEST_SUITE("Ui")
 		label->Attach<Loom::UiText>();
 		Pump();
 
+		// The first text drawn with no font named says so, once a run, so it
+		// may have been said already.
+		const LoomTests::Captured captured(std::cerr);
+
 		// The label covers the whole button, so the cursor is on the label.
 		labelRect->size = *rect->size;
 
@@ -567,6 +571,7 @@ TEST_SUITE("Ui")
 		CHECK(Loom::Ui::IsPointedAt(*labelRect));
 		CHECK(button->IsHovered());
 		CHECK(button->WasClicked());
+		CHECK(captured.Count("no font at") <= 1);
 
 		Settle();
 	};
@@ -633,6 +638,8 @@ TEST_SUITE("Ui")
 
 		constexpr int PIXELS = 2;
 
+		const LoomTests::Captured captured(std::cerr);
+
 		Loom::Scene scene("ui not a font");
 		Loom::GameObject* object = scene.AddChild("Label");
 		Pump();
@@ -651,6 +658,8 @@ TEST_SUITE("Ui")
 		text->fontPath = WriteFile("ui short font.ttf", "ttf");
 
 		CHECK(text->Measure() == glm::vec2(0.0f));
+		CHECK(captured.Says("ui not a font.tga"));
+		CHECK(captured.Says("ui short font.ttf"));
 	};
 
 	// On the desktop only: these bake a TrueType file from the engine's

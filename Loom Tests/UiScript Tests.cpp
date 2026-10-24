@@ -1,5 +1,7 @@
 #include "doctest.h"
 
+#include "Test Support.h"
+
 #include "UiScript.h"
 
 #include "Input.h"
@@ -84,15 +86,6 @@ namespace
 		ImGui::End();
 	};
 
-	// What the script says on stderr when it fails.
-	struct CapturedErrors
-	{
-		CapturedErrors() : previous(std::cerr.rdbuf(text.rdbuf())) { };
-		~CapturedErrors() { std::cerr.rdbuf(previous); };
-
-		std::ostringstream text;
-		std::streambuf* previous;
-	};
 };
 
 
@@ -305,19 +298,19 @@ TEST_SUITE("UiScript")
 
 	TEST_CASE("a target that never shows up fails the script, saying which line")
 	{
-		CapturedErrors errors;
+		const LoomTests::Captured errors(std::cerr);
 		ScriptedUi ui("wait 1\nclick \"Panel\" \"Missing\"\nclick \"Panel\" \"Never reached\"\n");
 
 		ui.Run([&]() { Panel([]() { ImGui::Button("Present"); }); });
 
 		CHECK(ui.script->Finished());
 		CHECK(ui.script->Failed());
-		CHECK(errors.text.str().find("line 2") != std::string::npos);
+		CHECK(errors.Says("line 2"));
 	};
 
 	TEST_CASE("an unknown command or key fails the script")
 	{
-		CapturedErrors errors;
+		const LoomTests::Captured errors(std::cerr);
 
 		for (const char* text : { "fly away\n", "key ctrl+nothing\n", "click \"Panel\"\n", "wait\n", "\"\" \"Cube\"\n", "hold\n", "release\n", "scroll\n", "scroll up\n", "resize 800\n", "resize wide 600\n", "resize 0 600\n" })
 		{
@@ -326,6 +319,8 @@ TEST_SUITE("UiScript")
 
 			CHECK(ui.script->Failed());
 		};
+
+		CHECK(errors.Says("UI script line"));
 	};
 
 	TEST_CASE("hold keeps ctrl down through a click until release")
@@ -362,7 +357,7 @@ TEST_SUITE("UiScript")
 		// GLFW's numbering, which the game hears keys by.
 		constexpr int left_ctrl = 341;
 
-		CapturedErrors errors;
+		const LoomTests::Captured errors(std::cerr);
 
 		for (const char* text : { "hold ctrl\nwait 1\n", "hold ctrl\nwait 1\nquit\n", "hold ctrl\nwait 1\nclick \"Panel\" \"Missing\"\n" })
 		{
@@ -377,6 +372,8 @@ TEST_SUITE("UiScript")
 			CHECK_FALSE(ImGui::GetIO().KeyCtrl);
 			CHECK_FALSE(Loom::Input::GetKey(left_ctrl));
 		};
+
+		CHECK(errors.Says("UI script line"));
 	};
 
 	TEST_CASE("the game hears a chord's keys, a modifier as its left one")
@@ -437,13 +434,13 @@ TEST_SUITE("UiScript")
 
 	TEST_CASE("resize with no window to resize fails the script")
 	{
-		CapturedErrors errors;
+		const LoomTests::Captured errors(std::cerr);
 		ScriptedUi ui("resize 800 600\n");
 
 		ui.Run([]() { });
 
 		CHECK(ui.script->Failed());
-		CHECK(errors.text.str().find("no window") != std::string::npos);
+		CHECK(errors.Says("no window"));
 	};
 
 	TEST_CASE("blank lines and comments are skipped, and quit ends early")
@@ -470,7 +467,7 @@ TEST_SUITE("UiScript")
 
 	TEST_CASE("a wait or scroll of no finite number, or a wait of more frames than an int counts, fails the script")
 	{
-		CapturedErrors errors;
+		const LoomTests::Captured errors(std::cerr);
 
 		for (const char* text : { "wait nan\n", "wait inf\n", "wait 3e9\n", "scroll nan\n" })
 		{
@@ -479,11 +476,13 @@ TEST_SUITE("UiScript")
 
 			CHECK(ui.script->Failed());
 		};
+
+		CHECK(errors.Says("UI script line"));
 	};
 
 	TEST_CASE("Run after quit or a failure runs only the new commands")
 	{
-		CapturedErrors errors;
+		const LoomTests::Captured errors(std::cerr);
 
 		for (const char* first : { "quit\nclick \"Panel\" \"Left over\"\n", "click \"Panel\" \"Missing\"\nclick \"Panel\" \"Left over\"\n" })
 		{
@@ -513,6 +512,8 @@ TEST_SUITE("UiScript")
 			CHECK(left_over == 0);
 			CHECK(fresh == 1);
 		};
+
+		CHECK(errors.Says("UI script line"));
 	};
 
 	TEST_CASE("items can be listed from one window, and only while listening")
@@ -616,12 +617,12 @@ TEST_SUITE("UiScript")
 
 	TEST_CASE("a screenshot of a window not showing fails the script, saying which")
 	{
-		CapturedErrors errors;
+		const LoomTests::Captured errors(std::cerr);
 		ScriptedUi ui("wait 1\nscreenshot shot.bmp \"Missing\"\n");
 
 		ui.Run([]() { Panel([]() { }); });
 
 		CHECK(ui.script->Failed());
-		CHECK(errors.text.str().find("Missing") != std::string::npos);
+		CHECK(errors.Says("Missing"));
 	};
 };

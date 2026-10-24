@@ -118,6 +118,7 @@ TEST_SUITE("Engine")
 	// must not take the process with it, and must not strand the tasks behind it.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a throwing task does not stop the drain")
 	{
+		const LoomTests::Captured captured(std::cerr);
 		bool afterRan = false;
 
 		Loom::Engine::QueueTask([]() { throw std::runtime_error("task blew up"); });
@@ -126,6 +127,7 @@ TEST_SUITE("Engine")
 		Pump();
 
 		CHECK(afterRan);
+		CHECK(captured.Says("Queued task threw: task blew up"));
 	};
 
 	TEST_CASE("the frame loop defaults have the engine driving its own scenes")

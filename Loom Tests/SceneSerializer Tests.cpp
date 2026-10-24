@@ -14,7 +14,6 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -427,8 +426,10 @@ TEST_SUITE("SceneSerializer")
 			"\t\t\t9 = 9\n"
 			"\t\t\t1 = \"kept\"\n";
 
+		const LoomTests::Captured captured(std::cerr);
 		const Loaded loaded(text);
 
+		CHECK(captured.Says("Marker has no field 9"));
 		REQUIRE(loaded.scene != nullptr);
 
 		Marker* marker = loaded.scene->GetRoot().GetComponent<Marker>();
@@ -447,15 +448,11 @@ TEST_SUITE("SceneSerializer")
 			"\t\t0 = 0\n"
 			"\t\t1 = false\n";
 
-		std::ostringstream captured;
-		std::streambuf* previous = std::cerr.rdbuf(captured.rdbuf());
-
+		const LoomTests::Captured captured(std::cerr);
 		const Loaded loaded(text);
 
-		std::cerr.rdbuf(previous);
-
 		REQUIRE(loaded.scene != nullptr);
-		CHECK(captured.str().empty());
+		CHECK(captured.Text().empty());
 
 		const Loom::Transform& transform = loaded.scene->GetRoot().transform;
 
@@ -525,8 +522,11 @@ TEST_SUITE("SceneSerializer")
 			"\t\t\t18446744073709551616 = 9.5\n"
 			"\t\t\t1 = \"still read\"\n";
 
+		const LoomTests::Captured captured(std::cerr);
 		const Loaded loaded(text);
 
+		CHECK(captured.Says("no field called 'weight'"));
+		CHECK(captured.Says("no field called '18446744073709551616'"));
 		REQUIRE(loaded.scene != nullptr);
 
 		Marker* marker = loaded.scene->GetRoot().GetComponent<Marker>();

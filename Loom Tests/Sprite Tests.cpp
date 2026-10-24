@@ -141,8 +141,11 @@ TEST_SUITE("Sprite")
 		Loom::Sprite* sprite = scene.Attach<Loom::Sprite>();
 		Pump();
 
+		const LoomTests::Captured captured(std::cerr);
+
 		sprite->texturePath = std::string("no such sprite.png");
 
 		CHECK(sprite->GetTexture() == nullptr);
+		CHECK(captured.Says("no such sprite.png"));
 	};
 };

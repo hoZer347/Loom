@@ -345,13 +345,11 @@ TEST_SUITE("Shader variables")
 
 		file.Write("// ===COMMON===\nuniform float u_gone;\n// ===FRAGMENT===\nBROKEN\n");
 
-		std::ostringstream captured;
-		std::streambuf* previous = std::cerr.rdbuf(captured.rdbuf());
+		const LoomTests::Captured captured(std::cerr);
 		const bool reloaded = shader.Reload();
-		std::cerr.rdbuf(previous);
 
 		CHECK_FALSE(reloaded);
-		CHECK(captured.str().find("compile error") != std::string::npos);
+		CHECK(captured.Says("compile error"));
 		CHECK(shader.id == second);
 		CHECK(shader.variables.size() == 2);
 	};

@@ -419,7 +419,7 @@ TEST_SUITE("PhysicsPiles")
 			<< "\n  busiest physics step " << busiest << " ms"
 			<< "\n  last physics step " << last << " ms"
 			<< "\n  " << awake << " still awake, " << inside << " inside the pit";
-		MESSAGE(report.str());
+		INFO(report.str());
 
 		CHECK(inside == COUNT);
 		CHECK(awake <= MOST_AWAKE);

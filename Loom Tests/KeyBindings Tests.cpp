@@ -1,5 +1,7 @@
 #include "doctest.h"
 
+#include "Test Support.h"
+
 #include "EditorIcons.h"
 #include "InputActions.h"
 #include "KeyBindings.h"
@@ -228,12 +230,14 @@ TEST_SUITE("KeyBindings")
 
 	TEST_CASE("with no project open there is nothing to change")
 	{
+		const LoomTests::Captured captured(std::cerr);
 		Driven driven(std::string(drawn) + "click \"Key Bindings\" \"Add Action\"\n", slowdown);
 
 		CHECK(driven.Run(false) == 0);
 
 		// Add Action was not there to click.
 		CHECK(driven.script->Failed());
+		CHECK(captured.Says("\"Add Action\": its target was not drawn"));
 		CHECK(Loom::InputActions::All() == slowdown);
 	};
 

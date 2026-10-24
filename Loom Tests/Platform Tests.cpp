@@ -25,7 +25,7 @@ TEST_SUITE("Platform")
 {
 	TEST_CASE("the build identifies itself")
 	{
-		MESSAGE("Running the " << LOOM_TEST_BUILD << " build");
+		INFO("Running the " << LOOM_TEST_BUILD << " build");
 
 		CHECK(std::string(LOOM_TEST_BUILD) != "");
 	};
@@ -77,10 +77,10 @@ TEST_SUITE("Platform")
 	{
 #ifdef __EMSCRIPTEN__
 #ifdef __EMSCRIPTEN_PTHREADS__
-		MESSAGE("Web build has pthreads enabled");
+		INFO("Web build has pthreads enabled");
 		CHECK(std::thread::hardware_concurrency() >= 1);
 #else
-		MESSAGE("Web build is single threaded; engine locks are uncontended");
+		INFO("Web build is single threaded; engine locks are uncontended");
 		CHECK(true);
 #endif
 #else
@@ -94,9 +94,9 @@ TEST_SUITE("Platform")
 	TEST_CASE("the build knows how it loads shader sources")
 	{
 #ifdef __EMSCRIPTEN__
-		MESSAGE("Shaders are fetched over HTTP on this build");
+		INFO("Shaders are fetched over HTTP on this build");
 #else
-		MESSAGE("Shaders are read from the filesystem on this build");
+		INFO("Shaders are read from the filesystem on this build");
 #endif
 		CHECK(true);
 	};

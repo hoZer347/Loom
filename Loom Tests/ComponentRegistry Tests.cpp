@@ -191,8 +191,14 @@ TEST_SUITE("ComponentRegistry")
 
 		REQUIRE(before != nullptr);
 
+		const LoomTests::Captured captured(std::cerr);
+
 		Loom::ComponentRegistry::RegisterType<First::Clash>();
 		Loom::ComponentRegistry::RegisterType<Second::Clash>();
+
+		// Said once here, and once more when the two first registered.
+		CHECK(captured.Count(LoomTests::STARTUP_CLASH) == 1);
+		CHECK(LoomTests::StartupClashes() == 1);
 
 		Loom::ComponentBase* after = Loom::ComponentRegistry::Create("Clash", scene.GetRoot());
 
