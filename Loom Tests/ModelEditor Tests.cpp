@@ -50,12 +50,14 @@ namespace
 		std::vector<float> positions{ };
 		std::vector<float> uvs{ };
 		std::vector<float> normals{ };
-		shape.ToTriangles(positions, uvs, normals);
+		std::vector<float> colors{ };
+		shape.ToTriangles(positions, uvs, normals, colors);
 
 		Loom::Mesh* mesh = object.Attach<Loom::Mesh>(Loom::Mesh::Triangles);
 		mesh->m_vertices = positions;
 		mesh->m_textureCoordinates = uvs;
 		mesh->m_normals = normals;
+		mesh->m_colors = colors;
 	};
 
 	// A prefab drawn with a mesh of the shape given on its top object, and
@@ -570,6 +572,46 @@ TEST_CASE("The Model panel gives a prefab with no mesh one, drawn with a shader 
 
 	std::error_code code;
 	std::filesystem::remove_all(project, code);
+};
+TEST_CASE("The Model panel lists its project's shaders and saves the one chosen into the prefab, keeping its guids")
+{
+	const std::filesystem::path project = std::filesystem::temp_directory_path() / "model_shaders";
+	const std::filesystem::path prefab = project / "Assets" / "Prefabs" / "Crate.loomprefab";
+	const EditableMesh cube = EditableMesh::Cube(1.0f);
+
+	std::filesystem::create_directories(prefab.parent_path());
+	std::ofstream(project / "Model.loomproject") << "name=Model\n";
+	std::ofstream(project / "Assets" / "Lit.shader") << "";
+	std::ofstream(project / "Assets" / "Model.shader") << "";
+	std::ofstream(prefab, std::ios::binary) << ReadFile(WritePrefab("model_shaders_source", &cube, &cube));
+
+	{
+		Driven driven("model_shaders", nullptr, prefab.string());
+		CHECK(driven.editor.Shaders() == std::vector<std::string>{ "Assets/Lit.shader", "Assets/Model.shader" });
+
+		Loom::Prefabs::ObjectNode before;
+		REQUIRE(Loom::Prefabs::Parse(ReadFile(prefab.string()), before));
+
+		driven.editor.SetShader("Assets/Model.shader");
+		REQUIRE(driven.editor.Save());
+
+		const std::string saved = ReadFile(prefab.string());
+		const auto named = [&](size_t from) { return saved.find("\"Assets/Model.shader\"", from); };
+		REQUIRE(named(0) != std::string::npos);
+		CHECK(named(named(0) + 1) != std::string::npos);
+
+		Loom::Prefabs::ObjectNode after;
+		REQUIRE(Loom::Prefabs::Parse(saved, after));
+		CHECK(after.guid == before.guid);
+		REQUIRE(after.components.size() == before.components.size());
+
+		for (size_t i = 0; i < after.components.size(); i++)
+			CHECK(after.components[i].guid == before.components[i].guid);
+	};
+
+	std::error_code code;
+	std::filesystem::remove_all(project, code);
+	std::filesystem::remove(std::filesystem::temp_directory_path() / "model_shaders_source.loomprefab", code);
 };
 #endif
 

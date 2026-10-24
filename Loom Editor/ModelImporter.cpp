@@ -1,7 +1,5 @@
 #include "ModelImporter.h"
 
-#include "ProjectTemplate.h"
-
 #include "Animator.h"
 #include "GameObject.h"
 #include "Material.h"
@@ -50,42 +48,56 @@ namespace Loom
 		// that does not move, or a channel that never leaves its rest value.
 		constexpr float NEGLIGIBLE = 1e-5f;
 
-		constexpr const char* TEXTURED_SHADER = R"(// Written by the model importer: the model's texture, unlit, casting
-// shadows onto whatever is shaded.
+		// glTF's alpha cutoff when a material is masked and names none.
+		constexpr float GLTF_DEFAULT_CUTOFF = 0.5f;
+
+		constexpr const char* MODEL_SHADER = R"(// Written by the model importer: the texture times the vertex colours
+// times the material's colour, lit and shadowed, and cut out where its
+// alpha falls below the cutoff.
 
 // ===SETTINGS===
 
+shading = on
 shadows = on
-pixelated = {PIXELATED}
 
 // ===VERTEX===
 
 layout(location = 0) in vec3 aPos;
 layout(location = 1) in vec2 aUV;
+layout(location = 3) in vec4 aColor;
 
 uniform mat4 u_model;
 uniform mat4 u_viewProjection;
 
 out vec2 v_uv;
+out vec4 v_color;
 
 void main()
 {
 	v_uv = aUV;
+	v_color = aColor;
 	gl_Position = u_viewProjection * u_model * vec4(aPos, 1.0);
 }
 
 // ===FRAGMENT===
 
 uniform sampler2D u_texture; // material
+uniform float u_alphaCutoff; // material
 uniform vec3 u_color;
 
 in vec2 v_uv;
+in vec4 v_color;
 
 out vec4 FragColor;
 
 void main()
 {
-	FragColor = vec4(texture(u_texture, v_uv).rgb * u_color, 1.0);
+	vec4 colour = texture(u_texture, v_uv) * v_color * vec4(u_color, 1.0);
+
+	if (colour.a < u_alphaCutoff)
+		discard;
+
+	FragColor = vec4(colour.rgb, 1.0);
 }
 )";
 
@@ -110,6 +122,7 @@ void main()
 					continue;
 
 				ModelPart& part = parts.emplace_back();
+				part.material = mesh.mMaterialIndex;
 
 				part.name =
 					node.mName.length ? node.mName.C_Str() :
@@ -134,11 +147,25 @@ void main()
 
 						part.vertices.insert(part.vertices.end(), { vertex.x, vertex.y, vertex.z });
 
+						if (mesh.HasTextureCoords(0))
+						{
+							const aiVector3D& uv = mesh.mTextureCoords[0][face.mIndices[i]];
+
+							part.uvs.insert(part.uvs.end(), { uv.x, uv.y });
+						};
+
 						if (mesh.HasNormals())
 						{
 							const aiVector3D normal = (turn * mesh.mNormals[face.mIndices[i]]).Normalize();
 
 							part.normals.insert(part.normals.end(), { normal.x, normal.y, normal.z });
+						};
+
+						if (mesh.HasVertexColors(0))
+						{
+							const aiColor4D& color = mesh.mColors[0][face.mIndices[i]];
+
+							part.colors.insert(part.colors.end(), { color.r, color.g, color.b, color.a });
 						};
 					};
 				};
@@ -208,24 +235,16 @@ void main()
 			object.transform.scale = ToGlm(scaling);
 		};
 
-		// The shader for a texture, written into the project if it has none
-		// by that name.
-		std::string TexturedShader(bool pixelated)
+		// model_shader_path, written into the project if it has none by that name.
+		std::string ModelShader()
 		{
-			const std::string path = pixelated ? model_pixelated_shader_path : model_textured_shader_path;
+			if (!std::filesystem::exists(model_shader_path))
+			{
+				std::filesystem::create_directories(std::filesystem::path(model_shader_path).parent_path());
+				std::ofstream(model_shader_path, std::ios::binary) << MODEL_SHADER;
+			};
 
-			if (std::filesystem::exists(path))
-				return path;
-
-			constexpr std::string_view PLACEHOLDER = "{PIXELATED}";
-
-			std::string text = TEXTURED_SHADER;
-			text.replace(text.find(PLACEHOLDER), PLACEHOLDER.size(), pixelated ? "on" : "off");
-
-			std::filesystem::create_directories(std::filesystem::path(path).parent_path());
-			std::ofstream(path, std::ios::binary) << text;
-
-			return path;
+			return model_shader_path;
 		};
 
 		// The material's texture as a file in folder, copied out of the model or
@@ -277,6 +296,51 @@ void main()
 			};
 
 			return { };
+		};
+
+		// The file's material as Model.shader draws it: its base colour, its
+		// texture copied into folder, how that is sampled, and where it is cut out.
+		void Dress(
+			Material& drawn,
+			const aiScene& scene,
+			const aiMaterial& material,
+			const std::filesystem::path& model,
+			const std::filesystem::path& folder)
+		{
+			drawn.SetShaderPath(ModelShader());
+
+			aiColor4D base(1.0f, 1.0f, 1.0f, 1.0f);
+
+			// Drawn by its glow's texture alone, as an unlit export is, it takes
+			// the glow's colour, its base colour being black.
+			const bool glows = material.GetTextureCount(aiTextureType_BASE_COLOR) + material.GetTextureCount(aiTextureType_DIFFUSE) == 0
+				&& material.GetTextureCount(aiTextureType_EMISSIVE) > 0;
+
+			if (glows)
+				material.Get(AI_MATKEY_COLOR_EMISSIVE, base);
+			else if (material.Get(AI_MATKEY_BASE_COLOR, base) != AI_SUCCESS)
+				material.Get(AI_MATKEY_COLOR_DIFFUSE, base);
+
+			drawn.color = glm::vec3(base.r, base.g, base.b);
+
+			bool nearest = false;
+			const std::string texture = TextureOf(scene, material, model, folder, nearest);
+
+			if (!texture.empty())
+				drawn.variables->SetTexture(model_texture_variable, texture);
+
+			if (nearest)
+				drawn.sampling = Material::Nearest;
+
+			aiString mode;
+
+			if (material.Get(AI_MATKEY_GLTF_ALPHAMODE, mode) == AI_SUCCESS && std::string_view(mode.C_Str()) == "MASK")
+			{
+				float cutoff = GLTF_DEFAULT_CUTOFF;
+				material.Get(AI_MATKEY_GLTF_ALPHACUTOFF, cutoff);
+
+				drawn.variables->Set(model_alpha_cutoff_variable, UniformType::Float, { cutoff });
+			};
 		};
 
 		// What a clip or a shape key is called, by its place when the file gives it no name.
@@ -407,19 +471,7 @@ void main()
 		{
 			SkinnedPart part = Unindex(mesh);
 
-			const aiMaterial& material = *rigged.scene.mMaterials[mesh.mMaterialIndex];
-			bool nearest = false;
-			const std::string texture = TextureOf(rigged.scene, material, rigged.path, rigged.textures, nearest);
-
-			Material* drawn = object.Attach<Material>();
-
-			if (texture.empty())
-				drawn->SetShaderPath(ProjectTemplate::shader_path);
-			else
-			{
-				drawn->SetShaderPath(TexturedShader(nearest));
-				drawn->variables->SetTexture(model_texture_variable, texture);
-			};
+			Dress(*object.Attach<Material>(), rigged.scene, *rigged.scene.mMaterials[mesh.mMaterialIndex], rigged.path, rigged.textures);
 
 			Mesh* drawing = object.Attach<Mesh>(Mesh::Triangles);
 			drawing->m_vertices = std::move(part.vertices);
@@ -814,21 +866,23 @@ void main()
 		if (parts.empty())
 			return nullptr;
 
-		if (!std::filesystem::exists(ProjectTemplate::shader_path))
-			std::cerr << "Import: no " << ProjectTemplate::shader_path << " in the project, so the model will not draw" << std::endl;
+		const std::string name = std::filesystem::path(path).stem().string();
+		const std::filesystem::path textures = std::filesystem::path("Assets") / name;
 
-		GameObject* model = parent.AddChild(std::filesystem::path(path).stem().string());
+		GameObject* model = parent.AddChild(name);
 
 		for (ModelPart& part : parts)
 		{
 			// A single mesh goes on the model itself rather than under it.
 			GameObject* target = parts.size() == 1 ? model : model->AddChild(part.name);
 
-			target->Attach<Material>()->SetShaderPath(ProjectTemplate::shader_path);
+			Dress(*target->Attach<Material>(), *scene, *scene->mMaterials[part.material], path, textures);
 
 			Mesh* drawing = target->Attach<Mesh>(Mesh::Triangles);
 			drawing->m_vertices = std::move(part.vertices);
+			drawing->m_textureCoordinates = std::move(part.uvs);
 			drawing->m_normals = std::move(part.normals);
+			drawing->m_colors = std::move(part.colors);
 		};
 
 		return model;

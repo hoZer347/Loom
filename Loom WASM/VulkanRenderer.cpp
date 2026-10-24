@@ -57,18 +57,30 @@ namespace Loom
 		constexpr uint32_t POSITION_LOCATION = 0;
 		constexpr uint32_t UV_LOCATION = 1;
 		constexpr uint32_t NORMAL_LOCATION = 2;
+		constexpr uint32_t COLOR_LOCATION = 3;
 		constexpr uint32_t POSITION_COMPONENTS = 3;
 		constexpr uint32_t UV_COMPONENTS = 2;
 		constexpr uint32_t NORMAL_COMPONENTS = 3;
+		constexpr uint32_t COLOR_COMPONENTS = 4;
 		constexpr uint32_t UV_OFFSET = POSITION_COMPONENTS * sizeof(float);
 		constexpr uint32_t NORMAL_OFFSET = (POSITION_COMPONENTS + UV_COMPONENTS) * sizeof(float);
 		constexpr uint32_t NORMAL_SIZE = NORMAL_COMPONENTS * sizeof(float);
+		constexpr uint32_t COLOR_OFFSET = NORMAL_OFFSET + NORMAL_SIZE;
+		constexpr uint32_t COLOR_SIZE = COLOR_COMPONENTS * sizeof(float);
+		constexpr float NO_COLOR[COLOR_COMPONENTS] = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 		// The vertices' binding, the one aNormal reads its zeros from when
-		// they have no normals, and the one DrawInstances hands its instances in.
+		// they have no normals, the one DrawInstances hands its instances in,
+		// and the one aColor reads its white from when they have no colours.
 		constexpr uint32_t VERTEX_BINDING = 0;
 		constexpr uint32_t NO_NORMAL_BINDING = 1;
 		constexpr uint32_t INSTANCE_BINDING = 2;
+		constexpr uint32_t NO_COLOR_BINDING = 3;
+
+		bool HasNormals(VertexFormat format)
+		{
+			return format == VertexFormat::PositionUVNormal || format == VertexFormat::PositionUVNormalColor;
+		};
 		constexpr uint32_t INSTANCE_SIZE = Renderer::FloatsPerInstance * sizeof(float);
 		constexpr uint32_t INSTANCE_COLUMNS = 4;
 		constexpr uint32_t INSTANCE_COLUMN_SIZE = INSTANCE_COLUMNS * sizeof(float);
@@ -734,15 +746,23 @@ namespace Loom
 			const size_t drawn = primitive == GL_LINE_LOOP_ ? count + 1 : count;
 			const size_t stride = FloatsPerVertex(format) * sizeof(float);
 
-			if (program.hasPosition || program.hasUV || program.hasNormal || program.hasInstance)
+			if (program.hasPosition || program.hasUV || program.hasNormal || program.hasColor || program.hasInstance)
 				bind(command, drawn, stride);
 
-			if (program.hasNormal && format != VertexFormat::PositionUVNormal)
+			if (program.hasNormal && !HasNormals(format))
 			{
 				const Allocation noNormal = Allocate(NORMAL_SIZE, sizeof(float));
 				memset(noNormal.mapped, 0, NORMAL_SIZE);
 
 				vkCmdBindVertexBuffers(command, NO_NORMAL_BINDING, 1, &noNormal.buffer, &noNormal.offset);
+			};
+
+			if (program.hasColor && format != VertexFormat::PositionUVNormalColor)
+			{
+				const Allocation noColor = Allocate(COLOR_SIZE, sizeof(float));
+				memcpy(noColor.mapped, NO_COLOR, COLOR_SIZE);
+
+				vkCmdBindVertexBuffers(command, NO_COLOR_BINDING, 1, &noColor.buffer, &noColor.offset);
 			};
 
 			// Members, so a draw allocates nothing; reserved, so the writes'
@@ -1062,6 +1082,7 @@ namespace Loom
 			bool hasPosition = false;
 			bool hasUV = false;
 			bool hasNormal = false;
+			bool hasColor = false;
 			bool hasInstance = false;
 			bool pixelated = false;
 			uint32_t blockSize = 0;
@@ -1724,9 +1745,10 @@ namespace Loom
 
 			const uint32_t stride = (uint32_t)(FloatsPerVertex(format) * sizeof(float));
 
-			// Without texture coordinates, aUV reads the position's x and y, and
+			// Without texture coordinates, aUV reads the position's x and y,
 			// without normals, aNormal reads one normal of zeros for the whole
-			// draw, as they do under GL.
+			// draw, and without colours, aColor reads one white, as they do
+			// under GL.
 			const uint32_t uvOffset = format != VertexFormat::Position ? UV_OFFSET : 0;
 
 			std::vector<VkVertexInputBindingDescription> bindings = { { VERTEX_BINDING, stride, VK_VERTEX_INPUT_RATE_VERTEX } };
@@ -1738,13 +1760,21 @@ namespace Loom
 			if (program.hasUV)
 				attributes.push_back({ UV_LOCATION, VERTEX_BINDING, VK_FORMAT_R32G32_SFLOAT, uvOffset });
 
-			if (program.hasNormal && format == VertexFormat::PositionUVNormal)
+			if (program.hasNormal && HasNormals(format))
 				attributes.push_back({ NORMAL_LOCATION, VERTEX_BINDING, VK_FORMAT_R32G32B32_SFLOAT, NORMAL_OFFSET });
 			else if (program.hasNormal)
 			{
 				// No stride, so every vertex of every instance reads the same zeros.
 				bindings.push_back({ NO_NORMAL_BINDING, 0, VK_VERTEX_INPUT_RATE_VERTEX });
 				attributes.push_back({ NORMAL_LOCATION, NO_NORMAL_BINDING, VK_FORMAT_R32G32B32_SFLOAT, 0 });
+			};
+
+			if (program.hasColor && format == VertexFormat::PositionUVNormalColor)
+				attributes.push_back({ COLOR_LOCATION, VERTEX_BINDING, VK_FORMAT_R32G32B32A32_SFLOAT, COLOR_OFFSET });
+			else if (program.hasColor)
+			{
+				bindings.push_back({ NO_COLOR_BINDING, 0, VK_VERTEX_INPUT_RATE_VERTEX });
+				attributes.push_back({ COLOR_LOCATION, NO_COLOR_BINDING, VK_FORMAT_R32G32B32A32_SFLOAT, 0 });
 			};
 
 			if (program.hasInstance)
@@ -1903,6 +1933,7 @@ namespace Loom
 					program.hasPosition |= variable->location == POSITION_LOCATION;
 					program.hasUV |= variable->location == UV_LOCATION;
 					program.hasNormal |= variable->location == NORMAL_LOCATION;
+					program.hasColor |= variable->location == COLOR_LOCATION;
 					program.hasInstance |= variable->location >= InstanceModelLocation && variable->location <= InstanceColorLocation;
 				};
 			};

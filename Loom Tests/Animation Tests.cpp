@@ -588,6 +588,40 @@ TEST_SUITE("Textured meshes")
 		CHECK(renderer.lastVertices == *mesh->m_vertices);
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh with a colour for every vertex draws it last, keeping the places of what it lacks")
+	{
+		RecordingRenderer renderer;
+
+		Loom::Scene scene("coloured");
+		Loom::Mesh* mesh = scene.Attach<Loom::Mesh>(Loom::Mesh::Triangles);
+		Pump();
+
+		mesh->m_vertices = { 0.0f, 0.0f, 0.0f, 2.0f, 0.0f, 0.0f, 0.0f, 2.0f, 0.0f };
+		mesh->m_colors = { 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.5f };
+		mesh->Draw(1);
+
+		CHECK(renderer.lastFormat == Loom::VertexFormat::PositionUVNormalColor);
+		CHECK(renderer.lastVertices == std::vector<float>{
+			0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1,
+			2, 0, 0, 2, 0, 0, 0, 0, 0, 1, 0, 1,
+			0, 2, 0, 0, 2, 0, 0, 0, 0, 0, 1, 0.5f });
+
+		mesh->m_textureCoordinates = { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f };
+		mesh->m_normals = { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f };
+		mesh->Draw(1);
+
+		CHECK(renderer.lastFormat == Loom::VertexFormat::PositionUVNormalColor);
+		CHECK(renderer.lastVertices == std::vector<float>{
+			0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1,
+			2, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1,
+			0, 2, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0.5f });
+
+		mesh->m_colors = { 1.0f, 1.0f, 1.0f, 1.0f };
+		mesh->Draw(1);
+
+		CHECK(renderer.lastFormat == Loom::VertexFormat::PositionUVNormal);
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader with pixelated on has its program sample nearest")
 	{
 		RecordingRenderer renderer;

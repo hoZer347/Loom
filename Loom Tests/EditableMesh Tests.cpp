@@ -62,7 +62,7 @@ namespace
 
 TEST_CASE("EditableMesh welds the corners of triangles that meet")
 {
-	const EditableMesh mesh = EditableMesh::FromTriangles(SQUARE, { }, { });
+	const EditableMesh mesh = EditableMesh::FromTriangles(SQUARE, { }, { }, { });
 
 	CHECK(mesh.vertices.size() == 4);
 	CHECK(mesh.faces.size() == 2);
@@ -82,21 +82,46 @@ TEST_CASE("EditableMesh gives back the triangles it was made from")
 		normals.insert(normals.end(), { 0.0f, 0.0f, 1.0f });
 	};
 
-	const EditableMesh mesh = EditableMesh::FromTriangles(SQUARE, uvs, normals);
+	const EditableMesh mesh = EditableMesh::FromTriangles(SQUARE, uvs, normals, { });
 
 	std::vector<float> positions_out{ };
 	std::vector<float> uvs_out{ };
 	std::vector<float> normals_out{ };
-	mesh.ToTriangles(positions_out, uvs_out, normals_out);
+	std::vector<float> colors_out{ };
+	mesh.ToTriangles(positions_out, uvs_out, normals_out, colors_out);
 
 	CHECK(positions_out == SQUARE);
 	CHECK(uvs_out == uvs);
 	CHECK(normals_out == normals);
 };
 
+TEST_CASE("EditableMesh gives back the colours of the triangles it was made from, and none it was not given")
+{
+	const std::vector<float> colors = {
+		1.0f, 0.0f, 0.0f, 1.0f,  0.0f, 1.0f, 0.0f, 1.0f,  0.0f, 0.0f, 1.0f, 1.0f,
+		1.0f, 0.0f, 0.0f, 1.0f,  0.0f, 0.0f, 1.0f, 1.0f,  1.0f, 1.0f, 1.0f, 0.5f,
+	};
+
+	std::vector<float> positions{ };
+	std::vector<float> uvs{ };
+	std::vector<float> normals{ };
+	std::vector<float> colors_out{ };
+
+	const EditableMesh coloured = EditableMesh::FromTriangles(SQUARE, { }, { }, colors);
+	CHECK(coloured.hasColors);
+	coloured.ToTriangles(positions, uvs, normals, colors_out);
+	CHECK(positions == SQUARE);
+	CHECK(colors_out == colors);
+
+	const EditableMesh short_of = EditableMesh::FromTriangles(SQUARE, { }, { }, { 1.0f, 0.0f, 0.0f, 1.0f });
+	CHECK_FALSE(short_of.hasColors);
+	short_of.ToTriangles(positions, uvs, normals, colors_out);
+	CHECK(colors_out.empty());
+};
+
 TEST_CASE("EditableMesh ignores UVs and normals that do not cover every vertex")
 {
-	const EditableMesh mesh = EditableMesh::FromTriangles(SQUARE, { 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f });
+	const EditableMesh mesh = EditableMesh::FromTriangles(SQUARE, { 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { });
 
 	CHECK_FALSE(mesh.hasUVs);
 	CHECK_FALSE(mesh.hasNormals);
@@ -144,7 +169,8 @@ TEST_CASE("EditableMesh moves a vertex in every face it is part of and flattens 
 	std::vector<float> positions{ };
 	std::vector<float> uvs{ };
 	std::vector<float> normals{ };
-	mesh.ToTriangles(positions, uvs, normals);
+	std::vector<float> colors{ };
+	mesh.ToTriangles(positions, uvs, normals, colors);
 
 	int moved = 0;
 
@@ -186,7 +212,7 @@ TEST_CASE("EditableMesh extrudes a face of a cube into a closed taller shape")
 
 TEST_CASE("EditableMesh extrudes two neighbouring faces as one region")
 {
-	EditableMesh mesh = EditableMesh::FromTriangles(SQUARE, { }, { });
+	EditableMesh mesh = EditableMesh::FromTriangles(SQUARE, { }, { }, { });
 
 	mesh.Extrude({ 0, 1 }, 1.0f);
 
@@ -195,6 +221,26 @@ TEST_CASE("EditableMesh extrudes two neighbouring faces as one region")
 	CHECK(mesh.faces.size() == 6);
 	CHECK(mesh.vertices.size() == 8);
 	CHECK(Near(mesh.FaceCentre(0), glm::vec3(2.0f / 3.0f, 1.0f / 3.0f, 1.0f)));
+};
+
+TEST_CASE("EditableMesh's extruded walls take the colours of the edges they rise from")
+{
+	constexpr size_t CORNERS = 6;
+	const glm::vec4 red(1.0f, 0.0f, 0.0f, 1.0f);
+
+	std::vector<float> colors{ };
+
+	for (size_t i = 0; i < CORNERS; i++)
+		colors.insert(colors.end(), { red.r, red.g, red.b, red.a });
+
+	EditableMesh mesh = EditableMesh::FromTriangles(SQUARE, { }, { }, colors);
+	mesh.Extrude({ 0, 1 }, 1.0f);
+
+	REQUIRE(mesh.faces.size() == 6);
+
+	for (const EditableMesh::Face& face : mesh.faces)
+		for (const EditableMesh::Corner& corner : face.corners)
+			CHECK(corner.color == red);
 };
 
 TEST_CASE("EditableMesh deletes faces and the vertices only they used")
@@ -216,7 +262,7 @@ TEST_CASE("EditableMesh deletes faces and the vertices only they used")
 
 TEST_CASE("EditableMesh deletes the faces on an edge")
 {
-	EditableMesh mesh = EditableMesh::FromTriangles(SQUARE, { }, { });
+	EditableMesh mesh = EditableMesh::FromTriangles(SQUARE, { }, { }, { });
 
 	// The diagonal the two triangles share.
 	mesh.DeleteEdges({ EditableMesh::EdgeOf(0, 2) });
@@ -237,6 +283,26 @@ TEST_CASE("EditableMesh duplicates and appends onto vertices of their own")
 	const std::set<uint32_t> added = mesh.Append(EditableMesh::Plane(1.0f));
 	CHECK(added == std::set<uint32_t>{ 8 });
 	CHECK(mesh.vertices.size() == 20);
+};
+
+TEST_CASE("EditableMesh keeps colours once either side of an append has them")
+{
+	const std::vector<float> grey(SQUARE.size() / 3 * 4, 0.5f);
+	const EditableMesh coloured = EditableMesh::FromTriangles(SQUARE, { }, { }, grey);
+
+	EditableMesh empty{ };
+	empty.Append(coloured);
+	CHECK(empty.hasColors);
+
+	EditableMesh cube = EditableMesh::Cube(2.0f);
+	cube.Append(coloured);
+	CHECK(cube.hasColors);
+	CHECK(cube.faces.front().corners.front().color == glm::vec4(1.0f));
+	CHECK(cube.faces.back().corners.front().color == glm::vec4(0.5f));
+
+	EditableMesh square = coloured;
+	square.Append(EditableMesh::Plane(1.0f));
+	CHECK(square.hasColors);
 };
 
 TEST_CASE("EditableMesh flips faces round")
@@ -263,7 +329,7 @@ TEST_CASE("EditableMesh finds the nearest face a ray goes into")
 
 TEST_CASE("EditableMesh joins triangles that lie flat together into quads")
 {
-	EditableMesh mesh = EditableMesh::FromTriangles(SQUARE, { }, { });
+	EditableMesh mesh = EditableMesh::FromTriangles(SQUARE, { }, { }, { });
 	mesh.JoinTriangles();
 
 	REQUIRE(mesh.faces.size() == 1);
@@ -273,9 +339,10 @@ TEST_CASE("EditableMesh joins triangles that lie flat together into quads")
 	std::vector<float> cube{ };
 	std::vector<float> uvs{ };
 	std::vector<float> normals{ };
-	EditableMesh::Cube(2.0f).ToTriangles(cube, uvs, normals);
+	std::vector<float> colors{ };
+	EditableMesh::Cube(2.0f).ToTriangles(cube, uvs, normals, colors);
 
-	EditableMesh welded = EditableMesh::FromTriangles(cube, uvs, normals);
+	EditableMesh welded = EditableMesh::FromTriangles(cube, uvs, normals, { });
 	welded.JoinTriangles();
 	CHECK(welded.faces.size() == 6);
 	CHECK(Closed(welded));
@@ -287,14 +354,14 @@ TEST_CASE("EditableMesh keeps triangles apart where a seam or a fold runs betwee
 	// The second triangle's UVs start again at the shared edge.
 	std::vector<float> uvs{ 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.5f, 0.5f, 1.0f, 1.0f, 0.0f, 1.0f };
 
-	EditableMesh seam = EditableMesh::FromTriangles(SQUARE, uvs, { });
+	EditableMesh seam = EditableMesh::FromTriangles(SQUARE, uvs, { }, { });
 	seam.JoinTriangles();
 	CHECK(seam.faces.size() == 2);
 
 	std::vector<float> folded = SQUARE;
 	folded.back() = 1.0f;
 
-	EditableMesh fold = EditableMesh::FromTriangles(folded, { }, { });
+	EditableMesh fold = EditableMesh::FromTriangles(folded, { }, { }, { });
 	fold.JoinTriangles();
 	CHECK(fold.faces.size() == 2);
 };

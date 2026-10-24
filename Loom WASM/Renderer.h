@@ -22,9 +22,11 @@ namespace Loom
 
 	// What each vertex handed to Renderer::Draw holds, its floats one after
 	// another: a position at location 0 (aPos), with PositionUV a texture
-	// coordinate after it at location 1 (aUV), and with PositionUVNormal a
-	// normal after that at location 2 (aNormal).
-	enum class VertexFormat { Position, PositionUV, PositionUVNormal };
+	// coordinate after it at location 1 (aUV), with PositionUVNormal a
+	// normal after that at location 2 (aNormal), and with
+	// PositionUVNormalColor a colour after that at location 3 (aColor, a
+	// vec4). A shader reading aColor from vertices without one reads white.
+	enum class VertexFormat { Position, PositionUV, PositionUVNormal, PositionUVNormalColor };
 
 	LOOM_API size_t FloatsPerVertex(VertexFormat format);
 

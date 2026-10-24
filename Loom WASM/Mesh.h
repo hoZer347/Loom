@@ -51,7 +51,7 @@ namespace Loom
 		// material's (the shadow pass) draws the same geometry. A shader that
 		// declares no u_model draws the vertices untransformed. A Skin on the
 		// GameObject bends them first, and m_textureCoordinates go with them as
-		// aUV and m_normals as aNormal. The renderer keeps them between draws,
+		// aUV, m_normals as aNormal and m_colors as aColor. The renderer keeps them between draws,
 		// and they are handed over again only once one of those fields has
 		// changed, or the Skin has bent them again.
 		void Draw(uint32_t program);
@@ -93,12 +93,17 @@ namespace Loom
 		// m_textureCoordinates for the same reason.
 		Serial<std::vector<float>> m_normals;
 
+		// Four floats a vertex, drawn as aColor, when there are four for
+		// every vertex; aColor reads white without them. After m_normals for
+		// the same reason.
+		Serial<std::vector<float>> m_colors;
+
 		// Leaves a generated mesh's geometry out of what is written.
 		bool IsSaved(const SerializedField& field) const override;
 
 		std::vector<uint32_t> m_indices;
 
-		// On, the vertices, texture coordinates and normals are made by a
+		// On, the vertices, texture coordinates, normals and colours are made by a
 		// script as it runs, such as ground grown from a seed: never written
 		// to a scene or prefab, so neither saved nor compared with a prefab's.
 		// Not saved itself, since the script sets it again as it makes them
@@ -130,6 +135,7 @@ namespace Loom
 			unsigned long long vertices = 0;
 			unsigned long long textureCoordinates = 0;
 			unsigned long long normals = 0;
+			unsigned long long colors = 0;
 			unsigned long long drawType = 0;
 			bool deformed = false;
 			unsigned long long deformedFrame = 0;

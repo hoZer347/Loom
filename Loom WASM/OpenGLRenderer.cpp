@@ -120,6 +120,9 @@ namespace Loom
 			if (m_noNormal)
 				glDeleteBuffers(1, &m_noNormal);
 
+			if (m_noColor)
+				glDeleteBuffers(1, &m_noColor);
+
 			for (const auto& [buffer, kept] : m_kept)
 				glDeleteBuffers(1, &buffer);
 
@@ -210,6 +213,11 @@ namespace Loom
 			glGenBuffers(1, &m_noNormal);
 			glBindBuffer(GL_ARRAY_BUFFER, m_noNormal);
 			glBufferData(GL_ARRAY_BUFFER, sizeof(NO_NORMAL), NO_NORMAL, GL_STATIC_DRAW);
+
+			constexpr float NO_COLOR[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+			glGenBuffers(1, &m_noColor);
+			glBindBuffer(GL_ARRAY_BUFFER, m_noColor);
+			glBufferData(GL_ARRAY_BUFFER, sizeof(NO_COLOR), NO_COLOR, GL_STATIC_DRAW);
 			glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 			glGenSamplers(1, &m_nearest);
@@ -566,9 +574,11 @@ namespace Loom
 			constexpr GLint POSITION_COMPONENTS = 3;
 			constexpr GLint UV_COMPONENTS = 2;
 			constexpr GLint NORMAL_COMPONENTS = 3;
+			constexpr GLint COLOR_COMPONENTS = 4;
 			constexpr GLuint POSITION_LOCATION = 0;
 			constexpr GLuint UV_LOCATION = 1;
 			constexpr GLuint NORMAL_LOCATION = 2;
+			constexpr GLuint COLOR_LOCATION = 3;
 
 			// A divisor no instance count reaches reads the first value for
 			// every vertex of every instance.
@@ -584,17 +594,36 @@ namespace Loom
 
 			// All left enabled after the draw: toggling them per draw has the
 			// driver recompile the vertex shader for each state. Without texture
-			// coordinates, aUV reads the position's x and y, and without normals,
-			// aNormal reads m_noNormal's zeros for every vertex.
+			// coordinates, aUV reads the position's x and y, without normals,
+			// aNormal reads m_noNormal's zeros for every vertex, and without
+			// colours, aColor reads m_noColor's white.
 			const GLsizeiptr uvOffset = format != VertexFormat::Position ? POSITION_COMPONENTS * sizeof(float) : 0;
 			const GLsizeiptr normalOffset = (POSITION_COMPONENTS + UV_COMPONENTS) * sizeof(float);
+			const GLsizeiptr colorOffset = normalOffset + NORMAL_COMPONENTS * sizeof(float);
+			const bool hasNormals = format == VertexFormat::PositionUVNormal || format == VertexFormat::PositionUVNormalColor;
+			const bool hasColors = format == VertexFormat::PositionUVNormalColor;
 
 			glVertexAttribPointer(POSITION_LOCATION, POSITION_COMPONENTS, GL_FLOAT, GL_FALSE, stride, (void*)0);
 			glEnableVertexAttribArray(POSITION_LOCATION);
 			glVertexAttribPointer(UV_LOCATION, UV_COMPONENTS, GL_FLOAT, GL_FALSE, stride, (void*)uvOffset);
 			glEnableVertexAttribArray(UV_LOCATION);
 
-			if (format == VertexFormat::PositionUVNormal)
+			if (hasColors)
+			{
+				glVertexAttribPointer(COLOR_LOCATION, COLOR_COMPONENTS, GL_FLOAT, GL_FALSE, stride, (void*)colorOffset);
+				glVertexAttribDivisor(COLOR_LOCATION, PER_VERTEX);
+			}
+			else
+			{
+				glBindBuffer(GL_ARRAY_BUFFER, m_noColor);
+				glVertexAttribPointer(COLOR_LOCATION, COLOR_COMPONENTS, GL_FLOAT, GL_FALSE, 0, (void*)0);
+				glVertexAttribDivisor(COLOR_LOCATION, PER_DRAW);
+				glBindBuffer(GL_ARRAY_BUFFER, buffer);
+			};
+
+			glEnableVertexAttribArray(COLOR_LOCATION);
+
+			if (hasNormals)
 			{
 				glVertexAttribPointer(NORMAL_LOCATION, NORMAL_COMPONENTS, GL_FLOAT, GL_FALSE, stride, (void*)normalOffset);
 				glVertexAttribDivisor(NORMAL_LOCATION, PER_VERTEX);
@@ -923,6 +952,9 @@ namespace Loom
 
 		// A normal of zeros, what aNormal reads from vertices without normals.
 		GLuint m_noNormal = 0;
+
+		// White, what aColor reads from vertices without colours.
+		GLuint m_noColor = 0;
 
 		// What a pixelated program samples its colour textures through.
 		GLuint m_nearest = 0;

@@ -8,6 +8,7 @@ namespace Loom
 		constexpr size_t POSITION = 3;
 		constexpr size_t UV = 2;
 		constexpr size_t NORMAL = 3;
+		constexpr size_t COLOR = 4;
 
 		switch (format)
 		{
@@ -15,6 +16,8 @@ namespace Loom
 			return POSITION + UV;
 		case VertexFormat::PositionUVNormal:
 			return POSITION + UV + NORMAL;
+		case VertexFormat::PositionUVNormalColor:
+			return POSITION + UV + NORMAL + COLOR;
 		default:
 			return POSITION;
 		};

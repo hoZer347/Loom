@@ -272,12 +272,13 @@ void main()
 			return ProjectAssets::ReadText(path);
 		};
 
-		// Writes the meshes' geometry into the file's own tree rather than this
-		// copy over it, so the file keeps its guids, and any component this
-		// build could not read stays as it was. Components pair up as the nth
-		// of their type on each side, and one the file's object lacks, such as
-		// a mesh added here, is added.
-		void MergeGeometry(const Prefabs::ObjectNode& shown, Prefabs::ObjectNode& file, const std::map<std::string, std::vector<std::string>>& geometry)
+		// Writes the fields edited here, the meshes' geometry and the materials'
+		// shaders, into the file's own tree rather than this copy over it, so
+		// the file keeps its guids, and any component this build could not read
+		// stays as it was. Components pair up as the nth of their type on each
+		// side, and one the file's object lacks, such as a mesh added here, is
+		// added.
+		void MergeFields(const Prefabs::ObjectNode& shown, Prefabs::ObjectNode& file, const std::map<std::string, std::vector<std::string>>& edited)
 		{
 			std::map<std::string, size_t> seen{ };
 
@@ -294,9 +295,9 @@ void main()
 					continue;
 				};
 
-				const auto keys = geometry.find(component.guid);
+				const auto keys = edited.find(component.guid);
 
-				if (keys == geometry.end())
+				if (keys == edited.end())
 					continue;
 
 				for (const std::string& key : keys->second)
@@ -316,7 +317,7 @@ void main()
 
 			// Objects are always read, so children pair up by place.
 			for (size_t i = 0; i < shown.children.size() && i < file.children.size(); i++)
-				MergeGeometry(shown.children[i], file.children[i], geometry);
+				MergeFields(shown.children[i], file.children[i], edited);
 		};
 
 		// A Skin keeps a weight for each of the mesh's corners as it is, which
@@ -348,9 +349,17 @@ void main()
 			return "";
 		};
 
-		// Failing that, the shader a new project draws with, or else the first
-		// the project of the prefab has, relative to the project.
-		std::string ProjectShader(const std::string& prefab)
+		void MaterialsOf(GameObject& object, std::vector<Material*>& found)
+		{
+			if (Material* material = object.GetComponent<Material>())
+				found.push_back(material);
+
+			for (GameObject* child : object.GetChildren())
+				MaterialsOf(*child, found);
+		};
+
+		// The folder holding the project the prefab is in, empty for none.
+		std::filesystem::path ProjectFolder(const std::string& prefab)
 		{
 			std::error_code code;
 
@@ -361,25 +370,43 @@ void main()
 					std::filesystem::directory_iterator(),
 					[](const std::filesystem::directory_entry& entry) { return entry.path().extension() == ProjectTemplate::extension; });
 
-				if (!project)
-					continue;
-
-				if (std::filesystem::exists(folder / ProjectTemplate::shader_path, code))
-					break;
-
-				std::vector<std::filesystem::path> shaders{ };
-
-				for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator(folder, code))
-					if (entry.path().extension() == ProjectAssets::shaderExtension)
-						shaders.push_back(entry.path());
-
-				if (shaders.empty())
-					break;
-
-				return std::min_element(shaders.begin(), shaders.end())->lexically_relative(folder).generic_string();
+				if (project)
+					return folder;
 			};
 
-			return ProjectTemplate::shader_path;
+			return { };
+		};
+
+		// Every shader the project of the prefab has, relative to the project, in order.
+		std::vector<std::string> ProjectShaders(const std::string& prefab)
+		{
+			const std::filesystem::path folder = ProjectFolder(prefab);
+			std::vector<std::string> shaders{ };
+			std::error_code code;
+
+			if (!folder.empty())
+				for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator(folder, code))
+					if (entry.path().extension() == ProjectAssets::shaderExtension)
+						shaders.push_back(entry.path().lexically_relative(folder).generic_string());
+
+			std::sort(shaders.begin(), shaders.end());
+
+			return shaders;
+		};
+
+		// Failing that, the shader a new project draws with, or else the first
+		// the project of the prefab has, relative to the project.
+		std::string ProjectShader(const std::string& prefab)
+		{
+			const std::filesystem::path folder = ProjectFolder(prefab);
+			std::error_code code;
+
+			if (folder.empty() || std::filesystem::exists(folder / ProjectTemplate::shader_path, code))
+				return ProjectTemplate::shader_path;
+
+			const std::vector<std::string> shaders = ProjectShaders(prefab);
+
+			return shaders.empty() ? ProjectTemplate::shader_path : shaders.front();
 		};
 	};
 
@@ -491,7 +518,7 @@ void main()
 		for (GameObject* object : found)
 		{
 			Mesh* mesh = object->GetComponent<Mesh>();
-			EditableMesh editing = EditableMesh::FromTriangles(*std::as_const(mesh->m_vertices), *std::as_const(mesh->m_textureCoordinates), *std::as_const(mesh->m_normals));
+			EditableMesh editing = EditableMesh::FromTriangles(*std::as_const(mesh->m_vertices), *std::as_const(mesh->m_textureCoordinates), *std::as_const(mesh->m_normals), *std::as_const(mesh->m_colors));
 			editing.JoinTriangles();
 
 			document.parts.push_back(Part{ object, mesh, std::move(editing) });
@@ -568,12 +595,13 @@ void main()
 		};
 
 		// Each mesh's geometry, under the keys of its fields that are not
-		// references, which point at this copy's objects rather than the file's.
-		std::map<std::string, std::vector<std::string>> geometry{ };
+		// references, which point at this copy's objects rather than the file's,
+		// and each material's shader.
+		std::map<std::string, std::vector<std::string>> edited{ };
 
 		for (const Part& part : document.parts)
 		{
-			std::vector<std::string>& keys = geometry[part.mesh->GetGuid().ToString()];
+			std::vector<std::string>& keys = edited[part.mesh->GetGuid().ToString()];
 			const std::vector<SerializedField>& fields = part.mesh->GetFields();
 
 			for (size_t i = 0; i < fields.size(); i++)
@@ -581,7 +609,19 @@ void main()
 					keys.push_back(std::to_string(i));
 		};
 
-		MergeGeometry(shown, file, geometry);
+		std::vector<Material*> materials{ };
+		MaterialsOf(*document.root, materials);
+
+		for (Material* material : materials)
+		{
+			const std::vector<SerializedField>& fields = material->GetFields();
+
+			for (size_t i = 0; i < fields.size(); i++)
+				if (fields[i].data == &material->GetShaderPath())
+					edited[material->GetGuid().ToString()].push_back(std::to_string(i));
+		};
+
+		MergeFields(shown, file, edited);
 
 		const std::string text = Prefabs::Write(file);
 
@@ -954,6 +994,33 @@ void main()
 
 			ImGui::SeparatorText("Mesh");
 			ImGui::Text("%zu vertices, %zu faces", mesh.vertices.size(), mesh.faces.size());
+		};
+
+		std::vector<Material*> materials{ };
+
+		if (document.root)
+			MaterialsOf(*document.root, materials);
+
+		if (!materials.empty())
+		{
+			ImGui::SeparatorText("Shader");
+
+			const std::string& current = materials.front()->GetShaderPath();
+			const bool mixed = std::any_of(materials.begin(), materials.end(), [&](const Material* material) { return material->GetShaderPath() != current; });
+
+			ImGui::SetNextItemWidth(-FLT_MIN);
+
+			if (ImGui::BeginCombo("##shader", mixed ? "Mixed" : current.c_str()))
+			{
+				if (ImGui::IsWindowAppearing())
+					m_shaders = ProjectShaders(document.path);
+
+				for (const std::string& shader : m_shaders)
+					if (ImGui::Selectable(shader.c_str(), !mixed && shader == current))
+						SetShader(document, shader);
+
+				ImGui::EndCombo();
+			};
 		};
 
 		if (document.skipped > 0)
@@ -2005,11 +2072,13 @@ void main()
 		std::vector<float> positions{ };
 		std::vector<float> uvs{ };
 		std::vector<float> normals{ };
-		part.editing.ToTriangles(positions, uvs, normals);
+		std::vector<float> colors{ };
+		part.editing.ToTriangles(positions, uvs, normals, colors);
 
 		part.mesh->m_vertices = std::move(positions);
 		part.mesh->m_textureCoordinates = std::move(uvs);
 		part.mesh->m_normals = std::move(normals);
+		part.mesh->m_colors = std::move(colors);
 
 		document.unsaved = true;
 
@@ -2283,6 +2352,32 @@ void main()
 		document->parts.push_back(Part{ document->root, mesh, EditableMesh{ } });
 
 		Add(Shape::Cube);
+	};
+
+	std::vector<std::string> ModelEditor::Shaders() const
+	{
+		const Document* document = Front();
+
+		return document ? ProjectShaders(document->path) : std::vector<std::string>{ };
+	};
+
+	void ModelEditor::SetShader(const std::string& path)
+	{
+		if (Document* document = Front(); document && document->root)
+			SetShader(*document, path);
+	};
+
+	void ModelEditor::SetShader(Document& document, const std::string& path)
+	{
+		std::vector<Material*> materials{ };
+		MaterialsOf(*document.root, materials);
+
+		for (Material* material : materials)
+			if (material->GetShaderPath() != path)
+			{
+				material->ChangeShader(path);
+				document.unsaved = true;
+			};
 	};
 
 	bool ModelEditor::Save()

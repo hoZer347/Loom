@@ -120,6 +120,12 @@ namespace Loom
 
 		// Gives a prefab with no mesh one on its top object, starting as a cube.
 		void AddMesh();
+
+		// The shaders the front tab's project has, relative to it, and which
+		// one every material of its prefab draws with.
+		std::vector<std::string> Shaders() const;
+		void SetShader(const std::string& path);
+
 		void Undo();
 		void Redo();
 		bool Save();
@@ -303,6 +309,7 @@ namespace Loom
 		static void Remember(Document& document);
 		static void Step(Document& document, bool undo);
 		static void Changed(Document& document);
+		static void SetShader(Document& document, const std::string& path);
 		static Selection Converted(const EditableMesh& mesh, const Selection& selection, Pick from, Pick to);
 
 		Document* Front() const;
@@ -318,6 +325,9 @@ namespace Loom
 		Document* m_closing = nullptr;
 
 		std::vector<std::string> m_saved;
+
+		// What the shader menu lists, found again each time it opens.
+		std::vector<std::string> m_shaders;
 
 		Tool m_tool = Tool::Move;
 		bool m_seeThrough = false;

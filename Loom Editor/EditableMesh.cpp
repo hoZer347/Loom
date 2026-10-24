@@ -14,6 +14,7 @@ namespace Loom
 	{
 		constexpr size_t floats_per_position = 3;
 		constexpr size_t floats_per_uv = 2;
+		constexpr size_t floats_per_color = 4;
 		constexpr size_t corners_per_triangle = 3;
 
 		// Below this a ray runs along a triangle's plane, or a hit is the
@@ -51,13 +52,14 @@ namespace Loom
 		return a < b ? Edge(a, b) : Edge(b, a);
 	};
 
-	EditableMesh EditableMesh::FromTriangles(const std::vector<float>& positions, const std::vector<float>& uvs, const std::vector<float>& normals)
+	EditableMesh EditableMesh::FromTriangles(const std::vector<float>& positions, const std::vector<float>& uvs, const std::vector<float>& normals, const std::vector<float>& colors)
 	{
 		const size_t count = positions.size() / floats_per_position / corners_per_triangle * corners_per_triangle;
 
 		EditableMesh mesh;
 		mesh.hasUVs = count > 0 && uvs.size() == count * floats_per_uv;
 		mesh.hasNormals = count > 0 && normals.size() == count * floats_per_position;
+		mesh.hasColors = count > 0 && colors.size() == count * floats_per_color;
 
 		std::map<std::array<float, floats_per_position>, uint32_t> welded{ };
 
@@ -83,17 +85,21 @@ namespace Loom
 			if (mesh.hasNormals)
 				corner.normal = glm::vec3(normals[i * floats_per_position], normals[i * floats_per_position + 1], normals[i * floats_per_position + 2]);
 
+			if (mesh.hasColors)
+				corner.color = glm::vec4(colors[i * floats_per_color], colors[i * floats_per_color + 1], colors[i * floats_per_color + 2], colors[i * floats_per_color + 3]);
+
 			mesh.faces.back().corners.push_back(corner);
 		};
 
 		return mesh;
 	};
 
-	void EditableMesh::ToTriangles(std::vector<float>& positions, std::vector<float>& uvs, std::vector<float>& normals) const
+	void EditableMesh::ToTriangles(std::vector<float>& positions, std::vector<float>& uvs, std::vector<float>& normals, std::vector<float>& colors) const
 	{
 		positions.clear();
 		uvs.clear();
 		normals.clear();
+		colors.clear();
 
 		const auto add = [&](const Corner& corner)
 		{
@@ -105,6 +111,9 @@ namespace Loom
 
 			if (hasNormals)
 				normals.insert(normals.end(), { corner.normal.x, corner.normal.y, corner.normal.z });
+
+			if (hasColors)
+				colors.insert(colors.end(), { corner.color.r, corner.color.g, corner.color.b, corner.color.a });
 		};
 
 		for (const Face& face : faces)
@@ -123,6 +132,11 @@ namespace Loom
 		for (size_t i = 0; i < corners.size(); i++)
 			face.corners.push_back(Corner{ corners[i], i < uvs.size() ? uvs[i] : glm::vec2(0.0f) });
 
+		return AddFace(std::move(face));
+	};
+
+	uint32_t EditableMesh::AddFace(Face face)
+	{
 		faces.push_back(std::move(face));
 
 		const uint32_t added = (uint32_t)faces.size() - 1;
@@ -417,7 +431,7 @@ namespace Loom
 			vertices.push_back(vertices[vertex] + offset);
 		};
 
-		std::vector<std::pair<std::vector<uint32_t>, std::vector<glm::vec2>>> walls{ };
+		std::vector<Face> walls{ };
 
 		for (const uint32_t face : selected)
 		{
@@ -429,15 +443,19 @@ namespace Loom
 				const Corner& to = corners[(i + 1) % corners.size()];
 
 				if (uses[EdgeOf(from.vertex, to.vertex)] == 1)
-					walls.push_back({ { from.vertex, to.vertex, lifted[to.vertex], lifted[from.vertex] }, { from.uv, to.uv, to.uv, from.uv } });
+					walls.push_back({ {
+						{ from.vertex, from.uv, { }, from.color },
+						{ to.vertex, to.uv, { }, to.color },
+						{ lifted[to.vertex], to.uv, { }, to.color },
+						{ lifted[from.vertex], from.uv, { }, from.color } } });
 			};
 
 			for (Corner& corner : corners)
 				corner.vertex = lifted[corner.vertex];
 		};
 
-		for (const auto& [corners, uvs] : walls)
-			AddFace(corners, uvs);
+		for (Face& wall : walls)
+			AddFace(std::move(wall));
 
 		RemoveUnused();
 
@@ -473,11 +491,15 @@ namespace Loom
 	std::set<uint32_t> EditableMesh::Append(const EditableMesh& other)
 	{
 		// An empty mesh says nothing about what a mesh has, so takes the other's.
+		// Colours are white where there were none, so either having them keeps them.
 		if (faces.empty())
 		{
 			hasUVs = other.hasUVs;
 			hasNormals = other.hasNormals;
-		};
+			hasColors = other.hasColors;
+		}
+		else
+			hasColors = hasColors || other.hasColors;
 
 		const uint32_t first_vertex = (uint32_t)vertices.size();
 		vertices.insert(vertices.end(), other.vertices.begin(), other.vertices.end());

@@ -18,7 +18,7 @@ namespace Loom
 	*   part of
 	* - A face has any number of corners and goes back to triangles as a fan,
 	*   so a quad stays one face through moves and extrusions
-	* - Each corner keeps its own UV and normal, as the Mesh had them. A face
+	* - Each corner keeps its own UV, normal and colour, as the Mesh had them. A face
 	*   whose shape changes takes its own flat normal at every corner
 	*/
 	struct EditableMesh final
@@ -28,6 +28,7 @@ namespace Loom
 			uint32_t vertex = 0;
 			glm::vec2 uv{ 0.0f };
 			glm::vec3 normal{ 0.0f };
+			glm::vec4 color{ 1.0f };
 
 			bool operator==(const Corner&) const = default;
 		};
@@ -46,13 +47,14 @@ namespace Loom
 		static Edge EdgeOf(uint32_t a, uint32_t b);
 
 		// Unindexed triangles, as Mesh keeps them: three floats a vertex for
-		// positions and normals and two for UVs. UVs and normals count only
-		// when there are as many of them as vertices.
-		static EditableMesh FromTriangles(const std::vector<float>& positions, const std::vector<float>& uvs, const std::vector<float>& normals);
+		// positions and normals, two for UVs and four for colours. UVs,
+		// normals and colours count only when there are as many of them as
+		// vertices.
+		static EditableMesh FromTriangles(const std::vector<float>& positions, const std::vector<float>& uvs, const std::vector<float>& normals, const std::vector<float>& colors);
 
-		// Back to Mesh's arrays. UVs and normals stay empty for a mesh that had
-		// none.
-		void ToTriangles(std::vector<float>& positions, std::vector<float>& uvs, std::vector<float>& normals) const;
+		// Back to Mesh's arrays. UVs, normals and colours stay empty for a
+		// mesh that had none.
+		void ToTriangles(std::vector<float>& positions, std::vector<float>& uvs, std::vector<float>& normals, std::vector<float>& colors) const;
 
 		// Centred on the origin, with flat normals and each face's UVs spanning
 		// the texture.
@@ -106,7 +108,7 @@ namespace Loom
 		void Flip(const std::set<uint32_t>& faces);
 
 		// Joins each pair of triangles that lie flat together across an edge,
-		// with the same UV and normal on both sides of it, into a quad, as a
+		// with the same UV, normal and colour on both sides of it, into a quad, as a
 		// model file that split its quads in two had them.
 		void JoinTriangles();
 
@@ -128,6 +130,7 @@ namespace Loom
 
 		bool hasUVs = false;
 		bool hasNormals = false;
+		bool hasColors = false;
 
 		bool operator==(const EditableMesh&) const = default;
 
@@ -139,5 +142,8 @@ namespace Loom
 
 		// A face from vertices given in order, with flat normals and the UVs given.
 		uint32_t AddFace(const std::vector<uint32_t>& corners, const std::vector<glm::vec2>& uvs);
+
+		// The face on the end, with flat normals.
+		uint32_t AddFace(Face face);
 	};
 };
