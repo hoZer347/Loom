@@ -69,6 +69,11 @@ namespace Loom
 		constexpr uint32_t UV_OFFSET = POSITION_COMPONENTS * sizeof(float);
 		constexpr uint32_t NORMAL_OFFSET = (POSITION_COMPONENTS + UV_COMPONENTS) * sizeof(float);
 		constexpr uint32_t NORMAL_SIZE = NORMAL_COMPONENTS * sizeof(float);
+		constexpr uint32_t COLOR_LOCATION = 3;
+		constexpr uint32_t COLOR_COMPONENTS = 4;
+		constexpr uint32_t COLOR_OFFSET = NORMAL_OFFSET + NORMAL_SIZE;
+		constexpr uint32_t COLOR_SIZE = COLOR_COMPONENTS * sizeof(float);
+		constexpr float NO_COLOR[COLOR_COMPONENTS] = { 1.0f, 1.0f, 1.0f, 1.0f };
 		constexpr uint32_t INSTANCE_SIZE = Renderer::FloatsPerInstance * sizeof(float);
 		constexpr uint32_t INSTANCE_COLUMNS = 4;
 		constexpr uint32_t INSTANCE_COLUMN_SIZE = INSTANCE_COLUMNS * sizeof(float);
@@ -153,6 +158,11 @@ namespace Loom
 		bool IsTriangles(wgpu::PrimitiveTopology topology)
 		{
 			return topology == wgpu::PrimitiveTopology::TriangleList || topology == wgpu::PrimitiveTopology::TriangleStrip;
+		};
+
+		bool HasNormals(VertexFormat format)
+		{
+			return format == VertexFormat::PositionUVNormal || format == VertexFormat::PositionUVNormalColor;
 		};
 
 		uint64_t RoundUp(uint64_t value, uint64_t alignment)
@@ -274,13 +284,15 @@ namespace Loom
 			zeros.size = RoundUp(NORMAL_SIZE, UNIFORM_SIZE_ALIGNMENT);
 			m_zeros = m_device.CreateBuffer(&zeros);
 
+			wgpu::BufferDescriptor noColor;
+			noColor.usage = wgpu::BufferUsage::Vertex | wgpu::BufferUsage::CopyDst;
+			noColor.size = COLOR_SIZE;
+			m_noColor = m_device.CreateBuffer(&noColor);
+			m_queue.WriteBuffer(m_noColor, 0, NO_COLOR, COLOR_SIZE);
+
 			const uint8_t white[] = { WHITE, WHITE, WHITE, WHITE };
 			m_fallbackColor = CreateTexture(1, 1, white);
 			m_fallbackDepth = CreateDepthTarget(1);
-
-			wgpu::AdapterInfo info;
-			m_adapter.GetInfo(&info);
-			std::cout << "WebGPU Device: " << std::string_view(info.vendor) << ' ' << std::string_view(info.architecture) << std::endl;
 
 			return m_fallbackColor && m_fallbackDepth;
 		};
@@ -955,6 +967,7 @@ namespace Loom
 			bool hasPosition = false;
 			bool hasUV = false;
 			bool hasNormal = false;
+			bool hasColor = false;
 			bool hasInstance = false;
 			bool pixelated = false;
 
@@ -1037,6 +1050,7 @@ namespace Loom
 		{
 			int vertices = -1;
 			int noNormal = -1;
+			int noColor = -1;
 			int instances = -1;
 		};
 
@@ -1312,6 +1326,7 @@ namespace Loom
 				program.hasPosition |= input == POSITION_LOCATION;
 				program.hasUV |= input == UV_LOCATION;
 				program.hasNormal |= input == NORMAL_LOCATION;
+				program.hasColor |= input == COLOR_LOCATION;
 				program.hasInstance |= input >= InstanceModelLocation && input <= InstanceColorLocation;
 			};
 
@@ -1523,11 +1538,17 @@ namespace Loom
 			Slots slots;
 			int next = 0;
 
-			if (program.hasPosition || program.hasUV || (program.hasNormal && format == VertexFormat::PositionUVNormal))
+			const bool hasNormals = HasNormals(format);
+			const bool hasColors = format == VertexFormat::PositionUVNormalColor;
+
+			if (program.hasPosition || program.hasUV || (program.hasNormal && hasNormals) || (program.hasColor && hasColors))
 				slots.vertices = next++;
 
-			if (program.hasNormal && format != VertexFormat::PositionUVNormal)
+			if (program.hasNormal && !hasNormals)
 				slots.noNormal = next++;
+
+			if (program.hasColor && !hasColors)
+				slots.noColor = next++;
 
 			if (program.hasInstance)
 				slots.instances = next++;
@@ -1573,6 +1594,9 @@ namespace Loom
 
 			if (slots.noNormal >= 0)
 				m_pass.SetVertexBuffer((uint32_t)slots.noNormal, m_zeros);
+
+			if (slots.noColor >= 0)
+				m_pass.SetVertexBuffer((uint32_t)slots.noColor, m_noColor);
 
 			if (slots.instances >= 0)
 			{
@@ -1648,10 +1672,14 @@ namespace Loom
 			if (program.hasUV)
 				vertexAttributes.push_back({ nullptr, wgpu::VertexFormat::Float32x2, format == VertexFormat::Position ? 0 : UV_OFFSET, UV_LOCATION });
 
-			if (program.hasNormal && format == VertexFormat::PositionUVNormal)
+			if (program.hasNormal && HasNormals(format))
 				vertexAttributes.push_back({ nullptr, wgpu::VertexFormat::Float32x3, NORMAL_OFFSET, NORMAL_LOCATION });
 
+			if (program.hasColor && format == VertexFormat::PositionUVNormalColor)
+				vertexAttributes.push_back({ nullptr, wgpu::VertexFormat::Float32x4, COLOR_OFFSET, COLOR_LOCATION });
+
 			const wgpu::VertexAttribute noNormal = { nullptr, wgpu::VertexFormat::Float32x3, 0, NORMAL_LOCATION };
+			const wgpu::VertexAttribute noColor = { nullptr, wgpu::VertexFormat::Float32x4, 0, COLOR_LOCATION };
 
 			std::vector<wgpu::VertexAttribute> instanceAttributes;
 
@@ -1668,13 +1696,22 @@ namespace Loom
 				layout.attributes = vertexAttributes.data();
 			};
 
-			// No stride, so every vertex of every instance reads the same zeros.
+			// No stride, so every vertex of every instance reads the same zeros,
+			// or the same white.
 			if (slots.noNormal >= 0)
 			{
 				wgpu::VertexBufferLayout& layout = buffers.emplace_back();
 				layout.arrayStride = 0;
 				layout.attributeCount = 1;
 				layout.attributes = &noNormal;
+			};
+
+			if (slots.noColor >= 0)
+			{
+				wgpu::VertexBufferLayout& layout = buffers.emplace_back();
+				layout.arrayStride = 0;
+				layout.attributeCount = 1;
+				layout.attributes = &noColor;
 			};
 
 			if (slots.instances >= 0)
@@ -2070,6 +2107,7 @@ namespace Loom
 		wgpu::Sampler m_nearest;
 		wgpu::Sampler m_shadow;
 		wgpu::Buffer m_zeros;
+		wgpu::Buffer m_noColor;
 		wgpu::ComputePipeline m_merge;
 
 		uint32_t m_nextHandle = 1;

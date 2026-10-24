@@ -454,7 +454,11 @@ namespace Loom
 		// to another.
 		if (!window && backend != Backend::OpenGL)
 		{
+#ifdef __EMSCRIPTEN__
+			std::cerr << "Engine: WebGPU could not start, so this runs on WebGL" << std::endl;
+#else
 			std::cerr << "Engine: Vulkan could not start, so this runs on OpenGL" << std::endl;
+#endif
 			backend = Backend::OpenGL;
 			window = OpenWindow(backend);
 		};
