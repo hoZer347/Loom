@@ -322,22 +322,98 @@ TEST_SUITE("SceneSerializer")
 		CHECK(loaded.scene->GetName() == "Commented");
 	};
 
-	// A file written by a build that had a component this one does not is worth
-	// loading anyway, minus the part that cannot be understood.
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an unknown component is skipped, with its fields")
+	// A scene read while a script's library has not built, then saved, as the
+	// editor does after a failed build: the script's components have to survive
+	// it, and be themselves again once the library loads.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a component of a type not registered is written back as it was read, and is itself once the type is back")
 	{
-		const std::string text =
-			"Unknown(" + Loom::Guid::New().ToString() + "):\n"
-			"\tGameObject Root(" + Loom::Guid::New().ToString() + ")\n"
-			"\t\tGameObject Child(" + Loom::Guid::New().ToString() + ")\n"
-			"\t\t\tComponent NotABuiltType(" + Loom::Guid::New().ToString() + ")\n"
-			"\t\t\t\tsomething = 4\n";
+		std::string text;
 
-		const Loaded loaded(text);
+		{
+			MarkerRegistered registered;
+
+			Loom::Scene scene("Kept");
+			Loom::GameObject* child = scene.AddChild("Child");
+			Pump();
+
+			Loom::GameObject* grandchild = child->AddChild("Grandchild");
+			Marker* marker = child->Attach<Marker>();
+			Pump();
+
+			marker->weight = 2.5f;
+			marker->label = "tagged";
+			marker->partner = grandchild;
+
+			text = Written(scene);
+		};
+
+		Pump();
+
+		std::string resaved;
+
+		{
+			const Loaded loaded(text);
+
+			REQUIRE(loaded.scene != nullptr);
+			REQUIRE(loaded.scene->GetRoot().GetChildren().size() == 1);
+
+			Loom::GameObject* child = loaded.scene->GetRoot().GetChildren().front();
+
+			REQUIRE(child->GetComponents().size() == 1);
+			CHECK(Loom::ComponentRegistry::NameOf(*child->GetComponents().front()) == "Marker");
+
+			resaved = Written(*loaded.scene);
+		};
+
+		CHECK(resaved == text);
+
+		MarkerRegistered registered;
+
+		const Loaded loaded(resaved);
 
 		REQUIRE(loaded.scene != nullptr);
 		REQUIRE(loaded.scene->GetRoot().GetChildren().size() == 1);
-		CHECK(loaded.scene->GetRoot().GetChildren().front()->GetComponents().empty());
+
+		Loom::GameObject* child = loaded.scene->GetRoot().GetChildren().front();
+		Marker* marker = child->GetComponent<Marker>();
+
+		REQUIRE(marker != nullptr);
+		CHECK(marker->weight == doctest::Approx(2.5f));
+		CHECK(*marker->label == "tagged");
+		CHECK(marker->partner == child->GetChildren().front());
+	};
+
+	// What a prefab instance or a paste is made from.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a pasted component of a type not registered points at the copies of what it pointed at")
+	{
+		Loom::Scene scene("Clipboard");
+		Loom::GameObject* original = scene.AddChild("Original");
+		Pump();
+
+		Loom::GameObject* grandchild = original->AddChild("Grandchild");
+		std::string text;
+
+		{
+			MarkerRegistered registered;
+
+			Marker* marker = original->Attach<Marker>();
+			Pump();
+
+			marker->partner = grandchild;
+			text = Loom::SceneSerializer::Serialize(*original);
+		};
+
+		Loom::GameObject* pasted = Loom::SceneSerializer::Deserialize(text, scene.GetRoot());
+		Pump();
+
+		REQUIRE(pasted != nullptr);
+		REQUIRE(pasted->GetChildren().size() == 1);
+
+		const std::string written = Loom::SceneSerializer::Serialize(*pasted);
+
+		CHECK(written.find("Component Marker(") != std::string::npos);
+		CHECK(written.find(" = " + pasted->GetChildren().front()->GetGuid().ToString() + "\n") != std::string::npos);
+		CHECK(written.find(grandchild->GetGuid().ToString()) == std::string::npos);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an unknown field is skipped, and the rest is kept")

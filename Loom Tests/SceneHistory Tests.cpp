@@ -385,6 +385,43 @@ TEST_SUITE("SceneHistory")
 		CHECK(restored_marker->partner == restored_target);
 	};
 
+	// The inspector's remove button on a script component whose library has
+	// not built, taken back.
+	TEST_CASE_FIXTURE(Editing, "undo puts back a component of a type not registered, as it was")
+	{
+		std::string text;
+
+		{
+			HistoryMarkerRegistered registered;
+
+			Loom::Scene scene("Missing");
+			Loom::GameObject* holder = scene.AddChild("Holder");
+			Pump();
+
+			holder->Attach<HistoryMarker>()->label = "kept";
+			Pump();
+
+			text = Loom::SceneSerializer::Serialize(scene);
+		};
+
+		Pump();
+
+		open.push_back(Loom::SceneSerializer::Deserialize(text));
+		Pump();
+		Record();
+
+		Loom::GameObject* holder = Root(0).GetChildren().front();
+
+		REQUIRE(holder->GetComponents().size() == 1);
+
+		holder->DetachComponent(holder->GetComponents().front());
+		Pump();
+		Record();
+
+		REQUIRE(Undo());
+		CHECK(Text(0) == text);
+	};
+
 	TEST_CASE_FIXTURE(Editing, "undo leaves the scene where it was among the open scenes")
 	{
 		Open("First");
