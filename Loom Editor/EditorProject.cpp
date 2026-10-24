@@ -1288,13 +1288,19 @@ namespace Loom
 		if (!m_opening && (m_scripts.IsIdle() || m_activeScene != nullptr))
 			return;
 
+		// A prompt or popup comes to the front only as it takes focus, so the
+		// bar, kept in front, would cover it.
+		if (m_askForLayoutName || m_askForFolder || m_askForNewProject || m_askForAsset ||
+			ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel))
+			return;
+
 		constexpr float half = 0.5f;
 		constexpr float sides = 2.0f;
 
 		constexpr ImGuiWindowFlags flags =
 			ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
 			ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
-			ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
+			ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoFocusOnAppearing;
 
 		const ImGuiViewport* viewport = ImGui::GetMainViewport();
 		const std::string step = m_opening
@@ -1319,7 +1325,7 @@ namespace Loom
 
 		if (ImGui::Begin("##Loading", nullptr, flags))
 		{
-			// Docked panels drawn after it would otherwise cover it.
+			// Focusing a panel brings its dock host to the front, over the bar.
 			ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
 
 			// A project's name goes above its bar and the step below.
