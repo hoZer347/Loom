@@ -63,9 +63,10 @@ namespace Loom
 		static bool SaveToFile(Scene& scene, const std::string& path, std::string* error = nullptr);
 
 		// Builds a new scene from the text. Returns null and fills in error when
-		// the text is not a scene; anything smaller (a component this build does
-		// not know, a field that no longer exists, a reference to something that
-		// was never written) is reported to std::cerr and skipped, so an
+		// the text is not a scene. A component this build does not know is
+		// kept as a MissingComponent, written back as it was read; anything
+		// else smaller (a field that no longer exists, a reference to something
+		// that was never written) is reported to std::cerr and skipped, so an
 		// out-of-date file still loads as far as it can.
 		//
 		// Given pending, the references the text leaves unresolved are added to

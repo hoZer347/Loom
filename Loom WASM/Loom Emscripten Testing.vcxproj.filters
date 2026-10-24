@@ -315,6 +315,9 @@
     <ClInclude Include="Component.h">
       <Filter>Component</Filter>
     </ClInclude>
+    <ClInclude Include="MissingComponent.h">
+      <Filter>Component</Filter>
+    </ClInclude>
     <ClInclude Include="LoomObject.h">
       <Filter>LoomObject</Filter>
     </ClInclude>

@@ -14,6 +14,7 @@
 #include "Light.h"
 #include "LoomObject.h"
 #include "Material.h"
+#include "MissingComponent.h"
 #include "Prefab.h"
 #include "Profiler.h"
 #include "Scene.h"
@@ -487,6 +488,25 @@ namespace Loom
 				ImGui::SetTooltip("%s", text.c_str());
 
 			ImGui::SameLine(left + column + ImGui::GetStyle().ItemInnerSpacing.x);
+		};
+
+		// A component whose type is not loaded, with its fields as the file has them.
+		void DrawKept(const MissingComponent& missing)
+		{
+			ImGui::TextDisabled("Not loaded");
+
+			std::vector<std::string> labels{ };
+
+			for (const MissingComponent::Line& line : missing.lines)
+				labels.push_back("Field " + line.key);
+
+			const float column = LabelColumn(labels, 0.0f);
+
+			for (size_t i = 0; i < labels.size(); i++)
+			{
+				Label(labels[i], column);
+				ImGui::TextUnformatted(missing.lines[i].value.c_str());
+			};
 		};
 
 		bool IsSpriteSource(const std::string& path)
@@ -3322,6 +3342,9 @@ namespace Loom
 		const std::vector<std::string> labels = FieldNames::Of(*component);
 
 		DrawFields(*component, labels, FieldLabelColumn(*component, labels));
+
+		if (const MissingComponent* missing = dynamic_cast<const MissingComponent*>(component))
+			DrawKept(*missing);
 
 		if (StateMachineBase* machine = dynamic_cast<StateMachineBase*>(component))
 		{

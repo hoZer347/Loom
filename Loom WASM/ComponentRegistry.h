@@ -77,8 +77,7 @@ namespace Loom
 		};
 
 		// Attaches one by registered name. Null when nothing is registered under
-		// that name, which is how loading a scene that uses a component this
-		// build does not have degrades rather than fails.
+		// that name, where a scene being read puts a MissingComponent instead.
 		static ComponentBase* Create(const std::string& name, GameObject& gameObject);
 
 		// Takes a type back out again: a script library is unloaded before it is
@@ -93,7 +92,8 @@ namespace Loom
 		static std::string CategoryOf(const std::string& name);
 
 		// What to call this component in a file or a header: its registered name
-		// when it has one, otherwise its type name tidied up.
+		// when it has one, otherwise its type name tidied up. A MissingComponent
+		// is called what it stands in for.
 		static std::string NameOf(const ComponentBase& component);
 
 	private:

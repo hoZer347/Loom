@@ -3,6 +3,7 @@
 #include "ComponentRegistry.h"
 #include "Engine.h"
 #include "GameObject.h"
+#include "MissingComponent.h"
 #include "Scene.h"
 
 #include <algorithm>
@@ -97,7 +98,26 @@ namespace Loom
 					'(' + component->GetGuid().ToString() + ")\n";
 
 				WriteFields(text, *component, depth + 2);
+
+				if (const MissingComponent* missing = dynamic_cast<const MissingComponent*>(component))
+					for (const MissingComponent::Line& line : missing->lines)
+						text += Indent(depth + 2) + line.key + " = " + line.value + '\n';
 			};
+		};
+
+		// The component registered under type, or until something registers
+		// it, one keeping its place.
+		ComponentBase* Make(const std::string& type, GameObject& gameObject)
+		{
+			if (ComponentBase* component = ComponentRegistry::Create(type, gameObject))
+				return component;
+
+			return gameObject.Attach<MissingComponent>(type);
+		};
+
+		MissingComponent::Line LineOf(const std::string& content, size_t equals)
+		{
+			return { Trim(content.substr(0, equals)), Trim(content.substr(equals + 1)) };
 		};
 
 		void WriteGameObject(std::string& text, GameObject& gameObject, int depth)
@@ -278,20 +298,7 @@ namespace Loom
 					if (parent.gameObject == nullptr)
 						return fail("a component has to sit under a GameObject");
 
-					ComponentBase* component = ComponentRegistry::Create(name, *parent.gameObject);
-
-					if (component == nullptr)
-					{
-						std::cerr
-							<< "Scene load: no component type named '" << name
-							<< "' is registered, skipping it" << std::endl;
-
-						// Left null on purpose: the fields underneath it then have
-						// nowhere to go and are skipped with them.
-						levels[depth] = Level{ };
-
-						return true;
-					};
+					ComponentBase* component = Make(name, *parent.gameObject);
 
 					component->SetGuid(Identity(guid));
 
@@ -308,6 +315,19 @@ namespace Loom
 
 				if (parent.object == nullptr)
 					return true;
+
+				// Kept as text, with a guid among the pasted objects following
+				// its object as a reference would.
+				if (MissingComponent* missing = dynamic_cast<MissingComponent*>(parent.object))
+				{
+					MissingComponent::Line& line = missing->lines.emplace_back(LineOf(content, equals));
+					Guid named;
+
+					if (Guid::TryParse(line.value, named) && fresh.count(named))
+						line.value = Identity(named).ToString();
+
+					return true;
+				};
 
 				const std::string key = Trim(content.substr(0, equals));
 				std::string value = Trim(content.substr(equals + 1));
@@ -521,23 +541,21 @@ namespace Loom
 
 			if (component == nullptr)
 			{
-				component = ComponentRegistry::Create(wanted.type, gameObject);
-
-				if (component == nullptr)
-				{
-					std::cerr
-						<< "Scene load: no component type named '" << wanted.type
-						<< "' is registered, skipping it" << std::endl;
-
-					continue;
-				};
-
+				component = Make(wanted.type, gameObject);
 				component->SetGuid(wanted.guid);
 			};
 
 			kept.push_back(component);
 
-			for (const std::string& field : wanted.fields)
+			if (MissingComponent* missing = dynamic_cast<MissingComponent*>(component))
+			{
+				missing->lines.clear();
+
+				for (const std::string& field : wanted.fields)
+					if (const size_t equals = field.find('='); equals != std::string::npos)
+						missing->lines.push_back(LineOf(field, equals));
+			}
+			else for (const std::string& field : wanted.fields)
 				ReadOwnField(*component, field, pending);
 		};
 

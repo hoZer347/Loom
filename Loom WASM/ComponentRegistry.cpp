@@ -1,6 +1,7 @@
 #include "ComponentRegistry.h"
 
 #include "Component.h"
+#include "MissingComponent.h"
 
 #include <cctype>
 #include <cstring>
@@ -96,6 +97,9 @@ namespace Loom
 
 	std::string ComponentRegistry::NameOf(const ComponentBase& component)
 	{
+		if (const MissingComponent* missing = dynamic_cast<const MissingComponent*>(&component))
+			return missing->GetType();
+
 		const char* type_name = component.GetTypeName();
 
 		if (type_name == nullptr)

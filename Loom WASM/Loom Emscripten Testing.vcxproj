@@ -189,6 +189,7 @@
     <ClInclude Include="Macro Helpers.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="Mesh.h" />
+    <ClInclude Include="MissingComponent.h" />
     <ClInclude Include="Skin.h" />
     <ClInclude Include="Animator.h" />
     <ClInclude Include="OpenGL.h" />
