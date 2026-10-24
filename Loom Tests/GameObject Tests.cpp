@@ -411,6 +411,86 @@ TEST_SUITE("GameObject")
 		CHECK(scene.GetRoot().GetChildren().empty());
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Destroy twice in one frame deletes the object once")
+	{
+		Loom::Scene scene("destroy twice");
+		Pump();
+
+		Loom::GameObject* child = scene.GetRoot().AddChild("Doomed");
+		Loom::GameObject* survivor = scene.GetRoot().AddChild("Survivor");
+		Pump();
+
+		const size_t before = Loom::GameObject::GetObjectCount();
+
+		child->Destroy();
+		child->Destroy();
+		Pump();
+
+		CHECK(Loom::GameObject::GetObjectCount() == before - 1);
+		CHECK(scene.GetRoot().GetChildren() == std::vector<Loom::GameObject*>{ survivor });
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Destroying a parent and then its child in one frame deletes each once")
+	{
+		Loom::Scene scene("destroy parent then child");
+		Pump();
+
+		Loom::GameObject* parent = scene.GetRoot().AddChild("Parent");
+		Pump();
+
+		Loom::GameObject* child = parent->AddChild("Child");
+		Pump();
+
+		const size_t before = Loom::GameObject::GetObjectCount();
+
+		parent->Destroy();
+		child->Destroy();
+		Pump();
+
+		CHECK(Loom::GameObject::GetObjectCount() == before - 2);
+		CHECK(scene.GetRoot().GetChildren().empty());
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "RemoveChild leaves an object that is not its child alone")
+	{
+		Loom::Scene scene("remove a stranger");
+		Pump();
+
+		Loom::GameObject& root = scene.GetRoot();
+		Loom::GameObject* a = root.AddChild("A");
+		Loom::GameObject* b = root.AddChild("B");
+		Pump();
+
+		Loom::GameObject* grandchild = a->AddChild("Grandchild");
+		Pump();
+
+		root.RemoveChild(grandchild);
+		Pump();
+
+		CHECK(root.GetChildren() == std::vector<Loom::GameObject*>{ a, b });
+		CHECK(a->GetChildren() == std::vector<Loom::GameObject*>{ grandchild });
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "SetParent onto an object destroyed in the same frame goes with it")
+	{
+		Loom::Scene scene("set parent onto doomed");
+		Pump();
+
+		Loom::GameObject& root = scene.GetRoot();
+		Loom::GameObject* doomed = root.AddChild("Doomed");
+		Loom::GameObject* mover = root.AddChild("Mover");
+		Pump();
+
+		const size_t before = Loom::GameObject::GetObjectCount();
+
+		doomed->Destroy();
+		mover->SetParent(doomed);
+		Pump();
+
+		CHECK(root.GetChildren().empty());
+		CHECK(Loom::GameObject::GetObjectCount() == before - 2);
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "SetParent reorders siblings and moves between parents")
 	{
 		Loom::Scene scene("set parent");

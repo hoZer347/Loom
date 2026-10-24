@@ -98,9 +98,26 @@ namespace Loom
 
 	void GameObject::RemoveChild(GameObject* child)
 	{
+		if (child == nullptr)
+			return;
+
+		for (const GameObject* above = child->parent; above != nullptr; above = above->parent)
+			if (above->m_removed)
+				return;
+
+		if (child->m_removed.exchange(true))
+			return;
+
 		Engine::QueueTask(
 			[this, child]()
 			{
+				// Moved elsewhere since, so it is not this object's to delete.
+				if (child->parent != this)
+				{
+					child->m_removed = false;
+					return;
+				};
+
 				const size_t at = child->GetSiblingIndex();
 
 				if (at < m_children.size())
