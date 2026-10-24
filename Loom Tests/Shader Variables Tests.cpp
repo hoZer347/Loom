@@ -380,6 +380,31 @@ TEST_SUITE("Shader variables")
 		CHECK(std::find(renderer.deleted.begin(), renderer.deleted.end(), shadow) != renderer.deleted.end());
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader file with a COMPUTE section builds a compute program and reads its variables")
+	{
+		RecordingRenderer renderer;
+
+		const ShaderFile file(
+			"compute.shader",
+			"// ===COMPUTE===\n"
+			"layout(local_size_x = 1) in;\n"
+			"uniform float u_speed;\n"
+			"void main() { }\n");
+		Loom::Shader shader(file.path.string());
+
+		CHECK(shader.compute);
+		CHECK(renderer.computes.size() == 1);
+		CHECK(shader.instanced_id == 0);
+		CHECK(shader.shadow_id == 0);
+		REQUIRE(shader.variables.size() == 1);
+		CHECK(shader.variables[0].name == "u_speed");
+
+		file.Write(STAGES);
+		REQUIRE(shader.Reload());
+
+		CHECK_FALSE(shader.compute);
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader path being typed keeps the material's shader until it names a shader file")
 	{
 		RecordingRenderer renderer;

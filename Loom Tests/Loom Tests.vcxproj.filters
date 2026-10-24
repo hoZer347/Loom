@@ -127,6 +127,9 @@
     <ClCompile Include="Shader Variables Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="Compute Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="Shaders Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

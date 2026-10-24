@@ -16,6 +16,12 @@ namespace
 		"out vec4 FragColor;\n"
 		"void main() { FragColor = vec4(1.0); }\n";
 
+	const std::string COMPUTE =
+		"// ===COMPUTE===\n"
+		"layout(local_size_x = 4) in;\n"
+		"layout(std430) buffer Values { float values[]; };\n"
+		"void main() { values[gl_GlobalInvocationID.x] *= 2.0; }\n";
+
 	const std::string VERTEX =
 		"// ===VERTEX===\n"
 		"layout(location = 0) in vec3 aPos;\n"
@@ -212,6 +218,44 @@ TEST_SUITE("Shader")
 			CHECK(message.line == 8);
 	};
 
+	TEST_CASE("Check puts a mistake in a compute stage on the file's line")
+	{
+		const std::vector<Loom::ShaderMessage> messages = Loom::Shader::Check(COMPUTE + "nothing;\n");
+
+		REQUIRE_FALSE(messages.empty());
+		CHECK(messages[0].error);
+		CHECK(messages[0].line == 5);
+	};
+
+	TEST_CASE("Check has nothing to say about a compute shader that compiles")
+	{
+		CHECK(Loom::Shader::Check(COMPUTE).empty());
+	};
+
+	TEST_CASE("Check refuses what compiles but no backend can bind, against no line")
+	{
+		const std::string writableVertexBlock =
+			"// ===VERTEX===\n"
+			"layout(std430) buffer Positions { vec4 positions[]; };\n"
+			"void main() { positions[0] = vec4(1.0); gl_Position = positions[0]; }\n"
+			+ FRAGMENT;
+
+		const std::string floatImage =
+			"// ===COMPUTE===\n"
+			"layout(local_size_x = 1) in;\n"
+			"layout(rgba32f) writeonly uniform image2D u_image;\n"
+			"void main() { imageStore(u_image, ivec2(0), vec4(1.0)); }\n";
+
+		for (const std::string& text : { writableVertexBlock, floatImage })
+		{
+			const std::vector<Loom::ShaderMessage> messages = Loom::Shader::Check(text);
+
+			REQUIRE(messages.size() == 1);
+			CHECK(messages[0].error);
+			CHECK(messages[0].line == 0);
+		};
+	};
+
 	TEST_CASE("Check reports a setting it does not know against no line")
 	{
 		const std::vector<Loom::ShaderMessage> messages = Loom::Shader::Check("// ===SETTINGS===\nglow = on\n" + FRAGMENT);
@@ -369,5 +413,21 @@ TEST_SUITE("Shader")
 
 		// The same words outside the section are the stages' business.
 		CHECK_NOTHROW(Loom::Shader::Assemble("bloom = on\n" + FRAGMENT));
+	};
+
+	TEST_CASE("a file with a COMPUTE section is that stage with COMMON in front, and no draw stages")
+	{
+		const Loom::Shader::Stages stages = Loom::Shader::Assemble("// ===COMMON===\nconst float SCALE = 2.0;\n" + COMPUTE);
+
+		CHECK(stages.compute.find("const float SCALE") < stages.compute.find("void main"));
+		CHECK(stages.vertex.empty());
+		CHECK(stages.fragment.empty());
+		CHECK(stages.shadowVertex.empty());
+	};
+
+	TEST_CASE("a COMPUTE section beside a VERTEX or FRAGMENT one is refused")
+	{
+		CHECK_THROWS_AS(Loom::Shader::Assemble(COMPUTE + FRAGMENT), std::runtime_error);
+		CHECK_THROWS_AS(Loom::Shader::Assemble(VERTEX + COMPUTE), std::runtime_error);
 	};
 };

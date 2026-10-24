@@ -410,6 +410,7 @@ namespace Loom
 			const GLuint program = Link(name, { CompileStage(GL_COMPUTE_SHADER, "COMPUTE", VERSION + compute) });
 
 			AssignStorage(program, layout);
+			m_programs[program].compute = true;
 
 			return program;
 #endif
@@ -421,7 +422,7 @@ namespace Loom
 			glUseProgram(program);
 			BindTextures(program);
 
-			if (!BindStorage(program))
+			if (!BindStorage(program, true))
 				return;
 
 			glDispatchCompute(x, y, z);
@@ -697,17 +698,20 @@ namespace Loom
 
 		// Binds the program's storage blocks and images. False when any is
 		// unset, which a draw or dispatch is skipped for.
-		bool BindStorage(uint32_t program)
+		// Whether the program is the kind asked for and has all its storage,
+		// which it is then bound to.
+		bool BindStorage(uint32_t program, bool compute = false)
 		{
 #ifndef __EMSCRIPTEN__
 			const auto found = m_programs.find(program);
 
 			if (found == m_programs.end())
-				return true;
+				return !compute;
 
 			const Program& state = found->second;
 
-			if (std::find(state.buffers.begin(), state.buffers.end(), 0u) != state.buffers.end()
+			if (state.compute != compute
+				|| std::find(state.buffers.begin(), state.buffers.end(), 0u) != state.buffers.end()
 				|| !std::all_of(state.images.begin(), state.images.end(), [this](GLuint image) { return m_storage.contains(image); }))
 				return false;
 
@@ -1290,6 +1294,7 @@ namespace Loom
 			std::vector<GLuint> buffers;
 			Locations imageUnits;
 			std::vector<GLuint> images;
+			bool compute = false;
 		};
 
 		std::unordered_map<uint32_t, Program> m_programs;

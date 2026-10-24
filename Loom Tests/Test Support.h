@@ -112,8 +112,8 @@ namespace LoomTests
 
 	// Stands in for the Engine's renderer while it lives, which a test has no
 	// window to open. It hands out handles, records what it is given, and
-	// compiles anything but a fragment or compute stage that says BROKEN. The window is
-	// windowSize, and a colour target the size it was made.
+	// compiles anything but a fragment or compute stage that says BROKEN. The
+	// window is windowSize, and a colour target the size it was made.
 	struct RecordingRenderer final : Loom::Renderer
 	{
 		static constexpr const char* BROKEN = "BROKEN";
