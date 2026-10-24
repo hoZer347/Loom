@@ -532,7 +532,8 @@ namespace Loom
 		std::vector<SceneSnapshot> TakeSnapshots() const;
 		void RestoreSnapshots(const std::vector<SceneSnapshot>& snapshots);
 
-		// The scenes, and what was selected in them, as a rebuild found them.
+		// The scenes and prefab, and what was selected in them, as a rebuild
+		// found them or as they were opened while it ran.
 		void RestoreAfterBuild();
 
 		void BuildDefaultLayout(unsigned int dockspace_id);

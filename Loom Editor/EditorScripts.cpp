@@ -121,9 +121,9 @@ namespace Loom
 		else if (!m_scripts.Load())
 		{
 			// Never built, or a copy of it is in the way. Opening the scenes now
-			// would drop every component that comes from the library, and the
-			// next save would write them out of the file for good, so this does
-			// what pressing Compile does and waits for the result.
+			// would show every component that comes from the library as not
+			// loaded until a build finished, so this does what pressing Compile
+			// does and waits for the result.
 			CompileScripts();
 		};
 	};
