@@ -7,6 +7,7 @@
 
 #include "Utilities/StateReference.h"
 
+#include <algorithm>
 #include <charconv>
 #include <cctype>
 #include <cstdlib>
@@ -15,6 +16,7 @@
 #include <limits>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 
@@ -113,12 +115,53 @@ namespace Loom
 			return text + ')';
 		};
 
+		// All of text as an integer T holds, into data, or false with data as it was.
+		template <typename T>
+		bool ReadInteger(const std::string& text, void* data)
+		{
+			const char* const end = text.data() + text.size();
+			T value{ };
+			const std::from_chars_result read = std::from_chars(text.data(), end, value);
+
+			if (read.ec != std::errc() || read.ptr != end)
+				return false;
+
+			*(T*)data = value;
+
+			return true;
+		};
+
+		// As ReadInteger, by strtof and strtod: the web's libc++ has no
+		// floating point from_chars.
+		template <typename T>
+		bool ReadReal(const std::string& text, void* data)
+		{
+			char* end = nullptr;
+			T value{ };
+
+			if constexpr (std::is_same_v<T, float>)
+				value = strtof(text.c_str(), &end);
+			else
+				value = strtod(text.c_str(), &end);
+
+			if (text.empty() || end != text.c_str() + text.size())
+				return false;
+
+			*(T*)data = value;
+
+			return true;
+		};
+
 		bool ReadVector(const std::string& text, float* values, int count)
 		{
+			constexpr int MOST_COMPONENTS = 4;
+
 			size_t at = text.find('(');
 
 			if (at == std::string::npos)
 				return false;
+
+			float read[MOST_COMPONENTS] = { };
 
 			for (int i = 0; i < count; i++)
 			{
@@ -130,8 +173,15 @@ namespace Loom
 				if (start >= text.size())
 					return false;
 
-				values[i] = strtof(text.substr(start, at - start).c_str(), nullptr);
+				char* end = nullptr;
+				const std::string component = text.substr(start, at - start);
+				read[i] = strtof(component.c_str(), &end);
+
+				if (end == component.c_str())
+					return false;
 			};
+
+			std::copy(read, read + count, values);
 
 			return true;
 		};
@@ -298,13 +348,19 @@ namespace Loom
 
 		switch (type)
 		{
-		case FieldType::Bool:	*(bool*)data = text == "true" || text == "1";			return true;
-		case FieldType::Int:	*(int*)data = (int)strtol(text.c_str(), nullptr, 10);	return true;
-		case FieldType::UInt:	*(unsigned int*)data = (unsigned int)strtoul(text.c_str(), nullptr, 10); return true;
-		case FieldType::Int64:	*(long long*)data = strtoll(text.c_str(), nullptr, 10);	return true;
-		case FieldType::UInt64:	*(unsigned long long*)data = strtoull(text.c_str(), nullptr, 10); return true;
-		case FieldType::Float:	*(float*)data = strtof(text.c_str(), nullptr);			return true;
-		case FieldType::Double:	*(double*)data = strtod(text.c_str(), nullptr);			return true;
+		case FieldType::Bool:
+			if (text != "true" && text != "1" && text != "false" && text != "0")
+				return false;
+
+			*(bool*)data = text == "true" || text == "1";
+			return true;
+
+		case FieldType::Int:	return ReadInteger<int>(text, data);
+		case FieldType::UInt:	return ReadInteger<unsigned int>(text, data);
+		case FieldType::Int64:	return ReadInteger<long long>(text, data);
+		case FieldType::UInt64:	return ReadInteger<unsigned long long>(text, data);
+		case FieldType::Float:	return ReadReal<float>(text, data);
+		case FieldType::Double:	return ReadReal<double>(text, data);
 		case FieldType::String:	*(std::string*)data = Unquote(text);					return true;
 		case FieldType::Vec2:	return ReadVector(text, (float*)data, 2);
 		case FieldType::Vec3:	return ReadVector(text, (float*)data, 3);

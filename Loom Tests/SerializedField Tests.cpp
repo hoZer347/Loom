@@ -502,6 +502,47 @@ TEST_SUITE("SerializedField")
 		CHECK(*read.numbers == *written.numbers);
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "text a field cannot hold is refused and leaves it as it was")
+	{
+		constexpr size_t flag = 0;
+		constexpr size_t count = 1;
+		constexpr size_t unsigned_count = 2;
+		constexpr size_t ratio = 5;
+		constexpr size_t precise = 6;
+		constexpr size_t triple = 9;
+
+		EveryField object;
+		Pump();
+
+		object.flag = true;
+		object.count = 7;
+		object.unsigned_count = 7u;
+		object.ratio = 0.5f;
+		object.precise = 0.5;
+		object.triple = { 1.0f, 2.0f, 3.0f };
+
+		const std::vector<std::pair<size_t, std::string>> refused = {
+			{ flag, "banana" },
+			{ count, "abc" }, { count, "12abc" }, { count, "" }, { count, "99999999999" },
+			{ unsigned_count, "-1" },
+			{ ratio, "abc" }, { ratio, "" }, { ratio, "1.5x" },
+			{ precise, "abc" },
+			{ triple, "(9, x, 9)" }, { triple, "(9, 9" } };
+
+		for (const auto& [index, text] : refused)
+		{
+			CAPTURE(text);
+			CHECK_FALSE(Field(object, index).Read(text));
+		};
+
+		CHECK(*object.flag);
+		CHECK(*object.count == 7);
+		CHECK(*object.unsigned_count == 7u);
+		CHECK(*object.ratio == 0.5f);
+		CHECK(*object.precise == 0.5);
+		CHECK(*object.triple == glm::vec3(1.0f, 2.0f, 3.0f));
+	};
+
 	// The value has to come back exactly, not nearly: a scene saved and loaded
 	// twice should not drift.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "floating point round trips exactly")
