@@ -159,6 +159,8 @@ namespace
 			<< "  --compile                      build the project's scripts on startup\n"
 			<< "  --play                         start with the scene running\n"
 			<< "  --play-web                     build the scene for the web and open it\n"
+			<< "  --build <configuration>        Build > Debug, Release or Final: build the\n"
+			<< "                                 game on its own and run the scene in it\n"
 			<< "  --import <file> [x y]          import a model, as if dropped on the window;\n"
 			<< "                                 over the Project or an asset panel, copy the\n"
 			<< "                                 file there\n"
@@ -384,6 +386,7 @@ int main(int argc, char** argv)
 		bool compile = false;
 		bool play = false;
 		bool play_web = false;
+		std::string build;
 		bool open_project_dialog = false;
 		bool settings = false;
 		std::string screenshot;
@@ -567,6 +570,16 @@ int main(int argc, char** argv)
 				play = true;
 			else if (argument == "--play-web")
 				play_web = true;
+			else if (argument == "--build")
+			{
+				if (i + 1 >= argc || !NativePlayer::IsConfiguration(argv[i + 1]))
+				{
+					std::cerr << "--build needs Debug, Release or Final" << std::endl;
+					return 1;
+				};
+
+				build = argv[++i];
+			}
 			else if (argument == "--open-project-dialog")
 				open_project_dialog = true;
 			else if (argument == "--settings")
@@ -684,6 +697,9 @@ int main(int argc, char** argv)
 
 		if (play_web)
 			editor.PlayWeb();
+
+		if (!build.empty())
+			editor.PlayNative(build);
 
 		if (open_project_dialog)
 			editor.ShowOpenProjectDialog();

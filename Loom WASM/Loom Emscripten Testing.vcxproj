@@ -173,6 +173,7 @@
     <ClCompile Include="OpenGLRenderer.cpp" />
     <ClCompile Include="Physics.cpp" />
     <ClCompile Include="Profiler.cpp" />
+    <ClCompile Include="StageTiming.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="SerializedField.cpp" />
@@ -217,6 +218,7 @@
     <ClInclude Include="GameObject.h" />
     <ClInclude Include="Physics.h" />
     <ClInclude Include="Profiler.h" />
+    <ClInclude Include="StageTiming.h" />
     <ClInclude Include="Prefab.h" />
     <ClInclude Include="RenderMath.h" />
     <ClInclude Include="Geo.h" />

@@ -174,6 +174,8 @@
     <ClCompile Include="EditCommands Tests.cpp" />
     <ClCompile Include="HiddenProcess Tests.cpp" />
     <ClCompile Include="WebPlayer Tests.cpp" />
+    <ClCompile Include="NativePlayer Tests.cpp" />
+    <ClCompile Include="StageTiming Tests.cpp" />
     <ClCompile Include="SerializedField Tests.cpp" />
     <ClCompile Include="Guid Tests.cpp" />
     <ClCompile Include="Component Tests.cpp" />

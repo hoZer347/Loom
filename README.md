@@ -30,6 +30,10 @@
 - Features thread safe memory management, and an Entity-Component system
 - Uses modern C++ features such as modules and std::barrier
 
+*Loom Player:*
+- A game on its own: the engine and a project's scripts linked into one program, in Debug, Release or Final. The editor's Build menu runs `./play-native.ps1`, which builds it into the project's `Build\<Configuration>` and runs the open scene in it
+- Debug and Release show the stage timing in a window over the game, which records nothing while it is collapsed. Final has none
+
 *Loom ImGui:*
 - Imported ImGui implementation using an OpenGL backend
 

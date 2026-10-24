@@ -1,8 +1,5 @@
 #include "WebPlayer.h"
 
-#include "HiddenProcess.h"
-#include "ProjectTemplate.h"
-
 #include <filesystem>
 #include <iostream>
 
@@ -17,16 +14,6 @@ namespace Loom
 	namespace
 	{
 		const char* const prefix = "[web] ";
-
-		// Quoted for a command line. A trailing backslash would escape the
-		// closing quote, and a folder means the same without one.
-		std::string Quote(std::string argument)
-		{
-			while (!argument.empty() && (argument.back() == '\\' || argument.back() == '/'))
-				argument.pop_back();
-
-			return '"' + argument + '"';
-		};
 
 		void OpenInBrowser(const std::string& url)
 		{
@@ -46,7 +33,7 @@ namespace Loom
 		// Opens the page when the server comes up, and prints what the script
 		// said if it ended first. Returns when everything holding the pipe has
 		// exited.
-		void Read(HiddenProcess hidden, const std::string& page, const std::atomic<bool>* stopping)
+		void Read(HiddenProcess hidden, const std::string& page, const std::atomic<bool>& stopping)
 		{
 			WebPlayer::Output output(page);
 
@@ -57,73 +44,27 @@ namespace Loom
 						OpenInBrowser(url);
 				});
 
-			for (const std::string& line : output.Ended(*stopping))
+			for (const std::string& line : output.Ended(stopping))
 				std::cout << prefix << line << std::endl;
 		};
 	};
 
-	WebPlayer::~WebPlayer()
-	{
-		Stop();
-	};
-
 	bool WebPlayer::Launch(const std::string& project, const std::string& scene)
 	{
-		Stop();
-
-		const std::filesystem::path script =
-			std::filesystem::path(ProjectTemplate::EngineRoot()) / "play-web.ps1";
-
 		// Where play-web.ps1 writes the page: beside the scene, served from the project.
 		const std::string page =
 			'/' + (std::filesystem::path(scene).parent_path().lexically_relative(project) / "index.html").generic_string();
 
-		m_job = CreateJobObjectA(nullptr, nullptr);
+		const bool started = m_run.Start("play-web.ps1",
+			"-Project " + ScriptRun::Quote(project) + " -Scene " + ScriptRun::Quote(scene),
+			[page](HiddenProcess hidden, const std::atomic<bool>& stopping)
+			{
+				Read(hidden, page, stopping);
+			});
 
-		JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{ };
-		limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-		SetInformationJobObject(m_job, JobObjectExtendedLimitInformation, &limits, sizeof(limits));
+		if (started)
+			std::cout << prefix << "Building " << project << " for the web" << std::endl;
 
-		const std::string command_line =
-			"powershell.exe -NoProfile -ExecutionPolicy Bypass -File " + Quote(script.string()) +
-			" -Project " + Quote(project) +
-			" -Scene " + Quote(scene);
-
-		HiddenProcess hidden;
-
-		if (!hidden.Start(command_line, m_job))
-		{
-			std::cerr << prefix << "Could not start " << script.string() << " (error " << GetLastError() << ')' << std::endl;
-			Stop();
-			return false;
-		};
-
-		// The job holds the server; nothing waits on the script itself.
-		CloseHandle(hidden.process);
-		hidden.process = nullptr;
-
-		std::cout << prefix << "Building " << project << " for the web" << std::endl;
-
-		m_reader = std::thread(Read, hidden, page, &m_stopping);
-
-		return true;
-	};
-
-	void WebPlayer::Stop()
-	{
-		m_stopping = true;
-
-		// The last handle to the job: closing it kills everything in it, and
-		// the reader runs out of pipe.
-		if (m_job != nullptr)
-		{
-			CloseHandle(m_job);
-			m_job = nullptr;
-		};
-
-		if (m_reader.joinable())
-			m_reader.join();
-
-		m_stopping = false;
+		return started;
 	};
 };

@@ -1,8 +1,8 @@
 #pragma once
 
-#include <atomic>
+#include "ScriptRun.h"
+
 #include <string>
-#include <thread>
 #include <vector>
 
 
@@ -20,17 +20,9 @@ namespace Loom
 	*/
 	struct WebPlayer final
 	{
-		WebPlayer() = default;
-		~WebPlayer();
-
-		WebPlayer(const WebPlayer&) = delete;
-		WebPlayer& operator=(const WebPlayer&) = delete;
-
 		// Both absolute, and the scene under the project folder, which is what
 		// the page is served from. Stops whatever an earlier launch left running.
 		bool Launch(const std::string& project, const std::string& scene);
-
-		void Stop();
 
 		// Where the page is, given a line of the script's output: empty unless
 		// it is the one emrun prints once it is listening,
@@ -99,10 +91,6 @@ namespace Loom
 		};
 
 	private:
-		void* m_job = nullptr;
-		std::thread m_reader{ };
-
-		// Set while Stop takes the script down, which is no failure of its own.
-		std::atomic<bool> m_stopping = false;
+		ScriptRun m_run{ };
 	};
 };

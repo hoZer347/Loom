@@ -19,6 +19,7 @@
 #include "SpriteEditor.h"
 #include "ModelEditor.h"
 #include "ModelPreview.h"
+#include "NativePlayer.h"
 #include "Prefabs.h"
 #include "SelectionOutline.h"
 #include "SceneHistory.h"
@@ -240,6 +241,10 @@ namespace Loom
 		// Builds the project for the web and opens the active scene in the
 		// default browser, as it was when Play was pressed if it is running.
 		void PlayWeb();
+
+		// Builds the project into a program of its own in a configuration of
+		// NativePlayer's and runs the active scene in it, as PlayWeb does.
+		void PlayNative(std::string_view configuration);
 
 		// Writes the editor as it stands - panels and all - to a bitmap once the
 		// given number of frames have gone by, so a scene can be looked at
@@ -492,21 +497,14 @@ namespace Loom
 		void DrawSceneData();
 		void DrawStats();
 
-#ifndef LOOM_FINAL
-		// What each thread spent on each stage of the frame: an average frame
-		// of the window laid out in time, then for each thread its stages
-		// stacked over the trend and each one's average and peak.
-		void DrawStages();
-		void DrawStageLanes();
-
-		// Over the corner of the Game view while it plays: a button that opens
-		// the lanes of DrawStages.
-		void DrawStageOverlay(const ImVec2& corner, const ImVec2& available);
-#endif
-
 		// The first-run "where are your scenes?" prompt, the new project dialog,
 		// and the browsers behind every Browse... button.
 		void DrawFolderPrompt();
+
+		// Writes the active scene, as it was when Play was pressed if it is
+		// running, into that folder for a player, giving its path, or empty
+		// when it could not.
+		std::filesystem::path WritePlayScene(const std::filesystem::path& folder) const;
 		void DrawNewProjectPrompt();
 		void DrawFileDialogs();
 
@@ -843,6 +841,7 @@ namespace Loom
 		EditorRefresh m_refresh;
 		bool m_relaunch = false;
 		WebPlayer m_webPlayer;
+		NativePlayer m_nativePlayer;
 
 		std::unique_ptr<EditorFileDialogs> m_dialogs;
 
@@ -1006,9 +1005,8 @@ namespace Loom
 		bool m_showSettings = false;
 
 #ifndef LOOM_FINAL
-		// Whether the Game view's stage timing is open, and whether this frame
-		// drew the stages anywhere, so the profiler records them, and only then.
-		bool m_stageOverlayOpen = false;
+		// Whether this frame drew the stages, so the profiler records them,
+		// and only then.
 		bool m_stagesShown = false;
 #endif
 

@@ -151,6 +151,8 @@
     <ClCompile Include="Hierarchy.cpp" />
     <ClCompile Include="FolderWatch.cpp" />
     <ClCompile Include="WebPlayer.cpp" />
+    <ClCompile Include="NativePlayer.cpp" />
+    <ClCompile Include="ScriptRun.cpp" />
     <ClCompile Include="ProjectTemplate.cpp" />
     <ClCompile Include="EditorScripts.cpp" />
     <ClCompile Include="EditorProject.cpp" />
@@ -203,6 +205,8 @@
     <ClInclude Include="Hierarchy.h" />
     <ClInclude Include="FolderWatch.h" />
     <ClInclude Include="WebPlayer.h" />
+    <ClInclude Include="NativePlayer.h" />
+    <ClInclude Include="ScriptRun.h" />
     <ClInclude Include="ProjectTemplate.h" />
     <ClInclude Include="ProjectAssets.h" />
     <ClInclude Include="EditorFileDialogs.h" />

@@ -24,10 +24,12 @@ namespace Loom
 {
 	namespace
 	{
-		// Under the project's build folder: the scene Play Web hands over, and
-		// the page and module built beside it.
+		// Under the project's build folder, beside the page and module built
+		// from it.
 		const char* const web_folder = "Web";
-		const char* const web_scene = "Scene";
+
+		// What a player is handed, beside what it runs in.
+		const char* const play_scene = "Scene";
 
 		// A path from a .loomproject is relative to the project folder.
 		std::string Resolve(const std::string& folder, const std::string& path)
@@ -403,6 +405,30 @@ namespace Loom
 		return m_playing || m_playAfterCompile;
 	};
 
+	std::filesystem::path Editor::WritePlayScene(const std::filesystem::path& folder) const
+	{
+		std::string text = SceneSerializer::Serialize(*m_activeScene);
+
+		for (const SceneSnapshot& snapshot : m_playSnapshots)
+			if (snapshot.active)
+				text = snapshot.text;
+
+		const std::filesystem::path scene = folder / (std::string(play_scene) + SceneSerializer::extension);
+
+		std::error_code code;
+		std::filesystem::create_directories(folder, code);
+
+		std::ofstream out(scene, std::ios::binary);
+
+		if (!(out << text))
+		{
+			std::cerr << "Could not write " << scene.string() << std::endl;
+			return { };
+		};
+
+		return scene;
+	};
+
 	void Editor::PlayWeb()
 	{
 		if (m_activeScene == nullptr || m_projectPath.empty())
@@ -411,32 +437,25 @@ namespace Loom
 			return;
 		};
 
-		std::string text = SceneSerializer::Serialize(*m_activeScene);
-
-		for (const SceneSnapshot& snapshot : m_playSnapshots)
-			if (snapshot.active)
-				text = snapshot.text;
-
 		const std::filesystem::path scene =
-			std::filesystem::path(m_projectPath) /
-			ProjectTemplate::build_folder /
-			web_folder /
-			(std::string(web_scene) + SceneSerializer::extension);
+			WritePlayScene(std::filesystem::path(m_projectPath) / ProjectTemplate::build_folder / web_folder);
 
-		std::error_code code;
-		std::filesystem::create_directories(scene.parent_path(), code);
+		if (!scene.empty())
+			m_webPlayer.Launch(m_projectPath, scene.string());
+	};
 
-		std::ofstream out(scene, std::ios::binary);
-
-		if (!(out << text))
+	void Editor::PlayNative(std::string_view configuration)
+	{
+		if (m_activeScene == nullptr || m_projectPath.empty())
 		{
-			std::cerr << "Could not write " << scene.string() << std::endl;
+			std::cerr << "Build needs a project folder and a scene open in it" << std::endl;
 			return;
 		};
 
-		out.close();
+		const std::filesystem::path scene = WritePlayScene(NativePlayer::Folder(m_projectPath, configuration));
 
-		m_webPlayer.Launch(m_projectPath, scene.string());
+		if (!scene.empty())
+			m_nativePlayer.Launch(m_projectPath, scene.string(), configuration);
 	};
 
 	void Editor::DrawNewProjectPrompt()

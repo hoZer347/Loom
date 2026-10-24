@@ -25,6 +25,9 @@
     <ClCompile Include="Profiler.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
+    <ClCompile Include="StageTiming.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
     <ClCompile Include="KeySet.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
@@ -273,6 +276,9 @@
       <Filter>Engine</Filter>
     </ClInclude>
     <ClInclude Include="Profiler.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="StageTiming.h">
       <Filter>Engine</Filter>
     </ClInclude>
     <ClInclude Include="KeySet.h">
