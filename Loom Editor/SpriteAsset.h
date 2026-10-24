@@ -35,7 +35,7 @@ namespace Loom
 		// As many as the Sprites panel's timeline has columns for.
 		static constexpr int maxFrames = 511;
 
-		// As wide or tall as a texture is sure to be.
+		// Bounds what one cel allocates.
 		static constexpr int maxSide = 16384;
 
 		using Colour = std::array<uint8_t, 4>;

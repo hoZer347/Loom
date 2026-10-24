@@ -205,22 +205,22 @@ TEST_SUITE("SpriteAsset")
 		std::filesystem::remove(path);
 	};
 
-	TEST_CASE("a sprite of no size, or wider than a texture, does not load")
+	TEST_CASE("a sprite of no size, too wide, or with more cels than frames does not load")
 	{
 		const std::string path = Temp("loom sprite sized.loomsprite").string();
 
-		const std::string sizes[] =
+		const std::string sprites[] =
 		{
-			"-2x3",
-			"0x4",
-			std::to_string(SpriteAsset::maxSide + 1) + "x1",
+			"size=-2x3\nframe=100\nlayer=Only\ncel=\n",
+			"size=" + std::to_string(SpriteAsset::maxSide + 1) + "x1\nframe=100\nlayer=Only\ncel=\n",
+			"size=2x2\nframe=100\nlayer=Only\ncel=\ncel=\n",
 		};
 
-		for (const std::string& size : sizes)
+		for (const std::string& text : sprites)
 		{
 			{
 				std::ofstream file(path);
-				file << "size=" << size << "\nframe=100\nlayer=Only\ncel=\n";
+				file << text;
 			};
 
 			SpriteAsset sprite;

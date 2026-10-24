@@ -388,6 +388,7 @@ namespace Loom
 		SpriteAsset loaded;
 		Links found;
 		std::string line;
+		bool overfull = false;
 
 		while (std::getline(file, line))
 		{
@@ -425,27 +426,38 @@ namespace Loom
 				loaded.layers.back().outlined = true;
 			else if (key == cel_key && !loaded.layers.empty())
 			{
-				Image cel = Image::Blank(loaded.width, loaded.height);
+				std::vector<Image>& cels = loaded.layers.back().cels;
 
-				if (!value.empty())
+				// A cel is made before the sprite is checked, so one past its
+				// frames is refused before it is.
+				if (cels.size() >= std::min<size_t>(loaded.durations.size(), maxFrames))
 				{
-					try
+					overfull = true;
+					break;
+				};
+
+				try
+				{
+					Image cel = Image::Blank(loaded.width, loaded.height);
+
+					if (!value.empty())
 					{
 						cel.pixels = Texture::Decode(McpProtocol::FromBase64(value), cel.width, cel.height);
 						FlipRows(cel);
-					}
-					catch (const std::exception& e)
-					{
-						std::cerr << "Sprites: " << path << ": " << e.what() << std::endl;
-						return false;
 					};
-				};
 
-				loaded.layers.back().cels.push_back(std::move(cel));
+					cels.push_back(std::move(cel));
+				}
+				catch (const std::exception& e)
+				{
+					std::cerr << "Sprites: " << path << ": " << e.what() << std::endl;
+					return false;
+				};
 			};
 		};
 
 		bool whole =
+			!overfull &&
 			loaded.width > 0 &&
 			loaded.height > 0 &&
 			!loaded.durations.empty() &&

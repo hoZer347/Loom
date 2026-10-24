@@ -55,10 +55,9 @@ namespace
 
 	// Takes writes from any thread, one at a time. It keeps no put area, so
 	// every character comes through here under the lock.
-	class SharedText final :
+	struct SharedText final :
 		public std::streambuf
 	{
-	public:
 		std::string Text()
 		{
 			std::lock_guard lock(m_mutex);
