@@ -150,8 +150,8 @@ int main(int argc, char** argv)
 	return context.run();
 };
 
-// A case outside any TEST_SUITE here would register before doctest.h names the
-// file's suite, since init_seg(lib) runs it first, and a -ts= run would crash on it.
+// A case outside any TEST_SUITE here would register, under init_seg(lib), before
+// doctest.h's TEST_SUITE_END names the default suite, and a -ts= run would crash on it.
 TEST_SUITE("Loom Tests")
 {
 	TEST_CASE("every case is in a suite a -ts= filter can read")
