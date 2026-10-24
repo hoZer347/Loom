@@ -635,10 +635,10 @@ bool LoomDitheredOut(float alpha)
 		while (!fetchComplete)
 			emscripten_sleep(10); // Yield control to the browser (non-blocking wait)
 
-		// Thrown like a file that will not open, so whoever asked reports it
-		// once, with the path.
+		// Thrown like a file that will not open, so a Material or a reload
+		// reports it once, with the path.
 		if (shader_source.empty())
-			throw std::runtime_error("could not fetch the file");
+			throw std::runtime_error("fetched nothing");
 	};
 #endif
 };
