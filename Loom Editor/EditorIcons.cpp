@@ -1,5 +1,6 @@
 #include "EditorIcons.h"
 
+#include "BuildSettings.h"
 #include "FileTab.h"
 #include "InputActions.h"
 #include "Prefab.h"
@@ -47,6 +48,9 @@ namespace Loom
 
 		if (extension == InputActions::extension)
 			return Bindings;
+
+		if (extension == BuildSettings::extension)
+			return Build;
 
 		if (extension == SpriteAsset::extension)
 			return Sprite;

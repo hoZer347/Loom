@@ -1,7 +1,5 @@
 #pragma once
 
-#include "ScriptRun.h"
-
 #include <algorithm>
 #include <array>
 #include <filesystem>
@@ -56,8 +54,13 @@ namespace Loom
 
 		// The window, which lists the project's scenes each time its list opens,
 		// and holds back another build while one is under way.
-		Action Draw(bool* open, const std::string& project, const std::string& name,
-			const std::function<std::vector<std::string>()>& list_scenes, std::string_view status, bool building);
+		Action Draw(
+			bool* open,
+			const std::string& project,
+			const std::string& name,
+			const std::function<std::vector<std::string>()>& list_scenes,
+			std::string_view status,
+			bool building);
 
 	private:
 		static constexpr size_t folder_capacity = 512;

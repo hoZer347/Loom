@@ -5,6 +5,7 @@
 
 #include "EditorIcons.h"
 #include "ProjectTemplate.h"
+#include "ScriptRun.h"
 
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -91,8 +92,13 @@ namespace Loom
 			(run ? " -Run" : "");
 	};
 
-	BuildSettings::Action BuildSettings::Draw(bool* open, const std::string& project, const std::string& name,
-		const std::function<std::vector<std::string>()>& list_scenes, std::string_view status, bool building)
+	BuildSettings::Action BuildSettings::Draw(
+		bool* open,
+		const std::string& project,
+		const std::string& name,
+		const std::function<std::vector<std::string>()>& list_scenes,
+		std::string_view status,
+		bool building)
 	{
 		Action action = Action::None;
 

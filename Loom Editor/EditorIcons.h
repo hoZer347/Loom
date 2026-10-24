@@ -30,6 +30,7 @@ namespace Loom
 		constexpr const char* Script = "🧩";
 		constexpr const char* State = "🚦";
 		constexpr const char* Bindings = "⌨";
+		constexpr const char* Build = "🔨";
 		constexpr const char* File = "📄";
 
 		// What the Project panel's tabs show beside a file, models
