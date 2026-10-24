@@ -193,9 +193,9 @@ namespace Loom
 
 		static LoomObject* _GetByID(const uint64_t& ID);
 		static LoomObject* _GetByName(const std::string& name);
+		static LoomObject* _GetByGuid(const Guid& guid);
 
 		// Takes this object out from under its name, holding mutex.
 		void Unname();
-		static LoomObject* _GetByGuid(const Guid& guid);
 	};
 };

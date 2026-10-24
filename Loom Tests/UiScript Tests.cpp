@@ -468,7 +468,7 @@ TEST_SUITE("UiScript")
 		CHECK_FALSE(ui.script->Failed());
 	};
 
-	TEST_CASE("a wait of no finite number of frames, or more than an int counts, fails the script")
+	TEST_CASE("a wait or scroll of no finite number, or a wait of more frames than an int counts, fails the script")
 	{
 		CapturedErrors errors;
 

@@ -51,13 +51,16 @@ TEST_SUITE("Clock")
 		CHECK(Loom::Time::UnscaledDeltaTime() > 0.0f);
 	};
 
-	TEST_CASE_FIXTURE(RunningClock, "a scale that is not a number stops the clock")
+	TEST_CASE_FIXTURE(RunningClock, "a scale that is not a finite number stops the clock")
 	{
-		Loom::Time::SetScale(std::numeric_limits<float>::quiet_NaN());
-		Frame(frame_length);
+		for (const float scale : { std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity() })
+		{
+			Loom::Time::SetScale(scale);
+			Frame(frame_length);
 
-		CHECK(Loom::Time::GetScale() == 0.0f);
-		CHECK(Loom::Time::DeltaTime() == 0.0f);
+			CHECK(Loom::Time::GetScale() == 0.0f);
+			CHECK(Loom::Time::DeltaTime() == 0.0f);
+		};
 	};
 
 	TEST_CASE_FIXTURE(RunningClock, "the scale multiplies the frame and leaves the unscaled one alone")

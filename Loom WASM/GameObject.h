@@ -179,9 +179,9 @@ namespace Loom
 		// them as they were.
 		void OrderComponents(const std::vector<ComponentBase*>& order);
 
-		// Deletes gameObject when it is still this object's child once the queue
-		// reaches it, and does nothing when it or what it is under is already
-		// on its way out.
+		// Deletes gameObject once the queue reaches it, wherever it has been
+		// moved to by then. Does nothing when it is not this object's child, or
+		// it or what it is under is already on its way out.
 		void RemoveChild(GameObject* gameObject);
 
 		// The thread whose turn runs the object's OnUpdate: 0 is the thread
@@ -264,6 +264,9 @@ namespace Loom
 		GameObject* parent;
 		mutable size_t m_siblingAt = 0;
 		std::atomic<bool> m_removed = false;
+
+		// Whether something this is under is on its way out.
+		bool UnderRemoved() const;
 
 		char newName[128];
 

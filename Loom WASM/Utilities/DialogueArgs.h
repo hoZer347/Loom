@@ -53,9 +53,13 @@ namespace Loom
 			}
 			else if constexpr (std::is_integral_v<_Type>)
 			{
+				// in_range takes no character type, so its range is read off the
+				// integer of the same size and sign.
+				using Range = std::conditional_t<std::is_signed_v<_Type>, std::make_signed_t<_Type>, std::make_unsigned_t<_Type>>;
+
 				long long value = 0;
 
-				if (!TryInteger(trimmed, value) || !std::in_range<_Type>(value))
+				if (!TryInteger(trimmed, value) || !std::in_range<Range>(value))
 					return false;
 
 				out = static_cast<_Type>(value);

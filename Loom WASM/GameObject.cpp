@@ -96,36 +96,40 @@ namespace Loom
 			});
 	};
 
+	bool GameObject::UnderRemoved() const
+	{
+		for (const GameObject* above = parent; above != nullptr; above = above->parent)
+			if (above->m_removed)
+				return true;
+
+		return false;
+	};
+
 	void GameObject::RemoveChild(GameObject* child)
 	{
-		if (child == nullptr)
+		if (child == nullptr || child->parent != this || child->UnderRemoved())
 			return;
-
-		for (const GameObject* above = child->parent; above != nullptr; above = above->parent)
-			if (above->m_removed)
-				return;
 
 		if (child->m_removed.exchange(true))
 			return;
 
+		// From wherever it has been moved to since, unless that is under
+		// something on its way out, which takes it along.
 		Engine::QueueTask(
-			[this, child]()
+			[child]()
 			{
-				// Moved elsewhere since, so it is not this object's to delete.
-				if (child->parent != this)
-				{
-					child->m_removed = false;
+				if (child->UnderRemoved())
 					return;
-				};
 
+				std::vector<GameObject*>& siblings = child->parent->m_children;
 				const size_t at = child->GetSiblingIndex();
 
-				if (at < m_children.size())
+				if (at < siblings.size())
 				{
 					if (at > 0)
-						m_children[at - 1]->Touch(true);
+						siblings[at - 1]->Touch(true);
 
-					m_children.erase(m_children.begin() + at);
+					siblings.erase(siblings.begin() + at);
 				};
 
 				delete child;

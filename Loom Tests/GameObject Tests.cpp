@@ -491,6 +491,34 @@ TEST_SUITE("GameObject")
 		CHECK(Loom::GameObject::GetObjectCount() == before - 2);
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an object destroyed and then moved in one frame is still deleted, from where it was moved to")
+	{
+		for (const bool again : { false, true })
+		{
+			Loom::Scene scene("destroy then move");
+			Pump();
+
+			Loom::GameObject& root = scene.GetRoot();
+			Loom::GameObject* doomed = root.AddChild("Doomed");
+			Loom::GameObject* holder = root.AddChild("Holder");
+			Pump();
+
+			const size_t before = Loom::GameObject::GetObjectCount();
+
+			doomed->Destroy();
+			doomed->SetParent(holder);
+
+			if (again)
+				doomed->Destroy();
+
+			Pump();
+
+			CHECK(Loom::GameObject::GetObjectCount() == before - 1);
+			CHECK(root.GetChildren() == std::vector<Loom::GameObject*>{ holder });
+			CHECK(holder->GetChildren().empty());
+		};
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "SetParent reorders siblings and moves between parents")
 	{
 		Loom::Scene scene("set parent");

@@ -28,7 +28,7 @@ namespace Loom
 		static unsigned long long FrameCount();
 
 		/// Multiplies DeltaTime. Zero freezes everything driven by this clock, as
-		/// does a scale below it or not a number.
+		/// does a scale below it or not a finite number.
 		static void SetScale(float scale);
 		static float GetScale();
 
