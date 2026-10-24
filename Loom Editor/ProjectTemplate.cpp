@@ -719,7 +719,7 @@ SpinningTriangle is there as a worked example.
 
 	std::string ProjectTemplate::BuildLine(const std::string& line)
 	{
-		const size_t start = line.find_first_not_of(" 	");
+		const size_t start = line.find_first_not_of(" \t");
 
 		if (start == std::string::npos)
 			return "";

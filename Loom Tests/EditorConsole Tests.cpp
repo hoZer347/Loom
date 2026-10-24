@@ -527,6 +527,7 @@ TEST_SUITE("EditorLog")
 			"a.png and b.png",
 			"C:\\Games\\Crash Demo2\\a.png, C:\\Games\\Crash Demo, C:\\Other\\a.png" });
 	};
+
 	TEST_CASE("a line naming a file in the project links to it, with the line and column after it")
 	{
 		const Project project;
