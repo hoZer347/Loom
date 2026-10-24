@@ -12,6 +12,7 @@
 
 #include "Utilities/Clock.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -24,12 +25,10 @@ namespace Loom
 {
 	namespace
 	{
-		// Under the project's build folder, beside the page and module built
-		// from it.
+		// Under the project's build folder: the scene Play Web hands over, and
+		// the page and module built beside it.
 		const char* const web_folder = "Web";
-
-		// What a player is handed, beside what it runs in.
-		const char* const play_scene = "Scene";
+		const char* const web_scene = "Scene";
 
 		// A path from a .loomproject is relative to the project folder.
 		std::string Resolve(const std::string& folder, const std::string& path)
@@ -56,6 +55,7 @@ namespace Loom
 			tab.folders.Clear();
 
 		InputActions::Set({ });
+		m_buildSettings = BuildSettings{ };
 
 		// Unless the project file names it otherwise.
 		m_projectName = std::filesystem::path(m_projectPath).filename().string();
@@ -82,6 +82,7 @@ namespace Loom
 			tab.Load(FileFoldersFile(tab));
 
 		InputActions::Load(InputActionsFile());
+		m_buildSettings.Load(BuildSettingsFile());
 
 		std::ifstream in(m_projectFile);
 		std::string line, project, library;
@@ -405,30 +406,6 @@ namespace Loom
 		return m_playing || m_playAfterCompile;
 	};
 
-	std::filesystem::path Editor::WritePlayScene(const std::filesystem::path& folder) const
-	{
-		std::string text = SceneSerializer::Serialize(*m_activeScene);
-
-		for (const SceneSnapshot& snapshot : m_playSnapshots)
-			if (snapshot.active)
-				text = snapshot.text;
-
-		const std::filesystem::path scene = folder / (std::string(play_scene) + SceneSerializer::extension);
-
-		std::error_code code;
-		std::filesystem::create_directories(folder, code);
-
-		std::ofstream out(scene, std::ios::binary);
-
-		if (!(out << text))
-		{
-			std::cerr << "Could not write " << scene.string() << std::endl;
-			return { };
-		};
-
-		return scene;
-	};
-
 	void Editor::PlayWeb()
 	{
 		if (m_activeScene == nullptr || m_projectPath.empty())
@@ -437,25 +414,118 @@ namespace Loom
 			return;
 		};
 
+		std::string text = SceneSerializer::Serialize(*m_activeScene);
+
+		for (const SceneSnapshot& snapshot : m_playSnapshots)
+			if (snapshot.active)
+				text = snapshot.text;
+
 		const std::filesystem::path scene =
-			WritePlayScene(std::filesystem::path(m_projectPath) / ProjectTemplate::build_folder / web_folder);
+			std::filesystem::path(m_projectPath) /
+			ProjectTemplate::build_folder /
+			web_folder /
+			(std::string(web_scene) + SceneSerializer::extension);
 
-		if (!scene.empty())
-			m_webPlayer.Launch(m_projectPath, scene.string());
-	};
+		std::error_code code;
+		std::filesystem::create_directories(scene.parent_path(), code);
 
-	void Editor::PlayNative(std::string_view configuration)
-	{
-		if (m_activeScene == nullptr || m_projectPath.empty())
+		std::ofstream out(scene, std::ios::binary);
+
+		if (!(out << text))
 		{
-			std::cerr << "Build needs a project folder and a scene open in it" << std::endl;
+			std::cerr << "Could not write " << scene.string() << std::endl;
 			return;
 		};
 
-		const std::filesystem::path scene = WritePlayScene(NativePlayer::Folder(m_projectPath, configuration));
+		out.close();
 
-		if (!scene.empty())
-			m_nativePlayer.Launch(m_projectPath, scene.string(), configuration);
+		m_webPlayer.Launch(m_projectPath, scene.string());
+	};
+
+	std::string Editor::BuildSettingsFile() const
+	{
+		return m_projectFile.empty()
+			? ""
+			: std::filesystem::path(m_projectFile).replace_extension(BuildSettings::extension).string();
+	};
+
+	void Editor::SaveBuildSettings()
+	{
+		if (const std::string file = BuildSettingsFile(); !m_buildSettings.Save(file))
+			std::cerr << "Build Settings: could not write them to " << file << std::endl;
+	};
+
+	std::vector<std::string> Editor::BuildScenes() const
+	{
+		std::vector<std::string> scenes{ };
+		std::error_code code;
+
+		for (auto entry = std::filesystem::recursive_directory_iterator(m_projectPath, code);
+			entry != std::filesystem::recursive_directory_iterator();
+			entry.increment(code))
+		{
+			const std::string name = entry->path().filename().string();
+
+			if (entry->is_directory(code))
+			{
+				if (name == ProjectTemplate::build_folder || name.starts_with('.'))
+					entry.disable_recursion_pending();
+			}
+			else if (entry->path().extension() == SceneSerializer::extension)
+				scenes.push_back(entry->path().lexically_relative(m_projectPath).generic_string());
+		};
+
+		std::sort(scenes.begin(), scenes.end());
+
+		return scenes;
+	};
+
+	void Editor::DrawBuildSettings()
+	{
+		// Starting on the scene being edited, until another is chosen.
+		if (m_buildSettings.scene.empty())
+			if (const auto path = m_scenePaths.find(m_activeScene); path != m_scenePaths.end() && !path->second.empty())
+				m_buildSettings.scene = std::filesystem::path(path->second).lexically_relative(m_projectPath).generic_string();
+
+		const GameBuilder::Status status = m_gameBuilder.GetStatus();
+
+		const BuildSettings::Action action = m_buildSettings.Draw(
+			&m_showBuildSettings,
+			m_projectPath,
+			m_projectName,
+			[this]() { return BuildScenes(); },
+			GameBuilder::Label(status),
+			status == GameBuilder::Status::Building);
+
+		switch (action)
+		{
+		case BuildSettings::Action::Changed:
+			SaveBuildSettings();
+			break;
+
+		case BuildSettings::Action::Browse:
+			m_dialogs->buildFolder.SetPwd(std::filesystem::path(m_projectPath).parent_path());
+			m_dialogs->buildFolder.Open();
+			break;
+
+		case BuildSettings::Action::Build:
+			BuildGame(false);
+			break;
+
+		case BuildSettings::Action::BuildAndRun:
+			BuildGame(true);
+			break;
+
+		default:
+			break;
+		};
+	};
+
+	void Editor::BuildGame(bool run)
+	{
+		SaveBuildSettings();
+
+		m_gameBuilder.Launch(m_buildSettings.Arguments(m_projectPath, m_projectName, run));
 	};
 
 	void Editor::DrawNewProjectPrompt()

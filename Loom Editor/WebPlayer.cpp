@@ -44,6 +44,8 @@ namespace Loom
 						OpenInBrowser(url);
 				});
 
+			hidden.Finish();
+
 			for (const std::string& line : output.Ended(stopping))
 				std::cout << prefix << line << std::endl;
 		};

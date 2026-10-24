@@ -193,7 +193,7 @@
     <ClCompile Include="WebPlayer Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
-    <ClCompile Include="NativePlayer Tests.cpp">
+    <ClCompile Include="BuildSettings Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
     <ClCompile Include="StageTiming Tests.cpp">

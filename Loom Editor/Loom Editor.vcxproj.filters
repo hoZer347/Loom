@@ -37,7 +37,10 @@
     <ClCompile Include="WebPlayer.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
-    <ClCompile Include="NativePlayer.cpp">
+    <ClCompile Include="GameBuilder.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildSettings.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
     <ClCompile Include="ScriptRun.cpp">
@@ -180,7 +183,10 @@
     <ClInclude Include="WebPlayer.h">
       <Filter>Scripts</Filter>
     </ClInclude>
-    <ClInclude Include="NativePlayer.h">
+    <ClInclude Include="GameBuilder.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildSettings.h">
       <Filter>Scripts</Filter>
     </ClInclude>
     <ClInclude Include="ScriptRun.h">

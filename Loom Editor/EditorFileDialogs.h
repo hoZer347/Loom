@@ -29,6 +29,11 @@ namespace Loom
 			ImGuiFileBrowserFlags_CreateNewDir |
 			ImGuiFileBrowserFlags_CloseOnEsc };
 
+		ImGui::FileBrowser buildFolder{
+			ImGuiFileBrowserFlags_SelectDirectory |
+			ImGuiFileBrowserFlags_CreateNewDir |
+			ImGuiFileBrowserFlags_CloseOnEsc };
+
 		EditorFileDialogs()
 		{
 			openProject.SetTitle("Open Project");
@@ -37,6 +42,8 @@ namespace Loom
 			folder.SetTitle("Choose a Scene Folder");
 
 			newProjectFolder.SetTitle("Where should the project go?");
+
+			buildFolder.SetTitle("Build Folder");
 		};
 	};
 };

@@ -1792,6 +1792,9 @@ namespace Loom
 
 		if (m_showSettings && m_settings.Draw(&m_showSettings))
 			SaveSettings();
+
+		if (m_showBuildSettings)
+			DrawBuildSettings();
 	};
 
 	bool Editor::TabDoubleClicked()
@@ -2145,6 +2148,10 @@ namespace Loom
 
 			ImGui::Separator();
 
+			ImGui::MenuItem("Build Settings...", nullptr, &m_showBuildSettings, !m_projectFile.empty());
+
+			ImGui::Separator();
+
 			if (ImGui::BeginMenu("Open Demo"))
 			{
 				if (ImGui::IsWindowAppearing())
@@ -2278,19 +2285,8 @@ namespace Loom
 		if (ImGui::MenuItem("Stop", nullptr, false, IsPlaying()))
 			Stop();
 
-		const bool playable = m_activeScene != nullptr && !m_projectPath.empty();
-
-		if (ImGui::MenuItem("Play Web", nullptr, false, playable))
+		if (ImGui::MenuItem("Play Web", nullptr, false, m_activeScene != nullptr && !m_projectPath.empty()))
 			PlayWeb();
-
-		if (ImGui::BeginMenu("Build", playable))
-		{
-			for (const std::string_view configuration : NativePlayer::configurations)
-				if (ImGui::MenuItem(std::string(configuration).c_str()))
-					PlayNative(configuration);
-
-			ImGui::EndMenu();
-		};
 
 		ImGui::EndMainMenuBar();
 	};
@@ -2399,6 +2395,15 @@ namespace Loom
 				m_askForFolder = false;
 
 			m_dialogs->openProject.ClearSelected();
+		};
+
+		m_dialogs->buildFolder.Display();
+
+		if (m_dialogs->buildFolder.HasSelected())
+		{
+			m_buildSettings.folder = m_dialogs->buildFolder.GetSelected().string();
+			m_dialogs->buildFolder.ClearSelected();
+			SaveBuildSettings();
 		};
 	};
 

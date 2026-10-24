@@ -1,11 +1,12 @@
 // Loom Player
 // -----------
-// What the editor's Build menu builds: the engine and a project's scripts in
-// one program, which loads the scene file it is given and runs it from the
-// project folder it is started in. Debug and Release show the stage timing
-// over the game, and a final build has none.
+// What the editor's Build Settings window builds: the engine and a project's
+// scripts in one program, which runs from its own folder beside a copy of the
+// project's files, starting on the scene its <Game>.loomgame names. Given a
+// scene, it runs that from the folder it was started in instead. Debug and
+// Release show the stage timing over the game, and a final build has none.
 //
-//   <Game>.exe <scene> [--screenshot <file> [frames]] [--collapsed]
+//   <Game>.exe [scene] [--screenshot <file> [frames]] [--collapsed]
 //
 // --screenshot runs it hidden, writes the frame once that many have been
 // drawn, and ends. --collapsed starts the stage timing collapsed.
@@ -20,11 +21,17 @@
 
 #include <GLFW/glfw3.h>
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+
 #include <cctype>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
+#include <string_view>
 
 using namespace Loom;
 
@@ -32,23 +39,64 @@ using namespace Loom;
 static constexpr int default_frames = 240;
 
 
-// The project's key bindings, beside its project file in the folder it runs from.
+static std::filesystem::path Program()
+{
+	std::wstring path(MAX_PATH, L'\0');
+
+	while (GetModuleFileNameW(nullptr, path.data(), (DWORD)path.size()) == path.size())
+		path.resize(path.size() * 2);
+
+	return std::filesystem::path(path.c_str());
+};
+
+// The scene a build starts on, which build-game.ps1 writes beside the program.
+static std::string StartScene(const std::filesystem::path& program)
+{
+	constexpr std::string_view scene_key = "scene=";
+	constexpr const char* game_extension = ".loomgame";
+
+	std::ifstream in(std::filesystem::path(program).replace_extension(game_extension));
+	std::string line;
+
+	while (std::getline(in, line))
+	{
+		while (!line.empty() && line.back() == '\r')
+			line.pop_back();
+
+		if (line.starts_with(scene_key))
+			return line.substr(scene_key.size());
+	};
+
+	return "";
+};
+
+// The project's key bindings, copied in with the rest of its files.
 static std::string InputActionsFile()
 {
-	constexpr const char* project_extension = ".loomproject";
-
 	std::error_code code;
 
 	for (const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator(std::filesystem::current_path(), code))
-		if (entry.path().extension() == project_extension)
-			return std::filesystem::path(entry.path()).replace_extension(InputActions::extension).string();
+		if (entry.path().extension() == InputActions::extension)
+			return entry.path().string();
 
 	return "";
 };
 
 int main(int argc, char** argv)
 {
-	if (argc < 2)
+	const std::filesystem::path program = Program();
+	const bool given = argc > 1 && !std::string_view(argv[1]).starts_with("--");
+	std::string scene = given ? argv[1] : "";
+
+	if (!given)
+	{
+		std::error_code code;
+		std::filesystem::current_path(program.parent_path(), code);
+
+		scene = StartScene(program);
+	};
+
+	if (scene.empty())
 	{
 		std::cerr << "Loom Player: no scene to load" << std::endl;
 		return EXIT_FAILURE;
@@ -58,7 +106,7 @@ int main(int argc, char** argv)
 	int frames = default_frames;
 	bool collapsed = false;
 
-	for (int i = 2; i < argc; i++)
+	for (int i = given ? 2 : 1; i < argc; i++)
 	{
 		const std::string argument = argv[i];
 
@@ -85,7 +133,7 @@ int main(int argc, char** argv)
 	// Before the scene: its components reach for the GL context as they attach.
 	Engine engine;
 
-	glfwSetWindowTitle(Engine::window, std::filesystem::path(argv[0]).stem().string().c_str());
+	glfwSetWindowTitle(Engine::window, program.stem().string().c_str());
 
 	// What the player shows is the game's, not left in the project between runs.
 	ImGui::GetIO().IniFilename = nullptr;
@@ -94,7 +142,7 @@ int main(int argc, char** argv)
 
 	std::string error;
 
-	if (SceneSerializer::LoadFromFile(argv[1], &error) == nullptr)
+	if (SceneSerializer::LoadFromFile(scene, &error) == nullptr)
 	{
 		std::cerr << "Loom Player: " << error << std::endl;
 		return EXIT_FAILURE;

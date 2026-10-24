@@ -151,7 +151,8 @@
     <ClCompile Include="Hierarchy.cpp" />
     <ClCompile Include="FolderWatch.cpp" />
     <ClCompile Include="WebPlayer.cpp" />
-    <ClCompile Include="NativePlayer.cpp" />
+    <ClCompile Include="GameBuilder.cpp" />
+    <ClCompile Include="BuildSettings.cpp" />
     <ClCompile Include="ScriptRun.cpp" />
     <ClCompile Include="ProjectTemplate.cpp" />
     <ClCompile Include="EditorScripts.cpp" />
@@ -205,7 +206,8 @@
     <ClInclude Include="Hierarchy.h" />
     <ClInclude Include="FolderWatch.h" />
     <ClInclude Include="WebPlayer.h" />
-    <ClInclude Include="NativePlayer.h" />
+    <ClInclude Include="GameBuilder.h" />
+    <ClInclude Include="BuildSettings.h" />
     <ClInclude Include="ScriptRun.h" />
     <ClInclude Include="ProjectTemplate.h" />
     <ClInclude Include="ProjectAssets.h" />

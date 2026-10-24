@@ -16,7 +16,8 @@ namespace Loom
 	*   and everything it starts in a job object of its own, so starting
 	*   another or closing the editor takes all of it down
 	* - What it says goes to a reader on a thread of its own, which is told
-	*   whether Stop is what ended it
+	*   whether Stop is what ended it, and finishes the process once its
+	*   output has run out
 	*/
 	struct ScriptRun final
 	{

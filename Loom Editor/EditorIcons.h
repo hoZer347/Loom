@@ -58,6 +58,7 @@ namespace Loom
 		constexpr const char* Palette = "🌈 Palette###Palette";
 		constexpr const char* Stats = "📈 Stats###Stats";
 		constexpr const char* Settings = "⚙ Settings###Settings";
+		constexpr const char* BuildSettings = "🔨 Build Settings###Build Settings";
 		constexpr const char* KeyBindings = "⌨ Key Bindings###Key Bindings";
 
 		// The part of a title after ###.

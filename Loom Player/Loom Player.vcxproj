@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- A game on its own: the engine and a project's scripts linked into one
-     program. play-native.ps1 builds it with SolutionDir naming the engine,
+     program. build-game.ps1 builds it with SolutionDir naming the engine,
      which the property sheets and the engine's own projects need,
-     GameScripts the project's scripts folder, GameBuild where the program
-     goes, under a folder for each configuration, and GameName what it is
-     called. In the solution, with no Game property given, it is the player
-     with no scripts. -->
+     GameScripts the project's scripts folder, GameBuild the project's Build
+     folder, under which it goes in a folder for each configuration before
+     the script copies it out, and GameName what it is called. In the
+     solution, with no Game property given, it is the player with no
+     scripts. -->
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -52,7 +53,7 @@
     <Import Project="..\Property Files\UserMacros.props" />
   </ImportGroup>
   <PropertyGroup Condition="'$(GameBuild)'!=''">
-    <OutDir>$(GameBuild)\$(Configuration)\</OutDir>
+    <OutDir>$(GameBuild)\Player\$(Configuration)\</OutDir>
     <IntDir>$(GameBuild)\Intermediate\Player\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(GameName)'!=''">

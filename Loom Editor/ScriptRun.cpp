@@ -40,10 +40,6 @@ namespace Loom
 			return false;
 		};
 
-		// The job holds everything it starts; nothing waits on the script itself.
-		CloseHandle(hidden.process);
-		hidden.process = nullptr;
-
 		m_reader = std::thread(read, hidden, std::cref(m_stopping));
 
 		return true;

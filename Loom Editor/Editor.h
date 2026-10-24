@@ -16,10 +16,11 @@
 #include "Hierarchy.h"
 #include "EditorSettings.h"
 #include "ShaderEditor.h"
+#include "BuildSettings.h"
+#include "GameBuilder.h"
 #include "SpriteEditor.h"
 #include "ModelEditor.h"
 #include "ModelPreview.h"
-#include "NativePlayer.h"
 #include "Prefabs.h"
 #include "SelectionOutline.h"
 #include "SceneHistory.h"
@@ -242,10 +243,6 @@ namespace Loom
 		// default browser, as it was when Play was pressed if it is running.
 		void PlayWeb();
 
-		// Builds the project into a program of its own in a configuration of
-		// NativePlayer's and runs the active scene in it, as PlayWeb does.
-		void PlayNative(std::string_view configuration);
-
 		// Writes the editor as it stands - panels and all - to a bitmap once the
 		// given number of frames have gone by, so a scene can be looked at
 		// without a visible window. Given a window, only the first shown one
@@ -391,6 +388,13 @@ namespace Loom
 		std::string InputActionsFile() const;
 		void SaveInputActions();
 
+		// The Build Settings window, and the game built from it.
+		std::string BuildSettingsFile() const;
+		void SaveBuildSettings();
+		std::vector<std::string> BuildScenes() const;
+		void DrawBuildSettings();
+		void BuildGame(bool run);
+
 		// Rereads the scripts project's headers for the types they declare.
 		void RefreshScripts();
 		void DrawHierarchy();
@@ -502,11 +506,6 @@ namespace Loom
 		void DrawFolderPrompt();
 		void DrawNewProjectPrompt();
 		void DrawFileDialogs();
-
-		// Writes the active scene, as it was when Play was pressed if it is
-		// running, into that folder for a player, giving its path, or empty
-		// when it could not.
-		std::filesystem::path WritePlayScene(const std::filesystem::path& folder) const;
 
 		void HandleShortcuts();
 
@@ -841,7 +840,8 @@ namespace Loom
 		EditorRefresh m_refresh;
 		bool m_relaunch = false;
 		WebPlayer m_webPlayer;
-		NativePlayer m_nativePlayer;
+		GameBuilder m_gameBuilder;
+		BuildSettings m_buildSettings;
 
 		std::unique_ptr<EditorFileDialogs> m_dialogs;
 
@@ -1003,6 +1003,7 @@ namespace Loom
 		bool m_showKeyBindings = true;
 		bool m_showImGuiDemo = false;
 		bool m_showSettings = false;
+		bool m_showBuildSettings = false;
 
 #ifndef LOOM_FINAL
 		// Whether this frame drew the stages, so the profiler records them,
