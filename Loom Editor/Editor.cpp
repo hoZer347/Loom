@@ -950,8 +950,10 @@ namespace Loom
 		m_openingPath.clear();
 		m_projectLoad.reset();
 
-		CloseAllScenes();
+		// Ahead of the scenes, whose closing runs the queue that deletes it
+		// while the scripts its components come from are still loaded.
 		ClosePrefab();
+		CloseAllScenes();
 		m_prefabs.clear();
 		m_readInstances.clear();
 		m_instances.clear();
