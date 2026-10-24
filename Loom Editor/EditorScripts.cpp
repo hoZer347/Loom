@@ -107,7 +107,7 @@ namespace Loom
 		if (std::string error; !ProjectTemplate::Precompile(project, &error))
 			std::cerr << error << std::endl;
 
-		m_scripts.SetProject(project, library);
+		m_scripts.SetProject(project, library, m_projectPath);
 
 		std::cout
 			<< "Project '" << m_projectName << "' scripts: " << project << std::endl;

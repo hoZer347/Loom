@@ -35,8 +35,9 @@ namespace Loom
 		ScriptLibrary(const ScriptLibrary&) = delete;
 		ScriptLibrary& operator=(const ScriptLibrary&) = delete;
 
-		// Both absolute: the .vcxproj to build and the .dll it produces.
-		void SetProject(const std::string& project, const std::string& library);
+		// All absolute: the .vcxproj to build, the .dll it produces, and the
+		// project's folder, which the build's lines name its files from.
+		void SetProject(const std::string& project, const std::string& library, const std::string& folder);
 		void Clear();
 
 		bool HasProject() const { return !m_project.empty(); };
@@ -114,6 +115,7 @@ namespace Loom
 
 		std::string m_project{ };
 		std::string m_library{ };
+		std::string m_folder{ };
 		std::string m_status{ "No script project." };
 		bool m_succeeded = false;
 

@@ -328,6 +328,26 @@ TEST_SUITE("ProjectTemplate")
 		CHECK(error.find("GameScripts.vcxproj") != std::string::npos);
 		CHECK(project.Text() == "name=Game\n");
 	};
+
+	TEST_CASE("a script build's line names a file in the project from the project's folder, without the project it came from")
+	{
+		const std::string line =
+			"  C:\\Games\\Raycasts\\Scripts\\Laser.hpp(111,1): error C2059: syntax error: 'this' "
+			"[C:\\Games\\Raycasts\\Scripts\\RaycastsScripts.vcxproj]";
+
+		CHECK(Loom::ProjectTemplate::BuildLine(line, "C:\\Games\\Raycasts") == "Scripts/Laser.hpp(111,1): error C2059: syntax error: 'this'");
+		CHECK(Loom::ProjectTemplate::BuildLine(line, "c:/games/raycasts/") == "Scripts/Laser.hpp(111,1): error C2059: syntax error: 'this'");
+	};
+
+	TEST_CASE("a script build's line keeps the whole path of a file outside the project")
+	{
+		const std::string outside = "C:\\Program Files\\VS\\Microsoft.CppBuild.targets(561,5): warning MSB8029: put it elsewhere";
+		const std::string sibling = "C:\\Games\\Raycasts Two\\Laser.hpp(1,1): error C2059: syntax error";
+
+		CHECK(Loom::ProjectTemplate::BuildLine(outside + " [C:\\Games\\Raycasts\\Scripts\\RaycastsScripts.vcxproj]", "C:\\Games\\Raycasts") == outside);
+		CHECK(Loom::ProjectTemplate::BuildLine(sibling, "C:\\Games\\Raycasts") == sibling);
+		CHECK(Loom::ProjectTemplate::BuildLine("   ", "C:\\Games\\Raycasts").empty());
+	};
 };
 
 #endif

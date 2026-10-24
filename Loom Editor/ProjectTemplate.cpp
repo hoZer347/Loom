@@ -716,6 +716,52 @@ SpinningTriangle is there as a worked example.
 
 		return EnsureScripts(project_file.string(), error);
 	};
+
+	std::string ProjectTemplate::BuildLine(const std::string& line, const std::string& folder)
+	{
+		const size_t start = line.find_first_not_of(" \t");
+
+		if (start == std::string::npos)
+			return "";
+
+		std::string shown = line.substr(start);
+
+		if (const size_t project = shown.rfind(" ["); project != std::string::npos && shown.ends_with(".vcxproj]"))
+			shown.erase(project);
+
+		if (folder.empty())
+			return shown;
+
+		// Paths compared as Windows does, whichever way round the slashes go.
+		const auto comparable =
+			[](std::string path)
+			{
+				for (char& c : path)
+					c = c == '\\' ? '/' : (char)std::tolower((unsigned char)c);
+
+				return path;
+			};
+
+		const std::string prefix = comparable((std::filesystem::path(folder) / "").string());
+		const std::string compared = comparable(shown);
+
+		std::string tidied;
+		size_t from = 0;
+
+		for (size_t at = compared.find(prefix); at != std::string::npos; at = compared.find(prefix, from))
+		{
+			const size_t path = at + prefix.size();
+			const size_t end = (std::min)(shown.find_first_of("(:", path), shown.size());
+
+			std::string local = shown.substr(path, end - path);
+			std::replace(local.begin(), local.end(), '\\', '/');
+
+			tidied += shown.substr(from, at - from) + local;
+			from = end;
+		};
+
+		return tidied + shown.substr(from);
+	};
 };
 
 #endif
