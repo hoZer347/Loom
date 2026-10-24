@@ -251,6 +251,13 @@ void main()
 			return std::filesystem::last_write_time(path, code);
 		};
 
+		// Absolute, since opening a project moves the working directory.
+		std::string Absolute(const std::string& path)
+		{
+			std::error_code code;
+			return std::filesystem::absolute(path, code).lexically_normal().string();
+		};
+
 		// The prefab's file, or until there is one, the text its tab was opened
 		// with, which is dropped once the file is found.
 		std::string PrefabText(const std::string& path, std::string& unwritten)
@@ -413,9 +420,7 @@ void main()
 
 	void ModelEditor::Open(const std::string& path, const std::string& text)
 	{
-		// Absolute, since opening a project moves the working directory.
-		std::error_code code;
-		const std::string normal = std::filesystem::absolute(path, code).lexically_normal().string();
+		const std::string normal = Absolute(path);
 
 		m_focusFrames = focus_frames;
 
@@ -434,6 +439,14 @@ void main()
 			return;
 
 		m_documents.push_back(std::move(document));
+	};
+
+	bool ModelEditor::IsOpen(const std::string& path) const
+	{
+		const std::string normal = Absolute(path);
+
+		return std::ranges::any_of(m_documents,
+			[&normal](const std::unique_ptr<Document>& document) { return document->path == normal; });
 	};
 
 	bool ModelEditor::Load(Document& document)
@@ -585,6 +598,7 @@ void main()
 
 		document.written = WriteTime(document.path);
 		document.text = text;
+		document.unwritten.clear();
 		document.unsaved = false;
 		document.message = "Saved.";
 		document.messageTime = ImGui::GetTime();

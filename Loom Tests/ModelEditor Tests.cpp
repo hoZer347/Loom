@@ -98,8 +98,9 @@ namespace
 		// Enough for the panel to dock its tab, take focus and size its view.
 		static constexpr int opening_frames = 4;
 
-		// The prefab at file, or a cube's with any child's shape under it.
-		explicit Driven(const std::string& name, const EditableMesh* child = nullptr, const std::string& file = "") :
+		// The prefab at file, or a cube's with any child's shape under it. With
+		// text, file is not written yet and opens as that.
+		explicit Driven(const std::string& name, const EditableMesh* child = nullptr, const std::string& file = "", const std::string& text = "") :
 			path(file.empty() ? WritePrefab(name, &cube, child) : file)
 		{
 			constexpr float frame_time = 1.0f / 60.0f;
@@ -119,7 +120,7 @@ namespace
 
 			// The engine's objects start once the queue next runs, which the
 			// editor's frame does.
-			editor.Open(path);
+			editor.Open(path, text);
 			LoomTests::Pump();
 
 			for (int i = 0; i < opening_frames; i++)
@@ -249,40 +250,39 @@ TEST_CASE("The Model panel finds a mesh on a child of the prefab's top object")
 	std::filesystem::remove(path, code);
 };
 
-TEST_CASE("The Model panel opens a prefab not yet written, and writes it where it was told to once saved")
+TEST_CASE("The Model panel opens a prefab not yet written, writes it where it was told to once saved, and goes by the file from then on")
 {
-	LoomTests::EngineFixture engine;
-	ImGuiContext* context = ImGui::CreateContext();
-
-	const EditableMesh cube = EditableMesh::Cube(1.0f);
-	const std::string source = WritePrefab("model_unwritten_source", &cube);
-	const std::string text = ReadFile(source);
-	const std::string path = (std::filesystem::temp_directory_path() / "model_unwritten.loomprefab").string();
-
+	std::string text;
 	std::error_code code;
-	std::filesystem::remove(source, code);
+
+	{
+		LoomTests::EngineFixture engine;
+
+		const EditableMesh cube = EditableMesh::Cube(1.0f);
+		const std::string source = WritePrefab("model_unwritten_source", &cube);
+		text = ReadFile(source);
+
+		std::filesystem::remove(source, code);
+	};
+
+	const std::string path = (std::filesystem::temp_directory_path() / "model_unwritten.loomprefab").string();
 	std::filesystem::remove(path, code);
 
-	ModelEditor editor;
-	editor.Open(path, text);
-	LoomTests::Pump();
+	Driven driven("model_unwritten", nullptr, path, text);
 
-	REQUIRE(editor.Editing() != nullptr);
-	CHECK(editor.Editing()->faces.size() == 6);
+	CHECK(driven.Mesh().faces.size() == 6);
 	CHECK_FALSE(std::filesystem::exists(path));
 
-	REQUIRE(editor.Save());
+	REQUIRE(driven.editor.Save());
 	REQUIRE(std::filesystem::exists(path));
 
-	ModelEditor reopened;
-	reopened.Open(path);
-	LoomTests::Pump();
-
-	REQUIRE(reopened.Editing() != nullptr);
-	CHECK(reopened.Editing()->faces.size() == 6);
-
-	ImGui::DestroyContext(context);
+	// Deleted once written, it is gone rather than back to the text it opened as.
 	std::filesystem::remove(path, code);
+
+	driven.Frame();
+	driven.Frame();
+
+	CHECK(driven.editor.Editing() == nullptr);
 };
 
 TEST_CASE("The Model panel goes on to edit the part whose face is clicked")

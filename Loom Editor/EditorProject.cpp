@@ -1508,7 +1508,7 @@ namespace Loom
 
 		if (!IsModelFile(file))
 			m_models.Open(file);
-		else if (std::filesystem::exists(prefab, code))
+		else if (std::filesystem::exists(prefab, code) || m_models.IsOpen(prefab))
 			m_models.Open(prefab);
 		else if (const std::string text = ImportedPrefab(file); !text.empty())
 			m_models.Open(prefab, text);

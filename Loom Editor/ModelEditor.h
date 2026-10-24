@@ -83,8 +83,12 @@ namespace Loom
 		void Open(const std::string& path);
 
 		// Opens text, a prefab not yet written, in a tab that writes it to path
-		// when saved. The file at path is read instead once there is one.
+		// when saved, or brings path's tab forward. The file at path is read
+		// instead once there is one.
 		void Open(const std::string& path, const std::string& text);
+
+		// Whether a tab has the prefab at path open.
+		bool IsOpen(const std::string& path) const;
 
 		void Draw(bool* open);
 
