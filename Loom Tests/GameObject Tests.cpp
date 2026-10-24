@@ -11,7 +11,7 @@
 #include <algorithm>
 #include <atomic>
 #include <iostream>
-#include <sstream>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -51,6 +51,42 @@ namespace
 	struct Thrower final : Loom::Component<Thrower>
 	{
 		void OnUpdate() override { throw std::runtime_error("thrown in OnUpdate"); };
+	};
+
+	// Takes writes from any thread, one at a time. It keeps no put area, so
+	// every character comes through here under the lock.
+	class SharedText final :
+		public std::streambuf
+	{
+	public:
+		std::string Text()
+		{
+			std::lock_guard lock(m_mutex);
+			return m_text;
+		};
+
+	protected:
+		int_type overflow(int_type c) override
+		{
+			if (!traits_type::eq_int_type(c, traits_type::eof()))
+			{
+				std::lock_guard lock(m_mutex);
+				m_text += traits_type::to_char_type(c);
+			};
+
+			return traits_type::not_eof(c);
+		};
+
+		std::streamsize xsputn(const char* text, std::streamsize count) override
+		{
+			std::lock_guard lock(m_mutex);
+			m_text.append(text, count);
+			return count;
+		};
+
+	private:
+		std::mutex m_mutex;
+		std::string m_text;
 	};
 
 	// An object of its own with a ThreadProbe on it, set to thread.
@@ -921,8 +957,8 @@ TEST_SUITE("GameObject")
 		ThreadProbe* onCaller = ProbeOn(scene, 0);
 		ThreadProbe* onLane = ProbeOn(scene, 1);
 
-		std::ostringstream captured;
-		std::streambuf* const previous = std::cerr.rdbuf(captured.rdbuf());
+		SharedText captured;
+		std::streambuf* const previous = std::cerr.rdbuf(&captured);
 
 		CHECK_NOTHROW(scene.Update());
 
@@ -931,7 +967,7 @@ TEST_SUITE("GameObject")
 		CHECK(onCaller->updates == 1);
 		CHECK(onLane->updates == 1);
 
-		const std::string log = captured.str();
+		const std::string log = captured.Text();
 		const std::string thrown = "thrown in OnUpdate";
 		const size_t once = log.find(thrown);
 
