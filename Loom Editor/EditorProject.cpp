@@ -425,7 +425,7 @@ namespace Loom
 			if (!selection)
 				return E_NOINTERFACE;
 
-			VARIANT position[]{ Integer(std::max(column, 1)), Integer(line) };
+			VARIANT position[]{ Integer((std::max)(column, 1)), Integer(line) };
 
 			return Call(selection.Get(), L"MoveToLineAndOffset", DISPATCH_METHOD, nullptr, position);
 		};
