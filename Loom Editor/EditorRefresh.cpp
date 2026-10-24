@@ -81,7 +81,7 @@ namespace Loom
 
 		if (m_executable.empty())
 		{
-			std::cerr << "Full refresh: Windows did not say where this editor runs from, so there is nothing to start again." << std::endl;
+			std::cerr << "Full refresh: could not find this editor's executable." << std::endl;
 
 			finish(false);
 			return;
@@ -135,7 +135,7 @@ namespace Loom
 		const std::string command =
 			'"' + msbuild + "\" \"" + sources.string() + "\" \"-t:" + target + '"' +
 			" -p:Configuration=" + ScriptLibrary::Configuration() +
-			" -p:Platform=x64 -nologo -v:m -m";
+			" -p:Platform=x64 -nologo -v:m -m -clp:ErrorsOnly";
 
 		std::cout << "Full refresh: building the editor (" << ScriptLibrary::Configuration() << ")..." << std::endl;
 
@@ -147,7 +147,7 @@ namespace Loom
 					[](const std::string& line)
 					{
 						if (!line.empty())
-							std::cout << "  " << line << std::endl;
+							std::cerr << line << std::endl;
 					});
 				build->done = true;
 			});

@@ -970,10 +970,6 @@ namespace Loom
 		RefreshProjectAssets();
 		SaveSettings();
 
-		std::cout
-			<< "Scene folder: " << m_projectPath
-			<< " (" << m_projectScenes.size() << " scene(s))" << std::endl;
-
 		// Nothing open yet and something to open: start on the scene the last
 		// session was on. Not while a build is running, though: PollScripts
 		// opens it once the component types the scene names actually exist.
@@ -1041,10 +1037,6 @@ namespace Loom
 		// A model being previewed stays in the Inspector.
 		if (m_selectedModel.empty())
 			Select(&scene->GetRoot());
-
-		std::cout
-			<< "Opened '" << path << "' as "
-			<< scene->GetName() << '(' << scene->GetGuid().ToString() << ')' << std::endl;
 	};
 
 	bool Editor::OpenSceneAlone(const std::string& path)
@@ -1101,8 +1093,6 @@ namespace Loom
 
 		m_scenePaths[scene] = std::filesystem::path(path).lexically_normal().string();
 
-		std::cout << "Saved '" << scene->GetName() << "' to " << path << std::endl;
-
 		return true;
 	};
 
@@ -1113,7 +1103,7 @@ namespace Loom
 
 		if (m_playing)
 		{
-			std::cerr << "Stop before saving: the scene is holding what the run has done to it" << std::endl;
+			std::cerr << "Stop playing before saving the scene" << std::endl;
 			return;
 		};
 
@@ -3933,8 +3923,6 @@ namespace Loom
 			std::cerr << "Project: " << error << std::endl;
 			return;
 		};
-
-		std::cout << "Copied " << file << " to " << copied << std::endl;
 
 		if (RevealFile(copied))
 			return;

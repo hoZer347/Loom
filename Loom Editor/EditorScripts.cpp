@@ -116,21 +116,13 @@ namespace Loom
 		// fallen behind its sources, or behind the editor, is rebuilt first;
 		// PollScripts opens the scene once that finishes.
 		if (m_scripts.IsStale())
-		{
-			std::cout << "Scripts are out of date; rebuilding." << std::endl;
-
 			CompileScripts();
-		}
 		else if (!m_scripts.Load())
 		{
 			// Never built, or a copy of it is in the way. Opening the scenes now
 			// would drop every component that comes from the library, and the
 			// next save would write them out of the file for good, so this does
 			// what pressing Compile does and waits for the result.
-			std::cout
-				<< "Scripts did not load (" << m_scripts.GetStatus()
-				<< "); building them before opening anything." << std::endl;
-
 			CompileScripts();
 		};
 	};
@@ -378,15 +370,11 @@ namespace Loom
 		{
 			m_snapshots = std::move(snapshots);
 
-			std::cout << "Stopped; the scenes reset once the build lands." << std::endl;
-
 			return;
 		};
 
 		CloseAllScenes();
 		RestoreSnapshots(snapshots);
-
-		std::cout << "Stopped; scenes reset." << std::endl;
 	};
 
 	bool Editor::IsPlaying() const

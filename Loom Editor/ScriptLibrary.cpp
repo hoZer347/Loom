@@ -323,12 +323,7 @@ namespace Loom
 			'"' + msbuild + "\" \"" + m_project + "\"" +
 			(rebuild ? " -t:Rebuild" : "") +
 			" -p:Configuration=" + configuration +
-			" -p:Platform=x64 -nologo -v:m -m";
-
-		std::cout
-			<< "Compiling scripts (" << configuration << ")"
-			<< (rebuild ? ", from scratch: the editor has been rebuilt since" : "")
-			<< "..." << std::endl;
+			" -p:Platform=x64 -nologo -v:m -m \"-clp:ErrorsOnly;WarningsOnly\"";
 
 		m_worker = std::thread(
 			[command, build = m_current]()
@@ -337,8 +332,11 @@ namespace Loom
 					command,
 					[](const std::string& line)
 					{
-						if (!line.empty())
-							std::cout << "  " << line << std::endl;
+						// Only errors and warnings come through, and a warning is no failure.
+						if (line.find(": warning ") != std::string::npos)
+							std::cout << line << std::endl;
+						else if (!line.empty())
+							std::cerr << line << std::endl;
 					});
 				build->done = true;
 			});
@@ -428,10 +426,7 @@ namespace Loom
 		{
 			m_status = "Built against an older editor; needs recompiling.";
 
-			std::cerr
-				<< "Not loading " << m_library
-				<< ": it was built against an older editor, and loading it would have"
-				   " the two disagree about how objects are laid out." << std::endl;
+			std::cerr << "Not loading " << m_library << ": it was built against an older editor." << std::endl;
 
 			return false;
 		};
@@ -523,14 +518,6 @@ namespace Loom
 		m_status =
 			"Loaded " + std::to_string(m_types.size()) + " component type(s) and " +
 			std::to_string(m_states.size()) + " state(s).";
-
-		std::cout << "Scripts: " << m_status << std::endl;
-
-		for (const std::string& type : m_types)
-			std::cout << "  " << type << std::endl;
-
-		for (const std::string& state : m_states)
-			std::cout << "  " << state << " (state)" << std::endl;
 
 		return true;
 	};

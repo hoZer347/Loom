@@ -7,7 +7,9 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <iterator>
+#include <sstream>
 #include <string>
 
 
@@ -289,6 +291,23 @@ TEST_SUITE("ProjectTemplate")
 
 		// What it wrote is what the next open finds, rather than a second one.
 		CHECK(project.Ensure() == scripts.lexically_normal().string());
+	};
+
+	TEST_CASE("giving a project its scripts and precompiling them prints nothing")
+	{
+		const ProjectFolder project("loom template quiet", "name=Game\n");
+
+		std::ostringstream captured;
+		std::streambuf* const previous = std::cout.rdbuf(captured.rdbuf());
+
+		const std::string scripts = project.Ensure();
+		const bool precompiled = Loom::ProjectTemplate::Precompile(scripts);
+
+		std::cout.rdbuf(previous);
+
+		CHECK(!scripts.empty());
+		CHECK(precompiled);
+		CHECK(captured.str().empty());
 	};
 
 	TEST_CASE("a project file with no name names its scripts after itself")

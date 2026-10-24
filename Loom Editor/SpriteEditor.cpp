@@ -1045,7 +1045,6 @@ namespace Loom
 			{
 				m_palettes[path] = palette;
 				SetPalette(path);
-				std::cout << "Created " << path << std::endl;
 			};
 		};
 

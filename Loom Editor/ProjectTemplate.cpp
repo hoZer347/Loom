@@ -12,7 +12,6 @@
 #include <cctype>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <vector>
 
 #define WIN32_LEAN_AND_MEAN
@@ -536,8 +535,6 @@ SpinningTriangle is there as a worked example.
 		if (!written)
 			return "";
 
-		std::cout << "Created project " << project << std::endl;
-
 		return (root / (name + extension)).string();
 	};
 
@@ -600,8 +597,6 @@ SpinningTriangle is there as a worked example.
 		{
 			kept += std::string(scripts_key) + '=' + PathIn(root, scripts) + '\n';
 			kept += std::string(library_key) + '=' + PathIn(root, LibraryOf(root, scripts)) + '\n';
-
-			std::cout << "Found the scripts project " << scripts.string() << std::endl;
 		}
 		else
 		{
@@ -621,8 +616,6 @@ SpinningTriangle is there as a worked example.
 				return "";
 
 			kept += Fill(scripts_entries, name, root.string(), "");
-
-			std::cout << "Created the scripts project " << scripts.string() << std::endl;
 		};
 
 		if (!Write(file, kept, error))
@@ -668,8 +661,6 @@ SpinningTriangle is there as a worked example.
 		// The later one first, so the earlier position still holds.
 		text.insert(LineStart(text, item), lines(ProjectAssets::Replace(pch_item, "{HEADERS}", headers)));
 		text.insert(LineStart(text, defines), lines(pch_settings));
-
-		std::cout << "Precompiled the engine's header for " << scripts << std::endl;
 
 		return Write(scripts, text, error);
 	};

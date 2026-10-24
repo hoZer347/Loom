@@ -1205,8 +1205,6 @@ namespace Loom
 			return "";
 		};
 
-		std::cout << "Created " << path << std::endl;
-
 		if (const char* appearsIn = InfoOf(m_newAssetKind).appearsIn)
 			std::cout << name << " shows up in " << appearsIn << " after the next compile." << std::endl;
 
@@ -1637,8 +1635,6 @@ namespace Loom
 			return;
 		};
 
-		std::cout << "Moved " << path << " to " << moved << std::endl;
-
 		for (auto& [scene, scenePath] : m_scenePaths)
 			if (!scenePath.empty())
 				scenePath = ProjectAssets::Relocate(scenePath, path, moved);
@@ -1694,7 +1690,6 @@ namespace Loom
 				std::cerr << "Project: " << error << std::endl;
 			else
 			{
-				std::cout << "Moved " << companion << " to " << companion_moved << std::endl;
 				m_sprites.Relocate(companion, companion_moved);
 				refile(companion, companion_moved);
 			};

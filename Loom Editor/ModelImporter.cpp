@@ -716,8 +716,6 @@ void main()
 			if (scene.HasAnimations())
 				AttachAnimator(scene, *model);
 
-			std::cout << "Imported " << path << " (" << scene.mNumMeshes << " mesh(es), " << scene.mNumAnimations << " clip(s))" << std::endl;
-
 			return model;
 		};
 
@@ -832,8 +830,6 @@ void main()
 			drawing->m_vertices = std::move(part.vertices);
 			drawing->m_normals = std::move(part.normals);
 		};
-
-		std::cout << "Imported " << path << " (" << parts.size() << " mesh(es))" << std::endl;
 
 		return model;
 	};

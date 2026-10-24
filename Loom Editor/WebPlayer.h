@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <string>
 #include <thread>
 
@@ -13,7 +14,8 @@ namespace Loom
 	*   page in the default browser once the server is listening
 	* - The script and everything it starts share a job object, so launching
 	*   again or closing the editor takes the server down with it
-	* - Everything the build says goes to the console, from a reader thread
+	* - What the build says goes to the console, from a reader thread, only
+	*   when it stops before serving the page
 	*/
 	struct WebPlayer final
 	{
@@ -60,5 +62,8 @@ namespace Loom
 	private:
 		void* m_job = nullptr;
 		std::thread m_reader{ };
+
+		// Set while Stop takes the script down, which is no failure of its own.
+		std::atomic<bool> m_stopping = false;
 	};
 };

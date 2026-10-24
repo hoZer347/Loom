@@ -167,8 +167,6 @@ namespace Loom
 		link->path = path;
 		m_historyDirty = true;
 
-		std::cout << "Saved '" << gameObject->GetName() << "' as the prefab " << path << std::endl;
-
 		m_selectedAsset = file.lexically_normal().string();
 		m_revealSelectedAsset = true;
 		RefreshProjectAssets();

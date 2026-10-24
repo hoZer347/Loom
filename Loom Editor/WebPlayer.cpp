@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <iostream>
+#include <vector>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -38,29 +39,36 @@ namespace Loom
 			// The one error code ShellExecute has: anything at or below 32.
 			if ((INT_PTR)result <= 32)
 				std::cerr << prefix << "Could not open " << url << " (error " << (INT_PTR)result << ')' << std::endl;
-			else
-				std::cout << prefix << "Opened " << url << std::endl;
 
 			if (SUCCEEDED(com))
 				CoUninitialize();
 		};
 
-		// Prints what the script says, a line at a time, and opens the page
-		// when the server comes up. Returns when everything holding the pipe
-		// has exited.
-		void Read(HiddenProcess hidden, const std::string& page)
+		// Opens the page when the server comes up. What the script said is
+		// printed only if it ended first, unless it was stopped. Returns when
+		// everything holding the pipe has exited.
+		void Read(HiddenProcess hidden, const std::string& page, const std::atomic<bool>* stopping)
 		{
+			std::vector<std::string> said{ };
+			bool serving = false;
+
 			hidden.ReadLines(
 				[&](const std::string& line)
 				{
-					if (line.empty())
+					if (serving || line.empty())
 						return;
 
-					std::cout << prefix << line << std::endl;
-
 					if (const std::string url = WebPlayer::PageUrl(line, page); !url.empty())
+					{
+						serving = true;
 						OpenInBrowser(url);
+					}
+					else said.push_back(line);
 				});
+
+			if (!serving && !*stopping)
+				for (const std::string& line : said)
+					std::cerr << prefix << line << std::endl;
 		};
 	};
 
@@ -106,13 +114,15 @@ namespace Loom
 
 		std::cout << prefix << "Building " << project << " for the web" << std::endl;
 
-		m_reader = std::thread(Read, hidden, page);
+		m_reader = std::thread(Read, hidden, page, &m_stopping);
 
 		return true;
 	};
 
 	void WebPlayer::Stop()
 	{
+		m_stopping = true;
+
 		// The last handle to the job: closing it kills everything in it, and
 		// the reader runs out of pipe.
 		if (m_job != nullptr)
@@ -123,5 +133,7 @@ namespace Loom
 
 		if (m_reader.joinable())
 			m_reader.join();
+
+		m_stopping = false;
 	};
 };

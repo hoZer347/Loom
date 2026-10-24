@@ -1000,8 +1000,6 @@ namespace Loom
 		m_listener = listener;
 		m_thread = std::thread(&EditorMcp::Serve, this);
 
-		std::cout << "MCP server at http://127.0.0.1:" << port << endpoint << std::endl;
-
 		return true;
 	};
 
