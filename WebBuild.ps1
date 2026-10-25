@@ -36,21 +36,28 @@ $webLinkFlags = @(
     '-Wno-pthreads-mem-growth'
 )
 
+# Emscripten 6 launches its tools with an .exe, earlier releases with a .bat.
+$emscriptenLaunchers = @('.exe', '.bat')
+
 function Find-Emcc
 {
-    $candidates = @()
+    $roots = @()
 
-    if ($env:EMSDK) { $candidates += (Join-Path $env:EMSDK 'upstream\emscripten\emcc.bat') }
+    if ($env:EMSDK) { $roots += $env:EMSDK }
 
-    $candidates += 'C:\emsdk\upstream\emscripten\emcc.bat'
-    $candidates += (Join-Path $webRoot 'External Libraries\emsdk\upstream\emscripten\emcc.bat')
+    $roots += 'C:\emsdk'
+    $roots += (Join-Path $webRoot 'External Libraries\emsdk')
 
-    foreach ($candidate in $candidates)
+    foreach ($root in $roots)
     {
-        if (Test-Path $candidate) { return $candidate }
+        foreach ($launcher in $emscriptenLaunchers)
+        {
+            $candidate = Join-Path $root "upstream\emscripten\emcc$launcher"
+            if (Test-Path $candidate) { return $candidate }
+        }
     }
 
-    $onPath = Get-Command emcc.bat -ErrorAction SilentlyContinue
+    $onPath = Get-Command ($emscriptenLaunchers | ForEach-Object { "emcc$_" }) -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($onPath) { return $onPath.Source }
 
     throw @"
@@ -61,6 +68,12 @@ C:\emsdk, or install the copy vendored at "External Libraries\emsdk":
     .\emsdk install latest
     .\emsdk activate latest
 "@
+}
+
+# Another emscripten tool beside emcc, launched the same way.
+function Get-EmscriptenTool([string] $Emcc, [string] $Name)
+{
+    Join-Path (Split-Path -Parent $Emcc) ($Name + [IO.Path]::GetExtension($Emcc))
 }
 
 function Test-Stale([string] $Target, $Inputs)
@@ -211,7 +224,7 @@ function Build-WebEngine([string] $Emcc)
     }
 
     Remove-Item -LiteralPath $library -ErrorAction SilentlyContinue
-    & (Join-Path (Split-Path -Parent $Emcc) 'emar.bat') rcs $library @($jobs | ForEach-Object { $_.Object }) | Out-Host
+    & (Get-EmscriptenTool $Emcc 'emar') rcs $library @($jobs | ForEach-Object { $_.Object }) | Out-Host
 
     if ($LASTEXITCODE -ne 0)
     {
