@@ -146,6 +146,7 @@ if (-not $NoBuild)
         '-sEXIT_RUNTIME=1'              # So the process exit code is the test result.
         '-sENVIRONMENT=node'
         '-sNODERAWFS=1'                 # Gives the suite the real filesystem under node.
+        '-sNODE_HOST_ENV=0'             # ...without node's environment, whose Windows TEMP the suite would take for a relative path.
     )
 
     $objects = Join-Path $outputDir 'Objects'
@@ -175,8 +176,8 @@ if (-not $NoBuild)
     }
 
     # The link's arguments go in a response file, as the objects alone run
-    # past cmd's limit on a command line for a batch file like emcc. It is
-    # rewritten only when they change, so its date says when they last did.
+    # past Windows' limit on a command line. It is rewritten only when they
+    # change, so its date says when they last did.
     $arguments = @($linkFlags) + @($jobs | ForEach-Object { $_.Object }) + @('-o', $output) |
         ForEach-Object { '"' + ($_ -replace '\\', '/') + '"' }
     $response = Join-Path $outputDir 'emcc.rsp'
@@ -201,7 +202,7 @@ if (-not $NoBuild)
         # ordinary notes there. Judge it by its exit code instead.
         $previous = $ErrorActionPreference
         $ErrorActionPreference = 'Continue'
-        try { & $emcc "@$response" }
+        try { & (Get-EmscriptenTool $emcc 'em++') "@$response" }
         finally { $ErrorActionPreference = $previous }
 
         if ($LASTEXITCODE -ne 0)

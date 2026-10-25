@@ -41,7 +41,7 @@ $Scene = (Resolve-Path -LiteralPath $Scene -ErrorAction Stop).Path
 $output = Split-Path -Parent $Scene
 
 $emcc = Find-Emcc
-$emrun = Join-Path (Split-Path -Parent $emcc) 'emrun.bat'
+$emrun = Get-EmscriptenTool $emcc 'emrun'
 
 # A path under the project as the page addresses it: from the root it is served from.
 function Get-UrlPath([string] $Path)
@@ -158,7 +158,7 @@ if (Test-Stale $module $linkInputs)
     # The whole archive goes in because components register themselves from
     # static initialisers nothing else refers to. The page preloads the scene
     # through FS.
-    & $emcc @webCompileFlags @webLinkFlags @webIncludes '-sEXPORTED_RUNTIME_METHODS=FS' $player @($scriptJobs | ForEach-Object { $_.Object }) `
+    & (Get-EmscriptenTool $emcc 'em++') @webCompileFlags @webLinkFlags @webIncludes '-sEXPORTED_RUNTIME_METHODS=FS' $player @($scriptJobs | ForEach-Object { $_.Object }) `
         '-Wl,--whole-archive' $library '-Wl,--no-whole-archive' `
         -o $module
 

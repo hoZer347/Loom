@@ -88,7 +88,7 @@ if (-not (Invoke-Compile $emcc $jobs $flags))
 
 # The whole archive goes in because components register themselves from
 # static initialisers nothing else refers to.
-& $emcc @webCompileFlags @webLinkFlags '-sEXIT_RUNTIME=1' @($jobs | ForEach-Object { $_.Object }) `
+& (Get-EmscriptenTool $emcc 'em++') @webCompileFlags @webLinkFlags '-sEXIT_RUNTIME=1' @($jobs | ForEach-Object { $_.Object }) `
     '-Wl,--whole-archive' $library '-Wl,--no-whole-archive' `
     -o (Join-Path $output 'tests.js')
 
