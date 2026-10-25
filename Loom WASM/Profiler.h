@@ -54,11 +54,6 @@ namespace Loom
 		{
 			std::string name;
 			int depth;
-
-			// From the start of each frame it ran in to when it first began
-			// in it, averaged over those frames.
-			double start;
-
 			double average;
 			double peak;
 

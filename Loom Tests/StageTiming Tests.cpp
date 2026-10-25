@@ -8,6 +8,7 @@
 #include "imgui.h"
 
 #include <array>
+#include <vector>
 
 
 namespace
@@ -55,6 +56,17 @@ namespace
 
 		return recording;
 	};
+
+	Loom::Profiler::Row Row(int depth, double average)
+	{
+		return { "", depth, average, average, { }, { } };
+	};
+
+	void CheckShare(const Loom::StageTiming::Share& share, double from, double to)
+	{
+		CHECK(share.from == doctest::Approx(from));
+		CHECK(share.to == doctest::Approx(to));
+	};
 };
 
 TEST_SUITE("StageTiming")
@@ -69,6 +81,51 @@ TEST_SUITE("StageTiming")
 	{
 		for (const bool recorded : RecordsWith(true))
 			CHECK_FALSE(recorded);
+	};
+
+	TEST_CASE("the stages share the whole width by their averages")
+	{
+		const std::vector<Loom::StageTiming::Share> shares = Loom::StageTiming::Shares({ Row(0, 1.0), Row(0, 3.0) });
+
+		REQUIRE(shares.size() == 2);
+		CheckShare(shares[0], 0.0, 0.25);
+		CheckShare(shares[1], 0.25, 1.0);
+	};
+
+	TEST_CASE("a stage's parts fill it from the left at the same scale")
+	{
+		const std::vector<Loom::StageTiming::Share> shares = Loom::StageTiming::Shares({
+			Row(0, 4.0),
+			Row(1, 1.0),
+			Row(2, 0.5),
+			Row(1, 2.0),
+			Row(0, 4.0) });
+
+		REQUIRE(shares.size() == 5);
+		CheckShare(shares[0], 0.0, 0.5);
+		CheckShare(shares[1], 0.0, 0.125);
+		CheckShare(shares[2], 0.0, 0.0625);
+		CheckShare(shares[3], 0.125, 0.375);
+		CheckShare(shares[4], 0.5, 1.0);
+	};
+
+	TEST_CASE("a part never runs past its stage")
+	{
+		const std::vector<Loom::StageTiming::Share> shares = Loom::StageTiming::Shares({ Row(0, 1.0), Row(1, 2.0), Row(0, 1.0) });
+
+		REQUIRE(shares.size() == 3);
+		CheckShare(shares[1], 0.0, 0.5);
+		CheckShare(shares[2], 0.5, 1.0);
+	};
+
+	TEST_CASE("rows that took no time share none of the width")
+	{
+		const std::vector<Loom::StageTiming::Share> shares = Loom::StageTiming::Shares({ Row(0, 0.0), Row(1, 0.0) });
+
+		REQUIRE(shares.size() == 2);
+
+		for (const Loom::StageTiming::Share& share : shares)
+			CheckShare(share, 0.0, 0.0);
 	};
 };
 

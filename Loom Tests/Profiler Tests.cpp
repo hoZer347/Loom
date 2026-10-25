@@ -92,8 +92,6 @@ TEST_SUITE("Profiler")
 		const Loom::Profiler::Row& first = rows[outer.row + 1];
 		const Loom::Profiler::Row& second = rows[outer.row + 2];
 
-		CHECK(whole.start <= first.start);
-		CHECK(first.start + first.average <= second.start);
 		CHECK(whole.average >= first.average + second.average);
 		CHECK(first.average >= (double)BUSY_FOR.count());
 		CHECK(first.history.back() == doctest::Approx(first.average));
@@ -142,7 +140,6 @@ TEST_SUITE("Profiler")
 		REQUIRE(ran.thread);
 
 		const double sum = ran.thread->rows[ran.row].peak;
-		const double start = ran.thread->rows[ran.row].start;
 		CHECK(sum >= 2.0 * (double)BUSY_FOR.count());
 		CHECK(ran.thread->rows[ran.row].average == doctest::Approx(sum));
 
@@ -154,7 +151,6 @@ TEST_SUITE("Profiler")
 		const Loom::Profiler::Row& row = missed.thread->rows[missed.row];
 		CHECK(row.peak == doctest::Approx(sum));
 		CHECK(row.average == doctest::Approx(sum / 2.0));
-		CHECK(row.start == doctest::Approx(start));
 		CHECK(row.history[Loom::Profiler::Window - 2] == doctest::Approx(sum));
 		CHECK(row.history.back() == 0.0);
 	};

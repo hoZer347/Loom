@@ -55,6 +55,44 @@ namespace Loom
 		};
 	};
 
+	std::vector<StageTiming::Share> StageTiming::Shares(const std::vector<Profiler::Row>& rows)
+	{
+		double total = 0.0;
+		int deepest = 0;
+
+		for (const Profiler::Row& row : rows)
+		{
+			if (row.depth == 0)
+				total += row.average;
+
+			deepest = (std::max)(deepest, row.depth);
+		};
+
+		std::vector<Share> shares(rows.size());
+
+		if (total <= 0.0)
+			return shares;
+
+		// For each depth, where its next row begins and where the stage it
+		// is part of ends.
+		std::vector<double> next((size_t)deepest + 2, 0.0);
+		std::vector<double> end((size_t)deepest + 2, 1.0);
+
+		for (size_t at = 0; at < rows.size(); at++)
+		{
+			const size_t depth = (size_t)rows[at].depth;
+			const double from = next[depth];
+			const double to = (std::min)(from + rows[at].average / total, end[depth]);
+
+			shares[at] = { from, to };
+			next[depth] = to;
+			next[depth + 1] = from;
+			end[depth + 1] = to;
+		};
+
+		return shares;
+	};
+
 	void StageTiming::Lanes()
 	{
 		const std::vector<Profiler::Thread>& threads = Profiler::Threads();
@@ -67,7 +105,6 @@ namespace Loom
 		constexpr float lane_gap = 1.0f;
 		constexpr float label_padding = 2.0f;
 
-		const double frame = Profiler::FrameLength();
 		const float lane = ImGui::GetTextLineHeight() * lane_lines;
 		float label_width = 0.0f;
 
@@ -77,7 +114,7 @@ namespace Loom
 		const ImVec2 mouse = ImGui::GetIO().MousePos;
 		ImDrawList* const draw = ImGui::GetWindowDrawList();
 
-		ImGui::TextDisabled("%s", AverageFrame(frame).c_str());
+		ImGui::TextDisabled("%s", AverageFrame(Profiler::FrameLength()).c_str());
 
 		for (const Profiler::Thread& thread : threads)
 		{
@@ -97,15 +134,18 @@ namespace Loom
 			ImGui::PopID();
 
 			const bool hovered = ImGui::IsItemHovered();
+			const std::vector<Share> shares = Shares(thread.rows);
 			const Profiler::Row* under = nullptr;
 
-			for (const Profiler::Row& row : thread.rows)
+			for (size_t at = 0; at < thread.rows.size(); at++)
 			{
+				const Profiler::Row& row = thread.rows[at];
+
 				if (row.average <= 0.0)
 					continue;
 
-				const float from = left + width * (float)std::clamp(row.start / frame, 0.0, 1.0);
-				const float to = (std::max)(from + stage_narrowest_bar, left + width * (float)std::clamp((row.start + row.average) / frame, 0.0, 1.0));
+				const float from = left + width * (float)shares[at].from;
+				const float to = (std::max)(from + stage_narrowest_bar, left + width * (float)shares[at].to);
 				const ImVec2 low(from, corner.y + lane * (float)row.depth);
 				const ImVec2 high(to, low.y + lane - lane_gap);
 

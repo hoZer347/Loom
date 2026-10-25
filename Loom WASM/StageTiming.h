@@ -4,6 +4,11 @@
 
 #ifndef LOOM_FINAL
 
+#include "Profiler.h"
+
+#include <vector>
+
+
 namespace Loom
 {
 	/**
@@ -13,8 +18,20 @@ namespace Loom
 	*/
 	struct LOOM_API StageTiming final
 	{
-		// An average frame of the window laid out in time: for each thread a
-		// lane for each depth of its stages.
+		// Where a row sits across its thread's lanes, from 0 to 1.
+		struct Share
+		{
+			double from = 0.0;
+			double to = 0.0;
+		};
+
+		// One for each row: the stages share the whole width by their
+		// averages, and each one's parts fill its span from the left at the
+		// same scale, leaving what it spent outside them.
+		static std::vector<Share> Shares(const std::vector<Profiler::Row>& rows);
+
+		// An average frame of the window: for each thread a lane for each
+		// depth of its stages, laid out by their Shares.
 		static void Lanes();
 
 		// The Lanes, then for each thread its stages stacked over the trend

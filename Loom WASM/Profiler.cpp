@@ -20,9 +20,6 @@ namespace Loom
 		// recording with no frames ending, such as a test's, stays bounded.
 		constexpr size_t MOST_SPANS = 4096;
 
-		// A frame's start for a stage that did not run in it.
-		constexpr double NOT_RUN = -1.0;
-
 		// Where a thread never named is listed, and what it is called.
 		constexpr int UNNAMED_ORDER = std::numeric_limits<int>::max();
 		constexpr const char* UNNAMED = "Thread ";
@@ -40,7 +37,7 @@ namespace Loom
 		{
 			// Moves the parts to the order they begin in this frame, ahead of
 			// those that have not run in it.
-			Node& Part(const std::string& name, unsigned long long frame, double start)
+			Node& Part(const std::string& name, unsigned long long frame)
 			{
 				const auto found = std::find_if(parts.begin(), parts.end(), [&name](const Node& part) { return part.name == name; });
 				const size_t at = (size_t)(found - parts.begin());
@@ -53,14 +50,12 @@ namespace Loom
 					Node& part = parts.emplace_back();
 					part.name = name;
 					part.first = frame;
-					part.starts.fill(NOT_RUN);
 				};
 
 				std::rotate(parts.begin() + placed, parts.begin() + at, parts.begin() + at + 1);
 
 				Node& part = parts[placed++];
 				part.last = frame;
-				part.began = start;
 
 				return part;
 			};
@@ -71,10 +66,6 @@ namespace Loom
 			// as the window moves on.
 			std::array<double, Profiler::Window> history{ };
 			double sum = 0.0;
-
-			// Each frame's first start, from the frame's, or NOT_RUN.
-			std::array<double, Profiler::Window> starts{ };
-			double began = 0.0;
 
 			// Each whole Bucket's average, the slot a bucket's number picks
 			// overwritten as the trend moves on, and the sum of this one so far.
@@ -154,7 +145,6 @@ namespace Loom
 			const unsigned long long buckets = (frame + 1) / Profiler::Bucket;
 
 			node.history[frame % Profiler::Window] = node.sum;
-			node.starts[frame % Profiler::Window] = node.last == frame ? node.began : NOT_RUN;
 			node.gathered += node.sum;
 			node.sum = 0.0;
 			node.placed = 0;
@@ -178,9 +168,7 @@ namespace Loom
 			for (const Node& part : node.parts)
 			{
 				const unsigned long long counted = std::min<unsigned long long>(frame - part.first + 1, Profiler::Window);
-				Profiler::Row& row = rows.emplace_back(Profiler::Row{ part.name, depth, 0.0, 0.0, 0.0, { }, { } });
-				double began = 0.0;
-				int ran = 0;
+				Profiler::Row& row = rows.emplace_back(Profiler::Row{ part.name, depth, 0.0, 0.0, { }, { } });
 
 				for (int age = 0; age < Profiler::Window; age++)
 				{
@@ -189,19 +177,12 @@ namespace Loom
 					row.history[age] = part.history[slot];
 					row.average += part.history[slot];
 					row.peak = std::max(row.peak, part.history[slot]);
-
-					if (part.starts[slot] != NOT_RUN)
-					{
-						began += part.starts[slot];
-						ran++;
-					};
 				};
 
 				for (int point = 0; point < Profiler::Trend; point++)
 					row.trend[point] = part.trend[(buckets + point) % Profiler::Trend];
 
 				row.average /= (double)counted;
-				row.start = began / (double)std::max(ran, 1);
 
 				List(part, frame, depth + 1, rows);
 			};
@@ -341,7 +322,7 @@ namespace Loom
 
 				open.resize(depth);
 
-				Node& node = (depth == 0 ? log->root : *open.back()).Part(span.name, shared.frame, span.start - shared.frameStart);
+				Node& node = (depth == 0 ? log->root : *open.back()).Part(span.name, shared.frame);
 				node.sum += length;
 				open.push_back(&node);
 			};
