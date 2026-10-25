@@ -97,6 +97,7 @@ namespace Loom
 
 		// The line, counted from one, that defines the type named name, export
 		// macro and all, or zero when text does not define it outside a comment.
+		// A primary template is passed over, since no component is one.
 		static int DeclarationLine(const std::string& text, const std::string& name);
 
 		struct DeclaredScript

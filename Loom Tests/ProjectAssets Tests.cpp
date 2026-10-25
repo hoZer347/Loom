@@ -186,6 +186,25 @@ TEST_SUITE("ProjectAssets")
 		CHECK(Loom::ProjectAssets::DeclarationLine(text, "Glow.*") == 0);
 	};
 
+	TEST_CASE("a type's declaration line skips block comments and the template it shares a name with")
+	{
+		const std::string text =
+			"/**\n"
+			"* struct Patrol : Component<Patrol> { };\n"
+			"*/\n"
+			"template <typename Self>\n"
+			"struct Machine : Base<Self>\n"
+			"{ };\n"
+			"template <typename T> struct Patrol { };\n"
+			"/* struct Machine { }; */\n"
+			"struct Machine : Machine<Machine>\n"
+			"{ };\n"
+			"struct Patrol final : Component<Patrol> { };\n";
+
+		CHECK(Loom::ProjectAssets::DeclarationLine(text, "Machine") == 9);
+		CHECK(Loom::ProjectAssets::DeclarationLine(text, "Patrol") == 11);
+	};
+
 	TEST_CASE("a script is a type that names itself to its base, and a state is one made a State")
 	{
 		const std::string text =

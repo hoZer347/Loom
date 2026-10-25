@@ -451,6 +451,7 @@ void main()
 			text.find(name) == std::string::npos)
 			return 0;
 
+		static const std::regex template_head("\\btemplate\\s*<");
 		const std::regex declared("\\b(?:struct|class)\\s+(?:\\w+\\s+)?" + name + "\\s*(?:final\\s*)?(?::(?!:)|\\{)");
 
 		for (auto match = std::sregex_iterator(text.begin(), text.end(), declared); match != std::sregex_iterator(); match++)
@@ -460,6 +461,21 @@ void main()
 			const size_t line_start = newline == std::string::npos ? 0 : newline + 1;
 
 			if (text.substr(line_start, start - line_start).find("//") != std::string::npos)
+				continue;
+
+			const size_t opened = text.rfind("/*", start);
+			const size_t closed = text.rfind("*/", start);
+
+			if (opened != std::string::npos && (closed == std::string::npos || closed < opened))
+				continue;
+
+			// A component is never a primary template, only what one is derived
+			// from, so a template head on this line or the one above rules it out.
+			const size_t previous = newline == std::string::npos || newline == 0
+				? line_start
+				: text.rfind('\n', newline - 1) + 1;
+
+			if (std::regex_search(text.substr(previous, start - previous), template_head))
 				continue;
 
 			return 1 + (int)std::count(text.begin(), text.begin() + start, '\n');
