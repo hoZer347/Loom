@@ -3228,6 +3228,48 @@ namespace Loom
 			std::cerr << "Could not write the component categories to " << m_projectFile << std::endl;
 	};
 
+	Editor::SourceLine Editor::FindSource(const std::string& component) const
+	{
+		std::vector<std::string> files{ };
+
+		if (const auto entry = m_scriptEntries.find(component); entry != m_scriptEntries.end() && !entry->second.file.empty())
+			files.push_back(entry->second.file);
+
+		std::error_code code;
+
+		for (auto entry = std::filesystem::recursive_directory_iterator(std::filesystem::path(ProjectTemplate::EngineRoot()) / "Loom WASM", code);
+			entry != std::filesystem::recursive_directory_iterator();
+			entry.increment(code))
+			if (ProjectAssets::IsScriptFile(entry->path().filename().string()))
+				files.push_back(entry->path().string());
+
+		for (const std::string& file : files)
+			if (const int line = ProjectAssets::DeclarationLine(ProjectAssets::ReadText(file), component))
+				return SourceLine{ file, line };
+
+		return { };
+	};
+
+	void Editor::DrawSourcePopup(const std::string& component)
+	{
+		if (!ImGui::BeginPopupContextItem())
+			return;
+
+		if (ImGui::IsWindowAppearing())
+			m_componentSource = FindSource(component);
+
+		const bool found = !m_componentSource.path.empty();
+
+		const std::string where = found
+			? std::filesystem::path(m_componentSource.path).filename().string() + ':' + std::to_string(m_componentSource.line)
+			: "";
+
+		if (ImGui::MenuItem("Go to Source", where.c_str(), false, found))
+			OpenInVisualStudio(m_componentSource.path, m_componentSource.line);
+
+		ImGui::EndPopup();
+	};
+
 	void Editor::DrawModelPreview()
 	{
 		constexpr float max_preview_side = 512.0f;
@@ -3279,7 +3321,11 @@ namespace Loom
 
 	void Editor::DrawTransform(GameObject* gameObject, float column)
 	{
-		if (!ImGui::CollapsingHeader("Transform", header_flags))
+		const bool open = ImGui::CollapsingHeader("Transform", header_flags);
+
+		DrawSourcePopup("Transform");
+
+		if (!open)
 			return;
 
 		Transform& transform = gameObject->transform;
@@ -3350,6 +3396,8 @@ namespace Loom
 		const std::string name = ComponentRegistry::NameOf(*component);
 
 		const bool open = ImGui::CollapsingHeader(name.c_str(), header_flags);
+
+		DrawSourcePopup(name);
 
 		// The remove button rides on the header's own line, Unity-style.
 		ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::GetFrameHeight());

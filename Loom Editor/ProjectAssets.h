@@ -95,6 +95,10 @@ namespace Loom
 		// defines nothing.
 		static std::vector<std::string> DeclaredTypes(const std::string& text);
 
+		// The line, counted from one, that defines the type named name, export
+		// macro and all, or zero when text does not define it outside a comment.
+		static int DeclarationLine(const std::string& text, const std::string& name);
+
 		struct DeclaredScript
 		{
 			std::string name;

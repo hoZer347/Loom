@@ -448,6 +448,20 @@ namespace Loom
 		// Right-click on a component in the Add Component menu: the category it
 		// is filed under in this project.
 		void DrawCategoryPopup(const std::string& component);
+
+		struct SourceLine
+		{
+			// Empty when no header defines the type.
+			std::string path;
+			int line = 0;
+		};
+
+		// Where a component type is defined: the scripts project's header for a
+		// script, otherwise the engine's own.
+		SourceLine FindSource(const std::string& component) const;
+
+		// Right-click on a component's header in the Inspector.
+		void DrawSourcePopup(const std::string& component);
 		void DrawFields(LoomObject& object, const std::vector<std::string>& labels, float column);
 		void DrawModelPreview();
 		void DrawScene();
@@ -1045,6 +1059,9 @@ namespace Loom
 		ComponentMenu m_componentMenu;
 		char m_categoryBuffer[max_category_length + 1]{ };
 		bool m_openAddComponent = false;
+
+		// The source of the component whose popup is open, found as it opens.
+		SourceLine m_componentSource{ };
 
 		// Set by "Step": updating is switched on for exactly one frame and
 		// switched back off at the top of the next one.

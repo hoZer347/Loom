@@ -163,6 +163,29 @@ TEST_SUITE("ProjectAssets")
 		CHECK(Loom::ProjectAssets::DeclaredTypes(text) == std::vector<std::string>{ "Glow", "Glow", "Shimmer", "GlowSettings" });
 	};
 
+	TEST_CASE("a type's declaration line skips forward declarations, comments and longer names")
+	{
+		const std::string text =
+			"struct Glow;\n"
+			"// struct Glow : Loom::Component<Glow> { };\n"
+			"struct GlowSettings { };\n"
+			"struct Glow : Loom::Component<Glow> { };\n"
+			"struct LOOM_API Shimmer final\n"
+			"\t: Component<Shimmer, \"Effects\">\n"
+			"{ };\n"
+			"class Flicker\n"
+			"{ };\n"
+			"struct Outer::Inner { };\n";
+
+		CHECK(Loom::ProjectAssets::DeclarationLine(text, "Glow") == 4);
+		CHECK(Loom::ProjectAssets::DeclarationLine(text, "GlowSettings") == 3);
+		CHECK(Loom::ProjectAssets::DeclarationLine(text, "Shimmer") == 5);
+		CHECK(Loom::ProjectAssets::DeclarationLine(text, "Flicker") == 8);
+		CHECK(Loom::ProjectAssets::DeclarationLine(text, "Outer") == 0);
+		CHECK(Loom::ProjectAssets::DeclarationLine(text, "Missing") == 0);
+		CHECK(Loom::ProjectAssets::DeclarationLine(text, "Glow.*") == 0);
+	};
+
 	TEST_CASE("a script is a type that names itself to its base, and a state is one made a State")
 	{
 		const std::string text =

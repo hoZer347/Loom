@@ -443,6 +443,31 @@ void main()
 		return names;
 	};
 
+	int ProjectAssets::DeclarationLine(const std::string& text, const std::string& name)
+	{
+		// Anything but a plain name would be read as part of the pattern.
+		if (name.empty() ||
+			!std::all_of(name.begin(), name.end(), [](unsigned char c) { return std::isalnum(c) || c == '_'; }) ||
+			text.find(name) == std::string::npos)
+			return 0;
+
+		const std::regex declared("\\b(?:struct|class)\\s+(?:\\w+\\s+)?" + name + "\\s*(?:final\\s*)?(?::(?!:)|\\{)");
+
+		for (auto match = std::sregex_iterator(text.begin(), text.end(), declared); match != std::sregex_iterator(); match++)
+		{
+			const size_t start = (size_t)match->position();
+			const size_t newline = text.rfind('\n', start);
+			const size_t line_start = newline == std::string::npos ? 0 : newline + 1;
+
+			if (text.substr(line_start, start - line_start).find("//") != std::string::npos)
+				continue;
+
+			return 1 + (int)std::count(text.begin(), text.begin() + start, '\n');
+		};
+
+		return 0;
+	};
+
 	std::vector<ProjectAssets::DeclaredScript> ProjectAssets::DeclaredScripts(const std::string& text)
 	{
 		static const std::regex declared("\\b(?:struct|class)\\s+(\\w+)\\s*(?:final\\s*)?:([^{;]*)\\{");
