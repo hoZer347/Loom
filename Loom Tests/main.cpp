@@ -151,7 +151,12 @@ int main(int argc, char** argv)
 #ifndef __EMSCRIPTEN__
 	// The executable's own path, since argv[0] is only what it was launched as.
 	char* executable = nullptr;
-	_get_pgmptr(&executable);
+
+	if (_get_pgmptr(&executable) != 0 || !executable)
+	{
+		std::fprintf(stderr, "The suite could not find its own executable to put screenshots beside\n");
+		return EXIT_FAILURE;
+	};
 
 	LoomTests::ScreenshotFolder() = std::filesystem::path(executable).parent_path() / "Screenshots";
 	std::filesystem::remove_all(LoomTests::ScreenshotFolder());

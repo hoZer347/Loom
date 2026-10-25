@@ -129,29 +129,6 @@ namespace LoomTests
 		};
 
 	private:
-		Image Read(const std::function<void()>& frame)
-		{
-			Image image;
-
-			Loom::Renderer::Get()->Capture(
-				[&image](int width, int height, const std::vector<uint8_t>& rgb)
-				{
-					image.width = width;
-					image.height = height;
-					image.rgb.resize(rgb.size());
-
-					// The renderer hands rows back bottom first.
-					const size_t row = (size_t)width * Image::BYTES_PER_PIXEL;
-
-					for (int y = 0; y < height; y++)
-						std::copy_n(rgb.data() + (size_t)(height - 1 - y) * row, row, image.rgb.data() + (size_t)y * row);
-				});
-
-			frame();
-
-			return image;
-		};
-
 		// How the Engine opens for a test, put back once it has closed, even
 		// when it could not open.
 		struct HiddenSettings
@@ -184,6 +161,29 @@ namespace LoomTests
 			bool m_vsync;
 			bool m_doGUI;
 			Loom::Backend m_backend;
+		};
+
+		Image Read(const std::function<void()>& frame)
+		{
+			Image image;
+
+			Loom::Renderer::Get()->Capture(
+				[&image](int width, int height, const std::vector<uint8_t>& rgb)
+				{
+					image.width = width;
+					image.height = height;
+					image.rgb.resize(rgb.size());
+
+					// The renderer hands rows back bottom first.
+					const size_t row = (size_t)width * Image::BYTES_PER_PIXEL;
+
+					for (int y = 0; y < height; y++)
+						std::copy_n(rgb.data() + (size_t)(height - 1 - y) * row, row, image.rgb.data() + (size_t)y * row);
+				});
+
+			frame();
+
+			return image;
 		};
 
 		// Declared first, so the Engine opens after them and closes before
