@@ -135,7 +135,7 @@ namespace Loom
 
 			const bool hovered = ImGui::IsItemHovered();
 			const std::vector<Share> shares = Shares(thread.rows);
-			const Profiler::Row* under = nullptr;
+			int under = -1;
 
 			for (size_t at = 0; at < thread.rows.size(); at++)
 			{
@@ -156,11 +156,24 @@ namespace Loom
 
 				// A part is drawn after its stage, so the deepest under the mouse wins.
 				if (hovered && mouse.x >= low.x && mouse.x < high.x && mouse.y >= low.y && mouse.y < high.y)
-					under = &row;
+					under = (int)at;
 			};
 
-			if (under)
-				ImGui::SetTooltip("%s: %.3f ms average, %.3f ms peak", under->name.c_str(), under->average, under->peak);
+			if (under < 0)
+				continue;
+
+			constexpr double percent = 100.0;
+
+			const Profiler::Row& row = thread.rows[under];
+			const Share& share = shares[under];
+
+			// Its share of the thread, in the colour of its bar.
+			ImGui::BeginTooltip();
+			ImGui::TextUnformatted(row.name.c_str());
+			ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(StageColour(row.name)), "%.1f%%", percent * (share.to - share.from));
+			ImGui::SameLine(0.0f, 0.0f);
+			ImGui::Text(" of %s, %.3f ms average, %.3f ms peak", thread.name.c_str(), row.average, row.peak);
+			ImGui::EndTooltip();
 		};
 	};
 
