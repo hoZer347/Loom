@@ -58,9 +58,10 @@ namespace Loom
 		renderer->PushTarget(m_texture);
 		renderer->Clear(clear_colour, true);
 
+		// Noted even when left out, so what it draws is not noted by a pass it is drawn inside.
 		m_pass.Begin();
 		draw();
-		const bool passes = m_pass.End();
+		const bool passes = m_pass.End() && m_pixelPasses;
 
 		if (passes && !m_result)
 			m_result = renderer->CreateColorTarget(m_width, m_height);

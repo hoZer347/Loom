@@ -89,7 +89,7 @@ namespace Loom
 		{ "LoomSceneDepth", "float LoomSceneDepth(ivec2 pixel)", "Pixel pass: the view's depth at a pixel, 0 at the near plane and 1 at the far or where nothing was drawn." },
 		{ "LoomScenePosition", "vec3 LoomScenePosition(ivec2 pixel)", "Pixel pass: where in the world a pixel of the view is." },
 		{ "LoomSceneNormal", "vec3 LoomSceneNormal(ivec2 pixel)", "Pixel pass: the world space normal of the surface at a pixel, facing the camera, or zero where nothing was drawn." },
-		{ "PixelKernel", "PixelKernel3x3 name;", "Pixel pass: declared outside any function, the colours of the 3x3 pixels (any odd size) around the one being drawn, as name.pixels, with name.offsets, name.weights (a Gaussian), name.centre and name.count." },
+		{ "PixelKernel", "PixelKernel3x3 name;", "Pixel pass: declared outside any function, the colours of the 3x3 pixels (any odd size up to 15) around the one being drawn, as name.pixels, with name.offsets, name.weights (a Gaussian), name.centre and name.count." },
 		{ "PositionKernel", "PositionKernel3x3 name;", "Pixel pass: as PixelKernel, with the world positions of the pixels as name.positions." },
 		{ "NormalKernel", "NormalKernel3x3 name;", "Pixel pass: as PixelKernel, with the world space normals of the pixels as name.normals." },
 	};

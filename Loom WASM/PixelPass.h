@@ -51,8 +51,9 @@ namespace Loom
 		// Each pass's program, in the order its first material was drawn.
 		std::vector<uint32_t> m_noted;
 
-		// What all but the last pass draw into, in turn.
-		uint32_t m_intermediates[2]{ };
+		// What all but the last pass draw into, in turn, each reading the one before.
+		static constexpr size_t INTERMEDIATES = 2;
+		uint32_t m_intermediates[INTERMEDIATES]{ };
 		glm::ivec2 m_size{ 0 };
 
 		// Draws a texture as it is, for a view with no passes.

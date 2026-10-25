@@ -232,4 +232,25 @@ TEST_SUITE("PixelPass")
 		REQUIRE(renderer.drawn.size() == 1);
 		CHECK(renderer.drawnInto[0] == viewport.GetTexture());
 	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a viewport that leaves pixel passes out shows what it drew, and notes nothing for a pass it is drawn inside")
+	{
+		RecordingRenderer renderer;
+		Passed passed("passed");
+		Loom::PixelPass outer;
+		Loom::EditorViewport viewport(false);
+
+		outer.Begin();
+
+		viewport.Render(
+			VIEW.x,
+			VIEW.y,
+			nullptr,
+			[&]() { Loom::PixelPass::Note(passed.material); },
+			[&]() { renderer.Draw(0, 0, nullptr, 0, 0, Loom::VertexFormat::Position); });
+
+		CHECK_FALSE(outer.End());
+		REQUIRE(renderer.drawn.size() == 1);
+		CHECK(renderer.drawnInto[0] == viewport.GetTexture());
+	};
 };

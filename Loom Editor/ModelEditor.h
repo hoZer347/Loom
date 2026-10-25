@@ -223,7 +223,7 @@ namespace Loom
 			float pitch = 0.0f;
 			Camera camera;
 
-			EditorViewport viewport;
+			EditorViewport viewport{ false };
 			View view;
 
 			Drag drag = Drag::None;

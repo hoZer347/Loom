@@ -16,7 +16,9 @@ namespace Loom
 	*/
 	struct EditorViewport final
 	{
-		EditorViewport() = default;
+		// A view whose shaders' pixel passes would run over more than the scene,
+		// such as an editing overlay, leaves them out.
+		explicit EditorViewport(bool pixel_passes = true) : m_pixelPasses(pixel_passes) { };
 		~EditorViewport();
 
 		EditorViewport(const EditorViewport&) = delete;
@@ -52,6 +54,7 @@ namespace Loom
 		uint32_t m_result = 0;
 		uint32_t m_shown = 0;
 		PixelPass m_pass;
+		bool m_pixelPasses;
 
 		int m_width = 0;
 		int m_height = 0;
