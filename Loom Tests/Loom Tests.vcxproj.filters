@@ -208,8 +208,12 @@
     <ClCompile Include="StateMachine Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="Render Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Test Support.h" />
+    <ClInclude Include="Render Support.h" />
   </ItemGroup>
 </Project>

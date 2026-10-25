@@ -100,6 +100,7 @@ needs Chrome or Edge installed.
 | `EditCommands` | The editor's Ctrl+Z/Y/X/C/V and Delete read from real ImGui key events, a text box keeping them, held keys not repeating, which object can be taken and where a paste lands, cut/copy/paste through undo |
 | `ProjectAssets` | Create > Script writing one self-registering header in the project's namespace, refusing a taken, registered or non-C++ name |
 | `AxisGui` | One axis-coloured stripe over each of the first three drag boxes, nothing else added beside ImGui's own `DragScalarN`, nothing drawn in a collapsed window |
+| `Render` | Desktop only: a frame read back at the window's size, top row first, a whole `renderFrame` drawing a scene, and a screenshot saved as a PNG of that size |
 
 ## How it is wired up
 
@@ -114,8 +115,24 @@ to emcc, so the two builds cannot drift apart. ImGui is linked as a library on
 the desktop and compiled from source for the web, since there is no prebuilt
 wasm artefact.
 
-Nothing constructs an `Engine`, so no window and no GL context is ever created.
-That is what makes the suite runnable in CI and under node.
+Only `LoomTests::RenderFixture` constructs an `Engine`. Everything else runs
+with no window and no GL context, which is what makes the suite runnable in CI
+and under node.
+
+### Rendering
+
+A case that needs to see what is drawn includes `Render Support.h` and uses
+`TEST_CASE_FIXTURE(LoomTests::RenderFixture, ...)`. The fixture opens the
+`Engine` on a hidden window, `DEFAULT_SIZE` pixels across, with vsync and its
+GUI off, and closes it when the case ends. `Frame()` runs a whole
+`renderFrame` and `Draw(...)` clears the window and runs what it is given;
+both hand back a `LoomTests::Image`. `At(x, y)` reads a pixel from the top
+left, and `Save(name)` writes `<name>.png` to `Screenshots` beside the
+executable, which `main` empties as a run starts. A demo's review can show
+them with `review.ps1 -ShowImages`.
+
+These cases are desktop only, inside `#ifndef __EMSCRIPTEN__`, since node has
+no GL.
 
 ### The task queue
 
@@ -154,9 +171,9 @@ and letting that fire after the object has gone runs it against freed memory.
 
 ## Not covered
 
-- Anything needing a live GL context: `Engine`'s constructor, `Start`,
-  `renderFrame`, shader compilation, `Mesh::OnRender` past its null guards,
-  `Mesh::Draw`, `Light::RenderShadowMap`, `Apply` and `ApplyNone`,
+- Anything needing a live GL context, beyond what the `Render` suite and
+  `RenderFixture` cases draw: `Start`, `Mesh::OnRender` past its null guards,
+  `Light::RenderShadowMap`, `Apply` and `ApplyNone`,
   `Camera::Apply`, `Material::Apply`, `Engine::CaptureFrame`, `Scene::Render`
   setting and clearing `Light::current` (a light renders its shadow map).
   `Loom Editor.exe Demos/Shadows --screenshot <file>` is the check for those,

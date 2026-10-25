@@ -12,6 +12,7 @@
 #include "doctest.h"
 
 #include "Test Support.h"
+#include "Render Support.h"
 
 #include <cstdio>
 #include <filesystem>
@@ -147,6 +148,11 @@ int main(int argc, char** argv)
 
 	context.applyCommandLine(argc, argv);
 
+#ifndef __EMSCRIPTEN__
+	LoomTests::ScreenshotFolder() = std::filesystem::absolute(argv[0]).parent_path() / "Screenshots";
+	std::filesystem::remove_all(LoomTests::ScreenshotFolder());
+#endif
+
 	return context.run();
 };
 
@@ -168,6 +174,14 @@ TEST_SUITE("Loom Tests")
 	TEST_CASE("the suite's temp files go in a folder of its own")
 	{
 		CHECK(std::filesystem::equivalent(std::filesystem::temp_directory_path(), tempFolder.folder));
+	};
+
+	TEST_CASE("the suite's screenshots go in a folder beside it")
+	{
+		char* executable = nullptr;
+		REQUIRE(_get_pgmptr(&executable) == 0);
+
+		CHECK(LoomTests::ScreenshotFolder() == std::filesystem::path(executable).parent_path() / "Screenshots");
 	};
 #endif
 };

@@ -188,6 +188,7 @@
     <ClCompile Include="Sprite Tests.cpp" />
     <ClCompile Include="Ui Tests.cpp" />
     <ClCompile Include="SelectionOutline Tests.cpp" />
+    <ClCompile Include="Render Tests.cpp" />
     <ClCompile Include="Mesh Tests.cpp" />
     <ClCompile Include="Animation Tests.cpp" />
     <ClCompile Include="Material Tests.cpp" />
@@ -219,6 +220,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Test Support.h" />
+    <ClInclude Include="Render Support.h" />
   </ItemGroup>
   <ItemGroup>
     <!-- The engine sources under test are compiled straight into the test
@@ -228,8 +230,8 @@
          emcc, so both builds cover exactly the same code.
          Wildcards rather than a fixed list: files come and go in Loom WASM
          often enough that a hand-maintained copy would be stale within a day.
-         Nothing here constructs an Engine, so no window and no GL context is
-         ever created; the tests drive the parts that do not need one. -->
+         Only the Render suite's RenderFixture constructs an Engine, on a
+         hidden window; the rest drive the parts that need no GL context. -->
     <ClCompile Include="..\Loom WASM\*.cpp" />
     <ClCompile Include="$(VulkanSdk)\Source\SPIRV-Reflect\spirv_reflect.c" />
     <ClCompile Include="..\Loom WASM\Utilities\*.cpp" Exclude="..\Loom WASM\Utilities\_*.cpp" />

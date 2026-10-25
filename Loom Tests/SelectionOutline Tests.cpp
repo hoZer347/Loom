@@ -1,6 +1,7 @@
 #include "doctest.h"
 
 #include "Test Support.h"
+#include "Render Support.h"
 
 #include "Camera.h"
 #include "GameObject.h"
@@ -167,4 +168,64 @@ TEST_SUITE("SelectionOutline")
 		CHECK(renderer.drawn == std::vector<uint32_t>{ renderer.programs.at(SPRITE_MASK), renderer.programs.at(EDGE) });
 		CHECK(renderer.drawnInto == std::vector<uint32_t>{ Mask(renderer), RecordingRenderer::WINDOW });
 	};
+
+#ifndef __EMSCRIPTEN__
+	TEST_CASE_FIXTURE(LoomTests::RenderFixture, "a selection running off the view is ringed along the view's edge where it leaves, and nowhere else along it")
+	{
+		// The left half of clip space and beyond it, a quarter of the way up and down.
+		const std::vector<float> PAST_THE_LEFT
+		{
+			-2.0f, -0.5f, 0.0f,  0.0f, -0.5f, 0.0f,  0.0f, 0.5f, 0.0f,
+			-2.0f, -0.5f, 0.0f,  0.0f,  0.5f, 0.0f, -2.0f, 0.5f, 0.0f,
+		};
+
+		// The ring's colour wherever it is wholly there, give or take how the
+		// GPU rounds it to eight bits.
+		const glm::ivec3 OUTLINE(255, 140, 26);
+		constexpr int ROUNDING = 1;
+
+		const auto ringed =
+			[&](const glm::u8vec3& pixel)
+			{
+				return glm::all(glm::lessThanEqual(glm::abs(glm::ivec3(pixel) - OUTLINE), glm::ivec3(ROUNDING)));
+			};
+
+		std::istringstream source(
+			"// ===VERTEX===\n"
+			"layout(location = 0) in vec3 aPos;\n"
+			"void main() { gl_Position = vec4(aPos, 1.0); }\n"
+			"// ===FRAGMENT===\n"
+			"out vec4 FragColor;\n"
+			"void main() { FragColor = vec4(1.0); }\n");
+		Loom::Shader shader("selection outline off the view", source);
+
+		Loom::Scene scene("selection outline off the view");
+		Pump();
+
+		Loom::Camera* camera = scene.Attach<Loom::Camera>();
+		Loom::GameObject* selected = scene.AddChild("Past The Left");
+		Pump();
+
+		selected->Attach<Loom::Material>()->shader = &shader;
+		selected->Attach<Loom::Mesh>()->m_vertices = PAST_THE_LEFT;
+		Pump();
+
+		Loom::SelectionOutline outline;
+		const LoomTests::Image image = Draw([&]() { outline.Draw(*selected, *camera); });
+
+		image.Save("SelectionOutline - off the view's edge");
+
+		const int middle = image.height / 2;
+		const int cut = image.width / 2;
+
+		// Where it leaves the view, and where its own right side is.
+		CHECK(ringed(image.At(0, middle)));
+		CHECK(ringed(image.At(cut + 1, middle)));
+
+		// The view's edge above and below it, and the selection's inside.
+		CHECK_FALSE(ringed(image.At(0, 0)));
+		CHECK_FALSE(ringed(image.At(0, image.height - 1)));
+		CHECK_FALSE(ringed(image.At(cut / 2, middle)));
+	};
+#endif
 };
