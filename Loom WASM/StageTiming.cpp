@@ -185,9 +185,13 @@ namespace Loom
 		if (threads.empty())
 			return;
 
+		bool every_frame = Profiler::EveryFrame();
+
+		if (ImGui::Checkbox("Every frame", &every_frame))
+			Profiler::SetEveryFrame(every_frame);
+
 		Lanes();
 
-		const double frame = Profiler::FrameLength();
 		const ImVec2 mouse = ImGui::GetIO().MousePos;
 		ImDrawList* const draw = ImGui::GetWindowDrawList();
 
@@ -197,7 +201,7 @@ namespace Loom
 		constexpr int graph_frames = Profiler::Trend * Profiler::Bucket;
 		constexpr double milliseconds_per_second = 1000.0;
 
-		const double seconds_per_point = frame * (double)Profiler::Bucket / milliseconds_per_second;
+		const double seconds_per_point = Profiler::Spacing() * (double)Profiler::Bucket / milliseconds_per_second;
 
 		ImGui::TextDisabled("Milliseconds a frame over the last %d, about %.0f s", graph_frames, seconds_per_point * (double)Profiler::Trend);
 

@@ -34,8 +34,9 @@ namespace Loom
 		// depth of its stages, laid out by their Shares.
 		static void Lanes();
 
-		// The Lanes, then for each thread its stages stacked over the trend
-		// and each one's average and peak.
+		// A switch to record every frame rather than one a poll, the Lanes,
+		// then for each thread its stages stacked over the trend and each
+		// one's average and peak.
 		static void Details();
 
 		// A window of the Lanes over the top left of the game, recording only

@@ -20,6 +20,9 @@ namespace Loom
 		// recording with no frames ending, such as a test's, stays bounded.
 		constexpr size_t MOST_SPANS = 4096;
 
+		// In milliseconds from one poll to the next.
+		constexpr double POLL = 1000.0 / (double)Profiler::Rate;
+
 		// Where a thread never named is listed, and what it is called.
 		constexpr int UNNAMED_ORDER = std::numeric_limits<int>::max();
 		constexpr const char* UNNAMED = "Thread ";
@@ -103,6 +106,11 @@ namespace Loom
 			double frameLength = 0.0;
 			unsigned long long frame = 0;
 
+			// Each recorded frame's start, and when the next poll is.
+			std::array<double, Profiler::Window> frameStarts{ };
+			double spacing = 0.0;
+			double due = 0.0;
+
 			std::vector<Profiler::Thread> threads{ };
 		};
 
@@ -115,6 +123,10 @@ namespace Loom
 		};
 
 		std::atomic<bool> s_recording{ false };
+		std::atomic<bool> s_everyFrame{ false };
+
+		// Whether the frame running now is recorded.
+		std::atomic<bool> s_polled{ false };
 
 		thread_local Log* t_log = nullptr;
 		thread_local std::vector<const char*> t_open{ };
@@ -122,6 +134,24 @@ namespace Loom
 		double Now()
 		{
 			return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - Shared().origin).count();
+		};
+
+		// Decides whether the frame starting now is recorded. Polls keep to
+		// their schedule rather than to the frame that took each, unless a
+		// frame ran past a whole poll.
+		void Poll(Registry& shared, double now)
+		{
+			const bool due = now >= shared.due;
+
+			if (due)
+				shared.due = std::max(shared.due + POLL, now);
+
+			const bool next = due || s_everyFrame.load(std::memory_order_relaxed);
+
+			if (next)
+				shared.frameStart = now;
+
+			s_polled.store(next, std::memory_order_relaxed);
 		};
 
 		Log& ThisThread()
@@ -190,7 +220,7 @@ namespace Loom
 	};
 
 	Profiler::Stage::Stage(const char* name) :
-		m_open(s_recording.load(std::memory_order_relaxed))
+		m_open(s_recording.load(std::memory_order_relaxed) && s_polled.load(std::memory_order_relaxed))
 	{
 		if (!m_open)
 			return;
@@ -250,18 +280,31 @@ namespace Loom
 		if (recording)
 		{
 			shared.frameStart = Now();
+			shared.due = shared.frameStart + POLL;
+			s_polled.store(true, std::memory_order_relaxed);
 			return;
 		};
 
 		shared.threads.clear();
 		shared.frameLengths.fill(0.0);
 		shared.frameLength = 0.0;
+		shared.spacing = 0.0;
 		shared.frame = 0;
 	};
 
 	bool Profiler::Recording()
 	{
 		return s_recording.load(std::memory_order_relaxed);
+	};
+
+	void Profiler::SetEveryFrame(bool every)
+	{
+		s_everyFrame.store(every, std::memory_order_relaxed);
+	};
+
+	bool Profiler::EveryFrame()
+	{
+		return s_everyFrame.load(std::memory_order_relaxed);
 	};
 
 	const char* Profiler::Current()
@@ -279,13 +322,35 @@ namespace Loom
 
 		std::lock_guard<std::mutex> lock(shared.mutex);
 
+		// A stage of a recorded frame may close in one that is not.
+		if (!s_polled.load(std::memory_order_relaxed))
+		{
+			for (const std::unique_ptr<Log>& log : shared.logs)
+			{
+				std::lock_guard<std::mutex> named(log->mutex);
+				log->recorded.clear();
+			};
+
+			Poll(shared, now);
+			return;
+		};
+
+		const unsigned long long counted = std::min<unsigned long long>(shared.frame + 1, Window);
+
 		shared.frameLengths[shared.frame % Window] = now - shared.frameStart;
 		shared.frameLength = 0.0;
 
 		for (const double length : shared.frameLengths)
 			shared.frameLength += length;
 
-		shared.frameLength /= (double)std::min<unsigned long long>(shared.frame + 1, Window);
+		shared.frameLength /= (double)counted;
+
+		shared.frameStarts[shared.frame % Window] = shared.frameStart;
+		shared.spacing =
+			counted > 1
+				? (shared.frameStart - shared.frameStarts[(shared.frame + 1 - counted) % Window]) / (double)(counted - 1)
+				: shared.frameLength;
+
 		shared.threads.clear();
 
 		std::vector<Recorded> recorded{ };
@@ -339,8 +404,8 @@ namespace Loom
 		for (auto& [order, thread] : listed)
 			shared.threads.push_back(std::move(thread));
 
-		shared.frameStart = now;
 		shared.frame++;
+		Poll(shared, now);
 	};
 
 	const std::vector<Profiler::Thread>& Profiler::Threads()
@@ -351,6 +416,11 @@ namespace Loom
 	double Profiler::FrameLength()
 	{
 		return Shared().frameLength;
+	};
+
+	double Profiler::Spacing()
+	{
+		return Shared().spacing;
 	};
 };
 #endif

@@ -42,12 +42,13 @@ namespace
 		return { };
 	};
 
-	// Starts each test recording, on a frame of its own, since tests before
-	// may have filled the last with stages of theirs.
+	// Starts each test recording every frame, on a frame of its own, since
+	// tests before may have filled the last with stages of theirs.
 	struct NewFrame
 	{
 		NewFrame()
 		{
+			Loom::Profiler::SetEveryFrame(true);
 			Loom::Profiler::SetRecording(true);
 			Loom::Profiler::EndFrame();
 		};
@@ -55,6 +56,7 @@ namespace
 		~NewFrame()
 		{
 			Loom::Profiler::SetRecording(false);
+			Loom::Profiler::SetEveryFrame(false);
 		};
 	};
 };
@@ -276,6 +278,42 @@ TEST_SUITE("Profiler")
 		CHECK(after.thread->rows[after.row].depth == 0);
 		CHECK_FALSE(FindRow("Profiler stopped inside").thread);
 		CHECK_FALSE(FindRow("Profiler started inside").thread);
+	};
+
+	TEST_CASE_FIXTURE(NewFrame, "short of every frame, only the frame a poll falls due in is recorded")
+	{
+		constexpr auto poll = std::chrono::ceil<std::chrono::milliseconds>(std::chrono::duration<double>(1.0 / Loom::Profiler::Rate));
+
+		Loom::Profiler::SetEveryFrame(false);
+
+		{
+			LOOM_STAGE("Profiler polled");
+		};
+
+		Loom::Profiler::EndFrame();
+		CHECK(FindRow("Profiler polled").thread);
+
+		{
+			LOOM_STAGE("Profiler between polls");
+			CHECK(Loom::Profiler::Current() == nullptr);
+		};
+
+		Loom::Profiler::EndFrame();
+		CHECK_FALSE(FindRow("Profiler between polls").thread);
+
+		Busy(poll);
+		Loom::Profiler::EndFrame();
+
+		{
+			LOOM_STAGE("Profiler next poll");
+		};
+
+		Loom::Profiler::EndFrame();
+		CHECK(FindRow("Profiler next poll").thread);
+		// The fixture's frame began the poll before, two recorded frames back.
+		constexpr double spaces = 2.0;
+		constexpr double milliseconds_per_second = 1000.0;
+		CHECK(Loom::Profiler::Spacing() * spaces >= milliseconds_per_second / (double)Loom::Profiler::Rate);
 	};
 
 	TEST_CASE_FIXTURE(NewFrame, "a worker's share of a For counts towards the stage it was started in")

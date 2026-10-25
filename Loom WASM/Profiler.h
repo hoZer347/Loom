@@ -34,18 +34,24 @@ namespace Loom
 	*   towards the stage the For was started in
 	* - The Engine ends each frame, which is when what every thread recorded
 	*   is gathered, so a frame is read once it is over
+	* - Unless SetEveryFrame, a frame is recorded only once a poll is due,
+	*   Rate times a second, so the window spans the same time at any
+	*   frame rate. The frames between record nothing
 	*/
 	struct LOOM_API Profiler final
 	{
-		// The frames all of a Row but its trend reaches back over.
+		// The recorded frames all of a Row but its trend reaches back over.
 		static constexpr int Window = 100;
 
-		// The frames each point of a Row's trend is the average of.
+		// The recorded frames each point of a Row's trend is the average of.
 		static constexpr int Bucket = 10;
 
 		// The points a Row's trend holds, so it reaches back Trend * Bucket
-		// frames.
+		// recorded frames.
 		static constexpr int Trend = 300;
+
+		// The polls a second, the most frames recorded unless SetEveryFrame.
+		static constexpr int Rate = 60;
 
 		// A stage as it has run on a thread, in milliseconds a frame: a frame
 		// it did not run in counts as none, and one it ran in more than once
@@ -103,6 +109,10 @@ namespace Loom
 		static void SetRecording(bool recording);
 		static bool Recording();
 
+		// Off until turned on, recording each frame rather than one a poll.
+		static void SetEveryFrame(bool every);
+		static bool EveryFrame();
+
 		// What the calling thread is listed as, and where: by order, then by
 		// when each first recorded. One never named is listed last as
 		// "Thread" and a number.
@@ -120,6 +130,10 @@ namespace Loom
 		// In milliseconds from one EndFrame to the next, averaged over the
 		// window.
 		static double FrameLength();
+
+		// In milliseconds from the start of one recorded frame to the next,
+		// averaged over the window.
+		static double Spacing();
 #endif
 	};
 };
