@@ -41,7 +41,9 @@ namespace Loom
 		Bounds WorldBounds() const;
 
 		// Its outline where it is now, in world space, as a list of lines two
-		// points each, for an editor to draw.
+		// points each, for an editor to draw. None for a shape that is its
+		// mesh's, which the selection's own outline already shows, and whose
+		// every edge would cost too much to draw each frame.
 		std::vector<glm::vec3> Wireframe() const;
 
 		// A trigger reports what overlaps it, through OnTriggerEnter and the
@@ -57,7 +59,7 @@ namespace Loom
 		virtual bool Refresh() const { return false; };
 
 		virtual Bounds BoundsIn(const glm::mat4& world) const = 0;
-		virtual void WireframeIn(const glm::mat4& world, std::vector<glm::vec3>& lines) const = 0;
+		virtual void WireframeIn(const glm::mat4& world, std::vector<glm::vec3>& lines) const { };
 
 		// With the ray's direction normalised; fills in point, normal and
 		// distance on a hit.

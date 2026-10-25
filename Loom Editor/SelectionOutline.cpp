@@ -108,6 +108,8 @@ void main()
 		// mask's. The distance to the silhouette's edge, negative inside it,
 		// places the ring: WIDTH pixels wide, fading in over the edge itself and
 		// out beyond, each over SOFTNESS, so neither side follows the pixels.
+		// Where the silhouette runs off the target, the ring runs along the
+		// target's edge inside it, as wide, so the cut side is ringed too.
 		const char* const edge_fragment = R"(
 uniform sampler2D u_mask;
 uniform vec4 u_color;
@@ -147,6 +149,14 @@ void main()
 	float alpha =
 		clamp((from_edge + SOFTNESS) / SOFTNESS, 0.0, 1.0) *
 		clamp((WIDTH + SOFTNESS - from_edge) / SOFTNESS, 0.0, 1.0);
+
+	if (inside)
+	{
+		vec2 to_far_side = vec2(last + 1) - gl_FragCoord.xy;
+		float to_target_edge = min(min(gl_FragCoord.x, gl_FragCoord.y), min(to_far_side.x, to_far_side.y));
+
+		alpha = max(alpha, clamp((WIDTH + SOFTNESS - to_target_edge) / SOFTNESS, 0.0, 1.0));
+	}
 
 	if (alpha <= 0.0)
 		discard;

@@ -17,6 +17,7 @@ namespace Loom
 	*   included, in green over a view the editor draws the scenes into, as
 	*   Unity does
 	* - Drawn over everything, so a collider inside its mesh still shows
+	* - A MeshCollider has no outline to draw: its shape is its mesh's
 	*/
 	struct ColliderGizmos final
 	{

@@ -14,5 +14,5 @@ MeshCollider that follows the ring's own triangles, so the beam goes through
 its hole. The laser turns, stops its beam at the first collider in its way,
 tints what it hit and draws the surface's normal from the hit point.
 
-Select a shape in the Hierarchy to see its collider outlined in green in the
-Scene view.
+Select a box or sphere in the Hierarchy to see its collider outlined in green
+in the Scene view.

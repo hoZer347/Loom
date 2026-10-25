@@ -19,6 +19,8 @@ namespace Loom
 	* - Draws the selection's silhouette into a mask of its own, then colours
 	*   the pixels just outside it, so the ring shows through whatever stands
 	*   in front of the selection
+	* - Where the selection runs off the view, the ring follows the view's
+	*   edge inside it, so a part cut off by the edge is ringed too
 	*/
 	struct SelectionOutline final
 	{

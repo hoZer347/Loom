@@ -21,7 +21,6 @@ static constexpr glm::vec3 FORWARD(0.0f, 0.0f, -1.0f);
 
 static constexpr size_t COMPONENTS = 3;
 static constexpr size_t CORNERS = 3;
-static constexpr size_t LINE_ENDS = 2;
 static constexpr size_t Z_COMPONENT = 2;
 
 // Two triangles making a square two across, facing along Z.
@@ -242,20 +241,17 @@ TEST_SUITE("MeshCollider")
 		CHECK(scene.Raycast({ glm::vec3(AWAY, 0.0f, 0.0f), FORWARD }, hit));
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the wireframe is every triangle's edges")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "there is no wireframe for the editor to draw, however many triangles there are")
 	{
 		Loom::Scene scene("mesh wireframe");
 		Pump();
 
 		Loom::MeshCollider* collider = PlaceMesh(scene, glm::vec3(0.0f, 0.0f, -5.0f), SQUARE);
 
-		const std::vector<glm::vec3> lines = collider->Wireframe();
-
 		constexpr size_t TRIANGLES = 2;
 
-		REQUIRE(lines.size() == TRIANGLES * CORNERS * LINE_ENDS);
-		CheckNear(lines[0], glm::vec3(-1.0f, -1.0f, -5.0f));
-		CheckNear(lines[1], glm::vec3(1.0f, -1.0f, -5.0f));
+		CHECK(collider->Wireframe().empty());
+		CHECK(collider->TriangleCount() == TRIANGLES);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh of thousands of triangles answers what testing every one would")

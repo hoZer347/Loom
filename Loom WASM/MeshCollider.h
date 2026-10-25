@@ -24,8 +24,8 @@ namespace Loom
 	*   inside a closed mesh hits it on the way out
 	* - Keeps its own tree of the triangles, rebuilt when the mesh's vertices,
 	*   indices or primitive have changed since it last looked: at every
-	*   physics step, and when asked for a raycast, its bounds or its
-	*   wireframe directly
+	*   physics step, and when asked for a raycast or its bounds directly
+	* - Has no wireframe for the editor to draw
 	*/
 	struct LOOM_API MeshCollider : Component<MeshCollider, "Physics", Collider>
 	{
@@ -52,7 +52,6 @@ namespace Loom
 		bool Refresh() const override;
 
 		Bounds BoundsIn(const glm::mat4& world) const override;
-		void WireframeIn(const glm::mat4& world, std::vector<glm::vec3>& lines) const override;
 		bool Intersect(const glm::mat4& world, const Ray& ray, float maxDistance, RaycastHit& hit) const override;
 
 	private:

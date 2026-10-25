@@ -192,16 +192,6 @@ namespace Loom
 		return { middle - reach, middle + reach };
 	};
 
-	void MeshCollider::WireframeIn(const glm::mat4& world, std::vector<glm::vec3>& lines) const
-	{
-		for (const Triangle& triangle : m_triangles)
-			for (uint32_t corner = 0; corner < CORNERS; corner++)
-			{
-				lines.push_back(glm::vec3(world * glm::vec4(triangle.corners[corner], 1.0f)));
-				lines.push_back(glm::vec3(world * glm::vec4(triangle.corners[(corner + 1) % CORNERS], 1.0f)));
-			};
-	};
-
 	bool MeshCollider::IntersectPosed(const Ray& ray, float maxDistance, RaycastHit& hit) const
 	{
 		float nearest = maxDistance;
