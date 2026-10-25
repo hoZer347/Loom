@@ -6,6 +6,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -22,6 +23,13 @@ namespace Loom
 
 		// In milliseconds from one poll to the next.
 		constexpr double POLL = 1000.0 / (double)Profiler::Rate;
+
+		// Each poll falls a varying share of POLL after the last, from the
+		// shortest to one more, stepping by the golden ratio so the shares
+		// stay spread and average one. Work on a fixed cadence, such as
+		// physics' steps, is then not always caught or always missed.
+		constexpr double SHORTEST_POLL = 0.5;
+		constexpr double POLL_STEP = 0.618034;
 
 		// Where a thread never named is listed, and what it is called.
 		constexpr int UNNAMED_ORDER = std::numeric_limits<int>::max();
@@ -106,10 +114,12 @@ namespace Loom
 			double frameLength = 0.0;
 			unsigned long long frame = 0;
 
-			// Each recorded frame's start, and when the next poll is.
+			// Each recorded frame's start, when the next poll is, and how many
+			// have fallen due.
 			std::array<double, Profiler::Window> frameStarts{ };
 			double spacing = 0.0;
 			double due = 0.0;
+			unsigned long long polls = 0;
 
 			std::vector<Profiler::Thread> threads{ };
 		};
@@ -144,7 +154,10 @@ namespace Loom
 			const bool due = now >= shared.due;
 
 			if (due)
-				shared.due = std::max(shared.due + POLL, now);
+			{
+				const double share = SHORTEST_POLL + std::fmod((double)shared.polls++ * POLL_STEP, 1.0);
+				shared.due = std::max(shared.due + POLL * share, now);
+			};
 
 			const bool next = due || s_everyFrame.load(std::memory_order_relaxed);
 

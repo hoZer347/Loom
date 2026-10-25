@@ -35,8 +35,8 @@ namespace Loom
 	* - The Engine ends each frame, which is when what every thread recorded
 	*   is gathered, so a frame is read once it is over
 	* - Unless SetEveryFrame, a frame is recorded only once a poll is due,
-	*   Rate times a second, so the window spans the same time at any
-	*   frame rate. The frames between record nothing
+	*   Rate times a second on average, so the window spans the same time
+	*   at any frame rate. The frames between record nothing
 	*/
 	struct LOOM_API Profiler final
 	{
@@ -98,8 +98,8 @@ namespace Loom
 		private:
 			double m_start = 0.0;
 
-			// Whether recording was on as it opened, so a stage open across
-			// SetRecording still closes as it began. One still open as it
+			// Whether its frame was recorded as it opened, so a stage open
+			// across SetRecording still closes as it began. One still open as it
 			// stops is not recorded.
 			bool m_open;
 		};
@@ -121,7 +121,8 @@ namespace Loom
 		// The innermost stage open on the calling thread, or null.
 		static const char* Current();
 
-		// Gathers what every thread recorded since the last call as a frame.
+		// Gathers what every thread recorded since the last call as a frame,
+		// or drops it, when the frame was not recorded.
 		static void EndFrame();
 
 		// The threads that ran a stage within the trend, as of the last frame.

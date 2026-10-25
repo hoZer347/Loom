@@ -15,13 +15,19 @@ namespace
 	constexpr std::chrono::milliseconds BUSY_FOR{ 2 };
 
 	// Spins rather than sleeps, since the web's main thread cannot sleep.
-	void Busy(std::chrono::milliseconds length)
+	void BusyUntil(std::chrono::steady_clock::time_point until)
 	{
-		const auto until = std::chrono::steady_clock::now() + length;
-
 		while (std::chrono::steady_clock::now() < until)
 			;
 	};
+
+	void Busy(std::chrono::steady_clock::duration length)
+	{
+		BusyUntil(std::chrono::steady_clock::now() + length);
+	};
+
+	// From one poll to the next, on average.
+	constexpr auto POLL_FOR = std::chrono::duration<double>(1.0 / Loom::Profiler::Rate);
 
 	struct Found
 	{
@@ -280,9 +286,9 @@ TEST_SUITE("Profiler")
 		CHECK_FALSE(FindRow("Profiler started inside").thread);
 	};
 
-	TEST_CASE_FIXTURE(NewFrame, "short of every frame, only the frame a poll falls due in is recorded")
+	TEST_CASE_FIXTURE(NewFrame, "short of every frame, only a frame starting once a poll is due is recorded")
 	{
-		constexpr auto poll = std::chrono::ceil<std::chrono::milliseconds>(std::chrono::duration<double>(1.0 / Loom::Profiler::Rate));
+		constexpr auto poll = std::chrono::ceil<std::chrono::milliseconds>(POLL_FOR);
 
 		Loom::Profiler::SetEveryFrame(false);
 
@@ -314,6 +320,62 @@ TEST_SUITE("Profiler")
 		constexpr double spaces = 2.0;
 		constexpr double milliseconds_per_second = 1000.0;
 		CHECK(Loom::Profiler::Spacing() * spaces >= milliseconds_per_second / (double)Loom::Profiler::Rate);
+	};
+
+	TEST_CASE_FIXTURE(NewFrame, "a stage of a recorded frame closing in one that is not is dropped")
+	{
+		constexpr auto poll = std::chrono::ceil<std::chrono::milliseconds>(POLL_FOR);
+
+		Loom::Profiler::SetEveryFrame(false);
+
+		{
+			LOOM_STAGE("Profiler straggler");
+			Loom::Profiler::EndFrame();
+		};
+
+		Loom::Profiler::EndFrame();
+		Busy(poll);
+		Loom::Profiler::EndFrame();
+		Loom::Profiler::EndFrame();
+
+		CHECK_FALSE(FindRow("Profiler straggler").thread);
+	};
+
+	TEST_CASE_FIXTURE(NewFrame, "a stage on every other frame reads as half its length, with frames twice as fast as polls")
+	{
+		constexpr int polls = 40;
+		constexpr int frames_per_poll = 2;
+		constexpr double half = 0.5;
+		constexpr double tolerance = 0.25;
+		constexpr double milliseconds_per_second = 1000.0;
+
+		const auto frame_for = std::chrono::duration_cast<std::chrono::steady_clock::duration>(POLL_FOR / frames_per_poll);
+		auto frame_end = std::chrono::steady_clock::now();
+
+		Loom::Profiler::SetEveryFrame(false);
+
+		for (int frame = 0; frame < polls * frames_per_poll; frame++)
+		{
+			frame_end += frame_for;
+
+			if (frame % frames_per_poll == 0)
+			{
+				LOOM_STAGE("Profiler every other");
+				Busy(BUSY_FOR);
+			};
+
+			BusyUntil(frame_end);
+			Loom::Profiler::EndFrame();
+		};
+
+		const Found found = FindRow("Profiler every other");
+		REQUIRE(found.thread);
+
+		const double stage = std::chrono::duration<double>(BUSY_FOR).count() * milliseconds_per_second;
+		const double average = found.thread->rows[found.row].average;
+
+		CHECK(average > stage * (half - tolerance));
+		CHECK(average < stage * (half + tolerance));
 	};
 
 	TEST_CASE_FIXTURE(NewFrame, "a worker's share of a For counts towards the stage it was started in")
