@@ -145,8 +145,7 @@ if (-not $NoBuild)
         '-Wno-pthreads-mem-growth'
         '-sEXIT_RUNTIME=1'              # So the process exit code is the test result.
         '-sENVIRONMENT=node'
-        '-sNODERAWFS=1'                 # Gives the suite the real filesystem under node...
-        '-sNODE_HOST_ENV=0'             # ...but not node's environment, whose Windows TEMP the suite would take for a relative path.
+        '-sNODERAWFS=1'                 # Gives the suite the real filesystem under node.
     )
 
     $objects = Join-Path $outputDir 'Objects'
@@ -231,5 +230,22 @@ if (-not $node)
 # the engine (one test deliberately makes a queued task throw). The exit code is
 # what says whether the run passed.
 $ErrorActionPreference = 'Continue'
-& $node.Source $output @TestArgs
+
+# The module sees node's environment, whose TEMP is a Windows path it would
+# take for a relative one. NODERAWFS hands node a path from / as it is, and
+# node roots it on the working folder's drive, so the run goes from the
+# repository with TMPDIR, which comes before TEMP, as a folder of its own.
+$temp = Join-Path $outputDir 'Temp'
+New-Item -ItemType Directory -Force -Path $temp | Out-Null
+$previousTmpDir = $env:TMPDIR
+$env:TMPDIR = $temp.Substring((Split-Path -Qualifier $temp).Length).Replace('\', '/')
+Push-Location -LiteralPath $root
+
+try { & $node.Source $output @TestArgs }
+finally
+{
+    Pop-Location
+    $env:TMPDIR = $previousTmpDir
+}
+
 exit $LASTEXITCODE
