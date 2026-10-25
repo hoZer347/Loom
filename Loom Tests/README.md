@@ -172,10 +172,9 @@ and letting that fire after the object has gone runs it against freed memory.
 ## Not covered
 
 - Anything needing a live GL context, beyond what the `Render` suite and
-  `RenderFixture` cases draw: `Start`, `Mesh::OnRender` past its null guards,
-  `Light::RenderShadowMap`, `Apply` and `ApplyNone`,
-  `Camera::Apply`, `Material::Apply`, `Engine::CaptureFrame`, `Scene::Render`
-  setting and clearing `Light::current` (a light renders its shadow map).
+  `RenderFixture` cases draw: `Start`, `Light::RenderShadowMap`, the light's
+  `Apply`, `Engine::CaptureFrame`, `Scene::Render` setting and clearing
+  `Light::current` (a light renders its shadow map).
   `Loom Editor.exe Demos/Shadows --screenshot <file>` is the check for those,
   with the OpenGL debug output on stderr. A clean run prints one GL line,
   "Pixel transfer is synchronized with 3D rendering", which is the screenshot's

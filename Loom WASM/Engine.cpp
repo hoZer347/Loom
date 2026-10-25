@@ -239,7 +239,9 @@ namespace Loom
 	void Engine::Stop()
 	{
 		isRunning = false;
-		glfwSetWindowShouldClose(window, true);
+
+		if (window)
+			glfwSetWindowShouldClose(window, true);
 	}
 
 	void Engine::renderFrame()

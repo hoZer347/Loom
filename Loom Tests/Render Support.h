@@ -84,22 +84,14 @@ namespace LoomTests
 	{
 		static constexpr glm::ivec2 DEFAULT_SIZE{ 160, 90 };
 
-		explicit RenderFixture(glm::ivec2 size = DEFAULT_SIZE) :
-			m_showWindow(Loom::Engine::showWindow),
-			m_vsync(Loom::Engine::vsync),
-			m_doGUI(Loom::Engine::doGUI),
-			m_backend(Loom::Engine::backend)
+		explicit RenderFixture(glm::ivec2 size = DEFAULT_SIZE)
 		{
-			Loom::Engine::showWindow = false;
-			Loom::Engine::vsync = false;
-			Loom::Engine::doGUI = false;
-			Loom::Engine::backend = Loom::Backend::OpenGL;
-
 			m_engine = std::make_unique<Loom::Engine>();
 
 			if (!Loom::Engine::window)
 				throw std::runtime_error("The Engine could not open a hidden window to render into");
 
+			// Or ImGui saves imgui.ini into whichever folder the suite runs in.
 			ImGui::GetIO().IniFilename = nullptr;
 			glfwSetWindowSize(Loom::Engine::window, size.x, size.y);
 			glfwPollEvents();
@@ -110,13 +102,6 @@ namespace LoomTests
 			// What the case's objects queued as they went, while there is still
 			// a renderer for it to release.
 			Pump();
-
-			m_engine.reset();
-
-			Loom::Engine::showWindow = m_showWindow;
-			Loom::Engine::vsync = m_vsync;
-			Loom::Engine::doGUI = m_doGUI;
-			Loom::Engine::backend = m_backend;
 		};
 
 		RenderFixture(const RenderFixture&) = delete;
@@ -167,11 +152,43 @@ namespace LoomTests
 			return image;
 		};
 
-		bool m_showWindow;
-		bool m_vsync;
-		bool m_doGUI;
-		Loom::Backend m_backend;
+		// How the Engine opens for a test, put back once it has closed, even
+		// when it could not open.
+		struct HiddenSettings
+		{
+			HiddenSettings() :
+				m_showWindow(Loom::Engine::showWindow),
+				m_vsync(Loom::Engine::vsync),
+				m_doGUI(Loom::Engine::doGUI),
+				m_backend(Loom::Engine::backend)
+			{
+				Loom::Engine::showWindow = false;
+				Loom::Engine::vsync = false;
+				Loom::Engine::doGUI = false;
+				Loom::Engine::backend = Loom::Backend::OpenGL;
+			};
 
+			~HiddenSettings()
+			{
+				Loom::Engine::showWindow = m_showWindow;
+				Loom::Engine::vsync = m_vsync;
+				Loom::Engine::doGUI = m_doGUI;
+				Loom::Engine::backend = m_backend;
+			};
+
+			HiddenSettings(const HiddenSettings&) = delete;
+			HiddenSettings& operator=(const HiddenSettings&) = delete;
+
+		private:
+			bool m_showWindow;
+			bool m_vsync;
+			bool m_doGUI;
+			Loom::Backend m_backend;
+		};
+
+		// Declared first, so the Engine opens after them and closes before
+		// they are put back.
+		HiddenSettings m_settings;
 		std::unique_ptr<Loom::Engine> m_engine;
 	};
 };

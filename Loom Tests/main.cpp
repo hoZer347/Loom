@@ -149,7 +149,11 @@ int main(int argc, char** argv)
 	context.applyCommandLine(argc, argv);
 
 #ifndef __EMSCRIPTEN__
-	LoomTests::ScreenshotFolder() = std::filesystem::absolute(argv[0]).parent_path() / "Screenshots";
+	// The executable's own path, since argv[0] is only what it was launched as.
+	char* executable = nullptr;
+	_get_pgmptr(&executable);
+
+	LoomTests::ScreenshotFolder() = std::filesystem::path(executable).parent_path() / "Screenshots";
 	std::filesystem::remove_all(LoomTests::ScreenshotFolder());
 #endif
 
@@ -178,10 +182,9 @@ TEST_SUITE("Loom Tests")
 
 	TEST_CASE("the suite's screenshots go in a folder beside it")
 	{
-		char* executable = nullptr;
-		REQUIRE(_get_pgmptr(&executable) == 0);
-
-		CHECK(LoomTests::ScreenshotFolder() == std::filesystem::path(executable).parent_path() / "Screenshots");
+		CHECK(LoomTests::ScreenshotFolder().is_absolute());
+		CHECK(LoomTests::ScreenshotFolder().filename() == "Screenshots");
+		CHECK(std::filesystem::exists(LoomTests::ScreenshotFolder().parent_path() / "Loom Tests.exe"));
 	};
 #endif
 };
