@@ -339,12 +339,14 @@ TEST_SUITE("ShaderEditor")
 	TEST_CASE("a kernel of any size is explained by its kind")
 	{
 		Driven sized("// ===PIXEL PASS===\nPositionKernel_17x5 around;\n");
+
 		CHECK(sized.TooltipAlong(1));
 	};
 
 	TEST_CASE("a kernel's size run straight onto its kind gets no explanation")
 	{
 		Driven unsized("// ===PIXEL PASS===\nPositionKernel17x5 around;\n");
+
 		CHECK_FALSE(unsized.TooltipAlong(1));
 	};
 

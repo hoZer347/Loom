@@ -416,6 +416,17 @@ TEST_SUITE("Shader")
 		CHECK(stages.pixelPass.find("ivec2(i % 3 - 1, i / 3 - 0)") != std::string::npos);
 	};
 
+	TEST_CASE("a kernel's size run straight onto its kind declares no kernel")
+	{
+		const Loom::Shader::Stages stages = Loom::Shader::Assemble(
+			"// ===PIXEL PASS===\n"
+			"out vec4 PassColour;\n"
+			"PixelKernel3x3 around;\n"
+			"void main() { PassColour = vec4(1.0); }\n");
+
+		CHECK(Count(stages.pixelPass, "struct PixelKernel") == 0);
+	};
+
 	TEST_CASE("a kernel with no centre, or too big, is refused")
 	{
 		for (const char* kernel : { "PixelKernel_4x4", "NormalKernel_3x2", "PositionKernel_17x17" })
