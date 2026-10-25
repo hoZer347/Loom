@@ -6,6 +6,7 @@
 #include <objbase.h>
 #include <shlobj.h>
 
+#include "CrashReports.h"
 #include "Editor.h"
 #include "EditorMcp.h"
 #include "ProjectAssets.h"
@@ -19,7 +20,6 @@
 #include "Scene.h"
 
 #include <cctype>
-#include <crtdbg.h>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -198,24 +198,6 @@ namespace
 			<< "                                 run with a window serves them on "
 			<< EditorMcp::default_port << " unasked"
 			<< std::endl;
-	};
-
-	// An automated run has nobody to answer a crash dialog, which would come up
-	// on the screen of whoever is at the machine and hold the run until they
-	// did. abort(), failed asserts and the debug runtime's errors are written
-	// to stderr instead, and a crash ends the process without Windows Error
-	// Reporting's dialog.
-	void ReportCrashesToStderr()
-	{
-		SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
-		_set_error_mode(_OUT_TO_STDERR);
-		_set_abort_behavior(0, _CALL_REPORTFAULT);
-
-		for (const int report : { _CRT_WARN, _CRT_ERROR, _CRT_ASSERT })
-		{
-			_CrtSetReportMode(report, _CRTDBG_MODE_FILE);
-			_CrtSetReportFile(report, _CRTDBG_FILE_STDERR);
-		};
 	};
 
 	// Puts the (still hidden) window on another virtual desktop and shows it

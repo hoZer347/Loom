@@ -140,6 +140,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="CrashReports.cpp" />
     <ClCompile Include="Editor.cpp" />
     <ClCompile Include="HiddenProcess.cpp" />
     <ClCompile Include="ScriptLibrary.cpp" />
@@ -193,6 +194,7 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CrashReports.h" />
     <ClInclude Include="Editor.h" />
     <ClInclude Include="HiddenProcess.h" />
     <ClInclude Include="ScriptLibrary.h" />

@@ -24,8 +24,14 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #else
+#include "CrashReports.h"
+
 #include <cstdlib>
 #include <process.h>
+#include <thread>
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 #endif
 
 // What holds back the startup clash below is initialised before anything else
@@ -57,6 +63,12 @@ namespace
 	} banner;
 
 #ifndef __EMSCRIPTEN__
+	// Two runs at once collide even with temp folders of their own: one clears
+	// the Screenshots folder another is writing to, and runs from different
+	// slots share the rest of the machine. Every run, from any slot, takes this
+	// in turn.
+	constexpr wchar_t SUITE_MUTEX[] = L"Global\\LoomTestSuite";
+
 	// Tests write fixed names under the temp folder, so two suites running at
 	// once, from two slots or a merge, would otherwise share each other's files.
 	struct OwnTempFolder
@@ -137,6 +149,19 @@ namespace
 
 int main(int argc, char** argv)
 {
+#ifndef __EMSCRIPTEN__
+	Loom::ReportCrashesToStderr();
+
+	// Held until the process ends; a run that crashes abandons it, which hands it on all the same.
+	const HANDLE suite = CreateMutexW(nullptr, FALSE, SUITE_MUTEX);
+
+	if (!suite || WaitForSingleObject(suite, INFINITE) == WAIT_FAILED)
+	{
+		std::fprintf(stderr, "The suite could not wait for other runs to finish (error %lu)\n", GetLastError());
+		return EXIT_FAILURE;
+	};
+#endif
+
 	LoomTests::StartupClashes() = startup->held;
 	startup.reset();
 
@@ -183,6 +208,25 @@ TEST_SUITE("Loom Tests")
 	TEST_CASE("the suite's temp files go in a folder of its own")
 	{
 		CHECK(std::filesystem::equivalent(std::filesystem::temp_directory_path(), tempFolder.folder));
+	};
+
+	TEST_CASE("another run waits while this one runs")
+	{
+		const HANDLE other = OpenMutexW(SYNCHRONIZE, FALSE, SUITE_MUTEX);
+		REQUIRE(other != nullptr);
+
+		DWORD waited = WAIT_FAILED;
+		std::thread([&] { waited = WaitForSingleObject(other, 0); }).join();
+		CloseHandle(other);
+
+		CHECK(waited == WAIT_TIMEOUT);
+	};
+
+	TEST_CASE("a crash is reported on stderr, with no dialog")
+	{
+		CHECK((GetErrorMode() & SEM_NOGPFAULTERRORBOX) != 0);
+		CHECK((_set_abort_behavior(0, 0) & _CALL_REPORTFAULT) == 0);
+		CHECK(_set_error_mode(_REPORT_ERRMODE) == _OUT_TO_STDERR);
 	};
 
 	TEST_CASE("the suite's screenshots go in a folder beside it")

@@ -46,6 +46,9 @@
     <ClCompile Include="ScriptRun.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
+    <ClCompile Include="CrashReports.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
     <ClCompile Include="Editor.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
@@ -200,6 +203,9 @@
     </ClInclude>
     <ClInclude Include="EditorFileDialogs.h">
       <Filter>Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="CrashReports.h">
+      <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="Editor.h">
       <Filter>Editor</Filter>
