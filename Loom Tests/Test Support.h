@@ -186,9 +186,11 @@ namespace LoomTests
 
 			const auto color = vec4s.find("u_color");
 			const auto texture = textures.find("u_texture");
+			const auto scene = textures.find("u_scene");
 
 			drawnColors.push_back(color == vec4s.end() ? glm::vec4(0.0f) : color->second);
 			drawnTextures.push_back(texture == textures.end() ? 0 : texture->second);
+			drawnScenes.push_back(scene == textures.end() ? 0 : scene->second);
 			drawnVertices.push_back(lastVertices);
 		};
 
@@ -245,6 +247,15 @@ namespace LoomTests
 			targetSizes[m_handles] = glm::ivec2(width, height);
 			return m_handles;
 		};
+		uint32_t TargetDepth(uint32_t target) override
+		{
+			const auto found = targetDepths.find(target);
+
+			if (found != targetDepths.end())
+				return found->second;
+
+			return targetDepths[target] = ++m_handles;
+		};
 		void DestroyTexture(uint32_t texture) override { destroyedTextures.push_back(texture); };
 
 		void PushTarget(uint32_t target) override { m_targets.push_back(target); };
@@ -283,9 +294,10 @@ namespace LoomTests
 		std::vector<float> lastVertices;
 		Loom::VertexFormat lastFormat = Loom::VertexFormat::Position;
 
-		// For each of drawn: u_color and u_texture as they were set, and its vertices.
+		// For each of drawn: u_color, u_texture and u_scene as they were set, and its vertices.
 		std::vector<glm::vec4> drawnColors;
 		std::vector<uint32_t> drawnTextures;
+		std::vector<uint32_t> drawnScenes;
 		std::vector<std::vector<float>> drawnVertices;
 
 		// How many instances each DrawInstances drew, and each instance's model
@@ -313,6 +325,7 @@ namespace LoomTests
 		std::map<std::string, uint32_t> programs;
 		std::map<std::string, std::string> vertices;
 		std::map<uint32_t, glm::ivec2> targetSizes;
+		std::map<uint32_t, uint32_t> targetDepths;
 		glm::ivec2 windowSize = glm::ivec2(1);
 
 	private:

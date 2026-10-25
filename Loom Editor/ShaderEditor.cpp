@@ -20,6 +20,7 @@
 #include <iostream>
 #include <iterator>
 #include <map>
+#include <regex>
 #include <set>
 #include <string_view>
 #include <utility>
@@ -67,6 +68,13 @@ namespace Loom
 
 		const ShaderSymbol* EngineSymbol(std::string_view name)
 		{
+			// A kernel is described by its kind, whatever its size.
+			static const std::regex kernel(R"(^(\w+Kernel)\d+x\d+$)");
+			std::match_results<std::string_view::const_iterator> sized;
+
+			if (std::regex_match(name.begin(), name.end(), sized, kernel))
+				name = std::string_view(sized[1].first, sized[1].second);
+
 			const auto found = std::find_if(
 				std::begin(ENGINE_SHADER_SYMBOLS),
 				std::end(ENGINE_SHADER_SYMBOLS),

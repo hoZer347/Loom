@@ -75,7 +75,8 @@ namespace Loom
 				line.find(COMMON_SECTION) != std::string::npos ||
 				line.find(VERTEX_SECTION) != std::string::npos ||
 				line.find(FRAGMENT_SECTION) != std::string::npos ||
-				line.find(SETTINGS_SECTION) != std::string::npos;
+				line.find(SETTINGS_SECTION) != std::string::npos ||
+				line.find(PIXEL_PASS_SECTION) != std::string::npos;
 		};
 
 		constexpr const char* SETTING_ON = "on";

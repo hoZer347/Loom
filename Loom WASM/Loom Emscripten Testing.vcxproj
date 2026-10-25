@@ -180,6 +180,7 @@
     <ClCompile Include="SceneSerializer.cpp" />
     <ClCompile Include="Shaders.cpp" />
     <ClCompile Include="GlslCompiler.cpp" />
+    <ClCompile Include="PixelPass.cpp" />
     <ClCompile Include="Sprite.cpp" />
     <ClCompile Include="Ui.cpp" />
     <ClCompile Include="Textures.cpp" />
@@ -246,6 +247,7 @@
     <ClInclude Include="SceneSerializer.h" />
     <ClInclude Include="Shaders.h" />
     <ClInclude Include="GlslCompiler.h" />
+    <ClInclude Include="PixelPass.h" />
     <ClInclude Include="Sprite.h" />
     <ClInclude Include="Ui.h" />
     <ClInclude Include="Textures.h" />

@@ -39,8 +39,9 @@ namespace Loom
 		static constexpr const char* extension = ".shader";
 
 		// What a shader file compiles to: its stages with the engine's
-		// sections added as its settings ask, and the shadow pass's stages,
-		// empty unless shadows are on.
+		// sections added as its settings ask, the shadow pass's stages, empty
+		// unless shadows are on, and the pixel pass's, empty unless the file
+		// has a PIXEL PASS section.
 		struct Stages
 		{
 			ShaderSettings settings;
@@ -48,10 +49,13 @@ namespace Loom
 			std::string fragment;
 			std::string shadowVertex;
 			std::string shadowFragment;
+			std::string pixelPassVertex;
+			std::string pixelPass;
 		};
 
-		// Throws std::runtime_error at a setting it does not know, or a stage
-		// the sections it asks for have nothing to add to.
+		// Throws std::runtime_error at a setting it does not know, a stage the
+		// sections it asks for have nothing to add to, or a kernel with no
+		// centre.
 		static Stages Assemble(const std::string& source);
 
 		// Compiles the file again, for after it has been edited, and swaps the
@@ -61,6 +65,9 @@ namespace Loom
 
 		// Reloads when the file has been written since it was last compiled.
 		void ReloadIfChanged();
+
+		// Whether any shader compiled has a pixel pass.
+		static bool AnyPixelPass();
 
 #ifndef __EMSCRIPTEN__
 		// Compiles the text of a shader file the way the Vulkan renderer would,
@@ -86,6 +93,11 @@ namespace Loom
 		uint32_t instanced_id = 0;
 		uint32_t shadow_instanced_id = 0;
 
+		// The program PixelPass runs over a view drawn with this shader, or 0
+		// without a PIXEL PASS section. Declared before id, which is what
+		// fills it in.
+		uint32_t pixel_pass_id = 0;
+
 		// The vertex stage the program was linked from, for drawing the same
 		// shape with another fragment stage. Declared before id, which is what
 		// fills it in.
@@ -104,6 +116,7 @@ namespace Loom
 			uint32_t shadow = 0;
 			uint32_t instanced = 0;
 			uint32_t shadowInstanced = 0;
+			uint32_t pixelPass = 0;
 			ShaderSettings settings;
 			std::string vertex;
 		};

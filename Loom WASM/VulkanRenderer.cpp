@@ -892,7 +892,7 @@ namespace Loom
 			if (!CreateAttachment(texture.color, COLOR_TARGET_FORMAT, width, height,
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT)
 				|| !CreateAttachment(texture.depth, DEPTH_FORMAT, width, height,
-					VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_ASPECT_DEPTH_BIT))
+					VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_DEPTH_BIT))
 			{
 				std::cerr << "Vulkan: a " << width << 'x' << height << " render target could not be allocated" << std::endl;
 				DestroyTextureNow(texture);
@@ -904,13 +904,36 @@ namespace Loom
 			Immediately([&](VkCommandBuffer command)
 			{
 				Transition(command, texture.color.image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-				Transition(command, texture.depth.image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+				Transition(command, texture.depth.image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 			});
 
 			texture.color.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			texture.depth.layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+			texture.depth.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 			return Add(std::move(texture));
+		};
+
+		uint32_t TargetDepth(uint32_t target) override
+		{
+			const auto found = m_textures.find(target);
+
+			if (found == m_textures.end() || !found->second.color.image || !found->second.depth.image)
+				return 0;
+
+			if (found->second.depthView)
+				return found->second.depthView;
+
+			Texture view;
+			view.depth = found->second.depth;
+			view.width = found->second.width;
+			view.height = found->second.height;
+			view.sampler = CreateSampler(false, VK_FILTER_NEAREST);
+			view.borrowed = true;
+
+			const uint32_t handle = Add(std::move(view));
+			m_textures.at(target).depthView = handle;
+
+			return handle;
 		};
 
 		void DestroyTexture(uint32_t handle) override
@@ -920,8 +943,13 @@ namespace Loom
 			if (found == m_textures.end())
 				return;
 
+			const uint32_t depthView = found->second.depthView;
+
 			Defer([this, texture = found->second]() mutable { DestroyTextureNow(texture); });
 			m_textures.erase(found);
+
+			if (depthView)
+				DestroyTexture(depthView);
 		};
 
 		void PushTarget(uint32_t target) override
@@ -1053,7 +1081,15 @@ namespace Loom
 			Pending pending;
 			VkDescriptorSet imgui = VK_NULL_HANDLE;
 
+			// A colour target's depth as TargetDepth hands it out, and the target
+			// it is the depth of, which owns the image.
+			uint32_t depthView = 0;
+			bool borrowed = false;
+
 			const Attachment& Sampled() const { return color.image ? color : depth; };
+
+			// Read by comparing, as a shadow map is.
+			bool Shadow() const { return !color.image && !borrowed; };
 		};
 
 		struct Program
@@ -1645,13 +1681,24 @@ namespace Loom
 			if (m_renderingTarget == WINDOW)
 				return;
 
-			// Back to being sampled, which is how every texture waits between passes.
+			// Back to being sampled, which is how every texture waits between
+			// passes. A colour target's depth can be sampled as well.
 			Texture& texture = m_textures.at(m_renderingTarget);
-			Attachment& sampled = texture.color.image ? texture.color : texture.depth;
-			const VkImageAspectFlags aspect = texture.color.image ? VK_IMAGE_ASPECT_COLOR_BIT : VK_IMAGE_ASPECT_DEPTH_BIT;
 
-			Transition(command, sampled.image, aspect, sampled.layout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-			sampled.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			if (texture.color.image)
+				ToSampled(command, texture.color, VK_IMAGE_ASPECT_COLOR_BIT);
+
+			if (texture.depth.image)
+				ToSampled(command, texture.depth, VK_IMAGE_ASPECT_DEPTH_BIT);
+		};
+
+		static void ToSampled(VkCommandBuffer command, Attachment& attachment, VkImageAspectFlags aspect)
+		{
+			if (attachment.layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+				return;
+
+			Transition(command, attachment.image, aspect, attachment.layout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			attachment.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		};
 
 		void ClearInPass(uint32_t target)
@@ -1961,7 +2008,7 @@ namespace Loom
 
 			// Whatever is behind it has to match the sampler's kind: a shadow
 			// sampler reads a depth texture.
-			if (found != m_textures.end() && (found->second.color.image == VK_NULL_HANDLE) == sampler.shadow)
+			if (found != m_textures.end() && found->second.Shadow() == sampler.shadow)
 				return found->second;
 
 			return m_textures.at(sampler.shadow ? m_fallbackDepth : m_fallbackColor);
@@ -2154,6 +2201,9 @@ namespace Loom
 
 			if (texture.sampler)
 				vkDestroySampler(m_device, texture.sampler, nullptr);
+
+			if (texture.borrowed)
+				return;
 
 			DestroyAttachment(texture.color);
 			DestroyAttachment(texture.depth);

@@ -6,9 +6,11 @@
 #include "OpenGL.h"
 #include "Renderer.h"
 #include "Scene.h"
+#include "Shaders.h"
 #include "Input.h"
 #include "Lane.h"
 #include "Physics.h"
+#include "PixelPass.h"
 #include "Profiler.h"
 #include "Ui.h"
 #include "Utilities/Clock.h"
@@ -38,6 +40,38 @@ namespace Loom
 		enum BitmapChannel { BITMAP_BLUE, BITMAP_GREEN, BITMAP_RED };
 
 		std::unique_ptr<Renderer> renderer;
+
+		// While a shader has a pixel pass, the scenes are drawn into this rather
+		// than the window, so the passes can read them back.
+		PixelPass s_framePass;
+		uint32_t s_frame = 0;
+		glm::ivec2 s_frameSize{ 0 };
+
+		void ReleaseFrame()
+		{
+			if (renderer && s_frame)
+				renderer->DestroyTexture(s_frame);
+
+			s_frame = 0;
+			s_frameSize = glm::ivec2(0);
+			s_framePass.Release();
+		};
+
+		uint32_t Frame(glm::ivec2 size)
+		{
+			if (s_frame && size == s_frameSize)
+				return s_frame;
+
+			ReleaseFrame();
+
+			if (size.x > 0 && size.y > 0)
+			{
+				s_frame = renderer->CreateColorTarget(size.x, size.y);
+				s_frameSize = size;
+			};
+
+			return s_frame;
+		};
 
 		// Writes a 24 bit bottom-up bitmap, which is the row order GL hands back
 		// and the one format worth writing without an image library.
@@ -306,8 +340,29 @@ namespace Loom
 				Ui::BeginOverlay();
 			};
 
+			const glm::ivec2 size = renderer->TargetSize();
+			const uint32_t frame = Shader::AnyPixelPass() ? Frame(size) : 0;
+
+			if (!frame)
+				ReleaseFrame();
+			else
+			{
+				renderer->PushTarget(frame);
+				renderer->Clear(clearColor, true);
+				s_framePass.Begin();
+			};
+
 			for (auto& scene : Scene::allScenes)
 				scene->Render();
+
+			if (frame)
+			{
+				s_framePass.End();
+				renderer->PopTarget();
+
+				LOOM_STAGE("PixelPass::Draw");
+				s_framePass.Draw(frame, size);
+			};
 
 			LOOM_STAGE("Ui::DrawOverlay");
 			Ui::DrawOverlay();
@@ -503,6 +558,7 @@ namespace Loom
 		// that is what holds the textures and programs being released here.
 		if (renderer)
 		{
+			ReleaseFrame();
 			renderer->ShutdownImGui();
 			ImGui::DestroyContext();
 

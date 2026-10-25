@@ -370,4 +370,114 @@ TEST_SUITE("Shader")
 		// The same words outside the section are the stages' business.
 		CHECK_NOTHROW(Loom::Shader::Assemble("bloom = on\n" + FRAGMENT));
 	};
+
+	TEST_CASE("a file with no pixel pass section has no pixel pass")
+	{
+		const Loom::Shader::Stages stages = Loom::Shader::Assemble(VERTEX + FRAGMENT);
+
+		CHECK(stages.pixelPass.empty());
+		CHECK(stages.pixelPassVertex.empty());
+	};
+
+	TEST_CASE("a pixel pass gets each kernel it names once, and its global kernels filled in for the pixel before its main runs")
+	{
+		const Loom::Shader::Stages stages = Loom::Shader::Assemble(
+			FRAGMENT +
+			"// ===PIXEL PASS===\n"
+			"out vec4 PassColour;\n"
+			"PixelKernel3x3 around;\n"
+			"void main()\n"
+			"{\n"
+			"\tNormalKernel3x3 normals = LoomNormalKernel3x3(LoomScreenPixel());\n"
+			"\tPixelKernel3x3 again = LoomPixelKernel3x3(LoomScreenPixel());\n"
+			"\tPassColour = around.centre + again.centre + vec4(normals.centre, 0.0);\n"
+			"}\n");
+
+		CHECK(Count(stages.pixelPass, "struct PixelKernel3x3") == 1);
+		CHECK(Count(stages.pixelPass, "struct NormalKernel3x3") == 1);
+		CHECK(Count(stages.pixelPass, "struct PositionKernel") == 0);
+		CHECK(Count(stages.pixelPass, "const float LOOM_WEIGHTS_3x3[9]") == 1);
+		CHECK(Count(stages.pixelPass, "around = LoomPixelKernel3x3(loom_pixel);") == 1);
+		CHECK(Count(stages.pixelPass, "again = LoomPixelKernel3x3(loom_pixel);") == 0);
+		CHECK(stages.pixelPass.find("around = LoomPixelKernel3x3(loom_pixel);") < stages.pixelPass.find("\tloom_main();"));
+		CHECK(stages.pixelPass.find("PassColour.a = 1.0;") > stages.pixelPass.find("\tloom_main();"));
+		CHECK(stages.pixelPassVertex.find("loom_InverseViewProjection") != std::string::npos);
+	};
+
+	TEST_CASE("a kernel's weights are the binomial ones, which sum to one, about its centre")
+	{
+		const Loom::Shader::Stages stages = Loom::Shader::Assemble(
+			"// ===PIXEL PASS===\n"
+			"out vec4 PassColour;\n"
+			"PixelKernel3x1 around;\n"
+			"void main() { PassColour = around.centre; }\n");
+
+		CHECK(stages.pixelPass.find("float[3](0.25, 0.5, 0.25)") != std::string::npos);
+		CHECK(stages.pixelPass.find("ivec2(i % 3 - 1, i / 3 - 0)") != std::string::npos);
+	};
+
+	TEST_CASE("a kernel with no centre, or too big, is refused")
+	{
+		for (const char* kernel : { "PixelKernel4x4", "NormalKernel3x2", "PositionKernel17x17" })
+			CHECK_THROWS_AS(
+				Loom::Shader::Assemble(
+					std::string("// ===PIXEL PASS===\nout vec4 PassColour;\n") + kernel +
+					" around;\nvoid main() { PassColour = vec4(1.0); }\n"),
+				std::runtime_error);
+	};
+
+	TEST_CASE("a pixel pass that writes no colour is refused")
+	{
+		CHECK_THROWS_AS(
+			Loom::Shader::Assemble("// ===PIXEL PASS===\nvoid main() { }\n"),
+			std::runtime_error);
+	};
+
+#ifndef __EMSCRIPTEN__
+	TEST_CASE("Check compiles a pixel pass with every kind of kernel, and the scene's own uniforms declared again")
+	{
+		const std::string text =
+			"// ===COMMON===\n"
+			"float Strength() { return 0.5; }\n" +
+			FRAGMENT +
+			"// ===PIXEL PASS===\n"
+			"uniform sampler2D u_scene;\n"
+			"out vec4 PassColour;\n"
+			"PixelKernel5x5 around;\n"
+			"// PositionKernel4x4 in a comment is no kernel.\n"
+			"void main()\n"
+			"{\n"
+			"\tNormalKernel3x3 normals = LoomNormalKernel3x3(LoomScreenPixel());\n"
+			"\tPositionKernel3x3 positions = LoomPositionKernel3x3(LoomScreenPixel());\n"
+			"\tvec4 blurred = vec4(0.0);\n"
+			"\tfor (int i = 0; i < around.count; i++)\n"
+			"\t\tblurred += around.pixels[i] * around.weights[i];\n"
+			"\tfloat edge = 1.0 - dot(normals.centre, normals.normals[0]);\n"
+			"\tPassColour = blurred * edge * Strength() + vec4(positions.centre * LoomSceneDepth(LoomScreenPixel()), 0.0);\n"
+			"}\n";
+
+		CHECK(Loom::Shader::Check(text).empty());
+	};
+
+	TEST_CASE("Check puts a mistake in a pixel pass on the file's line, past the code the pass adds")
+	{
+		const std::string text =
+			FRAGMENT +
+			"// ===PIXEL PASS===\n"
+			"out vec4 PassColour;\n"
+			"PixelKernel3x3 around;\n"
+			"void main()\n"
+			"{\n"
+			"\tPassColour = undeclaredColour;\n"
+			"}\n";
+
+		const std::vector<Loom::ShaderMessage> messages = Loom::Shader::Check(text);
+
+		REQUIRE_FALSE(messages.empty());
+		CHECK(messages[0].text.find("undeclaredColour") != std::string::npos);
+
+		for (const Loom::ShaderMessage& message : messages)
+			CHECK(message.line == 9);
+	};
+#endif
 };

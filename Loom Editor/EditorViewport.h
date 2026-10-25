@@ -1,5 +1,7 @@
 #pragma once
 
+#include "PixelPass.h"
+
 #include <cstdint>
 #include <functional>
 
@@ -21,16 +23,22 @@ namespace Loom
 		EditorViewport& operator=(const EditorViewport&) = delete;
 
 		// Runs draw at the requested size with the target bound and cleared to
-		// clear_colour (RGBA), reallocating the target if the size changed.
+		// clear_colour (RGBA), reallocating the target if the size changed, then
+		// the pixel passes of what it drew, then over on top of them.
 		// Safe to call while an ImGui frame is being built: the target is pushed
 		// and popped around draw, and ImGui only records the texture id until
 		// it draws.
-		void Render(int width, int height, const float* clear_colour, const std::function<void()>& draw);
+		void Render(
+			int width,
+			int height,
+			const float* clear_colour,
+			const std::function<void()>& draw,
+			const std::function<void()>& over = { });
 
-		// The colour attachment, as an ImTextureID.
+		// What the last Render left, as an ImTextureID.
 		void* GetTextureID() const;
 
-		uint32_t GetTexture() const { return m_texture; };
+		uint32_t GetTexture() const { return m_shown; };
 		int GetWidth() const { return m_width; };
 		int GetHeight() const { return m_height; };
 
@@ -39,6 +47,11 @@ namespace Loom
 		void Destroy();
 
 		uint32_t m_texture = 0;
+
+		// What the pixel passes draw into, made the first time there are any.
+		uint32_t m_result = 0;
+		uint32_t m_shown = 0;
+		PixelPass m_pass;
 
 		int m_width = 0;
 		int m_height = 0;

@@ -22,6 +22,7 @@ namespace Loom
 	inline constexpr const char* VERTEX_SECTION = "===VERTEX===";
 	inline constexpr const char* FRAGMENT_SECTION = "===FRAGMENT===";
 	inline constexpr const char* SETTINGS_SECTION = "===SETTINGS===";
+	inline constexpr const char* PIXEL_PASS_SECTION = "===PIXEL PASS===";
 
 	/**
 	* Loom::ShaderSettings
@@ -81,6 +82,16 @@ namespace Loom
 		{ "LoomShadow", "float LoomShadow(vec4 lightSpace)", "Fragment stage: 1 where the Light reaches, 0 in shadow, softened at the edges." },
 		{ "LoomDiffuse", "float LoomDiffuse(vec3 normal)", "Fragment stage: how squarely the Light falls on a world space normal, from 0 to 1." },
 		{ "LoomLight", "vec3 LoomLight(vec3 normal, vec4 lightSpace)\nvec3 LoomLight(vec3 normal)", "Fragment stage: the ambient light plus the Light's colour on a world space normal, shadowed when given where it falls in the shadow map." },
+		{ "u_scene", "uniform highp sampler2D u_scene;", "Pixel pass: the view as drawn, or as the pass before this one left it.", true },
+		{ "u_sceneDepth", "uniform highp sampler2D u_sceneDepth;", "Pixel pass: the view's depth, 0 at the near plane and 1 at the far.", true },
+		{ "LoomScreenPixel", "ivec2 LoomScreenPixel()", "Pixel pass: the pixel being drawn." },
+		{ "LoomScenePixel", "vec4 LoomScenePixel(ivec2 pixel)", "Pixel pass: the view's colour at a pixel." },
+		{ "LoomSceneDepth", "float LoomSceneDepth(ivec2 pixel)", "Pixel pass: the view's depth at a pixel, 0 at the near plane and 1 at the far or where nothing was drawn." },
+		{ "LoomScenePosition", "vec3 LoomScenePosition(ivec2 pixel)", "Pixel pass: where in the world a pixel of the view is." },
+		{ "LoomSceneNormal", "vec3 LoomSceneNormal(ivec2 pixel)", "Pixel pass: the world space normal of the surface at a pixel, facing the camera, or zero where nothing was drawn." },
+		{ "PixelKernel", "PixelKernel3x3 name;", "Pixel pass: declared outside any function, the colours of the 3x3 pixels (any odd size) around the one being drawn, as name.pixels, with name.offsets, name.weights (a Gaussian), name.centre and name.count." },
+		{ "PositionKernel", "PositionKernel3x3 name;", "Pixel pass: as PixelKernel, with the world positions of the pixels as name.positions." },
+		{ "NormalKernel", "NormalKernel3x3 name;", "Pixel pass: as PixelKernel, with the world space normals of the pixels as name.normals." },
 	};
 
 	// Whether a variable is filled in once on the Material, or on each Mesh

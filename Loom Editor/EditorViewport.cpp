@@ -14,10 +14,15 @@ namespace Loom
 	{
 		Renderer* renderer = Renderer::Get();
 
-		if (renderer && m_texture)
-			renderer->DestroyTexture(m_texture);
+		for (uint32_t* texture : { &m_texture, &m_result })
+		{
+			if (renderer && *texture)
+				renderer->DestroyTexture(*texture);
 
-		m_texture = 0;
+			*texture = 0;
+		};
+
+		m_shown = 0;
 		m_width = m_height = 0;
 	};
 
@@ -33,7 +38,12 @@ namespace Loom
 		m_texture = Renderer::Get()->CreateColorTarget(m_width, m_height);
 	};
 
-	void EditorViewport::Render(int width, int height, const float* clear_colour, const std::function<void()>& draw)
+	void EditorViewport::Render(
+		int width,
+		int height,
+		const float* clear_colour,
+		const std::function<void()>& draw,
+		const std::function<void()>& over)
 	{
 		Renderer* renderer = Renderer::Get();
 
@@ -48,13 +58,30 @@ namespace Loom
 		renderer->PushTarget(m_texture);
 		renderer->Clear(clear_colour, true);
 
+		m_pass.Begin();
 		draw();
+		const bool passes = m_pass.End();
+
+		if (passes && !m_result)
+			m_result = renderer->CreateColorTarget(m_width, m_height);
+
+		m_shown = passes && m_result ? m_result : m_texture;
+
+		if (m_shown != m_texture)
+		{
+			renderer->PopTarget();
+			renderer->PushTarget(m_result);
+			m_pass.Draw(m_texture, { m_width, m_height });
+		};
+
+		if (over)
+			over();
 
 		renderer->PopTarget();
 	};
 
 	void* EditorViewport::GetTextureID() const
 	{
-		return Renderer::Get()->ImGuiTexture(m_texture);
+		return Renderer::Get()->ImGuiTexture(m_shown);
 	};
 };

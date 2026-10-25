@@ -48,6 +48,15 @@ namespace Loom
 			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		};
 
+		// WebGL2 leaves a filtered depth texture incomplete.
+		void SetDepthSampling()
+		{
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		};
+
 		void SetColorSampling()
 		{
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -742,20 +751,27 @@ namespace Loom
 			glBindFramebuffer(GL_FRAMEBUFFER, target.framebuffer);
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, target.texture, 0);
 
-			glGenRenderbuffers(1, &target.depth);
-			glBindRenderbuffer(GL_RENDERBUFFER, target.depth);
-			glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
-			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, target.depth);
-			glBindRenderbuffer(GL_RENDERBUFFER, 0);
+			// A texture rather than a renderbuffer, so TargetDepth can hand it out.
+			glGenTextures(1, &target.depth);
+			glBindTexture(GL_TEXTURE_2D, target.depth);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, width, height, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, nullptr);
+			SetDepthSampling();
+			glBindTexture(GL_TEXTURE_2D, bound);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, target.depth, 0);
 
 			return Complete(target, width, height, previous);
 		};
 
+		uint32_t TargetDepth(uint32_t target) override
+		{
+			const auto found = m_targets.find(target);
+
+			return found == m_targets.end() || found->second.compare ? 0 : found->second.depth;
+		};
+
 		void DestroyTexture(uint32_t texture) override
 		{
-			// GL names a texture anew once it is gone, so no program may still bind it.
-			for (auto& [program, state] : m_programs)
-				std::replace(state.textures.begin(), state.textures.end(), (GLuint)texture, 0u);
+			Unbind(texture);
 
 			const auto found = m_targets.find(texture);
 
@@ -765,6 +781,7 @@ namespace Loom
 				return;
 			};
 
+			Unbind(found->second.depth);
 			DeleteTarget(found->second);
 			m_targets.erase(found);
 		};
@@ -882,6 +899,16 @@ namespace Loom
 			GLint viewport[VIEWPORT_SIZE]{ };
 		};
 
+		// GL names a texture anew once it is gone, so no program may still bind it.
+		void Unbind(GLuint texture)
+		{
+			if (!texture)
+				return;
+
+			for (auto& [program, state] : m_programs)
+				std::replace(state.textures.begin(), state.textures.end(), texture, 0u);
+		};
+
 		// Creating a texture binds it, and whatever program is in use may be
 		// sampling the one it replaces on that unit.
 		static GLuint BoundTexture()
@@ -926,7 +953,7 @@ namespace Loom
 		{
 			if (target.framebuffer)	glDeleteFramebuffers(1, &target.framebuffer);
 			if (target.texture)		glDeleteTextures(1, &target.texture);
-			if (target.depth)		glDeleteRenderbuffers(1, &target.depth);
+			if (target.depth)		glDeleteTextures(1, &target.depth);
 		};
 
 		GLFWwindow* m_window = nullptr;

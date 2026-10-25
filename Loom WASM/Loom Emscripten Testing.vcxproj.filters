@@ -37,6 +37,9 @@
     <ClCompile Include="GlslCompiler.cpp">
       <Filter>Shaders</Filter>
     </ClCompile>
+    <ClCompile Include="PixelPass.cpp">
+      <Filter>Shaders</Filter>
+    </ClCompile>
     <ClCompile Include="ShaderVariables.cpp">
       <Filter>Shaders</Filter>
     </ClCompile>
@@ -288,6 +291,9 @@
       <Filter>Shaders</Filter>
     </ClInclude>
     <ClInclude Include="GlslCompiler.h">
+      <Filter>Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="PixelPass.h">
       <Filter>Shaders</Filter>
     </ClInclude>
     <ClInclude Include="ShaderVariables.h">

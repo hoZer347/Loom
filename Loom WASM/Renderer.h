@@ -150,6 +150,10 @@ namespace Loom
 		// An RGBA colour texture with a depth buffer behind it.
 		virtual uint32_t CreateColorTarget(int width, int height) = 0;
 
+		// The depth behind a colour target, as a texture a sampler2D reads: 0 at
+		// the near plane, 1 at the far. It goes when the target does.
+		virtual uint32_t TargetDepth(uint32_t target) = 0;
+
 		virtual void DestroyTexture(uint32_t texture) = 0;
 
 		// Draws into a target until it is popped, which puts back whatever was

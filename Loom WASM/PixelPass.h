@@ -1,0 +1,65 @@
+#pragma once
+
+#include "Loom API.h"
+
+#include "glm/glm.hpp"
+
+#include <cstdint>
+#include <vector>
+
+
+namespace Loom
+{
+	struct Material;
+
+	/**
+	* Loom::PixelPass
+	* - Runs the PIXEL PASS sections of the shaders a view was drawn with over
+	*   the finished view, once for each pixel, one after another, each reading
+	*   what the one before it left
+	* - A view drawn with none of them is left as it is
+	*/
+	struct LOOM_API PixelPass final
+	{
+		PixelPass() = default;
+		~PixelPass();
+
+		PixelPass(const PixelPass&) = delete;
+		PixelPass& operator=(const PixelPass&) = delete;
+
+		// Notes the pixel pass of each material drawn until End, in place of
+		// any pass noting already.
+		void Begin();
+
+		// Stops noting, hands noting back to the pass it took over from, and
+		// answers whether any pass was noted.
+		bool End();
+
+		// Called for each material drawn.
+		static void Note(const Material& material);
+
+		// Draws a colour target of size through the passes noted, or as it is
+		// when none were, into whatever is being drawn into, clearing its depth.
+		void Draw(uint32_t target, glm::ivec2 size);
+
+		// Gives back what it holds, for before the renderer goes.
+		void Release();
+
+	private:
+		uint32_t Intermediate(size_t index, glm::ivec2 size);
+
+		// Each pass's program, in the order its first material was drawn.
+		std::vector<uint32_t> m_noted;
+
+		// What all but the last pass draw into, in turn.
+		uint32_t m_intermediates[2]{ };
+		glm::ivec2 m_size{ 0 };
+
+		// Draws a texture as it is, for a view with no passes.
+		uint32_t m_copy = 0;
+
+		PixelPass* m_previous = nullptr;
+
+		static inline PixelPass* s_noting = nullptr;
+	};
+};

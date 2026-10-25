@@ -3806,7 +3806,9 @@ namespace Loom
 
 				for (Scene* scene : scenes)
 					scene->Render(seen_through, scenes);
-
+			},
+			[&]()
+			{
 				if (!camera)
 					Ui::DrawOverlay();
 

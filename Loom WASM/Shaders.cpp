@@ -12,9 +12,11 @@
 #include <algorithm>
 #include <sstream>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <filesystem>
 #include <iterator>
+#include <numeric>
 #include <optional>
 #include <regex>
 #include <stdexcept>
@@ -85,6 +87,7 @@ bool LoomDitheredOut(float alpha)
 
 		constexpr const char* SHADOW_PROGRAM_SUFFIX = " shadows";
 		constexpr const char* INSTANCED_PROGRAM_SUFFIX = " instanced";
+		constexpr const char* PIXEL_PASS_PROGRAM_SUFFIX = " pixel pass";
 
 		// What the shading section's vertex half reads, and the declaration it
 		// adds when the stage has not made its own.
@@ -275,6 +278,332 @@ bool LoomDitheredOut(float alpha)
 			};
 		};
 
+		// A pixel pass is drawn as one quad over the view, which it reads from
+		// texel by texel. The inverse of the camera's view is worked out here
+		// rather than for each pixel.
+		constexpr const char* PIXEL_PASS_VERTEX = R"(
+layout(location = 0) in vec3 aPos;
+
+uniform mat4 u_viewProjection;
+
+out vec2 loom_ScreenUV;
+flat out mat4 loom_InverseViewProjection;
+
+const float LOOM_UV_PER_NDC = 0.5;
+
+void main()
+{
+	loom_ScreenUV = aPos.xy * LOOM_UV_PER_NDC + LOOM_UV_PER_NDC;
+	loom_InverseViewProjection = inverse(u_viewProjection);
+	gl_Position = vec4(aPos.xy, 0.0, 1.0);
+}
+)";
+
+		// What every pixel pass reads the view through. Depth is 0 at the near
+		// plane and 1 at the far, which is also where nothing was drawn.
+		constexpr const char* PIXEL_PASS_LIBRARY = R"(
+precision highp int;
+
+uniform highp sampler2D u_scene;
+uniform highp sampler2D u_sceneDepth;
+uniform vec3 u_cameraPosition;
+
+in vec2 loom_ScreenUV;
+flat in mat4 loom_InverseViewProjection;
+
+const float LOOM_UV_PER_NDC = 0.5;
+const float LOOM_TEXEL_CENTRE = 0.5;
+const float LOOM_FAR_DEPTH = 1.0;
+
+ivec2 LoomScreenPixel()
+{
+	return ivec2(loom_ScreenUV * vec2(textureSize(u_scene, 0)));
+}
+
+ivec2 LoomClamped(ivec2 pixel)
+{
+	return clamp(pixel, ivec2(0), textureSize(u_scene, 0) - 1);
+}
+
+vec4 LoomScenePixel(ivec2 pixel)
+{
+	return texelFetch(u_scene, LoomClamped(pixel), 0);
+}
+
+float LoomSceneDepth(ivec2 pixel)
+{
+	return texelFetch(u_sceneDepth, LoomClamped(pixel), 0).r;
+}
+
+vec3 LoomScenePosition(ivec2 pixel)
+{
+	pixel = LoomClamped(pixel);
+
+	vec2 uv = (vec2(pixel) + LOOM_TEXEL_CENTRE) / vec2(textureSize(u_sceneDepth, 0));
+	vec4 ndc = vec4(uv / LOOM_UV_PER_NDC - 1.0, LoomSceneDepth(pixel) / LOOM_UV_PER_NDC - 1.0, 1.0);
+	vec4 world = loom_InverseViewProjection * ndc;
+
+	return world.xyz / world.w;
+}
+
+// The shorter of two steps to a neighbour, as the longer may cross an edge.
+// A step of nothing is a neighbour clamped off the view.
+vec3 LoomShorter(vec3 a, vec3 b)
+{
+	float lengthA = dot(a, a);
+	float lengthB = dot(b, b);
+
+	return lengthA > 0.0 && (lengthA < lengthB || lengthB == 0.0) ? a : b;
+}
+
+vec3 LoomSceneNormal(ivec2 pixel)
+{
+	if (LoomSceneDepth(pixel) >= LOOM_FAR_DEPTH)
+		return vec3(0.0);
+
+	vec3 centre = LoomScenePosition(pixel);
+	vec3 across = LoomShorter(LoomScenePosition(pixel + ivec2(1, 0)) - centre, centre - LoomScenePosition(pixel - ivec2(1, 0)));
+	vec3 up = LoomShorter(LoomScenePosition(pixel + ivec2(0, 1)) - centre, centre - LoomScenePosition(pixel - ivec2(0, 1)));
+	vec3 normal = cross(across, up);
+
+	if (dot(normal, normal) == 0.0)
+		return vec3(0.0);
+
+	normal = normalize(normal);
+
+	return dot(normal, u_cameraPosition - centre) < 0.0 ? -normal : normal;
+}
+)";
+
+		// What a pixel pass may declare that its library already has.
+		constexpr const char* PIXEL_PASS_UNIFORMS[] = { "u_scene", "u_sceneDepth", "u_cameraPosition" };
+
+		// What each kind of kernel holds of each pixel it covers, and what
+		// reads it.
+		struct KernelKind
+		{
+			std::string_view name;
+			const char* type;
+			const char* values;
+			const char* read;
+		};
+
+		constexpr KernelKind KERNEL_KINDS[] =
+		{
+			{ "Pixel", "vec4", "pixels", "LoomScenePixel" },
+			{ "Position", "vec3", "positions", "LoomScenePosition" },
+			{ "Normal", "vec3", "normals", "LoomSceneNormal" },
+		};
+
+		// Past this a kernel reads more of the view for each pixel than a pass
+		// should.
+		constexpr int MAX_KERNEL_SIZE = 15;
+
+		// Enough digits to keep a weight a float apart from the next.
+		constexpr int WEIGHT_DIGITS = 9;
+
+		const std::regex& KernelPattern()
+		{
+			static const std::regex pattern(R"(\b(Pixel|Position|Normal)Kernel(\d+)x(\d+)\b)");
+
+			return pattern;
+		};
+
+		constexpr size_t KERNEL_KIND_MATCH = 1;
+		constexpr size_t KERNEL_WIDTH_MATCH = 2;
+		constexpr size_t KERNEL_HEIGHT_MATCH = 3;
+
+		// A kernel declared outside any function, by its type and name.
+		const std::regex& GlobalKernelPattern()
+		{
+			static const std::regex pattern(R"(\b((?:Pixel|Position|Normal)Kernel\d+x\d+)\s+(\w+)\s*;)");
+
+			return pattern;
+		};
+
+		constexpr size_t GLOBAL_TYPE_MATCH = 1;
+		constexpr size_t GLOBAL_NAME_MATCH = 2;
+
+		std::string WithoutComments(const std::string& stage)
+		{
+			static const std::regex comment(R"(//[^\n]*|/\*[\s\S]*?\*/)");
+
+			return std::regex_replace(stage, comment, " ");
+		};
+
+		// What is outside every brace, where a global is declared.
+		std::string OutsideBraces(const std::string& stage)
+		{
+			std::string outside;
+			int depth = 0;
+
+			for (const char c : stage)
+			{
+				if (c == '{')
+					depth++;
+				else if (c == '}')
+					depth = std::max(depth - 1, 0);
+				else if (depth == 0)
+					outside += c;
+			};
+
+			return outside;
+		};
+
+		// A GLSL float literal, which needs its point.
+		std::string FloatLiteral(double value)
+		{
+			std::ostringstream literal;
+			literal << std::setprecision(WEIGHT_DIGITS) << value;
+
+			std::string text = literal.str();
+
+			if (text.find_first_of(".e") == std::string::npos)
+				text += ".0";
+
+			return text;
+		};
+
+		// A row of Pascal's triangle over its sum: the binomial weights, the
+		// discrete Gaussian of that width.
+		std::vector<double> BinomialWeights(int size)
+		{
+			std::vector<double> weights(size, 1.0);
+
+			for (int i = 1; i < size; i++)
+				weights[i] = weights[i - 1] * (size - i) / i;
+
+			const double sum = std::accumulate(weights.begin(), weights.end(), 0.0);
+
+			for (double& weight : weights)
+				weight /= sum;
+
+			return weights;
+		};
+
+		std::string KernelSize(int width, int height)
+		{
+			return std::to_string(width) + 'x' + std::to_string(height);
+		};
+
+		std::string KernelWeights(int width, int height)
+		{
+			const std::vector<double> across = BinomialWeights(width);
+			const std::vector<double> up = BinomialWeights(height);
+			const std::string count = std::to_string(width * height);
+
+			std::string weights = "\nconst float LOOM_WEIGHTS_" + KernelSize(width, height) + '[' + count + "] = float[" + count + "](";
+
+			for (int y = 0; y < height; y++)
+				for (int x = 0; x < width; x++)
+					weights += (x || y ? ", " : "") + FloatLiteral(across[x] * up[y]);
+
+			return weights + ");\n";
+		};
+
+		std::string Kernel(const KernelKind& kind, int width, int height)
+		{
+			const std::string size = KernelSize(width, height);
+			const std::string name = std::string(kind.name) + "Kernel" + size;
+			const std::string count = std::to_string(width * height);
+
+			return
+				"\nstruct " + name + "\n{\n"
+				"\t" + kind.type + ' ' + kind.values + '[' + count + "];\n"
+				"\tivec2 offsets[" + count + "];\n"
+				"\tfloat weights[" + count + "];\n"
+				"\t" + kind.type + " centre;\n"
+				"\tint count;\n"
+				"};\n\n" +
+				name + " Loom" + name + "(ivec2 pixel)\n{\n"
+				"\t" + name + " kernel;\n"
+				"\tkernel.count = " + count + ";\n\n"
+				"\tfor (int i = 0; i < " + count + "; i++)\n\t{\n"
+				"\t\tivec2 offset = ivec2(i % " + std::to_string(width) + " - " + std::to_string(width / 2) + ", i / " + std::to_string(width) + " - " + std::to_string(height / 2) + ");\n"
+				"\t\tkernel.offsets[i] = offset;\n"
+				"\t\tkernel.weights[i] = LOOM_WEIGHTS_" + size + "[i];\n"
+				"\t\tkernel." + kind.values + "[i] = " + kind.read + "(pixel + offset);\n"
+				"\t}\n\n"
+				"\tkernel.centre = kernel." + kind.values + '[' + std::to_string(width * height / 2) + "];\n"
+				"\treturn kernel;\n"
+				"}\n";
+		};
+
+		// The library and each kernel the stage names, which go ahead of it.
+		std::string PixelPassLibrary(const std::string& code)
+		{
+			std::string library = PIXEL_PASS_LIBRARY;
+			std::vector<std::string> named;
+			std::vector<std::string> sizes;
+
+			for (std::sregex_iterator next(code.begin(), code.end(), KernelPattern()); next != std::sregex_iterator(); ++next)
+			{
+				const std::smatch& kernel = *next;
+
+				if (std::ranges::find(named, kernel.str()) != named.end())
+					continue;
+
+				named.push_back(kernel.str());
+
+				const int width = std::stoi(kernel[KERNEL_WIDTH_MATCH]);
+				const int height = std::stoi(kernel[KERNEL_HEIGHT_MATCH]);
+
+				if (width % 2 == 0 || height % 2 == 0 || width > MAX_KERNEL_SIZE || height > MAX_KERNEL_SIZE)
+					throw std::runtime_error(
+						kernel.str() + " has to be odd each way, so it has a centre, and at most " +
+						std::to_string(MAX_KERNEL_SIZE) + " across");
+
+				const std::string size = KernelSize(width, height);
+
+				if (std::ranges::find(sizes, size) == sizes.end())
+				{
+					sizes.push_back(size);
+					library += KernelWeights(width, height);
+				};
+
+				const KernelKind& kind = *std::ranges::find(KERNEL_KINDS, kernel[KERNEL_KIND_MATCH].str(), &KernelKind::name);
+				library += Kernel(kind, width, height);
+			};
+
+			return library;
+		};
+
+		// The pass's fragment stage: the library ahead of its own code, and a
+		// main that fills its global kernels in for the pixel being drawn
+		// before running its own.
+		std::string PixelPassFragment(const std::string& stage)
+		{
+			std::smatch color;
+
+			if (!std::regex_search(stage, color, ColorPattern()))
+				throw std::runtime_error("The pixel pass needs to write an out vec4 colour");
+
+			const std::string code = WithoutComments(stage);
+			const std::string outside = OutsideBraces(code);
+
+			std::string filled;
+
+			for (std::sregex_iterator next(outside.begin(), outside.end(), GlobalKernelPattern()); next != std::sregex_iterator(); ++next)
+				filled += "\t" + (*next)[GLOBAL_NAME_MATCH].str() + " = Loom" + (*next)[GLOBAL_TYPE_MATCH].str() + "(loom_pixel);\n";
+
+			// The library's functions read these ahead of where the stage
+			// declares them.
+			std::string own = WithMainRenamed(stage, "pixel pass");
+
+			for (const char* uniform : PIXEL_PASS_UNIFORMS)
+				own = std::regex_replace(own, std::regex(R"(\buniform\s+(?:(?:lowp|mediump|highp)\s+)?\w+\s+)" + std::string(uniform) + R"(\s*;)"), "");
+
+			// What the pass draws is the view's final colour, which nothing is
+			// seen through.
+			return EngineCode(PixelPassLibrary(code)) + own + '\n' + LineDirective(1, LIBRARY_SOURCE) +
+				"\nvoid main()\n{\n"
+				"\tivec2 loom_pixel = LoomScreenPixel();\n" +
+				filled +
+				"\tloom_main();\n"
+				"\t" + color[1].str() + ".a = 1.0;\n"
+				"}\n";
+		};
+
 #ifndef __EMSCRIPTEN__
 		// glslang's "ERROR: 0:12: 'x' : undeclared identifier", and its warnings.
 		const std::regex& MessagePattern()
@@ -369,13 +698,13 @@ bool LoomDitheredOut(float alpha)
 
 		if (Renderer* renderer = Renderer::Get())
 		{
-			for (const uint32_t program : { id, shadow_id, instanced_id, shadow_instanced_id })
+			for (const uint32_t program : { id, shadow_id, instanced_id, shadow_instanced_id, pixel_pass_id })
 				if (program)
 					renderer->DeleteProgram(program);
 		};
 	};
 
-	enum class ShaderType { NONE, COMMON, VERTEX, FRAGMENT, SETTINGS };
+	enum class ShaderType { NONE, COMMON, VERTEX, FRAGMENT, SETTINGS, PIXEL_PASS };
 
 	uint32_t Shader::CompileSource(const std::string& file_path)
 	{
@@ -411,7 +740,7 @@ bool LoomDitheredOut(float alpha)
 	{
 		std::scoped_lock lock{ mutex };
 
-		const uint32_t previous[] = { id, shadow_id, instanced_id, shadow_instanced_id };
+		const uint32_t previous[] = { id, shadow_id, instanced_id, shadow_instanced_id, pixel_pass_id };
 
 		try
 		{
@@ -447,6 +776,7 @@ bool LoomDitheredOut(float alpha)
 		shadow_id = programs.shadow;
 		instanced_id = programs.instanced;
 		shadow_instanced_id = programs.shadowInstanced;
+		pixel_pass_id = programs.pixelPass;
 		vertex = programs.vertex;
 
 		return programs.id;
@@ -489,6 +819,8 @@ bool LoomDitheredOut(float alpha)
 				current = ShaderType::COMMON;
 			else if (line.find(SETTINGS_SECTION) != std::string::npos)
 				current = ShaderType::SETTINGS;
+			else if (line.find(PIXEL_PASS_SECTION) != std::string::npos)
+				current = ShaderType::PIXEL_PASS;
 			else
 			{
 				if (current != ShaderType::NONE)
@@ -527,6 +859,12 @@ bool LoomDitheredOut(float alpha)
 			if (!stage->empty())
 				*stage = EngineCode(Light::FragmentLibrary(*stage)) + *stage;
 
+		if (sections.contains(ShaderType::PIXEL_PASS))
+		{
+			stages.pixelPassVertex = EngineCode(PIXEL_PASS_VERTEX);
+			stages.pixelPass = PixelPassFragment(common + sections[ShaderType::PIXEL_PASS].str());
+		};
+
 		return stages;
 	};
 
@@ -555,6 +893,20 @@ bool LoomDitheredOut(float alpha)
 			catch (...)
 			{
 				renderer->DeleteProgram(programs.id);
+				throw;
+			};
+
+		if (!stages.pixelPass.empty())
+			try
+			{
+				programs.pixelPass = renderer->CreateProgram(name + PIXEL_PASS_PROGRAM_SUFFIX, stages.pixelPassVertex, stages.pixelPass);
+			}
+			catch (...)
+			{
+				for (const uint32_t program : { programs.id, programs.shadow })
+					if (program)
+						renderer->DeleteProgram(program);
+
 				throw;
 			};
 
@@ -590,9 +942,19 @@ bool LoomDitheredOut(float alpha)
 		if (stages.settings.shadows)
 			log += Glsl::Compile(stages.shadowVertex, stages.shadowFragment).log;
 
+		if (!stages.pixelPass.empty())
+			log += Glsl::Compile(stages.pixelPassVertex, stages.pixelPass).log;
+
 		return ParseMessages(log);
 	};
 #endif
+
+	bool Shader::AnyPixelPass()
+	{
+		std::scoped_lock lock{ mutex };
+
+		return std::ranges::any_of(shaders, [](const auto& shader) { return shader.second.pixelPass != 0; });
+	};
 
 #ifdef __EMSCRIPTEN__
 	void Shader::Request(
