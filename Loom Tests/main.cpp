@@ -26,6 +26,7 @@
 #else
 #include "CrashReports.h"
 
+#include <crtdbg.h>
 #include <cstdlib>
 #include <process.h>
 #include <thread>
@@ -69,8 +70,14 @@ namespace
 	// in turn.
 	constexpr wchar_t SUITE_MUTEX[] = L"Global\\LoomTestSuite";
 
-	// Tests write fixed names under the temp folder, so two suites running at
-	// once, from two slots or a merge, would otherwise share each other's files.
+	// Before anything below can crash, so nothing in the suite puts up a dialog.
+	struct CrashesToStderr
+	{
+		CrashesToStderr() { Loom::ReportCrashesToStderr(); };
+	} crashesToStderr;
+
+	// Tests write fixed names under the temp folder, which other programs on the
+	// machine may use too, such as a copy of the suite from before runs took turns.
 	struct OwnTempFolder
 	{
 		const std::filesystem::path folder;
@@ -150,8 +157,6 @@ namespace
 int main(int argc, char** argv)
 {
 #ifndef __EMSCRIPTEN__
-	Loom::ReportCrashesToStderr();
-
 	// Held until the process ends; a run that crashes abandons it, which hands it on all the same.
 	const HANDLE suite = CreateMutexW(nullptr, FALSE, SUITE_MUTEX);
 
@@ -216,18 +221,20 @@ TEST_SUITE("Loom Tests")
 		REQUIRE(other != nullptr);
 
 		DWORD waited = WAIT_FAILED;
-		std::thread([&] { waited = WaitForSingleObject(other, 0); }).join();
+		std::thread([&]() { waited = WaitForSingleObject(other, 0); }).join();
 		CloseHandle(other);
 
 		CHECK(waited == WAIT_TIMEOUT);
 	};
 
+#ifdef _DEBUG
+	// doctest sets the error mode and abort behaviour itself around each case,
+	// but leaves the debug runtime's error reports, which put up abort()'s dialog.
 	TEST_CASE("a crash is reported on stderr, with no dialog")
 	{
-		CHECK((GetErrorMode() & SEM_NOGPFAULTERRORBOX) != 0);
-		CHECK((_set_abort_behavior(0, 0) & _CALL_REPORTFAULT) == 0);
-		CHECK(_set_error_mode(_REPORT_ERRMODE) == _OUT_TO_STDERR);
+		CHECK(_CrtSetReportMode(_CRT_ERROR, _CRTDBG_REPORT_MODE) == _CRTDBG_MODE_FILE);
 	};
+#endif
 
 	TEST_CASE("the suite's screenshots go in a folder beside it")
 	{
