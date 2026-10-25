@@ -141,7 +141,8 @@ namespace Loom
 			{
 				const Profiler::Row& row = thread.rows[at];
 
-				if (row.average <= 0.0)
+				// A row that took no time, or found its stage already filled, is not drawn.
+				if (shares[at].to <= shares[at].from)
 					continue;
 
 				const float from = left + width * (float)shares[at].from;
