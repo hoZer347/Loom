@@ -404,7 +404,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 		const std::regex& KernelPattern()
 		{
-			static const std::regex pattern(R"(\b(Pixel|Position|Normal)Kernel(\d+)x(\d+)\b)");
+			static const std::regex pattern(R"(\b(Pixel|Position|Normal)Kernel_(\d+)x(\d+)\b)");
 
 			return pattern;
 		};
@@ -416,7 +416,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		// A kernel declared outside any function, by its type and name.
 		const std::regex& GlobalKernelPattern()
 		{
-			static const std::regex pattern(R"(\b((?:Pixel|Position|Normal)Kernel\d+x\d+)\s+(\w+)\s*;)");
+			static const std::regex pattern(R"(\b((?:Pixel|Position|Normal)Kernel_\d+x\d+)\s+(\w+)\s*;)");
 
 			return pattern;
 		};
@@ -504,7 +504,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		std::string Kernel(const KernelKind& kind, int width, int height)
 		{
 			const std::string size = KernelSize(width, height);
-			const std::string name = std::string(kind.name) + "Kernel" + size;
+			const std::string name = std::string(kind.name) + "Kernel_" + size;
 			const std::string count = std::to_string(width * height);
 
 			return

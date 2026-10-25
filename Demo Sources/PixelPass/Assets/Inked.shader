@@ -34,9 +34,9 @@ void main()
 
 out vec4 FragColor;
 
-PixelKernel9x9 around;
-NormalKernel3x3 normals;
-PositionKernel3x3 positions;
+PixelKernel_9x9 around;
+NormalKernel_3x3 normals;
+PositionKernel_3x3 positions;
 
 const vec3 INK = vec3(0.08, 0.06, 0.05);
 

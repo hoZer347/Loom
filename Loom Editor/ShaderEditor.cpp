@@ -69,7 +69,7 @@ namespace Loom
 		const ShaderSymbol* EngineSymbol(std::string_view name)
 		{
 			// A kernel is described by its kind, whatever its size.
-			static const std::regex kernel(R"(^(\w+Kernel)\d+x\d+$)");
+			static const std::regex kernel(R"(^(\w+Kernel)_\d+x\d+$)");
 			std::match_results<std::string_view::const_iterator> sized;
 
 			if (std::regex_match(name.begin(), name.end(), sized, kernel))
