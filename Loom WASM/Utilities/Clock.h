@@ -13,7 +13,8 @@ namespace Loom
 	struct LOOM_API Time final
 	{
 		/// Seconds the last frame took. Clamped, so a breakpoint or a stalled tab does not
-		/// teleport everything that integrates against it.
+		/// teleport everything that integrates against it, and never negative, so the time
+		/// since the start only ever goes forward.
 		static float DeltaTime();
 
 		/// The same, but not scaled: for what keeps moving while the game is slowed or

@@ -82,5 +82,23 @@ TEST_SUITE("Clock")
 
 		CHECK(Loom::Time::UnscaledDeltaTime() == short_max_delta);
 	};
+
+	TEST_CASE_FIXTURE(RunningClock, "a frame across GLFW starting again takes no time")
+	{
+		Frame(frame_length);
+		const float before = Loom::Time::SinceStart();
+
+		glfwTerminate();
+		glfwInit();
+		Loom::Utilities::Tick();
+
+		CHECK(Loom::Time::UnscaledDeltaTime() == 0.0f);
+		CHECK(Loom::Time::DeltaTime() == 0.0f);
+		CHECK(Loom::Time::SinceStart() == before);
+
+		Frame(frame_length);
+
+		CHECK(Loom::Time::DeltaTime() > 0.0f);
+	};
 };
 #endif

@@ -6,6 +6,7 @@
 
 #include "OpenGL.h"
 
+#include <algorithm>
 #include <cmath>
 
 
@@ -53,8 +54,8 @@ namespace Loom
 
 		// A frame that took a second really happened, but nothing integrating against it
 		// wants to be told so -- a paused debugger would move a walking character a metre.
-		if (raw > s_maxDelta)
-			raw = s_maxDelta;
+		// GLFW's timer starts again from zero when GLFW does, and that frame took no time.
+		raw = std::clamp(raw, 0.0f, s_maxDelta);
 
 		s_unscaledDeltaTime = raw;
 		s_deltaTime = raw * s_scale;
