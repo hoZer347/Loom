@@ -77,6 +77,29 @@ namespace Loom
 		constexpr float pickerRows = 12.0f;
 		constexpr const char* PICKER = "##picker";
 
+		// icon, then as much of the end of text as fits beside it in width,
+		// cut as FitPath cuts, so a path keeps its file's name. Whether text
+		// was cut, in cut.
+		std::string FitPickerLabel(const char* icon, const std::string& text, float width, bool& cut)
+		{
+			const std::string lead = icon ? std::string(icon) + " " : std::string();
+			const std::string fitted = FitPath(text, width - ImGui::CalcTextSize(lead.c_str()).x);
+
+			cut = fitted != text;
+
+			return lead + fitted;
+		};
+
+		// What the item drawn last holds in full: tip if given, else text if
+		// it was cut.
+		void PickerTip(const std::string& tip, const std::string& text, bool cut)
+		{
+			if (!tip.empty())
+				ImGui::SetItemTooltip("%s", tip.c_str());
+			else if (cut)
+				ImGui::SetItemTooltip("%s", text.c_str());
+		};
+
 		// How far NewShader, NewShader1, ... counts before leaving the name to
 		// the user to sort out.
 		constexpr int maxDefaultNameSuffix = 1000;
@@ -768,7 +791,7 @@ namespace Loom
 				const float button_x = ImGui::GetContentRegionMax().x - button_width;
 
 				ImGui::AlignTextToFramePadding();
-				const std::string shown_path = FitTail(
+				const std::string shown_path = FitPath(
 					m_projectPath,
 					button_x - ImGui::GetStyle().ItemSpacing.x - ImGui::GetCursorPosX());
 
@@ -2199,13 +2222,20 @@ namespace Loom
 
 	#pragma region Field Pickers
 
-	void Editor::DrawPickerButton(const std::string& shown)
+	void Editor::DrawPickerButton(const std::string& shown, const char* icon, const std::string& tip)
 	{
-		if (ImGui::Button((shown + "###picker").c_str(), ImVec2(ImGui::CalcItemWidth(), 0.0f)))
+		const float width = ImGui::CalcItemWidth();
+
+		bool cut = false;
+		const std::string label = FitPickerLabel(icon, shown, width - ImGui::GetStyle().FramePadding.x * 2.0f, cut);
+
+		if (ImGui::Button((label + "###picker").c_str(), ImVec2(width, 0.0f)))
 		{
 			m_fieldPicker.ClearSearch();
 			ImGui::OpenPopup(PICKER);
 		};
+
+		PickerTip(tip, shown, cut);
 	};
 
 	bool Editor::BeginPicker(bool* appearing)
@@ -2239,7 +2269,7 @@ namespace Loom
 		ImGui::EndPopup();
 	};
 
-	bool Editor::PickerRow(const std::string& id, const std::string& label, bool selected)
+	bool Editor::PickerRow(const std::string& id, const std::string& label, bool selected, const char* icon, const std::string& tip)
 	{
 		ImGuiTreeNodeFlags flags =
 			ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanAvailWidth;
@@ -2247,7 +2277,13 @@ namespace Loom
 		if (selected)
 			flags |= ImGuiTreeNodeFlags_Selected;
 
-		ImGui::TreeNodeEx(("pick:" + id).c_str(), flags, "%s", label.c_str());
+		bool cut = false;
+		const std::string shown = FitPickerLabel(
+			icon, label, ImGui::GetContentRegionAvail().x - ImGui::GetTreeNodeToLabelSpacing(), cut);
+
+		ImGui::TreeNodeEx(("pick:" + id).c_str(), flags, "%s", shown.c_str());
+
+		PickerTip(tip, label, cut);
 
 		if (!ImGui::IsItemClicked(ImGuiMouseButton_Left))
 			return false;
@@ -2261,12 +2297,10 @@ namespace Loom
 	{
 		std::string& path = *(std::string*)field.data;
 
-		DrawPickerButton(path.empty()
-			? std::string("None")
-			: std::string(IconOf(path)) + " " + std::filesystem::path(path).stem().string());
-
-		if (!path.empty())
-			ImGui::SetItemTooltip("%s", path.c_str());
+		DrawPickerButton(
+			path.empty() ? std::string("None") : std::filesystem::path(path).stem().string(),
+			path.empty() ? nullptr : IconOf(path),
+			path);
 
 		const bool shader = field.extension == ProjectAssets::shaderExtension;
 
@@ -2298,21 +2332,13 @@ namespace Loom
 
 		const auto row = [&](const std::string& file, const std::string& label)
 		{
-			const bool picked = PickerRow(file, label, file == path);
-
-			if (!file.empty())
-				ImGui::SetItemTooltip("%s", file.c_str());
+			const bool picked = PickerRow(file, label, file == path, file.empty() ? nullptr : IconOf(file), file);
 
 			if (picked && file != path)
 			{
 				path = file;
 				changed = true;
 			};
-		};
-
-		const auto label = [](const std::string& file, const std::string& name)
-		{
-			return std::string(IconOf(file)) + " " + name;
 		};
 
 		row("", "None");
@@ -2329,7 +2355,7 @@ namespace Loom
 			hooks.reveal = [&](const std::string& folder) { return appearing && VirtualFolders::IsAtOrUnder(m_scriptFolders.FolderOf(path), folder); };
 			hooks.arrange = false;
 			hooks.create = nullptr;
-			hooks.item = [&](const std::string& name) { row(name, label(name, m_scriptEntries.at(name).label)); };
+			hooks.item = [&](const std::string& name) { row(name, m_scriptEntries.at(name).label); };
 
 			m_fieldPicker.Draw(m_scriptFolders, ScriptsByLabel(names), hooks);
 		}
@@ -2345,7 +2371,7 @@ namespace Loom
 			hooks.reveal = [&](const std::string& folder) { return appearing && VirtualFolders::IsAtOrUnder(tab->folders.FolderOf(path), folder); };
 			hooks.arrange = false;
 			hooks.create = nullptr;
-			hooks.item = [&](const std::string& file) { row(file, label(file, std::filesystem::path(file).filename().string())); };
+			hooks.item = [&](const std::string& file) { row(file, std::filesystem::path(file).filename().string()); };
 
 			m_fieldPicker.Draw(tab->folders, tab->folders.Build(files), hooks);
 		}
@@ -2361,7 +2387,7 @@ namespace Loom
 
 			FolderTree::Hooks hooks{ };
 			hooks.arrange = false;
-			hooks.item = [&](const std::string& file) { row(file, label(file, file)); };
+			hooks.item = [&](const std::string& file) { row(file, file); };
 
 			m_fieldPicker.Draw(flat, flat.Build(files), hooks);
 		};

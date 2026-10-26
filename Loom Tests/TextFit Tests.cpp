@@ -81,6 +81,31 @@ TEST_SUITE("TextFit")
 		CHECK(Loom::FitTail(path, 0.0f) == Loom::ellipsis);
 	};
 
+	TEST_CASE("a path that does not fit is cut between folders, keeping as many as fit")
+	{
+		Measuring measuring;
+
+		const std::string kept = "\\Desktop\\Game";
+
+		CHECK(Loom::FitPath(path, FLT_MAX) == path);
+		CHECK(Loom::FitPath(path, Width(Loom::ellipsis + kept)) == Loom::ellipsis + kept);
+		CHECK(Loom::FitPath(path, Width(Loom::ellipsis + kept) - 1.0f) == Loom::ellipsis + std::string("\\Game"));
+	};
+
+	TEST_CASE("a path whose file's name alone does not fit keeps the end of the name")
+	{
+		Measuring measuring;
+
+		const std::string name = "Assets/Prefabs/Headquarters.loomprefab";
+		const float width = Width(Loom::ellipsis + std::string("prefab"));
+
+		CHECK(Loom::FitPath(name, width) == Loom::FitTail(name, width));
+
+		const std::string tank = Loom::ellipsis + std::string("/Tank.loomprefab");
+
+		CHECK(Loom::FitPath("Assets/Prefabs/Tank.loomprefab", Width(tank)) == tank);
+	};
+
 	TEST_CASE("a character spelled in several bytes is never cut")
 	{
 		Measuring measuring;

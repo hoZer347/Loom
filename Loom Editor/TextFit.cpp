@@ -27,4 +27,20 @@ namespace Loom
 
 		return ellipsis;
 	};
+
+	std::string FitPath(const std::string& path, float width)
+	{
+		constexpr const char* separators = "/\\";
+
+		if (ImGui::CalcTextSize(path.c_str()).x <= width)
+			return path;
+
+		const float room = width - ImGui::CalcTextSize(ellipsis).x;
+
+		for (size_t at = path.find_first_of(separators); at != std::string::npos; at = path.find_first_of(separators, at + 1))
+			if (ImGui::CalcTextSize(path.c_str() + at).x <= room)
+				return ellipsis + path.substr(at);
+
+		return FitTail(path, width);
+	};
 };
