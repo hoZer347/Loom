@@ -2489,7 +2489,7 @@ void main()
 		SetPoses(document, snapshot.poses);
 		Posed(document);
 
-		// A step that only posed joints leaves the mesh as the file has it.
+		// A step that only posed joints leaves the mesh, and its bindings, as they are.
 		if (document.parts.empty() || document.parts[snapshot.part].editing == snapshot.mesh)
 			return;
 
@@ -2761,7 +2761,7 @@ void main()
 		{
 		case Pick::Vertices:	mesh.DeleteVertices(document->selection.vertices); break;
 		case Pick::Edges:		mesh.DeleteEdges(document->selection.edges); break;
-		case Pick::Faces:		mesh.DeleteFaces(document->selection.faces); break;
+		default:				mesh.DeleteFaces(document->selection.faces); break;
 		};
 
 		document->selection = { };

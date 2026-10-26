@@ -703,21 +703,32 @@ TEST_SUITE("ModelEditor")
 		Loom::Skin* skin = lid->GetComponent<Loom::Skin>();
 		Loom::Mesh* mesh = lid->GetComponent<Loom::Mesh>();
 
-		// Bent aside by Tip, so the top face is drawn clear of where the mesh holds it.
-		const glm::vec3 bent(0.5f, 0.0f, 0.0f);
-		Named(*model, "Tip")->transform.position = glm::vec3(0.0f, 1.0f, 0.0f) + bent;
+		// Turned a quarter about Tip, so the face drawn on top is a side of the
+		// mesh, and a move up where drawn is a move across it.
+		constexpr float quarter_turn = 90.0f;
+		constexpr float half = 0.5f;
+
+		Loom::GameObject* turned = Named(*model, "Tip");
+		turned->transform.rotation = glm::vec3(0.0f, 0.0f, quarter_turn);
 		driven.Frame();
 
+		// Framed again, as the turn takes it out of view.
+		driven.Key(ImGuiKey_F);
+
+		const glm::mat4 bend = turned->WorldMatrix() * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.0f, 0.0f));
+		const auto drawn = [&](const glm::vec3& point) { return glm::vec3(bend * glm::vec4(point, 1.0f)); };
+		const float side = drawn(glm::vec3(half, 0.0f, 0.0f)).y > drawn(glm::vec3(-half, 0.0f, 0.0f)).y ? half : -half;
+
 		driven.editor.SetPick(ModelEditor::Pick::Faces);
-		driven.Click(driven.Screen(glm::vec3(0.25f, 0.5f, 0.1f) + bent));
+		driven.Click(driven.Screen(drawn(glm::vec3(side, 0.1f, 0.1f))));
 		REQUIRE(driven.editor.Selected()->faces.size() == 1);
 
 		const uint32_t face = *driven.editor.Selected()->faces.begin();
 		const glm::vec3 centre = driven.Mesh().FaceCentre(face);
-		CHECK(std::abs(centre.y - 0.5f) < TOLERANCE);
+		CHECK(std::abs(centre.x - side) < TOLERANCE);
 
-		const ImVec2 middle = driven.Screen(centre + bent);
-		const ImVec2 above = driven.Screen(centre + bent + glm::vec3(0.0f, 0.1f, 0.0f));
+		const ImVec2 middle = driven.Screen(drawn(centre));
+		const ImVec2 above = driven.Screen(drawn(centre) + glm::vec3(0.0f, 0.1f, 0.0f));
 		const float reach = std::hypot(above.x - middle.x, above.y - middle.y);
 		const ImVec2 up((above.x - middle.x) / reach, (above.y - middle.y) / reach);
 
@@ -726,10 +737,12 @@ TEST_SUITE("ModelEditor")
 
 		driven.Drag(ImVec2(middle.x + up.x * grab, middle.y + up.y * grab), ImVec2(middle.x + up.x * (grab + pull), middle.y + up.y * (grab + pull)));
 
-		// Moved in the mesh's own space by as much as it moved where drawn.
+		// Up where drawn, so across the side in the mesh's own space.
 		const glm::vec3 moved = driven.Mesh().FaceCentre(face);
-		CHECK(moved.y > centre.y + TOLERANCE);
-		CHECK(std::abs(moved.x - centre.x) < TOLERANCE);
+		CHECK(drawn(moved).y > drawn(centre).y + TOLERANCE);
+		CHECK(std::abs(drawn(moved).x - drawn(centre).x) < TOLERANCE);
+		CHECK(std::abs(moved.x - centre.x) > TOLERANCE);
+		CHECK(std::abs(moved.y - centre.y) < TOLERANCE);
 		CHECK(std::abs(moved.z - centre.z) < TOLERANCE);
 
 		// What Extrude adds is bound as what it came from.
