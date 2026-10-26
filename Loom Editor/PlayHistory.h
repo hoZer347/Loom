@@ -34,12 +34,14 @@ namespace Loom
 	{
 		static constexpr size_t max_steps = 100;
 
+		// A step's text, or a field's, either side of an edit.
 		struct Sides
 		{
 			std::string before{ };
 			std::string after{ };
 		};
 
+		// The field at index of the object with that guid.
 		struct Field : Sides
 		{
 			Guid object{ };
@@ -59,6 +61,7 @@ namespace Loom
 		// for it, to what it holds now. One that changed nothing is not a step.
 		void RecordField(LoomObject& object, size_t index, const std::string& before);
 
+		// gameObject's components as they are, read before an edit to them.
 		static Components ReadComponents(GameObject& gameObject);
 
 		// Components added to, taken off or reordered on the GameObject since
