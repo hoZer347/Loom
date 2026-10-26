@@ -1047,8 +1047,12 @@ void main()
 
 		if (!document.fixed.empty())
 		{
+			const char* format = document.parts.empty() ?
+				"%zu cannot be shaped here: skinned, made by a script, or not triangles." :
+				"%zu more cannot be shaped here: skinned, made by a script, or not triangles.";
+
 			ImGui::PushTextWrapPos();
-			ImGui::TextDisabled(document.parts.empty() ? "%zu cannot be shaped here: skinned, made by a script, or not triangles." : "%zu more cannot be shaped here: skinned, made by a script, or not triangles.", document.fixed.size());
+			ImGui::TextDisabled(format, document.fixed.size());
 			ImGui::PopTextWrapPos();
 		};
 
