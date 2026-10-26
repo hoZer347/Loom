@@ -102,6 +102,7 @@ needs Chrome or Edge installed.
 | `SpeedManager` | `ClampMagnitude` and `MoveTowards`: clamping, no overshoot, zero-length input |
 | `Browser` | Run by `run-browser-tests.ps1` only: real mouse moves, buttons and the spacebar reaching `Input`, GLFW and `DialogueInput`; the page being cross-origin isolated |
 | `SceneHistory` | The editor's undo and redo: exact text both ways, redo cleared by a new edit, unrecorded edits, several scenes, closed scenes, the step cap, guids and references coming back, scene order |
+| `PlayHistory` | The editor's undo and redo while playing: one field's text both ways, a no-op edit, redo cleared by a new edit, gone objects passed over, the step cap, components taken off, put on and reordered in place, references to them coming back from their own and other GameObjects, edits to a component outliving its removal and return, and what the run did since left alone |
 | `EditCommands` | The editor's Ctrl+Z/Y/X/C/V and Delete read from real ImGui key events, a text box keeping them, held keys not repeating, which object can be taken and where a paste lands, cut/copy/paste through undo |
 | `ProjectAssets` | Create > Script writing one self-registering header in the project's namespace, refusing a taken, registered or non-C++ name |
 | `AxisGui` | One axis-coloured stripe over each of the first three drag boxes, nothing else added beside ImGui's own `DragScalarN`, nothing drawn in a collapsed window |
@@ -197,6 +198,7 @@ and letting that fire after the object has gone runs it against freed memory.
   exercises it yet: it was landing while this suite was being written, and it is
   what replaced the old `Loom::State` stack machine, whose suite was removed
   when `Loom WASM/State.h` and `State.cpp` were deleted.
-- `Loom SQL`, `Loom Demos`, `Space Explorers`, and `Loom Editor` beyond
-  `SceneHistory.cpp` and `EditCommands.cpp`, the two of its sources that need
-  no window and are compiled into the suite beside the engine's.
+- `Loom SQL`, `Loom Demos`, `Space Explorers`, and `Loom Editor` beyond the
+  sources of it that need no window, such as `SceneHistory.cpp`,
+  `EditCommands.cpp` and `PlayHistory.cpp`, which are compiled into the suite
+  beside the engine's.

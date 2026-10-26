@@ -6,7 +6,6 @@
 #include "GameObject.h"
 #include "PlayHistory.h"
 #include "Scene.h"
-#include "SceneSerializer.h"
 
 #include "glm/glm.hpp"
 
@@ -68,11 +67,11 @@ namespace
 		// the queue has caught up.
 		void Change(const std::function<void()>& change)
 		{
-			const std::string before = Loom::SceneSerializer::SerializeOwn(*cube);
+			Loom::PlayHistory::Components before = Loom::PlayHistory::ReadComponents(*cube);
 
 			change();
 			Pump();
-			history.RecordComponents(*cube, before);
+			history.RecordComponents(std::move(before));
 		};
 
 		PlayMarker* Marker(const std::string& label)
@@ -339,5 +338,89 @@ TEST_SUITE("PlayHistory")
 		Pump();
 
 		CHECK(Labels() == std::vector<std::string>{ "edited" });
+	};
+
+	TEST_CASE_FIXTURE(Running, "an edit to a component goes back once undo has put the component back")
+	{
+		PlayMarker* marker = Marker("first");
+
+		Edit(*marker, marker->label, std::string("second"));
+		Change([&]() { cube->DetachComponent(marker); });
+
+		history.Undo();
+		Pump();
+
+		REQUIRE(Labels() == std::vector<std::string>{ "second" });
+		CHECK(history.Undo() == cube);
+		CHECK(Labels() == std::vector<std::string>{ "first" });
+	};
+
+	TEST_CASE_FIXTURE(Running, "an edit to an added component comes back with it on redo")
+	{
+		PlayMarker* added = nullptr;
+
+		Change([&]() { added = Marker("added"); });
+		Edit(*added, added->label, std::string("edited"));
+
+		history.Undo();
+		history.Undo();
+		Pump();
+
+		REQUIRE(cube->GetComponents().empty());
+
+		history.Redo();
+		Pump();
+		history.Redo();
+
+		CHECK(Labels() == std::vector<std::string>{ "edited" });
+	};
+
+	TEST_CASE_FIXTURE(Running, "undoing a removal puts back the references to it from other GameObjects")
+	{
+		Loom::GameObject* other = scene->GetRoot().AddChild("Other");
+		Pump();
+
+		PlayMarker* holder = other->Attach<PlayMarker>();
+		PlayMarker* target = Marker("target");
+
+		holder->partner = target;
+
+		Change([&]() { cube->DetachComponent(target); });
+
+		REQUIRE(holder->partner == nullptr);
+
+		history.Undo();
+		Pump();
+
+		REQUIRE(cube->GetComponents().size() == 1);
+		CHECK(holder->partner == cube->GetComponents()[0]);
+
+		history.Redo();
+		Pump();
+
+		CHECK(holder->partner == nullptr);
+	};
+
+	TEST_CASE_FIXTURE(Running, "a reference the run has pointed elsewhere since keeps what it holds")
+	{
+		Loom::GameObject* other = scene->GetRoot().AddChild("Other");
+		Pump();
+
+		PlayMarker* holder = other->Attach<PlayMarker>();
+		PlayMarker* target = Marker("target");
+
+		holder->partner = target;
+
+		Change([&]() { cube->DetachComponent(target); });
+
+		PlayMarker* elsewhere = other->Attach<PlayMarker>();
+
+		holder->partner = elsewhere;
+		Pump();
+
+		history.Undo();
+		Pump();
+
+		CHECK(holder->partner == elsewhere);
 	};
 };

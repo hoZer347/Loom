@@ -2,6 +2,7 @@
 
 #include "Component.h"
 #include "GameObject.h"
+#include "Scene.h"
 #include "SceneSerializer.h"
 
 #include <algorithm>
@@ -113,32 +114,113 @@ namespace Loom
 
 			return dynamic_cast<GameObject*>(object);
 		};
+
+		// object's Reference fields that point at one of gameObject's components.
+		void Hold(const LoomObject& object, const GameObject& gameObject, std::vector<PlayHistory::Field>& held)
+		{
+			const std::vector<SerializedField>& fields = object.GetFields();
+
+			for (size_t i = 0; i < fields.size(); i++)
+			{
+				if (fields[i].type != FieldType::Reference)
+					continue;
+
+				const ComponentBase* component = dynamic_cast<const ComponentBase*>(fields[i].GetReference());
+
+				if (component == nullptr || component->GetGameObject() != &gameObject)
+					continue;
+
+				PlayHistory::Field& field = held.emplace_back();
+
+				field.before = fields[i].Write();
+				field.object = object.GetGuid();
+				field.index = i;
+			};
+		};
+
+		// Hold for everything from at down but gameObject, whose own text
+		// carries its own references.
+		void HoldUnder(const GameObject& at, const GameObject& gameObject, std::vector<PlayHistory::Field>& held)
+		{
+			if (&at != &gameObject)
+			{
+				Hold(at, gameObject, held);
+
+				for (const ComponentBase* component : at.GetComponents())
+					Hold(*component, gameObject, held);
+			};
+
+			for (const GameObject* child : at.GetChildren())
+				HoldUnder(*child, gameObject, held);
+		};
 	};
 
 	void PlayHistory::RecordField(LoomObject& object, size_t index, const std::string& before)
 	{
 		std::string after = object.GetFields()[index].Write();
 
-		if (after != before)
-			Push(Step{ &object, object.m_ID, index, before, std::move(after) });
+		if (after == before)
+			return;
+
+		Step step{ };
+
+		step.before = before;
+		step.after = std::move(after);
+		step.object = object.GetGuid();
+		step.index = index;
+
+		Push(std::move(step));
 	};
 
-	void PlayHistory::RecordComponents(GameObject& gameObject, const std::string& before)
+	PlayHistory::Components PlayHistory::ReadComponents(GameObject& gameObject)
 	{
-		std::string after = SceneSerializer::SerializeOwn(gameObject);
+		Components read{ gameObject.GetGuid(), SceneSerializer::SerializeOwn(gameObject) };
 
-		if (after != before)
-			Push(Step{ &gameObject, gameObject.m_ID, components, before, std::move(after) });
+		for (const Scene* scene : Scene::GetScenes())
+			HoldUnder(scene->GetRoot(), gameObject, read.held);
+
+		return read;
+	};
+
+	void PlayHistory::RecordComponents(Components before)
+	{
+		GameObject* gameObject = LoomObject::GetByGuid<GameObject>(before.gameObject);
+
+		if (gameObject == nullptr)
+			return;
+
+		Step step{ };
+
+		step.before = std::move(before.own);
+		step.after = SceneSerializer::SerializeOwn(*gameObject);
+		step.object = before.gameObject;
+		step.index = components;
+
+		for (Field& held : before.held)
+		{
+			LoomObject* holder = LoomObject::GetByGuid<LoomObject>(held.object);
+
+			if (holder == nullptr)
+				continue;
+
+			held.after = holder->GetFields()[held.index].Write();
+
+			if (held.after != held.before)
+				step.held.push_back(std::move(held));
+		};
+
+		if (step.after != step.before || !step.held.empty())
+			Push(std::move(step));
 	};
 
 	GameObject* PlayHistory::Undo()
 	{
-		return Move(m_undo, m_redo, &Step::after, &Step::before);
+		return Move(m_undo, m_redo, &Sides::after, &Sides::before);
 	};
 
 	GameObject* PlayHistory::Redo()
 	{
-		return Move(m_redo, m_undo, &Step::before, &Step::after);
+		return Move(m_redo, m_undo, &Sides::before, &Sides::after);
 	};
 
 	void PlayHistory::Clear()
@@ -157,7 +239,7 @@ namespace Loom
 		m_undo.push_back(std::move(step));
 	};
 
-	GameObject* PlayHistory::Move(std::vector<Step>& from, std::vector<Step>& to, std::string Step::* was, std::string Step::* wanted)
+	GameObject* PlayHistory::Move(std::vector<Step>& from, std::vector<Step>& to, std::string Sides::* was, std::string Sides::* wanted)
 	{
 		while (!from.empty())
 		{
@@ -165,21 +247,38 @@ namespace Loom
 
 			from.pop_back();
 
-			// The address alone could be a new object made where an old one was.
-			if (LoomObject::GetByID(step.id) != step.object)
+			LoomObject* object = LoomObject::GetByGuid<LoomObject>(step.object);
+
+			if (object == nullptr)
 				continue;
 
 			if (step.index == components)
-				PutComponents(static_cast<GameObject&>(*step.object), step.*was, step.*wanted);
+			{
+				PutComponents(static_cast<GameObject&>(*object), step.*was, step.*wanted);
+
+				// A holder the run has pointed elsewhere since keeps what it holds.
+				for (const Field& held : step.held)
+				{
+					LoomObject* holder = LoomObject::GetByGuid<LoomObject>(held.object);
+
+					if (holder == nullptr)
+						continue;
+
+					const SerializedField& field = holder->GetFields()[held.index];
+
+					if (field.Write() == held.*was && field.Read(held.*wanted))
+						holder->OnFieldChanged(field);
+				};
+			}
 			else
 			{
-				const SerializedField& field = step.object->GetFields()[step.index];
+				const SerializedField& field = object->GetFields()[step.index];
 
 				if (field.Read(step.*wanted))
-					step.object->OnFieldChanged(field);
+					object->OnFieldChanged(field);
 			};
 
-			GameObject* stepped = GameObjectOf(step.object);
+			GameObject* stepped = GameObjectOf(object);
 
 			to.push_back(std::move(step));
 

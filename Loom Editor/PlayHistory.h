@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Guid.h"
+
 #include <cstdint>
 #include <limits>
 #include <string>
@@ -19,24 +21,49 @@ namespace Loom
 	* - A field step is one field's text either side of one edit, and putting
 	*   it back writes only that field
 	* - A component step is a GameObject's own scene text either side of
-	*   adding or removing components. Putting it back adds or removes what
-	*   the edit did and writes only the fields the edit changed, such as a
-	*   reference to a removed component, so whatever the run has done to the
-	*   rest since is left as it is
-	* - A step whose object has gone is thrown away on the way past
+	*   adding, removing or reordering its components, with each Reference
+	*   field elsewhere that pointed at one of them. Putting it back adds,
+	*   removes or orders what the edit did and writes only the fields the edit
+	*   changed, so whatever the run has done to the rest since is left as it
+	*   is
+	* - Steps find their objects by guid, so a component a step puts back is
+	*   the same one to the steps before it. A step whose object has gone is
+	*   thrown away on the way past
 	*/
 	struct PlayHistory final
 	{
 		static constexpr size_t max_steps = 100;
 
+		struct Sides
+		{
+			std::string before{ };
+			std::string after{ };
+		};
+
+		struct Field : Sides
+		{
+			Guid object{ };
+			size_t index = 0;
+		};
+
+		// A GameObject's components as an edit to them found them, from
+		// ReadComponents, for RecordComponents once the edit is done.
+		struct Components
+		{
+			Guid gameObject{ };
+			std::string own{ };
+			std::vector<Field> held{ };
+		};
+
 		// An edit to object's field at index from before, the text Write gave
 		// for it, to what it holds now. One that changed nothing is not a step.
 		void RecordField(LoomObject& object, size_t index, const std::string& before);
 
-		// Components added to or taken off gameObject since it read as before,
-		// the text SerializeOwn gave for it. One that changed nothing is not a
-		// step.
-		void RecordComponents(GameObject& gameObject, const std::string& before);
+		static Components ReadComponents(GameObject& gameObject);
+
+		// Components added to, taken off or reordered on the GameObject since
+		// it read as before. One that changed nothing is not a step.
+		void RecordComponents(Components before);
 
 		// Puts the newest step whose object is still there back, or forward,
 		// and returns the GameObject it was on, or null when there was none.
@@ -51,20 +78,15 @@ namespace Loom
 	private:
 		static constexpr size_t components = (std::numeric_limits<size_t>::max)();
 
-		struct Step
+		// A field step, or a component step whose index is components.
+		struct Step : Field
 		{
-			LoomObject* object = nullptr;
-			uint64_t id = 0;
-
-			// The field's index, or components for a component step.
-			size_t index = components;
-			std::string before{ };
-			std::string after{ };
+			std::vector<Field> held{ };
 		};
 
 		void Push(Step step);
 
-		static GameObject* Move(std::vector<Step>& from, std::vector<Step>& to, std::string Step::* was, std::string Step::* wanted);
+		static GameObject* Move(std::vector<Step>& from, std::vector<Step>& to, std::string Sides::* was, std::string Sides::* wanted);
 
 		// Makes gameObject read as to where it read as from, and leaves the rest.
 		static void PutComponents(GameObject& gameObject, const std::string& from, const std::string& to);

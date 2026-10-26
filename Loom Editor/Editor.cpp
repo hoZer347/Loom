@@ -1523,18 +1523,21 @@ namespace Loom
 			return;
 		};
 
-		const std::string before = SceneSerializer::SerializeOwn(gameObject);
-		const uint64_t id = gameObject.m_ID;
+		// A field edit still held goes in first, since the change may take its
+		// object off.
+		RecordPlayEdit();
+
+		PlayHistory::Components before = PlayHistory::ReadComponents(gameObject);
 
 		change();
 
 		// Taking a component off waits for the queue, so what the change made
 		// is read once the queue gets this far.
 		Engine::QueueTask(
-			[this, &gameObject, id, before]()
+			[this, before = std::move(before)]()
 			{
-				if (m_playing && LoomObject::GetByID(id) == &gameObject)
-					m_playHistory.RecordComponents(gameObject, before);
+				if (m_playing)
+					m_playHistory.RecordComponents(before);
 			});
 	};
 
