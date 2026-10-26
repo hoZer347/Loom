@@ -268,13 +268,20 @@ namespace Loom
 				{
 					const bool written = RenameShaderVariable(shader->file_path, variable.name, m_rename, error);
 
+					// This one too, which may be in a scene left off the list,
+					// such as the prefab viewer's.
 					if (written)
+					{
+						RenameLocal(variable.name, m_rename);
+
 						for (Scene* scene : Scene::GetScenes())
-							EachMaterial(scene->GetRoot(), [&](Material& material)
-							{
-								if (material.shader == shader)
-									material.RenameLocal(variable.name, m_rename);
-							});
+							EachMaterial(scene->GetRoot(),
+								[&](Material& material)
+								{
+									if (material.shader == shader)
+										material.RenameLocal(variable.name, m_rename);
+								});
+					};
 
 					Edited(written, error);
 				};
