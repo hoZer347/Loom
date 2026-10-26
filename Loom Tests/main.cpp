@@ -176,8 +176,13 @@ int main(int argc, char** argv)
 #ifndef __EMSCRIPTEN__
 	// Held until the process ends; a run that crashes abandons it, which hands it on all the same.
 	const HANDLE suite = CreateMutexW(nullptr, FALSE, SUITE_MUTEX);
+	const auto waiting =
+		[]()
+		{
+			std::cerr << "Waiting for another run of the suite to finish" << std::endl;
+		};
 
-	if (!suite || !TakeTurn(suite, []() { std::cerr << "Waiting for another run of the suite to finish" << std::endl; }))
+	if (!suite || !TakeTurn(suite, waiting))
 	{
 		std::fprintf(stderr, "The suite could not wait for other runs to finish (error %lu)\n", GetLastError());
 		return EXIT_FAILURE;
@@ -259,6 +264,8 @@ TEST_SUITE("Loom Tests")
 
 	TEST_CASE("a run says it is waiting, then takes its turn once the other run lets go")
 	{
+		constexpr DWORD LET_GO_TIMEOUT_MS = 5000;
+
 		const HANDLE turn = CreateMutexW(nullptr, FALSE, nullptr);
 		const HANDLE letGo = CreateEventW(nullptr, FALSE, FALSE, nullptr);
 		REQUIRE(turn != nullptr);
@@ -270,7 +277,8 @@ TEST_SUITE("Loom Tests")
 			{
 				WaitForSingleObject(turn, INFINITE);
 				held.set_value();
-				WaitForSingleObject(letGo, INFINITE);
+				// Bounded, so a run that never says it waits fails here rather than hanging every run on the machine.
+				WaitForSingleObject(letGo, LET_GO_TIMEOUT_MS);
 				ReleaseMutex(turn);
 			});
 		held.get_future().wait();
