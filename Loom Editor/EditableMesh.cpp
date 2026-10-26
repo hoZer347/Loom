@@ -331,6 +331,56 @@ namespace Loom
 		return mesh;
 	};
 
+	EditableMesh EditableMesh::Capsule(float radius, float height, int segments, int cap_rings)
+	{
+		const float half = (std::max)(height / 2.0f, radius);
+		const float straight = half - radius;
+		const int rows = 2 * cap_rings;
+
+		EditableMesh mesh;
+		mesh.hasUVs = true;
+		mesh.hasNormals = true;
+
+		const uint32_t north = 0;
+		const uint32_t south = 1;
+
+		mesh.vertices = { { 0.0f, half, 0.0f }, { 0.0f, -half, 0.0f } };
+
+		// The rings from the north down, the waist twice: once ending the top
+		// half sphere and once starting the bottom one.
+		for (int row = 0; row < rows; row++)
+		{
+			const bool top = row < cap_rings;
+			const float down = glm::pi<float>() * (top ? row + 1 : row) / rows;
+			const float y = radius * std::cos(down) + (top ? straight : -straight);
+
+			for (int i = 0; i < segments; i++)
+				mesh.vertices.push_back(Round(radius * std::sin(down), y, i, segments));
+		};
+
+		const auto at = [&](int row, int i) { return (uint32_t)(2 + row * segments + (i % segments)); };
+		const auto uv = [&](uint32_t vertex, int i) { return glm::vec2((float)i / segments, (mesh.vertices[vertex].y + half) / (2.0f * half)); };
+
+		for (int i = 0; i < segments; i++)
+		{
+			mesh.AddFace({ north, at(0, i), at(0, i + 1) }, { uv(north, i), uv(at(0, i), i), uv(at(0, i + 1), i + 1) });
+
+			for (int row = 0; row + 1 < rows; row++)
+			{
+				const uint32_t a = at(row + 1, i);
+				const uint32_t b = at(row + 1, i + 1);
+				const uint32_t c = at(row, i + 1);
+				const uint32_t d = at(row, i);
+
+				mesh.AddFace({ a, b, c, d }, { uv(a, i), uv(b, i + 1), uv(c, i + 1), uv(d, i) });
+			};
+
+			mesh.AddFace({ south, at(rows - 1, i + 1), at(rows - 1, i) }, { uv(south, i), uv(at(rows - 1, i + 1), i + 1), uv(at(rows - 1, i), i) });
+		};
+
+		return mesh;
+	};
+
 	glm::vec3 EditableMesh::FaceNormal(uint32_t face) const
 	{
 		const std::vector<Corner>& corners = faces[face].corners;

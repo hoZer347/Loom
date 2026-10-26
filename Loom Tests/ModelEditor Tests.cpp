@@ -32,6 +32,7 @@ namespace
 {
 	using Loom::EditableMesh;
 	using Loom::ModelEditor;
+	namespace Shapes = Loom::Shapes;
 
 	constexpr float TOLERANCE = 1e-4f;
 
@@ -545,7 +546,7 @@ TEST_SUITE("ModelEditor")
 
 		const size_t faces = driven.Mesh().faces.size();
 
-		driven.editor.Add(ModelEditor::Shape::Cylinder);
+		driven.editor.Add(Shapes::Shape::Cylinder);
 		const size_t added = driven.editor.Selected()->faces.size();
 		CHECK(added > 0);
 		CHECK(driven.Mesh().faces.size() == faces + added);
@@ -571,7 +572,7 @@ TEST_SUITE("ModelEditor")
 
 		CHECK(driven.Mesh().faces.size() == 1);
 
-		driven.editor.Add(ModelEditor::Shape::Cube);
+		driven.editor.Add(Shapes::Shape::Cube);
 		std::ofstream(driven.path, std::ios::binary) << ReadFile(WritePrefab("model_reload_cube", &driven.cube));
 		driven.Frame();
 
@@ -588,7 +589,7 @@ TEST_SUITE("ModelEditor")
 		std::ofstream(driven.path, std::ios::binary | std::ios::app) << MYSTERY;
 		driven.Frame();
 
-		driven.editor.Add(ModelEditor::Shape::Cube);
+		driven.editor.Add(Shapes::Shape::Cube);
 		REQUIRE(driven.editor.Save());
 
 		const std::string saved = ReadFile(driven.path);
@@ -748,7 +749,7 @@ TEST_SUITE("ModelEditor")
 	{
 		Driven driven("model_extrude_all");
 
-		driven.editor.Add(ModelEditor::Shape::Cube);
+		driven.editor.Add(Shapes::Shape::Cube);
 		REQUIRE(driven.Mesh().faces.size() == 12);
 
 		driven.editor.SetPick(ModelEditor::Pick::Faces);

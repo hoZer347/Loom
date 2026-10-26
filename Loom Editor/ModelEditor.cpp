@@ -88,9 +88,6 @@ namespace Loom
 		constexpr float add_share = 0.5f;
 		constexpr float empty_size = 1.0f;
 
-		constexpr int round_segments = 16;
-		constexpr int sphere_rings = 8;
-
 		// With Ctrl held, handles move, turn and size in these steps.
 		constexpr float move_snap = 0.125f;
 		constexpr float turn_snap = 15.0f;
@@ -176,21 +173,6 @@ void main()
 			{ ModelEditor::Tool::Move, "Move", "The handles move what is picked", ImGuiKey_W },
 			{ ModelEditor::Tool::Rotate, "Rotate", "The rings turn what is picked", ImGuiKey_E },
 			{ ModelEditor::Tool::Scale, "Scale", "The handles size what is picked", ImGuiKey_R },
-		};
-
-		struct ShapeInfo
-		{
-			ModelEditor::Shape shape;
-			const char* label;
-		};
-
-		constexpr ShapeInfo shapes[] =
-		{
-			{ ModelEditor::Shape::Cube, "Cube" },
-			{ ModelEditor::Shape::Plane, "Plane" },
-			{ ModelEditor::Shape::Cylinder, "Cylinder" },
-			{ ModelEditor::Shape::Cone, "Cone" },
-			{ ModelEditor::Shape::Sphere, "Sphere" },
 		};
 
 		const char* const controls =
@@ -909,7 +891,7 @@ void main()
 
 		if (ImGui::BeginPopup("##add"))
 		{
-			for (const ShapeInfo& info : shapes)
+			for (const Shapes::Info& info : Shapes::All())
 				if (ImGui::MenuItem(info.label))
 					Add(info.shape);
 
@@ -2284,7 +2266,7 @@ void main()
 		Changed(*document);
 	};
 
-	void ModelEditor::Add(Shape shape)
+	void ModelEditor::Add(Shapes::Shape shape)
 	{
 		Document* document = Front();
 
@@ -2297,16 +2279,7 @@ void main()
 		const float largest = (std::max)({ extent.x, extent.y, extent.z });
 		const float size = largest > 0.0f ? largest * add_share : empty_size;
 
-		EditableMesh added{ };
-
-		switch (shape)
-		{
-		case Shape::Cube:		added = EditableMesh::Cube(size); break;
-		case Shape::Plane:		added = EditableMesh::Plane(size); break;
-		case Shape::Cylinder:	added = EditableMesh::Cylinder(size / 2.0f, size, round_segments); break;
-		case Shape::Cone:		added = EditableMesh::Cone(size / 2.0f, size, round_segments); break;
-		case Shape::Sphere:		added = EditableMesh::Sphere(size / 2.0f, round_segments, sphere_rings); break;
-		};
+		EditableMesh added = Shapes::Build(shape, size);
 
 		std::set<uint32_t> all{ };
 
@@ -2325,9 +2298,7 @@ void main()
 
 		Changed(*document);
 
-		const auto info = std::find_if(std::begin(shapes), std::end(shapes), [shape](const ShapeInfo& each) { return each.shape == shape; });
-
-		document->message = std::string("Added a ") + info->label + " where the view is looking. It is picked, so the arrows move it; tick See Through if it is inside the model.";
+		document->message = std::string("Added a ") + Shapes::Label(shape) + " where the view is looking. It is picked, so the arrows move it; tick See Through if it is inside the model.";
 		document->messageTime = ImGui::GetTime();
 	};
 
@@ -2361,7 +2332,7 @@ void main()
 		Mesh* mesh = document->root->Attach<Mesh>(Mesh::Triangles);
 		document->parts.push_back(Part{ document->root, mesh, EditableMesh{ } });
 
-		Add(Shape::Cube);
+		Add(Shapes::Shape::Cube);
 	};
 
 	std::vector<std::string> ModelEditor::Shaders() const

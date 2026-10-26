@@ -178,12 +178,14 @@ TEST_SUITE("EditableMesh")
 	TEST_CASE("EditableMesh's primitives are closed and face outwards")
 	{
 		constexpr float SIZE = 2.0f;
+		constexpr float CAPSULE_HEIGHT = 3.0f * SIZE;
 
 		for (const EditableMesh& mesh : {
 			EditableMesh::Cube(SIZE),
 			EditableMesh::Cylinder(SIZE, SIZE, SEGMENTS),
 			EditableMesh::Cone(SIZE, SIZE, SEGMENTS),
-			EditableMesh::Sphere(SIZE, SEGMENTS, RINGS) })
+			EditableMesh::Sphere(SIZE, SEGMENTS, RINGS),
+			EditableMesh::Capsule(SIZE, CAPSULE_HEIGHT, SEGMENTS, RINGS) })
 		{
 			CHECK(FacesOut(mesh));
 			CHECK(Closed(mesh));
@@ -200,6 +202,9 @@ TEST_SUITE("EditableMesh")
 
 		const EditableMesh plane = EditableMesh::Plane(SIZE);
 		CHECK(Near(plane.FaceNormal(0), glm::vec3(0.0f, 1.0f, 0.0f)));
+
+		const auto [capsule_low, capsule_high] = EditableMesh::Capsule(SIZE, CAPSULE_HEIGHT, SEGMENTS, RINGS).Bounds();
+		CHECK(Near(capsule_high - capsule_low, glm::vec3(2.0f * SIZE, CAPSULE_HEIGHT, 2.0f * SIZE)));
 	};
 
 	TEST_CASE("EditableMesh moves a vertex in every face it is part of and flattens them")

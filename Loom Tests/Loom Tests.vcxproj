@@ -265,6 +265,7 @@
     <ClCompile Include="..\Loom Editor\SpriteAsset.cpp" />
     <ClCompile Include="..\Loom Editor\SpriteEditor.cpp" />
     <ClCompile Include="..\Loom Editor\EditableMesh.cpp" />
+    <ClCompile Include="..\Loom Editor\Shapes.cpp" />
     <ClCompile Include="..\Loom Editor\ModelEditor.cpp" />
     <ClCompile Include="..\Loom Editor\UiScript.cpp" />
     <ClCompile Include="..\Loom Editor\McpProtocol.cpp" />

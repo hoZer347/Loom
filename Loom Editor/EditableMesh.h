@@ -73,6 +73,10 @@ namespace Loom
 		static EditableMesh Cone(float radius, float height, int segments);
 		static EditableMesh Sphere(float radius, int segments, int rings);
 
+		// Height end to end, each round end a half sphere of cap_rings rings.
+		// No shorter than a sphere.
+		static EditableMesh Capsule(float radius, float height, int segments, int cap_rings);
+
 		// Unit length, by Newell's method so it holds for any flat polygon.
 		// Zero for a face with no area.
 		glm::vec3 FaceNormal(uint32_t face) const;

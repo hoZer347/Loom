@@ -14,6 +14,7 @@
 #include "Light.h"
 #include "LoomObject.h"
 #include "Material.h"
+#include "Mesh.h"
 #include "MissingComponent.h"
 #include "Prefab.h"
 #include "Profiler.h"
@@ -679,6 +680,15 @@ namespace Loom
 			};
 
 			return changed;
+		};
+
+		void CountShaders(GameObject& object, std::unordered_map<std::string, int>& counts)
+		{
+			if (const Material* material = object.GetComponent<Material>(); material && !material->GetShaderPath().empty())
+				counts[material->GetShaderPath()]++;
+
+			for (GameObject* child : object.GetChildren())
+				CountShaders(*child, counts);
 		};
 	};
 
@@ -2247,6 +2257,8 @@ namespace Loom
 			if (ImGui::MenuItem("Create Child", nullptr, false, m_selected != nullptr))
 				Select(m_selected->AddChild());
 
+			DrawShapeMenu(m_activeScene ? &m_activeScene->GetRoot() : nullptr);
+
 			ImGui::Separator();
 
 			if (ImGui::MenuItem("Delete", nullptr, false, EditCommands::CanTake(m_selected)))
@@ -2503,6 +2515,16 @@ namespace Loom
 				ImGui::EndDragDropTarget();
 			};
 
+			if (ImGui::BeginPopupContextWindow("##create", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
+			{
+				if (ImGui::MenuItem("Add GameObject", nullptr, false, last_rows != nullptr))
+					Select(last_rows->AddChild());
+
+				DrawShapeMenu(last_rows);
+
+				ImGui::EndPopup();
+			};
+
 			m_childCounts.swap(m_drawnCounts);
 			m_drawnCounts.clear();
 		};
@@ -2566,6 +2588,8 @@ namespace Loom
 
 			if (ImGui::MenuItem("Add GameObject"))
 				Select(scene->AddChild());
+
+			DrawShapeMenu(&root);
 
 			ImGui::Separator();
 
@@ -2666,6 +2690,8 @@ namespace Loom
 			if (ImGui::MenuItem("Add Child"))
 				Select(gameObject->AddChild());
 
+			DrawShapeMenu(gameObject);
+
 			const std::filesystem::path prefab = PrefabFileOf(*gameObject);
 			std::error_code code;
 
@@ -2697,6 +2723,74 @@ namespace Loom
 		DrawChildNodes(*gameObject, disabled, in_prefab);
 
 		ImGui::TreePop();
+	};
+
+	void Editor::DrawShapeMenu(GameObject* parent)
+	{
+		if (!ImGui::BeginMenu("3D Object", parent != nullptr))
+			return;
+
+		for (const Shapes::Info& info : Shapes::All())
+			if (ImGui::MenuItem(info.label))
+				Select(AddShape(*parent, info.shape));
+
+		ImGui::EndMenu();
+	};
+
+	GameObject* Editor::AddShape(GameObject& parent, Shapes::Shape shape)
+	{
+		constexpr float size = 1.0f;
+
+		GameObject* object = parent.AddChild(Shapes::Label(shape));
+		object->Attach<Material>()->SetShaderPath(ShapeShader());
+
+		std::vector<float> positions{ };
+		std::vector<float> uvs{ };
+		std::vector<float> normals{ };
+		std::vector<float> colors{ };
+		Shapes::Build(shape, size).ToTriangles(positions, uvs, normals, colors);
+
+		Mesh* mesh = object->Attach<Mesh>(Mesh::Triangles);
+		mesh->m_vertices = std::move(positions);
+		mesh->m_textureCoordinates = std::move(uvs);
+		mesh->m_normals = std::move(normals);
+		mesh->m_colors = std::move(colors);
+
+		return object;
+	};
+
+	std::string Editor::ShapeShader() const
+	{
+		std::unordered_map<std::string, int> counts{ };
+
+		for (Scene* scene : Scene::GetScenes())
+			CountShaders(scene->GetRoot(), counts);
+
+		if (GameObject* prefab = GetPrefabRoot())
+			CountShaders(*prefab, counts);
+
+		const auto most = std::max_element(
+			counts.begin(),
+			counts.end(),
+			[](const auto& a, const auto& b) { return a.second < b.second; });
+
+		if (most != counts.end())
+			return most->first;
+
+		// Failing that, the shader a new project draws with, or else the
+		// first the project has.
+		std::error_code code;
+
+		if (m_projectPath.empty() || std::filesystem::exists(std::filesystem::path(m_projectPath) / ProjectTemplate::shader_path, code))
+			return ProjectTemplate::shader_path;
+
+		std::vector<std::string> shaders{ };
+
+		for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator(m_projectPath, code))
+			if (entry.path().extension() == ProjectAssets::shaderExtension)
+				shaders.push_back(entry.path().lexically_relative(m_projectPath).generic_string());
+
+		return shaders.empty() ? ProjectTemplate::shader_path : *std::min_element(shaders.begin(), shaders.end());
 	};
 
 	void Editor::DrawChildNodes(GameObject& parent, bool disabled, bool in_prefab)

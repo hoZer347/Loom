@@ -2,6 +2,7 @@
 
 #include "EditableMesh.h"
 #include "EditorViewport.h"
+#include "Shapes.h"
 
 #include "Camera.h"
 
@@ -52,15 +53,6 @@ namespace Loom
 			Move,
 			Rotate,
 			Scale,
-		};
-
-		enum struct Shape
-		{
-			Cube,
-			Plane,
-			Cylinder,
-			Cone,
-			Sphere,
 		};
 
 		struct Selection
@@ -116,7 +108,7 @@ namespace Loom
 		void Duplicate();
 		void Delete();
 		void Flip();
-		void Add(Shape shape);
+		void Add(Shapes::Shape shape);
 
 		// Gives a prefab with no mesh one on its top object, starting as a cube.
 		void AddMesh();

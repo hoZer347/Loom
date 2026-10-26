@@ -399,6 +399,9 @@ namespace Loom
 
 		// Rereads the scripts project's headers for the types they declare.
 		void RefreshScripts();
+
+		// The Hierarchy's right-click menu on empty space adds to the rows
+		// above it, as a drop there does.
 		void DrawHierarchy();
 		void DrawSceneNode(Scene* scene);
 		// A prefab instance's row shows the prefab icon, and it and everything
@@ -408,6 +411,15 @@ namespace Loom
 		// Only the rows in view are drawn, and the rest are stepped over, so the
 		// tree costs what is open and on screen rather than what the scenes hold.
 		void DrawChildNodes(GameObject& parent, bool disabled, bool in_prefab);
+
+		// The 3D Object submenu, each shape made a child of parent and
+		// selected. Disabled with no parent.
+		void DrawShapeMenu(GameObject* parent);
+
+		// A child of parent drawing the shape, one unit across, with the
+		// shader most meshes open already draw with.
+		GameObject* AddShape(GameObject& parent, Shapes::Shape shape);
+		std::string ShapeShader() const;
 		static void SkipRows(size_t rows);
 
 		// Finds the open nodes still there, under their parents in order, and
