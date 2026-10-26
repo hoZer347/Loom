@@ -815,6 +815,19 @@ namespace Loom
 			return texture;
 		};
 
+		int MaxTextureSize() const override
+		{
+			GLint size = 0;
+			glGetIntegerv(GL_MAX_TEXTURE_SIZE, &size);
+
+			return size;
+		};
+
+		void* ImGuiTexture(uint32_t texture) override
+		{
+			return (void*)(intptr_t)texture;
+		};
+
 		#pragma endregion
 
 		#pragma region Targets
@@ -979,23 +992,6 @@ namespace Loom
 			glGetIntegerv(GL_VIEWPORT, viewport);
 
 			return glm::ivec2(viewport[VIEWPORT_WIDTH], viewport[VIEWPORT_HEIGHT]);
-		};
-
-		#pragma endregion
-
-		#pragma region Textures
-
-		int MaxTextureSize() const override
-		{
-			GLint size = 0;
-			glGetIntegerv(GL_MAX_TEXTURE_SIZE, &size);
-
-			return size;
-		};
-
-		void* ImGuiTexture(uint32_t texture) override
-		{
-			return (void*)(intptr_t)texture;
 		};
 
 		#pragma endregion

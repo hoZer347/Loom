@@ -643,6 +643,13 @@ void main()
 		return true;
 	};
 
+	bool ModelEditor::Save()
+	{
+		Document* document = Front();
+
+		return document && SaveDocument(*document);
+	};
+
 	#pragma endregion
 
 	#pragma region Accessors
@@ -2112,6 +2119,18 @@ void main()
 		Changed(document);
 	};
 
+	void ModelEditor::Undo()
+	{
+		if (Document* document = Front(); document && !document->parts.empty())
+			Step(*document, true);
+	};
+
+	void ModelEditor::Redo()
+	{
+		if (Document* document = Front(); document && !document->parts.empty())
+			Step(*document, false);
+	};
+
 	#pragma endregion
 
 	#pragma region Changes
@@ -2362,22 +2381,6 @@ void main()
 
 	#pragma endregion
 
-	#pragma region Undo
-
-	void ModelEditor::Undo()
-	{
-		if (Document* document = Front(); document && !document->parts.empty())
-			Step(*document, true);
-	};
-
-	void ModelEditor::Redo()
-	{
-		if (Document* document = Front(); document && !document->parts.empty())
-			Step(*document, false);
-	};
-
-	#pragma endregion
-
 	#pragma region New Mesh
 
 	void ModelEditor::AddMesh()
@@ -2429,17 +2432,6 @@ void main()
 				material->ChangeShader(path);
 				document.unsaved = true;
 			};
-	};
-
-	#pragma endregion
-
-	#pragma region Documents
-
-	bool ModelEditor::Save()
-	{
-		Document* document = Front();
-
-		return document && SaveDocument(*document);
 	};
 
 	#pragma endregion

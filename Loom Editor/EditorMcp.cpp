@@ -38,8 +38,6 @@ using json = nlohmann::json;
 
 namespace Loom
 {
-	#pragma region Call Queue
-
 	struct EditorMcp::Call
 	{
 		std::string tool;
@@ -47,8 +45,6 @@ namespace Loom
 		json result;
 		bool done = false;
 	};
-
-	#pragma endregion
 
 	namespace
 	{
@@ -178,6 +174,20 @@ namespace Loom
 			return ComponentRegistry::NameOf(component) + " (" + component.GetGuid().ToString() + ")";
 		};
 
+		// The component set_field writes into, by type or guid. Null for the
+		// GameObject itself, whose fields hold its Transform.
+		ComponentBase* FindComponent(GameObject& gameObject, const std::string& component)
+		{
+			if (component.empty() || SameText(component, "GameObject"))
+				return nullptr;
+
+			for (ComponentBase* part : gameObject.GetComponents())
+				if (SameText(ComponentRegistry::NameOf(*part), component) || part->GetGuid().ToString() == component)
+					return part;
+
+			throw ToolError(gameObject.GetName() + " has no " + component);
+		};
+
 		#pragma endregion
 
 		#pragma region Writing
@@ -242,24 +252,6 @@ namespace Loom
 
 			for (const LoomObject::FieldButton& button : object.GetButtons())
 				out << '\t' << button.name << " (a button, press_button presses it)\n";
-		};
-
-		#pragma endregion
-
-		#pragma region Lookup
-
-		// The component set_field writes into, by type or guid. Null for the
-		// GameObject itself, whose fields hold its Transform.
-		ComponentBase* FindComponent(GameObject& gameObject, const std::string& component)
-		{
-			if (component.empty() || SameText(component, "GameObject"))
-				return nullptr;
-
-			for (ComponentBase* part : gameObject.GetComponents())
-				if (SameText(ComponentRegistry::NameOf(*part), component) || part->GetGuid().ToString() == component)
-					return part;
-
-			throw ToolError(gameObject.GetName() + " has no " + component);
 		};
 
 		#pragma endregion

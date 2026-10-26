@@ -1189,6 +1189,72 @@ namespace Loom
 		return true;
 	};
 
+	bool Editor::IsOwned(Scene* scene) const
+	{
+		return std::find(
+			m_ownedScenes.begin(),
+			m_ownedScenes.end(),
+			scene) != m_ownedScenes.end();
+	};
+
+	std::string Editor::ScenePathOf(Scene* scene) const
+	{
+		const auto path = m_scenePaths.find(scene);
+
+		return path == m_scenePaths.end() ? "" : path->second;
+	};
+
+	void Editor::CloseScene(Scene* scene)
+	{
+		if (scene == nullptr)
+			return;
+
+		m_ownedScenes.erase(
+			std::remove(
+				m_ownedScenes.begin(),
+				m_ownedScenes.end(),
+				scene),
+			m_ownedScenes.end());
+
+		if (m_activeScene == scene)
+			m_activeScene = nullptr;
+
+		if (IsSelectedIn(scene->GetRoot()))
+			Select(nullptr);
+
+		m_scenePaths.erase(scene);
+
+		// Deleting a scene mid-GUI would leave the rest of the frame walking a
+		// dangling pointer; deferring puts the delete (and the unregistering it
+		// queues in turn) at the top of the next frame instead.
+		Engine::QueueTask([scene]() { delete scene; });
+	};
+
+	void Editor::SetActiveScene(Scene* scene)
+	{
+		m_activeScene = scene;
+
+		// Closing scenes for a rebuild is not the user leaving a scene, so only
+		// arriving at one is worth remembering.
+		if (scene == nullptr || m_projectPath.empty())
+			return;
+
+		const auto path = m_scenePaths.find(scene);
+
+		if (path != m_scenePaths.end() && !path->second.empty())
+			m_startupScene = path->second;
+
+		SaveSettings();
+	};
+
+	void Editor::ShowInSceneView(Scene* scene)
+	{
+		SetActiveScene(scene);
+
+		m_showScene = true;
+		m_sceneFocusFrames = scene_focus_frames;
+	};
+
 	#pragma endregion
 
 	#pragma region Saving
@@ -1313,76 +1379,6 @@ namespace Loom
 
 	#pragma endregion
 
-	#pragma region Scenes
-
-	bool Editor::IsOwned(Scene* scene) const
-	{
-		return std::find(
-			m_ownedScenes.begin(),
-			m_ownedScenes.end(),
-			scene) != m_ownedScenes.end();
-	};
-
-	std::string Editor::ScenePathOf(Scene* scene) const
-	{
-		const auto path = m_scenePaths.find(scene);
-
-		return path == m_scenePaths.end() ? "" : path->second;
-	};
-
-	void Editor::CloseScene(Scene* scene)
-	{
-		if (scene == nullptr)
-			return;
-
-		m_ownedScenes.erase(
-			std::remove(
-				m_ownedScenes.begin(),
-				m_ownedScenes.end(),
-				scene),
-			m_ownedScenes.end());
-
-		if (m_activeScene == scene)
-			m_activeScene = nullptr;
-
-		if (IsSelectedIn(scene->GetRoot()))
-			Select(nullptr);
-
-		m_scenePaths.erase(scene);
-
-		// Deleting a scene mid-GUI would leave the rest of the frame walking a
-		// dangling pointer; deferring puts the delete (and the unregistering it
-		// queues in turn) at the top of the next frame instead.
-		Engine::QueueTask([scene]() { delete scene; });
-	};
-
-	void Editor::SetActiveScene(Scene* scene)
-	{
-		m_activeScene = scene;
-
-		// Closing scenes for a rebuild is not the user leaving a scene, so only
-		// arriving at one is worth remembering.
-		if (scene == nullptr || m_projectPath.empty())
-			return;
-
-		const auto path = m_scenePaths.find(scene);
-
-		if (path != m_scenePaths.end() && !path->second.empty())
-			m_startupScene = path->second;
-
-		SaveSettings();
-	};
-
-	void Editor::ShowInSceneView(Scene* scene)
-	{
-		SetActiveScene(scene);
-
-		m_showScene = true;
-		m_sceneFocusFrames = scene_focus_frames;
-	};
-
-	#pragma endregion
-
 	#pragma region Prefabs
 
 	void Editor::OpenPrefab(const std::string& path)
@@ -1456,6 +1452,19 @@ namespace Loom
 		return root && Hierarchy::Contains(m_prefabScene->GetRoot(), root) ? root : nullptr;
 	};
 
+	void Editor::DrawPrefabNode()
+	{
+		GameObject* root = GetPrefabRoot();
+
+		if (root == nullptr)
+			return;
+
+		ImGui::Separator();
+		ImGui::TextDisabled("%s %s", EditorIcons::Prefab, m_prefabPath.c_str());
+
+		DrawGameObjectNode(root, false, false);
+	};
+
 	#pragma endregion
 
 	#pragma region Selection
@@ -1474,6 +1483,67 @@ namespace Loom
 		Select(nullptr);
 		m_selectedModel = path;
 		m_selectedAsset = std::filesystem::path(path).lexically_normal().string();
+	};
+
+	bool Editor::IsSelectedIn(const GameObject& root) const
+	{
+		return
+			m_selected &&
+			LoomObject::GetByID(m_selectedId) == m_selected &&
+			Hierarchy::Contains(root, m_selected);
+	};
+
+	void Editor::RequestSelection(const std::string& name)
+	{
+		m_pendingSelection = name;
+		m_selectionFramesLeft = selection_frames;
+	};
+
+	void Editor::ValidateSelection()
+	{
+		const std::vector<Scene*>& scenes = Scene::GetScenes();
+
+		// The scenes load once the scripts have built, and add their children
+		// through the task queue, so the name is looked for over a few frames
+		// after the build before it is given up on.
+		if (!m_pendingSelection.empty() && !m_scripts.IsBuilding())
+		{
+			GameObject* named = nullptr;
+
+			for (Scene* scene : scenes)
+				if ((named = FindByName(scene->GetRoot(), m_pendingSelection)))
+					break;
+
+			if (named)
+			{
+				Select(named);
+				m_pendingSelection.clear();
+			}
+			else if (--m_selectionFramesLeft <= 0)
+			{
+				std::cerr << "No GameObject named '" << m_pendingSelection << "'" << std::endl;
+				m_pendingSelection.clear();
+			};
+		};
+
+		if (m_activeScene &&
+			std::find(scenes.begin(), scenes.end(), m_activeScene) == scenes.end())
+			m_activeScene = nullptr;
+
+		if (m_activeScene == nullptr && !scenes.empty())
+			m_activeScene = scenes.front();
+
+		if (m_selected == nullptr)
+			return;
+
+		for (Scene* scene : scenes)
+			if (IsSelectedIn(scene->GetRoot()))
+				return;
+
+		if (m_prefabScene && IsSelectedIn(m_prefabScene->GetRoot()))
+			return;
+
+		Select(nullptr);
 	};
 
 	#pragma endregion
@@ -1703,71 +1773,6 @@ namespace Loom
 				SaveActiveScene();
 			break;
 		};
-	};
-
-	#pragma endregion
-
-	#pragma region Selection
-
-	bool Editor::IsSelectedIn(const GameObject& root) const
-	{
-		return
-			m_selected &&
-			LoomObject::GetByID(m_selectedId) == m_selected &&
-			Hierarchy::Contains(root, m_selected);
-	};
-
-	void Editor::RequestSelection(const std::string& name)
-	{
-		m_pendingSelection = name;
-		m_selectionFramesLeft = selection_frames;
-	};
-
-	void Editor::ValidateSelection()
-	{
-		const std::vector<Scene*>& scenes = Scene::GetScenes();
-
-		// The scenes load once the scripts have built, and add their children
-		// through the task queue, so the name is looked for over a few frames
-		// after the build before it is given up on.
-		if (!m_pendingSelection.empty() && !m_scripts.IsBuilding())
-		{
-			GameObject* named = nullptr;
-
-			for (Scene* scene : scenes)
-				if ((named = FindByName(scene->GetRoot(), m_pendingSelection)))
-					break;
-
-			if (named)
-			{
-				Select(named);
-				m_pendingSelection.clear();
-			}
-			else if (--m_selectionFramesLeft <= 0)
-			{
-				std::cerr << "No GameObject named '" << m_pendingSelection << "'" << std::endl;
-				m_pendingSelection.clear();
-			};
-		};
-
-		if (m_activeScene &&
-			std::find(scenes.begin(), scenes.end(), m_activeScene) == scenes.end())
-			m_activeScene = nullptr;
-
-		if (m_activeScene == nullptr && !scenes.empty())
-			m_activeScene = scenes.front();
-
-		if (m_selected == nullptr)
-			return;
-
-		for (Scene* scene : scenes)
-			if (IsSelectedIn(scene->GetRoot()))
-				return;
-
-		if (m_prefabScene && IsSelectedIn(m_prefabScene->GetRoot()))
-			return;
-
-		Select(nullptr);
 	};
 
 	#pragma endregion
@@ -4112,27 +4117,6 @@ namespace Loom
 			ImGui::TextDisabled("No prefab open. Double-click one in the Project panel.");
 		else DrawView(m_prefabView, { m_prefabScene }, &m_prefabCamera, &m_prefabOutline);
 	};
-
-	#pragma endregion
-
-	#pragma region Prefabs
-
-	void Editor::DrawPrefabNode()
-	{
-		GameObject* root = GetPrefabRoot();
-
-		if (root == nullptr)
-			return;
-
-		ImGui::Separator();
-		ImGui::TextDisabled("%s %s", EditorIcons::Prefab, m_prefabPath.c_str());
-
-		DrawGameObjectNode(root, false, false);
-	};
-
-	#pragma endregion
-
-	#pragma region Views
 
 	void Editor::DrawGame()
 	{

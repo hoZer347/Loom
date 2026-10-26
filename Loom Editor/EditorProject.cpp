@@ -1327,6 +1327,70 @@ namespace Loom
 		return path;
 	};
 
+	void Editor::DrawCreateAssetPrompt()
+	{
+		if (!m_askForAsset)
+			return;
+
+		const AssetKindInfo& info = InfoOf(m_newAssetKind);
+		const std::string title = std::string(info.icon) + " Create " + info.label + "###create_asset";
+
+		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+		if (ImGui::Begin(
+			title.c_str(),
+			&m_askForAsset,
+			ImGuiWindowFlags_AlwaysAutoResize |
+			ImGuiWindowFlags_NoDocking |
+			ImGuiWindowFlags_NoCollapse |
+			ImGuiWindowFlags_NoSavedSettings))
+		{
+			if (m_focusAssetName)
+			{
+				ImGui::SetKeyboardFocusHere();
+				m_focusAssetName = false;
+			};
+
+			ImGui::SetNextItemWidth(namePromptWidth);
+
+			const bool entered = ImGui::InputText(
+				"Name",
+				m_newAssetName,
+				sizeof(m_newAssetName),
+				ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+
+			// Checked on edit rather than every frame: for a script it walks the
+			// scripts project.
+			if (ImGui::IsItemEdited())
+				m_newAssetProblem = NewAssetProblem();
+
+			const bool usable = m_newAssetProblem.empty();
+
+			ImGui::TextDisabled("%s", usable ? NewAssetPath().c_str() : m_newAssetProblem.c_str());
+
+			ImGui::BeginDisabled(!usable);
+
+			// Opened from here rather than in CreateAsset, so --create-script
+			// leaves Visual Studio closed.
+			if (ImGui::Button("Create", ImVec2(promptButtonWidth, 0.0f)) || (entered && usable))
+				if (const std::string path = CreateAsset(); !path.empty() && IsScript(m_newAssetKind))
+					OpenAsset(path);
+
+			ImGui::EndDisabled();
+
+			ImGui::SameLine();
+
+			const bool escaped =
+				ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
+				ImGui::IsKeyPressed(ImGuiKey_Escape);
+
+			if (ImGui::Button("Cancel", ImVec2(promptButtonWidth, 0.0f)) || escaped)
+				m_askForAsset = false;
+		};
+
+		ImGui::End();
+	};
+
 	#pragma endregion
 
 	#pragma region Visual Studio
@@ -1813,74 +1877,6 @@ namespace Loom
 
 	#pragma endregion
 
-	#pragma region Creating Assets
-
-	void Editor::DrawCreateAssetPrompt()
-	{
-		if (!m_askForAsset)
-			return;
-
-		const AssetKindInfo& info = InfoOf(m_newAssetKind);
-		const std::string title = std::string(info.icon) + " Create " + info.label + "###create_asset";
-
-		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-
-		if (ImGui::Begin(
-			title.c_str(),
-			&m_askForAsset,
-			ImGuiWindowFlags_AlwaysAutoResize |
-			ImGuiWindowFlags_NoDocking |
-			ImGuiWindowFlags_NoCollapse |
-			ImGuiWindowFlags_NoSavedSettings))
-		{
-			if (m_focusAssetName)
-			{
-				ImGui::SetKeyboardFocusHere();
-				m_focusAssetName = false;
-			};
-
-			ImGui::SetNextItemWidth(namePromptWidth);
-
-			const bool entered = ImGui::InputText(
-				"Name",
-				m_newAssetName,
-				sizeof(m_newAssetName),
-				ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
-
-			// Checked on edit rather than every frame: for a script it walks the
-			// scripts project.
-			if (ImGui::IsItemEdited())
-				m_newAssetProblem = NewAssetProblem();
-
-			const bool usable = m_newAssetProblem.empty();
-
-			ImGui::TextDisabled("%s", usable ? NewAssetPath().c_str() : m_newAssetProblem.c_str());
-
-			ImGui::BeginDisabled(!usable);
-
-			// Opened from here rather than in CreateAsset, so --create-script
-			// leaves Visual Studio closed.
-			if (ImGui::Button("Create", ImVec2(promptButtonWidth, 0.0f)) || (entered && usable))
-				if (const std::string path = CreateAsset(); !path.empty() && IsScript(m_newAssetKind))
-					OpenAsset(path);
-
-			ImGui::EndDisabled();
-
-			ImGui::SameLine();
-
-			const bool escaped =
-				ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
-				ImGui::IsKeyPressed(ImGuiKey_Escape);
-
-			if (ImGui::Button("Cancel", ImVec2(promptButtonWidth, 0.0f)) || escaped)
-				m_askForAsset = false;
-		};
-
-		ImGui::End();
-	};
-
-	#pragma endregion
-
 	#pragma region Project Files
 
 	std::string Editor::ScriptFoldersFile() const
@@ -1907,6 +1903,19 @@ namespace Loom
 	{
 		if (const std::string file = InputActionsFile(); !InputActions::Save(file))
 			std::cerr << "Key Bindings: could not write them to " << file << std::endl;
+	};
+
+	std::string Editor::FileFoldersFile(const FileTab& tab) const
+	{
+		return m_projectFile.empty()
+			? ""
+			: std::filesystem::path(m_projectFile).replace_extension(tab.kind.extension).string();
+	};
+
+	void Editor::SaveFileFolders(const FileTab& tab)
+	{
+		if (const std::string file = FileFoldersFile(tab); !tab.Save(file))
+			std::cerr << tab.kind.name << ": could not write the folders to " << file << std::endl;
 	};
 
 	#pragma endregion
@@ -2134,21 +2143,19 @@ namespace Loom
 		ImGui::EndPopup();
 	};
 
-	#pragma endregion
-
-	#pragma region Project Files
-
-	std::string Editor::FileFoldersFile(const FileTab& tab) const
+	FolderTree::Hooks Editor::ScriptFolderHooks()
 	{
-		return m_projectFile.empty()
-			? ""
-			: std::filesystem::path(m_projectFile).replace_extension(tab.kind.extension).string();
-	};
+		FolderTree::Hooks hooks;
+		hooks.item_payload = script_payload;
+		hooks.folder_payload = script_folder_payload;
+		hooks.panel = "Scripts";
+		hooks.reveal = [this](const std::string& folder) { return m_revealSelectedScript && VirtualFolders::IsAtOrUnder(m_scriptFolders.FolderOf(m_selectedScript), folder); };
+		hooks.create = [this](const std::string& folder) { DrawScriptsCreateMenu(folder); };
+		hooks.item = [this](const std::string& script) { DrawScriptEntry(script); };
+		hooks.name = [this](const std::string& script) { return m_scriptEntries.at(script).label; };
+		hooks.changed = [this]() { SaveScriptFolders(); };
 
-	void Editor::SaveFileFolders(const FileTab& tab)
-	{
-		if (const std::string file = FileFoldersFile(tab); !tab.Save(file))
-			std::cerr << tab.kind.name << ": could not write the folders to " << file << std::endl;
+		return hooks;
 	};
 
 	#pragma endregion
@@ -2330,25 +2337,6 @@ namespace Loom
 		ShowProjectTab(ProjectTabs::Scenes);
 		m_pingedAsset = m_selectedAsset;
 		m_pingedSince = ImGui::GetTime();
-	};
-
-	#pragma endregion
-
-	#pragma region Scripts Tab
-
-	FolderTree::Hooks Editor::ScriptFolderHooks()
-	{
-		FolderTree::Hooks hooks;
-		hooks.item_payload = script_payload;
-		hooks.folder_payload = script_folder_payload;
-		hooks.panel = "Scripts";
-		hooks.reveal = [this](const std::string& folder) { return m_revealSelectedScript && VirtualFolders::IsAtOrUnder(m_scriptFolders.FolderOf(m_selectedScript), folder); };
-		hooks.create = [this](const std::string& folder) { DrawScriptsCreateMenu(folder); };
-		hooks.item = [this](const std::string& script) { DrawScriptEntry(script); };
-		hooks.name = [this](const std::string& script) { return m_scriptEntries.at(script).label; };
-		hooks.changed = [this]() { SaveScriptFolders(); };
-
-		return hooks;
 	};
 
 	#pragma endregion
