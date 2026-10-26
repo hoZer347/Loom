@@ -615,7 +615,7 @@ TEST_SUITE("ModelEditor")
 		std::ofstream(prefab, std::ios::binary) << "GameObject Empty(5d0c6b7e-2f43-4a8e-9c1d-7a6e0b3f2c11)\n\t0 = 0\n\t1 = false\n\t2 = (0, 0, 0)\n\t3 = (0, 0, 0)\n\t4 = (1, 1, 1)\n\t5 = false\n";
 
 		{
-			// The shader is empty, so it does not compile.
+			// The suite works in a folder with no Assets, so the shader is not found.
 			const LoomTests::Captured captured(std::cerr);
 			Driven driven("model_add_mesh", nullptr, prefab.string());
 			CHECK(driven.editor.Editing() == nullptr);
@@ -651,7 +651,7 @@ TEST_SUITE("ModelEditor")
 		std::ofstream(prefab, std::ios::binary) << ReadFile(WritePrefab("model_shaders_source", &cube, &cube));
 
 		{
-			// The shaders are empty, so they do not compile.
+			// The suite works in a folder with no Assets, so the shader is not found.
 			const LoomTests::Captured captured(std::cerr);
 			Driven driven("model_shaders", nullptr, prefab.string());
 			CHECK(driven.editor.Shaders() == std::vector<std::string>{ "Assets/Lit.shader", "Assets/Model.shader" });

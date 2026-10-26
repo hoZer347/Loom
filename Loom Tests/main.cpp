@@ -95,9 +95,12 @@ namespace
 
 	// Tests write fixed names under the temp folder, which other programs on the
 	// machine may use too, such as a copy of the suite from before runs took turns.
+	// The run works in it as well, since a project's relative paths, such as a
+	// material's shader, would otherwise open whatever the caller's folder holds.
 	struct OwnTempFolder
 	{
 		const std::filesystem::path folder;
+		const std::filesystem::path was = std::filesystem::current_path();
 
 		OwnTempFolder()
 			: folder(std::filesystem::temp_directory_path() / ("Loom Tests " + std::to_string(_getpid())))
@@ -107,11 +110,13 @@ namespace
 			std::filesystem::create_directory(folder);
 			_wputenv_s(L"TMP", folder.c_str());
 			_wputenv_s(L"TEMP", folder.c_str());
+			std::filesystem::current_path(folder);
 		};
 
 		~OwnTempFolder()
 		{
 			std::error_code ignored;
+			std::filesystem::current_path(was, ignored);
 			std::filesystem::remove_all(folder, ignored);
 		};
 	} tempFolder;
@@ -232,9 +237,10 @@ TEST_SUITE("Loom Tests")
 	};
 
 #ifndef __EMSCRIPTEN__
-	TEST_CASE("the suite's temp files go in a folder of its own")
+	TEST_CASE("the suite's temp files go in a folder of its own, which it works in")
 	{
 		CHECK(std::filesystem::equivalent(std::filesystem::temp_directory_path(), tempFolder.folder));
+		CHECK(std::filesystem::equivalent(std::filesystem::current_path(), tempFolder.folder));
 	};
 
 	TEST_CASE("another run waits while this one runs")
