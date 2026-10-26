@@ -28,6 +28,8 @@
 
 #include <crtdbg.h>
 #include <cstdlib>
+#include <functional>
+#include <future>
 #include <process.h>
 #include <thread>
 
@@ -69,6 +71,21 @@ namespace
 	// slots share the rest of the machine. Every run, from any slot, takes this
 	// in turn.
 	constexpr wchar_t SUITE_MUTEX[] = L"Global\\LoomTestSuite";
+
+	// Calls waiting first when another run holds the suite, so a run waiting its
+	// turn does not look hung. False when the wait itself fails.
+	bool TakeTurn(HANDLE suite, const std::function<void()>& waiting)
+	{
+		DWORD taken = WaitForSingleObject(suite, 0);
+
+		if (taken == WAIT_TIMEOUT)
+		{
+			waiting();
+			taken = WaitForSingleObject(suite, INFINITE);
+		};
+
+		return taken != WAIT_FAILED;
+	};
 
 	// Before anything below can crash, so nothing in the suite puts up a dialog.
 	struct CrashesToStderr
@@ -160,7 +177,7 @@ int main(int argc, char** argv)
 	// Held until the process ends; a run that crashes abandons it, which hands it on all the same.
 	const HANDLE suite = CreateMutexW(nullptr, FALSE, SUITE_MUTEX);
 
-	if (!suite || WaitForSingleObject(suite, INFINITE) == WAIT_FAILED)
+	if (!suite || !TakeTurn(suite, []() { std::cerr << "Waiting for another run of the suite to finish" << std::endl; }))
 	{
 		std::fprintf(stderr, "The suite could not wait for other runs to finish (error %lu)\n", GetLastError());
 		return EXIT_FAILURE;
@@ -225,6 +242,47 @@ TEST_SUITE("Loom Tests")
 		CloseHandle(other);
 
 		CHECK(waited == WAIT_TIMEOUT);
+	};
+
+	TEST_CASE("a run takes a free turn without saying it waited")
+	{
+		const HANDLE turn = CreateMutexW(nullptr, FALSE, nullptr);
+		REQUIRE(turn != nullptr);
+
+		bool waited = false;
+		CHECK(TakeTurn(turn, [&]() { waited = true; }));
+		CHECK_FALSE(waited);
+
+		ReleaseMutex(turn);
+		CloseHandle(turn);
+	};
+
+	TEST_CASE("a run says it is waiting, then takes its turn once the other run lets go")
+	{
+		const HANDLE turn = CreateMutexW(nullptr, FALSE, nullptr);
+		const HANDLE letGo = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+		REQUIRE(turn != nullptr);
+		REQUIRE(letGo != nullptr);
+
+		std::promise<void> held;
+		std::thread other(
+			[&]()
+			{
+				WaitForSingleObject(turn, INFINITE);
+				held.set_value();
+				WaitForSingleObject(letGo, INFINITE);
+				ReleaseMutex(turn);
+			});
+		held.get_future().wait();
+
+		bool waited = false;
+		CHECK(TakeTurn(turn, [&]() { waited = true; SetEvent(letGo); }));
+		CHECK(waited);
+
+		other.join();
+		ReleaseMutex(turn);
+		CloseHandle(letGo);
+		CloseHandle(turn);
 	};
 
 #ifdef _DEBUG

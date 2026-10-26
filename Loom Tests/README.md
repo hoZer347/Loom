@@ -32,7 +32,7 @@ The first two scripts take `-NoBuild` to run the last binary as-is, and pass
 All three exit with the test runner's exit code, so CI can gate on any of them.
 
 A desktop run waits for any other, from any slot, to finish before it starts,
-so two never share the `Screenshots` folder or anything else on the machine. A
+saying so on stderr while it waits, so two never share the `Screenshots` folder or anything else on the machine. A
 crash or failed assert in it is written to stderr, never put up as a dialog.
 
 The `Performance` suite is timed against the clock and takes minutes under node, so
