@@ -1831,7 +1831,7 @@ namespace Loom
 				for (uint32_t column = 0; column < INSTANCE_COLUMNS; column++)
 					attributes.push_back({ InstanceModelLocation + column, INSTANCE_BINDING, VK_FORMAT_R32G32B32A32_SFLOAT, column * INSTANCE_COLUMN_SIZE });
 
-				attributes.push_back({ InstanceColorLocation, INSTANCE_BINDING, VK_FORMAT_R32G32B32_SFLOAT, INSTANCE_COLUMNS * INSTANCE_COLUMN_SIZE });
+				attributes.push_back({ InstanceColorLocation, INSTANCE_BINDING, VK_FORMAT_R32G32B32A32_SFLOAT, INSTANCE_COLUMNS * INSTANCE_COLUMN_SIZE });
 			};
 
 			VkPipelineVertexInputStateCreateInfo input{ VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };

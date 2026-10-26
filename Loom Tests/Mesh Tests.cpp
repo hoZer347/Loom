@@ -201,6 +201,63 @@ TEST_SUITE("Mesh")
 		CHECK(renderer.drawnVertices.back() == other);
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "each GameObject has a seed of its own from its guid, drawn alone or as an instance")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream source(
+			"// ===VERTEX===\nuniform mat4 u_model;\nuniform float u_seed;\nvoid main() { }\n"
+			"// ===FRAGMENT===\nuniform float u_seed;\nvoid main() { }\n");
+		Loom::Shader shader("seeded meshes", source);
+
+		REQUIRE(shader.instanced_id != 0);
+
+		Loom::Scene scene("seeded");
+		Pump();
+
+		std::vector<Loom::GameObject*> holders;
+		std::vector<Loom::Mesh*> meshes;
+
+		for (const char* name : { "First", "Second", "Third" })
+		{
+			Loom::GameObject* holder = scene.AddChild(name);
+			holders.push_back(holder);
+			holder->Attach<Loom::Material>()->shader = &shader;
+
+			Loom::Mesh* mesh = holder->Attach<Loom::Mesh>(Loom::Mesh::Triangles);
+			mesh->m_vertices = std::vector<float>(9, 1.0f);
+			meshes.push_back(mesh);
+		};
+
+		Pump();
+		scene.Render();
+
+		REQUIRE(renderer.instanceSeeds.size() == 3);
+
+		for (const float seed : renderer.instanceSeeds)
+		{
+			CHECK(seed >= 0.0f);
+			CHECK(seed < 1.0f);
+		};
+
+		CHECK(renderer.instanceSeeds[0] != renderer.instanceSeeds[1]);
+		CHECK(renderer.instanceSeeds[1] != renderer.instanceSeeds[2]);
+		CHECK(renderer.instanceSeeds[0] != renderer.instanceSeeds[2]);
+
+		meshes[0]->Draw(shader.id);
+		CHECK(renderer.floats["u_seed"] == renderer.instanceSeeds[0]);
+
+		const Loom::Guid guid(1, 2);
+
+		holders[0]->SetGuid(guid);
+		meshes[0]->Draw(shader.id);
+		const float fromGuid = renderer.floats["u_seed"];
+
+		holders[1]->SetGuid(guid);
+		meshes[1]->Draw(shader.id);
+		CHECK(renderer.floats["u_seed"] == fromGuid);
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "meshes differing in their material's variables, their own variables or a Skin are drawn alone")
 	{
 		RecordingRenderer renderer;

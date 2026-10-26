@@ -4,6 +4,7 @@
 #include "RenderMath.h"
 #include "Renderer.h"
 #include "Shaders.h"
+#include "Utilities/Clock.h"
 
 #include <filesystem>
 #include <iostream>
@@ -315,6 +316,7 @@ namespace Loom
 
 		renderer->SetUniform(program, "u_color", *color);
 		renderer->SetUniform(program, "u_shadowsOff", shadows ? 0.0f : 1.0f);
+		renderer->SetUniform(program, "u_time", Time::SinceStart());
 
 		if (!shader)
 			return;

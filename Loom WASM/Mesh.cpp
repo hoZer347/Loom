@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <climits>
 #include <iostream>
 #include <utility>
 
@@ -36,11 +37,23 @@ namespace Loom
 
 	namespace
 	{
-		// What each instance MeshBatch hands over holds: its model matrix, then its colour.
+		// What each instance MeshBatch hands over holds: its model matrix, its colour, then its seed.
 		constexpr size_t MODEL_FLOATS = sizeof(glm::mat4) / sizeof(float);
 		constexpr size_t COLOR_FLOATS = sizeof(glm::vec3) / sizeof(float);
+		constexpr size_t SEED_FLOATS = 1;
 
-		static_assert(MODEL_FLOATS + COLOR_FLOATS == Renderer::FloatsPerInstance);
+		static_assert(MODEL_FLOATS + COLOR_FLOATS + SEED_FLOATS == Renderer::FloatsPerInstance);
+
+		// splitmix64's finaliser.
+		constexpr uint64_t SPLITMIX_FIRST = 0xBF58476D1CE4E5B9ull;
+		constexpr uint64_t SPLITMIX_SECOND = 0x94D049BB133111EBull;
+		constexpr int SPLITMIX_SHIFT_FIRST = 30;
+		constexpr int SPLITMIX_SHIFT_SECOND = 27;
+		constexpr int SPLITMIX_SHIFT_LAST = 31;
+
+		// As many of the hash's top bits as a float holds exactly, over one past the most they make.
+		constexpr int SEED_BITS = 24;
+		constexpr float SEED_SCALE = 1.0f / (float)(1u << SEED_BITS);
 
 		// 64 bit FNV-1a's.
 		constexpr uint64_t FNV_OFFSET_BASIS = 14695981039346656037ull;
@@ -50,6 +63,20 @@ namespace Loom
 		uint64_t Mixed(uint64_t hash, uint32_t value)
 		{
 			return (hash ^ value) * FNV_PRIME;
+		};
+
+		// The GameObject's guid mixed down to u_seed, from 0 up to 1, so a
+		// GameObject saved in a scene keeps its seed from run to run.
+		float Seed(const GameObject& gameObject)
+		{
+			const Guid& guid = gameObject.GetGuid();
+			uint64_t hash = guid.high ^ guid.low;
+
+			hash = (hash ^ (hash >> SPLITMIX_SHIFT_FIRST)) * SPLITMIX_FIRST;
+			hash = (hash ^ (hash >> SPLITMIX_SHIFT_SECOND)) * SPLITMIX_SECOND;
+			hash ^= hash >> SPLITMIX_SHIFT_LAST;
+
+			return (float)(hash >> (sizeof(hash) * CHAR_BIT - SEED_BITS)) * SEED_SCALE;
 		};
 
 		uint64_t Hashed(const std::vector<float>& vertices, VertexFormat format)
@@ -134,6 +161,7 @@ namespace Loom
 			return;
 
 		renderer->SetUniform(program, "u_model", m_gameObject->WorldMatrix());
+		renderer->SetUniform(program, "u_seed", Seed(*m_gameObject));
 		renderer->DrawVertices(program, *std::as_const(primitive_id), m_kept);
 	};
 
@@ -360,6 +388,7 @@ namespace Loom
 
 				m_instances.insert(m_instances.end(), glm::value_ptr(model), glm::value_ptr(model) + MODEL_FLOATS);
 				m_instances.insert(m_instances.end(), color, color + COLOR_FLOATS);
+				m_instances.push_back(Seed(*mesh->m_gameObject));
 			};
 
 			ready(first, lot.instanced);

@@ -47,9 +47,10 @@ namespace Loom
 		void OnRender() override;
 
 		// Draws the vertices with the given program, under the GameObject's
-		// world matrix (as u_model), which is how a pass that is not the
-		// material's (the shadow pass) draws the same geometry. A shader that
-		// declares no u_model draws the vertices untransformed. A Skin on the
+		// world matrix (as u_model) and its seed (as u_seed), which is how a
+		// pass that is not the material's (the shadow pass) draws the same
+		// geometry. A shader that declares no u_model draws the vertices
+		// untransformed. A Skin on the
 		// GameObject bends them first, and m_textureCoordinates go with them as
 		// aUV, m_normals as aNormal and m_colors as aColor. The renderer keeps them between draws,
 		// and they are handed over again only once one of those fields has

@@ -654,11 +654,11 @@ namespace Loom
 			glBindBuffer(GL_ARRAY_BUFFER, 0);
 		};
 
-		// Draws with each instance's model matrix and colour read from m_instances.
+		// Draws with each instance's model matrix, colour and seed read from m_instances.
 		void DrawInstanced(uint32_t primitive, size_t count, const float* instances, size_t instanceCount)
 		{
 			constexpr GLint COLUMN_COMPONENTS = 4;
-			constexpr GLint COLOR_COMPONENTS = 3;
+			constexpr GLint COLOR_AND_SEED_COMPONENTS = 4;
 			constexpr GLuint COLUMNS = 4;
 			constexpr GLsizei STRIDE = (GLsizei)(FloatsPerInstance * sizeof(float));
 			constexpr GLuint PER_INSTANCE = 1;
@@ -674,7 +674,7 @@ namespace Loom
 				glEnableVertexAttribArray(location);
 			};
 
-			glVertexAttribPointer(InstanceColorLocation, COLOR_COMPONENTS, GL_FLOAT, GL_FALSE, STRIDE, (void*)(COLUMNS * COLUMN_COMPONENTS * sizeof(float)));
+			glVertexAttribPointer(InstanceColorLocation, COLOR_AND_SEED_COMPONENTS, GL_FLOAT, GL_FALSE, STRIDE, (void*)(COLUMNS * COLUMN_COMPONENTS * sizeof(float)));
 			glVertexAttribDivisor(InstanceColorLocation, PER_INSTANCE);
 			glEnableVertexAttribArray(InstanceColorLocation);
 

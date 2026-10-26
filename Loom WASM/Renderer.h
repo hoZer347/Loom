@@ -123,13 +123,16 @@ namespace Loom
 		virtual void DestroyVertices(uint32_t vertices) = 0;
 
 		// Where an instanced program's vertex stage reads each instance's model
-		// matrix, a column a location from the first, and its colour.
+		// matrix, a column a location from the first, and its colour with its
+		// seed as the fourth component, since WebGL 2 need give no more than
+		// 16 locations.
 		static constexpr uint32_t InstanceModelLocation = 11;
 		static constexpr uint32_t InstanceColorLocation = 15;
 
 		// What each instance DrawInstances is handed holds, its floats one
-		// after another: its model matrix, column by column, then its colour.
-		static constexpr size_t FloatsPerInstance = 19;
+		// after another: its model matrix, column by column, its colour, then
+		// its seed.
+		static constexpr size_t FloatsPerInstance = 20;
 
 		// Draws kept vertices once for each of count instances, with a program
 		// that reads them at the instance locations.

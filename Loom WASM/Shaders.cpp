@@ -222,42 +222,51 @@ bool LoomDitheredOut(float alpha)
 			std::string fragment;
 		};
 
-		// The stages, reading the model matrix and colour each draw would set
-		// from each instance, or none when the vertex stage declares no model
-		// matrix, either is declared some other way, or the fragment stage
+		// The stages, reading the model matrix, colour and seed each draw would
+		// set from each instance, or none when the vertex stage declares no
+		// model matrix, any is declared some other way, or the fragment stage
 		// reads the model matrix.
 		std::optional<InstancedStages> Instanced(const std::string& vertex, const std::string& fragment)
 		{
 			static const std::regex model(R"(\buniform\s+(?:(?:lowp|mediump|highp)\s+)?mat4\s+u_model\s*;)");
 			static const std::regex color(R"(\buniform\s+(?:(?:lowp|mediump|highp)\s+)?vec3\s+u_color\s*;)");
-			static const std::regex otherwise(R"(\buniform\b[^;]*\bu_(?:model|color)\b)");
+			static const std::regex seed(R"(\buniform\s+(?:(?:lowp|mediump|highp)\s+)?float\s+u_seed\s*;)");
+			static const std::regex otherwise(R"(\buniform\b[^;]*\bu_(?:model|color|seed)\b)");
 			static const std::regex readsModel(R"(\bu_model\b)");
 
 			if (!std::regex_search(vertex, model))
 				return std::nullopt;
 
-			InstancedStages stages{ std::regex_replace(std::regex_replace(vertex, model, ""), color, ""), std::regex_replace(fragment, color, "") };
+			const auto undeclared = [](const std::string& stage)
+			{
+				return std::regex_replace(std::regex_replace(stage, color, ""), seed, "");
+			};
+
+			InstancedStages stages{ undeclared(std::regex_replace(vertex, model, "")), undeclared(fragment) };
 
 			if (std::regex_search(stages.vertex, otherwise) ||
 				std::regex_search(stages.fragment, otherwise) ||
 				std::regex_search(fragment, readsModel))
 				return std::nullopt;
 
-			// The colour is the instance's, handed on to the fragment stage
-			// unblended.
+			// The colour and seed are the instance's, handed on to the fragment
+			// stage unblended.
 			stages.vertex =
 				"layout(location = " + std::to_string(Renderer::InstanceModelLocation) + ") in mat4 loom_InstanceModel;\n"
-				"layout(location = " + std::to_string(Renderer::InstanceColorLocation) + ") in vec3 loom_InstanceColor;\n"
+				"layout(location = " + std::to_string(Renderer::InstanceColorLocation) + ") in vec4 loom_InstanceColorSeed;\n"
 				"flat out vec3 loom_Color;\n"
+				"flat out float loom_Seed;\n"
 				"#define u_model loom_InstanceModel\n"
-				"#define u_color loom_InstanceColor\n" +
+				"#define u_color loom_InstanceColorSeed.rgb\n"
+				"#define u_seed loom_InstanceColorSeed.a\n" +
 				std::regex_replace(stages.vertex, MainPattern(), "$1loom_instance_main$2") +
 				"\nvoid main()\n{\n"
-				"\tloom_Color = loom_InstanceColor;\n"
+				"\tloom_Color = loom_InstanceColorSeed.rgb;\n"
+				"\tloom_Seed = loom_InstanceColorSeed.a;\n"
 				"\tloom_instance_main();\n"
 				"}\n";
 
-			stages.fragment = "flat in vec3 loom_Color;\n#define u_color loom_Color\n" + stages.fragment;
+			stages.fragment = "flat in vec3 loom_Color;\nflat in float loom_Seed;\n#define u_color loom_Color\n#define u_seed loom_Seed\n" + stages.fragment;
 
 			return stages;
 		};

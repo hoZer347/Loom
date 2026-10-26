@@ -228,6 +228,7 @@ namespace LoomTests
 
 				instanceModels.push_back(glm::make_mat4(instance));
 				instanceColors.push_back(glm::make_vec3(instance + MODEL_FLOATS));
+				instanceSeeds.push_back(instance[FloatsPerInstance - 1]);
 				DrawVertices(program, primitive, vertices);
 			};
 		};
@@ -301,10 +302,11 @@ namespace LoomTests
 		std::vector<std::vector<float>> drawnVertices;
 
 		// How many instances each DrawInstances drew, and each instance's model
-		// matrix and colour.
+		// matrix, colour and seed.
 		std::vector<size_t> instanceCounts;
 		std::vector<glm::mat4> instanceModels;
 		std::vector<glm::vec3> instanceColors;
+		std::vector<float> instanceSeeds;
 
 		// Each Clear: whether it was given a colour, and whether it cleared depth.
 		std::vector<std::pair<bool, bool>> clears;

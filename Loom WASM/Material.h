@@ -47,7 +47,8 @@ namespace Loom
 
 		// Hands the material's values to its program: u_color, whether it is
 		// shadowed, how its textures are sampled, and the shader's variables,
-		// the per-instance ones from instance.
+		// the per-instance ones from instance. With them goes u_time, Time's
+		// SinceStart.
 		void Apply(uint32_t program, const UniformValues* instance = nullptr) const;
 
 		// Recompiles every material's shader whose file has been written since,

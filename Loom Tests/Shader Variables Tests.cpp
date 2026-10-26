@@ -10,6 +10,7 @@
 #include "Scene.h"
 #include "Shaders.h"
 #include "ShaderVariables.h"
+#include "Utilities/Clock.h"
 
 #include <filesystem>
 #include <fstream>
@@ -80,6 +81,8 @@ TEST_SUITE("Shader variables")
 			"uniform mat4 u_model;\n"
 			"uniform mat4 u_viewProjection;\n"
 			"uniform float u_speed;\n"
+			"uniform float u_time;\n"
+			"uniform float u_seed;\n"
 			"// ===FRAGMENT===\n"
 			"uniform vec3 u_color;\n"
 			"// uniform float u_commented;\n");
@@ -492,13 +495,13 @@ TEST_SUITE("Shader variables")
 		CHECK(Loom::Shader("no shadow program", unshadowed).shadow_id == 0);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader has an instanced program reading its model matrix and colour from each instance")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader has an instanced program reading its model matrix, colour and seed from each instance")
 	{
 		RecordingRenderer renderer;
 
 		std::istringstream source(
-			"// ===VERTEX===\nuniform highp mat4 u_model;\nuniform vec3 u_color;\nvoid main() { }\n"
-			"// ===FRAGMENT===\nuniform vec3 u_color;\nvoid main() { }\n");
+			"// ===VERTEX===\nuniform highp mat4 u_model;\nuniform vec3 u_color;\nuniform float u_seed;\nvoid main() { }\n"
+			"// ===FRAGMENT===\nuniform vec3 u_color;\nuniform float u_seed;\nvoid main() { }\n");
 		Loom::Shader shader("instanced", source);
 
 		REQUIRE(shader.instanced_id != 0);
@@ -507,10 +510,12 @@ TEST_SUITE("Shader variables")
 		const std::string& vertex = renderer.vertices.at("instanced instanced");
 		CHECK(vertex.find("in mat4 loom_InstanceModel") != std::string::npos);
 		CHECK(vertex.find("uniform highp mat4 u_model") == std::string::npos);
+		CHECK(vertex.find("uniform float u_seed") == std::string::npos);
+		CHECK(vertex.find("#define u_seed loom_InstanceColorSeed.a") != std::string::npos);
 		CHECK(vertex.find("loom_instance_main()") != std::string::npos);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader that declares no model matrix, whose fragment stage reads it, or that declares its colour otherwise, has no instanced program")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader that declares no model matrix, whose fragment stage reads it, or that declares its colour or seed otherwise, has no instanced program")
 	{
 		RecordingRenderer renderer;
 
@@ -528,6 +533,11 @@ TEST_SUITE("Shader variables")
 			"// ===VERTEX===\nuniform mat4 u_model;\nvoid main() { }\n"
 			"// ===FRAGMENT===\nuniform vec4 u_color;\nvoid main() { }\n");
 		CHECK(Loom::Shader("vec4 colour", vec4Color).instanced_id == 0);
+
+		std::istringstream vec2Seed(
+			"// ===VERTEX===\nuniform mat4 u_model;\nuniform vec2 u_seed;\nvoid main() { }\n"
+			"// ===FRAGMENT===\nvoid main() { }\n");
+		CHECK(Loom::Shader("vec2 seed", vec2Seed).instanced_id == 0);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a second shader of the same name takes the compiled one's settings and shadow program")
@@ -589,6 +599,23 @@ TEST_SUITE("Shader variables")
 
 		materials[1]->Apply(shader.id);
 		CHECK(renderer.floats["u_shadowsOff"] == 1.0f);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a material hands its program the game time")
+	{
+		RecordingRenderer renderer;
+
+		Loom::Scene scene("game time");
+		Pump();
+
+		Loom::Material* material = scene.AddChild("Timed")->Attach<Loom::Material>();
+		Pump();
+
+		constexpr float unset = -1.0f;
+		renderer.floats["u_time"] = unset;
+		material->Apply(1);
+
+		CHECK(renderer.floats["u_time"] == Loom::Time::SinceStart());
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "casters alike are drawn into the shadow map as instances of one")
