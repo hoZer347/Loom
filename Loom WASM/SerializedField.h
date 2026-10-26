@@ -44,6 +44,10 @@ namespace Loom
 		// Raw words, such as a mesh's UV layers, written as integers so every
 		// bit comes back.
 		UIntArray,
+
+		// A file in the project, written as its path as a String is. The
+		// editor offers the project's files of its extension to pick from.
+		Asset,
 	};
 
 	// In front of a Serial's or Button's name, the category of the one
@@ -92,6 +96,10 @@ namespace Loom
 		// back to the category it stood for. Copied, so it outlives the module
 		// that declared it.
 		std::string name;
+
+		// Asset fields only: what the files it names end in, such as ".shader".
+		// Copied for the same reason.
+		std::string extension;
 
 		// The part of the name after its categories, which the editor labels
 		// the field with, and the categories before it, which it groups the

@@ -173,7 +173,7 @@ namespace RaycastsScripts
 
 		Loom::Serial<Kind> m_kind = Cube;
 		Loom::Serial<glm::vec3> m_color = glm::vec3(0.8f, 0.8f, 0.8f);
-		Loom::Serial<std::string> m_shader = "Assets/Lit.shader";
+		Loom::Serial<Loom::Asset<".shader">> m_shader = "Assets/Lit.shader";
 
 		Loom::Material* m_material = nullptr;
 		std::optional<glm::vec3> m_tint{ };

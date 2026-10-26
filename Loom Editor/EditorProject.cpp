@@ -70,6 +70,12 @@ namespace Loom
 		constexpr float pingOutlineThickness = 2.0f;
 		constexpr float pingRounding = 3.0f;
 
+		// The Asset field picker's list: at least this wide, and this many
+		// rows tall.
+		constexpr float assetPickerMinWidth = 240.0f;
+		constexpr float assetPickerRows = 12.0f;
+		constexpr const char* ASSET_PICKER = "##asset_picker";
+
 		// How far NewShader, NewShader1, ... counts before leaving the name to
 		// the user to sort out.
 		constexpr int maxDefaultNameSuffix = 1000;
@@ -1929,25 +1935,7 @@ namespace Loom
 			if (m_scriptFilter.Shows(IconOf(entry.kind)))
 				names.push_back(name);
 
-		ScriptFolders::Node root = m_scriptFolders.Build(names);
-
-		// By what each shows, so a shader sits among the scripts by its name
-		// rather than its path.
-		const auto by_label = [&](const auto& self, ScriptFolders::Node& node) -> void
-		{
-			std::stable_sort(
-				node.items.begin(),
-				node.items.end(),
-				[&](const std::string& a, const std::string& b)
-				{
-					return ScriptFolders::Alphabetical(m_scriptEntries.at(a).label, m_scriptEntries.at(b).label);
-				});
-
-			for (ScriptFolders::Node& child : node.children)
-				self(self, child);
-		};
-
-		by_label(by_label, root);
+		const VirtualFolders::Node root = ScriptsByLabel(names);
 
 		if (root.children.empty() && root.items.empty() && !m_scriptEntries.empty())
 			ImGui::TextDisabled("None of the kinds highlighted below.");
@@ -1978,6 +1966,31 @@ namespace Loom
 		};
 
 		ImGui::EndChild();
+	};
+
+	VirtualFolders::Node Editor::ScriptsByLabel(const std::vector<std::string>& names) const
+	{
+		VirtualFolders::Node root = m_scriptFolders.Build(names);
+
+		// By what each shows, so a shader sits among the scripts by its name
+		// rather than its path.
+		const auto by_label = [&](const auto& self, VirtualFolders::Node& node) -> void
+		{
+			std::stable_sort(
+				node.items.begin(),
+				node.items.end(),
+				[&](const std::string& a, const std::string& b)
+				{
+					return ScriptFolders::Alphabetical(m_scriptEntries.at(a).label, m_scriptEntries.at(b).label);
+				});
+
+			for (VirtualFolders::Node& child : node.children)
+				self(self, child);
+		};
+
+		by_label(by_label, root);
+
+		return root;
 	};
 
 	void Editor::DrawScriptEntry(const std::string& name)
@@ -2068,6 +2081,131 @@ namespace Loom
 				return &tab;
 
 		return nullptr;
+	};
+
+	bool Editor::DrawAssetField(const SerializedField& field)
+	{
+		std::string& path = *(std::string*)field.data;
+
+		const std::string shown = path.empty()
+			? std::string("None")
+			: std::string(IconOf(path)) + " " + std::filesystem::path(path).stem().string();
+
+		if (ImGui::Button((shown + "###asset").c_str(), ImVec2(ImGui::CalcItemWidth(), 0.0f)))
+		{
+			m_assetPicker.ClearSearch();
+			ImGui::OpenPopup(ASSET_PICKER);
+		};
+
+		if (!path.empty())
+			ImGui::SetItemTooltip("%s", path.c_str());
+
+		const ImVec2 under(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y);
+		const float width = (std::max)(ImGui::GetItemRectSize().x, assetPickerMinWidth);
+		const bool shader = field.extension == ProjectAssets::shaderExtension;
+
+		bool changed = false;
+
+		if (ImGui::BeginDragDropTarget())
+		{
+			const ImGuiPayload* dragged = ImGui::GetDragDropPayload();
+
+			if (dragged != nullptr &&
+				dragged->IsDataType(ASSET_PAYLOAD) &&
+				std::string_view((const char*)dragged->Data).ends_with(field.extension) &&
+				ImGui::AcceptDragDropPayload(ASSET_PAYLOAD))
+			{
+				path = (const char*)dragged->Data;
+				changed = true;
+			};
+
+			ImGui::EndDragDropTarget();
+		};
+
+		if (shader)
+			changed |= AcceptShaderDrop(path);
+
+		ImGui::SetNextWindowPos(under, ImGuiCond_Appearing);
+
+		if (!ImGui::BeginPopup(ASSET_PICKER))
+			return changed;
+
+		const bool appearing = ImGui::IsWindowAppearing();
+
+		if (appearing)
+			ImGui::SetKeyboardFocusHere();
+
+		m_assetPicker.DrawSearch();
+
+		ImGui::BeginChild("##assets", ImVec2(width, ImGui::GetFrameHeightWithSpacing() * assetPickerRows), ImGuiChildFlags_Borders);
+
+		const auto row = [&](const std::string& file, const std::string& label)
+		{
+			ImGuiTreeNodeFlags flags =
+				ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanAvailWidth;
+
+			if (file == path)
+				flags |= ImGuiTreeNodeFlags_Selected;
+
+			ImGui::TreeNodeEx(("pick:" + file).c_str(), flags, "%s", label.c_str());
+
+			if (!file.empty())
+				ImGui::SetItemTooltip("%s", file.c_str());
+
+			if (!ImGui::IsItemClicked(ImGuiMouseButton_Left))
+				return;
+
+			if (file != path)
+			{
+				path = file;
+				changed = true;
+			};
+
+			ImGui::CloseCurrentPopup();
+		};
+
+		const auto label = [](const std::string& file, const std::string& name)
+		{
+			return std::string(IconOf(file)) + " " + name;
+		};
+
+		row("", "None");
+
+		if (shader)
+		{
+			std::vector<std::string> names{ };
+
+			for (const auto& [name, entry] : m_scriptEntries)
+				if (entry.kind == ScriptEntryKind::Shader)
+					names.push_back(name);
+
+			FolderTree::Hooks hooks = ScriptFolderHooks();
+			hooks.reveal = [&](const std::string& folder) { return appearing && VirtualFolders::IsAtOrUnder(m_scriptFolders.FolderOf(path), folder); };
+			hooks.create = nullptr;
+			hooks.item = [&](const std::string& name) { row(name, label(name, m_scriptEntries.at(name).label)); };
+
+			m_assetPicker.Draw(m_scriptFolders, ScriptsByLabel(names), hooks);
+		}
+		else if (FileTab* tab = FileTabOf("file" + field.extension))
+		{
+			std::vector<std::string> files{ };
+
+			for (const std::string& file : tab->files)
+				if (file.ends_with(field.extension))
+					files.push_back(file);
+
+			FolderTree::Hooks hooks = FileFolderHooks(*tab);
+			hooks.reveal = [&](const std::string& folder) { return appearing && VirtualFolders::IsAtOrUnder(tab->folders.FolderOf(path), folder); };
+			hooks.create = nullptr;
+			hooks.item = [&](const std::string& file) { row(file, label(file, std::filesystem::path(file).filename().string())); };
+
+			m_assetPicker.Draw(tab->folders, tab->folders.Build(files), hooks);
+		};
+
+		ImGui::EndChild();
+		ImGui::EndPopup();
+
+		return changed;
 	};
 
 	bool Editor::RevealFile(const std::string& path)

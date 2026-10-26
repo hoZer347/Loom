@@ -257,6 +257,9 @@
     <ClInclude Include="SceneSerializer.h">
       <Filter>Serialization</Filter>
     </ClInclude>
+    <ClInclude Include="Asset.h">
+      <Filter>Serialization</Filter>
+    </ClInclude>
     <ClInclude Include="Serial.h">
       <Filter>Serialization</Filter>
     </ClInclude>

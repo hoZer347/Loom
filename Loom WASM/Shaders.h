@@ -36,7 +36,7 @@ namespace Loom
 
 		~Shader();
 
-		static constexpr const char* extension = ".shader";
+		static constexpr char extension[] = ".shader";
 
 		// What a shader file compiles to: its stages with the engine's
 		// sections added as its settings ask, the shadow pass's stages, empty

@@ -3811,6 +3811,10 @@ namespace Loom
 				changed = DrawReferenceField(field);
 				break;
 
+			case FieldType::Asset:
+				changed = DrawAssetField(field);
+				break;
+
 			case FieldType::State:
 				changed = StateMachineMonitor::DrawStateField(*(StateReference*)field.data);
 				break;

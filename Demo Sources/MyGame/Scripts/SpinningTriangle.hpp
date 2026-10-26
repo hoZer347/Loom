@@ -70,7 +70,7 @@ namespace MyGameScripts
 		Loom::Serial<float> m_radius = 0.6f;
 		Loom::Serial<float> m_angle;
 		Loom::Serial<bool> m_spinning = true;
-		Loom::Serial<std::string> m_shader = "Assets/Shader.shader";
+		Loom::Serial<Loom::Asset<".shader">> m_shader = "Assets/Shader.shader";
 
 		Loom::Mesh* m_mesh = nullptr;
 	};

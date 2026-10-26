@@ -122,7 +122,7 @@ namespace ProfilingScripts
 		Loom::Serial<int> m_rows = 90;
 		Loom::Serial<float> m_tickLength = 0.25f;
 		Loom::Serial<glm::vec3> m_color = glm::vec3(1.0f, 0.95f, 0.3f);
-		Loom::Serial<std::string> m_shader = "Assets/Beam.shader";
+		Loom::Serial<Loom::Asset<".shader">> m_shader = "Assets/Beam.shader";
 
 		Loom::Mesh* m_mesh = nullptr;
 		std::vector<std::vector<float>> m_ticks{ };

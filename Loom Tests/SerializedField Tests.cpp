@@ -5,6 +5,7 @@
 #ifndef __EMSCRIPTEN__
 #include "FieldNames.h"
 #endif
+#include "Asset.h"
 #include "GameObject.h"
 #include "LoomObject.h"
 #include "Material.h"
@@ -39,6 +40,13 @@ namespace
 		Loom::Serial<glm::vec3> triple;
 		Loom::Serial<glm::vec4> quad;
 		Loom::Serial<std::vector<float>> numbers;
+	};
+
+	// A shader file, and the plain path a scene saved before it was one.
+	struct Files final : Loom::Component<Files>
+	{
+		Loom::Serial<Loom::Asset<".shader">> shader;
+		Loom::Serial<std::string> path;
 	};
 
 	struct Pointer final : Loom::Component<Pointer>
@@ -591,6 +599,40 @@ TEST_SUITE("SerializedField")
 		REQUIRE(Field(object, Label).Read(written));
 
 		CHECK(*object.label == "tab\there \"quoted\" and\nnewline");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an asset is a file of its extension, written as the string of its path")
+	{
+		Files object;
+		Pump();
+
+		CHECK(Field(object, 0).type == Loom::FieldType::Asset);
+		CHECK(Field(object, 0).extension == ".shader");
+		CHECK(Field(object, 1).type == Loom::FieldType::String);
+		CHECK(Field(object, 1).extension.empty());
+
+		object.shader = "Assets/Lit.shader";
+
+		CHECK(*object.shader == "Assets/Lit.shader");
+		CHECK(Field(object, 0).Write() == "\"Assets/Lit.shader\"");
+
+		object.shader->clear();
+
+		REQUIRE(Field(object, 0).Read("\"Assets/Lit.shader\""));
+
+		CHECK(*object.shader == "Assets/Lit.shader");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an asset reads the path a string field saved")
+	{
+		Files object;
+		Pump();
+
+		object.path = "Assets/Old \"quoted\".shader";
+
+		REQUIRE(Field(object, 0).Read(Field(object, 1).Write()));
+
+		CHECK(*object.shader == "Assets/Old \"quoted\".shader");
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an empty float list is still a float list")

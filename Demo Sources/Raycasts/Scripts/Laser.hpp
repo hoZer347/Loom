@@ -102,7 +102,7 @@ namespace RaycastsScripts
 		Loom::Serial<float> m_normalLength = 0.8f;
 		Loom::Serial<glm::vec3> m_beamColor = glm::vec3(1.0f, 0.2f, 0.2f);
 		Loom::Serial<glm::vec3> m_hitColor = glm::vec3(1.0f, 0.85f, 0.2f);
-		Loom::Serial<std::string> m_shader = "Assets/Beam.shader";
+		Loom::Serial<Loom::Asset<".shader">> m_shader = "Assets/Beam.shader";
 
 		Loom::Mesh* m_mesh = nullptr;
 	};

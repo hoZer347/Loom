@@ -137,12 +137,12 @@ namespace Loom
 		if (field.data != &*m_shader_path)
 			return;
 
-		// The field changes a letter at a time. Until it names a shader file,
+		// Until it names a shader file, as one typed in over the MCP may not,
 		// the material keeps drawing with the one it has.
 		std::error_code code;
 
 		if (m_shader_path->empty() ||
-			(m_shader_path->ends_with(Shader::extension) && std::filesystem::is_regular_file(*m_shader_path, code)))
+			(m_shader_path->ends_with(Shader::extension) && std::filesystem::is_regular_file(GetShaderPath(), code)))
 			ChangeShader(m_shader_path);
 	};
 

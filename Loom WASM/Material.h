@@ -2,7 +2,9 @@
 
 #include "Loom API.h"
 
+#include "Asset.h"
 #include "Component.h"
+#include "Shaders.h"
 #include "ShaderVariables.h"
 
 #include <string>
@@ -10,8 +12,6 @@
 
 namespace Loom
 {
-	struct Shader;
-
 	struct LOOM_API Material : Component<Material, "Rendering">
 	{
 		// Names the shader to compile. Read by OnAttach, so a script sets it on
@@ -60,7 +60,7 @@ namespace Loom
 
 	private:
 		// Relative to the project folder, which is where the editor works from.
-		Serial<std::string> m_shader_path;
+		Serial<Asset<Shader::extension>, "Shader"> m_shader_path;
 
 	public:
 		// Declared after the path, which fixes its position in scene files.

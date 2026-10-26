@@ -220,7 +220,8 @@ namespace Loom
 		void (*set_reference)(void*, LoomObject*),
 		bool (*accepts_reference)(LoomObject*),
 		const char* name,
-		unsigned long long* version)
+		unsigned long long* version,
+		const char* extension)
 	{
 		// Each field's count starts this far past the last one's, further than
 		// any field is ever changed.
@@ -255,6 +256,9 @@ namespace Loom
 		field.version = version;
 		field.owner = owner;
 		field.name = owner->TakeName(name);
+
+		if (extension)
+			field.extension = extension;
 
 		owner->m_fields.push_back(field);
 

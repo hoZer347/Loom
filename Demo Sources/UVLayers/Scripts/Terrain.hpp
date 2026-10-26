@@ -158,7 +158,7 @@ namespace UVLayersScripts
 		Loom::Serial<float> m_glowSpeed = 3.0f;
 		// Units from the ring's middle out to where its glow ends.
 		Loom::Serial<float> m_glowWidth = 1.0f;
-		Loom::Serial<std::string> m_shader = "Assets/Terrain.shader";
+		Loom::Serial<Loom::Asset<".shader">> m_shader = "Assets/Terrain.shader";
 
 		Loom::Mesh* m_mesh = nullptr;
 		std::vector<glm::vec3> m_tints;

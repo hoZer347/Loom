@@ -86,6 +86,10 @@ TEST_SUITE("Material")
 		// It is a serialized field, so the scene file carries it too.
 		REQUIRE(material->GetFields().size() == FIELDS);
 		CHECK(material->GetFields().front().Write() == "\"Assets/Shader.shader\"");
+
+		// Picked in the editor from the project's shader files.
+		CHECK(material->GetFields().front().type == Loom::FieldType::Asset);
+		CHECK(material->GetFields().front().extension == Loom::Shader::extension);
 	};
 
 	// The path comes first: it was the only field before colour was added, and

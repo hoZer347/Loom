@@ -243,6 +243,7 @@
     <ClInclude Include="OpenGL.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="Scene.h" />
+    <ClInclude Include="Asset.h" />
     <ClInclude Include="Serial.h" />
     <ClInclude Include="SerializedField.h" />
     <ClInclude Include="SceneSerializer.h" />

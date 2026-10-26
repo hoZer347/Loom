@@ -361,6 +361,10 @@ namespace Loom
 		void DrawScriptEntry(const std::string& name);
 		void DrawScriptsCreateMenu(const std::string& folder);
 
+		// The Scripts tab's folders around names, the scripts in each in the
+		// order of what the tab calls them.
+		VirtualFolders::Node ScriptsByLabel(const std::vector<std::string>& names) const;
+
 		// How the Scripts tab's FolderTree draws and files its scripts.
 		FolderTree::Hooks ScriptFolderHooks();
 
@@ -379,6 +383,12 @@ namespace Loom
 
 		// The FileTab that holds the file, or none.
 		FileTab* FileTabOf(const std::string& path);
+
+		// An Asset field: the file it names, which a click swaps for another
+		// picked from the project's files of the field's extension, filed as
+		// the tab holding them files them, shaders as the Scripts tab does.
+		// Takes such a file dragged onto it. Whether it changed.
+		bool DrawAssetField(const SerializedField& field);
 
 		// Selects and shows the file at path in its FileTab. False when none
 		// holds it.
@@ -978,6 +988,10 @@ namespace Loom
 		std::string m_selectedScript{ };
 		bool m_revealSelectedScript = false;
 		FolderTree m_scriptFolderTree;
+
+		// The Asset field picker's search and open folders, apart from the
+		// tab's own.
+		FolderTree m_assetPicker;
 
 		// Where the Create prompt's script is filed once it is written.
 		std::string m_newScriptFolder{ };
