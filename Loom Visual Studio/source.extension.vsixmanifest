@@ -3,7 +3,7 @@
   <Metadata>
     <Identity Id="LoomVisualStudio.ac11bf25-8b3c-4e78-a5d7-234d833509e5" Version="1.0" Language="en-US" Publisher="Loom" />
     <DisplayName>Loom</DisplayName>
-    <Description>Add &gt; Loom Script... in a Loom project's scripts, writing a new component where you right-clicked. Every file opens with its #pragma region and #region blocks collapsed.</Description>
+    <Description>Add &gt; Loom Script... in a Loom project's scripts, writing a new component where you right-clicked. C++ and C# files open with their region blocks collapsed.</Description>
   </Metadata>
   <Installation>
     <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.14,19.0)">
