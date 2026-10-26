@@ -38,6 +38,8 @@ namespace Loom
 		// the one after.
 		constexpr int focus_frames = 2;
 
+		constexpr size_t floats_per_position = 3;
+
 		constexpr const char* model_light = "Model Light";
 
 		constexpr size_t max_steps = 100;
@@ -705,7 +707,7 @@ void main()
 			m_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
 			if (m_documents.empty())
-				ImGui::TextDisabled("Right-click a prefab in the Project panel and pick Edit Model to shape it here.");
+				ImGui::TextDisabled("Right-click a prefab or model in the Project panel and pick Edit Model to shape it here.");
 			else if (ImGui::BeginTabBar("##models", ImGuiTabBarFlags_AutoSelectNewTabs | ImGuiTabBarFlags_FittingPolicyScroll))
 			{
 				const Document* closed = nullptr;
@@ -1046,7 +1048,7 @@ void main()
 		if (!document.fixed.empty())
 		{
 			ImGui::PushTextWrapPos();
-			ImGui::TextDisabled("%zu more cannot be shaped here: skinned, made by a script, or not triangles.", document.fixed.size());
+			ImGui::TextDisabled(document.parts.empty() ? "%zu cannot be shaped here: skinned, made by a script, or not triangles." : "%zu more cannot be shaped here: skinned, made by a script, or not triangles.", document.fixed.size());
 			ImGui::PopTextWrapPos();
 		};
 
@@ -1343,7 +1345,7 @@ void main()
 				const glm::mat4 world = object->WorldMatrix();
 				const std::vector<float>& vertices = *std::as_const(object->GetComponent<Mesh>()->m_vertices);
 
-				for (size_t i = 0; i + 2 < vertices.size(); i += 3)
+				for (size_t i = 0; i + floats_per_position <= vertices.size(); i += floats_per_position)
 					framed.push_back(glm::vec3(world * glm::vec4(vertices[i], vertices[i + 1], vertices[i + 2], 1.0f)));
 			};
 
@@ -2372,7 +2374,22 @@ void main()
 		if (document.animator == nullptr)
 			return;
 
-		if (document.clip.empty())
+		const auto restore = [&document]()
+		{
+			for (const Rest& rest : document.rest)
+			{
+				rest.object->transform.position = rest.position;
+				rest.object->transform.rotation = rest.rotation;
+				rest.object->transform.scale = rest.scale;
+			};
+
+			for (const auto& [skin, weights] : document.weights)
+				skin->m_shapeWeights = weights;
+		};
+
+		if (!document.clip.empty())
+			restore();
+		else
 		{
 			std::vector<GameObject*> objects{ };
 			ObjectsOf(*document.root, objects);
@@ -2397,16 +2414,7 @@ void main()
 			return;
 		};
 
-		for (const Rest& rest : document.rest)
-		{
-			rest.object->transform.position = rest.position;
-			rest.object->transform.rotation = rest.rotation;
-			rest.object->transform.scale = rest.scale;
-		};
-
-		for (const auto& [skin, weights] : document.weights)
-			skin->m_shapeWeights = weights;
-
+		restore();
 		document.clip.clear();
 	};
 

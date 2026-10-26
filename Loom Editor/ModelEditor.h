@@ -132,8 +132,8 @@ namespace Loom
 		std::vector<std::string> Clips() const;
 		std::string Playing() const;
 
-		// Plays the named clip from its start, or with an empty name puts the
-		// model back in the pose its prefab holds.
+		// Plays the named clip from its start, or with an empty or unknown
+		// name puts the model back in the pose its prefab holds.
 		void Play(const std::string& clip);
 
 		// The front tab's copy of its prefab, as the view shows it.

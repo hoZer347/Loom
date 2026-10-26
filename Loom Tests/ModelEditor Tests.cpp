@@ -664,6 +664,7 @@ TEST_SUITE("ModelEditor")
 		Loom::GameObject* lid = model->GetChildren().front();
 
 		CHECK(driven.editor.Editing() == nullptr);
+		CHECK(!driven.renderer.clears.empty());
 		CHECK(driven.editor.Clips() == std::vector<std::string>{ "Lift", "Turn" });
 		CHECK(driven.editor.Playing().empty());
 
@@ -679,6 +680,7 @@ TEST_SUITE("ModelEditor")
 		driven.Frame();
 
 		CHECK(driven.editor.Playing() == "Turn");
+		CHECK(*lid->transform.position == glm::vec3(0.0f));
 
 		driven.editor.Play("");
 		driven.Frame();
