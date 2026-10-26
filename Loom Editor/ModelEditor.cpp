@@ -5,7 +5,6 @@
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
 
-#include "Animator.h"
 #include "Engine.h"
 #include "GameObject.h"
 #include "Light.h"
@@ -21,12 +20,14 @@
 
 #include "glm/gtc/constants.hpp"
 #include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/quaternion.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <unordered_map>
 #include <utility>
 
 
@@ -67,6 +68,11 @@ namespace Loom
 		constexpr float pick_radius = 10.0f;
 		constexpr float drag_threshold = 4.0f;
 		constexpr float dot_half_size = 3.5f;
+		constexpr float joint_half_size = 5.0f;
+
+		// How near a joint's position or size, back out of its matrix, is
+		// taken to be the one it had, so a turn writes no rounding into them.
+		constexpr float pose_tolerance = 1e-5f;
 		constexpr float wire_half_width = 0.6f;
 		constexpr float picked_wire_half_width = 1.4f;
 		constexpr float handle_length = 90.0f;
@@ -115,6 +121,18 @@ namespace Loom
 		const glm::vec4 hovered_colour(1.0f, 1.0f, 1.0f, 1.0f);
 		const glm::vec4 picked_fill(1.0f, 0.58f, 0.12f, 0.3f);
 		const glm::vec4 hovered_fill(1.0f, 1.0f, 1.0f, 0.15f);
+		const glm::vec4 bone_colour(0.85f, 0.85f, 0.85f, 0.9f);
+
+		// How much of the background is laid over the model while its joints
+		// are picked, so they stand out in front of it.
+		constexpr float fade_alpha = 0.65f;
+
+		// The whole view, as two triangles in the device's own space.
+		const glm::vec3 screen_corners[] =
+		{
+			{ -1.0f, -1.0f, 0.0f }, { 1.0f, -1.0f, 0.0f }, { 1.0f, 1.0f, 0.0f },
+			{ -1.0f, -1.0f, 0.0f }, { 1.0f, 1.0f, 0.0f }, { -1.0f, 1.0f, 0.0f },
+		};
 
 		// The ground's lines either side of the middle one.
 		constexpr int grid_half_lines = 12;
@@ -161,6 +179,7 @@ void main()
 			{ ModelEditor::Pick::Vertices, "Vertices", "Click picks corners", ImGuiKey_1 },
 			{ ModelEditor::Pick::Edges, "Edges", "Click picks edges", ImGuiKey_2 },
 			{ ModelEditor::Pick::Faces, "Faces", "Click picks faces", ImGuiKey_3 },
+			{ ModelEditor::Pick::Joints, "Joints", "Click picks the joints a skin bends by", ImGuiKey_4 },
 		};
 
 		struct ToolInfo
@@ -188,7 +207,7 @@ void main()
 			"Middle drag: pan\n"
 			"Wheel: zoom\n"
 			"F: frame what is picked, or the whole model\n"
-			"1, 2, 3: pick vertices, edges, faces\n"
+			"1, 2, 3, 4: pick vertices, edges, faces, joints\n"
 			"W, E, R: move, rotate, scale\n"
 			"Ctrl+A: pick everything, Esc: pick nothing";
 
@@ -200,6 +219,7 @@ void main()
 			{
 			case ModelEditor::Pick::Vertices:	return one ? "vertex" : "vertices";
 			case ModelEditor::Pick::Edges:		return one ? "edge" : "edges";
+			case ModelEditor::Pick::Joints:		return one ? "joint" : "joints";
 			default:							return one ? "face" : "faces";
 			};
 		};
@@ -257,14 +277,34 @@ void main()
 			return ProjectAssets::ReadText(path);
 		};
 
-		// Writes the fields edited here, the meshes' geometry and the materials'
-		// shaders, into the file's own tree rather than this copy over it, so
-		// the file keeps its guids, and any component this build could not read
-		// stays as it was. Components pair up as the nth of their type on each
-		// side, and one the file's object lacks, such as a mesh added here, is
-		// added.
+		void MergeKeys(const std::vector<Prefabs::Field>& from, std::vector<Prefabs::Field>& into, const std::vector<std::string>& keys)
+		{
+			for (const std::string& key : keys)
+			{
+				const auto value = std::find_if(from.begin(), from.end(), [&](const Prefabs::Field& field) { return field.key == key; });
+
+				if (value == from.end())
+					continue;
+
+				const auto found = std::find_if(into.begin(), into.end(), [&](const Prefabs::Field& field) { return field.key == key; });
+
+				if (found == into.end())
+					into.push_back(*value);
+				else found->value = value->value;
+			};
+		};
+
+		// Writes the fields edited here, the meshes' geometry, the materials'
+		// shaders and the joints' transforms, into the file's own tree rather
+		// than this copy over it, so the file keeps its guids, and any
+		// component this build could not read stays as it was. Components pair
+		// up as the nth of their type on each side, and one the file's object
+		// lacks, such as a mesh added here, is added.
 		void MergeFields(const Prefabs::ObjectNode& shown, Prefabs::ObjectNode& file, const std::map<std::string, std::vector<std::string>>& edited)
 		{
+			if (const auto keys = edited.find(shown.guid); keys != edited.end())
+				MergeKeys(shown.fields, file.fields, keys->second);
+
 			std::map<std::string, size_t> seen{ };
 
 			for (const Prefabs::ComponentNode& component : shown.components)
@@ -280,24 +320,8 @@ void main()
 					continue;
 				};
 
-				const auto keys = edited.find(component.guid);
-
-				if (keys == edited.end())
-					continue;
-
-				for (const std::string& key : keys->second)
-				{
-					const auto value = std::find_if(component.fields.begin(), component.fields.end(), [&](const Prefabs::Field& field) { return field.key == key; });
-
-					if (value == component.fields.end())
-						continue;
-
-					const auto into = std::find_if(counterpart->fields.begin(), counterpart->fields.end(), [&](const Prefabs::Field& field) { return field.key == key; });
-
-					if (into == counterpart->fields.end())
-						counterpart->fields.push_back(*value);
-					else into->value = value->value;
-				};
+				if (const auto keys = edited.find(component.guid); keys != edited.end())
+					MergeKeys(component.fields, counterpart->fields, keys->second);
 			};
 
 			// Objects are always read, so children pair up by place.
@@ -320,18 +344,6 @@ void main()
 				FindParts(*child, found, fixed);
 		};
 
-		Animator* AnimatorOf(GameObject& object)
-		{
-			if (Animator* animator = object.GetComponent<Animator>())
-				return animator;
-
-			for (GameObject* child : object.GetChildren())
-				if (Animator* found = AnimatorOf(*child))
-					return found;
-
-			return nullptr;
-		};
-
 		void SkinsOf(GameObject& object, std::vector<Skin*>& found)
 		{
 			if (Skin* skin = object.GetComponent<Skin>())
@@ -341,12 +353,22 @@ void main()
 				SkinsOf(*child, found);
 		};
 
-		void ObjectsOf(GameObject& object, std::vector<GameObject*>& found)
+		// The joints under object, in the order a walk meets them, each with
+		// how many of them are above it.
+		void JointsUnder(GameObject& object, const std::set<GameObject*>& joints, int depth, std::vector<std::pair<GameObject*, int>>& found)
 		{
-			found.push_back(&object);
+			const bool joint = joints.contains(&object);
+
+			if (joint)
+				found.push_back({ &object, depth });
 
 			for (GameObject* child : object.GetChildren())
-				ObjectsOf(*child, found);
+				JointsUnder(*child, joints, joint ? depth + 1 : depth, found);
+		};
+
+		glm::vec3 Placed(const GameObject& object)
+		{
+			return glm::vec3(object.WorldMatrix()[3]);
 		};
 
 		void MaterialsOf(GameObject& object, std::vector<Material*>& found)
@@ -503,7 +525,6 @@ void main()
 		std::vector<GameObject*> found{ };
 		document.fixed.clear();
 		FindParts(*root, found, document.fixed);
-		document.animator = AnimatorOf(*root);
 
 		for (GameObject* object : found)
 		{
@@ -513,6 +534,41 @@ void main()
 
 			document.parts.push_back(Part{ object, mesh, std::move(editing) });
 		};
+
+		// Found by name under each skin's skeleton, as the skin finds them.
+		std::vector<Skin*> skins{ };
+		SkinsOf(*root, skins);
+
+		std::set<GameObject*> named{ };
+
+		for (Skin* skin : skins)
+			if (GameObject* skeleton = *std::as_const(skin->skeleton))
+			{
+				const std::unordered_map<std::string, GameObject*> under = DescendantsByName(*skeleton);
+
+				for (const std::string& name : SplitLines(*std::as_const(skin->m_joints)))
+					if (const auto joint = under.find(name); joint != under.end())
+						named.insert(joint->second);
+			};
+
+		std::vector<std::pair<GameObject*, int>> joints{ };
+		JointsUnder(*root, named, 0, joints);
+
+		document.joints.clear();
+
+		for (const auto& [joint, depth] : joints)
+			document.joints.push_back(Joint{ joint, depth });
+
+		const std::vector<JointPose> poses = Poses(document);
+
+		for (size_t i = 0; i < poses.size(); i++)
+			document.joints[i].saved = poses[i];
+
+		// A model with nothing to shape opens on its joints.
+		if (document.joints.empty() && document.pick == Pick::Joints)
+			document.pick = Pick::Faces;
+		else if (!document.joints.empty() && document.parts.empty())
+			document.pick = Pick::Joints;
 
 		if (document.distance == 0.0f)
 		{
@@ -536,10 +592,7 @@ void main()
 		document.root = nullptr;
 		document.parts.clear();
 		document.fixed.clear();
-		document.animator = nullptr;
-		document.clip.clear();
-		document.rest.clear();
-		document.weights.clear();
+		document.joints.clear();
 		document.part = 0;
 		document.selection = { };
 		document.undo.clear();
@@ -549,6 +602,7 @@ void main()
 		document.hoveredVertex.reset();
 		document.hoveredEdge.reset();
 		document.hoveredFace.reset();
+		document.hoveredJoint.reset();
 		document.edgesOf.reset();
 		document.pickedOf.reset();
 	};
@@ -616,6 +670,13 @@ void main()
 					edited[material->GetGuid().ToString()].push_back(std::to_string(i));
 		};
 
+		// Only the joints posed here, so the rest keep their values as written.
+		const std::vector<JointPose> poses = Poses(document);
+
+		for (size_t i = 0; i < poses.size(); i++)
+			if (poses[i] != document.joints[i].saved)
+				edited[document.joints[i].object->GetGuid().ToString()] = Prefabs::TransformKeys(*document.joints[i].object);
+
 		MergeFields(shown, file, edited);
 
 		const std::string text = Prefabs::Write(file);
@@ -636,6 +697,9 @@ void main()
 		document.unwritten.clear();
 		document.unsaved = false;
 		document.message = "Saved.";
+
+		for (size_t i = 0; i < poses.size(); i++)
+			document.joints[i].saved = poses[i];
 		document.messageTime = ImGui::GetTime();
 
 		m_saved.push_back(document.path);
@@ -776,7 +840,6 @@ void main()
 		const ImVec2 available = ImGui::GetContentRegionAvail();
 		const float height = available.y - status_height;
 
-		Animate(document);
 		DrawSide(document);
 		ImGui::SameLine();
 
@@ -808,7 +871,7 @@ void main()
 		// Asked every frame for the routing, as undo is, but left alone while
 		// the Centre field's text box has the keyboard or the mouse is in a
 		// drag, which holds on to what is under it.
-		const bool idle = !ImGui::GetIO().WantTextInput && !document.parts.empty() && document.drag == Drag::None;
+		const bool idle = !ImGui::GetIO().WantTextInput && (!document.parts.empty() || !document.joints.empty()) && document.drag == Drag::None;
 
 		for (const PickInfo& info : picks)
 			if (ImGui::Shortcut(info.key) && idle)
@@ -839,15 +902,18 @@ void main()
 
 	void ModelEditor::DrawToolbar(Document& document)
 	{
-		const bool editable = !document.parts.empty();
+		const bool shaping = Shaping(document);
 
-		ImGui::BeginDisabled(!editable);
+		ImGui::BeginDisabled(document.parts.empty() && document.joints.empty());
 
 		for (const PickInfo& info : picks)
 		{
+			ImGui::BeginDisabled(info.pick == Pick::Joints ? document.joints.empty() : document.parts.empty());
+
 			if (ImGui::RadioButton(info.label, document.pick == info.pick))
 				SetPick(info.pick);
 
+			ImGui::EndDisabled();
 			ImGui::SetItemTooltip("%s (%s)", info.tip, ImGui::GetKeyName(info.key));
 			ImGui::SameLine();
 		};
@@ -864,13 +930,17 @@ void main()
 			ImGui::SameLine();
 		};
 
+		ImGui::EndDisabled();
+
+		ImGui::BeginDisabled(!shaping);
+
 		ImGui::TextDisabled("|");
 		ImGui::SameLine();
 		ImGui::Checkbox("See Through", &m_seeThrough);
 		ImGui::SetItemTooltip("Show and pick what is behind the front of the model too");
 
-		const bool faces = editable && !PickedFaces(document).empty();
-		const bool any = editable && !Moving(document).empty();
+		const bool faces = shaping && !PickedFaces(document).empty();
+		const bool any = shaping && !Moving(document).empty();
 
 		const auto action = [](const char* label, bool usable, const char* tip, const char* unusable, const char* key)
 		{
@@ -922,7 +992,7 @@ void main()
 		if (action("Redo", !document.redo.empty(), "Make the change taken back again", "Nothing to make again", "Ctrl+Y"))
 			Step(document, false);
 
-		if (action("Save", document.unsaved, "Write the meshes back into the prefab", "Nothing to save", "Ctrl+S"))
+		if (action("Save", document.unsaved, "Write the meshes and joints back into the prefab", "Nothing to save", "Ctrl+S"))
 			SaveDocument(document);
 
 		ImGui::TextDisabled("|");
@@ -945,9 +1015,11 @@ void main()
 	{
 		const float status_height = ImGui::GetTextLineHeightWithSpacing();
 
-		ImGui::BeginChild("##side", ImVec2(side_width, ImGui::GetContentRegionAvail().y - status_height), ImGuiChildFlags_Borders);
+		ImGui::BeginChild("##side", ImVec2(side_width, ImGui::GetContentRegionAvail().y - status_height), ImGuiChildFlags_Borders, ImGuiWindowFlags_HorizontalScrollbar);
 
-		if (document.parts.size() > 1)
+		const bool shaping = Shaping(document);
+
+		if (shaping && document.parts.size() > 1)
 		{
 			ImGui::SeparatorText("Parts");
 
@@ -965,18 +1037,17 @@ void main()
 			};
 		};
 
-		if (!document.parts.empty())
+		if (shaping || document.pick == Pick::Joints)
 		{
-			const EditableMesh& mesh = document.parts[document.part].editing;
-
 			ImGui::SeparatorText("Picked");
 
 			const size_t count = document.pick == Pick::Vertices ? document.selection.vertices.size()
 				: document.pick == Pick::Edges ? document.selection.edges.size()
+				: document.pick == Pick::Joints ? document.selection.joints.size()
 				: document.selection.faces.size();
 
 			if (count == 0)
-				ImGui::TextDisabled("Nothing. Click the model.");
+				ImGui::TextDisabled(document.pick == Pick::Joints ? "Nothing. Click a joint." : "Nothing. Click the model.");
 			else ImGui::Text("%zu %s", count, PickName(document.pick, count));
 
 			if (std::optional<glm::vec3> pivot = Pivot(document))
@@ -989,18 +1060,52 @@ void main()
 
 				ImGui::SetItemTooltip("Where the middle of what is picked is. Drag or type to move it.");
 
-				if (changed)
+				if (changed && shaping)
 				{
 					document.parts[document.part].editing.Transform(Moving(document), glm::translate(glm::mat4(1.0f), centre - *pivot));
 					Changed(document);
+				}
+				else if (changed)
+				{
+					TransformJoints(document, glm::translate(glm::mat4(1.0f), centre - *pivot));
+					Posed(document);
 				};
 
-				if (ImGui::IsItemDeactivated() && document.parts[document.part].editing != document.pending.mesh)
+				if (ImGui::IsItemDeactivated() && Differs(document, document.pending))
 					Commit(document, std::move(document.pending));
 			};
+		};
+
+		if (shaping)
+		{
+			const EditableMesh& mesh = document.parts[document.part].editing;
 
 			ImGui::SeparatorText("Mesh");
 			ImGui::Text("%zu vertices, %zu faces", mesh.vertices.size(), mesh.faces.size());
+		};
+
+		if (document.pick == Pick::Joints)
+		{
+			ImGui::SeparatorText("Joints");
+
+			for (uint32_t i = 0; i < document.joints.size(); i++)
+			{
+				const Joint& joint = document.joints[i];
+				const float indent = joint.depth * ImGui::GetStyle().IndentSpacing;
+
+				ImGui::PushID((int)i);
+				ImGui::SetCursorPosX(ImGui::GetCursorPosX() + indent);
+
+				if (ImGui::Selectable(joint.object->GetName().c_str(), document.selection.joints.contains(i)))
+				{
+					if (!ImGui::GetIO().KeyShift)
+						document.selection.joints = { i };
+					else if (!document.selection.joints.erase(i))
+						document.selection.joints.insert(i);
+				};
+
+				ImGui::PopID();
+			};
 		};
 
 		std::vector<Material*> materials{ };
@@ -1030,21 +1135,6 @@ void main()
 			};
 		};
 
-		if (document.animator && !document.animator->GetClipNames().empty())
-		{
-			ImGui::SeparatorText("Animation");
-
-			if (ImGui::Selectable("None", document.clip.empty()))
-				Play(document, "");
-
-			for (const std::string& clip : document.animator->GetClipNames())
-				if (ImGui::Selectable(clip.c_str(), clip == document.clip))
-					Play(document, clip);
-
-			if (!document.clip.empty())
-				document.animator->OnGui();
-		};
-
 		if (!document.fixed.empty())
 		{
 			const char* format = document.parts.empty() ?
@@ -1069,7 +1159,7 @@ void main()
 
 		const char* hint = "Click the model to pick part of it, or drag a box round several. Right drag orbits, the wheel zooms.";
 
-		if (document.parts.empty())
+		if (document.parts.empty() && document.joints.empty())
 			hint = "Right drag orbits, middle drag pans, the wheel zooms.";
 		else if (document.drag == Drag::Box)
 			hint = "Let go to pick everything in the box. Hold Shift to add to what is picked.";
@@ -1082,8 +1172,10 @@ void main()
 				"Drag right or up to make what is picked bigger, left or down to make it smaller.";
 		else if (document.hoveredFace && document.hoveredPart != document.part)
 			hint = "Click to edit this part, picking this face.";
-		else if (document.hoveredVertex || document.hoveredEdge || document.hoveredFace)
+		else if (document.hoveredVertex || document.hoveredEdge || document.hoveredFace || document.hoveredJoint)
 			hint = "Click to pick this. Shift + click adds it to, or takes it from, what is picked.";
+		else if (document.pick == Pick::Joints)
+			hint = "Click a joint to pick it, or drag a box round several. Right drag orbits, the wheel zooms.";
 
 		ImGui::TextDisabled("%s", hint);
 	};
@@ -1154,8 +1246,9 @@ void main()
 
 		const bool hovered = ImGui::IsItemHovered();
 
-		// With only fixed meshes the view turns round them, and nothing is picked.
-		const bool editable = !document.parts.empty();
+		// With only fixed meshes and no joints the view turns round them, and
+		// nothing is picked.
+		const bool editable = !document.parts.empty() || !document.joints.empty();
 
 		// The camera is steered before anything is measured from it, so the
 		// image and the picking keep up with the mouse.
@@ -1176,6 +1269,7 @@ void main()
 				document.hoveredVertex.reset();
 				document.hoveredEdge.reset();
 				document.hoveredFace.reset();
+				document.hoveredJoint.reset();
 			};
 		};
 
@@ -1201,8 +1295,7 @@ void main()
 		{
 			if (ImGui::IsKeyPressed(ImGuiKey_Escape))
 			{
-				document.parts[document.part].editing = document.pending.mesh;
-				Changed(document);
+				Restore(document, document.pending);
 				document.unsaved = document.wasUnsaved;
 				document.drag = Drag::None;
 			}
@@ -1216,7 +1309,7 @@ void main()
 				Click(document, document.pressed);
 			else if (document.drag == Drag::Box)
 				Box(document, document.pressed, mouse);
-			else if (document.drag == Drag::Handle && document.parts[document.part].editing != document.pending.mesh)
+			else if (document.drag == Drag::Handle && Differs(document, document.pending))
 				Commit(document, std::move(document.pending));
 			else if (document.drag == Drag::Handle)
 				document.unsaved = document.wasUnsaved;
@@ -1253,12 +1346,6 @@ void main()
 		};
 
 		draw->PopClipRect();
-	};
-
-	void ModelEditor::Animate(Document& document)
-	{
-		if (document.animator && !document.clip.empty())
-			document.animator->Advance(ImGui::GetIO().DeltaTime);
 	};
 
 	void ModelEditor::Steer(Document& document, bool hovered)
@@ -1320,22 +1407,28 @@ void main()
 		view.size = size;
 		view.viewProjection = document.camera.ViewProjection(size.x / size.y);
 		view.pixel = 2.0f * std::tan(glm::radians((float)document.camera.fieldOfView) / 2.0f) / size.y;
-		view.world = document.parts.empty() ? glm::mat4(1.0f) : document.parts[document.part].object->WorldMatrix();
+		view.world = Shaping(document) ? document.parts[document.part].object->WorldMatrix() : glm::mat4(1.0f);
 		view.local = glm::inverse(view.world);
 	};
 
 	void ModelEditor::Frame(Document& document)
 	{
 		// What is picked, or with nothing picked every part.
-		const std::set<uint32_t> picked = document.parts.empty() ? std::set<uint32_t>{ } : Moving(document);
+		const std::set<uint32_t> picked = Shaping(document) ? Moving(document) : std::set<uint32_t>{ };
 		std::vector<glm::vec3> framed{ };
+
+		if (document.pick == Pick::Joints)
+			for (const uint32_t joint : document.selection.joints)
+				framed.push_back(Placed(*document.joints[joint].object));
+
+		const bool whole = picked.empty() && framed.empty();
 
 		for (size_t i = 0; i < document.parts.size(); i++)
 		{
 			const Part& part = document.parts[i];
 			const glm::mat4 world = part.object->WorldMatrix();
 
-			if (picked.empty())
+			if (whole)
 				for (const glm::vec3& vertex : part.editing.vertices)
 					framed.push_back(glm::vec3(world * glm::vec4(vertex, 1.0f)));
 			else if (i == document.part)
@@ -1343,7 +1436,7 @@ void main()
 					framed.push_back(glm::vec3(world * glm::vec4(part.editing.vertices[vertex], 1.0f)));
 		};
 
-		if (picked.empty())
+		if (whole)
 			for (GameObject* object : document.fixed)
 			{
 				const glm::mat4 world = object->WorldMatrix();
@@ -1373,7 +1466,10 @@ void main()
 		const float half_view = glm::radians((float)document.camera.fieldOfView) / 2.0f;
 
 		document.target = (low + high) / 2.0f;
-		document.distance = (std::max)(min_distance, radius / std::sin(half_view) * fit_margin);
+
+		// A point alone, such as one joint, is looked at from as far as before.
+		if (radius > 0.0f)
+			document.distance = (std::max)(min_distance, radius / std::sin(half_view) * fit_margin);
 	};
 
 	std::optional<ImVec2> ModelEditor::Project(const View& view, const glm::vec3& world) const
@@ -1438,6 +1534,19 @@ void main()
 
 	std::optional<glm::vec3> ModelEditor::Pivot(const Document& document) const
 	{
+		if (document.pick == Pick::Joints)
+		{
+			if (document.selection.joints.empty())
+				return std::nullopt;
+
+			glm::vec3 sum(0.0f);
+
+			for (const uint32_t joint : document.selection.joints)
+				sum += Placed(*document.joints[joint].object);
+
+			return sum / (float)document.selection.joints.size();
+		};
+
 		const std::set<uint32_t> moving = Moving(document);
 
 		if (moving.empty())
@@ -1538,11 +1647,29 @@ void main()
 		document.hoveredVertex.reset();
 		document.hoveredEdge.reset();
 		document.hoveredFace.reset();
+		document.hoveredJoint.reset();
 
 		if (document.hoveredHandle)
 			return;
 
 		const View& view = document.view;
+
+		// Drawn in front of the model, so always seen.
+		if (document.pick == Pick::Joints)
+		{
+			float nearest = pick_radius;
+
+			for (uint32_t joint = 0; joint < document.joints.size(); joint++)
+				if (const std::optional<ImVec2> point = Project(view, Placed(*document.joints[joint].object)))
+					if (const float distance = Distance(mouse, *point); distance < nearest)
+					{
+						nearest = distance;
+						document.hoveredJoint = joint;
+					};
+
+			return;
+		};
+
 		const EditableMesh& mesh = document.parts[document.part].editing;
 
 		if (document.pick == Pick::Faces)
@@ -1632,7 +1759,9 @@ void main()
 
 		Hover(document, mouse);
 
-		if (document.hoveredVertex)
+		if (document.hoveredJoint)
+			toggle(selection.joints, *document.hoveredJoint);
+		else if (document.hoveredVertex)
 			toggle(selection.vertices, *document.hoveredVertex);
 		else if (document.hoveredEdge)
 			toggle(selection.edges, *document.hoveredEdge);
@@ -1656,7 +1785,6 @@ void main()
 		const ImVec2 high((std::max)(from.x, to.x), (std::max)(from.y, to.y));
 
 		const View& view = document.view;
-		const EditableMesh& mesh = document.parts[document.part].editing;
 
 		const auto inside = [&](const glm::vec3& local)
 		{
@@ -1669,6 +1797,17 @@ void main()
 
 		if (!ImGui::GetIO().KeyShift)
 			selection = { };
+
+		if (document.pick == Pick::Joints)
+		{
+			for (uint32_t joint = 0; joint < document.joints.size(); joint++)
+				if (inside(Placed(*document.joints[joint].object)))
+					selection.joints.insert(joint);
+
+			return;
+		};
+
+		const EditableMesh& mesh = document.parts[document.part].editing;
 
 		switch (document.pick)
 		{
@@ -1685,7 +1824,7 @@ void main()
 					selection.edges.insert(edge);
 			break;
 
-		case Pick::Faces:
+		default:
 			for (uint32_t face = 0; face < mesh.faces.size(); face++)
 				if (inside(mesh.FaceCentre(face)) && Visible(document, mesh.FaceCentre(face)))
 					selection.faces.insert(face);
@@ -1816,6 +1955,14 @@ void main()
 			change = glm::translate(glm::mat4(1.0f), centre) * sizing * glm::translate(glm::mat4(1.0f), -centre);
 		};
 
+		if (document.pick == Pick::Joints)
+		{
+			SetPoses(document, document.pending.poses);
+			TransformJoints(document, change);
+			Posed(document);
+			return;
+		};
+
 		EditableMesh& mesh = document.parts[document.part].editing;
 		mesh = document.pending.mesh;
 		mesh.Transform(Moving(document), view.local * change * view.world);
@@ -1836,7 +1983,7 @@ void main()
 			{
 				document.scene->Render(&document.camera, { document.scene });
 
-				if (!document.parts.empty())
+				if (Shaping(document) || document.pick == Pick::Joints)
 					DrawOverlay(document);
 			});
 	};
@@ -1849,12 +1996,7 @@ void main()
 			return;
 
 		const View& view = document.view;
-		const EditableMesh& mesh = document.parts[document.part].editing;
-
-		std::vector<glm::vec3> points{ };
-
-		for (const glm::vec3& vertex : mesh.vertices)
-			points.push_back(glm::vec3(view.world * glm::vec4(vertex, 1.0f)));
+		const bool joints = document.pick == Pick::Joints;
 
 		// Of any part, so the face under the mouse lights up on a part not
 		// being edited too.
@@ -1891,24 +2033,13 @@ void main()
 			triangles.insert(triangles.end(), { a - at_a, b - at_b, b + at_b, a - at_a, b + at_b, a + at_a });
 		};
 
-		const auto strips = [&](const std::vector<EditableMesh::Edge>& edges, float half_width)
+		const auto dots = [&](const std::vector<glm::vec3>& at, float half_size)
 		{
 			std::vector<glm::vec3> triangles{ };
 
-			for (const EditableMesh::Edge& edge : edges)
-				strip(points[edge.first], points[edge.second], half_width, triangles);
-
-			return triangles;
-		};
-
-		const auto dots = [&](const std::set<uint32_t>& vertices)
-		{
-			std::vector<glm::vec3> triangles{ };
-
-			for (const uint32_t vertex : vertices)
+			for (const glm::vec3& p : at)
 			{
-				const glm::vec3& p = points[vertex];
-				const float size = dot_half_size * view.pixel * glm::distance(view.eye, p);
+				const float size = half_size * view.pixel * glm::distance(view.eye, p);
 				const glm::vec3 right = view.right * size;
 				const glm::vec3 up = view.up * size;
 
@@ -1927,7 +2058,16 @@ void main()
 			renderer->Draw(m_program, GL_TRIANGLES, &triangles[0].x, triangles.size(), GL_STREAM_DRAW);
 		};
 
-		if (m_seeThrough)
+		// The background laid over the model, as if it were seen through.
+		if (joints)
+		{
+			renderer->Clear(nullptr, true);
+			renderer->SetUniform(m_program, "u_viewProjection", glm::mat4(1.0f));
+			renderer->SetUniform(m_program, "u_pull", 0.0f);
+			draw(std::vector<glm::vec3>(std::begin(screen_corners), std::end(screen_corners)), glm::vec4(Engine::clearColor[0], Engine::clearColor[1], Engine::clearColor[2], fade_alpha));
+		};
+
+		if (joints || m_seeThrough)
 			renderer->Clear(nullptr, true);
 
 		document.camera.Apply(m_program);
@@ -1958,6 +2098,67 @@ void main()
 		draw(x_axis, glm::vec4(axis_colours[0], grid_axis_alpha));
 		draw(z_axis, glm::vec4(axis_colours[axes - 1], grid_axis_alpha));
 
+		if (joints)
+		{
+			// Each joint's bone, from the joint above it.
+			std::vector<glm::vec3> bones{ };
+			std::vector<glm::vec3> all{ };
+			std::vector<glm::vec3> picked{ };
+
+			for (uint32_t i = 0; i < document.joints.size(); i++)
+			{
+				const Joint& joint = document.joints[i];
+				const glm::vec3 at = Placed(*joint.object);
+
+				for (const GameObject* above = joint.object->GetParent(); above && joint.depth > 0; above = above->GetParent())
+					if (std::any_of(document.joints.begin(), document.joints.end(), [above](const Joint& other) { return other.object == above; }))
+					{
+						strip(Placed(*above), at, picked_wire_half_width, bones);
+						break;
+					};
+
+				all.push_back(at);
+
+				if (document.selection.joints.contains(i))
+					picked.push_back(at);
+			};
+
+			draw(bones, bone_colour);
+			draw(dots(all, joint_half_size), wire_colour);
+			draw(dots(picked, joint_half_size), picked_colour);
+
+			if (document.hoveredJoint)
+				draw(dots({ Placed(*document.joints[*document.hoveredJoint].object) }, joint_half_size), hovered_colour);
+
+			return;
+		};
+
+		const EditableMesh& mesh = document.parts[document.part].editing;
+		std::vector<glm::vec3> points{ };
+
+		for (const glm::vec3& vertex : mesh.vertices)
+			points.push_back(glm::vec3(view.world * glm::vec4(vertex, 1.0f)));
+
+		const auto strips = [&](const std::vector<EditableMesh::Edge>& edges, float half_width)
+		{
+			std::vector<glm::vec3> triangles{ };
+
+			for (const EditableMesh::Edge& edge : edges)
+				strip(points[edge.first], points[edge.second], half_width, triangles);
+
+			return triangles;
+		};
+
+		const auto pointsOf = [&](const std::set<uint32_t>& vertices)
+		{
+			std::vector<glm::vec3> at{ };
+
+			for (const uint32_t vertex : vertices)
+				at.push_back(points[vertex]);
+
+			return at;
+		};
+
 		const std::set<uint32_t> moving = Moving(document);
 		std::vector<EditableMesh::Edge> picked_edges{ };
 
@@ -1978,16 +2179,11 @@ void main()
 
 		if (document.pick == Pick::Vertices)
 		{
-			std::set<uint32_t> all{ };
-
-			for (uint32_t vertex = 0; vertex < mesh.vertices.size(); vertex++)
-				all.insert(vertex);
-
-			draw(dots(all), wire_colour);
-			draw(dots(document.selection.vertices), picked_colour);
+			draw(dots(points, dot_half_size), wire_colour);
+			draw(dots(pointsOf(document.selection.vertices), dot_half_size), picked_colour);
 
 			if (document.hoveredVertex)
-				draw(dots({ *document.hoveredVertex }), hovered_colour);
+				draw(dots({ points[*document.hoveredVertex] }, dot_half_size), hovered_colour);
 		};
 	};
 
@@ -2070,9 +2266,107 @@ void main()
 		else draw->AddRect(ImVec2(middle->x - centre_size, middle->y - centre_size), ImVec2(middle->x + centre_size, middle->y + centre_size), free, 0.0f, ImDrawFlags_None, handle_width);
 	};
 
+	bool ModelEditor::Shaping(const Document& document)
+	{
+		return document.pick != Pick::Joints && !document.parts.empty();
+	};
+
+	std::vector<ModelEditor::JointPose> ModelEditor::Poses(const Document& document)
+	{
+		std::vector<JointPose> poses{ };
+
+		for (const Joint& joint : document.joints)
+		{
+			const Transform& transform = joint.object->transform;
+			poses.push_back(JointPose{ *transform.position, *transform.rotation, *transform.scale });
+		};
+
+		return poses;
+	};
+
+	void ModelEditor::SetPoses(Document& document, const std::vector<JointPose>& poses)
+	{
+		for (size_t i = 0; i < poses.size() && i < document.joints.size(); i++)
+		{
+			Transform& transform = document.joints[i].object->transform;
+
+			if (JointPose{ *std::as_const(transform.position), *std::as_const(transform.rotation), *std::as_const(transform.scale) } == poses[i])
+				continue;
+
+			transform.position = poses[i].position;
+			transform.rotation = poses[i].rotation;
+			transform.scale = poses[i].scale;
+		};
+	};
+
+	void ModelEditor::TransformJoints(Document& document, const glm::mat4& change)
+	{
+		std::set<const GameObject*> picked{ };
+
+		for (const uint32_t joint : document.selection.joints)
+			picked.insert(document.joints[joint].object);
+
+		// A move keeps each joint's turn and size as they were, rather than
+		// as they come back out of its matrix.
+		const bool moving = glm::mat3(change) == glm::mat3(1.0f);
+
+		for (const uint32_t index : document.selection.joints)
+		{
+			GameObject* joint = document.joints[index].object;
+			const GameObject* parent = joint->GetParent();
+			bool under = false;
+
+			for (const GameObject* above = parent; above && !under; above = above->GetParent())
+				under = picked.contains(above);
+
+			// Moved already, by the joint above it.
+			if (under)
+				continue;
+
+			const glm::mat4 local = glm::inverse(parent ? parent->WorldMatrix() : glm::mat4(1.0f)) * change * joint->WorldMatrix();
+
+			const auto kept = [](const glm::vec3& from, const glm::vec3& to)
+			{
+				return glm::all(glm::lessThan(glm::abs(to - from), glm::vec3(pose_tolerance))) ? from : to;
+			};
+
+			joint->transform.position = kept(*std::as_const(joint->transform.position), glm::vec3(local[3]));
+
+			if (moving)
+				continue;
+
+			const glm::vec3 scale(glm::length(glm::vec3(local[0])), glm::length(glm::vec3(local[1])), glm::length(glm::vec3(local[2])));
+			const glm::mat3 turn(glm::vec3(local[0]) / scale.x, glm::vec3(local[1]) / scale.y, glm::vec3(local[2]) / scale.z);
+
+			joint->transform.rotation = Transform::EulerDegrees(glm::quat_cast(turn));
+			joint->transform.scale = kept(*std::as_const(joint->transform.scale), scale);
+		};
+	};
+
 	ModelEditor::Snapshot ModelEditor::Take(const Document& document)
 	{
-		return Snapshot{ document.part, document.parts[document.part].editing, document.selection };
+		const EditableMesh mesh = document.parts.empty() ? EditableMesh{ } : document.parts[document.part].editing;
+
+		return Snapshot{ document.part, mesh, document.selection, Poses(document) };
+	};
+
+	bool ModelEditor::Differs(const Document& document, const Snapshot& snapshot)
+	{
+		return Poses(document) != snapshot.poses || (!document.parts.empty() && document.parts[snapshot.part].editing != snapshot.mesh);
+	};
+
+	void ModelEditor::Restore(Document& document, const Snapshot& snapshot)
+	{
+		document.part = snapshot.part;
+		document.selection = snapshot.selection;
+		SetPoses(document, snapshot.poses);
+		Posed(document);
+
+		if (document.parts.empty())
+			return;
+
+		document.parts[snapshot.part].editing = snapshot.mesh;
+		Changed(document);
 	};
 
 	void ModelEditor::Commit(Document& document, Snapshot snapshot)
@@ -2098,16 +2392,13 @@ void main()
 		if (from.empty())
 			return;
 
-		Snapshot step = std::move(from.back());
+		const Snapshot step = std::move(from.back());
 		from.pop_back();
 
-		to.push_back(Snapshot{ step.part, document.parts[step.part].editing, document.selection });
-
 		document.part = step.part;
-		document.parts[step.part].editing = std::move(step.mesh);
-		document.selection = std::move(step.selection);
+		to.push_back(Take(document));
 
-		Changed(document);
+		Restore(document, step);
 	};
 
 	void ModelEditor::Changed(Document& document)
@@ -2124,6 +2415,12 @@ void main()
 		document.hoveredFace.reset();
 		document.edgesOf.reset();
 		document.pickedOf.reset();
+	};
+
+	void ModelEditor::Posed(Document& document)
+	{
+		document.unsaved = true;
+		document.hoveredJoint.reset();
 	};
 
 	const std::vector<EditableMesh::Edge>& ModelEditor::Edges(Document& document)
@@ -2148,12 +2445,13 @@ void main()
 			mesh.VerticesOfFaces(selection.faces);
 
 		Selection converted{ };
+		converted.joints = selection.joints;
 
 		switch (to)
 		{
 		case Pick::Vertices:	converted.vertices = vertices; break;
 		case Pick::Edges:		converted.edges = mesh.EdgesWithin(vertices); break;
-		case Pick::Faces:		converted.faces = mesh.FacesWithin(vertices); break;
+		default:				converted.faces = mesh.FacesWithin(vertices); break;
 		};
 
 		return converted;
@@ -2163,10 +2461,13 @@ void main()
 	{
 		Document* document = Front();
 
-		if (document == nullptr || document->parts.empty())
+		if (document == nullptr || (pick == Pick::Joints ? document->joints.empty() : document->parts.empty()))
 			return;
 
-		document->selection = Converted(document->parts[document->part].editing, document->selection, document->pick, pick);
+		// The joints picked and the part of the mesh picked are kept apart.
+		if (pick != Pick::Joints && document->pick != Pick::Joints)
+			document->selection = Converted(document->parts[document->part].editing, document->selection, document->pick, pick);
+
 		document->pick = pick;
 	};
 
@@ -2174,7 +2475,18 @@ void main()
 	{
 		Document* document = Front();
 
-		if (document == nullptr || document->parts.empty())
+		if (document == nullptr)
+			return;
+
+		if (document->pick == Pick::Joints)
+		{
+			for (uint32_t joint = 0; joint < document->joints.size(); joint++)
+				document->selection.joints.insert(joint);
+
+			return;
+		};
+
+		if (document->parts.empty())
 			return;
 
 		const EditableMesh& mesh = document->parts[document->part].editing;
@@ -2196,7 +2508,7 @@ void main()
 	{
 		Document* document = Front();
 
-		if (document == nullptr || document->parts.empty())
+		if (document == nullptr || !Shaping(*document))
 			return;
 
 		const std::set<uint32_t> faces = PickedFaces(*document);
@@ -2245,7 +2557,7 @@ void main()
 	{
 		Document* document = Front();
 
-		if (document == nullptr || document->parts.empty())
+		if (document == nullptr || !Shaping(*document))
 			return;
 
 		const std::set<uint32_t> faces = PickedFaces(*document);
@@ -2273,7 +2585,7 @@ void main()
 	{
 		Document* document = Front();
 
-		if (document == nullptr || document->parts.empty() || Moving(*document).empty())
+		if (document == nullptr || !Shaping(*document) || Moving(*document).empty())
 			return;
 
 		Remember(*document);
@@ -2296,7 +2608,7 @@ void main()
 	{
 		Document* document = Front();
 
-		if (document == nullptr || document->parts.empty())
+		if (document == nullptr || !Shaping(*document))
 			return;
 
 		const std::set<uint32_t> faces = PickedFaces(*document);
@@ -2346,20 +2658,6 @@ void main()
 		document->messageTime = ImGui::GetTime();
 	};
 
-	std::vector<std::string> ModelEditor::Clips() const
-	{
-		const Document* document = Front();
-
-		return document && document->animator ? document->animator->GetClipNames() : std::vector<std::string>{ };
-	};
-
-	std::string ModelEditor::Playing() const
-	{
-		const Document* document = Front();
-
-		return document ? document->clip : "";
-	};
-
 	GameObject* ModelEditor::Model() const
 	{
 		const Document* document = Front();
@@ -2367,70 +2665,26 @@ void main()
 		return document ? document->root : nullptr;
 	};
 
-	void ModelEditor::Play(const std::string& clip)
+	std::vector<GameObject*> ModelEditor::Joints() const
 	{
-		if (Document* document = Front())
-			Play(*document, clip);
-	};
+		std::vector<GameObject*> joints{ };
 
-	void ModelEditor::Play(Document& document, const std::string& clip)
-	{
-		if (document.animator == nullptr)
-			return;
+		if (const Document* document = Front())
+			for (const Joint& joint : document->joints)
+				joints.push_back(joint.object);
 
-		const auto restore = [&document]()
-		{
-			for (const Rest& rest : document.rest)
-			{
-				rest.object->transform.position = rest.position;
-				rest.object->transform.rotation = rest.rotation;
-				rest.object->transform.scale = rest.scale;
-			};
-
-			for (const auto& [skin, weights] : document.weights)
-				skin->m_shapeWeights = weights;
-		};
-
-		if (!document.clip.empty())
-			restore();
-		else
-		{
-			std::vector<GameObject*> objects{ };
-			ObjectsOf(*document.root, objects);
-
-			document.rest.clear();
-
-			for (GameObject* object : objects)
-				document.rest.push_back(Rest{ object, *object->transform.position, *object->transform.rotation, *object->transform.scale });
-
-			std::vector<Skin*> skins{ };
-			SkinsOf(*document.root, skins);
-
-			document.weights.clear();
-
-			for (Skin* skin : skins)
-				document.weights.emplace_back(skin, *std::as_const(skin->m_shapeWeights));
-		};
-
-		if (!clip.empty() && document.animator->Play(clip))
-		{
-			document.clip = clip;
-			return;
-		};
-
-		restore();
-		document.clip.clear();
+		return joints;
 	};
 
 	void ModelEditor::Undo()
 	{
-		if (Document* document = Front(); document && !document->parts.empty())
+		if (Document* document = Front())
 			Step(*document, true);
 	};
 
 	void ModelEditor::Redo()
 	{
-		if (Document* document = Front(); document && !document->parts.empty())
+		if (Document* document = Front())
 			Step(*document, false);
 	};
 

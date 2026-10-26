@@ -20,11 +20,9 @@
 
 namespace Loom
 {
-	struct Animator;
 	struct GameObject;
 	struct Mesh;
 	struct Scene;
-	struct Skin;
 
 	/**
 	* Loom::ModelEditor
@@ -33,14 +31,14 @@ namespace Loom
 	* - The left mouse picks what is under it, or what a dragged box takes in,
 	*   and drags the handles that move, turn and size it. The right mouse
 	*   orbits, the middle pans and the wheel zooms
+	* - The joints a Skin bends its mesh by are picked and posed the same way,
+	*   with the rest of the model faded behind them. A skinned mesh is shown,
+	*   and bends as they move, but is not shaped
 	* - Every action has a button, named and greyed out until it can be used,
 	*   and the line along the bottom says what the mouse would do. Ctrl+Z and
 	*   Ctrl+Y step back and forward an action at a time
-	* - Ctrl+S writes the meshes back into the prefab, and every instance of
-	*   it picks the change up
-	* - A model with an Animator plays the clip picked from its list in the
-	*   view, which never changes what is saved. A skinned mesh is shown, and
-	*   plays, but is not shaped
+	* - Ctrl+S writes the meshes and the joints' poses back into the prefab,
+	*   and every instance of it picks the change up
 	*/
 	struct ModelEditor final
 	{
@@ -50,6 +48,7 @@ namespace Loom
 			Vertices,
 			Edges,
 			Faces,
+			Joints,
 		};
 
 		// What the handles do to what is picked.
@@ -65,6 +64,7 @@ namespace Loom
 			std::set<uint32_t> vertices;
 			std::set<EditableMesh::Edge> edges;
 			std::set<uint32_t> faces;
+			std::set<uint32_t> joints;
 
 			bool operator==(const Selection&) const = default;
 		};
@@ -127,25 +127,20 @@ namespace Loom
 		void Redo();
 		bool Save();
 
-		// The clips of the front tab's Animator, and the one playing in the
-		// view, empty for none.
-		std::vector<std::string> Clips() const;
-		std::string Playing() const;
-
-		// Plays the named clip from its start, or with an empty or unknown
-		// name puts the model back in the pose its prefab holds.
-		void Play(const std::string& clip);
-
 		// The front tab's copy of its prefab, as the view shows it.
 		GameObject* Model() const;
+
+		// The front tab's joints, those its skins bend by, as its side lists them.
+		std::vector<GameObject*> Joints() const;
 
 		// The tab in front's mesh being edited, null with none open or none in
 		// its prefab.
 		const EditableMesh* Editing() const;
 		const Selection* Selected() const;
 
-		// Where a point of the mesh being edited was drawn in the panel when
-		// it last drew, in screen pixels. None behind the camera.
+		// Where a point of the mesh being edited, or of the world while joints
+		// are picked, was drawn in the panel when it last drew, in screen
+		// pixels. None behind the camera.
 		std::optional<ImVec2> ScreenOf(const glm::vec3& point) const;
 
 	private:
@@ -157,13 +152,22 @@ namespace Loom
 			EditableMesh editing;
 		};
 
-		// Where an object stood before a clip moved it.
-		struct Rest
+		struct JointPose
 		{
-			GameObject* object = nullptr;
 			glm::vec3 position{ 0.0f };
 			glm::vec3 rotation{ 0.0f };
 			glm::vec3 scale{ 1.0f };
+
+			bool operator==(const JointPose&) const = default;
+		};
+
+		// One of the GameObjects a Skin bends its mesh by, under depth others,
+		// and its pose as the file holds it.
+		struct Joint
+		{
+			GameObject* object = nullptr;
+			int depth = 0;
+			JointPose saved;
 		};
 
 		struct Snapshot
@@ -171,6 +175,7 @@ namespace Loom
 			size_t part = 0;
 			EditableMesh mesh;
 			Selection selection;
+			std::vector<JointPose> poses;
 		};
 
 		// One of the handles round what is picked, along an axis or, with
@@ -203,7 +208,8 @@ namespace Loom
 			glm::vec3 right{ 1.0f, 0.0f, 0.0f };
 			glm::vec3 up{ 0.0f, 1.0f, 0.0f };
 
-			// The part's own space to the world, and back.
+			// The part's own space to the world, and back. The world itself
+			// while joints are picked.
 			glm::mat4 world{ 1.0f };
 			glm::mat4 local{ 1.0f };
 
@@ -249,8 +255,8 @@ namespace Loom
 			Handle held;
 			glm::vec3 pivot{ 0.0f };
 
-			// How things stood when a drag that may change the mesh began, a
-			// step for undo once it has.
+			// How things stood when a drag that may change the mesh or the
+			// joints began, a step for undo once it has.
 			Snapshot pending;
 			bool wasUnsaved = false;
 
@@ -258,13 +264,7 @@ namespace Loom
 			// script, or not triangles. They are still shown.
 			std::vector<GameObject*> fixed;
 
-			// The clip playing in the view, empty for none, and how everything
-			// under the root stood and the Skins' shape keys were weighted
-			// before it.
-			Animator* animator = nullptr;
-			std::string clip;
-			std::vector<Rest> rest;
-			std::vector<std::pair<Skin*, std::vector<float>>> weights;
+			std::vector<Joint> joints;
 
 			// Worked out from the mesh being edited, and from it and what is
 			// picked, and kept until those change.
@@ -278,6 +278,7 @@ namespace Loom
 			std::optional<uint32_t> hoveredVertex;
 			std::optional<EditableMesh::Edge> hoveredEdge;
 			std::optional<uint32_t> hoveredFace;
+			std::optional<uint32_t> hoveredJoint;
 
 			// The part hoveredFace is a face of, which may not be the one edited.
 			size_t hoveredPart = 0;
@@ -302,7 +303,6 @@ namespace Loom
 		void DrawCloseQuestion();
 		void HandleKeys(Document& document);
 
-		void Animate(Document& document);
 		void Steer(Document& document, bool hovered);
 		void Frame(Document& document);
 		void Pose(Document& document);
@@ -322,7 +322,7 @@ namespace Loom
 		std::optional<Handle> HandleAt(const Document& document, const ImVec2& mouse) const;
 
 		// The vertices the selection moves, and the middle of them in the
-		// part's own space.
+		// part's own space, or of the joints picked in the world.
 		std::set<uint32_t> Moving(const Document& document) const;
 		std::optional<glm::vec3> Pivot(const Document& document) const;
 
@@ -331,13 +331,25 @@ namespace Loom
 		const std::set<uint32_t>& PickedFaces(Document& document) const;
 		static const std::vector<EditableMesh::Edge>& Edges(Document& document);
 
+		// Whether a click picks part of a mesh rather than a joint.
+		static bool Shaping(const Document& document);
+
+		static std::vector<JointPose> Poses(const Document& document);
+		static void SetPoses(Document& document, const std::vector<JointPose>& poses);
+
+		// Moves the picked joints by change, a matrix in the world, each with
+		// those under it.
+		static void TransformJoints(Document& document, const glm::mat4& change);
+
 		static Snapshot Take(const Document& document);
+		static bool Differs(const Document& document, const Snapshot& snapshot);
+		static void Restore(Document& document, const Snapshot& snapshot);
 		static void Commit(Document& document, Snapshot snapshot);
 		static void Remember(Document& document);
 		static void Step(Document& document, bool undo);
 		static void Changed(Document& document);
+		static void Posed(Document& document);
 		static void SetShader(Document& document, const std::string& path);
-		static void Play(Document& document, const std::string& clip);
 		static Selection Converted(const EditableMesh& mesh, const Selection& selection, Pick from, Pick to);
 
 		Document* Front() const;

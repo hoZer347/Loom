@@ -6,7 +6,6 @@
 #include "Prefabs.h"
 #include "UiScript.h"
 
-#include "Animator.h"
 #include "GameObject.h"
 #include "Material.h"
 #include "Mesh.h"
@@ -26,6 +25,7 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 
@@ -95,9 +95,12 @@ namespace
 		return path;
 	};
 
-	// A crate whose skinned lid its Animator's clips lift and turn.
-	std::string WriteAnimatedPrefab(const std::string& name)
+	// A crate whose skinned lid is bent by Bones' two joints, Hinge and Tip
+	// above it, every corner by Tip.
+	std::string WriteJointedPrefab(const std::string& name)
 	{
+		constexpr size_t joints_per_vertex = 4;
+
 		const EditableMesh cube = EditableMesh::Cube(1.0f);
 		const std::string path = WritePrefab(name, nullptr, &cube, true);
 
@@ -107,19 +110,55 @@ namespace
 		Loom::GameObject* top = Loom::SceneSerializer::Deserialize(ReadFile(path), source.GetRoot());
 		LoomTests::Pump();
 
-		Loom::Animator* animator = top->Attach<Loom::Animator>();
-		animator->m_clips = "Lift\t1\nTurn\t1\n";
-		animator->m_channels = "0\ttranslation\tLid\n1\trotation\tLid\n";
-		animator->m_keys =
+		Loom::GameObject* bones = top->AddChild("Bones");
+		Loom::GameObject* hinge = bones->AddChild("Hinge");
+		Loom::GameObject* tip = hinge->AddChild("Tip");
+		tip->transform.position = glm::vec3(0.0f, 1.0f, 0.0f);
+		LoomTests::Pump();
+
+		Loom::GameObject* lid = top->GetChildren().front();
+		Loom::Skin* skin = lid->GetComponent<Loom::Skin>();
+		skin->skeleton = bones;
+		skin->m_joints = "Hinge\nTip\n";
+
+		std::vector<float> binds{ };
+
+		for (const glm::mat4& bind : { glm::mat4(1.0f), glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.0f, 0.0f)) })
+			for (int i = 0; i < 4 * 4; i++)
+				binds.push_back(bind[i / 4][i % 4]);
+
+		skin->m_inverseBinds = binds;
+
+		std::vector<float> influences{ };
+		const size_t vertices = (*std::as_const(lid->GetComponent<Loom::Mesh>()->m_vertices)).size() / 3;
+
+		for (size_t i = 0; i < vertices; i++)
 		{
-			2.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 2.0f, 0.0f,
-			2.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+			influences.push_back(1.0f);
+			influences.insert(influences.end(), joints_per_vertex - 1, 0.0f);
+			influences.push_back(1.0f);
+			influences.insert(influences.end(), joints_per_vertex - 1, 0.0f);
 		};
+
+		skin->m_influences = influences;
 		LoomTests::Pump();
 
 		std::ofstream(path, std::ios::binary) << Loom::SceneSerializer::Serialize(*top);
 
 		return path;
+	};
+
+	Loom::GameObject* Named(Loom::GameObject& root, const std::string& name)
+	{
+		Loom::GameObject* found = Loom::DescendantsByName(root)[name];
+		REQUIRE(found != nullptr);
+
+		return found;
+	};
+
+	glm::vec3 Placed(const Loom::GameObject& object)
+	{
+		return glm::vec3(object.WorldMatrix()[3]);
 	};
 
 	// The Model panel in an ImGui context of the test's own, with a renderer
@@ -648,67 +687,160 @@ TEST_SUITE("ModelEditor")
 		std::filesystem::remove(path, code);
 	};
 
-	TEST_CASE("The Model panel shows a skinned model, plays the clip picked from its Animator, and puts the model back as its prefab holds it, saving no pose")
+	TEST_CASE("The Model panel opens a skinned model on its joints, and the joint clicked is picked")
 	{
-		constexpr int half_clip_frames = 30;
-
-		const std::string path = WriteAnimatedPrefab("model_animated");
-		const std::string written = ReadFile(path);
-
-		Driven driven("model_animated", nullptr, path);
+		Driven driven("model_joints", nullptr, WriteJointedPrefab("model_joints"));
 
 		Loom::GameObject* model = driven.editor.Model();
 		REQUIRE(model != nullptr);
-		REQUIRE(model->GetChildren().size() == 1);
-
-		Loom::GameObject* lid = model->GetChildren().front();
 
 		CHECK(driven.editor.Editing() == nullptr);
 		CHECK(!driven.renderer.clears.empty());
-		CHECK(driven.editor.Clips() == std::vector<std::string>{ "Lift", "Turn" });
-		CHECK(driven.editor.Playing().empty());
+		CHECK(driven.editor.Joints() == std::vector<Loom::GameObject*>{ Named(*model, "Hinge"), Named(*model, "Tip") });
+		CHECK(driven.editor.Selected()->joints.empty());
 
-		driven.editor.Play("Lift");
+		driven.Click(driven.Screen(Placed(*Named(*model, "Tip"))));
+		CHECK(driven.editor.Selected()->joints == std::set<uint32_t>{ 1 });
 
-		for (int i = 0; i < half_clip_frames; i++)
-			driven.Frame();
+		driven.editor.SelectNone();
+		driven.Click(driven.Screen(Placed(*Named(*model, "Hinge"))));
+		CHECK(driven.editor.Selected()->joints == std::set<uint32_t>{ 0 });
 
-		CHECK(driven.editor.Playing() == "Lift");
-		CHECK((*lid->transform.position).y > TOLERANCE);
+		driven.editor.SetPick(ModelEditor::Pick::Faces);
+		CHECK(driven.editor.Selected()->joints == std::set<uint32_t>{ 0 });
+	};
 
-		driven.editor.Play("Turn");
-		driven.Frame();
+	TEST_CASE("The Model panel's move handle lowers the picked joint and the skin with it, and undo puts it back")
+	{
+		const std::string path = WriteJointedPrefab("model_joint_move");
+		const std::string written = ReadFile(path);
 
-		CHECK(driven.editor.Playing() == "Turn");
-		CHECK(*lid->transform.position == glm::vec3(0.0f));
+		Driven driven("model_joint_move", nullptr, path);
 
-		driven.editor.Play("");
-		driven.Frame();
+		Loom::GameObject* model = driven.editor.Model();
+		Loom::GameObject* hinge = Named(*model, "Hinge");
+		Loom::GameObject* tip = Named(*model, "Tip");
+		Loom::GameObject* lid = Named(*model, "Lid");
 
-		CHECK(driven.editor.Playing().empty());
-		CHECK(*lid->transform.position == glm::vec3(0.0f));
-		CHECK(*lid->transform.rotation == glm::vec3(0.0f));
+		const glm::vec3 start = Placed(*tip);
 
-		driven.editor.Play("Lift");
+		driven.Click(driven.Screen(start));
+		REQUIRE(driven.editor.Selected()->joints == std::set<uint32_t>{ 1 });
 
-		for (int i = 0; i < half_clip_frames; i++)
-			driven.Frame();
+		// Tip is near the top of the view, so it is dragged by its middle,
+		// across the screen.
+		constexpr float pull = 40.0f;
 
+		const ImVec2 middle = driven.Screen(start);
+		driven.Drag(middle, ImVec2(middle.x, middle.y + pull));
+
+		const glm::vec3 moved = Placed(*tip);
+		CHECK(moved.y < start.y - TOLERANCE);
+		CHECK(Placed(*hinge) == glm::vec3(0.0f));
+
+		// Every corner of the lid follows Tip down.
+		Loom::Mesh* mesh = lid->GetComponent<Loom::Mesh>();
+		lid->GetComponent<Loom::Skin>()->Deform(*mesh);
+		const std::vector<float>& rest = *std::as_const(mesh->m_vertices);
+		REQUIRE(mesh->m_deformed.size() == rest.size());
+
+		for (size_t i = 1; i < rest.size(); i += 3)
+			CHECK(std::abs(mesh->m_deformed[i] - rest[i] - (moved.y - start.y)) < TOLERANCE);
+
+		driven.editor.Undo();
+		CHECK(glm::distance(Placed(*tip), start) < TOLERANCE);
+
+		driven.editor.Redo();
+		CHECK(glm::distance(Placed(*tip), moved) < TOLERANCE);
+
+		driven.editor.Undo();
 		CHECK(driven.editor.Save());
 		CHECK(ReadFile(path) == written);
 	};
 
-	TEST_CASE("The Model panel puts the model back for a clip its Animator has none by")
+	TEST_CASE("The Model panel moves and turns a picked joint with those under it")
 	{
-		Driven driven("model_unknown_clip", nullptr, WriteAnimatedPrefab("model_unknown_clip"));
+		// A quarter of the way round the outer ring.
+		constexpr float ring = 112.5f;
 
-		driven.editor.Play("Lift");
-		driven.Frame();
-		driven.editor.Play("Jump");
-		driven.Frame();
+		Driven driven("model_joint_turn", nullptr, WriteJointedPrefab("model_joint_turn"));
 
-		CHECK(driven.editor.Playing().empty());
-		CHECK(*driven.editor.Model()->GetChildren().front()->transform.position == glm::vec3(0.0f));
+		Loom::GameObject* model = driven.editor.Model();
+		Loom::GameObject* hinge = Named(*model, "Hinge");
+		Loom::GameObject* tip = Named(*model, "Tip");
+
+		const glm::vec3 reach = Placed(*tip) - Placed(*hinge);
+
+		driven.editor.SelectAll();
+		REQUIRE(driven.editor.Selected()->joints == std::set<uint32_t>{ 0, 1 });
+
+		const ImVec2 middle = driven.Screen((Placed(*hinge) + Placed(*tip)) / 2.0f);
+		const ImVec2 aside = driven.Screen((Placed(*hinge) + Placed(*tip)) / 2.0f + glm::vec3(0.1f, 0.0f, 0.0f));
+		const float across = std::hypot(aside.x - middle.x, aside.y - middle.y);
+		const ImVec2 right((aside.x - middle.x) / across, (aside.y - middle.y) / across);
+
+		constexpr float grab = 60.0f;
+		constexpr float pull = 40.0f;
+
+		driven.Drag(ImVec2(middle.x + right.x * grab, middle.y + right.y * grab), ImVec2(middle.x + right.x * (grab + pull), middle.y + right.y * (grab + pull)));
+
+		CHECK((*hinge->transform.position).x > TOLERANCE);
+		CHECK(*tip->transform.position == glm::vec3(0.0f, 1.0f, 0.0f));
+		CHECK(glm::distance(Placed(*tip) - Placed(*hinge), reach) < TOLERANCE);
+
+		driven.editor.SelectNone();
+		driven.Click(driven.Screen(Placed(*hinge)));
+		REQUIRE(driven.editor.Selected()->joints == std::set<uint32_t>{ 0 });
+
+		const glm::vec3 before = Placed(*tip);
+		const glm::vec3 hinged = *hinge->transform.position;
+		const ImVec2 pivot = driven.Screen(Placed(*hinge));
+
+		driven.editor.SetTool(ModelEditor::Tool::Rotate);
+		driven.Drag(ImVec2(pivot.x + ring, pivot.y), ImVec2(pivot.x, pivot.y - ring));
+
+		CHECK(std::abs(glm::distance(Placed(*tip), Placed(*hinge)) - glm::length(reach)) < TOLERANCE);
+		CHECK(glm::distance(Placed(*tip), before) > 0.1f);
+		CHECK(*tip->transform.position == glm::vec3(0.0f, 1.0f, 0.0f));
+
+		// Turned about itself, so where it is and its size are as they were.
+		CHECK(*hinge->transform.position == hinged);
+		CHECK(*hinge->transform.scale == glm::vec3(1.0f));
+	};
+
+	TEST_CASE("The Model panel saves the joints posed into the prefab, and only those")
+	{
+		const std::string path = WriteJointedPrefab("model_joint_save");
+
+		Driven driven("model_joint_save", nullptr, path);
+
+		Loom::GameObject* model = driven.editor.Model();
+		Loom::GameObject* tip = Named(*model, "Tip");
+
+		driven.Click(driven.Screen(Placed(*tip)));
+		REQUIRE(driven.editor.Selected()->joints == std::set<uint32_t>{ 1 });
+
+		constexpr float pull = 40.0f;
+
+		const ImVec2 middle = driven.Screen(Placed(*tip));
+		driven.Drag(middle, ImVec2(middle.x, middle.y + pull));
+		REQUIRE((*tip->transform.position).y < 1.0f - TOLERANCE);
+
+		CHECK(driven.editor.Save());
+
+		Loom::Scene reader("Reader");
+		LoomTests::Pump();
+
+		Loom::GameObject* saved = Loom::SceneSerializer::Deserialize(ReadFile(path), reader.GetRoot());
+		LoomTests::Pump();
+		REQUIRE(saved != nullptr);
+
+		CHECK(glm::distance(*Named(*saved, "Tip")->transform.position, *tip->transform.position) < TOLERANCE);
+		CHECK(*Named(*saved, "Hinge")->transform.position == glm::vec3(0.0f));
+
+		const std::string written = ReadFile(path);
+		CHECK(driven.editor.Save());
+		CHECK(ReadFile(path) == written);
 	};
 
 	// The mesh's new material reads the project's shader, which the web build
