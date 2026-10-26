@@ -120,11 +120,17 @@ namespace Loom
 	*/
 	struct Editor final
 	{
+		#pragma region Construction
+
 		Editor();
 		~Editor();
 
 		Editor(const Editor&) = delete;
 		Editor& operator=(const Editor&) = delete;
+
+		#pragma endregion
+
+		#pragma region Scenes
 
 		// Scenes created or loaded here are owned by the editor and can be
 		// closed from the Hierarchy; scenes created anywhere else still show up
@@ -145,6 +151,10 @@ namespace Loom
 		// cannot start.
 		bool OpenSceneAlone(const std::string& path);
 
+		#pragma endregion
+
+		#pragma region Prefabs
+
 		// Writes the GameObject to a new .loomprefab in folder, named after it,
 		// and makes it an instance of that prefab. The path of the file, or
 		// empty when it could not be written.
@@ -164,11 +174,19 @@ namespace Loom
 		void ClosePrefab();
 		GameObject* GetPrefabRoot() const;
 
+		#pragma endregion
+
+		#pragma region Saving
+
 		// File > Save Scene and Ctrl+S: the active scene, to the file it was
 		// opened from, or, for one never saved, a new file named after it in
 		// the project's scenes folder. Refused while playing, when the scene
 		// holds what the run has done to it.
 		void SaveActiveScene();
+
+		#pragma endregion
+
+		#pragma region Refresh
 
 		// File > Full Refresh and Ctrl+Shift+R: rebuilds the editor from the
 		// engine's sources, then stops any run, saves the project and closes,
@@ -183,6 +201,10 @@ namespace Loom
 		const std::filesystem::path& RelaunchExecutable() const { return m_refresh.GetExecutable(); };
 		std::string RelaunchTarget() const;
 
+		#pragma endregion
+
+		#pragma region Project
+
 		// The folder the editor works out of. Everything under it is listed in
 		// the Project panel; the choice is remembered between runs, so the
 		// folder prompt only shows up when there is nothing to remember.
@@ -194,14 +216,27 @@ namespace Loom
 		// Opens one of the projects in <engine>/Demos, by its folder name.
 		bool OpenDemo(const std::string& name);
 
+		#pragma endregion
+
+		#pragma region Asset Editors
+
 		// In a tab of the Shaders panel, which comes forward.
 		void OpenShader(const std::string& path);
+
+		#pragma endregion
+
+		#pragma region Layouts
 
 		// A layout from the Layout menu: loaded at the top of the next frame,
 		// saved once the panels have been drawn, or asked a name for.
 		void LoadLayout(const std::string& name) { m_pendingLayout = name; };
 		void SaveLayout(const std::string& name) { m_layoutToSave = name; };
 		void ShowSaveLayoutPrompt();
+
+		#pragma endregion
+
+		#pragma region Asset Editors
+
 		// In a tab of the Sprites panel, which comes forward.
 		void OpenSprite(const std::string& path);
 
@@ -213,6 +248,10 @@ namespace Loom
 		// In the Palette panel, which comes forward, for the sprite in front.
 		void OpenPalette(const std::string& path);
 
+		#pragma endregion
+
+		#pragma region Components
+
 		// The Inspector's Add Component menu, opened on the selection the next
 		// time it is drawn.
 		void ShowAddComponent() { m_openAddComponent = true; };
@@ -220,6 +259,10 @@ namespace Loom
 		// Files a component under category in the open project, or back under
 		// its own when category is empty.
 		void SetComponentCategory(const std::string& component, const std::string& category);
+
+		#pragma endregion
+
+		#pragma region Project
 
 		// Writes a new project (scenes, scripts, a Visual Studio solution) into
 		// folder/name and opens it.
@@ -229,6 +272,10 @@ namespace Loom
 		// scenes go out and come back around it, because their components are
 		// code that is about to be replaced.
 		void CompileScripts();
+
+		#pragma endregion
+
+		#pragma region Play
 
 		// Starts or pauses the scenes updating. Starting compiles first when
 		// the scripts have moved on since the library was built.
@@ -246,11 +293,19 @@ namespace Loom
 		// default browser, as it was when Play was pressed if it is running.
 		void PlayWeb();
 
+		#pragma endregion
+
+		#pragma region Screenshots
+
 		// Writes the editor as it stands - panels and all - to a bitmap once the
 		// given number of frames have gone by, so a scene can be looked at
 		// without a visible window. Given a window, only the first shown one
 		// whose name contains it.
 		void RequestScreenshot(const std::string& path, int after_frames, bool exit_after, const std::string& window = "");
+
+		#pragma endregion
+
+		#pragma region Queued Input
 
 		// Imports a model file once the next frame has drawn the panels, into
 		// whatever the mouse is over: a Hierarchy node, one of the views, or
@@ -262,11 +317,19 @@ namespace Loom
 		// folder there instead.
 		void Drop(const std::string& path, float x, float y);
 
+		#pragma endregion
+
+		#pragma region Dialogs
+
 		// File > Open Project..., starting beside the project that is open.
 		void ShowOpenProjectDialog();
 
 		// Window > Settings.
 		void ShowSettings() { m_showSettings = true; };
+
+		#pragma endregion
+
+		#pragma region Selection
 
 		void SetActiveScene(Scene* scene);
 
@@ -280,11 +343,19 @@ namespace Loom
 		// Clears the selected model too.
 		void Select(GameObject* gameObject);
 
+		#pragma endregion
+
+		#pragma region History
+
 		// Steps the owned scenes back or forward through the edits made to them.
 		// While playing, only through the edits made in the Inspector since
 		// Play: what a run changes is not an edit.
 		void Undo();
 		void Redo();
+
+		#pragma endregion
+
+		#pragma region Queued Input
 
 		// An undo or redo to run once the queued imports have landed and been
 		// recorded, one per frame, so an automated run can step back over them.
@@ -295,9 +366,17 @@ namespace Loom
 		// the panels without the real mouse.
 		void QueueClick(float x, float y, float to_x, float to_y);
 
+		#pragma endregion
+
+		#pragma region Settings
+
 		// The graphics API the settings file says to start on, which main reads
 		// before the Engine opens its window. OpenGL when nothing is saved.
 		static Backend SavedBackend();
+
+		#pragma endregion
+
+		#pragma region Editing
 
 		// The selection as the text a scene writes it as, on the system
 		// clipboard, so it can be pasted into another scene or another editor.
@@ -311,6 +390,10 @@ namespace Loom
 		// screenshot can show it in the inspector.
 		void RequestSelection(const std::string& name);
 
+		#pragma endregion
+
+		#pragma region Asset Creation
+
 		// Create > Script, State or State Machine in the project folder, named
 		// and confirmed.
 		void CreateScriptAsset(AssetKind kind, const std::string& name);
@@ -318,6 +401,10 @@ namespace Loom
 		// Opens the Create prompt for that kind of asset, named the first default
 		// name nothing is using.
 		void AskForAsset(AssetKind kind, const std::string& folder);
+
+		#pragma endregion
+
+		#pragma region Access
 
 		const std::string& GetProjectPath() const { return m_projectPath; };
 
@@ -335,10 +422,18 @@ namespace Loom
 		// theirs once nothing is held down.
 		void MarkEdited() { m_historyDirty = true; };
 
+		#pragma endregion
+
 	private:
+		#pragma region Frame
+
 		void DrawGui();
 
 		void DrawMainMenuBar();
+
+		#pragma endregion
+
+		#pragma region Project Panel
 
 		// The Project panel, its tabs drawn by the ones below.
 		void DrawProject();
@@ -413,6 +508,10 @@ namespace Loom
 		// Rereads the scripts project's headers for the types they declare.
 		void RefreshScripts();
 
+		#pragma endregion
+
+		#pragma region Hierarchy
+
 		// The Hierarchy's right-click menu on empty space adds to the rows
 		// above it, as a drop there does.
 		void DrawHierarchy();
@@ -465,6 +564,10 @@ namespace Loom
 		// on the object that holds the field. A press on the arrow only opens it.
 		bool NodeReleased();
 
+		#pragma endregion
+
+		#pragma region Inspector
+
 		void DrawInspector();
 		void DrawTransform(GameObject* gameObject, float column);
 		void DrawThread(GameObject* gameObject, float column);
@@ -499,6 +602,11 @@ namespace Loom
 		void DrawSourcePopup(const std::string& component);
 		void DrawFields(LoomObject& object, const std::vector<std::string>& labels, float column);
 		void DrawModelPreview();
+
+		#pragma endregion
+
+		#pragma region Views
+
 		void DrawScene();
 		void DrawPrefab();
 		void DrawGame();
@@ -529,6 +637,10 @@ namespace Loom
 		// with when it has focus, and fills it on a double-click of its tab.
 		void Watch(View view);
 
+		#pragma endregion
+
+		#pragma region Workspace
+
 		// The menu bar and the panels docked round the dock space.
 		void DrawWorkspace();
 
@@ -539,6 +651,10 @@ namespace Loom
 		void EnterFullscreen(View view);
 		void LeaveFullscreen();
 
+		#pragma endregion
+
+		#pragma region Views
+
 		// The bar along the top of the Game and Debug panels.
 		void DrawToolbar();
 
@@ -547,8 +663,17 @@ namespace Loom
 		// camera takes the mouse and keyboard, to fly it, and only one with a
 		// camera rings the selection, when it is given an outline to do it with.
 		void DrawView(EditorViewport& view, const std::vector<Scene*>& scenes, EditorCamera* camera, SelectionOutline* outline = nullptr);
+
+		#pragma endregion
+
+		#pragma region Info Panels
+
 		void DrawSceneData();
 		void DrawStats();
+
+		#pragma endregion
+
+		#pragma region Dialogs
 
 		// The first-run "where are your scenes?" prompt, the new project dialog,
 		// and the browsers behind every Browse... button.
@@ -556,7 +681,15 @@ namespace Loom
 		void DrawNewProjectPrompt();
 		void DrawFileDialogs();
 
+		#pragma endregion
+
+		#pragma region Shortcuts
+
 		void HandleShortcuts();
+
+		#pragma endregion
+
+		#pragma region History
 
 		// Syncs the prefabs and records a step once a scene has changed since
 		// the last time, which on a large scene takes long enough to be felt.
@@ -585,6 +718,10 @@ namespace Loom
 		// open files: what is dragged out of them lands in another window.
 		bool CanEditScenes(const ImGuiWindow* window) const;
 
+		#pragma endregion
+
+		#pragma region Snapshots
+
 		// One open scene as the text it serializes to, so it can be put back
 		// after the code behind it is replaced or after a run is thrown away.
 		struct SceneSnapshot
@@ -600,6 +737,10 @@ namespace Loom
 		// The scenes and prefab, and what was selected in them, as a rebuild
 		// found them or as they were opened while it ran.
 		void RestoreAfterBuild();
+
+		#pragma endregion
+
+		#pragma region Layouts
 
 		void BuildDefaultLayout(unsigned int dockspace_id);
 
@@ -624,6 +765,10 @@ namespace Loom
 		// Remembered in the settings file, so the next session names it too.
 		void SetCurrentLayout(const std::string& name);
 
+		#pragma endregion
+
+		#pragma region Queued Input
+
 		// Records the item just drawn as where a queued import goes, if the
 		// mouse is over it.
 		void TakeImportTarget(GameObject* gameObject);
@@ -636,6 +781,10 @@ namespace Loom
 		void CopyIntoProject(const std::string& file);
 		void ImportQueued();
 		void ClickQueued();
+
+		#pragma endregion
+
+		#pragma region Assets
 
 		// Rescans the project folder: the asset tree the Scenes tab draws,
 		// the scenes in it, the shaders and each FileTab's files.
@@ -671,6 +820,10 @@ namespace Loom
 		// else, or a texture that will not load.
 		const Texture* Thumbnail(const std::string& path);
 
+		#pragma endregion
+
+		#pragma region Asset Drops
+
 		// Whether an asset dropped in the Hierarchy at path has a GameObject
 		// to become under parent: a prefab not already around parent, a
 		// model, a texture or sprite, or a sound.
@@ -696,6 +849,10 @@ namespace Loom
 		// GameObject in the hierarchy, attaching it. Whether the drag was one.
 		bool DropScript(GameObject* gameObject);
 
+		#pragma endregion
+
+		#pragma region Reloads
+
 		// Recompiles the shaders whose files something else has written, every
 		// so often.
 		void PollShaders();
@@ -707,6 +864,10 @@ namespace Loom
 		// Has the instances of a prefab the Model panel saved take it as it
 		// now is.
 		void TakeSavedModels();
+
+		#pragma endregion
+
+		#pragma region Asset Creation
 
 		// Where the Create prompt's asset would be written: the file for most,
 		// the source for a script, which goes under the scripts project even
@@ -724,6 +885,10 @@ namespace Loom
 		// The path written, or an empty string when it could not be.
 		std::string CreateAsset();
 
+		#pragma endregion
+
+		#pragma region Project
+
 		// Reads <folder>/*.loomproject, if there is one, and hooks up the script
 		// library it names.
 		void LoadProjectFile();
@@ -732,9 +897,17 @@ namespace Loom
 		// library is in.
 		void PollScripts();
 
+		#pragma endregion
+
+		#pragma region Refresh
+
 		// Watches for the refresh's build to finish, and closes the editor
 		// once it has, unless it failed.
 		void PollRefresh();
+
+		#pragma endregion
+
+		#pragma region Saving
 
 		// Every owned scene, open shader and sprite, to its file. False when
 		// something could not be saved.
@@ -743,13 +916,25 @@ namespace Loom
 		// SaveActiveScene's choice of file, for any owned scene.
 		bool SaveToProject(Scene* scene);
 
+		#pragma endregion
+
+		#pragma region Play
+
 		// Switches updating on, keeping the state the scenes are in now so Stop
 		// has something to go back to.
 		void BeginPlay();
 
+		#pragma endregion
+
+		#pragma region Scenes
+
 		// Deletes every open scene here and now, rather than on the task queue:
 		// the callers are about to unload the code those scenes are made of.
 		void CloseAllScenes();
+
+		#pragma endregion
+
+		#pragma region Settings
 
 		// The chosen folder and the scene that was open in it, remembered beside
 		// the executable so the prompt is a first-run thing rather than an
@@ -757,9 +942,17 @@ namespace Loom
 		void LoadSettings();
 		void SaveSettings() const;
 
+		#pragma endregion
+
+		#pragma region Screenshots
+
 		// Writes the frame being drawn to the screenshot's path once it is
 		// finished, and ends the run if the screenshot asked to.
 		void CaptureFrame();
+
+		#pragma endregion
+
+		#pragma region Scene Loading
 
 		// Which of the project's scenes a session opens with: the one it was
 		// last on, or its only one. None when there is a choice to make, which
@@ -789,6 +982,10 @@ namespace Loom
 		// shows, or else the project's scenes to pick from.
 		void DrawNoScene();
 
+		#pragma endregion
+
+		#pragma region Selection
+
 		// Selection and the active scene are raw pointers into a hierarchy that
 		// edits itself between frames, so both are checked for liveness once per
 		// frame rather than trusted.
@@ -797,6 +994,10 @@ namespace Loom
 		// Whether the selection is root or under it. False once the selection is
 		// gone, which can happen partway through a frame.
 		bool IsSelectedIn(const GameObject& root) const;
+
+		#pragma endregion
+
+		#pragma region Prefabs
 
 		// The prefab as the file now has it, read again whenever the file
 		// changes. A change from outside the editor unlinks the prefab's
@@ -837,6 +1038,10 @@ namespace Loom
 		// The prefab tree drawn in the Hierarchy, under the open scenes.
 		void DrawPrefabNode();
 
+		#pragma endregion
+
+		#pragma region Views
+
 		EditorViewport m_sceneView;
 		EditorViewport m_gameView;
 		EditorViewport m_debugView;
@@ -846,6 +1051,10 @@ namespace Loom
 
 		SelectionOutline m_sceneOutline;
 		SelectionOutline m_debugOutline;
+
+		#pragma endregion
+
+		#pragma region Prefabs
 
 		// The Prefab panel: the prefab open in it, by its path from the project
 		// folder, the scene it is shown in, whose first child is the prefab
@@ -894,8 +1103,16 @@ namespace Loom
 		// edited, and its edit goes to the prefab and every other instance.
 		std::set<std::pair<std::string, std::string>> m_linkedInstances{ };
 
+		#pragma endregion
+
+		#pragma region Views
+
 		// Shared: unlike an outline, it keeps nothing the size of a view.
 		ColliderGizmos m_colliderGizmos;
+
+		#pragma endregion
+
+		#pragma region Builds
 
 		ScriptLibrary m_scripts;
 		EditorRefresh m_refresh;
@@ -905,6 +1122,10 @@ namespace Loom
 		BuildSettings m_buildSettings;
 
 		std::unique_ptr<EditorFileDialogs> m_dialogs;
+
+		#pragma endregion
+
+		#pragma region Scenes
 
 		Scene* m_activeScene = nullptr;
 		GameObject* m_selected = nullptr;
@@ -925,6 +1146,10 @@ namespace Loom
 		// A project on its way in, and what it waits on.
 		std::optional<ProjectLoad> m_projectLoad{ };
 
+		#pragma endregion
+
+		#pragma region Project
+
 		std::string m_projectPath{ };
 		std::string m_projectFile{ };
 
@@ -939,6 +1164,10 @@ namespace Loom
 
 		// The shaders from the last scan, which the Scripts tab lists.
 		std::vector<std::string> m_projectShaders{ };
+
+		#pragma endregion
+
+		#pragma region Project Panel
 
 		// A model file picked in the 3D tab, previewed in the Inspector
 		// in place of a GameObject.
@@ -971,6 +1200,8 @@ namespace Loom
 		// drawn, since opening one can rescan the tree being drawn.
 		std::string m_assetToOpen{ };
 
+		#pragma region Scripts Tab
+
 		// Where a script or shader is written, what the Scripts tab calls it,
 		// and whether it has been compiled.
 		struct ScriptEntry
@@ -1001,7 +1232,13 @@ namespace Loom
 		// Where the Create prompt's script is filed once it is written.
 		std::string m_newScriptFolder{ };
 
+		#pragma endregion
+
 		std::vector<FileTab> m_fileTabs{ std::begin(FileTabs::all), std::end(FileTabs::all) };
+
+		#pragma endregion
+
+		#pragma region Settings
 
 		// The scene a session opens with: what the settings file said last time,
 		// and then whichever one this session last made active.
@@ -1009,6 +1246,10 @@ namespace Loom
 
 		// The graphics API, font and look, edited in the Settings window.
 		EditorSettings m_settings;
+
+		#pragma endregion
+
+		#pragma region Play
 
 		// One entry per scene that was open when a rebuild started, and what a
 		// Stop pressed during that rebuild leaves behind for it to come back to.
@@ -1023,6 +1264,10 @@ namespace Loom
 		// scene open.
 		bool m_playing = false;
 		std::vector<SceneSnapshot> m_playSnapshots{ };
+
+		#pragma endregion
+
+		#pragma region History
 
 		SceneHistory m_history{ };
 		PlayHistory m_playHistory{ };
@@ -1048,6 +1293,10 @@ namespace Loom
 		// of. That edits nothing, so it marks nothing, since comparing a large
 		// scene takes long enough to stall the editor.
 		bool m_flyingView = false;
+
+		#pragma endregion
+
+		#pragma region Panels
 
 		bool m_showProject = true;
 		bool m_focusProject = false;
@@ -1094,6 +1343,10 @@ namespace Loom
 		bool m_stagesShown = false;
 #endif
 
+		#pragma endregion
+
+		#pragma region Layouts
+
 		bool m_firstFrame = true;
 		bool m_rebuildLayout = false;
 
@@ -1122,6 +1375,10 @@ namespace Loom
 		bool m_askForLayoutName = false;
 		char m_layoutName[EditorLayouts::MaxNameLength + 1]{ };
 
+		#pragma endregion
+
+		#pragma region Inspector
+
 		static constexpr size_t max_category_length = 128;
 
 		ComponentMenu m_componentMenu;
@@ -1134,9 +1391,17 @@ namespace Loom
 		// The source of the component whose popup is open, found as it opens.
 		SourceLine m_componentSource{ };
 
+		#pragma endregion
+
+		#pragma region Play
+
 		// Set by "Step": updating is switched on for exactly one frame and
 		// switched back off at the top of the next one.
 		bool m_steppedLastFrame = false;
+
+		#pragma endregion
+
+		#pragma region Dialogs
 
 		bool m_askForFolder = false;
 
@@ -1155,14 +1420,26 @@ namespace Loom
 		char m_newAssetName[128]{ };
 		std::string m_newAssetProblem{ };
 
+		#pragma endregion
+
+		#pragma region Tools
+
 		EditorConsole m_console;
 		KeyBindings m_keyBindings;
 		ShaderEditor m_shaders;
 		SpriteEditor m_sprites;
 		ModelEditor m_models;
 
+		#pragma endregion
+
+		#pragma region Inspector
+
 		char m_nameBuffer[128]{ };
 		const GameObject* m_nameBufferOwner = nullptr;
+
+		#pragma endregion
+
+		#pragma region Queued Input
 
 		// A file waiting to be imported, and where the mouse goes first when it
 		// came from a drop rather than a plain queue.
@@ -1201,6 +1478,10 @@ namespace Loom
 
 		std::vector<QueuedClick> m_clicks{ };
 
+		#pragma endregion
+
+		#pragma region Hierarchy
+
 		// The Hierarchy's open nodes, by m_ID so each copy of a scene opened
 		// twice has its own, and with their GUIDs: an undone delete and a
 		// prefab read again make new objects under the GUIDs they had. Scene
@@ -1221,8 +1502,16 @@ namespace Loom
 		bool m_renaming = false;
 		bool m_focusRename = false;
 
+		#pragma endregion
+
+		#pragma region Views
+
 		// Frames left in which the Scene view asks for focus.
 		int m_sceneFocusFrames = 0;
+
+		#pragma endregion
+
+		#pragma region Screenshots
 
 		std::string m_screenshotPath{ };
 		std::string m_screenshotWindow{ };
@@ -1230,6 +1519,12 @@ namespace Loom
 		bool m_screenshotExits = false;
 		int m_frame = 0;
 
+		#pragma endregion
+
+		#pragma region Scenes
+
 		int m_sceneCounter = 0;
+
+		#pragma endregion
 	};
 };

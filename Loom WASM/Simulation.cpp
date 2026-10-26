@@ -30,6 +30,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Constants
+
 		// As many as Unity's default.
 		constexpr int ITERATIONS = 6;
 
@@ -93,6 +95,10 @@ namespace Loom
 		constexpr float SPHERE_INERTIA = 2.0f / 5.0f;
 		constexpr float HALF = 0.5f;
 
+		#pragma endregion
+
+		#pragma region Wide Lanes
+
 #if defined(_M_X64) || defined(__SSE2__)
 		// The four lanes of a vec4 at once.
 		struct Wide
@@ -125,6 +131,10 @@ namespace Loom
 		float Sum(Wide wide) { return wide.x + wide.y + wide.z + wide.w; };
 #endif
 
+		#pragma endregion
+
+		#pragma region Helpers
+
 		glm::vec3 Perpendicular(const glm::vec3& normal)
 		{
 			// Crossed with an axis it is far from parallel to.
@@ -143,7 +153,11 @@ namespace Loom
 
 			return false;
 		};
+
+		#pragma endregion
 	};
+
+	#pragma region Joining
 
 	Simulation::Simulation(ColliderTree& tree) :
 		m_tree(tree)
@@ -266,6 +280,10 @@ namespace Loom
 		return true;
 	};
 
+	#pragma endregion
+
+	#pragma region Solver Thread
+
 #ifndef __EMSCRIPTEN__
 	struct Simulation::Solver
 	{
@@ -334,6 +352,10 @@ namespace Loom
 		solver.solved.wait(lock, [&]() { return std::ranges::find(solver.queue, this) == solver.queue.end(); });
 #endif
 	};
+
+	#pragma endregion
+
+	#pragma region Stepping
 
 	Simulation::~Simulation()
 	{
@@ -493,6 +515,10 @@ namespace Loom
 		m_noted.clear();
 	};
 
+	#pragma endregion
+
+	#pragma region Phases
+
 	void Simulation::ReadyBodies(float seconds)
 	{
 		// Once the tree is in step, so a collider attached since the body
@@ -630,6 +656,10 @@ namespace Loom
 			});
 	};
 
+	#pragma endregion
+
+	#pragma region Bodies
+
 	Simulation::Key Simulation::Ordered(const Collider* a, const Collider* b)
 	{
 		return a->m_made < b->m_made ? Key{ a, b } : Key{ b, a };
@@ -725,6 +755,10 @@ namespace Loom
 		if (Weigh(sleeper))
 			sleeper.awake = true;
 	};
+
+	#pragma endregion
+
+	#pragma region Gathering
 
 	void Simulation::Gather()
 	{
@@ -962,6 +996,10 @@ namespace Loom
 		out.pairs.push_back(pair);
 	};
 
+	#pragma endregion
+
+	#pragma region Contact Preparation
+
 	void Simulation::Prepare(Pair& pair, float seconds)
 	{
 		if (pair.trigger)
@@ -1046,6 +1084,10 @@ namespace Loom
 
 		};
 	};
+
+	#pragma endregion
+
+	#pragma region Slabs
 
 	void Simulation::Partition()
 	{
@@ -1234,6 +1276,10 @@ namespace Loom
 			});
 	};
 
+	#pragma endregion
+
+	#pragma region Impulses
+
 	Simulation::Body* Simulation::Solved(int body)
 	{
 		return body != NONE && m_bodies[body].inverseMass > 0.0f ? &m_bodies[body] : nullptr;
@@ -1308,6 +1354,10 @@ namespace Loom
 			normal.impulse = total;
 		};
 	};
+
+	#pragma endregion
+
+	#pragma region Integration
 
 	void Simulation::Integrate(Body& body, float seconds)
 	{
@@ -1435,6 +1485,10 @@ namespace Loom
 		return false;
 	};
 
+	#pragma endregion
+
+	#pragma region Moving
+
 	int Simulation::Depth(const GameObject& object)
 	{
 		int depth = 0;
@@ -1478,6 +1532,10 @@ namespace Loom
 			};
 		};
 	};
+
+	#pragma endregion
+
+	#pragma region Reporting
 
 	void Simulation::Report()
 	{
@@ -1621,4 +1679,6 @@ namespace Loom
 			part(candidate);
 		};
 	};
+
+	#pragma endregion
 };

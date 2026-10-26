@@ -49,6 +49,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Constants
+
 		// Fields take files by ASSET_PAYLOAD, so a folder goes by its own.
 		constexpr const char* FOLDER_PAYLOAD = "LoomFolder";
 
@@ -79,6 +81,10 @@ namespace Loom
 		// How far NewShader, NewShader1, ... counts before leaving the name to
 		// the user to sort out.
 		constexpr int maxDefaultNameSuffix = 1000;
+
+		#pragma endregion
+
+		#pragma region Asset Kinds
 
 		struct AssetKindInfo
 		{
@@ -165,6 +171,10 @@ namespace Loom
 			return nullptr;
 		};
 
+		#pragma endregion
+
+		#pragma region Icons
+
 		// What each tab lists, in the order its filter shows them.
 		constexpr KindFilter::Kind projectKinds[] =
 		{
@@ -242,6 +252,10 @@ namespace Loom
 				thumbnailBottom);
 		};
 
+		#pragma endregion
+
+		#pragma region Scanning
+
 		// The scenes and prefabs, and the folders they are in: folders first,
 		// then files, each alphabetically. Dot-prefixed folders (.vs) and the
 		// build output are left out, and so is a folder whose files are all
@@ -313,6 +327,10 @@ namespace Loom
 			return held;
 		};
 
+		#pragma endregion
+
+		#pragma region Shell
+
 		void Shell(const char* file, const std::string& parameters)
 		{
 			const HINSTANCE result = ShellExecuteA(
@@ -365,6 +383,10 @@ namespace Loom
 			else
 				OpenAsText(path);
 		};
+
+		#pragma endregion
+
+		#pragma region Visual Studio
 
 		using Microsoft::WRL::ComPtr;
 
@@ -636,6 +658,10 @@ namespace Loom
 				}).detach();
 		};
 
+		#pragma endregion
+
+		#pragma region Models
+
 		// The model as a prefab of it holds it, empty when it cannot be read.
 		// Imported into a scene of its own, deleted as a closed scene is.
 		std::string ImportedPrefab(const std::string& path)
@@ -660,7 +686,11 @@ namespace Loom
 
 			return text;
 		};
+
+		#pragma endregion
 	};
+
+	#pragma region Project Panel
 
 	void Editor::RefreshProjectAssets()
 	{
@@ -838,6 +868,10 @@ namespace Loom
 		m_projectTabToShow = tab;
 	};
 
+	#pragma endregion
+
+	#pragma region Scenes Tab
+
 	void Editor::DrawScenes()
 	{
 		// Something new is selected to be shown, which the search or the
@@ -1011,6 +1045,10 @@ namespace Loom
 			std::ranges::any_of(node.children, [this](const AssetNode& child) { return ShowsAsset(child); });
 	};
 
+	#pragma endregion
+
+	#pragma region Create Menus
+
 	void Editor::DrawAssetContextMenu(const AssetNode& node)
 	{
 		if (!ImGui::BeginPopupContextItem())
@@ -1071,6 +1109,10 @@ namespace Loom
 
 		ImGui::EndMenu();
 	};
+
+	#pragma endregion
+
+	#pragma region Creating Assets
 
 	void Editor::AskForAsset(AssetKind kind, const std::string& folder)
 	{
@@ -1285,6 +1327,10 @@ namespace Loom
 		return path;
 	};
 
+	#pragma endregion
+
+	#pragma region Visual Studio
+
 	void Editor::OpenInVisualStudio(const std::string& path, int line, int column)
 	{
 		// A hand-written project need not have a solution beside it, even though
@@ -1311,6 +1357,10 @@ namespace Loom
 		else
 			Shell(devenv.c_str(), "/Edit \"" + path + '"');
 	};
+
+	#pragma endregion
+
+	#pragma region Opening Scenes
 
 	void Editor::BeginOpeningScene(const std::string& path)
 	{
@@ -1484,6 +1534,10 @@ namespace Loom
 			OpenSceneAlone(chosen);
 	};
 
+	#pragma endregion
+
+	#pragma region Opening Assets
+
 	void Editor::OpenAsset(const std::string& path)
 	{
 		if (IsModelFile(path))
@@ -1577,6 +1631,10 @@ namespace Loom
 		return true;
 	};
 
+	#pragma endregion
+
+	#pragma region Thumbnails
+
 	const Texture* Editor::Thumbnail(const std::string& path)
 	{
 		if (!ProjectAssets::IsTextureFile(path) || m_noThumbnail.contains(path))
@@ -1591,6 +1649,10 @@ namespace Loom
 
 		return nullptr;
 	};
+
+	#pragma endregion
+
+	#pragma region Moving Assets
 
 	void Editor::DragAsset(const AssetNode& node)
 	{
@@ -1749,6 +1811,10 @@ namespace Loom
 		m_revealSelectedAsset = true;
 	};
 
+	#pragma endregion
+
+	#pragma region Creating Assets
+
 	void Editor::DrawCreateAssetPrompt()
 	{
 		if (!m_askForAsset)
@@ -1813,6 +1879,10 @@ namespace Loom
 		ImGui::End();
 	};
 
+	#pragma endregion
+
+	#pragma region Project Files
+
 	std::string Editor::ScriptFoldersFile() const
 	{
 		return m_projectFile.empty()
@@ -1838,6 +1908,10 @@ namespace Loom
 		if (const std::string file = InputActionsFile(); !InputActions::Save(file))
 			std::cerr << "Key Bindings: could not write them to " << file << std::endl;
 	};
+
+	#pragma endregion
+
+	#pragma region Scripts Tab
 
 	void Editor::RefreshScripts()
 	{
@@ -2060,6 +2134,10 @@ namespace Loom
 		ImGui::EndPopup();
 	};
 
+	#pragma endregion
+
+	#pragma region Project Files
+
 	std::string Editor::FileFoldersFile(const FileTab& tab) const
 	{
 		return m_projectFile.empty()
@@ -2072,6 +2150,10 @@ namespace Loom
 		if (const std::string file = FileFoldersFile(tab); !tab.Save(file))
 			std::cerr << tab.kind.name << ": could not write the folders to " << file << std::endl;
 	};
+
+	#pragma endregion
+
+	#pragma region Revealing Files
 
 	FileTab* Editor::FileTabOf(const std::string& path)
 	{
@@ -2250,6 +2332,10 @@ namespace Loom
 		m_pingedSince = ImGui::GetTime();
 	};
 
+	#pragma endregion
+
+	#pragma region Scripts Tab
+
 	FolderTree::Hooks Editor::ScriptFolderHooks()
 	{
 		FolderTree::Hooks hooks;
@@ -2264,6 +2350,10 @@ namespace Loom
 
 		return hooks;
 	};
+
+	#pragma endregion
+
+	#pragma region File Tabs
 
 	void Editor::DrawFileTab(FileTab& tab)
 	{
@@ -2431,4 +2521,6 @@ namespace Loom
 
 		return hooks;
 	};
+
+	#pragma endregion
 };

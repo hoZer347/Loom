@@ -19,6 +19,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Constants
+
 		constexpr int channels = 4;
 		constexpr int alpha = 3;
 
@@ -97,6 +99,10 @@ namespace Loom
 
 		constexpr ImGuiKey swap_key = ImGuiKey_X;
 
+		#pragma endregion
+
+		#pragma region Colours
+
 		// First in every palette, whether its file has it or not, and painting
 		// as the eraser does.
 		constexpr SpriteAsset::Colour clear{ };
@@ -119,6 +125,10 @@ namespace Loom
 			return swatch == chosen || (SeeThrough(swatch) && SeeThrough(chosen));
 		};
 
+		#pragma endregion
+
+		#pragma region Tools
+
 		constexpr ImGuiMouseButton paint_buttons[] = { ImGuiMouseButton_Left, ImGuiMouseButton_Right };
 		static_assert(std::size(paint_buttons) == SpriteEditor::paintButtons);
 		constexpr const char* button_names[] = { "Left", "Right" };
@@ -137,6 +147,10 @@ namespace Loom
 			{ SpriteEditor::Tool::Fill, "Fill", ImGuiKey_G },
 			{ SpriteEditor::Tool::Picker, "Picker", ImGuiKey_I },
 		};
+
+		#pragma endregion
+
+		#pragma region Helpers
 
 		ImU32 ToImGui(const SpriteAsset::Colour& colour)
 		{
@@ -167,7 +181,11 @@ namespace Loom
 
 			return path.string();
 		};
+
+		#pragma endregion
 	};
+
+	#pragma region Opening
 
 	void SpriteEditor::Open(const std::string& path)
 	{
@@ -266,6 +284,10 @@ namespace Loom
 		return std::exchange(m_saved, { });
 	};
 
+	#pragma endregion
+
+	#pragma region Windows
+
 	void SpriteEditor::Draw(bool* open, bool* palette_open)
 	{
 		if (m_focusFrames > 0)
@@ -363,6 +385,10 @@ namespace Loom
 		DrawTimeline(document, timeline_height);
 		DrawStatus(document, palette_open, palette_shown);
 	};
+
+	#pragma endregion
+
+	#pragma region Canvas
 
 	void SpriteEditor::DrawCanvas(Document& document, const ImVec2& size)
 	{
@@ -514,6 +540,10 @@ namespace Loom
 
 		draw->PopClipRect();
 	};
+
+	#pragma endregion
+
+	#pragma region Timeline
 
 	void SpriteEditor::DrawTimeline(Document& document, float height)
 	{
@@ -855,6 +885,10 @@ namespace Loom
 		};
 	};
 
+	#pragma endregion
+
+	#pragma region Status
+
 	void SpriteEditor::DrawStatus(Document& document, bool* palette_open, bool palette_shown)
 	{
 		if (document.outside)
@@ -926,6 +960,10 @@ namespace Loom
 			ImGui::TextDisabled("  %d, %d  #%02X%02X%02X%02X", document.hoverX, document.hoverY, colour[0], colour[1], colour[2], colour[3]);
 		};
 	};
+
+	#pragma endregion
+
+	#pragma region Palette Window
 
 	void SpriteEditor::DrawPalette(bool* open, const std::string& project_folder)
 	{
@@ -1137,6 +1175,10 @@ namespace Loom
 		ImGui::SetItemTooltip("Take the left colour out of the palette");
 	};
 
+	#pragma endregion
+
+	#pragma region Tool Shortcuts
+
 	void SpriteEditor::ToolShortcuts()
 	{
 		for (const ToolInfo& info : tools)
@@ -1146,6 +1188,10 @@ namespace Loom
 		if (ImGui::Shortcut(swap_key))
 			std::swap(m_colours[ImGuiMouseButton_Left], m_colours[ImGuiMouseButton_Right]);
 	};
+
+	#pragma endregion
+
+	#pragma region Palettes
 
 	const std::string& SpriteEditor::PalettePath() const
 	{
@@ -1177,6 +1223,10 @@ namespace Loom
 
 		return palette;
 	};
+
+	#pragma endregion
+
+	#pragma region Painting
 
 	const SpriteAsset::Image& SpriteEditor::Shown(Document& document)
 	{
@@ -1268,6 +1318,10 @@ namespace Loom
 		document.stale = true;
 	};
 
+	#pragma endregion
+
+	#pragma region Playback
+
 	void SpriteEditor::Play(Document& document)
 	{
 		if (!document.playing || document.sprite.Frames() == 1)
@@ -1285,6 +1339,10 @@ namespace Loom
 			document.stale = true;
 		};
 	};
+
+	#pragma endregion
+
+	#pragma region History
 
 	void SpriteEditor::Remember(Document& document)
 	{
@@ -1323,6 +1381,10 @@ namespace Loom
 		Edited(document);
 	};
 
+	#pragma endregion
+
+	#pragma region View
+
 	void SpriteEditor::Fit(Document& document, const ImVec2& size)
 	{
 		const SpriteAsset& sprite = document.sprite;
@@ -1359,6 +1421,10 @@ namespace Loom
 		document.zoom = zoom;
 	};
 
+	#pragma endregion
+
+	#pragma region Saving
+
 	bool SpriteEditor::SaveAll()
 	{
 		bool saved = true;
@@ -1390,6 +1456,10 @@ namespace Loom
 
 		return true;
 	};
+
+	#pragma endregion
+
+	#pragma region Closing
 
 	void SpriteEditor::DrawCloseQuestion()
 	{
@@ -1438,4 +1508,6 @@ namespace Loom
 
 		std::erase_if(m_documents, [document](const std::unique_ptr<Document>& open) { return open.get() == document; });
 	};
+
+	#pragma endregion
 };

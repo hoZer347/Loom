@@ -70,6 +70,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Inspector
+
 		constexpr float rotation_drag_speed = 0.5f;
 
 		constexpr int selection_frames = 60;
@@ -80,6 +82,10 @@ namespace Loom
 		// A category of a component's fields, inside that component's own
 		// header, folded until it is opened.
 		constexpr ImGuiTreeNodeFlags field_group_flags = ImGuiTreeNodeFlags_SpanAvailWidth;
+
+		#pragma endregion
+
+		#pragma region Field Groups
 
 		// One thing an object's inspector draws: a field or a Button, by where
 		// it is in their list, or a group of them, by where it is in its
@@ -172,6 +178,10 @@ namespace Loom
 			};
 		};
 
+		#pragma endregion
+
+		#pragma region Utilities
+
 		bool AnyMouseClicked()
 		{
 			for (int button = 0; button < ImGuiMouseButton_COUNT; button++)
@@ -201,6 +211,10 @@ namespace Loom
 
 			return nullptr;
 		};
+
+		#pragma endregion
+
+		#pragma region Paths
 
 		// Sits beside the executable and holds what the editor remembers between
 		// runs. Beside the executable rather than in the working directory,
@@ -287,12 +301,20 @@ namespace Loom
 			return demos;
 		};
 
+		#pragma endregion
+
+		#pragma region Timing
+
 		// A window docked on the frame it first appears only takes its tab on
 		// the one after.
 		constexpr int scene_focus_frames = 2;
 
 		// How often the editor checks whether a shader file was edited outside it.
 		constexpr double shader_poll_seconds = 0.5;
+
+		#pragma endregion
+
+		#pragma region Hierarchy Eye
 
 		// The Hierarchy's eye, against the font size: its half-width, how far
 		// its lids bow from the middle, its pupil, and its lashes when closed.
@@ -363,6 +385,10 @@ namespace Loom
 			};
 		};
 
+		#pragma endregion
+
+		#pragma region File Drops
+
 		// GLFW's drop callback carries no user data, and there is one editor.
 		Editor* drop_receiver = nullptr;
 
@@ -398,6 +424,10 @@ namespace Loom
 					glfwSetDropCallback((GLFWwindow*)viewport->PlatformHandle, callback);
 		};
 
+		#pragma endregion
+
+		#pragma region Panels
+
 		// What is docked in the middle: the views, and the shader, sprite and
 		// model editors.
 		constexpr const char* centre_windows[] = { EditorPanels::SceneId, EditorPanels::Game, EditorPanels::Debug, EditorPanels::PrefabId, EditorPanels::Shaders, EditorPanels::Sprites, EditorPanels::Model };
@@ -417,6 +447,10 @@ namespace Loom
 			"Right mouse: look, with WASD and QE to fly (Shift for faster)\n"
 			"Middle mouse: pan\n"
 			"Wheel: in and out";
+
+		#pragma endregion
+
+		#pragma region Labels
 
 		// Inspector field names longer than this are cut, however wide the panel.
 		constexpr size_t max_label_chars = 20;
@@ -512,6 +546,10 @@ namespace Loom
 			};
 		};
 
+		#pragma endregion
+
+		#pragma region Sprites
+
 		bool IsSpriteSource(const std::string& path)
 		{
 			return std::filesystem::path(path).extension() == SpriteAsset::extension || ProjectAssets::IsTextureFile(path);
@@ -527,6 +565,10 @@ namespace Loom
 
 			return path;
 		};
+
+		#pragma endregion
+
+		#pragma region Dragging
 
 		// Components carry no name of their own, so one is shown as its type on
 		// the GameObject that holds it.
@@ -580,6 +622,10 @@ namespace Loom
 
 			return field.ReferenceFor(LoomObject::GetByGuid(*(const Guid*)payload->Data));
 		};
+
+		#pragma endregion
+
+		#pragma region Fields
 
 		// The index among object's fields of the one whose value is at data.
 		size_t FieldAt(const LoomObject& object, const void* data)
@@ -712,7 +758,11 @@ namespace Loom
 
 			return changed;
 		};
+
+		#pragma endregion
 	};
+
+	#pragma region Construction
 
 	Editor::Editor() :
 		m_dialogs(std::make_unique<EditorFileDialogs>())
@@ -789,6 +839,10 @@ namespace Loom
 
 		EditorLog::Get().Uninstall();
 	};
+
+	#pragma endregion
+
+	#pragma region Settings
 
 	Backend Editor::SavedBackend()
 	{
@@ -887,6 +941,10 @@ namespace Loom
 			? m_projectScenes.front()
 			: "";
 	};
+
+	#pragma endregion
+
+	#pragma region Project
 
 	bool Editor::OpenProject(const std::string& path, bool open_scene)
 	{
@@ -1044,6 +1102,10 @@ namespace Loom
 		return true;
 	};
 
+	#pragma endregion
+
+	#pragma region Scenes
+
 	Scene* Editor::CreateScene(const std::string& name)
 	{
 		Scene* scene = new Scene(name);
@@ -1127,6 +1189,10 @@ namespace Loom
 		return true;
 	};
 
+	#pragma endregion
+
+	#pragma region Saving
+
 	bool Editor::SaveScene(Scene* scene, const std::string& path)
 	{
 		if (scene == nullptr)
@@ -1203,6 +1269,10 @@ namespace Loom
 		return saved;
 	};
 
+	#pragma endregion
+
+	#pragma region Refresh
+
 	void Editor::FullRefresh()
 	{
 		if (!IsRefreshing())
@@ -1240,6 +1310,10 @@ namespace Loom
 
 		return scene != m_scenePaths.end() ? scene->second : m_projectPath;
 	};
+
+	#pragma endregion
+
+	#pragma region Scenes
 
 	bool Editor::IsOwned(Scene* scene) const
 	{
@@ -1306,6 +1380,10 @@ namespace Loom
 		m_showScene = true;
 		m_sceneFocusFrames = scene_focus_frames;
 	};
+
+	#pragma endregion
+
+	#pragma region Prefabs
 
 	void Editor::OpenPrefab(const std::string& path)
 	{
@@ -1378,6 +1456,10 @@ namespace Loom
 		return root && Hierarchy::Contains(m_prefabScene->GetRoot(), root) ? root : nullptr;
 	};
 
+	#pragma endregion
+
+	#pragma region Selection
+
 	void Editor::Select(GameObject* gameObject)
 	{
 		m_selected = gameObject;
@@ -1393,6 +1475,10 @@ namespace Loom
 		m_selectedModel = path;
 		m_selectedAsset = std::filesystem::path(path).lexically_normal().string();
 	};
+
+	#pragma endregion
+
+	#pragma region Editing
 
 	void Editor::DeleteSelected()
 	{
@@ -1439,6 +1525,10 @@ namespace Loom
 
 		m_historyDirty = true;
 	};
+
+	#pragma endregion
+
+	#pragma region History
 
 	void Editor::Undo()
 	{
@@ -1581,6 +1671,10 @@ namespace Loom
 		m_history.TakeChanged();
 	};
 
+	#pragma endregion
+
+	#pragma region Shortcuts
+
 	void Editor::HandleShortcuts()
 	{
 		// Wherever the keyboard is: it is about the whole editor.
@@ -1610,6 +1704,10 @@ namespace Loom
 			break;
 		};
 	};
+
+	#pragma endregion
+
+	#pragma region Selection
 
 	bool Editor::IsSelectedIn(const GameObject& root) const
 	{
@@ -1671,6 +1769,10 @@ namespace Loom
 
 		Select(nullptr);
 	};
+
+	#pragma endregion
+
+	#pragma region Frame
 
 	void Editor::DrawGui()
 	{
@@ -1800,6 +1902,10 @@ namespace Loom
 
 		return root != ImGui::FindWindowByName(EditorPanels::Project) || m_projectTab == ProjectTabs::Scenes;
 	};
+
+	#pragma endregion
+
+	#pragma region Workspace
 
 	void Editor::DrawWorkspace()
 	{
@@ -2031,6 +2137,10 @@ namespace Loom
 		m_windowFullscreen.Leave(Engine::window);
 	};
 
+	#pragma endregion
+
+	#pragma region Screenshots
+
 	void Editor::CaptureFrame()
 	{
 		if (m_screenshotWindow.empty())
@@ -2053,6 +2163,10 @@ namespace Loom
 		m_screenshotExits = exit_after;
 		m_frame = 0;
 	};
+
+	#pragma endregion
+
+	#pragma region Layouts
 
 	void Editor::BuildDefaultLayout(unsigned int dockspace_id)
 	{
@@ -2237,6 +2351,10 @@ namespace Loom
 		ImGui::End();
 	};
 
+	#pragma endregion
+
+	#pragma region Main Menu
+
 	void Editor::DrawMainMenuBar()
 	{
 		if (!ImGui::BeginMainMenuBar())
@@ -2417,6 +2535,10 @@ namespace Loom
 		ImGui::EndMainMenuBar();
 	};
 
+	#pragma endregion
+
+	#pragma region Dialogs
+
 	void Editor::DrawFolderPrompt()
 	{
 		if (!m_askForFolder)
@@ -2532,6 +2654,12 @@ namespace Loom
 			SaveBuildSettings();
 		};
 	};
+
+	#pragma endregion
+
+	#pragma region Hierarchy
+
+	#pragma region Nodes
 
 	void Editor::DrawHierarchy()
 	{
@@ -2830,6 +2958,10 @@ namespace Loom
 		return most.empty() ? ProjectAssets::ProjectShader(m_projectPath) : most;
 	};
 
+	#pragma endregion
+
+	#pragma region Open Rows
+
 	void Editor::DrawChildNodes(GameObject& parent, bool disabled, bool in_prefab)
 	{
 		const ImRect& clip = ImGui::GetCurrentWindow()->ClipRect;
@@ -2926,6 +3058,10 @@ namespace Loom
 		else
 			m_openNodes.erase(node.m_ID);
 	};
+
+	#pragma endregion
+
+	#pragma region Row Input
 
 	void Editor::DrawEnableToggle(GameObject* gameObject, bool parent_disabled, const ImRect& eye)
 	{
@@ -3084,6 +3220,12 @@ namespace Loom
 			!m_nodePressOpened;
 	};
 
+	#pragma endregion
+
+	#pragma endregion
+
+	#pragma region Asset Drops
+
 	bool Editor::CanPlace(const std::string& path, const GameObject& parent) const
 	{
 		// A prefab inside itself would take in its own every edit.
@@ -3211,6 +3353,10 @@ namespace Loom
 		return true;
 	};
 
+	#pragma endregion
+
+	#pragma region Reloads
+
 	void Editor::PollShaders()
 	{
 		if (ImGui::GetTime() - m_shadersPolled < shader_poll_seconds)
@@ -3233,6 +3379,12 @@ namespace Loom
 		if (!m_models.TakeSaved().empty())
 			m_historyDirty = true;
 	};
+
+	#pragma endregion
+
+	#pragma region Inspector
+
+	#pragma region Panel
 
 	void Editor::DrawInspector()
 	{
@@ -3330,6 +3482,10 @@ namespace Loom
 		ImGui::End();
 	};
 
+	#pragma endregion
+
+	#pragma region Add Component
+
 	void Editor::DrawComponentMenu(GameObject* gameObject, const ComponentMenu::Node& node)
 	{
 		for (const ComponentMenu::Node& child : node.children)
@@ -3401,6 +3557,10 @@ namespace Loom
 			std::cerr << "Could not write the component categories to " << m_projectFile << std::endl;
 	};
 
+	#pragma endregion
+
+	#pragma region Source
+
 	Editor::SourceLine Editor::FindSource(const std::string& component) const
 	{
 		std::vector<std::string> files{ };
@@ -3442,6 +3602,10 @@ namespace Loom
 
 		ImGui::EndPopup();
 	};
+
+	#pragma endregion
+
+	#pragma region Model Preview
 
 	void Editor::DrawModelPreview()
 	{
@@ -3491,6 +3655,10 @@ namespace Loom
 		if (ImGui::IsItemHovered())
 			ImGui::SetTooltip("Into the active scene");
 	};
+
+	#pragma endregion
+
+	#pragma region Transform
 
 	void Editor::DrawTransform(GameObject* gameObject, float column)
 	{
@@ -3567,6 +3735,10 @@ namespace Loom
 
 		ImGui::PopItemWidth();
 	};
+
+	#pragma endregion
+
+	#pragma region Components
 
 	void Editor::DrawComponent(GameObject* gameObject, ComponentBase* component)
 	{
@@ -3699,6 +3871,10 @@ namespace Loom
 
 		ImGui::EndDragDropTarget();
 	};
+
+	#pragma endregion
+
+	#pragma region Fields
 
 	void Editor::DrawFields(LoomObject& object, const std::vector<std::string>& labels, float column)
 	{
@@ -3859,6 +4035,12 @@ namespace Loom
 		ImGui::PopItemWidth();
 	};
 
+	#pragma endregion
+
+	#pragma endregion
+
+	#pragma region Views
+
 	void Editor::DrawScene()
 	{
 		const std::string title =
@@ -3931,6 +4113,10 @@ namespace Loom
 		else DrawView(m_prefabView, { m_prefabScene }, &m_prefabCamera, &m_prefabOutline);
 	};
 
+	#pragma endregion
+
+	#pragma region Prefabs
+
 	void Editor::DrawPrefabNode()
 	{
 		GameObject* root = GetPrefabRoot();
@@ -3943,6 +4129,10 @@ namespace Loom
 
 		DrawGameObjectNode(root, false, false);
 	};
+
+	#pragma endregion
+
+	#pragma region Views
 
 	void Editor::DrawGame()
 	{
@@ -4145,6 +4335,10 @@ namespace Loom
 				ImVec2(1.0f, 0.0f));// so the V axis is flipped
 	};
 
+	#pragma endregion
+
+	#pragma region Queued Input
+
 	void Editor::QueueImport(const std::string& path)
 	{
 		m_importQueue.push_back(QueuedImport{ path });
@@ -4293,6 +4487,10 @@ namespace Loom
 		m_revealSelectedAsset = true;
 	};
 
+	#pragma endregion
+
+	#pragma region Info Panels
+
 	void Editor::DrawSceneData()
 	{
 		if (ImGui::Begin(EditorPanels::SceneData, &m_showSceneData))
@@ -4373,5 +4571,7 @@ namespace Loom
 
 		ImGui::End();
 	};
+
+	#pragma endregion
 
 };

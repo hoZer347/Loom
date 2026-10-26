@@ -32,10 +32,16 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Settings
+
 		constexpr uint32_t API_VERSION = VK_API_VERSION_1_3;
 		constexpr uint32_t FRAMES_IN_FLIGHT = 2;
 
 		constexpr size_t RGBA = 4;
+
+		#pragma endregion
+
+		#pragma region Pipeline Keys
 
 		// Where each part of a pipeline's key sits: the topology in the low
 		// byte, then the colour format, then whether there is depth, then
@@ -73,6 +79,10 @@ namespace Loom
 			};
 		};
 
+		#pragma endregion
+
+		#pragma region Resources
+
 		constexpr VkFormat COLOR_TARGET_FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
 		constexpr VkFormat DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
 
@@ -81,6 +91,10 @@ namespace Loom
 		constexpr VkDeviceSize CHUNK_SIZE = 4 * 1024 * 1024;
 
 		constexpr uint32_t IMGUI_DESCRIPTORS = 1024;
+
+		#pragma endregion
+
+		#pragma region Vertex Layout
 
 		constexpr uint32_t POSITION_LOCATION = 0;
 		constexpr uint32_t UV_LOCATION = 1;
@@ -127,6 +141,10 @@ namespace Loom
 			return format == VertexFormat::PositionUVNormal || format == VertexFormat::PositionUVNormalColor;
 		};
 
+		#pragma endregion
+
+		#pragma region Lookups
+
 		// The GL primitives Mesh serialises.
 		enum GLPrimitive : uint32_t
 		{
@@ -168,6 +186,10 @@ namespace Loom
 			};
 		};
 
+		#pragma endregion
+
+		#pragma region Diagnostics
+
 		bool Succeeded(VkResult result, const char* what)
 		{
 			if (result == VK_SUCCESS)
@@ -186,6 +208,10 @@ namespace Loom
 			std::cerr << "Vulkan Debug: " << data->pMessage << std::endl;
 			return VK_FALSE;
 		};
+
+		#pragma endregion
+
+		#pragma region Device Support
 
 #ifndef NDEBUG
 		bool HasLayer(const char* name)
@@ -223,10 +249,14 @@ namespace Loom
 			// GL's -1 to 1 clip space depth, so shaders and projections carry over.
 			VK_EXT_DEPTH_CLIP_CONTROL_EXTENSION_NAME,
 		};
+
+		#pragma endregion
 	};
 
 	struct VulkanRenderer final : Renderer
 	{
+		#pragma region Lifetime
+
 		VulkanRenderer()
 		{
 			glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -273,6 +303,10 @@ namespace Loom
 			if (m_instance)		vkDestroyInstance(m_instance, nullptr);
 		};
 
+		#pragma endregion
+
+		#pragma region Window
+
 		Backend GetBackend() const override
 		{
 			return Backend::Vulkan;
@@ -314,6 +348,10 @@ namespace Loom
 
 			return m_fallbackColor && m_fallbackDepth;
 		};
+
+		#pragma endregion
+
+		#pragma region ImGui
 
 		void InitImGui(GLFWwindow* window) override
 		{
@@ -386,6 +424,10 @@ namespace Loom
 			ImGui::UpdatePlatformWindows();
 			ImGui::RenderPlatformWindowsDefault();
 		};
+
+		#pragma endregion
+
+		#pragma region Frames
 
 		void BeginFrame() override
 		{
@@ -509,6 +551,10 @@ namespace Loom
 		{
 			m_capture = handler;
 		};
+
+		#pragma endregion
+
+		#pragma region Programs
 
 		uint32_t CreateProgram(const std::string& name, const std::string& vertex, const std::string& fragment) override
 		{
@@ -640,6 +686,10 @@ namespace Loom
 			if (found != m_programs.end())
 				found->second.pixelated = pixelated;
 		};
+
+		#pragma endregion
+
+		#pragma region Drawing
 
 		void Draw(uint32_t handle, uint32_t primitive, const float* vertices, size_t count, uint32_t, VertexFormat format) override
 		{
@@ -863,6 +913,10 @@ namespace Loom
 			vkCmdDraw(command, (uint32_t)drawn, (uint32_t)instances, 0, 0);
 		};
 
+		#pragma endregion
+
+		#pragma region Textures
+
 		uint32_t CreateTexture(int width, int height, const uint8_t* rgba) override
 		{
 			Texture texture;
@@ -1005,6 +1059,10 @@ namespace Loom
 				DestroyTexture(depthView);
 		};
 
+		#pragma endregion
+
+		#pragma region Targets
+
 		void PushTarget(uint32_t target) override
 		{
 			EndRendering();
@@ -1047,6 +1105,10 @@ namespace Loom
 				ClearInPass(target);
 		};
 
+		#pragma endregion
+
+		#pragma region Render State
+
 		void SetDepthBias(float slope, float constant) override
 		{
 			m_biasSlope = slope;
@@ -1068,6 +1130,10 @@ namespace Loom
 			if (m_rendering)
 				vkCmdSetDepthCompareOp(Command(), m_depthCompare);
 		};
+
+		#pragma endregion
+
+		#pragma region Queries
 
 		glm::ivec2 TargetSize() const override
 		{
@@ -1101,7 +1167,11 @@ namespace Loom
 			return (void*)texture.imgui;
 		};
 
+		#pragma endregion
+
 	private:
+		#pragma region Types
+
 		// The window, as a target.
 		static constexpr uint32_t WINDOW = 0;
 
@@ -1242,6 +1312,10 @@ namespace Loom
 			int width = 0;
 			int height = 0;
 		};
+
+		#pragma endregion
+
+		#pragma region Device
 
 		bool CreateInstance()
 		{
@@ -1433,6 +1507,10 @@ namespace Loom
 			return true;
 		};
 
+		#pragma endregion
+
+		#pragma region Swapchain
+
 		bool CreateSwapchain()
 		{
 			m_swapchainDirty = false;
@@ -1595,6 +1673,10 @@ namespace Loom
 
 			return result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR;
 		};
+
+		#pragma endregion
+
+		#pragma region Passes
 
 		VkCommandBuffer Command() const
 		{
@@ -1815,6 +1897,10 @@ namespace Loom
 				1, &barrier);
 		};
 
+		#pragma endregion
+
+		#pragma region Pipelines
+
 		VkPipeline PipelineFor(Program& program, VkPrimitiveTopology topology, uint32_t target, const VertexLayout& layout)
 		{
 			const VertexFormat format = layout.format;
@@ -2009,6 +2095,10 @@ namespace Loom
 			return pipeline;
 		};
 
+		#pragma endregion
+
+		#pragma region Uniforms
+
 		// Takes one stage's uniforms, samplers and inputs into the program.
 		void Reflect(Program& program, const std::vector<uint32_t>& code)
 		{
@@ -2103,6 +2193,10 @@ namespace Loom
 			return m_textures.at(sampler.shadow ? m_fallbackDepth : m_fallbackColor);
 		};
 
+		#pragma endregion
+
+		#pragma region Textures
+
 		uint32_t Add(Texture&& texture)
 		{
 			const uint32_t handle = m_nextHandle++;
@@ -2110,6 +2204,10 @@ namespace Loom
 
 			return handle;
 		};
+
+		#pragma endregion
+
+		#pragma region Memory
 
 		Allocation Allocate(VkDeviceSize size, VkDeviceSize alignment)
 		{
@@ -2201,6 +2299,10 @@ namespace Loom
 			if (memory)	vkFreeMemory(m_device, memory, nullptr);
 		};
 
+		#pragma endregion
+
+		#pragma region Images
+
 		VkImageView CreateView(VkImage image, VkFormat format, VkImageAspectFlags aspect)
 		{
 			VkImageViewCreateInfo info{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
@@ -2283,6 +2385,10 @@ namespace Loom
 			return sampler;
 		};
 
+		#pragma endregion
+
+		#pragma region Destruction
+
 		void DestroyTextureNow(Texture& texture)
 		{
 			if (texture.imgui && m_imgui)
@@ -2311,6 +2417,10 @@ namespace Loom
 			vkDestroyPipelineLayout(m_device, program.layout, nullptr);
 			vkDestroyDescriptorSetLayout(m_device, program.setLayout, nullptr);
 		};
+
+		#pragma endregion
+
+		#pragma region Kept Vertices
 
 		// Moves kept's vertices into a buffer of their own on the GPU, with the
 		// first vertex once more after the last, which a loop closes on. Left
@@ -2369,6 +2479,10 @@ namespace Loom
 			kept.streamed.clear();
 		};
 
+		#pragma endregion
+
+		#pragma region Deferred Deletion
+
 		// Destroys something once the frames that may still be using it are done.
 		void Defer(std::function<void()> deletion)
 		{
@@ -2382,6 +2496,10 @@ namespace Loom
 
 			frame.deletions.clear();
 		};
+
+		#pragma endregion
+
+		#pragma region Immediate Commands
 
 		// Records and runs commands outside the frame, waiting for them: for
 		// setting a resource up, which can happen in the middle of a pass.
@@ -2413,6 +2531,10 @@ namespace Loom
 
 			vkFreeCommandBuffers(m_device, m_immediatePool, 1, &command);
 		};
+
+		#pragma endregion
+
+		#pragma region Readback
 
 		Readback RecordReadback(VkCommandBuffer command)
 		{
@@ -2473,6 +2595,10 @@ namespace Loom
 
 			handler(readback.mapped ? readback.width : 0, readback.mapped ? readback.height : 0, rgb);
 		};
+
+		#pragma endregion
+
+		#pragma region State
 
 		GLFWwindow* m_window = nullptr;
 
@@ -2544,12 +2670,18 @@ namespace Loom
 		unsigned long long m_framesBegun = 0;
 		uint32_t m_fallbackColor = 0;
 		uint32_t m_fallbackDepth = 0;
+
+		#pragma endregion
 	};
+
+	#pragma region Factory
 
 	std::unique_ptr<Renderer> CreateVulkanRenderer()
 	{
 		return std::make_unique<VulkanRenderer>();
 	};
+
+	#pragma endregion
 };
 
 #endif

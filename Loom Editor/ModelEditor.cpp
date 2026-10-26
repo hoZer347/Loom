@@ -33,6 +33,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Constants
+
 		// A window docked on the frame it first appears only takes its tab on
 		// the one after.
 		constexpr int focus_frames = 2;
@@ -121,6 +123,10 @@ namespace Loom
 
 		const glm::vec3 axis_colours[axes] = { { 0.9f, 0.27f, 0.27f }, { 0.43f, 0.78f, 0.27f }, { 0.27f, 0.51f, 0.94f } };
 
+		#pragma endregion
+
+		#pragma region Overlay Shader
+
 		const char* const overlay_vertex = R"(
 layout(location = 0) in vec3 aPos;
 
@@ -144,6 +150,10 @@ void main()
 	FragColor = u_color;
 }
 )";
+
+		#pragma endregion
+
+		#pragma region Picks and Tools
 
 		struct PickInfo
 		{
@@ -201,6 +211,10 @@ void main()
 			};
 		};
 
+		#pragma endregion
+
+		#pragma region Math
+
 		float Distance(const ImVec2& a, const ImVec2& b)
 		{
 			return std::hypot(a.x - b.x, a.y - b.y);
@@ -226,6 +240,10 @@ void main()
 			u = glm::normalize(glm::cross(axis, std::abs(axis.y) < std::abs(axis.x) ? Y_AXIS : X_AXIS));
 			v = glm::cross(axis, u);
 		};
+
+		#pragma endregion
+
+		#pragma region Prefab Files
 
 		std::filesystem::file_time_type WriteTime(const std::string& path)
 		{
@@ -302,6 +320,10 @@ void main()
 				MergeFields(shown.children[i], file.children[i], edited);
 		};
 
+		#pragma endregion
+
+		#pragma region Parts
+
 		// A Skin keeps a weight for each of the mesh's corners as it is, which
 		// a change to them would scramble, so an animated mesh is skipped.
 		void FindParts(GameObject& object, std::vector<GameObject*>& found, size_t& skipped)
@@ -325,6 +347,10 @@ void main()
 			for (GameObject* child : object.GetChildren())
 				MaterialsOf(*child, found);
 		};
+
+		#pragma endregion
+
+		#pragma region Shaders
 
 		// The folder holding the project the prefab is in, empty for none.
 		std::filesystem::path ProjectFolder(const std::string& prefab)
@@ -365,7 +391,11 @@ void main()
 			return "";
 		};
 
+		#pragma endregion
+
 	};
+
+	#pragma region Lifetime
 
 	ModelEditor::~ModelEditor()
 	{
@@ -396,6 +426,10 @@ void main()
 
 		return m_program != 0;
 	};
+
+	#pragma endregion
+
+	#pragma region Opening
 
 	void ModelEditor::Open(const std::string& path)
 	{
@@ -432,6 +466,10 @@ void main()
 		return std::ranges::any_of(m_documents,
 			[&normal](const std::unique_ptr<Document>& document) { return document->path == normal; });
 	};
+
+	#pragma endregion
+
+	#pragma region Documents
 
 	bool ModelEditor::Load(Document& document)
 	{
@@ -605,6 +643,10 @@ void main()
 		return true;
 	};
 
+	#pragma endregion
+
+	#pragma region Accessors
+
 	ModelEditor::Document* ModelEditor::Front() const
 	{
 		if (m_front)
@@ -636,6 +678,10 @@ void main()
 
 		return Project(document->view, glm::vec3(document->view.world * glm::vec4(point, 1.0f)));
 	};
+
+	#pragma endregion
+
+	#pragma region Window
 
 	void ModelEditor::Draw(bool* open)
 	{
@@ -799,6 +845,10 @@ void main()
 		if (ImGui::Shortcut(ImGuiKey_F) && idle)
 			Frame(document);
 	};
+
+	#pragma endregion
+
+	#pragma region Panels
 
 	void ModelEditor::DrawToolbar(Document& document)
 	{
@@ -1030,6 +1080,10 @@ void main()
 		ImGui::TextDisabled("%s", hint);
 	};
 
+	#pragma endregion
+
+	#pragma region Closing
+
 	void ModelEditor::DrawCloseQuestion()
 	{
 		constexpr const char* popup = "Unsaved Model";
@@ -1084,6 +1138,10 @@ void main()
 
 		std::erase_if(m_documents, [document](const std::unique_ptr<Document>& open) { return open.get() == document; });
 	};
+
+	#pragma endregion
+
+	#pragma region Canvas
 
 	void ModelEditor::DrawCanvas(Document& document, const ImVec2& size)
 	{
@@ -1192,6 +1250,10 @@ void main()
 
 		draw->PopClipRect();
 	};
+
+	#pragma endregion
+
+	#pragma region Camera
 
 	void ModelEditor::Steer(Document& document, bool hovered)
 	{
@@ -1324,6 +1386,10 @@ void main()
 		direction = glm::normalize(glm::vec3(distant) / distant.w - view.eye);
 	};
 
+	#pragma endregion
+
+	#pragma region Hit Testing
+
 	bool ModelEditor::Visible(const Document& document, const glm::vec3& local) const
 	{
 		if (m_seeThrough)
@@ -1453,6 +1519,10 @@ void main()
 
 		return nearest;
 	};
+
+	#pragma endregion
+
+	#pragma region Picking
 
 	void ModelEditor::Hover(Document& document, const ImVec2& mouse)
 	{
@@ -1615,6 +1685,10 @@ void main()
 		};
 	};
 
+	#pragma endregion
+
+	#pragma region Dragging
+
 	void ModelEditor::DragHandle(Document& document, const ImVec2& mouse)
 	{
 		const View& view = document.view;
@@ -1744,6 +1818,10 @@ void main()
 
 		Changed(document);
 	};
+
+	#pragma endregion
+
+	#pragma region Rendering
 
 	void ModelEditor::Render(Document& document)
 	{
@@ -1990,6 +2068,10 @@ void main()
 		else draw->AddRect(ImVec2(middle->x - centre_size, middle->y - centre_size), ImVec2(middle->x + centre_size, middle->y + centre_size), free, 0.0f, ImDrawFlags_None, handle_width);
 	};
 
+	#pragma endregion
+
+	#pragma region Undo
+
 	ModelEditor::Snapshot ModelEditor::Take(const Document& document)
 	{
 		return Snapshot{ document.part, document.parts[document.part].editing, document.selection };
@@ -2030,6 +2112,10 @@ void main()
 		Changed(document);
 	};
 
+	#pragma endregion
+
+	#pragma region Changes
+
 	void ModelEditor::Changed(Document& document)
 	{
 		Part& part = document.parts[document.part];
@@ -2056,6 +2142,10 @@ void main()
 
 		return document.edges;
 	};
+
+	#pragma endregion
+
+	#pragma region Selection
 
 	ModelEditor::Selection ModelEditor::Converted(const EditableMesh& mesh, const Selection& selection, Pick from, Pick to)
 	{
@@ -2111,6 +2201,10 @@ void main()
 		if (Document* document = Front())
 			document->selection = { };
 	};
+
+	#pragma endregion
+
+	#pragma region Edits
 
 	void ModelEditor::Extrude()
 	{
@@ -2266,6 +2360,10 @@ void main()
 		document->messageTime = ImGui::GetTime();
 	};
 
+	#pragma endregion
+
+	#pragma region Undo
+
 	void ModelEditor::Undo()
 	{
 		if (Document* document = Front(); document && !document->parts.empty())
@@ -2277,6 +2375,10 @@ void main()
 		if (Document* document = Front(); document && !document->parts.empty())
 			Step(*document, false);
 	};
+
+	#pragma endregion
+
+	#pragma region New Mesh
 
 	void ModelEditor::AddMesh()
 	{
@@ -2298,6 +2400,10 @@ void main()
 
 		Add(Shapes::Shape::Cube);
 	};
+
+	#pragma endregion
+
+	#pragma region Shaders
 
 	std::vector<std::string> ModelEditor::Shaders() const
 	{
@@ -2325,10 +2431,16 @@ void main()
 			};
 	};
 
+	#pragma endregion
+
+	#pragma region Documents
+
 	bool ModelEditor::Save()
 	{
 		Document* document = Front();
 
 		return document && SaveDocument(*document);
 	};
+
+	#pragma endregion
 };

@@ -32,6 +32,8 @@ namespace Loom
 
 	namespace
 	{
+		#pragma region Engine Code
+
 		// The file is source string 0 to the compiler and the engine's GLSL is
 		// 1, so nothing said about the engine's is taken for the file's.
 		constexpr int FILE_SOURCE = 0;
@@ -90,6 +92,10 @@ bool LoomDitheredOut(float alpha)
 		constexpr const char* SHADOW_PROGRAM_SUFFIX = " shadows";
 		constexpr const char* INSTANCED_PROGRAM_SUFFIX = " instanced";
 		constexpr const char* PIXEL_PASS_PROGRAM_SUFFIX = " pixel pass";
+
+		#pragma endregion
+
+		#pragma region Shading
 
 		// What the shading section's vertex half reads, and the declaration it
 		// adds when the stage has not made its own.
@@ -217,6 +223,10 @@ bool LoomDitheredOut(float alpha)
 				"}\n";
 		};
 
+		#pragma endregion
+
+		#pragma region Instancing
+
 		// The stages of a program drawn as instances.
 		struct InstancedStages
 		{
@@ -288,6 +298,12 @@ bool LoomDitheredOut(float alpha)
 				return 0;
 			};
 		};
+
+		#pragma endregion
+
+		#pragma region Pixel Passes
+
+		#pragma region Library
 
 		// A pixel pass is drawn as one quad over the view, which it reads from
 		// texel by texel. The inverse of the camera's view is worked out here
@@ -388,6 +404,10 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 		// What a pixel pass may declare that its library already has.
 		constexpr const char* PIXEL_PASS_UNIFORMS[] = { "u_scene", "u_sceneDepth", "u_cameraPosition" };
+
+		#pragma endregion
+
+		#pragma region Kernels
 
 		// What each kind of kernel holds of each pixel it covers, and what
 		// reads it.
@@ -540,6 +560,10 @@ vec3 LoomSceneNormal(ivec2 pixel)
 				"}\n";
 		};
 
+		#pragma endregion
+
+		#pragma region Fragment Stage
+
 		// The library and each kernel the stage names, which go ahead of it.
 		std::string PixelPassLibrary(const std::string& code)
 		{
@@ -615,7 +639,13 @@ vec3 LoomSceneNormal(ivec2 pixel)
 				"}\n";
 		};
 
+		#pragma endregion
+
+		#pragma endregion
+
 #ifndef __EMSCRIPTEN__
+		#pragma region Messages
+
 		// glslang's "ERROR: 0:12: 'x' : undeclared identifier", and its warnings.
 		const std::regex& MessagePattern()
 		{
@@ -682,8 +712,12 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 			return messages;
 		};
+
+		#pragma endregion
 #endif
 	};
+
+	#pragma region Construction
 
 	Shader::Shader() :
 		id(CompileSource(defaultShader))
@@ -714,6 +748,10 @@ vec3 LoomSceneNormal(ivec2 pixel)
 					renderer->DeleteProgram(program);
 		};
 	};
+
+	#pragma endregion
+
+	#pragma region Loading
 
 	enum class ShaderType { NONE, COMMON, VERTEX, FRAGMENT, SETTINGS, PIXEL_PASS };
 
@@ -803,8 +841,12 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		return Build(name, source);
 	};
 
+	#pragma endregion
+
 	namespace
 	{
+		#pragma region UV Layers
+
 		// A scalar type a UV layer's field can be, the vectors of it, and how
 		// one of the layer's words reads as it.
 		struct UVScalar
@@ -984,7 +1026,11 @@ vec3 LoomSceneNormal(ivec2 pixel)
 				return code + ")\n";
 			};
 		};
+
+		#pragma endregion
 	};
+
+	#pragma region Assembly
 
 	Shader::Stages Shader::Assemble(const std::string& source)
 	{
@@ -1130,7 +1176,11 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		return Cached(programs);
 	};
 
+	#pragma endregion
+
 #ifndef __EMSCRIPTEN__
+	#pragma region Checking
+
 	std::vector<ShaderMessage> Shader::Check(const std::string& text)
 	{
 		Stages stages;
@@ -1154,7 +1204,11 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 		return ParseMessages(log);
 	};
+
+	#pragma endregion
 #endif
+
+	#pragma region Queries
 
 	bool Shader::AnyPixelPass()
 	{
@@ -1163,7 +1217,11 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		return std::ranges::any_of(shaders, [](const auto& shader) { return shader.second.pixelPass != 0; });
 	};
 
+	#pragma endregion
+
 #ifdef __EMSCRIPTEN__
+	#pragma region Fetching
+
 	void Shader::Request(
 		const std::string& file_path,
 		std::string& shader_source)
@@ -1209,5 +1267,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		if (shader_source.empty())
 			throw std::runtime_error("fetched nothing");
 	};
+
+	#pragma endregion
 #endif
 };

@@ -141,6 +141,8 @@ namespace Loom
 
 	struct OpenGLRenderer final : Renderer
 	{
+		#pragma region Lifetime
+
 		OpenGLRenderer()
 		{
 #if defined(__EMSCRIPTEN__)
@@ -191,6 +193,10 @@ namespace Loom
 		{
 			return Backend::OpenGL;
 		};
+
+		#pragma endregion
+
+		#pragma region Window
 
 		bool Attach(GLFWwindow* window) override
 		{
@@ -285,6 +291,10 @@ namespace Loom
 			return true;
 		};
 
+		#pragma endregion
+
+		#pragma region ImGui
+
 		void InitImGui(GLFWwindow* window) override
 		{
 #ifdef __EMSCRIPTEN__
@@ -338,6 +348,10 @@ namespace Loom
 			glfwMakeContextCurrent(context);
 		};
 
+		#pragma endregion
+
+		#pragma region Frames
+
 		void BeginFrame() override
 		{ };
 
@@ -382,6 +396,10 @@ namespace Loom
 
 			handler(width, height, pixels);
 		};
+
+		#pragma endregion
+
+		#pragma region Programs
 
 		uint32_t CreateProgram(const std::string& name, const std::string& vertex, const std::string& fragment) override
 		{
@@ -446,6 +464,10 @@ namespace Loom
 			m_pixelated.erase(program);
 			glDeleteProgram(program);
 		};
+
+		#pragma endregion
+
+		#pragma region Uniforms
 
 		void SetUniform(uint32_t program, const char* name, float value) override
 		{
@@ -568,6 +590,10 @@ namespace Loom
 
 			glActiveTexture(GL_TEXTURE0);
 		};
+
+		#pragma endregion
+
+		#pragma region Drawing
 
 		void Draw(uint32_t program, uint32_t primitive, const float* vertices, size_t count, uint32_t usage, VertexFormat format) override
 		{
@@ -764,6 +790,10 @@ namespace Loom
 			glDisableVertexAttribArray(InstanceColorLocation);
 		};
 
+		#pragma endregion
+
+		#pragma region Textures
+
 		void SetPixelated(uint32_t program, bool pixelated) override
 		{
 			if (pixelated)
@@ -784,6 +814,10 @@ namespace Loom
 
 			return texture;
 		};
+
+		#pragma endregion
+
+		#pragma region Targets
 
 		uint32_t CreateDepthTarget(int size) override
 		{
@@ -887,6 +921,10 @@ namespace Loom
 				saved.viewport[VIEWPORT_HEIGHT]);
 		};
 
+		#pragma endregion
+
+		#pragma region Render State
+
 		void Clear(const float* color, bool depth) override
 		{
 			GLbitfield mask = 0;
@@ -943,6 +981,10 @@ namespace Loom
 			return glm::ivec2(viewport[VIEWPORT_WIDTH], viewport[VIEWPORT_HEIGHT]);
 		};
 
+		#pragma endregion
+
+		#pragma region Textures
+
 		int MaxTextureSize() const override
 		{
 			GLint size = 0;
@@ -956,7 +998,11 @@ namespace Loom
 			return (void*)(intptr_t)texture;
 		};
 
+		#pragma endregion
+
 	private:
+		#pragma region Targets
+
 		struct Target
 		{
 			GLuint texture = 0;
@@ -1032,6 +1078,10 @@ namespace Loom
 			if (target.depth)		glDeleteTextures(1, &target.depth);
 		};
 
+		#pragma endregion
+
+		#pragma region State
+
 		GLFWwindow* m_window = nullptr;
 		const char* m_glslVersion = nullptr;
 
@@ -1091,6 +1141,8 @@ namespace Loom
 		};
 
 		std::unordered_map<uint32_t, Program> m_programs;
+
+		#pragma endregion
 	};
 
 	std::unique_ptr<Renderer> CreateOpenGLRenderer()

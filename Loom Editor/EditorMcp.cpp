@@ -38,6 +38,8 @@ using json = nlohmann::json;
 
 namespace Loom
 {
+	#pragma region Call Queue
+
 	struct EditorMcp::Call
 	{
 		std::string tool;
@@ -46,8 +48,12 @@ namespace Loom
 		bool done = false;
 	};
 
+	#pragma endregion
+
 	namespace
 	{
+		#pragma region Constants
+
 		constexpr const char* endpoint = "/mcp";
 
 		constexpr size_t max_request_bytes = 1 << 20;
@@ -72,6 +78,10 @@ namespace Loom
 			"inspect shows each field as the scene file writes it, and set_field takes values in that form. "
 			"Edits land in the editor's undo history. "
 			"The ui tool drives the panels with in-process input; ui_items says what can be aimed at.";
+
+		#pragma endregion
+
+		#pragma region Arguments
 
 		struct ToolError : std::runtime_error
 		{
@@ -101,6 +111,10 @@ namespace Loom
 		{
 			return arguments.contains(name) && arguments[name].is_string() ? arguments[name].get<std::string>() : "";
 		};
+
+		#pragma endregion
+
+		#pragma region Lookup
 
 		bool SameText(const std::string& a, const std::string& b)
 		{
@@ -164,6 +178,10 @@ namespace Loom
 			return ComponentRegistry::NameOf(component) + " (" + component.GetGuid().ToString() + ")";
 		};
 
+		#pragma endregion
+
+		#pragma region Writing
+
 		void WriteTree(std::ostream& out, GameObject& gameObject, int depth)
 		{
 			out << std::string(depth, '\t') << Named(gameObject);
@@ -226,6 +244,10 @@ namespace Loom
 				out << '\t' << button.name << " (a button, press_button presses it)\n";
 		};
 
+		#pragma endregion
+
+		#pragma region Lookup
+
 		// The component set_field writes into, by type or guid. Null for the
 		// GameObject itself, whose fields hold its Transform.
 		ComponentBase* FindComponent(GameObject& gameObject, const std::string& component)
@@ -239,6 +261,10 @@ namespace Loom
 
 			throw ToolError(gameObject.GetName() + " has no " + component);
 		};
+
+		#pragma endregion
+
+		#pragma region State
 
 		std::string StateOf(Editor& editor)
 		{
@@ -284,6 +310,10 @@ namespace Loom
 			return out.str();
 		};
 
+		#pragma endregion
+
+		#pragma region Console Log
+
 		// The id the console's next line will have.
 		size_t NextLogLine()
 		{
@@ -315,6 +345,10 @@ namespace Loom
 			return out;
 		};
 
+		#pragma endregion
+
+		#pragma region Capture
+
 		// The capture is RGB from the bottom row up, as a bitmap stores it.
 		SpriteAsset::Image Captured(int width, int height, const std::vector<uint8_t>& rgb)
 		{
@@ -336,6 +370,12 @@ namespace Loom
 
 			return image;
 		};
+
+		#pragma endregion
+
+		#pragma region Tool Calls
+
+		#pragma region Inspection
 
 		json State(Context& context, const json&)
 		{
@@ -391,6 +431,10 @@ namespace Loom
 
 			return Text(out.str());
 		};
+
+		#pragma endregion
+
+		#pragma region Fields and Buttons
 
 		json SetField(Context& context, const json& arguments)
 		{
@@ -503,6 +547,10 @@ namespace Loom
 			return Text("Pressed " + matches.front()->name);
 		};
 
+		#pragma endregion
+
+		#pragma region Objects
+
 		json Select(Context& context, const json& arguments)
 		{
 			const std::string name = OptionalArgument(arguments, "object");
@@ -571,6 +619,10 @@ namespace Loom
 			return Text("Deleted " + name);
 		};
 
+		#pragma endregion
+
+		#pragma region Commands
+
 		json Command(Context& context, const json& arguments)
 		{
 			Editor& editor = context.editor;
@@ -627,6 +679,10 @@ namespace Loom
 
 			return Text(LogFrom(first_id, errors_only, limit));
 		};
+
+		#pragma endregion
+
+		#pragma region Screen
 
 		json Screenshot(Context& context, const json& arguments)
 		{
@@ -737,6 +793,12 @@ namespace Loom
 
 			return { };
 		};
+
+		#pragma endregion
+
+		#pragma endregion
+
+		#pragma region Tool Table
 
 		struct Tool
 		{
@@ -912,6 +974,10 @@ namespace Loom
 			return list;
 		};
 
+		#pragma endregion
+
+		#pragma region HTTP
+
 		std::string Lower(std::string text)
 		{
 			std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return (char)tolower(c); });
@@ -938,7 +1004,11 @@ namespace Loom
 				sent += count;
 			};
 		};
+
+		#pragma endregion
 	};
+
+	#pragma region Lifetime
 
 	EditorMcp::EditorMcp(Editor& editor, UiScript& script) :
 		m_editor(editor),
@@ -966,6 +1036,10 @@ namespace Loom
 		if (m_listener != INVALID_SOCKET)
 			WSACleanup();
 	};
+
+	#pragma endregion
+
+	#pragma region Server
 
 	bool EditorMcp::Listen(unsigned short port)
 	{
@@ -1115,6 +1189,10 @@ namespace Loom
 			Send(client, "200 OK", response);
 	};
 
+	#pragma endregion
+
+	#pragma region Call Queue
+
 	json EditorMcp::Wait(const std::shared_ptr<Call>& call)
 	{
 		std::unique_lock<std::mutex> lock(m_mutex);
@@ -1199,4 +1277,6 @@ namespace Loom
 			Finish(call);
 		};
 	};
+
+	#pragma endregion
 };
