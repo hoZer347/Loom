@@ -537,9 +537,9 @@ namespace Loom
 			return object.NameAndID();
 		};
 
-		void DragSource(const LoomObject& object)
+		void DragSource(const LoomObject& object, ImGuiDragDropFlags flags = 0)
 		{
-			if (!ImGui::BeginDragDropSource())
+			if (!ImGui::BeginDragDropSource(flags))
 				return;
 
 			ImGui::SetDragDropPayload(Editor::object_payload, &object.GetGuid(), sizeof(Guid));
@@ -3552,9 +3552,22 @@ namespace Loom
 		const std::string name = ComponentRegistry::NameOf(*component);
 
 		const bool open = ImGui::CollapsingHeader(name.c_str(), header_flags);
+		const ImRect header(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
 
-		DragSource(*component);
-		DropComponent(*gameObject, *component);
+		// From halfway into the gap above the header to halfway into the one
+		// below the component, so neighbours' areas meet where a line marks
+		// the place between them.
+		const float gap = ImGui::GetStyle().ItemSpacing.y / 2.0f;
+		const auto drop = [&]()
+		{
+			const ImRect area(header.Min.x, header.Min.y - gap, header.Max.x, ImGui::GetCursorScreenPos().y - gap);
+
+			DropComponent(*gameObject, *component, area);
+		};
+
+		// Headers passed over neither light up nor fold, so only the line
+		// between components marks where it goes.
+		DragSource(*component, ImGuiDragDropFlags_SourceNoHoldToOpenOthers);
 		DrawSourcePopup(name);
 
 		// The remove button rides on the header's own line, Unity-style.
@@ -3564,6 +3577,7 @@ namespace Loom
 
 		if (!open)
 		{
+			drop();
 			ImGui::PopID();
 			return;
 		};
@@ -3600,32 +3614,53 @@ namespace Loom
 
 		component->OnGui();
 
+		drop();
 		ImGui::PopID();
 	};
 
-	void Editor::DropComponent(GameObject& gameObject, ComponentBase& onto)
+	void Editor::DropComponent(GameObject& gameObject, ComponentBase& onto, const ImRect& area)
 	{
-		const ImGuiPayload* payload = ImGui::GetDragDropPayload();
+		const ImGuiPayload* dragging = ImGui::GetDragDropPayload();
 
-		if (payload == nullptr || !payload->IsDataType(object_payload))
+		if (dragging == nullptr || !dragging->IsDataType(object_payload))
 			return;
 
-		ComponentBase* dragged = LoomObject::GetByGuid<ComponentBase>(*(const Guid*)payload->Data);
+		ComponentBase* dragged = LoomObject::GetByGuid<ComponentBase>(*(const Guid*)dragging->Data);
 
-		if (dragged == nullptr || dragged == &onto || dragged->GetGameObject() != &gameObject || !ImGui::BeginDragDropTarget())
+		if (dragged == nullptr || dragged == &onto || dragged->GetGameObject() != &gameObject)
 			return;
 
-		if (ImGui::AcceptDragDropPayload(object_payload))
+		std::vector<ComponentBase*> order = gameObject.GetComponents();
+		const auto from = std::find(order.begin(), order.end(), dragged);
+		const bool below = ImGui::GetMousePos().y > area.GetCenter().y;
+
+		// Just above or below where it already is would leave it there.
+		const ptrdiff_t at = std::find(order.begin(), order.end(), &onto) - order.begin();
+
+		if (at + (below ? 1 : -1) == from - order.begin())
+			return;
+
+		if (!ImGui::BeginDragDropTargetCustom(area, ImGui::GetID("##drop")))
+			return;
+
+		constexpr ImGuiDragDropFlags flags =
+			ImGuiDragDropFlags_AcceptBeforeDelivery |
+			ImGuiDragDropFlags_AcceptNoDrawDefaultRect;
+
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(object_payload, flags))
 		{
-			std::vector<ComponentBase*> order = gameObject.GetComponents();
-			const auto from = std::find(order.begin(), order.end(), dragged);
-			const bool down = from < std::find(order.begin(), order.end(), &onto);
+			const float y = below ? area.Max.y : area.Min.y;
 
-			order.erase(from);
-			order.insert(std::find(order.begin(), order.end(), &onto) + (down ? 1 : 0), dragged);
+			ImGui::GetWindowDrawList()->AddLine(ImVec2(area.Min.x, y), ImVec2(area.Max.x, y), ImGui::GetColorU32(ImGuiCol_DragDropTarget));
 
-			ChangeComponents(gameObject, [&gameObject, &order]() { gameObject.OrderComponents(order); });
-			m_historyDirty = true;
+			if (payload->IsDelivery())
+			{
+				order.erase(from);
+				order.insert(std::find(order.begin(), order.end(), &onto) + (below ? 1 : 0), dragged);
+
+				ChangeComponents(gameObject, [&gameObject, &order]() { gameObject.OrderComponents(order); });
+				m_historyDirty = true;
+			};
 		};
 
 		ImGui::EndDragDropTarget();

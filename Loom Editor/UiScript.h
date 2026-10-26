@@ -31,6 +31,9 @@ namespace Loom
 	*     key <chord>          ImGui's key names joined by +: ctrl+z, enter, f2
 	*     hold <chord>         presses it and leaves it down, for a click with ctrl
 	*     release <chord>      lets go of a held chord
+	*     hold mouse           presses the left button and leaves it down, for
+	*                          moves to see what a drag shows on the way
+	*     release mouse        lets go of it
 	*     scroll <notches>     turns the wheel where the mouse is, away from you
 	*                          positive
 	*     type <text>          the rest of the line
@@ -138,6 +141,7 @@ namespace Loom
 		int m_retries = 0;
 
 		std::vector<ImGuiKey> m_held{ };
+		bool m_mouse_held = false;
 
 		ImVec2 m_mouse{ };
 		bool m_mouseSet = false;

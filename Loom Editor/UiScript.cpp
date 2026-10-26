@@ -391,6 +391,18 @@ namespace Loom
 
 			press(ImGuiMouseButton_Left, false);
 		}
+		else if ((verb == "hold" || verb == "release") && tokens.size() == 2 && tokens[1] == "mouse")
+		{
+			const bool down = verb == "hold";
+
+			press(ImGuiMouseButton_Left, down);
+			m_actions.push_back(
+				[this, down]()
+				{
+					m_mouse_held = down;
+					return Result::Done;
+				});
+		}
 		else if (verb == "key" || verb == "hold" || verb == "release")
 		{
 			if (tokens.size() != 2)
@@ -709,6 +721,13 @@ namespace Loom
 		};
 
 		m_held.clear();
+
+		if (m_mouse_held)
+		{
+			m_context->IO.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+			Input::OnMouseButtonThisFrame(ImGuiMouseButton_Left, false);
+			m_mouse_held = false;
+		};
 	};
 
 	void UiScript::Fail(const std::string& why)

@@ -252,6 +252,66 @@ TEST_SUITE("UiScript")
 		CHECK(dropped == payload);
 	};
 
+	TEST_CASE("hold mouse carries a drag through moves, so a target sees it before release")
+	{
+		ScriptedUi ui("move \"Panel\" \"Source\"\nhold mouse\nmove \"Panel\" \"Source\" right\nmove \"Panel\" \"Target\"\nwait 2\nrelease mouse\nwait 1\n");
+		constexpr int payload = 7;
+		int dropped = 0;
+		bool hovered = false;
+		bool hovered_before_drop = false;
+
+		ui.Run(
+			[&]()
+			{
+				Panel(
+					[&]()
+					{
+						ImGui::Button("Source");
+
+						if (ImGui::BeginDragDropSource())
+						{
+							ImGui::SetDragDropPayload("test", &payload, sizeof(payload));
+							ImGui::EndDragDropSource();
+						};
+
+						ImGui::Button("Target");
+
+						if (ImGui::BeginDragDropTarget())
+						{
+							if (const ImGuiPayload* delivered = ImGui::AcceptDragDropPayload("test", ImGuiDragDropFlags_AcceptBeforeDelivery))
+							{
+								if (delivered->IsDelivery())
+								{
+									dropped = *(const int*)delivered->Data;
+									hovered_before_drop = hovered;
+								}
+								else
+									hovered = true;
+							};
+
+							ImGui::EndDragDropTarget();
+						};
+					});
+			});
+
+		CHECK_FALSE(ui.script->Failed());
+		CHECK(hovered_before_drop);
+		CHECK(dropped == payload);
+	};
+
+	TEST_CASE("a held mouse is let go of when the script ends")
+	{
+		ScriptedUi ui("hold mouse\nwait 1\n");
+		ui.Run([]() { Panel([]() { }); });
+
+		ImGui::NewFrame();
+		ImGui::Render();
+		Loom::Input::Tick();
+
+		CHECK_FALSE(ImGui::GetIO().MouseDown[ImGuiMouseButton_Left]);
+		CHECK_FALSE(Loom::Input::GetMouseButton(ImGuiMouseButton_Left));
+	};
+
 	TEST_CASE("coordinates click where they say")
 	{
 		ScriptedUi ui("wait 2\nclick 60 60\n");
@@ -312,7 +372,7 @@ TEST_SUITE("UiScript")
 	{
 		const LoomTests::Captured errors(std::cerr);
 
-		for (const char* text : { "fly away\n", "key ctrl+nothing\n", "click \"Panel\"\n", "wait\n", "\"\" \"Cube\"\n", "hold\n", "release\n", "scroll\n", "scroll up\n", "resize 800\n", "resize wide 600\n", "resize 0 600\n" })
+		for (const char* text : { "fly away\n", "key ctrl+nothing\n", "click \"Panel\"\n", "wait\n", "\"\" \"Cube\"\n", "hold\n", "release\n", "hold mouse right\n", "scroll\n", "scroll up\n", "resize 800\n", "resize wide 600\n", "resize 0 600\n" })
 		{
 			ScriptedUi ui(text);
 			ui.Run([]() { });

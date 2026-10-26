@@ -459,9 +459,10 @@ namespace Loom
 		void DrawThread(GameObject* gameObject, float column);
 		void DrawComponent(GameObject* gameObject, ComponentBase* component);
 
-		// Takes a component of gameObject dragged onto onto's header, putting
-		// it in onto's place.
-		void DropComponent(GameObject& gameObject, ComponentBase& onto);
+		// Takes a component of gameObject dragged over onto, which fills area,
+		// putting it above onto or below it by the half under the mouse, and
+		// marks where with a line.
+		void DropComponent(GameObject& gameObject, ComponentBase& onto, const ImRect& area);
 		void DrawComponentMenu(GameObject* gameObject, const ComponentMenu::Node& node);
 
 		// Right-click on a component in the Add Component menu: the category it
