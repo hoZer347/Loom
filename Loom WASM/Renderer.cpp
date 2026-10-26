@@ -6,6 +6,8 @@
 
 namespace Loom
 {
+	#pragma region Vertex Layout
+
 	size_t FloatsPerVertex(VertexFormat format)
 	{
 		constexpr size_t POSITION = 3;
@@ -81,6 +83,10 @@ namespace Loom
 		return { };
 	};
 
+	#pragma endregion
+
+	#pragma region Lifetime
+
 	std::unique_ptr<Renderer> CreateOpenGLRenderer();
 #ifndef __EMSCRIPTEN__
 	std::unique_ptr<Renderer> CreateVulkanRenderer();
@@ -95,4 +101,6 @@ namespace Loom
 
 		return CreateOpenGLRenderer();
 	};
+
+	#pragma endregion
 };

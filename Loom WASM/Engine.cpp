@@ -32,12 +32,10 @@ namespace Loom
 
 	namespace
 	{
+		#pragma region Frame Loop
+
 		// Frame time the physics steps have not covered yet.
 		float s_physicsTime = 0.0f;
-
-		// GL hands pixels back red first; a bitmap stores them blue first.
-		enum Channel { RED, GREEN, BLUE, BYTES_PER_PIXEL };
-		enum BitmapChannel { BITMAP_BLUE, BITMAP_GREEN, BITMAP_RED };
 
 		std::unique_ptr<Renderer> renderer;
 
@@ -72,6 +70,14 @@ namespace Loom
 
 			return s_frame;
 		};
+
+		#pragma endregion
+
+		#pragma region Capture
+
+		// GL hands pixels back red first; a bitmap stores them blue first.
+		enum Channel { RED, GREEN, BLUE, BYTES_PER_PIXEL };
+		enum BitmapChannel { BITMAP_BLUE, BITMAP_GREEN, BITMAP_RED };
 
 		// Writes a 24 bit bottom-up bitmap, which is the row order GL hands back
 		// and the one format worth writing without an image library.
@@ -126,103 +132,94 @@ namespace Loom
 
 			return (bool)out;
 		};
+
+		#pragma endregion
 	};
 
-	void Engine::InitImGui()
+	#pragma region Lifetime
+
+	Engine::Engine()
 	{
-		// Setup Dear ImGui context
-		IMGUI_CHECKVERSION();
-		ImGui::CreateContext();
+		if (!glfwInit())
+			std::cerr << "Engine: GLFW could not start" << std::endl;
 
-		io = &ImGui::GetIO(); (void)io;
+		window = OpenWindow(backend);
 
-		io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-		io->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-		io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
-
-#ifndef __EMSCRIPTEN__
-		// Multi-viewport (native only). Not while the window is hidden: a panel
-		// dragged out in an earlier session is remembered in the layout, and a
-		// viewport is a real window that ImGui shows whatever this one does.
-		if (showWindow)
+		// Vulkan needs a driver and features an OpenGL machine may not have, and
+		// a window made for one API cannot be handed to the other.
+		if (!window && backend == Backend::Vulkan)
 		{
-			io->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;   // Enable Multi-Viewport / Platform Windows
-			io->ConfigViewportsNoAutoMerge = true;
-		};
-#endif
-
-		// Setup Dear ImGui style
-		ImGui::StyleColorsLight();
-
-		// When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
-		ImGuiStyle& style = ImGui::GetStyle();
-		if (io->ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-		{
-			style.WindowRounding = 0.0f;
-			style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+			std::cerr << "Engine: Vulkan could not start, so this runs on OpenGL" << std::endl;
+			backend = Backend::OpenGL;
+			window = OpenWindow(backend);
 		};
 
-		renderer->InitImGui(Engine::window);
+		if (!window)
+		{
+			std::cerr << "Engine: could not open a window" << std::endl;
+			return;
+		};
+
+		Renderer::current = renderer.get();
+
+		// Ahead of the job workers, which are numbered from one.
+		Profiler::NameThread("Main", 0);
+
+		Input::Init();
+
+		InitImGui();
 	};
 
-	void Engine::BuildImGui()
+	GLFWwindow* Engine::OpenWindow(Backend api)
 	{
-		LOOM_STAGE("Engine::BuildImGui");
+		glfwDefaultWindowHints();
+		renderer = Renderer::Create(api);
 
-		{
-			LOOM_STAGE("Renderer::NewImGuiFrame");
-			renderer->NewImGuiFrame();
-		};
+		if (!showWindow)
+			glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
-		if (onImGuiInput)
-		{
-			LOOM_STAGE("Engine::onImGuiInput");
-			onImGuiInput();
-		};
+		GLFWwindow* opened = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "", NULL, NULL);
 
-		{
-			LOOM_STAGE("ImGui::NewFrame");
-			ImGui::NewFrame();
-		};
+		if (opened && renderer->Attach(opened))
+			return opened;
 
-		if (onGui)
-		{
-			LOOM_STAGE("Engine::onGui");
-			onGui();
-		}
-		else if (Engine::doGUI)
-			for (auto& scene : Scene::allScenes)
-			{
-				if (ImGui::Begin(scene->NameAndID().c_str()))
-				{
-					LOOM_STAGE("GameObject::Gui");
-					scene->root.Gui();
-				};
+		renderer.reset();
 
-				ImGui::End();
-			};
+		if (opened)
+			glfwDestroyWindow(opened);
 
-		{
-			LOOM_STAGE("ImGui::Render");
-			ImGui::Render();
-		};
+		return nullptr;
 	};
 
-	void Engine::DrawImGui()
+	Engine::~Engine()
 	{
-		LOOM_STAGE("Engine::DrawImGui");
+		Stop();
 
+		// After whatever the application built on the Engine is gone, since
+		// that is what holds the textures and programs being released here.
+		if (renderer)
 		{
-			LOOM_STAGE("Renderer::RenderImGui");
-			renderer->RenderImGui(ImGui::GetDrawData());
+			ReleaseFrame();
+			renderer->ShutdownImGui();
+			ImGui::DestroyContext();
+
+			Renderer::current = nullptr;
+			renderer.reset();
 		};
 
-		if (io->ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-		{
-			LOOM_STAGE("Renderer::RenderImGuiWindows");
-			renderer->RenderImGuiWindows();
-		};
+		glfwTerminate();
+		window = nullptr;
 	};
+
+	const size_t Engine::GetUniqueID()
+	{
+		static std::atomic<size_t> id = 0;
+		return id++;
+	};
+
+	#pragma endregion
+
+	#pragma region Frame Loop
 
 	void Engine::Start()
 	{
@@ -243,6 +240,12 @@ namespace Loom
 		if (window)
 			glfwSetWindowShouldClose(window, true);
 	}
+
+	void Engine::SetUpdateFunction(const Task& task)
+	{
+		std::lock_guard<std::recursive_mutex> lock(mutex);
+		onUpdate = task;
+	};
 
 	void Engine::renderFrame()
 	{
@@ -383,46 +386,110 @@ namespace Loom
 		Profiler::EndFrame();
 	};
 
-	void Engine::CaptureFrame(const std::string& path, const std::optional<Region>& region)
+	#pragma endregion
+
+	#pragma region GUI
+
+	void Engine::InitImGui()
 	{
-		renderer->Capture(
-			[path, region](int width, int height, const std::vector<uint8_t>& captured)
+		// Setup Dear ImGui context
+		IMGUI_CHECKVERSION();
+		ImGui::CreateContext();
+
+		io = &ImGui::GetIO(); (void)io;
+
+		io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+		io->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+		io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
+
+#ifndef __EMSCRIPTEN__
+		// Multi-viewport (native only). Not while the window is hidden: a panel
+		// dragged out in an earlier session is remembered in the layout, and a
+		// viewport is a real window that ImGui shows whatever this one does.
+		if (showWindow)
+		{
+			io->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;   // Enable Multi-Viewport / Platform Windows
+			io->ConfigViewportsNoAutoMerge = true;
+		};
+#endif
+
+		// Setup Dear ImGui style
+		ImGui::StyleColorsLight();
+
+		// When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
+		ImGuiStyle& style = ImGui::GetStyle();
+		if (io->ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+		{
+			style.WindowRounding = 0.0f;
+			style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+		};
+
+		renderer->InitImGui(Engine::window);
+	};
+
+	void Engine::BuildImGui()
+	{
+		LOOM_STAGE("Engine::BuildImGui");
+
+		{
+			LOOM_STAGE("Renderer::NewImGuiFrame");
+			renderer->NewImGuiFrame();
+		};
+
+		if (onImGuiInput)
+		{
+			LOOM_STAGE("Engine::onImGuiInput");
+			onImGuiInput();
+		};
+
+		{
+			LOOM_STAGE("ImGui::NewFrame");
+			ImGui::NewFrame();
+		};
+
+		if (onGui)
+		{
+			LOOM_STAGE("Engine::onGui");
+			onGui();
+		}
+		else if (Engine::doGUI)
+			for (auto& scene : Scene::allScenes)
 			{
-				const std::vector<uint8_t> cut = region ? Crop(*region, width, height, captured) : std::vector<uint8_t>{ };
-				const std::vector<uint8_t>& rgb = region ? cut : captured;
+				if (ImGui::Begin(scene->NameAndID().c_str()))
+				{
+					LOOM_STAGE("GameObject::Gui");
+					scene->root.Gui();
+				};
 
-				if (width <= 0 || height <= 0)
-					std::cerr << "Nothing to capture: " << (region ? "the region is outside the window" : "the window has no size") << std::endl;
-				else if (!WriteBitmap(path, width, height, rgb))
-					std::cerr << "Could not write " << path << std::endl;
-				else std::cout << "Wrote " << path << " (" << width << 'x' << height << ')' << std::endl;
-			});
+				ImGui::End();
+			};
+
+		{
+			LOOM_STAGE("ImGui::Render");
+			ImGui::Render();
+		};
 	};
 
-	std::vector<uint8_t> Engine::Crop(const Region& region, int& width, int& height, const std::vector<uint8_t>& rgb)
+	void Engine::DrawImGui()
 	{
-		const int left = std::clamp(region.x, 0, width);
-		const int right = std::clamp(region.x + region.width, left, width);
-		const int top = std::clamp(region.y, 0, height);
-		const int bottom = std::clamp(region.y + region.height, top, height);
-		const size_t row = (size_t)(right - left) * BYTES_PER_PIXEL;
+		LOOM_STAGE("Engine::DrawImGui");
 
-		std::vector<uint8_t> cut(row * (bottom - top));
+		{
+			LOOM_STAGE("Renderer::RenderImGui");
+			renderer->RenderImGui(ImGui::GetDrawData());
+		};
 
-		// Rows run from the bottom up, so the region's lowest comes first.
-		for (int y = 0; y < bottom - top; y++)
-			std::copy_n(rgb.data() + ((size_t)(height - bottom + y) * width + left) * BYTES_PER_PIXEL, row, cut.data() + y * row);
-
-		width = right - left;
-		height = bottom - top;
-
-		return cut;
+		if (io->ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+		{
+			LOOM_STAGE("Renderer::RenderImGuiWindows");
+			renderer->RenderImGuiWindows();
+		};
 	};
 
-	void Engine::SetUpdateFunction(const Task& task)
+	void Engine::SetGuiFunction(const Task& task)
 	{
 		std::lock_guard<std::recursive_mutex> lock(mutex);
-		onUpdate = task;
+		onGui = task;
 	};
 
 	void Engine::SetImGuiInputFunction(const Task& task)
@@ -431,11 +498,9 @@ namespace Loom
 		onImGuiInput = task;
 	};
 
-	void Engine::SetGuiFunction(const Task& task)
-	{
-		std::lock_guard<std::recursive_mutex> lock(mutex);
-		onGui = task;
-	};
+	#pragma endregion
+
+	#pragma region Tasks
 
 	void Engine::QueueTask(const Task& task)
 	{
@@ -493,82 +558,45 @@ namespace Loom
 		};
 	};
 
-	const size_t Engine::GetUniqueID()
+	#pragma endregion
+
+	#pragma region Capture
+
+	void Engine::CaptureFrame(const std::string& path, const std::optional<Region>& region)
 	{
-		static std::atomic<size_t> id = 0;
-		return id++;
+		renderer->Capture(
+			[path, region](int width, int height, const std::vector<uint8_t>& captured)
+			{
+				const std::vector<uint8_t> cut = region ? Crop(*region, width, height, captured) : std::vector<uint8_t>{ };
+				const std::vector<uint8_t>& rgb = region ? cut : captured;
+
+				if (width <= 0 || height <= 0)
+					std::cerr << "Nothing to capture: " << (region ? "the region is outside the window" : "the window has no size") << std::endl;
+				else if (!WriteBitmap(path, width, height, rgb))
+					std::cerr << "Could not write " << path << std::endl;
+				else std::cout << "Wrote " << path << " (" << width << 'x' << height << ')' << std::endl;
+			});
 	};
 
-	Engine::Engine()
+	std::vector<uint8_t> Engine::Crop(const Region& region, int& width, int& height, const std::vector<uint8_t>& rgb)
 	{
-		if (!glfwInit())
-			std::cerr << "Engine: GLFW could not start" << std::endl;
+		const int left = std::clamp(region.x, 0, width);
+		const int right = std::clamp(region.x + region.width, left, width);
+		const int top = std::clamp(region.y, 0, height);
+		const int bottom = std::clamp(region.y + region.height, top, height);
+		const size_t row = (size_t)(right - left) * BYTES_PER_PIXEL;
 
-		window = OpenWindow(backend);
+		std::vector<uint8_t> cut(row * (bottom - top));
 
-		// Vulkan needs a driver and features an OpenGL machine may not have, and
-		// a window made for one API cannot be handed to the other.
-		if (!window && backend == Backend::Vulkan)
-		{
-			std::cerr << "Engine: Vulkan could not start, so this runs on OpenGL" << std::endl;
-			backend = Backend::OpenGL;
-			window = OpenWindow(backend);
-		};
+		// Rows run from the bottom up, so the region's lowest comes first.
+		for (int y = 0; y < bottom - top; y++)
+			std::copy_n(rgb.data() + ((size_t)(height - bottom + y) * width + left) * BYTES_PER_PIXEL, row, cut.data() + y * row);
 
-		if (!window)
-		{
-			std::cerr << "Engine: could not open a window" << std::endl;
-			return;
-		};
+		width = right - left;
+		height = bottom - top;
 
-		Renderer::current = renderer.get();
-
-		// Ahead of the job workers, which are numbered from one.
-		Profiler::NameThread("Main", 0);
-
-		Input::Init();
-
-		InitImGui();
+		return cut;
 	};
 
-	GLFWwindow* Engine::OpenWindow(Backend api)
-	{
-		glfwDefaultWindowHints();
-		renderer = Renderer::Create(api);
-
-		if (!showWindow)
-			glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-
-		GLFWwindow* opened = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "", NULL, NULL);
-
-		if (opened && renderer->Attach(opened))
-			return opened;
-
-		renderer.reset();
-
-		if (opened)
-			glfwDestroyWindow(opened);
-
-		return nullptr;
-	};
-
-	Engine::~Engine()
-	{
-		Stop();
-
-		// After whatever the application built on the Engine is gone, since
-		// that is what holds the textures and programs being released here.
-		if (renderer)
-		{
-			ReleaseFrame();
-			renderer->ShutdownImGui();
-			ImGui::DestroyContext();
-
-			Renderer::current = nullptr;
-			renderer.reset();
-		};
-
-		glfwTerminate();
-		window = nullptr;
-	};
+	#pragma endregion
 };

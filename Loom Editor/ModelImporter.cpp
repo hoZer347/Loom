@@ -35,6 +35,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Assimp
+
 		constexpr unsigned int import_flags =
 			aiProcess_Triangulate |
 			aiProcess_SortByPType |
@@ -43,12 +45,33 @@ namespace Loom
 		// Four joints a vertex is what Skin bends by.
 		constexpr unsigned int rigged_import_flags = import_flags | aiProcess_LimitBoneWeights;
 
+		// Lower case, dot first, the way std::filesystem gives an extension.
+		const std::unordered_set<std::string>& ModelExtensions()
+		{
+			static const std::unordered_set<std::string> extensions = []
+			{
+				// "*.3ds;*.obj;..."
+				std::string list;
+				Assimp::Importer().GetExtensionList(list);
+
+				std::unordered_set<std::string> found;
+				std::istringstream patterns(list);
+
+				for (std::string pattern; std::getline(patterns, pattern, ';');)
+					found.insert(pattern.substr(pattern.find('.')));
+
+				return found;
+			}();
+
+			return extensions;
+		};
+
+		#pragma endregion
+
+		#pragma region Materials
+
 		// glTF's code for a sampler that reads the nearest texel.
 		constexpr int GLTF_NEAREST = 9728;
-
-		// Closer than this to nothing, an offset is none: a shape key's vertex
-		// that does not move, or a channel that never leaves its rest value.
-		constexpr float NEGLIGIBLE = 1e-5f;
 
 		// glTF's alpha cutoff when a material is masked and names none.
 		constexpr float GLTF_DEFAULT_CUTOFF = 0.5f;
@@ -102,169 +125,6 @@ void main()
 	FragColor = vec4(colour.rgb, 1.0);
 }
 )";
-
-		// A layer for each of the mesh's sets of texture coordinates past the
-		// first, numbered by its channel, each vertex's coordinates its words.
-		std::vector<UVLayer> UVLayersOf(const aiMesh& mesh)
-		{
-			std::vector<UVLayer> layers;
-
-			for (unsigned int channel = 1; channel < AI_MAX_NUMBER_OF_TEXTURECOORDS; channel++)
-				if (mesh.HasTextureCoords(channel))
-					layers.push_back({ channel, mesh.mNumUVComponents[channel] });
-
-			return layers;
-		};
-
-		void AppendUVs(const aiMesh& mesh, unsigned int index, std::vector<UVLayer>& layers)
-		{
-			for (UVLayer& layer : layers)
-				for (uint32_t i = 0; i < layer.words; i++)
-					layer.values.push_back(std::bit_cast<uint32_t>(mesh.mTextureCoords[layer.id][index][i]));
-		};
-
-		void Collect(
-			const aiScene& scene,
-			const aiNode& node,
-			const aiMatrix4x4& parent_transform,
-			std::vector<ModelPart>& parts)
-		{
-			const aiMatrix4x4 transform = parent_transform * node.mTransformation;
-
-			// Keeps normals square to their faces however the node stretches them.
-			const aiMatrix3x3 turn = aiMatrix3x3(transform).Inverse().Transpose();
-
-			for (unsigned int n = 0; n < node.mNumMeshes; n++)
-			{
-				const aiMesh& mesh = *scene.mMeshes[node.mMeshes[n]];
-
-				// Points and lines are sorted into meshes of their own, which a
-				// triangle list has nothing to draw with.
-				if (!(mesh.mPrimitiveTypes & aiPrimitiveType_TRIANGLE))
-					continue;
-
-				ModelPart& part = parts.emplace_back();
-				part.material = mesh.mMaterialIndex;
-				part.layers = UVLayersOf(mesh);
-
-				part.name =
-					node.mName.length ? node.mName.C_Str() :
-					mesh.mName.length ? mesh.mName.C_Str() :
-					"Mesh " + std::to_string(parts.size());
-
-				part.vertices.reserve((size_t)mesh.mNumFaces * model_vertices_per_triangle * model_floats_per_vertex);
-
-				if (mesh.HasTextureCoords(0))
-					part.uvs.reserve(part.vertices.capacity() / model_floats_per_vertex * model_floats_per_uv);
-
-				if (mesh.HasNormals())
-					part.normals.reserve(part.vertices.capacity());
-
-				if (mesh.HasVertexColors(0))
-					part.colors.reserve(part.vertices.capacity() / model_floats_per_vertex * model_floats_per_color);
-
-				for (unsigned int f = 0; f < mesh.mNumFaces; f++)
-				{
-					const aiFace& face = mesh.mFaces[f];
-
-					if (face.mNumIndices != model_vertices_per_triangle)
-						continue;
-
-					for (unsigned int i = 0; i < face.mNumIndices; i++)
-					{
-						const aiVector3D vertex = transform * mesh.mVertices[face.mIndices[i]];
-
-						part.vertices.insert(part.vertices.end(), { vertex.x, vertex.y, vertex.z });
-
-						if (mesh.HasTextureCoords(0))
-						{
-							const aiVector3D& uv = mesh.mTextureCoords[0][face.mIndices[i]];
-
-							part.uvs.insert(part.uvs.end(), { uv.x, uv.y });
-						};
-
-						if (mesh.HasNormals())
-						{
-							const aiVector3D normal = (turn * mesh.mNormals[face.mIndices[i]]).Normalize();
-
-							part.normals.insert(part.normals.end(), { normal.x, normal.y, normal.z });
-						};
-
-						if (mesh.HasVertexColors(0))
-						{
-							const aiColor4D& color = mesh.mColors[0][face.mIndices[i]];
-
-							part.colors.insert(part.colors.end(), { color.r, color.g, color.b, color.a });
-						};
-
-						AppendUVs(mesh, face.mIndices[i], part.layers);
-					};
-				};
-			};
-
-			for (unsigned int c = 0; c < node.mNumChildren; c++)
-				Collect(scene, *node.mChildren[c], transform, parts);
-		};
-
-		// Lower case, dot first, the way std::filesystem gives an extension.
-		const std::unordered_set<std::string>& ModelExtensions()
-		{
-			static const std::unordered_set<std::string> extensions = []
-			{
-				// "*.3ds;*.obj;..."
-				std::string list;
-				Assimp::Importer().GetExtensionList(list);
-
-				std::unordered_set<std::string> found;
-				std::istringstream patterns(list);
-
-				for (std::string pattern; std::getline(patterns, pattern, ';');)
-					found.insert(pattern.substr(pattern.find('.')));
-
-				return found;
-			}();
-
-			return extensions;
-		};
-
-		bool HasRig(const aiScene& scene)
-		{
-			if (scene.HasAnimations())
-				return true;
-
-			for (unsigned int m = 0; m < scene.mNumMeshes; m++)
-				if (scene.mMeshes[m]->HasBones() || scene.mMeshes[m]->mNumAnimMeshes)
-					return true;
-
-			return false;
-		};
-
-		glm::vec3 ToGlm(const aiVector3D& vector)
-		{
-			return glm::vec3(vector.x, vector.y, vector.z);
-		};
-
-		glm::quat ToGlm(const aiQuaternion& rotation)
-		{
-			return glm::quat(rotation.w, rotation.x, rotation.y, rotation.z);
-		};
-
-		// Assimp's matrices are row by row, glm's column by column.
-		glm::mat4 ToGlm(const aiMatrix4x4& matrix)
-		{
-			return glm::transpose(glm::make_mat4(&matrix.a1));
-		};
-
-		void SetLocal(GameObject& object, const aiMatrix4x4& matrix)
-		{
-			aiVector3D scaling, position;
-			aiQuaternion rotation;
-			matrix.Decompose(scaling, rotation, position);
-
-			object.transform.position = ToGlm(position);
-			object.transform.rotation = Transform::EulerDegrees(ToGlm(rotation));
-			object.transform.scale = ToGlm(scaling);
-		};
 
 		// model_shader_path, written into the project if it has none by that name.
 		std::string ModelShader()
@@ -374,6 +234,194 @@ void main()
 			};
 		};
 
+		#pragma endregion
+
+		#pragma region Parts
+
+		// A layer for each of the mesh's sets of texture coordinates past the
+		// first, numbered by its channel, each vertex's coordinates its words.
+		std::vector<UVLayer> UVLayersOf(const aiMesh& mesh)
+		{
+			std::vector<UVLayer> layers;
+
+			for (unsigned int channel = 1; channel < AI_MAX_NUMBER_OF_TEXTURECOORDS; channel++)
+				if (mesh.HasTextureCoords(channel))
+					layers.push_back({ channel, mesh.mNumUVComponents[channel] });
+
+			return layers;
+		};
+
+		void AppendUVs(const aiMesh& mesh, unsigned int index, std::vector<UVLayer>& layers)
+		{
+			for (UVLayer& layer : layers)
+				for (uint32_t i = 0; i < layer.words; i++)
+					layer.values.push_back(std::bit_cast<uint32_t>(mesh.mTextureCoords[layer.id][index][i]));
+		};
+
+		void Collect(
+			const aiScene& scene,
+			const aiNode& node,
+			const aiMatrix4x4& parent_transform,
+			std::vector<ModelPart>& parts)
+		{
+			const aiMatrix4x4 transform = parent_transform * node.mTransformation;
+
+			// Keeps normals square to their faces however the node stretches them.
+			const aiMatrix3x3 turn = aiMatrix3x3(transform).Inverse().Transpose();
+
+			for (unsigned int n = 0; n < node.mNumMeshes; n++)
+			{
+				const aiMesh& mesh = *scene.mMeshes[node.mMeshes[n]];
+
+				// Points and lines are sorted into meshes of their own, which a
+				// triangle list has nothing to draw with.
+				if (!(mesh.mPrimitiveTypes & aiPrimitiveType_TRIANGLE))
+					continue;
+
+				ModelPart& part = parts.emplace_back();
+				part.material = mesh.mMaterialIndex;
+				part.layers = UVLayersOf(mesh);
+
+				part.name =
+					node.mName.length ? node.mName.C_Str() :
+					mesh.mName.length ? mesh.mName.C_Str() :
+					"Mesh " + std::to_string(parts.size());
+
+				part.vertices.reserve((size_t)mesh.mNumFaces * model_vertices_per_triangle * model_floats_per_vertex);
+
+				if (mesh.HasTextureCoords(0))
+					part.uvs.reserve(part.vertices.capacity() / model_floats_per_vertex * model_floats_per_uv);
+
+				if (mesh.HasNormals())
+					part.normals.reserve(part.vertices.capacity());
+
+				if (mesh.HasVertexColors(0))
+					part.colors.reserve(part.vertices.capacity() / model_floats_per_vertex * model_floats_per_color);
+
+				for (unsigned int f = 0; f < mesh.mNumFaces; f++)
+				{
+					const aiFace& face = mesh.mFaces[f];
+
+					if (face.mNumIndices != model_vertices_per_triangle)
+						continue;
+
+					for (unsigned int i = 0; i < face.mNumIndices; i++)
+					{
+						const aiVector3D vertex = transform * mesh.mVertices[face.mIndices[i]];
+
+						part.vertices.insert(part.vertices.end(), { vertex.x, vertex.y, vertex.z });
+
+						if (mesh.HasTextureCoords(0))
+						{
+							const aiVector3D& uv = mesh.mTextureCoords[0][face.mIndices[i]];
+
+							part.uvs.insert(part.uvs.end(), { uv.x, uv.y });
+						};
+
+						if (mesh.HasNormals())
+						{
+							const aiVector3D normal = (turn * mesh.mNormals[face.mIndices[i]]).Normalize();
+
+							part.normals.insert(part.normals.end(), { normal.x, normal.y, normal.z });
+						};
+
+						if (mesh.HasVertexColors(0))
+						{
+							const aiColor4D& color = mesh.mColors[0][face.mIndices[i]];
+
+							part.colors.insert(part.colors.end(), { color.r, color.g, color.b, color.a });
+						};
+
+						AppendUVs(mesh, face.mIndices[i], part.layers);
+					};
+				};
+			};
+
+			for (unsigned int c = 0; c < node.mNumChildren; c++)
+				Collect(scene, *node.mChildren[c], transform, parts);
+		};
+
+		// The scene's triangles, each mesh with its node's transform applied,
+		// centred and scaled to span model_fit_extent. Empty, with why logged,
+		// when there are none.
+		std::vector<ModelPart> PartsOf(const aiScene& scene, const std::string& path)
+		{
+			std::vector<ModelPart> parts;
+			Collect(scene, *scene.mRootNode, aiMatrix4x4(), parts);
+
+			if (parts.empty())
+			{
+				std::cerr << "Import: " << path << " has no triangles" << std::endl;
+				return { };
+			};
+
+			constexpr float infinity = std::numeric_limits<float>::infinity();
+
+			float low[model_floats_per_vertex] = { infinity, infinity, infinity };
+			float high[model_floats_per_vertex] = { -infinity, -infinity, -infinity };
+
+			for (const ModelPart& part : parts)
+				for (size_t i = 0; i < part.vertices.size(); i++)
+				{
+					const size_t axis = i % model_floats_per_vertex;
+
+					low[axis] = std::min(low[axis], part.vertices[i]);
+					high[axis] = std::max(high[axis], part.vertices[i]);
+				};
+
+			float centre[model_floats_per_vertex];
+			float longest = 0.0f;
+
+			for (size_t axis = 0; axis < model_floats_per_vertex; axis++)
+			{
+				centre[axis] = std::midpoint(low[axis], high[axis]);
+				longest = std::max(longest, high[axis] - low[axis]);
+			};
+
+			const float scale = longest > 0.0f ? model_fit_extent / longest : 1.0f;
+
+			for (ModelPart& part : parts)
+				for (size_t i = 0; i < part.vertices.size(); i++)
+					part.vertices[i] = (part.vertices[i] - centre[i % model_floats_per_vertex]) * scale;
+
+			return parts;
+		};
+
+		#pragma endregion
+
+		#pragma region Conversion
+
+		glm::vec3 ToGlm(const aiVector3D& vector)
+		{
+			return glm::vec3(vector.x, vector.y, vector.z);
+		};
+
+		glm::quat ToGlm(const aiQuaternion& rotation)
+		{
+			return glm::quat(rotation.w, rotation.x, rotation.y, rotation.z);
+		};
+
+		// Assimp's matrices are row by row, glm's column by column.
+		glm::mat4 ToGlm(const aiMatrix4x4& matrix)
+		{
+			return glm::transpose(glm::make_mat4(&matrix.a1));
+		};
+
+		void SetLocal(GameObject& object, const aiMatrix4x4& matrix)
+		{
+			aiVector3D scaling, position;
+			aiQuaternion rotation;
+			matrix.Decompose(scaling, rotation, position);
+
+			object.transform.position = ToGlm(position);
+			object.transform.rotation = Transform::EulerDegrees(ToGlm(rotation));
+			object.transform.scale = ToGlm(scaling);
+		};
+
+		#pragma endregion
+
+		#pragma region Names
+
 		// What a clip or a shape key is called, by its place when the file gives it no name.
 		std::string ClipName(const aiAnimation& animation, unsigned int index)
 		{
@@ -394,6 +442,14 @@ void main()
 
 			return joined;
 		};
+
+		#pragma endregion
+
+		#pragma region Skinning
+
+		// Closer than this to nothing, an offset is none: a shape key's vertex
+		// that does not move, or a channel that never leaves its rest value.
+		constexpr float NEGLIGIBLE = 1e-5f;
 
 		// A mesh unindexed, which is how Mesh draws, with what a Skin needs to
 		// bend it: each vertex's joints and weights and each shape key's
@@ -499,89 +555,9 @@ void main()
 			return part;
 		};
 
-		struct RiggedModel
-		{
-			const aiScene& scene;
-			std::filesystem::path path;
-			std::filesystem::path textures;
-			GameObject* model;
-		};
+		#pragma endregion
 
-		void AttachPart(RiggedModel& rigged, const aiMesh& mesh, GameObject& object)
-		{
-			SkinnedPart part = Unindex(mesh);
-
-			Dress(*object.Attach<Material>(), rigged.scene, *rigged.scene.mMaterials[mesh.mMaterialIndex], rigged.path, rigged.textures);
-
-			Mesh* drawing = object.Attach<Mesh>(Mesh::Triangles);
-			drawing->m_vertices = std::move(part.vertices);
-			drawing->m_textureCoordinates = std::move(part.uvs);
-			drawing->m_normals = std::move(part.normals);
-			drawing->m_colors = std::move(part.colors);
-
-			for (const UVLayer& layer : part.layers)
-				drawing->SetUVWords(layer);
-
-			if (part.joints.empty() && part.shapes.empty())
-				return;
-
-			// Bent again every frame.
-			drawing->m_draw_type = Mesh::Dynamic;
-
-			Skin* skin = object.Attach<Skin>();
-			skin->skeleton = rigged.model;
-			skin->m_joints = JoinLines(part.joints);
-			skin->m_inverseBinds = std::move(part.inverseBinds);
-			skin->m_influences = std::move(part.influences);
-			skin->m_shapes = JoinLines(part.shapes);
-			skin->m_shapeOffsets = std::move(part.shapeOffsets);
-			skin->m_shapeWeights = std::vector<float>(part.shapes.size());
-		};
-
-		void AttachNode(RiggedModel& rigged, const aiNode& node, GameObject& object)
-		{
-			std::vector<const aiMesh*> meshes;
-
-			for (unsigned int n = 0; n < node.mNumMeshes; n++)
-				if (const aiMesh* mesh = rigged.scene.mMeshes[node.mMeshes[n]]; mesh->mPrimitiveTypes & aiPrimitiveType_TRIANGLE)
-					meshes.push_back(mesh);
-
-			// One part on the node itself; more, each under it, named after its material.
-			for (const aiMesh* mesh : meshes)
-				AttachPart(
-					rigged,
-					*mesh,
-					meshes.size() == 1 ? object : *object.AddChild(rigged.scene.mMaterials[mesh->mMaterialIndex]->GetName().C_Str()));
-
-			for (unsigned int c = 0; c < node.mNumChildren; c++)
-			{
-				const aiNode& child = *node.mChildren[c];
-				GameObject* added = object.AddChild(child.mName.C_Str());
-
-				SetLocal(*added, child.mTransformation);
-				AttachNode(rigged, child, *added);
-			};
-		};
-
-		void Bound(const aiScene& scene, const aiNode& node, const aiMatrix4x4& parent, glm::vec3& low, glm::vec3& high)
-		{
-			const aiMatrix4x4 transform = parent * node.mTransformation;
-
-			for (unsigned int n = 0; n < node.mNumMeshes; n++)
-			{
-				const aiMesh& mesh = *scene.mMeshes[node.mMeshes[n]];
-
-				for (unsigned int v = 0; v < mesh.mNumVertices; v++)
-				{
-					const glm::vec3 vertex = ToGlm(transform * mesh.mVertices[v]);
-					low = glm::min(low, vertex);
-					high = glm::max(high, vertex);
-				};
-			};
-
-			for (unsigned int c = 0; c < node.mNumChildren; c++)
-				Bound(scene, *node.mChildren[c], transform, low, high);
-		};
+		#pragma region Animation
 
 		// A channel of one clip: its property, what it moves, and its keys, each
 		// a time and then the value.
@@ -787,6 +763,106 @@ void main()
 			animator->m_keys = std::move(keys);
 		};
 
+		#pragma endregion
+
+		#pragma region Rigged Models
+
+		bool HasRig(const aiScene& scene)
+		{
+			if (scene.HasAnimations())
+				return true;
+
+			for (unsigned int m = 0; m < scene.mNumMeshes; m++)
+				if (scene.mMeshes[m]->HasBones() || scene.mMeshes[m]->mNumAnimMeshes)
+					return true;
+
+			return false;
+		};
+
+		struct RiggedModel
+		{
+			const aiScene& scene;
+			std::filesystem::path path;
+			std::filesystem::path textures;
+			GameObject* model;
+		};
+
+		void AttachPart(RiggedModel& rigged, const aiMesh& mesh, GameObject& object)
+		{
+			SkinnedPart part = Unindex(mesh);
+
+			Dress(*object.Attach<Material>(), rigged.scene, *rigged.scene.mMaterials[mesh.mMaterialIndex], rigged.path, rigged.textures);
+
+			Mesh* drawing = object.Attach<Mesh>(Mesh::Triangles);
+			drawing->m_vertices = std::move(part.vertices);
+			drawing->m_textureCoordinates = std::move(part.uvs);
+			drawing->m_normals = std::move(part.normals);
+			drawing->m_colors = std::move(part.colors);
+
+			for (const UVLayer& layer : part.layers)
+				drawing->SetUVWords(layer);
+
+			if (part.joints.empty() && part.shapes.empty())
+				return;
+
+			// Bent again every frame.
+			drawing->m_draw_type = Mesh::Dynamic;
+
+			Skin* skin = object.Attach<Skin>();
+			skin->skeleton = rigged.model;
+			skin->m_joints = JoinLines(part.joints);
+			skin->m_inverseBinds = std::move(part.inverseBinds);
+			skin->m_influences = std::move(part.influences);
+			skin->m_shapes = JoinLines(part.shapes);
+			skin->m_shapeOffsets = std::move(part.shapeOffsets);
+			skin->m_shapeWeights = std::vector<float>(part.shapes.size());
+		};
+
+		void AttachNode(RiggedModel& rigged, const aiNode& node, GameObject& object)
+		{
+			std::vector<const aiMesh*> meshes;
+
+			for (unsigned int n = 0; n < node.mNumMeshes; n++)
+				if (const aiMesh* mesh = rigged.scene.mMeshes[node.mMeshes[n]]; mesh->mPrimitiveTypes & aiPrimitiveType_TRIANGLE)
+					meshes.push_back(mesh);
+
+			// One part on the node itself; more, each under it, named after its material.
+			for (const aiMesh* mesh : meshes)
+				AttachPart(
+					rigged,
+					*mesh,
+					meshes.size() == 1 ? object : *object.AddChild(rigged.scene.mMaterials[mesh->mMaterialIndex]->GetName().C_Str()));
+
+			for (unsigned int c = 0; c < node.mNumChildren; c++)
+			{
+				const aiNode& child = *node.mChildren[c];
+				GameObject* added = object.AddChild(child.mName.C_Str());
+
+				SetLocal(*added, child.mTransformation);
+				AttachNode(rigged, child, *added);
+			};
+		};
+
+		void Bound(const aiScene& scene, const aiNode& node, const aiMatrix4x4& parent, glm::vec3& low, glm::vec3& high)
+		{
+			const aiMatrix4x4 transform = parent * node.mTransformation;
+
+			for (unsigned int n = 0; n < node.mNumMeshes; n++)
+			{
+				const aiMesh& mesh = *scene.mMeshes[node.mMeshes[n]];
+
+				for (unsigned int v = 0; v < mesh.mNumVertices; v++)
+				{
+					const glm::vec3 vertex = ToGlm(transform * mesh.mVertices[v]);
+					low = glm::min(low, vertex);
+					high = glm::max(high, vertex);
+				};
+			};
+
+			for (unsigned int c = 0; c < node.mNumChildren; c++)
+				Bound(scene, *node.mChildren[c], transform, low, high);
+		};
+
 		GameObject* ImportRigged(const aiScene& scene, const std::string& path, GameObject& parent)
 		{
 			constexpr float infinity = std::numeric_limits<float>::infinity();
@@ -815,52 +891,10 @@ void main()
 			return model;
 		};
 
-		// The scene's triangles, each mesh with its node's transform applied,
-		// centred and scaled to span model_fit_extent. Empty, with why logged,
-		// when there are none.
-		std::vector<ModelPart> PartsOf(const aiScene& scene, const std::string& path)
-		{
-			std::vector<ModelPart> parts;
-			Collect(scene, *scene.mRootNode, aiMatrix4x4(), parts);
-
-			if (parts.empty())
-			{
-				std::cerr << "Import: " << path << " has no triangles" << std::endl;
-				return { };
-			};
-
-			constexpr float infinity = std::numeric_limits<float>::infinity();
-
-			float low[model_floats_per_vertex] = { infinity, infinity, infinity };
-			float high[model_floats_per_vertex] = { -infinity, -infinity, -infinity };
-
-			for (const ModelPart& part : parts)
-				for (size_t i = 0; i < part.vertices.size(); i++)
-				{
-					const size_t axis = i % model_floats_per_vertex;
-
-					low[axis] = std::min(low[axis], part.vertices[i]);
-					high[axis] = std::max(high[axis], part.vertices[i]);
-				};
-
-			float centre[model_floats_per_vertex];
-			float longest = 0.0f;
-
-			for (size_t axis = 0; axis < model_floats_per_vertex; axis++)
-			{
-				centre[axis] = std::midpoint(low[axis], high[axis]);
-				longest = std::max(longest, high[axis] - low[axis]);
-			};
-
-			const float scale = longest > 0.0f ? model_fit_extent / longest : 1.0f;
-
-			for (ModelPart& part : parts)
-				for (size_t i = 0; i < part.vertices.size(); i++)
-					part.vertices[i] = (part.vertices[i] - centre[i % model_floats_per_vertex]) * scale;
-
-			return parts;
-		};
+		#pragma endregion
 	};
+
+	#pragma region Loading
 
 	bool IsModelFile(const std::string& path)
 	{
@@ -889,6 +923,10 @@ void main()
 
 		return PartsOf(*scene, path);
 	};
+
+	#pragma endregion
+
+	#pragma region Importing
 
 	GameObject* ImportModel(const std::string& path, GameObject& parent)
 	{
@@ -934,4 +972,6 @@ void main()
 
 		return model;
 	};
+
+	#pragma endregion
 };

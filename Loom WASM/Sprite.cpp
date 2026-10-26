@@ -18,6 +18,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Quad
+
 		constexpr uint32_t STATIC_DRAW = 0x88E4;	// GL_STATIC_DRAW
 
 		// Two triangles over the unit square. The vertex shader takes its
@@ -37,6 +39,10 @@ namespace Loom
 		// Keeps a zero or negative pixelsPerUnit from making the quad infinite or
 		// turning it inside out.
 		constexpr float MIN_PIXELS_PER_UNIT = 1e-3f;
+
+		#pragma endregion
+
+		#pragma region Shaders
 
 		const char* const SPRITE_SHADER = R"(
 // ===COMMON===
@@ -194,6 +200,8 @@ void main()
 			static const uint32_t program = Compile("Loom Sprite Depth", SPRITE_DEPTH_SHADER);
 			return program;
 		};
+
+		#pragma endregion
 	};
 
 	Texture* Sprite::GetTexture()

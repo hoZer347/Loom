@@ -28,21 +28,7 @@ namespace Loom
 {
 	namespace
 	{
-		// How a Serial member's type is spelled in the symbols, up to its argument.
-		constexpr std::wstring_view serial_type = L"Loom::Serial<";
-
-		// cvconst.h's DataIsMember, which dbghelp.h leaves out of its copy of
-		// the symbol enums.
-		constexpr DWORD data_is_member = 7;
-
-		struct Member final
-		{
-			std::string label;
-			std::vector<FieldNames::Enumerator> enumerators;
-		};
-
-		// A member by its offset in the complete object.
-		typedef std::map<ptrdiff_t, Member> Members;
+		#pragma region Symbols
 
 		// Not a process handle: DbgHelp takes any unique value for a session that
 		// loads its modules by hand, which keeps this one apart from anything
@@ -122,6 +108,26 @@ namespace Loom
 			};
 		};
 
+		#pragma endregion
+
+		#pragma region Members
+
+		// How a Serial member's type is spelled in the symbols, up to its argument.
+		constexpr std::wstring_view serial_type = L"Loom::Serial<";
+
+		// cvconst.h's DataIsMember, which dbghelp.h leaves out of its copy of
+		// the symbol enums.
+		constexpr DWORD data_is_member = 7;
+
+		struct Member final
+		{
+			std::string label;
+			std::vector<FieldNames::Enumerator> enumerators;
+		};
+
+		// A member by its offset in the complete object.
+		typedef std::map<ptrdiff_t, Member> Members;
+
 		// The enumerators of the enum a Serial holds, or none when it holds
 		// something else.
 		std::vector<FieldNames::Enumerator> Enumerators(DWORD64 base, ULONG serial)
@@ -200,6 +206,10 @@ namespace Loom
 				};
 			};
 		};
+
+		#pragma endregion
+
+		#pragma region Lookup
 
 		// typeid spells a type "struct Game::Name<class Game::Other>" and puts an
 		// anonymous namespace in words; the symbols say "Game::Name<Game::Other>"
@@ -320,6 +330,8 @@ namespace Loom
 
 			return members;
 		};
+
+		#pragma endregion
 	};
 
 	std::vector<std::string> FieldNames::Of(const LoomObject& object)

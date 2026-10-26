@@ -40,6 +40,8 @@ namespace Loom
 		};
 	};
 
+	#pragma region Names
+
 	bool EditorLayouts::IsValidName(const std::string& name)
 	{
 		if (name.empty() || name.size() > MaxNameLength || name.front() == ' ' || name.back() == ' ')
@@ -73,6 +75,10 @@ namespace Loom
 
 		return names;
 	};
+
+	#pragma endregion
+
+	#pragma region Files
 
 	bool EditorLayouts::Save(const std::filesystem::path& folder, const std::string& name)
 	{
@@ -133,4 +139,6 @@ namespace Loom
 
 		return std::filesystem::remove(PathOf(folder, name), error);
 	};
+
+	#pragma endregion
 };

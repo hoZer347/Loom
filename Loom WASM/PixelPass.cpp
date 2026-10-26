@@ -64,6 +64,8 @@ void main()
 		Release();
 	};
 
+	#pragma region Noting
+
 	void PixelPass::Begin()
 	{
 		m_noted.clear();
@@ -99,6 +101,10 @@ void main()
 		material.Apply(program);
 		Scene::ApplyView(program);
 	};
+
+	#pragma endregion
+
+	#pragma region Drawing
 
 	void PixelPass::Draw(uint32_t target, glm::ivec2 size)
 	{
@@ -188,4 +194,6 @@ void main()
 		m_size = glm::ivec2(0);
 		m_noted.clear();
 	};
+
+	#pragma endregion
 };

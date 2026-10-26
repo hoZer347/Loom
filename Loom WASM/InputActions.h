@@ -29,7 +29,9 @@ namespace Loom
 	*/
 	struct LOOM_API InputActions final
 	{
-		static constexpr const char* extension = ".loominput";
+		InputActions() = delete;
+
+		#pragma region Actions
 
 		struct Action
 		{
@@ -44,16 +46,6 @@ namespace Loom
 			std::string folder;
 
 			bool operator==(const Action&) const = default;
-		};
-
-		// What a file holds: the actions, and every folder they are filed in,
-		// those holding none included.
-		struct File
-		{
-			std::vector<Action> actions;
-			std::vector<std::string> folders;
-
-			bool operator==(const File&) const = default;
 		};
 
 		// Whether an action by that name had its keys go down together this
@@ -71,6 +63,22 @@ namespace Loom
 		// nothing or it holds the '=' a file ends a name at.
 		static std::string Tidy(std::string_view name);
 
+		#pragma endregion
+
+		#pragma region Files
+
+		static constexpr const char* extension = ".loominput";
+
+		// What a file holds: the actions, and every folder they are filed in,
+		// those holding none included.
+		struct File
+		{
+			std::vector<Action> actions;
+			std::vector<std::string> folders;
+
+			bool operator==(const File&) const = default;
+		};
+
 		// The actions in the file, or none when it is not there.
 		static void Load(const std::string& file);
 		static bool Save(const std::string& file);
@@ -80,6 +88,6 @@ namespace Loom
 		static File Read(std::istream& in);
 		static void Write(std::ostream& out, const File& file);
 
-		InputActions() = delete;
+		#pragma endregion
 	};
 };

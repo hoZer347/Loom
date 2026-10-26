@@ -48,7 +48,7 @@ namespace Loom
 		#pragma endregion
 	};
 
-	#pragma region Script
+	#pragma region Running
 
 	void DialogueManager::SetScript(std::string script)
 	{
@@ -57,78 +57,6 @@ namespace Loom
 		// Readiness was established against the previous script.
 		_ready = false;
 	};
-
-	#pragma endregion
-
-	#pragma region Text
-
-	void DialogueManager::SetContinueText(std::string text)
-	{
-		_continueText = std::move(text);
-	};
-
-	void DialogueManager::Append(const std::string& text)
-	{
-		if (text.empty())
-			return;
-
-		_text += text;
-
-		if (onTextChanged)
-			onTextChanged(_text);
-	};
-
-	void DialogueManager::Append(char c)
-	{
-		_text += c;
-
-		if (onTextChanged)
-			onTextChanged(_text);
-	};
-
-	void DialogueManager::ClearText()
-	{
-		if (_text.empty())
-			return;
-
-		_text.clear();
-
-		if (onTextChanged)
-			onTextChanged(_text);
-	};
-
-	#pragma endregion
-
-	#pragma region Voice
-
-	float DialogueManager::VoiceOut() const
-	{
-		const float level = VoiceLevel ? std::clamp(VoiceLevel(), 0.0f, 1.0f) : 1.0f;
-
-		return voiceVolume * level;
-	};
-
-	void DialogueManager::Speak(char c)
-	{
-		if (!onSpeak || std::isspace(static_cast<unsigned char>(c)))
-			return;
-
-		if (_voiceCharCount++ % std::max(1, voiceEvery) != 0)
-			return;
-
-		const float level = VoiceOut();
-
-		if (level <= 0.0f)
-			return;
-
-		const float t = float(std::rand()) / float(RAND_MAX);
-
-		onSpeak(c, level, voicePitchMin + (voicePitchMax - voicePitchMin) * t);
-	};
-
-	#pragma endregion
-
-	#pragma region Running
 
 	void DialogueManager::OnStart()
 	{
@@ -222,6 +150,74 @@ namespace Loom
 		};
 
 		Push<St_Dg_DialogueEnd>();
+	};
+
+	#pragma endregion
+
+	#pragma region Text
+
+	void DialogueManager::SetContinueText(std::string text)
+	{
+		_continueText = std::move(text);
+	};
+
+	void DialogueManager::Append(const std::string& text)
+	{
+		if (text.empty())
+			return;
+
+		_text += text;
+
+		if (onTextChanged)
+			onTextChanged(_text);
+	};
+
+	void DialogueManager::Append(char c)
+	{
+		_text += c;
+
+		if (onTextChanged)
+			onTextChanged(_text);
+	};
+
+	void DialogueManager::ClearText()
+	{
+		if (_text.empty())
+			return;
+
+		_text.clear();
+
+		if (onTextChanged)
+			onTextChanged(_text);
+	};
+
+	#pragma endregion
+
+	#pragma region Voice
+
+	float DialogueManager::VoiceOut() const
+	{
+		const float level = VoiceLevel ? std::clamp(VoiceLevel(), 0.0f, 1.0f) : 1.0f;
+
+		return voiceVolume * level;
+	};
+
+	void DialogueManager::Speak(char c)
+	{
+		if (!onSpeak || std::isspace(static_cast<unsigned char>(c)))
+			return;
+
+		if (_voiceCharCount++ % std::max(1, voiceEvery) != 0)
+			return;
+
+		const float level = VoiceOut();
+
+		if (level <= 0.0f)
+			return;
+
+		const float t = float(std::rand()) / float(RAND_MAX);
+
+		onSpeak(c, level, voicePitchMin + (voicePitchMax - voicePitchMin) * t);
 	};
 
 	#pragma endregion

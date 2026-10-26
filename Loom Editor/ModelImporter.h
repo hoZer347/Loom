@@ -11,6 +11,8 @@ namespace Loom
 {
 	struct GameObject;
 
+	#pragma region Loading
+
 	// How much of clip space a loaded model's longest side spans.
 	inline constexpr float model_fit_extent = 1.6f;
 
@@ -18,16 +20,6 @@ namespace Loom
 	inline constexpr size_t model_vertices_per_triangle = 3;
 	inline constexpr size_t model_floats_per_uv = 2;
 	inline constexpr size_t model_floats_per_color = 4;
-
-	// What an imported model draws with, relative to the project folder,
-	// written there by the first import: lit and shadowed, its texture times
-	// its vertex colours times the material's colour.
-	inline constexpr const char* model_shader_path = "Assets/Model.shader";
-
-	// The material variables that shader reads, by name: the texture, white
-	// without one, and the alpha below which a fragment is cut out.
-	inline constexpr const char* model_texture_variable = "u_texture";
-	inline constexpr const char* model_alpha_cutoff_variable = "u_alphaCutoff";
 
 	// One mesh of a model, unindexed (which is how Mesh draws), with its node's
 	// transform already applied, its UVs, normals and colours when the file
@@ -59,6 +51,20 @@ namespace Loom
 	*/
 	std::vector<ModelPart> LoadModel(const std::string& path);
 
+	#pragma endregion
+
+	#pragma region Importing
+
+	// What an imported model draws with, relative to the project folder,
+	// written there by the first import: lit and shadowed, its texture times
+	// its vertex colours times the material's colour.
+	inline constexpr const char* model_shader_path = "Assets/Model.shader";
+
+	// The material variables that shader reads, by name: the texture, white
+	// without one, and the alpha below which a fragment is cut out.
+	inline constexpr const char* model_texture_variable = "u_texture";
+	inline constexpr const char* model_alpha_cutoff_variable = "u_alphaCutoff";
+
 	/**
 	* Loom::ImportModel
 	* - Loads a model into a new child of parent, named after the file, with a
@@ -75,4 +81,6 @@ namespace Loom
 	* - Null, with the reason logged, when the file cannot be read
 	*/
 	GameObject* ImportModel(const std::string& path, GameObject& parent);
+
+	#pragma endregion
 };

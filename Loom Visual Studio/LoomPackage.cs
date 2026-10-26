@@ -28,24 +28,12 @@ namespace LoomVisualStudio
 	{
 		public const string PackageGuid = "69f330bb-26c0-41bf-a703-9df61f61d634";
 
+		#region Command
+
 		static readonly Guid commandSet = new Guid("76837ee1-2516-42e3-b0fa-d0c4a6c01015");
 		const int addScriptCommand = 0x0100;
 
-		// A scripts project is told apart by what F5 runs, which is also the
-		// editor that writes the script.
-		const string debuggerCommandProperty = "LocalDebuggerCommand";
-		const string editorExecutable = "Loom Editor.exe";
-
 		internal const string Title = "Add Loom Script";
-
-		// Where a script made from the current selection goes.
-		sealed class Target
-		{
-			public IVsHierarchy Hierarchy;
-			public string Project;
-			public string Folder;
-			public string Editor;
-		};
 
 		protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
 		{
@@ -104,6 +92,15 @@ namespace LoomVisualStudio
 				_ = JoinableTaskFactory.RunAsync(() => AddScriptAsync(target, name));
 		}
 
+		void Show(string message, OLEMSGICON icon)
+		{
+			VsShellUtilities.ShowMessageBox(this, message, Title, icon, OLEMSGBUTTON.OLEMSGBUTTON_OK, OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST);
+		}
+
+		#endregion
+
+		#region Script Writing
+
 		async Task AddScriptAsync(Target target, string name)
 		{
 			var (exitCode, output, error) = await Task.Run(() => RunEditorAsync(target, name));
@@ -152,13 +149,23 @@ namespace LoomVisualStudio
 		// A path ending in a backslash would escape its own closing quote.
 		static string Quote(string argument) => "\"" + argument.TrimEnd('\\') + "\"";
 
-		static string RelativeFolder(Target target)
-		{
-			string root = Path.GetDirectoryName(target.Project);
-			string relative = target.Folder.Length > root.Length ? target.Folder.Substring(root.Length).TrimStart('\\') : "";
+		#endregion
 
-			return Path.Combine(Path.GetFileName(root), relative);
-		}
+		#region Selection
+
+		// Where a script made from the current selection goes.
+		sealed class Target
+		{
+			public IVsHierarchy Hierarchy;
+			public string Project;
+			public string Folder;
+			public string Editor;
+		};
+
+		// A scripts project is told apart by what F5 runs, which is also the
+		// editor that writes the script.
+		const string debuggerCommandProperty = "LocalDebuggerCommand";
+		const string editorExecutable = "Loom Editor.exe";
 
 		Target SelectedTarget()
 		{
@@ -250,9 +257,14 @@ namespace LoomVisualStudio
 				: null;
 		}
 
-		void Show(string message, OLEMSGICON icon)
+		static string RelativeFolder(Target target)
 		{
-			VsShellUtilities.ShowMessageBox(this, message, Title, icon, OLEMSGBUTTON.OLEMSGBUTTON_OK, OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST);
+			string root = Path.GetDirectoryName(target.Project);
+			string relative = target.Folder.Length > root.Length ? target.Folder.Substring(root.Length).TrimStart('\\') : "";
+
+			return Path.Combine(Path.GetFileName(root), relative);
 		}
+
+		#endregion
 	}
 }

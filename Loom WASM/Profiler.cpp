@@ -17,6 +17,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Constants
+
 		// Past this many stages in a frame a thread's are dropped, so one
 		// recording with no frames ending, such as a test's, stays bounded.
 		constexpr size_t MOST_SPANS = 4096;
@@ -34,6 +36,10 @@ namespace Loom
 		// Where a thread never named is listed, and what it is called.
 		constexpr int UNNAMED_ORDER = std::numeric_limits<int>::max();
 		constexpr const char* UNNAMED = "Thread ";
+
+		#pragma endregion
+
+		#pragma region Storage
 
 		struct Recorded
 		{
@@ -146,6 +152,24 @@ namespace Loom
 			return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - Shared().origin).count();
 		};
 
+		Log& ThisThread()
+		{
+			if (t_log)
+				return *t_log;
+
+			Registry& shared = Shared();
+			std::lock_guard<std::mutex> lock(shared.mutex);
+
+			t_log = shared.logs.emplace_back(std::make_unique<Log>()).get();
+			t_log->name = UNNAMED + std::to_string(shared.logs.size());
+
+			return *t_log;
+		};
+
+		#pragma endregion
+
+		#pragma region Frames
+
 		// Decides whether the frame starting now is recorded. Polls keep to
 		// their schedule rather than to the frame that took each, unless a
 		// frame ran past a whole poll.
@@ -165,20 +189,6 @@ namespace Loom
 				shared.frameStart = now;
 
 			s_polled.store(next, std::memory_order_relaxed);
-		};
-
-		Log& ThisThread()
-		{
-			if (t_log)
-				return *t_log;
-
-			Registry& shared = Shared();
-			std::lock_guard<std::mutex> lock(shared.mutex);
-
-			t_log = shared.logs.emplace_back(std::make_unique<Log>()).get();
-			t_log->name = UNNAMED + std::to_string(shared.logs.size());
-
-			return *t_log;
 		};
 
 		// Takes this frame's sums into the window and the trend, and forgets
@@ -230,7 +240,11 @@ namespace Loom
 				List(part, frame, depth + 1, rows);
 			};
 		};
+
+		#pragma endregion
 	};
+
+	#pragma region Stages
 
 	Profiler::Stage::Stage(const char* name) :
 		m_open(s_recording.load(std::memory_order_relaxed) && s_polled.load(std::memory_order_relaxed))
@@ -270,6 +284,15 @@ namespace Loom
 		log.name = name;
 		log.order = order;
 	};
+
+	const char* Profiler::Current()
+	{
+		return t_open.empty() ? nullptr : t_open.back();
+	};
+
+	#pragma endregion
+
+	#pragma region Recording
 
 	void Profiler::SetRecording(bool recording)
 	{
@@ -320,10 +343,9 @@ namespace Loom
 		return s_everyFrame.load(std::memory_order_relaxed);
 	};
 
-	const char* Profiler::Current()
-	{
-		return t_open.empty() ? nullptr : t_open.back();
-	};
+	#pragma endregion
+
+	#pragma region Frames
 
 	void Profiler::EndFrame()
 	{
@@ -435,5 +457,7 @@ namespace Loom
 	{
 		return Shared().spacing;
 	};
+
+	#pragma endregion
 };
 #endif

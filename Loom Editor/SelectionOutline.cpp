@@ -21,9 +21,9 @@ namespace Loom
 {
 	namespace
 	{
-		constexpr glm::vec4 outline_colour(1.0f, 0.55f, 0.1f, 1.0f);
+		#pragma region Drawing
 
-		constexpr const char* mesh_mask_name = "Loom Editor Mesh Mask";
+		constexpr glm::vec4 outline_colour(1.0f, 0.55f, 0.1f, 1.0f);
 
 		constexpr float uncovered[] = { 0.0f, 0.0f, 0.0f, 0.0f };
 
@@ -39,6 +39,12 @@ namespace Loom
 		};
 		constexpr size_t floats_per_vertex = 3;
 		constexpr size_t screen_vertices = std::size(screen) / floats_per_vertex;
+
+		#pragma endregion
+
+		#pragma region Programs
+
+		constexpr const char* mesh_mask_name = "Loom Editor Mesh Mask";
 
 		const char* const mesh_mask_vertex = R"(
 layout(location = 0) in vec3 aPos;
@@ -164,12 +170,20 @@ void main()
 	FragColor = vec4(u_color.rgb, u_color.a * alpha);
 }
 )";
+
+		#pragma endregion
 	};
+
+	#pragma region Lifetime
 
 	SelectionOutline::~SelectionOutline()
 	{
 		Destroy();
 	};
+
+	#pragma endregion
+
+	#pragma region Programs
 
 	bool SelectionOutline::Compile()
 	{
@@ -241,6 +255,10 @@ void main()
 		return mask.program;
 	};
 
+	#pragma endregion
+
+	#pragma region Drawing
+
 	bool SelectionOutline::DrawSilhouettes(GameObject& gameObject, const Camera& camera)
 	{
 		bool drew = false;
@@ -307,4 +325,6 @@ void main()
 		renderer->SetUniform(m_edge, "u_color", outline_colour);
 		renderer->Draw(m_edge, GL_TRIANGLES, screen, screen_vertices, GL_STATIC_DRAW);
 	};
+
+	#pragma endregion
 };

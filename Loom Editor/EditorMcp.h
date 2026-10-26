@@ -34,7 +34,7 @@ namespace Loom
 	*/
 	struct EditorMcp final
 	{
-		static constexpr unsigned short default_port = 47800;
+		#pragma region Lifetime
 
 		EditorMcp(Editor& editor, UiScript& script);
 		~EditorMcp();
@@ -42,8 +42,18 @@ namespace Loom
 		EditorMcp(const EditorMcp&) = delete;
 		EditorMcp& operator=(const EditorMcp&) = delete;
 
+		#pragma endregion
+
+		#pragma region Server
+
+		static constexpr unsigned short default_port = 47800;
+
 		// False, with why on stderr, when the port cannot be had.
 		bool Listen(unsigned short port);
+
+		#pragma endregion
+
+		#pragma region Call Queue
 
 		// Once a frame, before ImGui::NewFrame.
 		void Step();
@@ -55,13 +65,25 @@ namespace Loom
 		// frames to finish.
 		using Poll = std::function<bool()>;
 
+		#pragma endregion
+
 	private:
+		#pragma region Server
+
 		void Serve();
 		void Answer(uintptr_t connection);
+
+		#pragma endregion
+
+		#pragma region Call Queue
 
 		// Blocks the server's thread until the main thread has answered.
 		nlohmann::json Wait(const std::shared_ptr<Call>& call);
 		void Finish(const std::shared_ptr<Call>& call);
+
+		#pragma endregion
+
+		#pragma region State
 
 		Editor& m_editor;
 		UiScript& m_script;
@@ -80,5 +102,7 @@ namespace Loom
 		std::shared_ptr<Call> m_running{ };
 		Poll m_poll{ };
 		std::chrono::steady_clock::time_point m_runningSince{ };
+
+		#pragma endregion
 	};
 };

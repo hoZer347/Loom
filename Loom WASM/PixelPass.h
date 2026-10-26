@@ -27,6 +27,8 @@ namespace Loom
 		PixelPass(const PixelPass&) = delete;
 		PixelPass& operator=(const PixelPass&) = delete;
 
+		#pragma region Noting
+
 		// Notes the pixel pass of each material drawn until End, in place of
 		// any pass noting already.
 		void Begin();
@@ -38,6 +40,10 @@ namespace Loom
 		// Called for each material drawn.
 		static void Note(const Material& material);
 
+		#pragma endregion
+
+		#pragma region Drawing
+
 		// Draws a colour target of size through the passes noted, or as it is
 		// when none were, into whatever is being drawn into, clearing its depth.
 		void Draw(uint32_t target, glm::ivec2 size);
@@ -45,8 +51,14 @@ namespace Loom
 		// Gives back what it holds, for before the renderer goes.
 		void Release();
 
+		#pragma endregion
+
 	private:
+		#pragma region Drawing
+
 		uint32_t Intermediate(size_t index, glm::ivec2 size);
+
+		#pragma endregion
 
 		// Each pass's program, in the order its first material was drawn.
 		std::vector<uint32_t> m_noted;

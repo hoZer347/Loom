@@ -145,9 +145,11 @@ namespace Loom
 		/// local units.
 		void QuadVector(float out[4]) const;
 
+		void OnRender() override;
+
 		#pragma endregion
 
-		#pragma region Shared setup
+		#pragma region Shared Setup
 
 		/// The shader every sprite draws with. Compiled once, on the first draw.
 		static inline std::string shaderPath = "Flipbook.shader";
@@ -164,11 +166,20 @@ namespace Loom
 
 		#pragma endregion
 
-		void OnRender() override;
+		#pragma region Inspector
+
 		void OnGui() override;
 
+		#pragma endregion
+
 	private:
+		#pragma region Animation
+
 		void AdoptLength();
+
+		#pragma endregion
+
+		#pragma region State
 
 		int clip = 0;
 
@@ -177,5 +188,7 @@ namespace Loom
 		float startTime = 0.0f;
 
 		unsigned int m_program = 0;
+
+		#pragma endregion
 	};
 };

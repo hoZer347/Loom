@@ -84,8 +84,34 @@ namespace Loom
 	{
 		virtual ~AttributeBase() = default;
 
+		#pragma region Value
+
 		/// The current value rendered for display. Empty for a type with no sensible text.
 		virtual std::string GetValueString() const { return ""; };
+
+		/// The value as a number, when the value type is one. False for the types that
+		/// are not -- a string attribute has no delta to draw -- so a caller can skip
+		/// rather than guess at a zero.
+		virtual bool TryGetNumbers(double& baseValue, double& value) const
+		{
+			baseValue = 0.0;
+			value = 0.0;
+
+			return false;
+		};
+
+		/// Writes the base from a number, for a value type that is one. The mirror of
+		/// TryGetNumbers, and it exists for the same reason: something that has to walk
+		/// every attribute an object has -- a save, a diff, a copy taken to simulate
+		/// against -- cannot know each one's type.
+		virtual bool TrySetBaseNumber(double value) { return false; };
+
+		/// How many modifiers are stacked on it, for a readout that lists them.
+		virtual size_t ModifierCount() const { return 0; };
+
+		#pragma endregion
+
+		#pragma region Changes
 
 		/// Recompute on the next read, and tell everyone watching.
 		virtual void Invalidate() { };
@@ -111,25 +137,7 @@ namespace Loom
 				});
 		};
 
-		/// The value as a number, when the value type is one. False for the types that
-		/// are not -- a string attribute has no delta to draw -- so a caller can skip
-		/// rather than guess at a zero.
-		virtual bool TryGetNumbers(double& baseValue, double& value) const
-		{
-			baseValue = 0.0;
-			value = 0.0;
-
-			return false;
-		};
-
-		/// Writes the base from a number, for a value type that is one. The mirror of
-		/// TryGetNumbers, and it exists for the same reason: something that has to walk
-		/// every attribute an object has -- a save, a diff, a copy taken to simulate
-		/// against -- cannot know each one's type.
-		virtual bool TrySetBaseNumber(double value) { return false; };
-
-		/// How many modifiers are stacked on it, for a readout that lists them.
-		virtual size_t ModifierCount() const { return 0; };
+		#pragma endregion
 
 	protected:
 		void RaiseChanged()
@@ -153,6 +161,8 @@ namespace Loom
 	template <typename _ValueType, typename _CacheMode = OnModifier>
 	struct Attribute : AttributeBase
 	{
+		#pragma region Construction
+
 		static_assert(
 			std::is_same_v<_CacheMode, OnModifier> || std::is_same_v<_CacheMode, OnValue>,
 			"Cache mode must be OnModifier or OnValue");
@@ -170,6 +180,10 @@ namespace Loom
 			m_base(base),
 			onModify(std::move(onModify))
 		{ };
+
+		#pragma endregion
+
+		#pragma region Value
 
 		const _ValueType& Base() const { return m_base; };
 
@@ -195,6 +209,53 @@ namespace Loom
 
 			Invalidate();
 		};
+
+		std::string GetValueString() const override
+		{
+			if constexpr (std::is_same_v<_ValueType, std::string>)
+				return Value();
+			else if constexpr (std::is_arithmetic_v<_ValueType>)
+				return std::to_string(Value());
+			else return "";
+		};
+
+		bool TryGetNumbers(double& baseValue, double& value) const override
+		{
+			baseValue = 0.0;
+			value = 0.0;
+
+			// bool and char convert, but neither is meaningfully a number here -- a
+			// readout drawing a delta between two bools is noise, not information.
+			if constexpr (
+				std::is_arithmetic_v<_ValueType>
+				&& !std::is_same_v<_ValueType, bool>
+				&& !std::is_same_v<_ValueType, char>)
+			{
+				baseValue = double(m_base);
+				value = double(Value());
+
+				return true;
+			}
+			else return false;
+		};
+
+		bool TrySetBaseNumber(double value) override
+		{
+			if constexpr (
+				std::is_arithmetic_v<_ValueType>
+				&& !std::is_same_v<_ValueType, bool>
+				&& !std::is_same_v<_ValueType, char>)
+			{
+				SetBase(_ValueType(value));
+
+				return true;
+			}
+			else return false;
+		};
+
+		#pragma endregion
+
+		#pragma region Modifiers
 
 		/// Takes ownership. The returned pointer stays valid until it is removed or the
 		/// attribute dies, and is what a caller keeps in order to remove the modifier
@@ -247,6 +308,12 @@ namespace Loom
 			Invalidate();
 		};
 
+		size_t ModifierCount() const override { return modifiers.size(); };
+
+		#pragma endregion
+
+		#pragma region Changes
+
 		AttributeTrigger* AddTrigger(std::unique_ptr<AttributeTrigger> trigger)
 		{
 			AttributeTrigger* raw = trigger.get();
@@ -281,17 +348,6 @@ namespace Loom
 				};
 		};
 
-		size_t ModifierCount() const override { return modifiers.size(); };
-
-		std::string GetValueString() const override
-		{
-			if constexpr (std::is_same_v<_ValueType, std::string>)
-				return Value();
-			else if constexpr (std::is_arithmetic_v<_ValueType>)
-				return std::to_string(Value());
-			else return "";
-		};
-
 		void Invalidate() override
 		{
 			dirty = true;
@@ -306,39 +362,7 @@ namespace Loom
 			RaiseChanged();
 		};
 
-		bool TryGetNumbers(double& baseValue, double& value) const override
-		{
-			baseValue = 0.0;
-			value = 0.0;
-
-			// bool and char convert, but neither is meaningfully a number here -- a
-			// readout drawing a delta between two bools is noise, not information.
-			if constexpr (
-				std::is_arithmetic_v<_ValueType>
-				&& !std::is_same_v<_ValueType, bool>
-				&& !std::is_same_v<_ValueType, char>)
-			{
-				baseValue = double(m_base);
-				value = double(Value());
-
-				return true;
-			}
-			else return false;
-		};
-
-		bool TrySetBaseNumber(double value) override
-		{
-			if constexpr (
-				std::is_arithmetic_v<_ValueType>
-				&& !std::is_same_v<_ValueType, bool>
-				&& !std::is_same_v<_ValueType, char>)
-			{
-				SetBase(_ValueType(value));
-
-				return true;
-			}
-			else return false;
-		};
+		#pragma endregion
 
 	private:
 		_ValueType Recalculate() const

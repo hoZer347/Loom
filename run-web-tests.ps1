@@ -37,6 +37,8 @@ $root = $PSScriptRoot
 
 . (Join-Path $root 'WebBuild.ps1')
 
+#region Sources
+
 # The desktop project is the single source of truth for what gets compiled.
 # Reading it here means adding a test file, or the engine gaining a source file,
 # updates both builds at once.
@@ -85,11 +87,17 @@ function Get-SourcesFromProject
     return $sources
 }
 
+#endregion
+
+#region Build
+
 $outputDir = Join-Path $root "x64\Web$Configuration"
 $output    = Join-Path $outputDir 'Loom Tests.js'
 
 if (-not $NoBuild)
 {
+    #region Inputs
+
     $emcc = Find-Emcc
     Write-Host "Building the web test suite ($Configuration) with $emcc"
 
@@ -149,6 +157,10 @@ if (-not $NoBuild)
         '-sNODE_HOST_ENV=0'             # ...without node's environment, whose Windows TEMP the suite would take for a relative path.
     )
 
+    #endregion
+
+    #region Compile
+
     $objects = Join-Path $outputDir 'Objects'
     New-Item -ItemType Directory -Force -Path $objects | Out-Null
 
@@ -174,6 +186,10 @@ if (-not $NoBuild)
 
         [IO.File]::WriteAllText($stamp, $stamped -join "`n")
     }
+
+    #endregion
+
+    #region Link
 
     # The link's arguments go in a response file, as the objects alone run
     # past Windows' limit on a command line. It is rewritten only when they
@@ -211,7 +227,13 @@ if (-not $NoBuild)
             exit $LASTEXITCODE
         }
     }
+
+    #endregion
 }
+
+#endregion
+
+#region Run
 
 if (-not (Test-Path $output))
 {
@@ -232,3 +254,5 @@ if (-not $node)
 $ErrorActionPreference = 'Continue'
 & $node.Source $output @TestArgs
 exit $LASTEXITCODE
+
+#endregion

@@ -33,6 +33,8 @@ namespace Loom
 	{
 		static constexpr int NONE = -1;
 
+		#pragma region Lifetime
+
 		ColliderTree() = default;
 		ColliderTree(const ColliderTree&) = delete;
 		ColliderTree& operator=(const ColliderTree&) = delete;
@@ -40,6 +42,14 @@ namespace Loom
 		// Lets go of every collider still in it, so none removes itself from a
 		// tree that is gone.
 		~ColliderTree();
+
+		#pragma endregion
+
+		#pragma region Syncing
+
+		// The current tree during Scene::Physics, which a collider's OnPhysics
+		// enlists itself in.
+		static inline ColliderTree* current = nullptr;
 
 		void BeginSync();
 
@@ -70,11 +80,32 @@ namespace Loom
 		bool Fits(const Collider& collider, const glm::vec3& travel) const;
 		void EndSync();
 
+		// The colliders whose leaves went in or were refitted since the last
+		// call, for whoever pairs them up to look at again; the rest overlap
+		// what they did.
+		std::vector<Collider*> TakeMoved() { return std::exchange(m_moved, { }); };
+
+		#pragma endregion
+
+		#pragma region Changes
+
 		void Remove(Collider& collider);
 
 		// Refits collider's leaf to what it covers where it was last synced,
 		// for a shape that changed between syncs.
 		void Resize(const Collider& collider);
+
+		// Told of every collider that leaves the tree, while it still exists.
+		std::function<void(const Collider&)> onRemove{ };
+
+		// Told before a collider is resized or moved to another tree, so a
+		// step solving against this one meanwhile lands first. One destroyed
+		// leaves without it, as no step may be solving then.
+		std::function<void()> onChange{ };
+
+		#pragma endregion
+
+		#pragma region Queries
 
 		// Calls visit with every hit within maxDistance on a collider where it
 		// was last synced, roughly nearest first. visit answers the distance to
@@ -86,19 +117,6 @@ namespace Loom
 		// Calls visit for every collider whose padded bounds overlap bounds.
 		void Query(const Bounds& bounds, const std::function<void(Collider&)>& visit) const;
 
-		// The colliders whose leaves went in or were refitted since the last
-		// call, for whoever pairs them up to look at again; the rest overlap
-		// what they did.
-		std::vector<Collider*> TakeMoved() { return std::exchange(m_moved, { }); };
-
-		// Told of every collider that leaves the tree, while it still exists.
-		std::function<void(const Collider&)> onRemove{ };
-
-		// Told before a collider is resized or moved to another tree, so a
-		// step solving against this one meanwhile lands first. One destroyed
-		// leaves without it, as no step may be solving then.
-		std::function<void()> onChange{ };
-
 		size_t Size() const { return m_leaves; };
 
 		// Leaves are height 0. An empty tree is height -1.
@@ -106,15 +124,15 @@ namespace Loom
 
 		const Bounds* PaddedBounds(const Collider& collider) const;
 
-		// The current tree during Scene::Physics, which a collider's OnPhysics
-		// enlists itself in.
-		static inline ColliderTree* current = nullptr;
-
 		// Held shared while threads ask where the colliders are, and alone
 		// while a tree or a collider's shape changes, so any thread may ask.
 		static std::shared_mutex guard;
 
+		#pragma endregion
+
 	private:
+		#pragma region Nodes
+
 		struct Node
 		{
 			Bounds bounds;
@@ -132,16 +150,24 @@ namespace Loom
 			bool IsLeaf() const { return children[0] == NONE; };
 		};
 
+		int Allocate();
+		void Free(int node);
+
+		#pragma endregion
+
+		#pragma region Syncing
+
 		// Whether collider's GameObject and those above it are all where they
 		// were at its last sync.
 		bool Unmoved(const Collider& collider) const;
 
-		int Allocate();
-		void Free(int node);
-
 		// Puts leaf where bounds and the travel from them need it, unless its
 		// padding still covers them and the next step's travel.
 		void Fit(int leaf, const Bounds& bounds, const glm::vec3& travel);
+
+		#pragma endregion
+
+		#pragma region Hierarchy
 
 		void InsertLeaf(int leaf);
 		void RemoveLeaf(int leaf);
@@ -152,14 +178,25 @@ namespace Loom
 		// Recomputes the bounds and height of every branch from node to the root.
 		void Refit(int node);
 
+		#pragma endregion
+
+		#pragma region Nodes
+
 		std::vector<Node> m_nodes{ };
+		int m_root = NONE;
+		int m_free = NONE;
+		size_t m_leaves = 0;
+
+		#pragma endregion
+
+		#pragma region Syncing
+
 		std::vector<Collider*> m_moved{ };
 
 		std::vector<Collider*> m_enlisted{ };
 		std::vector<char> m_measured{ };
-		int m_root = NONE;
-		int m_free = NONE;
-		size_t m_leaves = 0;
 		unsigned m_sync = 0;
+
+		#pragma endregion
 	};
 };

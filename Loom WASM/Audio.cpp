@@ -21,6 +21,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Output
+
 		// The pitch the sound's clock stops at, and below.
 		constexpr float MIN_PITCH = 0.01f;
 
@@ -31,12 +33,6 @@ namespace Loom
 		// Decoded whole on the thread that loads them, so the resource manager
 		// needs no threads of its own.
 		constexpr ma_uint32 LOAD_FLAGS = MA_SOUND_FLAG_DECODE;
-
-		constexpr ma_uint32 LISTENER = 0;
-
-		// Where sounds are heard from with no AudioListener.
-		constexpr glm::vec3 FORWARD(0.0f, 0.0f, -1.0f);
-		constexpr glm::vec3 UP(0.0f, 1.0f, 0.0f);
 
 		struct Output final
 		{
@@ -70,6 +66,10 @@ namespace Loom
 			static std::vector<AudioSource*>* const sources = new std::vector<AudioSource*>();
 			return *sources;
 		};
+
+		#pragma endregion
+
+		#pragma region Shots
 
 		// Removes every sound that has finished, or every sound when all is set.
 		void Reap(bool all)
@@ -129,6 +129,16 @@ namespace Loom
 			return true;
 		};
 
+		#pragma endregion
+
+		#pragma region Listener
+
+		constexpr ma_uint32 LISTENER = 0;
+
+		// Where sounds are heard from with no AudioListener.
+		constexpr glm::vec3 FORWARD(0.0f, 0.0f, -1.0f);
+		constexpr glm::vec3 UP(0.0f, 1.0f, 0.0f);
+
 		// A direction with no length has nothing to normalise.
 		glm::vec3 Direction(const glm::vec3& vector, const glm::vec3& otherwise)
 		{
@@ -154,7 +164,55 @@ namespace Loom
 			ma_engine_listener_set_direction(engine, LISTENER, forward.x, forward.y, forward.z);
 			ma_engine_listener_set_world_up(engine, LISTENER, up.x, up.y, up.z);
 		};
+
+		#pragma endregion
 	};
+
+	#pragma region Shots
+
+	bool Audio::PlayAt(const std::string& path, const glm::vec3& position, float volume)
+	{
+		return Shoot(Get(), path, volume, &position);
+	};
+
+	bool Audio::Play(const std::string& path, float volume)
+	{
+		return Shoot(Get(), path, volume, nullptr);
+	};
+
+	void Audio::StopAll()
+	{
+		if (output)
+			Reap(true);
+	};
+
+	void Audio::Unload()
+	{
+		if (!output)
+			return;
+
+		Reap(true);
+
+		for (const std::string& path : output->registered)
+			ma_resource_manager_unregister_file(&output->resources, path.c_str());
+
+		output->registered.clear();
+		output->failed.clear();
+	};
+
+	size_t Audio::PlayingCount()
+	{
+		if (!output)
+			return 0;
+
+		Reap(false);
+
+		return output->shots.size();
+	};
+
+	#pragma endregion
+
+	#pragma region Output
 
 	ma_engine* Audio::Get()
 	{
@@ -203,46 +261,6 @@ namespace Loom
 		return &output->engine;
 	};
 
-	bool Audio::PlayAt(const std::string& path, const glm::vec3& position, float volume)
-	{
-		return Shoot(Get(), path, volume, &position);
-	};
-
-	bool Audio::Play(const std::string& path, float volume)
-	{
-		return Shoot(Get(), path, volume, nullptr);
-	};
-
-	void Audio::StopAll()
-	{
-		if (output)
-			Reap(true);
-	};
-
-	void Audio::Unload()
-	{
-		if (!output)
-			return;
-
-		Reap(true);
-
-		for (const std::string& path : output->registered)
-			ma_resource_manager_unregister_file(&output->resources, path.c_str());
-
-		output->registered.clear();
-		output->failed.clear();
-	};
-
-	size_t Audio::PlayingCount()
-	{
-		if (!output)
-			return 0;
-
-		Reap(false);
-
-		return output->shots.size();
-	};
-
 	void Audio::Tick()
 	{
 		if (!output)
@@ -276,6 +294,8 @@ namespace Loom
 		ma_engine_read_pcm_frames(&output->engine, mixed.data(), frames, nullptr);
 	};
 
+	#pragma endregion
+
 	AudioListener* AudioListener::Current()
 	{
 		for (Scene* scene : Scene::GetScenes())
@@ -284,6 +304,8 @@ namespace Loom
 
 		return nullptr;
 	};
+
+	#pragma region Lifecycle
 
 	AudioSource::AudioSource()
 	{
@@ -313,6 +335,10 @@ namespace Loom
 
 		Sync();
 	};
+
+	#pragma endregion
+
+	#pragma region Playback
 
 	void AudioSource::Play()
 	{
@@ -345,17 +371,9 @@ namespace Loom
 		return m_sound && ma_sound_is_playing(m_sound);
 	};
 
-	void AudioSource::Hold()
-	{
-		const bool updated = m_updated;
-		m_updated = false;
+	#pragma endregion
 
-		if (updated || !IsPlaying())
-			return;
-
-		ma_sound_stop(m_sound);
-		m_held = true;
-	};
+	#pragma region Sound
 
 	ma_sound* AudioSource::Load()
 	{
@@ -420,4 +438,18 @@ namespace Loom
 		delete m_sound;
 		m_sound = nullptr;
 	};
+
+	void AudioSource::Hold()
+	{
+		const bool updated = m_updated;
+		m_updated = false;
+
+		if (updated || !IsPlaying())
+			return;
+
+		ma_sound_stop(m_sound);
+		m_held = true;
+	};
+
+	#pragma endregion
 };

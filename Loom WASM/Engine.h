@@ -26,50 +26,16 @@ namespace Loom
 	*/
 	struct LOOM_API Engine final
 	{
+		#pragma region Lifetime
+
 		Engine();
 		~Engine();
-
-		void Start();
-
-		// Static so anything holding no Engine reference (a tool, a UI callback)
-		// can still ask the loop to end; it only ever touches Engine statics.
-		static void Stop();
-
-		static void SetUpdateFunction(const Task& task);
-
-		// Replaces the built-in per-scene ImGui windows with a custom one. Called
-		// from inside the ImGui frame, so it is safe to issue ImGui (and Renderer)
-		// calls from it. Pass an empty Task to fall back to the default windows.
-		static void SetGuiFunction(const Task& task);
-
-		// Runs each frame after the platform has queued its input and before
-		// ImGui reads it, so it can queue input of its own: the last event of a
-		// kind wins.
-		static void SetImGuiInputFunction(const Task& task);
-
-		static void QueueTask(const Task& task);
-
-		// Runs everything QueueTask has collected so far, on the calling
-		// thread. renderFrame calls this once a frame; it is public so a host
-		// that drives the engine itself (a test, a tool) can flush deferred
-		// work without a window or a renderer. From a Lane, or while one has
-		// work, it does nothing, leaving the queue to the main thread once the
-		// lanes are done, since its tasks would change the objects they update.
-		static void DoTasks() noexcept;
-
-		static inline bool doGUI = true;
 
 		// Whether the window the engine opens is shown. Set before the Engine is
 		// constructed, because that is what opens it: an automated run has nobody
 		// to show it to, and a window appearing takes the screen and the focus
 		// off whoever is at the machine.
 		static inline bool showWindow = true;
-
-		// Whether renderFrame ticks / draws the registered scenes itself. An
-		// editor turns rendering off so it can draw the scene into its own
-		// framebuffer instead, and drives updating with its play controls.
-		static inline bool updateScenes = true;
-		static inline bool renderScenes = true;
 
 		// The graphics API the window is opened on. Set before the Engine is
 		// constructed; if Vulkan cannot run here it falls back to OpenGL, and
@@ -81,15 +47,69 @@ namespace Loom
 		// editor turns it off, so what it shows is what a frame costs.
 		static inline bool vsync = true;
 
+		static inline GLFWwindow* window = nullptr;
+
 		static const size_t GetUniqueID();
+
+		#pragma endregion
+
+		#pragma region Frame Loop
+
+		void Start();
+
+		// Static so anything holding no Engine reference (a tool, a UI callback)
+		// can still ask the loop to end; it only ever touches Engine statics.
+		static void Stop();
+
+		static void SetUpdateFunction(const Task& task);
+
+		// Whether renderFrame ticks / draws the registered scenes itself. An
+		// editor turns rendering off so it can draw the scene into its own
+		// framebuffer instead, and drives updating with its play controls.
+		static inline bool updateScenes = true;
+		static inline bool renderScenes = true;
 
 		// The colour the frame is cleared to, as RGBA. Settable so a scene can
 		// match whatever it is embedded in; renderFrame reads it every frame.
 		static inline float clearColor[4] = { 0.2f, 0.3f, 0.3f, 1.0f };
 
-		static inline GLFWwindow* window = nullptr;
-
 		static void renderFrame();
+
+		static inline bool isRunning;
+
+		#pragma endregion
+
+		#pragma region GUI
+
+		// Replaces the built-in per-scene ImGui windows with a custom one. Called
+		// from inside the ImGui frame, so it is safe to issue ImGui (and Renderer)
+		// calls from it. Pass an empty Task to fall back to the default windows.
+		static void SetGuiFunction(const Task& task);
+
+		// Runs each frame after the platform has queued its input and before
+		// ImGui reads it, so it can queue input of its own: the last event of a
+		// kind wins.
+		static void SetImGuiInputFunction(const Task& task);
+
+		static inline bool doGUI = true;
+
+		#pragma endregion
+
+		#pragma region Tasks
+
+		static void QueueTask(const Task& task);
+
+		// Runs everything QueueTask has collected so far, on the calling
+		// thread. renderFrame calls this once a frame; it is public so a host
+		// that drives the engine itself (a test, a tool) can flush deferred
+		// work without a window or a renderer. From a Lane, or while one has
+		// work, it does nothing, leaving the queue to the main thread once the
+		// lanes are done, since its tasks would change the objects they update.
+		static void DoTasks() noexcept;
+
+		#pragma endregion
+
+		#pragma region Capture
 
 		// A part of the window, in its pixels from the top left.
 		struct Region
@@ -109,17 +129,27 @@ namespace Loom
 		// The region of a capture, clipped to it, with width and height made its.
 		static std::vector<uint8_t> Crop(const Region& region, int& width, int& height, const std::vector<uint8_t>& rgb);
 
-		static inline bool isRunning;
+		#pragma endregion
 
 	private:
+		#pragma region Lifetime
+
+		// A window with a renderer attached, or null if the API cannot run.
+		static GLFWwindow* OpenWindow(Backend api);
+
+		#pragma endregion
+
+		#pragma region GUI
+
 		static void InitImGui();
 		// The frame's GUI, built while physics steps and drawn once the
 		// scenes have been.
 		static void BuildImGui();
 		static void DrawImGui();
 
-		// A window with a renderer attached, or null if the API cannot run.
-		static GLFWwindow* OpenWindow(Backend api);
+		#pragma endregion
+
+		#pragma region State
 
 		static inline const char* projectDirectory;
 
@@ -129,5 +159,7 @@ namespace Loom
 
 		static inline std::recursive_mutex mutex;
 		static inline std::queue<Task> taskQueue;
+
+		#pragma endregion
 	};
 };

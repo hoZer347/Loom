@@ -21,7 +21,7 @@ namespace Loom
 	*/
 	struct BuildSettings final
 	{
-		static constexpr const char* extension = ".loombuild";
+		#pragma region Configurations
 
 		static constexpr std::array<std::string_view, 3> configurations = { "Debug", "Release", "Final" };
 
@@ -30,8 +30,7 @@ namespace Loom
 			return std::find(configurations.begin(), configurations.end(), configuration) != configurations.end();
 		};
 
-		// What a press in the window asks of the editor.
-		enum class Action { None, Changed, Browse, Build, BuildAndRun };
+		#pragma endregion
 
 		std::string configuration = std::string(configurations[1]);
 
@@ -39,9 +38,17 @@ namespace Loom
 		std::string scene;
 		std::string folder;
 
+		#pragma region File
+
+		static constexpr const char* extension = ".loombuild";
+
 		// A setting the file lacks keeps the value it had.
 		void Load(const std::string& path);
 		bool Save(const std::string& path) const;
+
+		#pragma endregion
+
+		#pragma region Paths
 
 		// folder, or for a project that names none, one beside the project
 		// folder named after the game.
@@ -52,6 +59,13 @@ namespace Loom
 
 		// What build-game.ps1 is handed.
 		std::string Arguments(const std::string& project, const std::string& name) const;
+
+		#pragma endregion
+
+		#pragma region Window
+
+		// What a press in the window asks of the editor.
+		enum class Action { None, Changed, Browse, Build, BuildAndRun };
 
 		// The tab, which lists the project's scenes each time its list opens,
 		// holds back another build while one is under way, and with no project
@@ -64,10 +78,16 @@ namespace Loom
 			std::string_view status,
 			bool building);
 
+		#pragma endregion
+
 	private:
-		static constexpr size_t folder_capacity = 512;
+		#pragma region Paths
 
 		static std::filesystem::path DefaultOutput(const std::string& project, const std::string& name);
+
+		#pragma endregion
+
+		static constexpr size_t folder_capacity = 512;
 
 		std::vector<std::string> m_scenes{ };
 		char m_folder[folder_capacity] = { };

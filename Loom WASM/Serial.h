@@ -23,6 +23,8 @@ namespace Loom
 	struct StateReference;
 	struct UniformValues;
 
+	#pragma region Registration
+
 	// Hands a field to the last LoomObject whose constructor started on this
 	// thread, and returns that object. A Serial member is built as part of its
 	// owner, before that constructor has finished, which is what makes that
@@ -43,6 +45,8 @@ namespace Loom
 
 	// Hands a button to the same object, with its name and what pressing it runs.
 	LOOM_API void RegisterButton(const char* name, const std::function<void()>* press);
+
+	#pragma endregion
 
 	/**
 	* Loom::Button
@@ -126,6 +130,8 @@ namespace Loom
 	template <typename T, Str name = "">
 	struct Serial final
 	{
+		#pragma region Construction
+
 		// Declared bare, or with the default the member would have had anyway:
 		// Serial<float> m_speed = 0.02f.
 		Serial() : m_value() { Register(); };
@@ -142,6 +148,10 @@ namespace Loom
 		// identities rather than values.
 		Serial(const Serial&) = delete;
 		Serial& operator=(const Serial&) = delete;
+
+		#pragma endregion
+
+		#pragma region Assignment
 
 		// Assigned like the plain member it replaces, in three overloads because
 		// one cannot cover it. This one takes anything T can be assigned from
@@ -181,6 +191,10 @@ namespace Loom
 		T operator++(int) requires requires (T& value) { value++; } { T before = m_value++; Changed(); return before; };
 		T operator--(int) requires requires (T& value) { value--; } { T before = m_value--; Changed(); return before; };
 
+		#pragma endregion
+
+		#pragma region Access
+
 		// Read like the plain member it replaces, without counting as a change
 		// however it is held. Changing it in place takes *, -> or one of the
 		// operators above, each of which counts.
@@ -218,7 +232,11 @@ namespace Loom
 		// counting.
 		unsigned long long Version() const { return m_version; };
 
+		#pragma endregion
+
 	private:
+		#pragma region Registration
+
 		void Changed()
 		{
 			m_version++;
@@ -276,8 +294,14 @@ namespace Loom
 			else return &m_value;
 		};
 
+		#pragma endregion
+
+		#pragma region State
+
 		T m_value;
 		unsigned long long m_version = 0;
 		LoomObject* m_owner = nullptr;
+
+		#pragma endregion
 	};
 };

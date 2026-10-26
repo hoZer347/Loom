@@ -19,6 +19,8 @@ namespace Loom
 	*/
 	namespace McpProtocol
 	{
+		#pragma region Requests
+
 		// What a tools/call runs, given the tool's name and its arguments.
 		// Nothing when there is no such tool.
 		using CallTool = std::function<std::optional<nlohmann::json>(const std::string& name, const nlohmann::json& arguments)>;
@@ -39,10 +41,16 @@ namespace Loom
 		// browser sends its own, and can reach a server on this machine.
 		bool LocalOrigin(const std::string& origin);
 
+		#pragma endregion
+
+		#pragma region Base64
+
 		std::string Base64(const std::vector<char>& bytes);
 
 		// What Base64 was given, or nothing when text holds a character it
 		// would not have written.
 		std::vector<char> FromBase64(std::string_view text);
+
+		#pragma endregion
 	};
 };

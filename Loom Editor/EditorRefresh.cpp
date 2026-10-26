@@ -49,6 +49,8 @@ namespace Loom
 		};
 	};
 
+	#pragma region Lifetime
+
 	EditorRefresh::~EditorRefresh()
 	{
 		if (m_worker.joinable())
@@ -57,6 +59,10 @@ namespace Loom
 		// A build that failed puts the executable back.
 		Poll();
 	};
+
+	#pragma endregion
+
+	#pragma region Build
 
 	void EditorRefresh::Start()
 	{
@@ -176,6 +182,10 @@ namespace Loom
 		return Progress::Finished;
 	};
 
+	#pragma endregion
+
+	#pragma region Relaunch
+
 	bool EditorRefresh::Relaunch(const std::filesystem::path& executable, const std::string& arguments)
 	{
 		const int length = MultiByteToWideChar(CP_ACP, 0, arguments.c_str(), -1, nullptr, 0);
@@ -200,4 +210,6 @@ namespace Loom
 
 		return true;
 	};
+
+	#pragma endregion
 };

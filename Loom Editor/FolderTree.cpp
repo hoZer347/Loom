@@ -11,6 +11,8 @@
 
 namespace Loom
 {
+	#pragma region Drawing
+
 	void FolderTree::Draw(VirtualFolders& folders, const VirtualFolders::Node& top, const Hooks& hooks)
 	{
 		m_search.BeginResults();
@@ -99,17 +101,9 @@ namespace Loom
 		ImGui::TreePop();
 	};
 
-	bool FolderTree::Shows(const VirtualFolders::Node& node, const Hooks& hooks) const
-	{
-		return m_search.Matches(node.name) ||
-			std::ranges::any_of(node.items, [&](const std::string& item) { return Shows(item, hooks); }) ||
-			std::ranges::any_of(node.children, [&](const VirtualFolders::Node& child) { return Shows(child, hooks); });
-	};
+	#pragma endregion
 
-	bool FolderTree::Shows(const std::string& item, const Hooks& hooks) const
-	{
-		return m_search.Matches(hooks.name ? hooks.name(item) : item);
-	};
+	#pragma region Editing
 
 	void FolderTree::Drop(VirtualFolders& folders, const std::string& folder, const Hooks& hooks)
 	{
@@ -175,4 +169,22 @@ namespace Loom
 		else
 			hooks.changed();
 	};
+
+	#pragma endregion
+
+	#pragma region Search
+
+	bool FolderTree::Shows(const VirtualFolders::Node& node, const Hooks& hooks) const
+	{
+		return m_search.Matches(node.name) ||
+			std::ranges::any_of(node.items, [&](const std::string& item) { return Shows(item, hooks); }) ||
+			std::ranges::any_of(node.children, [&](const VirtualFolders::Node& child) { return Shows(child, hooks); });
+	};
+
+	bool FolderTree::Shows(const std::string& item, const Hooks& hooks) const
+	{
+		return m_search.Matches(hooks.name ? hooks.name(item) : item);
+	};
+
+	#pragma endregion
 };

@@ -48,6 +48,8 @@ namespace Loom
 			Picker,
 		};
 
+		#pragma region Opening
+
 		// Opens a sprite, or the sprite kept for an image, in a tab of its own,
 		// or brings its tab forward, and the panel with it. An image with no
 		// sprite yet opens as one of a frame and a layer, written beside it on
@@ -58,29 +60,45 @@ namespace Loom
 		// its own when there is none.
 		void OpenPalette(const std::string& path);
 
-		// palette_open is the Palette panel's, which a sprite's tab can open.
-		void Draw(bool* open, bool* palette_open);
-
-		// project_folder is where it looks for palettes to pick from, or beside
-		// the sprite when it is empty.
-		void DrawPalette(bool* open, const std::string& project_folder);
-
 		// Keeps the tabs of files that were moved saving to where they are now.
 		void Relocate(const std::string& from, const std::string& to);
+
+		// The images saved since the last call.
+		std::vector<std::string> TakeSaved();
+
+		#pragma endregion
+
+		#pragma region Windows
+
+		// palette_open is the Palette panel's, which a sprite's tab can open.
+		void Draw(bool* open, bool* palette_open);
 
 		// Whether each panel had the keyboard when it was last drawn, so the
 		// scene's own undo keeps out of its way.
 		bool IsFocused() const { return m_focused; };
 		bool IsPaletteFocused() const { return m_paletteFocused; };
 
+		#pragma endregion
+
+		#pragma region Palette Window
+
+		// project_folder is where it looks for palettes to pick from, or beside
+		// the sprite when it is empty.
+		void DrawPalette(bool* open, const std::string& project_folder);
+
+		#pragma endregion
+
+		#pragma region Saving
+
 		// Every tab with unsaved changes, to its files. False when one could
 		// not be written.
 		bool SaveAll();
 
-		// The images saved since the last call.
-		std::vector<std::string> TakeSaved();
+		#pragma endregion
 
 	private:
+		#pragma region Document
+
 		using Image = SpriteAsset::Image;
 		using Colour = SpriteAsset::Colour;
 
@@ -143,38 +161,102 @@ namespace Loom
 			bool select = true;
 		};
 
-		bool SaveDocument(Document& document);
+		#pragma endregion
+
+		#pragma region Windows
 
 		void DrawDocument(Document& document, bool* palette_open, bool palette_shown);
+
+		#pragma endregion
+
+		#pragma region Canvas
+
 		void DrawCanvas(Document& document, const ImVec2& size);
+
+		#pragma endregion
+
+		#pragma region Timeline
+
 		void DrawTimeline(Document& document, float height);
+
+		#pragma endregion
+
+		#pragma region Status
+
 		void DrawStatus(Document& document, bool* palette_open, bool palette_shown);
-		void DrawCloseQuestion();
+
+		#pragma endregion
+
+		#pragma region Palette Window
 
 		void DrawTools();
 		void DrawSwatches(const std::string& path);
 		void DrawPaletteChoice(const std::string& project_folder);
+
+		#pragma endregion
+
+		#pragma region Tool Shortcuts
+
 		// The tools' keys, and X to swap the colours.
 		void ToolShortcuts();
+
+		#pragma endregion
+
+		#pragma region Palettes
 
 		// The palette of the sprite in front, or the one opened on its own.
 		const std::string& PalettePath() const;
 		void SetPalette(const std::string& path);
 		Palette& PaletteAt(const std::string& path);
 
+		#pragma endregion
+
+		#pragma region Painting
+
 		// What the frame looks like.
 		static const Image& Shown(Document& document);
 
 		// pressed is the button that went down on the canvas this frame.
 		void Paint(Document& document, int x, int y, std::optional<ImGuiMouseButton> pressed);
+
+		#pragma endregion
+
+		#pragma region Playback
+
 		void Play(Document& document);
+
+		#pragma endregion
+
+		#pragma region History
+
 		static void Remember(Document& document);
 		static void Edited(Document& document);
 		static void Step(Document& document, bool undo);
+
+		#pragma endregion
+
+		#pragma region View
+
 		static void Fit(Document& document, const ImVec2& size);
 		static void Zoom(Document& document, const ImVec2& about, float wheel);
 
+		#pragma endregion
+
+		#pragma region Saving
+
+		bool SaveDocument(Document& document);
+
+		#pragma endregion
+
+		#pragma region Closing
+
+		void DrawCloseQuestion();
+
 		void Close(const Document* document);
+
+		#pragma endregion
+
+		#pragma region Documents
 
 		std::vector<std::unique_ptr<Document>> m_documents;
 
@@ -188,11 +270,22 @@ namespace Loom
 
 		std::vector<std::string> m_saved;
 
+		#pragma endregion
+
+		#pragma region Editing
+
 		Tool m_tool = Tool::Pencil;
 		// What the left and right mouse buttons paint with, by ImGuiMouseButton.
 		std::array<Colour, paintButtons> m_colours{ Colour{ 0, 0, 0, UINT8_MAX }, Colour{ UINT8_MAX, UINT8_MAX, UINT8_MAX, UINT8_MAX } };
 		bool m_grid = true;
-		bool m_focused = false;
+
+		// What a layer's rename box holds while it is open.
+		static constexpr size_t layerNameSize = 64;
+		char m_layerName[layerNameSize] = { };
+
+		#pragma endregion
+
+		#pragma region Palettes
 
 		// Every palette shown so far, by path, as last saved.
 		std::map<std::string, Palette> m_palettes;
@@ -203,16 +296,20 @@ namespace Loom
 		// Found when the list of them opens.
 		std::vector<std::string> m_paletteFiles;
 
+		#pragma endregion
+
+		#pragma region Focus
+
+		bool m_focused = false;
+
 		// Whether the Palette panel was in sight when it was last drawn.
 		bool m_paletteShown = false;
 		bool m_paletteFocused = false;
 
-		// What a layer's rename box holds while it is open.
-		static constexpr size_t layerNameSize = 64;
-		char m_layerName[layerNameSize] = { };
-
 		// Frames left to ask for focus on.
 		int m_focusFrames = 0;
 		int m_paletteFocusFrames = 0;
+
+		#pragma endregion
 	};
 };

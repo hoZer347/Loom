@@ -35,6 +35,8 @@ param(
     [switch] $SkipUnity
 )
 
+#region Setup
+
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $project = Join-Path $root 'Benchmarks\Unity Crowd'
@@ -53,6 +55,36 @@ function Read-Results([string] $path)
 
     return $results
 }
+
+$columns = [ordered]@{ }
+
+#endregion
+
+#region Loom
+
+Write-Host 'Timing Loom (Release)...'
+$loomOutput = Join-Path $work 'loom.txt'
+$env:LOOM_BENCHMARK_OUTPUT = $loomOutput
+
+try
+{
+    & (Join-Path $root 'run-tests.ps1') -Configuration Release -TestArgs '-ts=Benchmark', '--no-skip' | Out-Null
+}
+finally
+{
+    Remove-Item Env:\LOOM_BENCHMARK_OUTPUT
+}
+
+if (-not (Test-Path $loomOutput))
+{
+    throw 'The Loom benchmark wrote no results.'
+}
+
+$columns['Loom'] = Read-Results $loomOutput
+
+#endregion
+
+#region Unity
 
 function Find-Unity
 {
@@ -86,28 +118,6 @@ function Invoke-Unity([string] $unity, [string] $output, [string[]] $extra)
     return Read-Results $output
 }
 
-$columns = [ordered]@{ }
-
-Write-Host 'Timing Loom (Release)...'
-$loomOutput = Join-Path $work 'loom.txt'
-$env:LOOM_BENCHMARK_OUTPUT = $loomOutput
-
-try
-{
-    & (Join-Path $root 'run-tests.ps1') -Configuration Release -TestArgs '-ts=Benchmark', '--no-skip' | Out-Null
-}
-finally
-{
-    Remove-Item Env:\LOOM_BENCHMARK_OUTPUT
-}
-
-if (-not (Test-Path $loomOutput))
-{
-    throw 'The Loom benchmark wrote no results.'
-}
-
-$columns['Loom'] = Read-Results $loomOutput
-
 if (-not $SkipUnity)
 {
     $unity = Find-Unity
@@ -118,6 +128,10 @@ if (-not $SkipUnity)
     Write-Host 'Timing Unity on one thread...'
     $columns['Unity, one thread'] = Invoke-Unity $unity (Join-Path $work 'unity-one-thread.txt') @('-job-worker-count', '0')
 }
+
+#endregion
+
+#region Table
 
 $rows = [ordered]@{
     'peak_step_ms'    = 'Slowest step (ms)'
@@ -154,3 +168,5 @@ Write-Host "$($columns['Loom']['bodies']) bodies, $($columns['Loom']['steps']) s
 $table | Format-Table -AutoSize | Out-String -Width 200 | Write-Host
 
 Remove-Item -Recurse -Force $work
+
+#endregion

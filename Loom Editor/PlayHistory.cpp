@@ -14,6 +14,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Scene Text
+
 		// A GameObject's own line, or one of its components', with the field
 		// lines under it.
 		struct Block
@@ -107,6 +109,10 @@ namespace Loom
 			};
 		};
 
+		#pragma endregion
+
+		#pragma region References
+
 		GameObject* GameObjectOf(LoomObject* object)
 		{
 			if (ComponentBase* component = dynamic_cast<ComponentBase*>(object))
@@ -153,7 +159,11 @@ namespace Loom
 			for (const GameObject* child : at.GetChildren())
 				HoldUnder(*child, gameObject, held);
 		};
+
+		#pragma endregion
 	};
+
+	#pragma region Recording
 
 	void PlayHistory::RecordField(LoomObject& object, size_t index, const std::string& before)
 	{
@@ -212,6 +222,10 @@ namespace Loom
 		if (step.after != step.before || !step.held.empty())
 			Push(std::move(step));
 	};
+
+	#pragma endregion
+
+	#pragma region Stepping
 
 	GameObject* PlayHistory::Undo()
 	{
@@ -327,4 +341,6 @@ namespace Loom
 		if (SceneSerializer::ReadOwn(gameObject, Text(put), pending))
 			SceneSerializer::ResolveReferences(pending);
 	};
+
+	#pragma endregion
 };

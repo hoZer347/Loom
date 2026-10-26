@@ -18,6 +18,8 @@ namespace Loom
 		thread_local LoomObject* constructing = nullptr;
 	};
 
+	#pragma region Identity
+
 	const std::string& LoomObject::GetName()
 	{
 		std::lock_guard lock{ mutex };
@@ -63,135 +65,6 @@ namespace Loom
 		Touch();
 	};
 
-	void LoomObject::Touch(bool placed)
-	{
-		if (!watching)
-			return;
-
-		const unsigned char kinds = placed ? touched_placed : touched_self;
-
-		// Already in for this: whoever takes the journal reads the object
-		// after taking it, so sees this change too.
-		if ((m_touched & kinds) == kinds)
-			return;
-
-		std::lock_guard lock{ journal_mutex };
-
-		if (m_touched == 0)
-		{
-			m_journalAt = journal.size();
-			journal.push_back(this);
-		};
-
-		m_touched |= kinds;
-	};
-
-	void LoomObject::Watch(bool watch)
-	{
-		std::lock_guard lock{ journal_mutex };
-
-		if (watch == watching)
-			return;
-
-		watching = watch;
-
-		if (watch)
-		{
-			watch_count++;
-
-			return;
-		};
-
-		for (LoomObject* object : journal)
-			object->m_touched = 0;
-
-		journal.clear();
-		destroyed.clear();
-	};
-
-	LoomObject::Journal LoomObject::TakeJournal()
-	{
-		std::lock_guard lock{ journal_mutex };
-
-		Journal taken{ };
-
-		taken.touched.reserve(journal.size());
-
-		for (LoomObject* object : journal)
-		{
-			taken.touched.push_back({ object, (object->m_touched & touched_self) != 0, (object->m_touched & touched_placed) != 0 });
-			object->m_touched = 0;
-		};
-
-		journal.clear();
-		taken.destroyed.swap(destroyed);
-
-		return taken;
-	};
-
-	void SerialChanged(LoomObject* owner, bool reference)
-	{
-		if (owner == nullptr)
-			return;
-
-		owner->Touch();
-
-		if (reference)
-			owner->ReferencesWritten();
-	};
-
-	void LoomObject::ReferencesWritten()
-	{
-		// Still waiting: Reindex clears this before it reads the fields, so it
-		// reads this write too.
-		if (m_referencesDirty)
-			return;
-
-		std::lock_guard lock{ mutex };
-
-		if (m_referencesDirty)
-			return;
-
-		m_referencesDirty = true;
-		m_dirtyAt = dirty_holders.size();
-		dirty_holders.push_back(this);
-	};
-
-	void LoomObject::Reindex()
-	{
-		std::lock_guard lock{ mutex };
-
-		for (LoomObject* holder : dirty_holders)
-		{
-			holder->m_referencesDirty = false;
-
-			for (const LoomObject* target : holder->m_referenced)
-			{
-				const auto entry = referrers.find(target);
-
-				entry->second.erase(holder);
-
-				if (entry->second.empty())
-					referrers.erase(entry);
-			};
-
-			holder->m_referenced.clear();
-
-			for (const SerializedField& field : holder->m_fields)
-			{
-				LoomObject* target = field.type == FieldType::Reference ? field.GetReference() : nullptr;
-
-				if (target == nullptr || target == holder)
-					continue;
-
-				if (referrers[target].insert(holder).second)
-					holder->m_referenced.push_back(target);
-			};
-		};
-
-		dirty_holders.clear();
-	};
-
 	uint64_t LoomObject::Initialize()
 	{
 		// Runs before any member of a derived class is built, which is what puts
@@ -212,6 +85,61 @@ namespace Loom
 
 		return ID;
 	};
+
+	LoomObject* LoomObject::_GetByID(const uint64_t& ID)
+	{
+		std::lock_guard lock{ mutex };
+
+		const auto found = by_id.find(ID);
+
+		return found == by_id.end()
+			? nullptr
+			: found->second;
+	};
+
+	LoomObject* LoomObject::_GetByName(const std::string& name)
+	{
+		std::lock_guard lock{ mutex };
+
+		const auto found = by_name.find(name);
+
+		return found == by_name.end()
+			? nullptr
+			: *found->second.begin();
+	};
+
+	void LoomObject::Unname()
+	{
+		const auto found = by_name.find(m_name);
+
+		if (found == by_name.end())
+			return;
+
+		found->second.erase(this);
+
+		if (found->second.empty())
+			by_name.erase(found);
+	};
+
+	LoomObject* LoomObject::_GetByGuid(const Guid& guid)
+	{
+		std::lock_guard lock{ mutex };
+
+		const auto found = by_guid.find(guid);
+
+		return found == by_guid.end()
+			? nullptr
+			: found->second;
+	};
+
+	std::string LoomObject::NameAndID() const
+	{
+		return m_name + " (ID: " + std::to_string(m_ID) + ')';
+	};
+
+	#pragma endregion
+
+	#pragma region Fields
 
 	LoomObject* RegisterSerialField(
 		FieldType type,
@@ -302,56 +230,144 @@ namespace Loom
 		return category.empty() ? display : std::string(category) + '/' + display;
 	};
 
-	LoomObject* LoomObject::_GetByID(const uint64_t& ID)
+	#pragma endregion
+
+	#pragma region Journal
+
+	void LoomObject::Touch(bool placed)
 	{
-		std::lock_guard lock{ mutex };
-
-		const auto found = by_id.find(ID);
-
-		return found == by_id.end()
-			? nullptr
-			: found->second;
-	};
-
-	LoomObject* LoomObject::_GetByName(const std::string& name)
-	{
-		std::lock_guard lock{ mutex };
-
-		const auto found = by_name.find(name);
-
-		return found == by_name.end()
-			? nullptr
-			: *found->second.begin();
-	};
-
-	void LoomObject::Unname()
-	{
-		const auto found = by_name.find(m_name);
-
-		if (found == by_name.end())
+		if (!watching)
 			return;
 
-		found->second.erase(this);
+		const unsigned char kinds = placed ? touched_placed : touched_self;
 
-		if (found->second.empty())
-			by_name.erase(found);
+		// Already in for this: whoever takes the journal reads the object
+		// after taking it, so sees this change too.
+		if ((m_touched & kinds) == kinds)
+			return;
+
+		std::lock_guard lock{ journal_mutex };
+
+		if (m_touched == 0)
+		{
+			m_journalAt = journal.size();
+			journal.push_back(this);
+		};
+
+		m_touched |= kinds;
 	};
 
-	LoomObject* LoomObject::_GetByGuid(const Guid& guid)
+	void LoomObject::Watch(bool watch)
+	{
+		std::lock_guard lock{ journal_mutex };
+
+		if (watch == watching)
+			return;
+
+		watching = watch;
+
+		if (watch)
+		{
+			watch_count++;
+
+			return;
+		};
+
+		for (LoomObject* object : journal)
+			object->m_touched = 0;
+
+		journal.clear();
+		destroyed.clear();
+	};
+
+	LoomObject::Journal LoomObject::TakeJournal()
+	{
+		std::lock_guard lock{ journal_mutex };
+
+		Journal taken{ };
+
+		taken.touched.reserve(journal.size());
+
+		for (LoomObject* object : journal)
+		{
+			taken.touched.push_back({ object, (object->m_touched & touched_self) != 0, (object->m_touched & touched_placed) != 0 });
+			object->m_touched = 0;
+		};
+
+		journal.clear();
+		taken.destroyed.swap(destroyed);
+
+		return taken;
+	};
+
+	void SerialChanged(LoomObject* owner, bool reference)
+	{
+		if (owner == nullptr)
+			return;
+
+		owner->Touch();
+
+		if (reference)
+			owner->ReferencesWritten();
+	};
+
+	#pragma endregion
+
+	#pragma region References
+
+	void LoomObject::ReferencesWritten()
+	{
+		// Still waiting: Reindex clears this before it reads the fields, so it
+		// reads this write too.
+		if (m_referencesDirty)
+			return;
+
+		std::lock_guard lock{ mutex };
+
+		if (m_referencesDirty)
+			return;
+
+		m_referencesDirty = true;
+		m_dirtyAt = dirty_holders.size();
+		dirty_holders.push_back(this);
+	};
+
+	void LoomObject::Reindex()
 	{
 		std::lock_guard lock{ mutex };
 
-		const auto found = by_guid.find(guid);
+		for (LoomObject* holder : dirty_holders)
+		{
+			holder->m_referencesDirty = false;
 
-		return found == by_guid.end()
-			? nullptr
-			: found->second;
+			for (const LoomObject* target : holder->m_referenced)
+			{
+				const auto entry = referrers.find(target);
+
+				entry->second.erase(holder);
+
+				if (entry->second.empty())
+					referrers.erase(entry);
+			};
+
+			holder->m_referenced.clear();
+
+			for (const SerializedField& field : holder->m_fields)
+			{
+				LoomObject* target = field.type == FieldType::Reference ? field.GetReference() : nullptr;
+
+				if (target == nullptr || target == holder)
+					continue;
+
+				if (referrers[target].insert(holder).second)
+					holder->m_referenced.push_back(target);
+			};
+		};
+
+		dirty_holders.clear();
 	};
 
-	std::string LoomObject::NameAndID() const
-	{
-		return m_name + " (ID: " + std::to_string(m_ID) + ')';
-	};
+	#pragma endregion
 
 	LoomObject::~LoomObject()
 	{

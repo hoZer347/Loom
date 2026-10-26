@@ -10,6 +10,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Requests
+
 		constexpr const char* server_name = "loom-editor";
 		constexpr const char* server_version = "1.0";
 
@@ -21,15 +23,6 @@ namespace Loom
 		constexpr int invalid_request = -32600;
 		constexpr int method_not_found = -32601;
 		constexpr int invalid_params = -32602;
-
-		constexpr std::string_view base64_digits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-		constexpr char base64_padding = '=';
-		constexpr size_t base64_group_bytes = 3;
-		constexpr size_t base64_group_digits = 4;
-		constexpr int base64_digit_bits = 6;
-		constexpr unsigned base64_digit_mask = 0x3F;
-		constexpr int byte_bits = 8;
-		constexpr unsigned byte_mask = 0xFF;
 
 		json Error(const json& id, int code, const std::string& message)
 		{
@@ -80,7 +73,24 @@ namespace Loom
 
 			return Result(id, *result);
 		};
+
+		#pragma endregion
+
+		#pragma region Base64
+
+		constexpr std::string_view base64_digits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+		constexpr char base64_padding = '=';
+		constexpr size_t base64_group_bytes = 3;
+		constexpr size_t base64_group_digits = 4;
+		constexpr int base64_digit_bits = 6;
+		constexpr unsigned base64_digit_mask = 0x3F;
+		constexpr int byte_bits = 8;
+		constexpr unsigned byte_mask = 0xFF;
+
+		#pragma endregion
 	};
+
+	#pragma region Requests
 
 	std::string McpProtocol::Respond(const std::string& body, const json& tools, const std::string& instructions, const CallTool& call)
 	{
@@ -127,6 +137,10 @@ namespace Loom
 
 		return false;
 	};
+
+	#pragma endregion
+
+	#pragma region Base64
 
 	std::string McpProtocol::Base64(const std::vector<char>& bytes)
 	{
@@ -176,4 +190,6 @@ namespace Loom
 
 		return out;
 	};
+
+	#pragma endregion
 };

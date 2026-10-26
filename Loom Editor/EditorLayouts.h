@@ -19,6 +19,8 @@ namespace Loom
 	*/
 	namespace EditorLayouts
 	{
+		#pragma region Names
+
 		constexpr const char* Extension = ".ini";
 		constexpr size_t MaxNameLength = 64;
 
@@ -32,10 +34,16 @@ namespace Loom
 		// The layouts saved in the folder, sorted.
 		std::vector<std::string> Names(const std::filesystem::path& folder);
 
+		#pragma endregion
+
+		#pragma region Files
+
 		// Each false when the file could not be written, read or removed. Load
 		// gives the IDs of the windows the layout has a place for.
 		bool Save(const std::filesystem::path& folder, const std::string& name);
 		bool Load(const std::filesystem::path& folder, const std::string& name, std::vector<ImGuiID>* windows = nullptr);
 		bool Delete(const std::filesystem::path& folder, const std::string& name);
+
+		#pragma endregion
 	};
 };

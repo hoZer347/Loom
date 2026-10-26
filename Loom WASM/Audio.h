@@ -29,6 +29,8 @@ namespace Loom
 	*/
 	struct LOOM_API Audio final
 	{
+		#pragma region Shots
+
 		// Plays path through once from position and lets it go. False when the
 		// file will not load or there is no output, having said which the first
 		// time.
@@ -49,6 +51,10 @@ namespace Loom
 		// How many of the sounds PlayAt and Play started are still going.
 		static size_t PlayingCount();
 
+		#pragma endregion
+
+		#pragma region Output
+
 		// Lets go of finished sounds, holds every AudioSource whose object was
 		// not updated this frame, moves the listener to the AudioListener's
 		// pose, and follows Engine::updateScenes. The engine calls it once a
@@ -64,11 +70,17 @@ namespace Loom
 		// has nobody to play to.
 		static inline bool useDevice = true;
 
+		#pragma endregion
+
 	private:
 		friend struct AudioSource;
 
+		#pragma region Output
+
 		// Opened the first time it is asked for. Null when it would not open.
 		static ma_engine* Get();
+
+		#pragma endregion
 	};
 
 	/**
@@ -94,15 +106,23 @@ namespace Loom
 	*/
 	struct LOOM_API AudioSource : Component<AudioSource, "Audio">
 	{
+		#pragma region Lifecycle
+
 		AudioSource();
 		~AudioSource();
 
 		void OnUpdate() override;
 
+		#pragma endregion
+
+		#pragma region Playback
+
 		// From the start, whether or not it was playing.
 		void Play();
 		void Stop();
 		bool IsPlaying() const;
+
+		#pragma endregion
 
 		// Relative to the project folder, which is where the editor works from.
 		Serial<std::string> clipPath;
@@ -124,6 +144,10 @@ namespace Loom
 		Serial<float> maxDistance = 500.0f;
 
 	private:
+		friend struct Audio;
+
+		#pragma region Sound
+
 		// The sound for clipPath, loading it again whenever the path changes.
 		// Null while it will not load.
 		ma_sound* Load();
@@ -133,11 +157,11 @@ namespace Loom
 
 		void Release();
 
-		friend struct Audio;
-
 		// Holds the sound while the object was not updated this frame, and lets
 		// it carry on once it is again.
 		void Hold();
+
+		#pragma endregion
 
 		ma_sound* m_sound = nullptr;
 

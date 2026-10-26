@@ -24,6 +24,8 @@ namespace Loom
 		std::unordered_map<std::string, Texture*> shared{ };
 	};
 
+	#pragma region Lifetime
+
 	Texture::Texture(const std::string& file_path) :
 		file_path(file_path),
 		pixels(Decode(file_path, width, height))
@@ -32,55 +34,15 @@ namespace Loom
 			handle = renderer->CreateTexture(width, height, pixels.data());
 	};
 
-	std::vector<uint8_t> Texture::Decode(const std::string& file_path, int& width, int& height)
-	{
-		// Images are stored top row first; textures are uploaded bottom row first.
-		stbi_set_flip_vertically_on_load(true);
-
-		int channels = 0;
-		stbi_uc* decoded = stbi_load(
-			file_path.c_str(),
-			&width,
-			&height,
-			&channels,
-			RGBA);
-
-		if (decoded == nullptr)
-			throw std::runtime_error("Could not load texture " + file_path + ": " + stbi_failure_reason());
-
-		std::vector<uint8_t> pixels(decoded, decoded + (size_t)width * height * RGBA);
-		stbi_image_free(decoded);
-
-		return pixels;
-	};
-
-	std::vector<uint8_t> Texture::Decode(const std::vector<char>& bytes, int& width, int& height)
-	{
-		stbi_set_flip_vertically_on_load(true);
-
-		int channels = 0;
-		stbi_uc* decoded = stbi_load_from_memory(
-			(const stbi_uc*)bytes.data(),
-			(int)bytes.size(),
-			&width,
-			&height,
-			&channels,
-			RGBA);
-
-		if (decoded == nullptr)
-			throw std::runtime_error(std::string("Could not decode an image: ") + stbi_failure_reason());
-
-		std::vector<uint8_t> pixels(decoded, decoded + (size_t)width * height * RGBA);
-		stbi_image_free(decoded);
-
-		return pixels;
-	};
-
 	Texture::~Texture()
 	{
 		if (Renderer* renderer = Renderer::Get(); renderer && handle)
 			renderer->DestroyTexture(handle);
 	};
+
+	#pragma endregion
+
+	#pragma region Sharing
 
 	Texture* Texture::Shared(const std::string& file_path)
 	{
@@ -170,4 +132,54 @@ namespace Loom
 			texture->handle = renderer->CreateTexture(texture->width, texture->height, texture->pixels.data());
 		};
 	};
+
+	#pragma endregion
+
+	#pragma region Decoding
+
+	std::vector<uint8_t> Texture::Decode(const std::string& file_path, int& width, int& height)
+	{
+		// Images are stored top row first; textures are uploaded bottom row first.
+		stbi_set_flip_vertically_on_load(true);
+
+		int channels = 0;
+		stbi_uc* decoded = stbi_load(
+			file_path.c_str(),
+			&width,
+			&height,
+			&channels,
+			RGBA);
+
+		if (decoded == nullptr)
+			throw std::runtime_error("Could not load texture " + file_path + ": " + stbi_failure_reason());
+
+		std::vector<uint8_t> pixels(decoded, decoded + (size_t)width * height * RGBA);
+		stbi_image_free(decoded);
+
+		return pixels;
+	};
+
+	std::vector<uint8_t> Texture::Decode(const std::vector<char>& bytes, int& width, int& height)
+	{
+		stbi_set_flip_vertically_on_load(true);
+
+		int channels = 0;
+		stbi_uc* decoded = stbi_load_from_memory(
+			(const stbi_uc*)bytes.data(),
+			(int)bytes.size(),
+			&width,
+			&height,
+			&channels,
+			RGBA);
+
+		if (decoded == nullptr)
+			throw std::runtime_error(std::string("Could not decode an image: ") + stbi_failure_reason());
+
+		std::vector<uint8_t> pixels(decoded, decoded + (size_t)width * height * RGBA);
+		stbi_image_free(decoded);
+
+		return pixels;
+	};
+
+	#pragma endregion
 };

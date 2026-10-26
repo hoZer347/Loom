@@ -17,16 +17,12 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Colours
+
 		constexpr float ChannelMax = 255.0f;
 		constexpr unsigned int ChannelMask = 0xFF;
 		constexpr int RedShift = 16;
 		constexpr int GreenShift = 8;
-
-		// Vendored with ImGui, so they are wherever the engine is.
-		std::filesystem::path FontFolder()
-		{
-			return std::filesystem::path(ProjectTemplate::EngineRoot()) / "External Libraries/imgui/misc/fonts";
-		};
 
 		constexpr ImVec4 Rgb(unsigned int hex, float alpha = 1.0f)
 		{
@@ -69,6 +65,10 @@ namespace Loom
 		constexpr ImVec4 Clear = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
 		constexpr ImVec4 Dimmer = ImVec4(0.0f, 0.0f, 0.0f, DimAlpha);
 
+		#pragma endregion
+
+		#pragma region Sizes
+
 		constexpr float ControlRounding = 4.0f;
 		constexpr float GrabRounding = 3.0f;
 		constexpr float ScrollbarRounding = 6.0f;
@@ -81,6 +81,16 @@ namespace Loom
 		constexpr ImVec2 ItemSpacing = ImVec2(8.0f, 5.0f);
 		constexpr ImVec2 ItemInnerSpacing = ImVec2(5.0f, 4.0f);
 		constexpr ImVec2 CellPadding = ImVec2(6.0f, 3.0f);
+
+		#pragma endregion
+
+		#pragma region Fonts
+
+		// Vendored with ImGui, so they are wherever the engine is.
+		std::filesystem::path FontFolder()
+		{
+			return std::filesystem::path(ProjectTemplate::EngineRoot()) / "External Libraries/imgui/misc/fonts";
+		};
 
 		// Monospaced, for the shader editor.
 		constexpr const char* CodeFontFile = "Cousine-Regular.ttf";
@@ -143,11 +153,11 @@ namespace Loom
 
 			ImGui::GetIO().Fonts->AddFontFromFileTTF(path.string().c_str(), size, &config);
 		};
+
+		#pragma endregion
 	};
 
-	const ImVec4 EditorTheme::AccentText = AccentLight;
-	const ImVec4 EditorTheme::ErrorText = Error;
-	const ImVec4 EditorTheme::WarningText = Warning;
+	#pragma region Fonts
 
 	std::vector<std::string> EditorTheme::Fonts()
 	{
@@ -175,6 +185,14 @@ namespace Loom
 	{
 		return codeFont;
 	};
+
+	#pragma endregion
+
+	#pragma region Style
+
+	const ImVec4 EditorTheme::AccentText = AccentLight;
+	const ImVec4 EditorTheme::ErrorText = Error;
+	const ImVec4 EditorTheme::WarningText = Warning;
 
 	void EditorTheme::ApplyStyle()
 	{
@@ -285,4 +303,6 @@ namespace Loom
 		colours[ImGuiCol_NavWindowingDimBg] = Dimmer;
 		colours[ImGuiCol_ModalWindowDimBg] = Dimmer;
 	};
+
+	#pragma endregion
 };

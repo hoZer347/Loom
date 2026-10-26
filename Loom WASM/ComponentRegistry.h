@@ -35,6 +35,8 @@ namespace Loom
 	{
 		typedef std::function<ComponentBase* (GameObject&)> Factory;
 
+		#pragma region Registration
+
 		static void Register(
 			const std::string& name,
 			const char* type_name,
@@ -76,14 +78,18 @@ namespace Loom
 			return true;
 		};
 
-		// Attaches one by registered name. Null when nothing is registered under
-		// that name, where a scene being read puts a MissingComponent instead.
-		static ComponentBase* Create(const std::string& name, GameObject& gameObject);
-
 		// Takes a type back out again: a script library is unloaded before it is
 		// rebuilt, and a factory pointing into code that is no longer mapped is
 		// a crash waiting for someone to open the Add Component menu.
 		static void Unregister(const std::string& name);
+
+		#pragma endregion
+
+		#pragma region Lookup
+
+		// Attaches one by registered name. Null when nothing is registered under
+		// that name, where a scene being read puts a MissingComponent instead.
+		static ComponentBase* Create(const std::string& name, GameObject& gameObject);
 
 		static const std::map<std::string, Factory>& All();
 
@@ -96,15 +102,25 @@ namespace Loom
 		// is called what it stands in for.
 		static std::string NameOf(const ComponentBase& component);
 
+		#pragma endregion
+
 	private:
+		#pragma region Registration
+
 		// Whether a type registering itself may take the name. Not when it
 		// already has it, which is a second module including the same type, and
 		// not when another type does: the names drop namespaces, and whichever
 		// came first keeps it.
 		static bool IsFree(const std::string& name, const char* type_name);
 
+		#pragma endregion
+
+		#pragma region Storage
+
 		static std::map<std::string, Factory>& Factories();
 		static std::map<std::string, std::string>& DisplayNames();
 		static std::map<std::string, std::string>& Categories();
+
+		#pragma endregion
 	};
 };

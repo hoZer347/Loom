@@ -30,6 +30,8 @@ namespace Loom
 		constexpr ImVec2 window_size = ImVec2(640.0f, 0.0f);
 	};
 
+	#pragma region File
+
 	void BuildSettings::Load(const std::string& path)
 	{
 		std::ifstream in(path);
@@ -66,6 +68,10 @@ namespace Loom
 		return (bool)out;
 	};
 
+	#pragma endregion
+
+	#pragma region Paths
+
 	std::filesystem::path BuildSettings::DefaultOutput(const std::string& project, const std::string& name)
 	{
 		return (std::filesystem::path(project).parent_path() / (name + folder_suffix)).lexically_normal();
@@ -97,6 +103,10 @@ namespace Loom
 			" -Configuration " + configuration +
 			" -Output " + ScriptRun::Quote(Output(project, name).string());
 	};
+
+	#pragma endregion
+
+	#pragma region Window
 
 	BuildSettings::Action BuildSettings::Draw(
 		bool* open,
@@ -197,6 +207,8 @@ namespace Loom
 
 		return action;
 	};
+
+	#pragma endregion
 };
 
 #endif

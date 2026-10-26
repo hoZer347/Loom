@@ -16,12 +16,10 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Text
+
 		constexpr const char* field_separator = " = ";
 		constexpr const char* null_reference = "null";
-
-		// What a reference out of the tree compares as: an instance keeps its
-		// own, and a prefab has nothing outside it to point at.
-		constexpr const char* outside = "out";
 
 		std::string Indent(int depth)
 		{
@@ -51,6 +49,32 @@ namespace Loom
 
 			return true;
 		};
+
+		void WriteFields(std::string& text, const std::vector<Prefabs::Field>& fields, int depth)
+		{
+			for (const Prefabs::Field& field : fields)
+				text += Indent(depth) + field.key + field_separator + field.value + '\n';
+		};
+
+		void WriteObject(std::string& text, const Prefabs::ObjectNode& node, int depth)
+		{
+			text += Indent(depth) + SceneSerializer::gameobject_keyword + node.name + '(' + node.guid + ")\n";
+
+			WriteFields(text, node.fields, depth + 1);
+
+			for (const Prefabs::ComponentNode& component : node.components)
+			{
+				text += Indent(depth + 1) + SceneSerializer::component_keyword + component.type + '(' + component.guid + ")\n";
+				WriteFields(text, component.fields, depth + 2);
+			};
+
+			for (const Prefabs::ObjectNode& child : node.children)
+				WriteObject(text, child, depth + 1);
+		};
+
+		#pragma endregion
+
+		#pragma region Nodes
 
 		bool Contains(const std::vector<std::string>& keys, const std::string& key)
 		{
@@ -96,27 +120,13 @@ namespace Loom
 				Number(child, false, numbers);
 		};
 
-		void WriteFields(std::string& text, const std::vector<Prefabs::Field>& fields, int depth)
-		{
-			for (const Prefabs::Field& field : fields)
-				text += Indent(depth) + field.key + field_separator + field.value + '\n';
-		};
+		#pragma endregion
 
-		void WriteObject(std::string& text, const Prefabs::ObjectNode& node, int depth)
-		{
-			text += Indent(depth) + SceneSerializer::gameobject_keyword + node.name + '(' + node.guid + ")\n";
+		#pragma region Syncing
 
-			WriteFields(text, node.fields, depth + 1);
-
-			for (const Prefabs::ComponentNode& component : node.components)
-			{
-				text += Indent(depth + 1) + SceneSerializer::component_keyword + component.type + '(' + component.guid + ")\n";
-				WriteFields(text, component.fields, depth + 2);
-			};
-
-			for (const Prefabs::ObjectNode& child : node.children)
-				WriteObject(text, child, depth + 1);
-		};
+		// What a reference out of the tree compares as: an instance keeps its
+		// own, and a prefab has nothing outside it to point at.
+		constexpr const char* outside = "out";
 
 		struct Shaper
 		{
@@ -272,7 +282,11 @@ namespace Loom
 			for (Prefabs::ObjectNode& child : node.children)
 				Isolate(child, inside);
 		};
+
+		#pragma endregion
 	};
+
+	#pragma region Links
 
 	std::vector<std::string> Prefabs::TransformKeys(const GameObject& gameObject)
 	{
@@ -315,6 +329,10 @@ namespace Loom
 
 		return name;
 	};
+
+	#pragma endregion
+
+	#pragma region Text
 
 	bool Prefabs::Parse(const std::string& text, ObjectNode& root, std::string* error)
 	{
@@ -425,6 +443,64 @@ namespace Loom
 		return text;
 	};
 
+	std::string Prefabs::Splice(const std::string& scene, const std::string& guid, const std::string& subtree)
+	{
+		std::vector<std::string> lines{ };
+		std::istringstream in(scene);
+
+		for (std::string line; std::getline(in, line);)
+			lines.push_back(line);
+
+		size_t first = lines.size();
+		int depth = 0;
+
+		for (size_t i = 0; i < lines.size() && first == lines.size(); i++)
+		{
+			size_t start = 0;
+			const int at = SceneSerializer::DepthOf(lines[i], start);
+			const std::string content = lines[i].substr(start);
+
+			std::string name;
+			std::string found;
+
+			if (StartsWith(content, SceneSerializer::gameobject_keyword) &&
+				SplitNameAndGuid(content.substr(strlen(SceneSerializer::gameobject_keyword)), name, found) &&
+				found == guid)
+			{
+				first = i;
+				depth = at;
+			};
+		};
+
+		if (first == lines.size())
+			return scene;
+
+		size_t end = first + 1;
+
+		for (size_t start = 0; end < lines.size(); end++)
+			if (lines[end].find_first_not_of(" \t\r") != std::string::npos && SceneSerializer::DepthOf(lines[end], start) <= depth)
+				break;
+
+		std::string text{ };
+
+		for (size_t i = 0; i < first; i++)
+			text += lines[i] + '\n';
+
+		std::istringstream replacement(subtree);
+
+		for (std::string line; std::getline(replacement, line);)
+			text += Indent(depth) + line + '\n';
+
+		for (size_t i = end; i < lines.size(); i++)
+			text += lines[i] + '\n';
+
+		return text;
+	};
+
+	#pragma endregion
+
+	#pragma region Syncing
+
 	std::string Prefabs::Shape(const ObjectNode& root, const std::vector<std::string>& transform_keys, Part part)
 	{
 		Shaper shaper{ transform_keys, part };
@@ -492,57 +568,5 @@ namespace Loom
 		return outcome;
 	};
 
-	std::string Prefabs::Splice(const std::string& scene, const std::string& guid, const std::string& subtree)
-	{
-		std::vector<std::string> lines{ };
-		std::istringstream in(scene);
-
-		for (std::string line; std::getline(in, line);)
-			lines.push_back(line);
-
-		size_t first = lines.size();
-		int depth = 0;
-
-		for (size_t i = 0; i < lines.size() && first == lines.size(); i++)
-		{
-			size_t start = 0;
-			const int at = SceneSerializer::DepthOf(lines[i], start);
-			const std::string content = lines[i].substr(start);
-
-			std::string name;
-			std::string found;
-
-			if (StartsWith(content, SceneSerializer::gameobject_keyword) &&
-				SplitNameAndGuid(content.substr(strlen(SceneSerializer::gameobject_keyword)), name, found) &&
-				found == guid)
-			{
-				first = i;
-				depth = at;
-			};
-		};
-
-		if (first == lines.size())
-			return scene;
-
-		size_t end = first + 1;
-
-		for (size_t start = 0; end < lines.size(); end++)
-			if (lines[end].find_first_not_of(" \t\r") != std::string::npos && SceneSerializer::DepthOf(lines[end], start) <= depth)
-				break;
-
-		std::string text{ };
-
-		for (size_t i = 0; i < first; i++)
-			text += lines[i] + '\n';
-
-		std::istringstream replacement(subtree);
-
-		for (std::string line; std::getline(replacement, line);)
-			text += Indent(depth) + line + '\n';
-
-		for (size_t i = end; i < lines.size(); i++)
-			text += lines[i] + '\n';
-
-		return text;
-	};
+	#pragma endregion
 };

@@ -11,6 +11,8 @@
 
 namespace Loom
 {
+	#pragma region Storage
+
 	std::map<std::string, ComponentRegistry::Factory>& ComponentRegistry::Factories()
 	{
 		static std::map<std::string, Factory> factories{ };
@@ -28,6 +30,10 @@ namespace Loom
 		static std::map<std::string, std::string> categories{ };
 		return categories;
 	};
+
+	#pragma endregion
+
+	#pragma region Registration
 
 	void ComponentRegistry::Register(
 		const std::string& name,
@@ -60,16 +66,6 @@ namespace Loom
 
 		return false;
 	};
-
-	ComponentBase* ComponentRegistry::Create(const std::string& name, GameObject& gameObject)
-	{
-		const auto found = Factories().find(name);
-
-		return found == Factories().end()
-			? nullptr
-			: found->second(gameObject);
-	};
-
 	void ComponentRegistry::Unregister(const std::string& name)
 	{
 		Factories().erase(name);
@@ -79,6 +75,19 @@ namespace Loom
 			it = it->second == name
 				? DisplayNames().erase(it)
 				: std::next(it);
+	};
+
+	#pragma endregion
+
+	#pragma region Lookup
+
+	ComponentBase* ComponentRegistry::Create(const std::string& name, GameObject& gameObject)
+	{
+		const auto found = Factories().find(name);
+
+		return found == Factories().end()
+			? nullptr
+			: found->second(gameObject);
 	};
 
 	const std::map<std::string, ComponentRegistry::Factory>& ComponentRegistry::All()
@@ -165,4 +174,6 @@ namespace Loom
 			? name
 			: last;
 	};
+
+	#pragma endregion
 };

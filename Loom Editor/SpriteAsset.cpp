@@ -24,27 +24,13 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Image
+
 		constexpr int channels = 4;
 		constexpr int alpha = 3;
 		constexpr float full = (float)UINT8_MAX;
 
 		constexpr int jpeg_quality = 95;
-
-		constexpr char separator = '=';
-		constexpr std::string_view image_key = "image";
-		constexpr std::string_view palette_key = "palette";
-		constexpr std::string_view size_key = "size";
-		constexpr std::string_view frame_key = "frame";
-		constexpr std::string_view layer_key = "layer";
-		constexpr std::string_view hidden_key = "hidden";
-		constexpr std::string_view outlined_key = "outlined";
-		constexpr std::string_view cel_key = "cel";
-		constexpr char size_between = 'x';
-
-		constexpr char colour_mark = '#';
-		constexpr size_t rgb = 3;
-		constexpr int hex = 16;
-		constexpr size_t hex_digits = 2;
 
 		std::string LowerExtension(const std::string& path)
 		{
@@ -70,6 +56,21 @@ namespace Loom
 					image.pixels.begin() + (ptrdiff_t)((y + 1) * row),
 					image.pixels.begin() + (ptrdiff_t)((image.height - 1 - y) * row));
 		};
+
+		#pragma endregion
+
+		#pragma region Files
+
+		constexpr char separator = '=';
+		constexpr std::string_view image_key = "image";
+		constexpr std::string_view palette_key = "palette";
+		constexpr std::string_view size_key = "size";
+		constexpr std::string_view frame_key = "frame";
+		constexpr std::string_view layer_key = "layer";
+		constexpr std::string_view hidden_key = "hidden";
+		constexpr std::string_view outlined_key = "outlined";
+		constexpr std::string_view cel_key = "cel";
+		constexpr char size_between = 'x';
 
 		bool ParseInt(std::string_view text, int& value)
 		{
@@ -121,7 +122,20 @@ namespace Loom
 
 			return true;
 		};
+
+		#pragma endregion
+
+		#pragma region Palette
+
+		constexpr char colour_mark = '#';
+		constexpr size_t rgb = 3;
+		constexpr int hex = 16;
+		constexpr size_t hex_digits = 2;
+
+		#pragma endregion
 	};
+
+	#pragma region Image
 
 	SpriteAsset::Image SpriteAsset::Image::Blank(int width, int height)
 	{
@@ -324,16 +338,9 @@ namespace Loom
 		return saved;
 	};
 
-	SpriteAsset SpriteAsset::FromImage(Image image)
-	{
-		SpriteAsset sprite;
-		sprite.width = image.width;
-		sprite.height = image.height;
-		sprite.durations = { defaultDuration };
-		sprite.layers = { Layer{ "Layer 1", true, { std::move(image) } } };
+	#pragma endregion
 
-		return sprite;
-	};
+	#pragma region Files
 
 	std::string SpriteAsset::For(const std::string& image_path)
 	{
@@ -537,6 +544,78 @@ namespace Loom
 		return WriteFile(path, out.str(), "Sprites");
 	};
 
+	#pragma endregion
+
+	#pragma region Editing
+
+	SpriteAsset SpriteAsset::FromImage(Image image)
+	{
+		SpriteAsset sprite;
+		sprite.width = image.width;
+		sprite.height = image.height;
+		sprite.durations = { defaultDuration };
+		sprite.layers = { Layer{ "Layer 1", true, { std::move(image) } } };
+
+		return sprite;
+	};
+
+	void SpriteAsset::AddLayer(int at, const std::string& name)
+	{
+		layers.insert(layers.begin() + at, Layer{ name, true, std::vector<Image>(durations.size(), Image::Blank(width, height)) });
+	};
+
+	void SpriteAsset::MoveLayer(int from, int to)
+	{
+		const auto begin = layers.begin();
+
+		if (from < to)
+			std::rotate(begin + from, begin + from + 1, begin + to + 1);
+		else
+			std::rotate(begin + to, begin + from, begin + from + 1);
+	};
+
+	void SpriteAsset::TakeIn(Image image, const std::string& name)
+	{
+		if (image.width != width * Frames() || image.height != height)
+		{
+			*this = FromImage(std::move(image));
+			return;
+		};
+
+		AddLayer((int)layers.size(), name);
+
+		const size_t row = (size_t)width * channels;
+
+		for (int frame = 0; frame < Frames(); frame++)
+			for (int y = 0; y < height; y++)
+				std::copy_n(
+					image.pixels.begin() + (ptrdiff_t)(((size_t)y * image.width + (size_t)frame * width) * channels),
+					row,
+					layers.back().cels[frame].pixels.begin() + (ptrdiff_t)(y * row));
+	};
+
+	void SpriteAsset::AddFrame(int at, bool copy_previous)
+	{
+		const bool copy = copy_previous && at > 0;
+
+		durations.insert(durations.begin() + at, copy ? durations[at - 1] : defaultDuration);
+
+		for (Layer& layer : layers)
+			layer.cels.insert(layer.cels.begin() + at, copy ? layer.cels[at - 1] : Image::Blank(width, height));
+	};
+
+	void SpriteAsset::RemoveFrame(int frame)
+	{
+		durations.erase(durations.begin() + frame);
+
+		for (Layer& layer : layers)
+			layer.cels.erase(layer.cels.begin() + frame);
+	};
+
+	#pragma endregion
+
+	#pragma region Contents
+
 	SpriteAsset::Image SpriteAsset::Flatten(int frame) const
 	{
 		Image image = Image::Blank(width, height);
@@ -596,59 +675,6 @@ namespace Loom
 		return colours;
 	};
 
-	void SpriteAsset::AddLayer(int at, const std::string& name)
-	{
-		layers.insert(layers.begin() + at, Layer{ name, true, std::vector<Image>(durations.size(), Image::Blank(width, height)) });
-	};
-
-	void SpriteAsset::MoveLayer(int from, int to)
-	{
-		const auto begin = layers.begin();
-
-		if (from < to)
-			std::rotate(begin + from, begin + from + 1, begin + to + 1);
-		else
-			std::rotate(begin + to, begin + from, begin + from + 1);
-	};
-
-	void SpriteAsset::TakeIn(Image image, const std::string& name)
-	{
-		if (image.width != width * Frames() || image.height != height)
-		{
-			*this = FromImage(std::move(image));
-			return;
-		};
-
-		AddLayer((int)layers.size(), name);
-
-		const size_t row = (size_t)width * channels;
-
-		for (int frame = 0; frame < Frames(); frame++)
-			for (int y = 0; y < height; y++)
-				std::copy_n(
-					image.pixels.begin() + (ptrdiff_t)(((size_t)y * image.width + (size_t)frame * width) * channels),
-					row,
-					layers.back().cels[frame].pixels.begin() + (ptrdiff_t)(y * row));
-	};
-
-	void SpriteAsset::AddFrame(int at, bool copy_previous)
-	{
-		const bool copy = copy_previous && at > 0;
-
-		durations.insert(durations.begin() + at, copy ? durations[at - 1] : defaultDuration);
-
-		for (Layer& layer : layers)
-			layer.cels.insert(layer.cels.begin() + at, copy ? layer.cels[at - 1] : Image::Blank(width, height));
-	};
-
-	void SpriteAsset::RemoveFrame(int frame)
-	{
-		durations.erase(durations.begin() + frame);
-
-		for (Layer& layer : layers)
-			layer.cels.erase(layer.cels.begin() + frame);
-	};
-
 	size_t SpriteAsset::Bytes() const
 	{
 		size_t bytes = 0;
@@ -659,6 +685,10 @@ namespace Loom
 
 		return bytes;
 	};
+
+	#pragma endregion
+
+	#pragma region Palette
 
 	bool Palette::Load(const std::string& path, Palette& palette)
 	{
@@ -718,4 +748,6 @@ namespace Loom
 
 		return WriteFile(path, text, "Palette");
 	};
+
+	#pragma endregion
 };

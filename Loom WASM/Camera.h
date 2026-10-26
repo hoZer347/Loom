@@ -25,6 +25,8 @@ namespace Loom
 	*/
 	struct LOOM_API Camera : Component<Camera, "Rendering">
 	{
+		#pragma region View
+
 		// World space to clip space, for a target of the given width over height.
 		glm::mat4 ViewProjection(float aspect) const;
 
@@ -35,6 +37,14 @@ namespace Loom
 		void SetPose(const glm::mat4& world) { m_pose = world; };
 		const glm::mat4& GetPose() const { return m_pose; };
 
+		// The camera the scene being rendered is seen through, for as long as
+		// Scene::Render is drawing it.
+		static inline Camera* current = nullptr;
+
+		#pragma endregion
+
+		#pragma region Aiming
+
 		// Switches what the camera aims by, re-aiming the one it switches to so
 		// the view does not turn: the target goes ahead of the camera at the
 		// distance it was, or the transform is rotated to face it.
@@ -43,9 +53,9 @@ namespace Loom
 		// The inspector's checkbox flips the field itself, so the re-aim follows.
 		void OnFieldChanged(const SerializedField& field) override;
 
-		// The camera the scene being rendered is seen through, for as long as
-		// Scene::Render is drawing it.
-		static inline Camera* current = nullptr;
+		#pragma endregion
+
+		#pragma region Fields
 
 		Serial<bool> lookAtTarget;
 		// World space.
@@ -56,7 +66,11 @@ namespace Loom
 		Serial<float> nearPlane = 0.1f;
 		Serial<float> farPlane = 100.0f;
 
+		#pragma endregion
+
 	private:
+		#pragma region Aiming
+
 		struct Aim
 		{
 			glm::vec3 eye;
@@ -67,9 +81,15 @@ namespace Loom
 		// World space, orthonormal, aimed the way the flag given says.
 		Aim GetAim(bool atTarget) const;
 
+		void Reaim();
+
+		#pragma endregion
+
+		#pragma region View
+
 		glm::mat4 ViewProjection(const Aim& aim, float aspect) const;
 
-		void Reaim();
+		#pragma endregion
 
 		glm::mat4 m_pose{ 1.0f };
 	};

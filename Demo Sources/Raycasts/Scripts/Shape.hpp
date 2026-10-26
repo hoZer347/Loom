@@ -63,15 +63,7 @@ namespace RaycastsScripts
 		};
 
 	private:
-		static constexpr int CUBE_FACES = 6;
-		static constexpr int FACES_PER_AXIS = 2;
-		static constexpr int SPHERE_STACKS = 16;
-		static constexpr int SPHERE_SLICES = 32;
-		static constexpr float HALF = 0.5f;
-		static constexpr int RING_SEGMENTS = 48;
-		static constexpr int TUBE_SEGMENTS = 16;
-		static constexpr float RING_RADIUS = 0.35f;
-		static constexpr float TUBE_RADIUS = 0.15f;
+		#pragma region Building
 
 		static std::vector<float> Build(Kind kind)
 		{
@@ -93,6 +85,20 @@ namespace RaycastsScripts
 			for (const glm::vec3& point : { a, b, c, a, c, d })
 				Add(vertices, point);
 		};
+
+		#pragma endregion
+
+		#pragma region Shapes
+
+		static constexpr int CUBE_FACES = 6;
+		static constexpr int FACES_PER_AXIS = 2;
+		static constexpr int SPHERE_STACKS = 16;
+		static constexpr int SPHERE_SLICES = 32;
+		static constexpr float HALF = 0.5f;
+		static constexpr int RING_SEGMENTS = 48;
+		static constexpr int TUBE_SEGMENTS = 16;
+		static constexpr float RING_RADIUS = 0.35f;
+		static constexpr float TUBE_RADIUS = 0.15f;
 
 		static std::vector<float> CubeVertices()
 		{
@@ -170,6 +176,8 @@ namespace RaycastsScripts
 
 			return vertices;
 		};
+
+		#pragma endregion
 
 		Loom::Serial<Kind> m_kind = Cube;
 		Loom::Serial<glm::vec3> m_color = glm::vec3(0.8f, 0.8f, 0.8f);

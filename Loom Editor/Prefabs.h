@@ -23,6 +23,8 @@ namespace Loom
 	*/
 	namespace Prefabs
 	{
+		#pragma region Nodes
+
 		struct Field
 		{
 			std::string key;
@@ -44,6 +46,42 @@ namespace Loom
 			std::vector<ComponentNode> components;
 			std::vector<ObjectNode> children;
 		};
+
+		#pragma endregion
+
+		#pragma region Links
+
+		// The keys a GameObject's transform fields are written under.
+		std::vector<std::string> TransformKeys(const GameObject& gameObject);
+
+		// The registered name the Prefab component is written under.
+		const std::string& PrefabType();
+
+		// The Prefab component linking a GameObject to its prefab, or null when
+		// it has none or one naming no file.
+		Prefab* LinkOf(const GameObject& gameObject);
+
+		// The link of the prefab gameObject is part of: its own, or its nearest
+		// ancestor's. Null when it is in none.
+		Prefab* NearestLink(const GameObject& gameObject);
+
+		#pragma endregion
+
+		#pragma region Text
+
+		// What SceneSerializer::Serialize(GameObject&) writes, and back. Parse
+		// is false, with why in error, for text that is not one GameObject.
+		bool Parse(const std::string& text, ObjectNode& root, std::string* error = nullptr);
+		std::string Write(const ObjectNode& root);
+
+		// Scene text with the lines of the GameObject with this guid, and of
+		// everything under it, swapped for subtree written at its depth. The
+		// text unchanged when no GameObject has the guid.
+		std::string Splice(const std::string& scene, const std::string& guid, const std::string& subtree);
+
+		#pragma endregion
+
+		#pragma region Syncing
 
 		// What a prefab and the trees compared with it agree on: Shared for an
 		// instance, Whole for the Prefab panel's copy, whose transforms and
@@ -73,25 +111,6 @@ namespace Loom
 			bool reshow = false;
 		};
 
-		// The keys a GameObject's transform fields are written under.
-		std::vector<std::string> TransformKeys(const GameObject& gameObject);
-
-		// The registered name the Prefab component is written under.
-		const std::string& PrefabType();
-
-		// The Prefab component linking a GameObject to its prefab, or null when
-		// it has none or one naming no file.
-		Prefab* LinkOf(const GameObject& gameObject);
-
-		// The link of the prefab gameObject is part of: its own, or its nearest
-		// ancestor's. Null when it is in none.
-		Prefab* NearestLink(const GameObject& gameObject);
-
-		// What SceneSerializer::Serialize(GameObject&) writes, and back. Parse
-		// is false, with why in error, for text that is not one GameObject.
-		bool Parse(const std::string& text, ObjectNode& root, std::string* error = nullptr);
-		std::string Write(const ObjectNode& root);
-
 		// The same text for two trees exactly when they agree on part.
 		std::string Shape(const ObjectNode& root, const std::vector<std::string>& transform_keys, Part part);
 
@@ -120,9 +139,6 @@ namespace Loom
 			const std::vector<Instance>& instances,
 			const std::vector<std::string>& transform_keys);
 
-		// Scene text with the lines of the GameObject with this guid, and of
-		// everything under it, swapped for subtree written at its depth. The
-		// text unchanged when no GameObject has the guid.
-		std::string Splice(const std::string& scene, const std::string& guid, const std::string& subtree);
+		#pragma endregion
 	};
 };

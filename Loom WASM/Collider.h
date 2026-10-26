@@ -15,6 +15,8 @@
 
 namespace Loom
 {
+	#pragma region Collider
+
 	/**
 	* Loom::Collider
 	* - A shape on a GameObject that rays can hit, in the GameObject's own
@@ -118,6 +120,10 @@ namespace Loom
 		const unsigned m_made = s_made++;
 	};
 
+	#pragma endregion
+
+	#pragma region Box Collider
+
 	/**
 	* Loom::BoxCollider
 	* - A box of size around center, hit from outside: a ray starting inside
@@ -146,6 +152,10 @@ namespace Loom
 		mutable glm::vec3 m_center{ 0.0f };
 		mutable glm::vec3 m_size{ 0.0f };
 	};
+
+	#pragma endregion
+
+	#pragma region Sphere Collider
 
 	/**
 	* Loom::SphereCollider
@@ -179,4 +189,6 @@ namespace Loom
 		mutable glm::vec3 m_center{ 0.0f };
 		mutable float m_radius = 0.0f;
 	};
+
+	#pragma endregion
 };

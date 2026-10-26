@@ -52,6 +52,8 @@ namespace UVLayersScripts
 		};
 
 	private:
+		#pragma region Building
+
 		static constexpr int CORNERS_PER_TRIANGLE = 3;
 		static constexpr int CORNERS_PER_CELL = 6;
 		static constexpr float HALF = 0.5f;
@@ -129,6 +131,10 @@ namespace UVLayersScripts
 			m_mesh->SetUV(3, lines);
 		};
 
+		#pragma endregion
+
+		#pragma region Glow
+
 		void Glow()
 		{
 			const float radius = std::fmod(m_elapsed * *m_glowSpeed, *m_cells * *m_cellSize * HALF);
@@ -145,6 +151,10 @@ namespace UVLayersScripts
 			m_mesh->SetUV(1, tinted);
 		};
 
+		#pragma endregion
+
+		#pragma region Fields
+
 		Loom::Serial<int> m_cells = 48;
 		// Units across a cell.
 		Loom::Serial<float> m_cellSize = 0.4f;
@@ -160,9 +170,15 @@ namespace UVLayersScripts
 		Loom::Serial<float> m_glowWidth = 1.0f;
 		Loom::Serial<Loom::Asset<".shader">> m_shader = "Assets/Terrain.shader";
 
+		#pragma endregion
+
+		#pragma region State
+
 		Loom::Mesh* m_mesh = nullptr;
 		std::vector<glm::vec3> m_tints;
 		std::vector<glm::vec2> m_corners;
 		float m_elapsed = 0.0f;
+
+		#pragma endregion
 	};
 };

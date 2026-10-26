@@ -10,14 +10,13 @@ namespace Loom
 {
 	namespace EditorTheme
 	{
+		#pragma region Fonts
+
 		// The font the editor starts in, and the sizes the Settings window offers.
 		constexpr const char* DefaultFont = "Roboto-Medium.ttf";
 		constexpr float DefaultFontSize = 15.0f;
 		constexpr float MinFontSize = 8.0f;
 		constexpr float MaxFontSize = 32.0f;
-
-		// Replaces the engine's stock ImGui sizes and colours with the editor's.
-		void ApplyStyle();
 
 		// The fonts vendored with ImGui, by file name.
 		std::vector<std::string> Fonts();
@@ -31,9 +30,18 @@ namespace Loom
 		// Monospaced, at the size LoadFont was given.
 		ImFont* CodeFont();
 
+		#pragma endregion
+
+		#pragma region Style
+
+		// Replaces the engine's stock ImGui sizes and colours with the editor's.
+		void ApplyStyle();
+
 		// Text colours for the panels, picked to read on the theme's backgrounds.
 		extern const ImVec4 AccentText;
 		extern const ImVec4 ErrorText;
 		extern const ImVec4 WarningText;
+
+		#pragma endregion
 	};
 };

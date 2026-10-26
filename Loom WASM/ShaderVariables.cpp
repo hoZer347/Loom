@@ -21,23 +21,13 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Variables
+
 		constexpr const char* INSTANCE_TAG = "instance";
 		constexpr const char* MATERIAL_TAG = "material";
 
 		// GLSL keeps gl_ for itself.
 		constexpr std::string_view RESERVED_PREFIX = "gl_";
-
-		constexpr float FLOAT_DRAG_SPEED = 0.01f;
-		constexpr float INTEGER_DRAG_SPEED = 0.2f;
-		constexpr const char* FLOAT_FORMAT = "%.3f";
-		constexpr const char* INTEGER_FORMAT = "%.0f";
-
-		// Enough digits for a float, the precision every float variable has in
-		// the end, to come back the same.
-		constexpr const char* WRITTEN_FLOAT_FORMAT = "%.9g";
-		constexpr const char* WRITTEN_INTEGER_FORMAT = "%.0f";
-
-		constexpr size_t NUMBER_LENGTH = 64;
 
 		const std::regex& DeclarationPattern()
 		{
@@ -62,6 +52,24 @@ namespace Loom
 				[name](const ShaderSymbol& symbol) { return symbol.uniform && symbol.name == name; });
 		};
 
+		std::string Declaration(const ShaderVariable& variable)
+		{
+			return
+				std::string("uniform ") + InfoOf(variable.type).glsl + ' ' + variable.name + "; // " +
+				(variable.scope == UniformScope::Instance ? INSTANCE_TAG : MATERIAL_TAG);
+		};
+
+		bool IsIdentifier(const std::string& name)
+		{
+			static const std::regex identifier(R"([A-Za-z_]\w*)");
+
+			return std::regex_match(name, identifier);
+		};
+
+		#pragma endregion
+
+		#pragma region Shader File
+
 		std::string Trimmed(const std::string& line)
 		{
 			const size_t start = line.find_first_not_of(" \t");
@@ -77,35 +85,6 @@ namespace Loom
 				line.find(FRAGMENT_SECTION) != std::string::npos ||
 				line.find(SETTINGS_SECTION) != std::string::npos ||
 				line.find(PIXEL_PASS_SECTION) != std::string::npos;
-		};
-
-		constexpr const char* SETTING_ON = "on";
-		constexpr const char* SETTING_OFF = "off";
-
-		const std::regex& SettingPattern()
-		{
-			// The setting's name, then on or off.
-			static const std::regex pattern(R"(^\s*(\w+)\s*=\s*(\w+)\s*(?://.*)?$)");
-
-			return pattern;
-		};
-
-		constexpr size_t SETTING_NAME_MATCH = 1;
-		constexpr size_t SETTING_VALUE_MATCH = 2;
-
-		// Each setting by the name the file gives it.
-		struct SettingName
-		{
-			const char* name;
-			bool ShaderSettings::* member;
-		};
-
-		constexpr SettingName SETTING_NAMES[] =
-		{
-			{ "shading", &ShaderSettings::shading },
-			{ "shadows", &ShaderSettings::shadows },
-			{ "transparency", &ShaderSettings::transparency },
-			{ "pixelated", &ShaderSettings::pixelated },
 		};
 
 		// A shader file as lines, and the line ending to write it back with.
@@ -199,19 +178,54 @@ namespace Loom
 			};
 		};
 
-		std::string Declaration(const ShaderVariable& variable)
+		#pragma endregion
+
+		#pragma region Settings
+
+		constexpr const char* SETTING_ON = "on";
+		constexpr const char* SETTING_OFF = "off";
+
+		const std::regex& SettingPattern()
 		{
-			return
-				std::string("uniform ") + InfoOf(variable.type).glsl + ' ' + variable.name + "; // " +
-				(variable.scope == UniformScope::Instance ? INSTANCE_TAG : MATERIAL_TAG);
+			// The setting's name, then on or off.
+			static const std::regex pattern(R"(^\s*(\w+)\s*=\s*(\w+)\s*(?://.*)?$)");
+
+			return pattern;
 		};
 
-		bool IsIdentifier(const std::string& name)
-		{
-			static const std::regex identifier(R"([A-Za-z_]\w*)");
+		constexpr size_t SETTING_NAME_MATCH = 1;
+		constexpr size_t SETTING_VALUE_MATCH = 2;
 
-			return std::regex_match(name, identifier);
+		// Each setting by the name the file gives it.
+		struct SettingName
+		{
+			const char* name;
+			bool ShaderSettings::* member;
 		};
+
+		constexpr SettingName SETTING_NAMES[] =
+		{
+			{ "shading", &ShaderSettings::shading },
+			{ "shadows", &ShaderSettings::shadows },
+			{ "transparency", &ShaderSettings::transparency },
+			{ "pixelated", &ShaderSettings::pixelated },
+		};
+
+		#pragma endregion
+
+		#pragma region Values
+
+		constexpr float FLOAT_DRAG_SPEED = 0.01f;
+		constexpr float INTEGER_DRAG_SPEED = 0.2f;
+		constexpr const char* FLOAT_FORMAT = "%.3f";
+		constexpr const char* INTEGER_FORMAT = "%.0f";
+
+		// Enough digits for a float, the precision every float variable has in
+		// the end, to come back the same.
+		constexpr const char* WRITTEN_FLOAT_FORMAT = "%.9g";
+		constexpr const char* WRITTEN_INTEGER_FORMAT = "%.0f";
+
+		constexpr size_t NUMBER_LENGTH = 64;
 
 		const UniformValue& DefaultOf(UniformType type)
 		{
@@ -333,108 +347,111 @@ namespace Loom
 
 			return changed;
 		};
+
+		#pragma endregion
 	};
 
-	UniformValue UniformValue::Default(UniformType type)
+	#pragma region Settings
+
+	ShaderSettings ParseShaderSettings(const std::string& source)
 	{
-		UniformValue value;
-		value.type = type;
+		ShaderSettings settings;
 
-		const UniformTypeInfo& info = InfoOf(type);
-
-		if (IsMatrix(info))
-			for (int i = 0; i < std::min(info.columns, info.rows); i++)
-				value.components[i * info.rows + i] = 1.0;
-
-		return value;
-	};
-
-	const UniformValue* UniformValues::Find(const ShaderVariable& variable) const
-	{
-		const auto found = values.find(variable.name);
-
-		return found != values.end() && found->second.type == variable.type
-			? &found->second
-			: nullptr;
-	};
-
-	void UniformValues::Set(const std::string& name, UniformType type, std::initializer_list<double> components)
-	{
-		UniformValue value = UniformValue::Default(type);
-
-		std::copy_n(components.begin(), std::min(components.size(), value.components.size()), value.components.begin());
-
-		values[name] = value;
-	};
-
-	void UniformValues::SetTexture(const std::string& name, const std::string& path)
-	{
-		UniformValue value = UniformValue::Default(UniformType::Sampler2D);
-		value.texture = path;
-
-		values[name] = value;
-	};
-
-	std::string UniformValues::Write() const
-	{
-		std::string text;
-
-		for (const auto& [name, value] : values)
-		{
-			const UniformTypeInfo& info = InfoOf(value.type);
-
-			text += name + ' ' + info.glsl;
-
-			if (info.kind == UniformKind::Texture)
-				text += ' ' + value.texture;
-			else
-				for (int i = 0; i < info.columns * info.rows; i++)
-				{
-					char number[NUMBER_LENGTH]{ };
-
-					if (info.kind == UniformKind::Float)
-						snprintf(number, sizeof(number), WRITTEN_FLOAT_FORMAT, (float)value.components[i]);
-					else snprintf(number, sizeof(number), WRITTEN_INTEGER_FORMAT, value.components[i]);
-
-					text += ' ';
-					text += number;
-				};
-
-			text += '\n';
-		};
-
-		return text;
-	};
-
-	void UniformValues::Read(const std::string& text)
-	{
-		values.clear();
-
-		std::istringstream lines(text);
+		std::istringstream lines(source);
 		std::string line;
+		bool inSettings = false;
 
 		while (std::getline(lines, line))
 		{
-			std::istringstream words(line);
-			std::string name;
-			std::string glsl;
-			UniformType type;
+			if (!line.empty() && line.back() == '\r')
+				line.pop_back();
 
-			if (!(words >> name >> glsl) || !FindUniformType(glsl, type))
+			if (IsSectionMarker(line))
+			{
+				inSettings = line.find(SETTINGS_SECTION) != std::string::npos;
+				continue;
+			};
+
+			const std::string trimmed = Trimmed(line);
+
+			if (!inSettings || trimmed.empty() || trimmed.starts_with("//"))
 				continue;
 
-			UniformValue value = UniformValue::Default(type);
-			const UniformTypeInfo& info = InfoOf(type);
+			std::smatch match;
+			bool* setting = nullptr;
 
-			if (info.kind == UniformKind::Texture)
-				std::getline(words >> std::ws, value.texture);
-			else
-				for (int i = 0; i < info.columns * info.rows; i++)
-					words >> value.components[i];
+			if (std::regex_match(line, match, SettingPattern()))
+				for (const auto& [name, member] : SETTING_NAMES)
+					if (match[SETTING_NAME_MATCH] == name)
+						setting = &(settings.*member);
 
-			values[name] = value;
+			const std::string value = match.empty() ? "" : match[SETTING_VALUE_MATCH].str();
+
+			if (!setting || (value != SETTING_ON && value != SETTING_OFF))
+				throw std::runtime_error("'" + trimmed + "' is not a setting: shading, shadows, transparency or pixelated, = on or off");
+
+			*setting = value == SETTING_ON;
 		};
+
+		return settings;
 	};
+
+	bool WriteShaderSettings(const std::string& path, const ShaderSettings& settings, std::string& error)
+	{
+		ShaderFile file;
+
+		if (!file.Read(path, error))
+			return false;
+
+		const auto IsSettingsMarker = [](const std::string& line) { return line.find(SETTINGS_SECTION) != std::string::npos; };
+
+		size_t marker = std::find_if(file.lines.begin(), file.lines.end(), IsSettingsMarker) - file.lines.begin();
+
+		// In front of the first stage, below whatever comments head the file.
+		if (marker == file.lines.size())
+		{
+			marker = std::find_if(file.lines.begin(), file.lines.end(), IsSectionMarker) - file.lines.begin();
+			file.lines.insert(file.lines.begin() + marker, { std::string("// ") + SETTINGS_SECTION, "" });
+		};
+
+		const size_t start = marker + 1;
+		size_t end = start;
+
+		while (end < file.lines.size() && !IsSectionMarker(file.lines[end]))
+			end++;
+
+		// A setting the section is missing goes after the ones it has.
+		size_t append = start;
+		std::smatch match;
+
+		for (size_t i = start; i < end; i++)
+			if (std::regex_match(file.lines[i], match, SettingPattern()))
+				append = i + 1;
+
+		for (const auto& [name, member] : SETTING_NAMES)
+		{
+			const std::string written = std::string(name) + " = " + (settings.*member ? SETTING_ON : SETTING_OFF);
+
+			size_t at = start;
+
+			while (at < end && !(std::regex_match(file.lines[at], match, SettingPattern()) && match[SETTING_NAME_MATCH] == name))
+				at++;
+
+			if (at < end)
+				file.lines[at] = written;
+			else
+			{
+				file.lines.insert(file.lines.begin() + append++, written);
+				end++;
+			};
+		};
+
+		return file.Write(path, error);
+	};
+
+	#pragma endregion
+
+	#pragma region Variables
 
 	std::vector<ShaderVariable> ParseShaderVariables(const std::string& source)
 	{
@@ -542,100 +559,109 @@ namespace Loom
 		return file.Write(path, error);
 	};
 
-	ShaderSettings ParseShaderSettings(const std::string& source)
-	{
-		ShaderSettings settings;
+	#pragma endregion
 
-		std::istringstream lines(source);
+	#pragma region Values
+
+	UniformValue UniformValue::Default(UniformType type)
+	{
+		UniformValue value;
+		value.type = type;
+
+		const UniformTypeInfo& info = InfoOf(type);
+
+		if (IsMatrix(info))
+			for (int i = 0; i < std::min(info.columns, info.rows); i++)
+				value.components[i * info.rows + i] = 1.0;
+
+		return value;
+	};
+
+	const UniformValue* UniformValues::Find(const ShaderVariable& variable) const
+	{
+		const auto found = values.find(variable.name);
+
+		return found != values.end() && found->second.type == variable.type
+			? &found->second
+			: nullptr;
+	};
+
+	void UniformValues::Set(const std::string& name, UniformType type, std::initializer_list<double> components)
+	{
+		UniformValue value = UniformValue::Default(type);
+
+		std::copy_n(components.begin(), std::min(components.size(), value.components.size()), value.components.begin());
+
+		values[name] = value;
+	};
+
+	void UniformValues::SetTexture(const std::string& name, const std::string& path)
+	{
+		UniformValue value = UniformValue::Default(UniformType::Sampler2D);
+		value.texture = path;
+
+		values[name] = value;
+	};
+
+	std::string UniformValues::Write() const
+	{
+		std::string text;
+
+		for (const auto& [name, value] : values)
+		{
+			const UniformTypeInfo& info = InfoOf(value.type);
+
+			text += name + ' ' + info.glsl;
+
+			if (info.kind == UniformKind::Texture)
+				text += ' ' + value.texture;
+			else
+				for (int i = 0; i < info.columns * info.rows; i++)
+				{
+					char number[NUMBER_LENGTH]{ };
+
+					if (info.kind == UniformKind::Float)
+						snprintf(number, sizeof(number), WRITTEN_FLOAT_FORMAT, (float)value.components[i]);
+					else snprintf(number, sizeof(number), WRITTEN_INTEGER_FORMAT, value.components[i]);
+
+					text += ' ';
+					text += number;
+				};
+
+			text += '\n';
+		};
+
+		return text;
+	};
+
+	void UniformValues::Read(const std::string& text)
+	{
+		values.clear();
+
+		std::istringstream lines(text);
 		std::string line;
-		bool inSettings = false;
 
 		while (std::getline(lines, line))
 		{
-			if (!line.empty() && line.back() == '\r')
-				line.pop_back();
+			std::istringstream words(line);
+			std::string name;
+			std::string glsl;
+			UniformType type;
 
-			if (IsSectionMarker(line))
-			{
-				inSettings = line.find(SETTINGS_SECTION) != std::string::npos;
-				continue;
-			};
-
-			const std::string trimmed = Trimmed(line);
-
-			if (!inSettings || trimmed.empty() || trimmed.starts_with("//"))
+			if (!(words >> name >> glsl) || !FindUniformType(glsl, type))
 				continue;
 
-			std::smatch match;
-			bool* setting = nullptr;
+			UniformValue value = UniformValue::Default(type);
+			const UniformTypeInfo& info = InfoOf(type);
 
-			if (std::regex_match(line, match, SettingPattern()))
-				for (const auto& [name, member] : SETTING_NAMES)
-					if (match[SETTING_NAME_MATCH] == name)
-						setting = &(settings.*member);
-
-			const std::string value = match.empty() ? "" : match[SETTING_VALUE_MATCH].str();
-
-			if (!setting || (value != SETTING_ON && value != SETTING_OFF))
-				throw std::runtime_error("'" + trimmed + "' is not a setting: shading, shadows, transparency or pixelated, = on or off");
-
-			*setting = value == SETTING_ON;
-		};
-
-		return settings;
-	};
-
-	bool WriteShaderSettings(const std::string& path, const ShaderSettings& settings, std::string& error)
-	{
-		ShaderFile file;
-
-		if (!file.Read(path, error))
-			return false;
-
-		const auto IsSettingsMarker = [](const std::string& line) { return line.find(SETTINGS_SECTION) != std::string::npos; };
-
-		size_t marker = std::find_if(file.lines.begin(), file.lines.end(), IsSettingsMarker) - file.lines.begin();
-
-		// In front of the first stage, below whatever comments head the file.
-		if (marker == file.lines.size())
-		{
-			marker = std::find_if(file.lines.begin(), file.lines.end(), IsSectionMarker) - file.lines.begin();
-			file.lines.insert(file.lines.begin() + marker, { std::string("// ") + SETTINGS_SECTION, "" });
-		};
-
-		const size_t start = marker + 1;
-		size_t end = start;
-
-		while (end < file.lines.size() && !IsSectionMarker(file.lines[end]))
-			end++;
-
-		// A setting the section is missing goes after the ones it has.
-		size_t append = start;
-		std::smatch match;
-
-		for (size_t i = start; i < end; i++)
-			if (std::regex_match(file.lines[i], match, SettingPattern()))
-				append = i + 1;
-
-		for (const auto& [name, member] : SETTING_NAMES)
-		{
-			const std::string written = std::string(name) + " = " + (settings.*member ? SETTING_ON : SETTING_OFF);
-
-			size_t at = start;
-
-			while (at < end && !(std::regex_match(file.lines[at], match, SettingPattern()) && match[SETTING_NAME_MATCH] == name))
-				at++;
-
-			if (at < end)
-				file.lines[at] = written;
+			if (info.kind == UniformKind::Texture)
+				std::getline(words >> std::ws, value.texture);
 			else
-			{
-				file.lines.insert(file.lines.begin() + append++, written);
-				end++;
-			};
-		};
+				for (int i = 0; i < info.columns * info.rows; i++)
+					words >> value.components[i];
 
-		return file.Write(path, error);
+			values[name] = value;
+		};
 	};
 
 	void ApplyShaderVariables(uint32_t program, const std::vector<ShaderVariable>& variables, const UniformValues& material, const UniformValues* instance)
@@ -722,4 +748,6 @@ namespace Loom
 
 		return changed;
 	};
+
+	#pragma endregion
 };

@@ -20,6 +20,8 @@ namespace Loom
 
 	struct LOOM_API Mesh : Component<Mesh, "Rendering">
 	{
+		#pragma region Construction
+
 		// The GL values, spelled out so this header does not have to pull in GL.
 		enum Primitive : uint32_t
 		{
@@ -41,6 +43,10 @@ namespace Loom
 
 		Mesh(Primitive primitive = Triangles);
 		~Mesh();
+
+		#pragma endregion
+
+		#pragma region Drawing
 
 		// Whether there is a material with a shader to draw with, finding the
 		// GameObject's material the first time it is asked. Every pass checks
@@ -77,7 +83,9 @@ namespace Loom
 		// be drawn as an instance joins it rather than being drawn.
 		static inline MeshBatch* batch = nullptr;
 
-		void OnGui() override;
+		#pragma endregion
+
+		#pragma region UV Layers
 
 		// A raw layer of values, one tuple a vertex, which a vertex stage
 		// declaring UV_<id> with the same types in the same order reads back:
@@ -112,6 +120,19 @@ namespace Loom
 		// The layers set, by id.
 		std::vector<UVLayer> UVLayers() const;
 
+		#pragma endregion
+
+		#pragma region Editor
+
+		void OnGui() override;
+
+		// Leaves a generated mesh's geometry out of what is written.
+		bool IsSaved(const SerializedField& field) const override;
+
+		#pragma endregion
+
+		#pragma region Fields
+
 		Serial<Material*> material;
 		Serial<Primitive> primitive_id;
 		Serial<DrawType> m_draw_type = Static;
@@ -139,9 +160,6 @@ namespace Loom
 		// vertices, then its words. After m_colors for the same reason.
 		Serial<std::vector<unsigned int>, "UV Layers"> m_uvLayers;
 
-		// Leaves a generated mesh's geometry out of what is written.
-		bool IsSaved(const SerializedField& field) const override;
-
 		std::vector<uint32_t> m_indices;
 
 		// On, the vertices, texture coordinates, normals, colours and UV layers are made by a
@@ -158,12 +176,20 @@ namespace Loom
 		// The same for m_normals.
 		std::vector<float> m_deformedNormals;
 
+		#pragma endregion
+
 	private:
 		friend struct MeshBatch;
+
+		#pragma region Drawing
 
 		// Hands the renderer the vertices again once they have changed. False
 		// when there is nothing it can draw.
 		bool Keep(Renderer& renderer);
+
+		#pragma endregion
+
+		#pragma region Kept Vertices
 
 		// The frame m_deformed was bent for, so the passes after the first in
 		// a frame draw what it bent.
@@ -196,7 +222,11 @@ namespace Loom
 		// be. Only the hashes are compared, so two meshes whose vertices differ
 		// but hash alike, a chance in 2^64, would draw as one.
 		uint64_t m_geometry = 0;
+
+		#pragma endregion
 	};
+
+	#pragma region Batching
 
 	/**
 	* Loom::MeshBatch
@@ -239,4 +269,6 @@ namespace Loom
 		// Each instance's model matrix and colour, for the lot being drawn.
 		std::vector<float> m_instances;
 	};
+
+	#pragma endregion
 };

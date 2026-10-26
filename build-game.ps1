@@ -42,6 +42,8 @@ $root = $PSScriptRoot
 . (Join-Path $root 'MSBuild.ps1')
 . (Join-Path $root 'ProjectFiles.ps1')
 
+#region Arguments
+
 $Project = (Resolve-Path -LiteralPath $Project -ErrorAction Stop).Path.TrimEnd('\')
 $Scene = (Resolve-Path -LiteralPath $Scene -ErrorAction Stop).Path
 $Output = [System.IO.Path]::GetFullPath($Output).TrimEnd('\')
@@ -57,6 +59,10 @@ if ("$Project\".StartsWith("$Output\", [System.StringComparison]::OrdinalIgnoreC
     Write-Output "The project is in $Output, which a build would empty."
     exit 1
 }
+
+#endregion
+
+#region Project
 
 # Named for the project, and built from the headers beside the script project
 # its .loomproject names.
@@ -90,6 +96,10 @@ if ((Test-Path -LiteralPath $Output) -and -not (Test-Path -LiteralPath $marker) 
     exit 1
 }
 
+#endregion
+
+#region Compile
+
 $build = Join-Path $Project 'Build'
 $msbuild = Find-MSBuild
 
@@ -106,6 +116,10 @@ if ($LASTEXITCODE -ne 0)
     Write-Output "The $Configuration build of $name failed."
     exit 1
 }
+
+#endregion
+
+#region Copy
 
 $game = Join-Path $Output "$name.exe"
 $running = Get-Process -Name $name -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $game }
@@ -130,6 +144,10 @@ if (-not (Copy-ProjectFiles $Project $Output $scripts))
     exit 1
 }
 
+#endregion
+
+#region Program
+
 $program = Join-Path $build "Player\$Configuration"
 
 try
@@ -147,3 +165,5 @@ catch
 }
 
 exit 0
+
+#endregion

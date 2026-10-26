@@ -34,6 +34,8 @@ namespace Loom
 	*/
 	struct LOOM_API Animator : Component<Animator, "Animation">
 	{
+		#pragma region Properties
+
 		enum class Property { Translation, Rotation, Scale, Weight };
 
 		// The floats a key of each property holds after its time: a position
@@ -43,17 +45,15 @@ namespace Loom
 		// The name m_channels gives each property.
 		static const char* PropertyName(Property property);
 
+		#pragma endregion
+
+		#pragma region Playback
+
 		void OnUpdate() override;
 
 		// Moves the playing clip on by seconds of the clock and puts the pose
 		// there on the joints and Skins.
 		void Advance(float seconds);
-
-		// How far into the playing clip it is.
-		void OnGui() override;
-
-		// The clips' names, for clip.
-		std::vector<std::string> GetFieldChoices(const SerializedField& field) override;
 
 		// Starts the named clip, or the clip at that place in the list, from its
 		// beginning. False, changing nothing, for one it has no clip by.
@@ -65,6 +65,17 @@ namespace Loom
 		// moving the clock or easing out of an earlier pose.
 		void Pose(float time);
 
+		// Whether the clip at index is a transition, which a script moving
+		// between clips passes over for the Animator to play on the way.
+		bool IsTransition(int index);
+
+		// Whether a transition is playing on the way to clip.
+		bool InTransition() const { return m_after >= 0; };
+
+		#pragma endregion
+
+		#pragma region Clips
+
 		std::vector<std::string> GetClipNames();
 
 		// The playing clip's name, or empty when clip is none of them.
@@ -75,12 +86,17 @@ namespace Loom
 
 		float GetTime() const { return m_time; };
 
-		// Whether the clip at index is a transition, which a script moving
-		// between clips passes over for the Animator to play on the way.
-		bool IsTransition(int index);
+		#pragma endregion
 
-		// Whether a transition is playing on the way to clip.
-		bool InTransition() const { return m_after >= 0; };
+		#pragma region Inspector
+
+		// How far into the playing clip it is.
+		void OnGui() override;
+
+		// The clips' names, for clip.
+		std::vector<std::string> GetFieldChoices(const SerializedField& field) override;
+
+		#pragma endregion
 
 		// Which clip plays, by its place in m_clips. While a transition into it
 		// plays, it already names the clip the transition leads to.
@@ -104,6 +120,8 @@ namespace Loom
 		Serial<float> blendTime = 0.25f;
 
 	private:
+		#pragma region Parsing
+
 		struct Clip
 		{
 			std::string name;
@@ -131,8 +149,9 @@ namespace Loom
 		// Reads the clips and channels again when their text has changed.
 		void Parse();
 
-		// The value of a channel at time, its keys either side blended.
-		std::vector<float> Sample(const Channel& channel, float time) const;
+		#pragma endregion
+
+		#pragma region Playback
 
 		// The playing clip's index: the transition while one plays, otherwise
 		// clip. The clip count when that is none of them.
@@ -145,6 +164,13 @@ namespace Loom
 		// The transition from one clip to another, or -1 when there is none.
 		int TransitionBetween(int from, int to);
 
+		#pragma endregion
+
+		#pragma region Posing
+
+		// The value of a channel at time, its keys either side blended.
+		std::vector<float> Sample(const Channel& channel, float time) const;
+
 		// Remembers where the joints and shape keys are, to ease out of.
 		void CaptureBlend();
 
@@ -154,6 +180,10 @@ namespace Loom
 		// The Skins under it, gathered again once anything has been added,
 		// removed or moved.
 		const std::vector<Skin*>& Skins();
+
+		#pragma endregion
+
+		#pragma region Parsing
 
 		std::vector<Clip> m_parsedClips;
 		std::vector<Channel> m_parsedChannels;
@@ -167,9 +197,9 @@ namespace Loom
 		std::vector<std::string> m_jointNames;
 		NamedObjects m_joints;
 
-		std::vector<Skin*> m_skins;
-		bool m_skinsGathered = false;
-		unsigned long long m_skinsChanges = 0;
+		#pragma endregion
+
+		#pragma region Playback
 
 		// The clip m_time counts from the start of, or -1 before any has played.
 		int m_playing = -1;
@@ -178,6 +208,14 @@ namespace Loom
 		// The clip the playing transition leads into, or -1 when it is not one.
 		// While one plays, clip already names where it leads.
 		int m_after = -1;
+
+		#pragma endregion
+
+		#pragma region Posing
+
+		std::vector<Skin*> m_skins;
+		bool m_skinsGathered = false;
+		unsigned long long m_skinsChanges = 0;
 
 		struct Held
 		{
@@ -193,5 +231,7 @@ namespace Loom
 		std::vector<float> m_heldWeights;
 		float m_blendLeft = 0.0f;
 		float m_blendFor = 0.0f;
+
+		#pragma endregion
 	};
 };

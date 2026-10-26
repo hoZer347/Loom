@@ -18,6 +18,17 @@ namespace Loom
 	*/
 	struct EditorLog final
 	{
+		#pragma region Installing
+
+		static EditorLog& Get();
+
+		void Install();
+		void Uninstall();
+
+		#pragma endregion
+
+		#pragma region Lines
+
 		// A file in the project that a line names, with where in it the line
 		// points when it says.
 		struct Link
@@ -40,11 +51,6 @@ namespace Loom
 			std::vector<Link> links;
 		};
 
-		static EditorLog& Get();
-
-		void Install();
-		void Uninstall();
-
 		void Clear();
 
 		// Lines that name a file inside this folder name it from the folder,
@@ -56,9 +62,17 @@ namespace Loom
 		// while older lines are trimmed or cleared away.
 		void ForEach(const std::function<void(size_t id, const Line&)>& visit) const;
 
+		#pragma endregion
+
 	private:
+		#pragma region Installing
+
 		EditorLog() = default;
 		~EditorLog();
+
+		#pragma endregion
+
+		#pragma region Sink
 
 		// Splits whatever is written to a stream into lines and appends them,
 		// passing the characters along to the stream's original buffer so the
@@ -80,6 +94,8 @@ namespace Loom
 
 			std::string pending;
 		};
+
+		#pragma endregion
 
 		static constexpr size_t max_lines = 2048;
 

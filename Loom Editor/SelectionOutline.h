@@ -24,29 +24,26 @@ namespace Loom
 	*/
 	struct SelectionOutline final
 	{
+		#pragma region Lifetime
+
 		SelectionOutline() = default;
 		~SelectionOutline();
 
 		SelectionOutline(const SelectionOutline&) = delete;
 		SelectionOutline& operator=(const SelectionOutline&) = delete;
 
+		#pragma endregion
+
+		#pragma region Drawing
+
 		// Draws over the target being drawn into, seen through camera. When the
 		// selection has anything to draw, leaves that target's depth cleared.
 		void Draw(GameObject& selected, const Camera& camera);
 
+		#pragma endregion
+
 	private:
-		// Compiles the programs the first time it is asked. False when they
-		// will not compile, which is reported once.
-		bool Compile();
-		void Destroy();
-
-		// Whether anything was drawn.
-		bool DrawSilhouettes(GameObject& gameObject, const Camera& camera);
-
-		// The mask program for meshes drawn with shader: its own vertex stage,
-		// so the silhouette lands where the mesh does, or the plain one when
-		// that will not compile.
-		uint32_t MeshMask(const Shader& shader);
+		#pragma region Programs
 
 		// A mask program, and the shader program it was made beside, which a
 		// reloaded shader no longer matches.
@@ -56,7 +53,26 @@ namespace Loom
 			uint32_t program = 0;
 		};
 
-		EditorViewport m_mask;
+		// Compiles the programs the first time it is asked. False when they
+		// will not compile, which is reported once.
+		bool Compile();
+		void Destroy();
+
+		// The mask program for meshes drawn with shader: its own vertex stage,
+		// so the silhouette lands where the mesh does, or the plain one when
+		// that will not compile.
+		uint32_t MeshMask(const Shader& shader);
+
+		#pragma endregion
+
+		#pragma region Drawing
+
+		// Whether anything was drawn.
+		bool DrawSilhouettes(GameObject& gameObject, const Camera& camera);
+
+		#pragma endregion
+
+		#pragma region Programs
 
 		std::unordered_map<const Shader*, ShaderMask> m_meshMasks;
 		uint32_t m_meshMask = 0;
@@ -64,5 +80,13 @@ namespace Loom
 		uint32_t m_edge = 0;
 
 		bool m_compileTried = false;
+
+		#pragma endregion
+
+		#pragma region Drawing
+
+		EditorViewport m_mask;
+
+		#pragma endregion
 	};
 };

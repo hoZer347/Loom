@@ -8,6 +8,8 @@
 
 namespace Loom
 {
+	#pragma region Key Names
+
 	// The keys by name, numbered as GLFW numbers them, so either can be asked
 	// of Input. A Serial<Key> is offered in the inspector as a list of them,
 	// None for a key that is not set.
@@ -49,8 +51,12 @@ namespace Loom
 	LOOM_API std::string_view NameOf(Key key);
 	LOOM_API Key KeyNamed(std::string_view name);
 
+	#pragma endregion
+
 	struct LOOM_API Input
 	{
+		#pragma region Mouse Buttons
+
 		// Buttons are numbered as GLFW numbers them: 0 left, 1 right, 2 middle,
 		// up to GLFW_MOUSE_BUTTON_LAST. Anything outside that is never pressed.
 		static constexpr int mouse_buttons = 8;
@@ -67,6 +73,14 @@ namespace Loom
 
 		// What the platform's button callback reports, as it happens.
 		static void OnMouseButton(int button, bool pressed);
+
+		// For a press made up after this frame's Tick, such as a UI script's,
+		// which this frame hears as though it had been polled with the rest.
+		static void OnMouseButtonThisFrame(int button, bool pressed);
+
+		#pragma endregion
+
+		#pragma region Cursor
 
 		// What the platform's cursor callback reports: the cursor in pixels from
 		// the window's top left, and the window's size.
@@ -88,9 +102,9 @@ namespace Loom
 		static void SetView(int x, int y, int width, int height);
 		static void ClearView();
 
-		// For a press made up after this frame's Tick, such as a UI script's,
-		// which this frame hears as though it had been polled with the rest.
-		static void OnMouseButtonThisFrame(int button, bool pressed);
+		#pragma endregion
+
+		#pragma region Keys
 
 		// Keys are numbered as GLFW numbers them, and as Key names them: a
 		// letter or a digit by its character, 'W' or '1', and the rest as
@@ -112,6 +126,10 @@ namespace Loom
 		static void OnKey(int key, bool pressed);
 		static void OnKeyThisFrame(int key, bool pressed);
 
+		#pragma endregion
+
+		#pragma region Wheel
+
 		// How far the mouse wheel turned since the frame before, in notches,
 		// away from the person positive. Heard only while the cursor is on
 		// the view, as the wheel turns whatever is under it.
@@ -121,6 +139,10 @@ namespace Loom
 		// turn made up after Tick, as for a mouse button.
 		static void OnMouseWheel(float notches);
 		static void OnMouseWheelThisFrame(float notches);
+
+		#pragma endregion
+
+		#pragma region Frame
 
 		// Whether the game hears the mouse and the keyboard, which
 		// DialogueInput also asks before it reports keys and pads: always on
@@ -133,6 +155,8 @@ namespace Loom
 		// Hands what the callbacks heard since the last call to this frame's
 		// questions. Engine calls it once a frame, after polling for events.
 		static void Tick();
+
+		#pragma endregion
 
 		static inline int screen_width = 0;
 		static inline int screen_height = 0;
@@ -147,6 +171,10 @@ namespace Loom
 		Input() = delete;
 		~Input() = delete;
 
+		#pragma region Platform
+
 		static void Init();
+
+		#pragma endregion
 	};
 };

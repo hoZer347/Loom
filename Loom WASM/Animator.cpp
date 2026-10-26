@@ -37,6 +37,8 @@ namespace Loom
 		};
 	};
 
+	#pragma region Properties
+
 	size_t Animator::ValueFloats(Property property)
 	{
 		constexpr size_t VECTOR = 3;
@@ -61,6 +63,166 @@ namespace Loom
 		default:					return "weight";
 		};
 	};
+
+	#pragma endregion
+
+	#pragma region Playback
+
+	void Animator::OnUpdate()
+	{
+		Advance(Time::DeltaTime());
+	};
+
+	void Animator::Advance(float seconds)
+	{
+		Parse();
+
+		if (*clip != (m_after >= 0 ? m_after : m_playing))
+			Start(clip);
+
+		m_time += seconds * speed;
+		m_blendLeft = std::max(0.0f, m_blendLeft - seconds * std::abs(speed));
+
+		if (m_after >= 0 && m_time >= GetDuration())
+		{
+			// A transition ends where its clip begins, so it carries on into it
+			// with no easing of its own.
+			m_time -= GetDuration();
+			m_playing = m_after;
+			m_after = -1;
+		};
+
+		Apply(m_time, true);
+	};
+
+	bool Animator::Play(const std::string& name)
+	{
+		Parse();
+
+		const auto found = std::find_if(m_parsedClips.begin(), m_parsedClips.end(), [&](const Clip& each) { return each.name == name; });
+
+		return Play((int)(found - m_parsedClips.begin()));
+	};
+
+	bool Animator::Play(int index)
+	{
+		Parse();
+
+		if (index < 0 || (size_t)index >= m_parsedClips.size())
+			return false;
+
+		Start(index);
+
+		return true;
+	};
+
+	void Animator::Pose(float time)
+	{
+		Apply(time, false);
+	};
+
+	bool Animator::IsTransition(int index)
+	{
+		Parse();
+
+		return index >= 0 && (size_t)index < m_parsedClips.size() && m_parsedClips[index].from >= 0;
+	};
+
+	size_t Animator::PlayingIndex() const
+	{
+		const int playing = m_after >= 0 ? m_playing : *clip;
+
+		return playing >= 0 && (size_t)playing < m_parsedClips.size() ? (size_t)playing : m_parsedClips.size();
+	};
+
+	void Animator::Start(int index)
+	{
+		CaptureBlend();
+
+		const int via = m_after < 0 ? TransitionBetween(m_playing, index) : -1;
+
+		m_after = via >= 0 ? index : -1;
+		m_playing = via >= 0 ? via : index;
+		clip = index;
+		m_time = 0.0f;
+	};
+
+	int Animator::TransitionBetween(int from, int to)
+	{
+		Parse();
+
+		if (from < 0 || to < 0)
+			return -1;
+
+		for (size_t i = 0; i < m_parsedClips.size(); i++)
+			if (m_parsedClips[i].from == from && m_parsedClips[i].to == to)
+				return (int)i;
+
+		return -1;
+	};
+
+	#pragma endregion
+
+	#pragma region Clips
+
+	std::vector<std::string> Animator::GetClipNames()
+	{
+		Parse();
+
+		std::vector<std::string> names;
+
+		for (const Clip& each : m_parsedClips)
+			names.push_back(each.name);
+
+		return names;
+	};
+
+	std::string Animator::GetClipName()
+	{
+		Parse();
+
+		const size_t playing = PlayingIndex();
+
+		return playing < m_parsedClips.size() ? m_parsedClips[playing].name : std::string();
+	};
+
+	float Animator::GetDuration()
+	{
+		Parse();
+
+		const size_t playing = PlayingIndex();
+
+		return playing < m_parsedClips.size() ? m_parsedClips[playing].duration : 0.0f;
+	};
+
+	#pragma endregion
+
+	#pragma region Inspector
+
+	void Animator::OnGui()
+	{
+		Parse();
+
+		if (m_parsedClips.empty())
+			return;
+
+		const float duration = GetDuration();
+		const float into = duration <= 0.0f ? 0.0f : loop ? std::fmod(m_time, duration) : std::min(m_time, duration);
+
+		ImGui::Text("%.2f / %.2f s", into, duration);
+	};
+
+	std::vector<std::string> Animator::GetFieldChoices(const SerializedField& field)
+	{
+		if (field.data == &*clip)
+			return GetClipNames();
+
+		return { };
+	};
+
+	#pragma endregion
+
+	#pragma region Parsing
 
 	void Animator::Parse()
 	{
@@ -154,6 +316,10 @@ namespace Loom
 		};
 	};
 
+	#pragma endregion
+
+	#pragma region Posing
+
 	std::vector<float> Animator::Sample(const Channel& channel, float time) const
 	{
 		const size_t floats = ValueFloats(channel.property);
@@ -204,108 +370,6 @@ namespace Loom
 		return blended;
 	};
 
-	size_t Animator::PlayingIndex() const
-	{
-		const int playing = m_after >= 0 ? m_playing : *clip;
-
-		return playing >= 0 && (size_t)playing < m_parsedClips.size() ? (size_t)playing : m_parsedClips.size();
-	};
-
-	const std::vector<Skin*>& Animator::Skins()
-	{
-		if (m_skinsGathered && GameObject::HierarchyChanges() == m_skinsChanges)
-			return m_skins;
-
-		m_skins.clear();
-		CollectSkins(*m_gameObject, m_skins);
-
-		m_skinsGathered = true;
-		m_skinsChanges = GameObject::HierarchyChanges();
-
-		return m_skins;
-	};
-
-	bool Animator::Play(const std::string& name)
-	{
-		Parse();
-
-		const auto found = std::find_if(m_parsedClips.begin(), m_parsedClips.end(), [&](const Clip& each) { return each.name == name; });
-
-		return Play((int)(found - m_parsedClips.begin()));
-	};
-
-	bool Animator::Play(int index)
-	{
-		Parse();
-
-		if (index < 0 || (size_t)index >= m_parsedClips.size())
-			return false;
-
-		Start(index);
-
-		return true;
-	};
-
-	void Animator::OnUpdate()
-	{
-		Advance(Time::DeltaTime());
-	};
-
-	void Animator::Advance(float seconds)
-	{
-		Parse();
-
-		if (*clip != (m_after >= 0 ? m_after : m_playing))
-			Start(clip);
-
-		m_time += seconds * speed;
-		m_blendLeft = std::max(0.0f, m_blendLeft - seconds * std::abs(speed));
-
-		if (m_after >= 0 && m_time >= GetDuration())
-		{
-			// A transition ends where its clip begins, so it carries on into it
-			// with no easing of its own.
-			m_time -= GetDuration();
-			m_playing = m_after;
-			m_after = -1;
-		};
-
-		Apply(m_time, true);
-	};
-
-	bool Animator::IsTransition(int index)
-	{
-		Parse();
-
-		return index >= 0 && (size_t)index < m_parsedClips.size() && m_parsedClips[index].from >= 0;
-	};
-
-	int Animator::TransitionBetween(int from, int to)
-	{
-		Parse();
-
-		if (from < 0 || to < 0)
-			return -1;
-
-		for (size_t i = 0; i < m_parsedClips.size(); i++)
-			if (m_parsedClips[i].from == from && m_parsedClips[i].to == to)
-				return (int)i;
-
-		return -1;
-	};
-
-	void Animator::Start(int index)
-	{
-		CaptureBlend();
-
-		const int via = m_after < 0 ? TransitionBetween(m_playing, index) : -1;
-
-		m_after = via >= 0 ? index : -1;
-		m_playing = via >= 0 ? via : index;
-		clip = index;
-		m_time = 0.0f;
-	};
-
 	void Animator::CaptureBlend()
 	{
 		m_blendLeft = 0.0f;
@@ -335,11 +399,6 @@ namespace Loom
 
 		m_blendLeft = blendTime;
 		m_blendFor = blendTime;
-	};
-
-	void Animator::Pose(float time)
-	{
-		Apply(time, false);
 	};
 
 	void Animator::Apply(float time, bool blend)
@@ -426,54 +485,19 @@ namespace Loom
 		};
 	};
 
-	std::vector<std::string> Animator::GetClipNames()
+	const std::vector<Skin*>& Animator::Skins()
 	{
-		Parse();
+		if (m_skinsGathered && GameObject::HierarchyChanges() == m_skinsChanges)
+			return m_skins;
 
-		std::vector<std::string> names;
+		m_skins.clear();
+		CollectSkins(*m_gameObject, m_skins);
 
-		for (const Clip& each : m_parsedClips)
-			names.push_back(each.name);
+		m_skinsGathered = true;
+		m_skinsChanges = GameObject::HierarchyChanges();
 
-		return names;
+		return m_skins;
 	};
 
-	std::string Animator::GetClipName()
-	{
-		Parse();
-
-		const size_t playing = PlayingIndex();
-
-		return playing < m_parsedClips.size() ? m_parsedClips[playing].name : std::string();
-	};
-
-	float Animator::GetDuration()
-	{
-		Parse();
-
-		const size_t playing = PlayingIndex();
-
-		return playing < m_parsedClips.size() ? m_parsedClips[playing].duration : 0.0f;
-	};
-
-	std::vector<std::string> Animator::GetFieldChoices(const SerializedField& field)
-	{
-		if (field.data == &*clip)
-			return GetClipNames();
-
-		return { };
-	};
-
-	void Animator::OnGui()
-	{
-		Parse();
-
-		if (m_parsedClips.empty())
-			return;
-
-		const float duration = GetDuration();
-		const float into = duration <= 0.0f ? 0.0f : loop ? std::fmod(m_time, duration) : std::min(m_time, duration);
-
-		ImGui::Text("%.2f / %.2f s", into, duration);
-	};
+	#pragma endregion
 };

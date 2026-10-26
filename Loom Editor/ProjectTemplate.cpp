@@ -22,36 +22,7 @@ namespace Loom
 {
 	namespace
 	{
-		bool Write(const std::filesystem::path& path, const std::string& text, std::string* error)
-		{
-			std::error_code code;
-			std::filesystem::create_directories(path.parent_path(), code);
-
-			std::ofstream out(path, std::ios::binary);
-
-			if (!out)
-			{
-				if (error)
-					*error = "Could not write " + path.string();
-
-				return false;
-			};
-
-			out << text;
-
-			return true;
-		};
-
-		// A guid in the shape MSBuild wants: braced and upper case.
-		std::string ProjectGuid()
-		{
-			std::string text = Guid::New().ToString();
-
-			for (char& c : text)
-				c = (char)toupper((unsigned char)c);
-
-			return '{' + text + '}';
-		};
+		#pragma region Templates
 
 		const char* const loomproject = R"(name={NAME}
 )";
@@ -388,6 +359,41 @@ SpinningTriangle is there as a worked example.
 			return filled;
 		};
 
+		#pragma endregion
+
+		#pragma region Writing
+
+		bool Write(const std::filesystem::path& path, const std::string& text, std::string* error)
+		{
+			std::error_code code;
+			std::filesystem::create_directories(path.parent_path(), code);
+
+			std::ofstream out(path, std::ios::binary);
+
+			if (!out)
+			{
+				if (error)
+					*error = "Could not write " + path.string();
+
+				return false;
+			};
+
+			out << text;
+
+			return true;
+		};
+
+		// A guid in the shape MSBuild wants: braced and upper case.
+		std::string ProjectGuid()
+		{
+			std::string text = Guid::New().ToString();
+
+			for (char& c : text)
+				c = (char)toupper((unsigned char)c);
+
+			return '{' + text + '}';
+		};
+
 		// The scripts project, its solution and the example script, under
 		// root's scripts folder.
 		bool WriteScripts(const std::filesystem::path& root, const std::string& name, std::string* error)
@@ -466,43 +472,11 @@ SpinningTriangle is there as a worked example.
 				? 0
 				: newline + 1;
 		};
+
+		#pragma endregion
 	};
 
-	std::string ProjectTemplate::EngineRoot()
-	{
-		char buffer[MAX_PATH]{ };
-
-		GetModuleFileNameA(nullptr, buffer, MAX_PATH);
-
-		// <engine>/x64/<configuration>/Loom Editor.exe
-		std::filesystem::path root =
-			std::filesystem::path(buffer).parent_path().parent_path().parent_path();
-
-		std::error_code code;
-
-		if (std::filesystem::exists(root / "Loom WASM" / "Loom.h", code))
-			return root.lexically_normal().string();
-
-		return std::filesystem::current_path(code).string();
-	};
-
-	bool ProjectTemplate::IsWorktree(const std::string& root)
-	{
-		std::error_code code;
-		return std::filesystem::is_regular_file(std::filesystem::path(root) / ".git", code);
-	};
-
-	bool ProjectTemplate::IsValidName(const std::string& name)
-	{
-		if (name.empty() || name.size() > maxNameLength)
-			return false;
-
-		for (const char c : name)
-			if (!isalnum((unsigned char)c) && c != '_' && c != '-')
-				return false;
-
-		return !isdigit((unsigned char)name.front());
-	};
+	#pragma region Project
 
 	std::string ProjectTemplate::Create(
 		const std::string& folder,
@@ -571,6 +545,10 @@ SpinningTriangle is there as a worked example.
 			? line.substr(prefix.size())
 			: "";
 	};
+
+	#pragma endregion
+
+	#pragma region Scripts
 
 	std::string ProjectTemplate::EnsureScripts(const std::string& project_file, std::string* error)
 	{
@@ -690,28 +668,6 @@ SpinningTriangle is there as a worked example.
 		return Write(scripts, text, error);
 	};
 
-	std::string ProjectTemplate::UsableName(const std::string& name)
-	{
-		constexpr const char* fallback = "Project";
-
-		std::string usable;
-
-		for (const char c : name)
-			if (isalnum((unsigned char)c) || c == '_' || c == '-')
-				usable += c;
-
-		usable = usable.substr(0, maxNameLength);
-
-		return IsValidName(usable)
-			? usable
-			: fallback + usable.substr(0, maxNameLength - strlen(fallback));
-	};
-
-	std::string ProjectTemplate::ScriptsProject(const std::string& folder, const std::string& name)
-	{
-		return (std::filesystem::path(folder) / scripts_folder / (UsableName(name) + "Scripts.vcxproj")).lexically_normal().string();
-	};
-
 	std::string ProjectTemplate::AddScripts(
 		const std::string& folder,
 		const std::string& name,
@@ -742,6 +698,11 @@ SpinningTriangle is there as a worked example.
 		return EnsureScripts(project_file.string(), error);
 	};
 
+	std::string ProjectTemplate::ScriptsProject(const std::string& folder, const std::string& name)
+	{
+		return (std::filesystem::path(folder) / scripts_folder / (UsableName(name) + "Scripts.vcxproj")).lexically_normal().string();
+	};
+
 	std::string ProjectTemplate::BuildLine(const std::string& line)
 	{
 		const size_t start = line.find_first_not_of(" \t");
@@ -756,6 +717,69 @@ SpinningTriangle is there as a worked example.
 
 		return shown;
 	};
+
+	#pragma endregion
+
+	#pragma region Engine
+
+	std::string ProjectTemplate::EngineRoot()
+	{
+		char buffer[MAX_PATH]{ };
+
+		GetModuleFileNameA(nullptr, buffer, MAX_PATH);
+
+		// <engine>/x64/<configuration>/Loom Editor.exe
+		std::filesystem::path root =
+			std::filesystem::path(buffer).parent_path().parent_path().parent_path();
+
+		std::error_code code;
+
+		if (std::filesystem::exists(root / "Loom WASM" / "Loom.h", code))
+			return root.lexically_normal().string();
+
+		return std::filesystem::current_path(code).string();
+	};
+
+	bool ProjectTemplate::IsWorktree(const std::string& root)
+	{
+		std::error_code code;
+		return std::filesystem::is_regular_file(std::filesystem::path(root) / ".git", code);
+	};
+
+	#pragma endregion
+
+	#pragma region Names
+
+	bool ProjectTemplate::IsValidName(const std::string& name)
+	{
+		if (name.empty() || name.size() > maxNameLength)
+			return false;
+
+		for (const char c : name)
+			if (!isalnum((unsigned char)c) && c != '_' && c != '-')
+				return false;
+
+		return !isdigit((unsigned char)name.front());
+	};
+
+	std::string ProjectTemplate::UsableName(const std::string& name)
+	{
+		constexpr const char* fallback = "Project";
+
+		std::string usable;
+
+		for (const char c : name)
+			if (isalnum((unsigned char)c) || c == '_' || c == '-')
+				usable += c;
+
+		usable = usable.substr(0, maxNameLength);
+
+		return IsValidName(usable)
+			? usable
+			: fallback + usable.substr(0, maxNameLength - strlen(fallback));
+	};
+
+	#pragma endregion
 };
 
 #endif

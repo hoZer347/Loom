@@ -24,7 +24,32 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Names
+
 		constexpr size_t maxNameLength = 64;
+
+		// Windows forbids the first lot in a file name; the rest mean something
+		// to MSBuild, or to the XML a project is written in.
+		constexpr const char* const forbiddenNameCharacters = "<>:\"/\\|?*&;%'$@()";
+
+		constexpr const char* const keywords[] =
+		{
+			"alignas", "alignof", "asm", "auto", "bool", "break", "case", "catch", "char",
+			"char8_t", "char16_t", "char32_t", "class", "concept", "const", "consteval",
+			"constexpr", "constinit", "const_cast", "continue", "co_await", "co_return",
+			"co_yield", "decltype", "default", "delete", "do", "double", "dynamic_cast",
+			"else", "enum", "explicit", "export", "extern", "false", "float", "for",
+			"friend", "goto", "if", "inline", "int", "long", "mutable", "namespace", "new",
+			"noexcept", "nullptr", "operator", "private", "protected", "public", "register",
+			"reinterpret_cast", "requires", "return", "short", "signed", "sizeof", "static",
+			"static_assert", "static_cast", "struct", "switch", "template", "this",
+			"thread_local", "throw", "true", "try", "typedef", "typeid", "typename", "union",
+			"unsigned", "using", "virtual", "void", "volatile", "wchar_t", "while",
+		};
+
+		#pragma endregion
+
+		#pragma region File Kinds
 
 		// Scripts, shaders, textures, sounds and fonts aside.
 		constexpr std::string_view gameFileExtensions[] =
@@ -61,24 +86,9 @@ namespace Loom
 			return std::find(std::begin(extensions), std::end(extensions), extension) != std::end(extensions);
 		};
 
-		// Windows forbids the first lot in a file name; the rest mean something
-		// to MSBuild, or to the XML a project is written in.
-		constexpr const char* const forbiddenNameCharacters = "<>:\"/\\|?*&;%'$@()";
+		#pragma endregion
 
-		constexpr const char* const keywords[] =
-		{
-			"alignas", "alignof", "asm", "auto", "bool", "break", "case", "catch", "char",
-			"char8_t", "char16_t", "char32_t", "class", "concept", "const", "consteval",
-			"constexpr", "constinit", "const_cast", "continue", "co_await", "co_return",
-			"co_yield", "decltype", "default", "delete", "do", "double", "dynamic_cast",
-			"else", "enum", "explicit", "export", "extern", "false", "float", "for",
-			"friend", "goto", "if", "inline", "int", "long", "mutable", "namespace", "new",
-			"noexcept", "nullptr", "operator", "private", "protected", "public", "register",
-			"reinterpret_cast", "requires", "return", "short", "signed", "sizeof", "static",
-			"static_assert", "static_cast", "struct", "switch", "template", "this",
-			"thread_local", "throw", "true", "try", "typedef", "typeid", "typename", "union",
-			"unsigned", "using", "virtual", "void", "volatile", "wchar_t", "while",
-		};
+		#pragma region Writing
 
 		void Fail(std::string* error, const std::string& reason)
 		{
@@ -108,90 +118,6 @@ namespace Loom
 
 			return true;
 		};
-
-		// The namespace the scripts project puts its code in, or the project's
-		// own name when it does not say.
-		std::string RootNamespace(const std::filesystem::path& project)
-		{
-			const std::string name = ProjectAssets::Element(ProjectAssets::ReadText(project.string()), "RootNamespace");
-
-			return name.empty()
-				? project.stem().string()
-				: name;
-		};
-
-		// A whole script in one header, which the scripts project picks up by
-		// its **\*.hpp glob and which registers itself as a component.
-		const char* const script = R"(#pragma once
-
-#include "Loom.h"
-
-
-namespace {NAMESPACE}
-{
-	struct {NAME} : Loom::Component<{NAME}>
-	{
-		void OnAttach() override
-		{
-		};
-
-		void OnUpdate() override
-		{
-		};
-	};
-};
-)";
-
-		const char* const state = R"(#pragma once
-
-#include "Loom.h"
-
-
-namespace {NAMESPACE}
-{
-	// One step of a state machine's behaviour. Deriving from Loom::State is
-	// all it takes for a StateMachine's Start and Current to offer it.
-	// gameObject is the object the machine is on. Proceed() moves the machine
-	// on to the next queued state, SetState<Other>() straight to another.
-	struct {NAME} : Loom::State<{NAME}>
-	{
-		void OnEnter(Loom::StateBase* lastState) override
-		{
-		};
-
-		void OnUpdate() override
-		{
-		};
-
-		void OnExit(Loom::StateBase* nextState) override
-		{
-		};
-	};
-};
-)";
-
-		const char* const state_machine = R"(#pragma once
-
-#include "Loom.h"
-
-
-namespace {NAMESPACE}
-{
-	// A component whose behaviour is its states. Deriving from
-	// Loom::StateMachine is all it takes to appear under Add Component, with
-	// Start and Current to pick its states from.
-	struct {NAME} : Loom::StateMachine<{NAME}>
-	{
-		void OnStart() override
-		{
-		};
-
-		void OnUpdate() override
-		{
-		};
-	};
-};
-)";
 
 		// A PNG with its pixel data stored rather than deflated, which is a
 		// valid zlib stream and needs no compressor.
@@ -304,91 +230,162 @@ namespace {NAMESPACE}
 				return png;
 			};
 		};
+
+		#pragma endregion
+
+		#pragma region Script Templates
+
+		// The namespace the scripts project puts its code in, or the project's
+		// own name when it does not say.
+		std::string RootNamespace(const std::filesystem::path& project)
+		{
+			const std::string name = ProjectAssets::Element(ProjectAssets::ReadText(project.string()), "RootNamespace");
+
+			return name.empty()
+				? project.stem().string()
+				: name;
+		};
+
+		// A whole script in one header, which the scripts project picks up by
+		// its **\*.hpp glob and which registers itself as a component.
+		const char* const script = R"(#pragma once
+
+#include "Loom.h"
+
+
+namespace {NAMESPACE}
+{
+	struct {NAME} : Loom::Component<{NAME}>
+	{
+		void OnAttach() override
+		{
+		};
+
+		void OnUpdate() override
+		{
+		};
 	};
-
-	const char* const ProjectAssets::defaultShader = R"(
-// ===VERTEX===
-
-layout(location = 0) in vec3 aPos;
-
-uniform mat4 u_model;
-uniform mat4 u_viewProjection;
-
-void main()
-{
-	gl_Position = u_viewProjection * u_model * vec4(aPos, 1.0);
-}
-
-// ===FRAGMENT===
-
-uniform vec3 u_color;
-
-out vec4 FragColor;
-
-void main()
-{
-	FragColor = vec4(u_color, 1.0);
-}
+};
 )";
 
-	std::string ProjectAssets::Replace(std::string text, const std::string& token, const std::string& value)
-	{
-		// Resuming past the replacement, not at it: a value that contains its
-		// own token would otherwise be substituted forever.
-		for (size_t at = text.find(token); at != std::string::npos; at = text.find(token, at + value.size()))
-			text.replace(at, token.size(), value);
+		const char* const state = R"(#pragma once
 
-		return text;
+#include "Loom.h"
+
+
+namespace {NAMESPACE}
+{
+	// One step of a state machine's behaviour. Deriving from Loom::State is
+	// all it takes for a StateMachine's Start and Current to offer it.
+	// gameObject is the object the machine is on. Proceed() moves the machine
+	// on to the next queued state, SetState<Other>() straight to another.
+	struct {NAME} : Loom::State<{NAME}>
+	{
+		void OnEnter(Loom::StateBase* lastState) override
+		{
+		};
+
+		void OnUpdate() override
+		{
+		};
+
+		void OnExit(Loom::StateBase* nextState) override
+		{
+		};
+	};
+};
+)";
+
+		const char* const state_machine = R"(#pragma once
+
+#include "Loom.h"
+
+
+namespace {NAMESPACE}
+{
+	// A component whose behaviour is its states. Deriving from
+	// Loom::StateMachine is all it takes to appear under Add Component, with
+	// Start and Current to pick its states from.
+	struct {NAME} : Loom::StateMachine<{NAME}>
+	{
+		void OnStart() override
+		{
+		};
+
+		void OnUpdate() override
+		{
+		};
+	};
+};
+)";
+
+		#pragma endregion
 	};
 
-	std::string ProjectAssets::ReadText(const std::string& path)
-	{
-		std::ifstream in(path, std::ios::binary);
+	#pragma region File Kinds
 
-		return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+	ProjectAssets::Opener ProjectAssets::OpenerOf(const std::string& path, const std::string& scripts_folder)
+	{
+		const std::filesystem::path extension = std::filesystem::path(path).extension();
+
+		if (extension == SceneSerializer::extension)
+			return Opener::Editor;
+
+		if (extension == Prefab::extension)
+			return Opener::Prefab;
+
+		if (extension == shaderExtension)
+			return Opener::Shaders;
+
+		if (IsTextureFile(path) || extension == SpriteAsset::extension)
+			return Opener::Sprites;
+
+		if (extension == Palette::extension)
+			return Opener::Palette;
+
+		return IsScriptFile(path) && !scripts_folder.empty() && IsUnder(path, scripts_folder)
+			? Opener::VisualStudio
+			: Opener::Shell;
 	};
 
-	std::vector<std::string> ProjectAssets::ShadersIn(const std::string& folder)
+	bool ProjectAssets::IsGameFile(const std::string& name)
 	{
-		std::vector<std::string> shaders{ };
-		std::error_code code;
-
-		if (!folder.empty())
-			for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator(folder, code))
-				if (entry.path().extension() == shaderExtension)
-					shaders.push_back(entry.path().lexically_relative(folder).generic_string());
-
-		std::sort(shaders.begin(), shaders.end());
-
-		return shaders;
+		return HasExtension(name, gameFileExtensions) || IsShaderFile(name) || IsTwoDFile(name) || IsSoundFile(name) || IsFontFile(name);
 	};
 
-	std::string ProjectAssets::ProjectShader(const std::string& folder)
+	bool ProjectAssets::IsScriptFile(const std::string& name)
 	{
-		std::error_code code;
-
-		if (folder.empty() || std::filesystem::exists(std::filesystem::path(folder) / ProjectTemplate::shader_path, code))
-			return ProjectTemplate::shader_path;
-
-		const std::vector<std::string> shaders = ShadersIn(folder);
-
-		return shaders.empty() ? ProjectTemplate::shader_path : shaders.front();
+		return HasExtension(name, scriptExtensions);
 	};
 
-	std::string ProjectAssets::Element(const std::string& xml, const std::string& tag)
+	bool ProjectAssets::IsShaderFile(const std::string& name)
 	{
-		const std::string open = '<' + tag + '>';
-		const size_t begin = xml.find(open);
-
-		if (begin == std::string::npos)
-			return "";
-
-		const size_t end = xml.find("</" + tag + '>', begin);
-
-		return end == std::string::npos
-			? ""
-			: xml.substr(begin + open.size(), end - begin - open.size());
+		return HasExtension(name, shaderExtensions);
 	};
+
+	bool ProjectAssets::IsTextureFile(const std::string& name)
+	{
+		return HasExtension(name, textureExtensions);
+	};
+
+	bool ProjectAssets::IsTwoDFile(const std::string& name)
+	{
+		return IsTextureFile(name) || HasExtension(name, twoDExtensions);
+	};
+
+	bool ProjectAssets::IsSoundFile(const std::string& name)
+	{
+		return HasExtension(name, soundExtensions);
+	};
+
+	bool ProjectAssets::IsFontFile(const std::string& name)
+	{
+		return HasExtension(name, fontExtensions);
+	};
+
+	#pragma endregion
+
+	#pragma region Creating
 
 	bool ProjectAssets::IsValidName(const std::string& name)
 	{
@@ -404,6 +401,204 @@ void main()
 
 		return true;
 	};
+
+	std::string ProjectAssets::CreateFolder(const std::string& folder, const std::string& name, std::string* error)
+	{
+		const std::filesystem::path path = std::filesystem::path(folder) / name;
+
+		std::error_code code;
+
+		if (!IsValidName(name) || !std::filesystem::create_directory(path, code))
+		{
+			Fail(error, "Could not create the folder " + path.string());
+			return "";
+		};
+
+		return path.string();
+	};
+
+	std::string ProjectAssets::CreateShader(const std::string& folder, const std::string& name, std::string* error)
+	{
+		const std::filesystem::path path = std::filesystem::path(folder) / (name + shaderExtension);
+
+		if (!IsValidName(name) || !WriteNew(path, defaultShader, error))
+			return "";
+
+		return path.string();
+	};
+
+	std::string ProjectAssets::CreateTexture(const std::string& folder, const std::string& name, std::string* error)
+	{
+		constexpr uint32_t size = 64;
+		constexpr std::array<uint8_t, Png::channels> white = { 0xFF, 0xFF, 0xFF, 0xFF };
+
+		const std::filesystem::path path = std::filesystem::path(folder) / (name + textureExtension);
+
+		const std::vector<uint8_t> png = Png::Encode(size, size, white);
+
+		if (!IsValidName(name) || !WriteNew(path, std::string(png.begin(), png.end()), error))
+			return "";
+
+		return path.string();
+	};
+
+	std::string ProjectAssets::CreatePalette(const std::string& folder, const std::string& name, std::string* error)
+	{
+		const std::filesystem::path path = std::filesystem::path(folder) / (name + Palette::extension);
+
+		if (!IsValidName(name) || !WriteNew(path, "", error))
+			return "";
+
+		return path.string();
+	};
+
+	std::string ProjectAssets::CreateScript(
+		const std::string& scripts_project,
+		const std::string& folder,
+		const std::string& name,
+		ScriptKind kind,
+		std::string* error)
+	{
+		if (const std::string problem = ScriptNameProblem(scripts_project, name); !problem.empty())
+		{
+			Fail(error, problem);
+			return "";
+		};
+
+		const std::filesystem::path root = std::filesystem::path(scripts_project).parent_path();
+		const std::filesystem::path header = std::filesystem::path(folder) / (name + ".hpp");
+
+		const std::filesystem::path relative = std::filesystem::path(folder).lexically_relative(root);
+
+		if (relative.empty() || *relative.begin() == "..")
+		{
+			Fail(error, "Scripts go under " + root.string());
+			return "";
+		};
+
+		// A folder made outside the editor never went through IsValidName, and
+		// the project's glob hands its name to MSBuild as written.
+		for (const std::filesystem::path& part : relative)
+			if (part != "." && !IsValidName(part.string()))
+			{
+				Fail(error, "'" + part.string() + "' cannot hold scripts: folder names reach MSBuild, which cannot take " + forbiddenNameCharacters);
+				return "";
+			};
+
+		const char* const templates[] = { script, state, state_machine };
+
+		const std::string text = Replace(
+			Replace(templates[(int)kind], "{NAME}", name),
+			"{NAMESPACE}",
+			RootNamespace(scripts_project));
+
+		return WriteNew(header, text, error)
+			? header.string()
+			: "";
+	};
+
+	#pragma endregion
+
+	#pragma region Paths
+
+	std::string ProjectAssets::CopyInto(const std::string& file, const std::string& folder, std::string* error)
+	{
+		const std::filesystem::path source(file);
+		std::error_code code;
+
+		if (!std::filesystem::is_regular_file(source, code))
+		{
+			Fail(error, file + " is not a file");
+			return "";
+		};
+
+		if (std::filesystem::equivalent(source.parent_path(), folder, code))
+			return source.string();
+
+		std::filesystem::path target = std::filesystem::path(folder) / source.filename();
+
+		for (int suffix = 1; std::filesystem::exists(target, code); suffix++)
+			target = std::filesystem::path(folder) / (source.stem().string() + std::to_string(suffix) + source.extension().string());
+
+		if (!std::filesystem::copy_file(source, target, code))
+		{
+			Fail(error, "Could not copy " + file + " to " + target.string() + ": " + code.message());
+			return "";
+		};
+
+		return target.string();
+	};
+
+	std::string ProjectAssets::MoveInto(const std::string& path, const std::string& folder, std::string* error)
+	{
+		const std::filesystem::path source(path);
+		std::error_code code;
+
+		if (!std::filesystem::exists(source, code))
+		{
+			Fail(error, path + " does not exist");
+			return "";
+		};
+
+		if (std::filesystem::equivalent(source.parent_path(), folder, code))
+			return source.string();
+
+		if (IsUnder(folder, path))
+		{
+			Fail(error, "Could not move " + path + " inside itself");
+			return "";
+		};
+
+		const std::filesystem::path target = std::filesystem::path(folder) / source.filename();
+
+		if (std::filesystem::exists(target, code))
+		{
+			Fail(error, "Could not move " + path + ": " + target.string() + " already exists");
+			return "";
+		};
+
+		std::filesystem::rename(source, target, code);
+
+		if (code)
+		{
+			Fail(error, "Could not move " + path + " to " + target.string() + ": " + code.message());
+			return "";
+		};
+
+		return target.string();
+	};
+
+	std::string ProjectAssets::Relocate(const std::string& path, const std::string& from, const std::string& to)
+	{
+		std::error_code code;
+		const std::filesystem::path absolute = std::filesystem::absolute(path, code).lexically_normal();
+
+		if (!IsUnder(absolute.string(), from))
+			return path;
+
+		const std::filesystem::path relative = absolute.lexically_relative(from);
+
+		return relative == "."
+			? to
+			: (std::filesystem::path(to) / relative).string();
+	};
+
+	bool ProjectAssets::IsUnder(const std::string& path, const std::string& folder)
+	{
+		const std::filesystem::path relative =
+			std::filesystem::path(path).lexically_relative(folder);
+
+		return !relative.empty() && *relative.begin() != "..";
+	};
+
+	std::string ProjectAssets::RelativeTo(const std::string& path, const std::string& folder)
+	{
+		return std::filesystem::path(path).lexically_normal().lexically_relative(folder).generic_string();
+	};
+
+	#pragma endregion
+
+	#pragma region Scripts
 
 	std::string ProjectAssets::ScriptNameProblem(const std::string& scripts_project, const std::string& name)
 	{
@@ -532,252 +727,97 @@ void main()
 		return scripts;
 	};
 
-	std::string ProjectAssets::CreateFolder(const std::string& folder, const std::string& name, std::string* error)
-	{
-		const std::filesystem::path path = std::filesystem::path(folder) / name;
+	#pragma endregion
 
+	#pragma region Shaders
+
+	const char* const ProjectAssets::defaultShader = R"(
+// ===VERTEX===
+
+layout(location = 0) in vec3 aPos;
+
+uniform mat4 u_model;
+uniform mat4 u_viewProjection;
+
+void main()
+{
+	gl_Position = u_viewProjection * u_model * vec4(aPos, 1.0);
+}
+
+// ===FRAGMENT===
+
+uniform vec3 u_color;
+
+out vec4 FragColor;
+
+void main()
+{
+	FragColor = vec4(u_color, 1.0);
+}
+)";
+
+	std::vector<std::string> ProjectAssets::ShadersIn(const std::string& folder)
+	{
+		std::vector<std::string> shaders{ };
 		std::error_code code;
 
-		if (!IsValidName(name) || !std::filesystem::create_directory(path, code))
-		{
-			Fail(error, "Could not create the folder " + path.string());
-			return "";
-		};
+		if (!folder.empty())
+			for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator(folder, code))
+				if (entry.path().extension() == shaderExtension)
+					shaders.push_back(entry.path().lexically_relative(folder).generic_string());
 
-		return path.string();
+		std::sort(shaders.begin(), shaders.end());
+
+		return shaders;
 	};
 
-	std::string ProjectAssets::CreateShader(const std::string& folder, const std::string& name, std::string* error)
-	{
-		const std::filesystem::path path = std::filesystem::path(folder) / (name + shaderExtension);
-
-		if (!IsValidName(name) || !WriteNew(path, defaultShader, error))
-			return "";
-
-		return path.string();
-	};
-
-	std::string ProjectAssets::CreateTexture(const std::string& folder, const std::string& name, std::string* error)
-	{
-		constexpr uint32_t size = 64;
-		constexpr std::array<uint8_t, Png::channels> white = { 0xFF, 0xFF, 0xFF, 0xFF };
-
-		const std::filesystem::path path = std::filesystem::path(folder) / (name + textureExtension);
-
-		const std::vector<uint8_t> png = Png::Encode(size, size, white);
-
-		if (!IsValidName(name) || !WriteNew(path, std::string(png.begin(), png.end()), error))
-			return "";
-
-		return path.string();
-	};
-
-	std::string ProjectAssets::CreatePalette(const std::string& folder, const std::string& name, std::string* error)
-	{
-		const std::filesystem::path path = std::filesystem::path(folder) / (name + Palette::extension);
-
-		if (!IsValidName(name) || !WriteNew(path, "", error))
-			return "";
-
-		return path.string();
-	};
-
-	std::string ProjectAssets::CopyInto(const std::string& file, const std::string& folder, std::string* error)
-	{
-		const std::filesystem::path source(file);
-		std::error_code code;
-
-		if (!std::filesystem::is_regular_file(source, code))
-		{
-			Fail(error, file + " is not a file");
-			return "";
-		};
-
-		if (std::filesystem::equivalent(source.parent_path(), folder, code))
-			return source.string();
-
-		std::filesystem::path target = std::filesystem::path(folder) / source.filename();
-
-		for (int suffix = 1; std::filesystem::exists(target, code); suffix++)
-			target = std::filesystem::path(folder) / (source.stem().string() + std::to_string(suffix) + source.extension().string());
-
-		if (!std::filesystem::copy_file(source, target, code))
-		{
-			Fail(error, "Could not copy " + file + " to " + target.string() + ": " + code.message());
-			return "";
-		};
-
-		return target.string();
-	};
-
-	std::string ProjectAssets::MoveInto(const std::string& path, const std::string& folder, std::string* error)
-	{
-		const std::filesystem::path source(path);
-		std::error_code code;
-
-		if (!std::filesystem::exists(source, code))
-		{
-			Fail(error, path + " does not exist");
-			return "";
-		};
-
-		if (std::filesystem::equivalent(source.parent_path(), folder, code))
-			return source.string();
-
-		if (IsUnder(folder, path))
-		{
-			Fail(error, "Could not move " + path + " inside itself");
-			return "";
-		};
-
-		const std::filesystem::path target = std::filesystem::path(folder) / source.filename();
-
-		if (std::filesystem::exists(target, code))
-		{
-			Fail(error, "Could not move " + path + ": " + target.string() + " already exists");
-			return "";
-		};
-
-		std::filesystem::rename(source, target, code);
-
-		if (code)
-		{
-			Fail(error, "Could not move " + path + " to " + target.string() + ": " + code.message());
-			return "";
-		};
-
-		return target.string();
-	};
-
-	std::string ProjectAssets::Relocate(const std::string& path, const std::string& from, const std::string& to)
+	std::string ProjectAssets::ProjectShader(const std::string& folder)
 	{
 		std::error_code code;
-		const std::filesystem::path absolute = std::filesystem::absolute(path, code).lexically_normal();
 
-		if (!IsUnder(absolute.string(), from))
-			return path;
+		if (folder.empty() || std::filesystem::exists(std::filesystem::path(folder) / ProjectTemplate::shader_path, code))
+			return ProjectTemplate::shader_path;
 
-		const std::filesystem::path relative = absolute.lexically_relative(from);
+		const std::vector<std::string> shaders = ShadersIn(folder);
 
-		return relative == "."
-			? to
-			: (std::filesystem::path(to) / relative).string();
+		return shaders.empty() ? ProjectTemplate::shader_path : shaders.front();
 	};
 
-	std::string ProjectAssets::CreateScript(
-		const std::string& scripts_project,
-		const std::string& folder,
-		const std::string& name,
-		ScriptKind kind,
-		std::string* error)
+	#pragma endregion
+
+	#pragma region Text
+
+	std::string ProjectAssets::Replace(std::string text, const std::string& token, const std::string& value)
 	{
-		if (const std::string problem = ScriptNameProblem(scripts_project, name); !problem.empty())
-		{
-			Fail(error, problem);
+		// Resuming past the replacement, not at it: a value that contains its
+		// own token would otherwise be substituted forever.
+		for (size_t at = text.find(token); at != std::string::npos; at = text.find(token, at + value.size()))
+			text.replace(at, token.size(), value);
+
+		return text;
+	};
+
+	std::string ProjectAssets::ReadText(const std::string& path)
+	{
+		std::ifstream in(path, std::ios::binary);
+
+		return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+	};
+
+	std::string ProjectAssets::Element(const std::string& xml, const std::string& tag)
+	{
+		const std::string open = '<' + tag + '>';
+		const size_t begin = xml.find(open);
+
+		if (begin == std::string::npos)
 			return "";
-		};
 
-		const std::filesystem::path root = std::filesystem::path(scripts_project).parent_path();
-		const std::filesystem::path header = std::filesystem::path(folder) / (name + ".hpp");
+		const size_t end = xml.find("</" + tag + '>', begin);
 
-		const std::filesystem::path relative = std::filesystem::path(folder).lexically_relative(root);
-
-		if (relative.empty() || *relative.begin() == "..")
-		{
-			Fail(error, "Scripts go under " + root.string());
-			return "";
-		};
-
-		// A folder made outside the editor never went through IsValidName, and
-		// the project's glob hands its name to MSBuild as written.
-		for (const std::filesystem::path& part : relative)
-			if (part != "." && !IsValidName(part.string()))
-			{
-				Fail(error, "'" + part.string() + "' cannot hold scripts: folder names reach MSBuild, which cannot take " + forbiddenNameCharacters);
-				return "";
-			};
-
-		const char* const templates[] = { script, state, state_machine };
-
-		const std::string text = Replace(
-			Replace(templates[(int)kind], "{NAME}", name),
-			"{NAMESPACE}",
-			RootNamespace(scripts_project));
-
-		return WriteNew(header, text, error)
-			? header.string()
-			: "";
+		return end == std::string::npos
+			? ""
+			: xml.substr(begin + open.size(), end - begin - open.size());
 	};
 
-	ProjectAssets::Opener ProjectAssets::OpenerOf(const std::string& path, const std::string& scripts_folder)
-	{
-		const std::filesystem::path extension = std::filesystem::path(path).extension();
-
-		if (extension == SceneSerializer::extension)
-			return Opener::Editor;
-
-		if (extension == Prefab::extension)
-			return Opener::Prefab;
-
-		if (extension == shaderExtension)
-			return Opener::Shaders;
-
-		if (IsTextureFile(path) || extension == SpriteAsset::extension)
-			return Opener::Sprites;
-
-		if (extension == Palette::extension)
-			return Opener::Palette;
-
-		return IsScriptFile(path) && !scripts_folder.empty() && IsUnder(path, scripts_folder)
-			? Opener::VisualStudio
-			: Opener::Shell;
-	};
-
-	bool ProjectAssets::IsUnder(const std::string& path, const std::string& folder)
-	{
-		const std::filesystem::path relative =
-			std::filesystem::path(path).lexically_relative(folder);
-
-		return !relative.empty() && *relative.begin() != "..";
-	};
-
-	std::string ProjectAssets::RelativeTo(const std::string& path, const std::string& folder)
-	{
-		return std::filesystem::path(path).lexically_normal().lexically_relative(folder).generic_string();
-	};
-
-	bool ProjectAssets::IsGameFile(const std::string& name)
-	{
-		return HasExtension(name, gameFileExtensions) || IsShaderFile(name) || IsTwoDFile(name) || IsSoundFile(name) || IsFontFile(name);
-	};
-
-	bool ProjectAssets::IsScriptFile(const std::string& name)
-	{
-		return HasExtension(name, scriptExtensions);
-	};
-
-	bool ProjectAssets::IsShaderFile(const std::string& name)
-	{
-		return HasExtension(name, shaderExtensions);
-	};
-
-	bool ProjectAssets::IsTextureFile(const std::string& name)
-	{
-		return HasExtension(name, textureExtensions);
-	};
-
-	bool ProjectAssets::IsTwoDFile(const std::string& name)
-	{
-		return IsTextureFile(name) || HasExtension(name, twoDExtensions);
-	};
-
-	bool ProjectAssets::IsSoundFile(const std::string& name)
-	{
-		return HasExtension(name, soundExtensions);
-	};
-
-	bool ProjectAssets::IsFontFile(const std::string& name)
-	{
-		return HasExtension(name, fontExtensions);
-	};
+	#pragma endregion
 };

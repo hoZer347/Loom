@@ -38,14 +38,6 @@ namespace UIScripts
 		};
 
 	private:
-		static constexpr glm::vec3 RED = { 0.9f, 0.25f, 0.2f };
-		static constexpr glm::vec3 GREEN = { 0.3f, 0.75f, 0.35f };
-		static constexpr glm::vec3 BLUE = { 0.25f, 0.45f, 0.95f };
-
-		// Degrees.
-		static constexpr float TURN_PER_NOTCH = 15.0f;
-		static constexpr float TURN_PER_SECOND = 90.0f;
-
 		// The first GameObject called name at or under from.
 		static Loom::GameObject* Find(Loom::GameObject& from, const std::string& name)
 		{
@@ -58,6 +50,8 @@ namespace UIScripts
 
 			return nullptr;
 		};
+
+		#pragma region Buttons
 
 		bool Clicked(const std::string& name)
 		{
@@ -76,6 +70,26 @@ namespace UIScripts
 			return true;
 		};
 
+		// Its button clicked, or a key for the action by the same name pressed.
+		bool Chosen(const char* name)
+		{
+			return Clicked(name) || Loom::InputActions::Down(name);
+		};
+
+		void ShowPopup(bool shown)
+		{
+			if (Loom::GameObject* popup = Find(*m_gameObject, "Popup"))
+				popup->SetDisabled(!shown);
+		};
+
+		#pragma endregion
+
+		#pragma region Tint
+
+		static constexpr glm::vec3 RED = { 0.9f, 0.25f, 0.2f };
+		static constexpr glm::vec3 GREEN = { 0.3f, 0.75f, 0.35f };
+		static constexpr glm::vec3 BLUE = { 0.25f, 0.45f, 0.95f };
+
 		void Tint(const glm::vec3& color)
 		{
 			if (Loom::GameObject* card = Find(*m_gameObject, "Card"))
@@ -83,11 +97,13 @@ namespace UIScripts
 					material->color = color;
 		};
 
-		// Its button clicked, or a key for the action by the same name pressed.
-		bool Chosen(const char* name)
-		{
-			return Clicked(name) || Loom::InputActions::Down(name);
-		};
+		#pragma endregion
+
+		#pragma region Turning
+
+		// Degrees.
+		static constexpr float TURN_PER_NOTCH = 15.0f;
+		static constexpr float TURN_PER_SECOND = 90.0f;
 
 		// About its upright.
 		void Turn()
@@ -105,11 +121,7 @@ namespace UIScripts
 					card->transform.rotation->y += turn;
 		};
 
-		void ShowPopup(bool shown)
-		{
-			if (Loom::GameObject* popup = Find(*m_gameObject, "Popup"))
-				popup->SetDisabled(!shown);
-		};
+		#pragma endregion
 
 		int m_clicks = 0;
 	};

@@ -13,6 +13,8 @@ namespace Loom
 	struct Collider;
 	struct GameObject;
 
+	#pragma region Rays
+
 	constexpr float INFINITE_DISTANCE = std::numeric_limits<float>::infinity();
 
 	/**
@@ -27,6 +29,25 @@ namespace Loom
 
 		glm::vec3 GetPoint(float distance) const { return origin + direction * distance; };
 	};
+
+	/**
+	* Loom::RaycastHit
+	* - Where a ray first met a collider: the point on its surface, the
+	*   surface's outward normal there, and how far along the ray that was
+	*/
+	struct RaycastHit final
+	{
+		Collider* collider = nullptr;
+		GameObject* gameObject = nullptr;
+
+		glm::vec3 point{ 0.0f };
+		glm::vec3 normal{ 0.0f };
+		float distance = 0.0f;
+	};
+
+	#pragma endregion
+
+	#pragma region Bounds
 
 	/**
 	* Loom::Bounds
@@ -75,20 +96,7 @@ namespace Loom
 		bool IntersectRay(const Ray& ray, float& entry, float& exit, int& entryAxis) const;
 	};
 
-	/**
-	* Loom::RaycastHit
-	* - Where a ray first met a collider: the point on its surface, the
-	*   surface's outward normal there, and how far along the ray that was
-	*/
-	struct RaycastHit final
-	{
-		Collider* collider = nullptr;
-		GameObject* gameObject = nullptr;
-
-		glm::vec3 point{ 0.0f };
-		glm::vec3 normal{ 0.0f };
-		float distance = 0.0f;
-	};
+	#pragma endregion
 
 	/**
 	* Loom::Physics
@@ -105,6 +113,8 @@ namespace Loom
 	*/
 	namespace Physics
 	{
+		#pragma region Settings
+
 		LOOM_API glm::vec3 GetGravity();
 		LOOM_API void SetGravity(const glm::vec3& gravity);
 
@@ -113,6 +123,10 @@ namespace Loom
 		LOOM_API float FixedDeltaTime();
 		LOOM_API void SetFixedDeltaTime(float seconds);
 
+		#pragma endregion
+
+		#pragma region Raycasts
+
 		// The nearest hit within maxDistance, into hit.
 		LOOM_API bool Raycast(const Ray& ray, RaycastHit& hit, float maxDistance = INFINITE_DISTANCE);
 		LOOM_API bool Raycast(const glm::vec3& origin, const glm::vec3& direction, RaycastHit& hit, float maxDistance = INFINITE_DISTANCE);
@@ -120,5 +134,7 @@ namespace Loom
 		// Every hit within maxDistance, nearest first.
 		LOOM_API std::vector<RaycastHit> RaycastAll(const Ray& ray, float maxDistance = INFINITE_DISTANCE);
 		LOOM_API std::vector<RaycastHit> RaycastAll(const glm::vec3& origin, const glm::vec3& direction, float maxDistance = INFINITE_DISTANCE);
+
+		#pragma endregion
 	};
 };

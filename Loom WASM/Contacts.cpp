@@ -14,6 +14,8 @@ namespace Contacts
 {
 	namespace
 	{
+		#pragma region Constants
+
 		constexpr int CORNERS = 3;
 		constexpr int FACE_CORNERS = 4;
 
@@ -37,23 +39,9 @@ namespace Contacts
 
 		using Triangle = std::array<glm::vec3, CORNERS>;
 
-		// Points held in place, so clipping never reaches for the heap.
-		struct Polygon
-		{
-			glm::vec3 points[MOST_CORNERS];
-			float depths[MOST_CORNERS];
-			int count = 0;
+		#pragma endregion
 
-			void Add(const glm::vec3& point, float depth = 0.0f)
-			{
-				if (count < MOST_CORNERS)
-				{
-					points[count] = point;
-					depths[count] = depth;
-					count++;
-				};
-			};
-		};
+		#pragma region Shapes
 
 		bool BoxOf(const BoxCollider& collider, const glm::mat4& world, Box& box)
 		{
@@ -89,62 +77,25 @@ namespace Contacts
 			return { sphere.center - glm::vec3(sphere.radius), sphere.center + glm::vec3(sphere.radius) };
 		};
 
-		void Add(Manifold& manifold, const glm::vec3& point, float depth)
+		#pragma endregion
+
+		#pragma region Polygons
+
+		// Points held in place, so clipping never reaches for the heap.
+		struct Polygon
 		{
-			if (manifold.count < MOST_POINTS)
+			glm::vec3 points[MOST_CORNERS];
+			float depths[MOST_CORNERS];
+			int count = 0;
+
+			void Add(const glm::vec3& point, float depth = 0.0f)
 			{
-				manifold.points[manifold.count] = point;
-				manifold.depths[manifold.count] = depth;
-				manifold.count++;
-			};
-		};
-
-		// Keeps the deepest point and those spread farthest from the ones
-		// kept, which hold a resting face as well as all of them would.
-		void AddReduced(Manifold& manifold, const Polygon& candidates)
-		{
-			if (candidates.count == 0)
-				return;
-
-			bool taken[MOST_CORNERS] = { };
-
-			int deepest = 0;
-
-			for (int i = 1; i < candidates.count; i++)
-				if (candidates.depths[i] > candidates.depths[deepest])
-					deepest = i;
-
-			taken[deepest] = true;
-			Add(manifold, candidates.points[deepest], candidates.depths[deepest]);
-
-			while (manifold.count < MOST_POINTS && manifold.count < candidates.count)
-			{
-				int farthest = 0;
-				float most = -1.0f;
-
-				for (int i = 0; i < candidates.count; i++)
+				if (count < MOST_CORNERS)
 				{
-					if (taken[i])
-						continue;
-
-					// Squared, which orders them the same.
-					float nearest = INFINITE_DISTANCE;
-
-					for (int k = 0; k < manifold.count; k++)
-					{
-						const glm::vec3 apart = candidates.points[i] - manifold.points[k];
-						nearest = std::min(nearest, glm::dot(apart, apart));
-					};
-
-					if (nearest > most)
-					{
-						most = nearest;
-						farthest = i;
-					};
+					points[count] = point;
+					depths[count] = depth;
+					count++;
 				};
-
-				taken[farthest] = true;
-				Add(manifold, candidates.points[farthest], candidates.depths[farthest]);
 			};
 		};
 
@@ -233,6 +184,80 @@ namespace Contacts
 					points.Add(point + outward * behind * HALF, behind);
 			};
 		};
+
+		#pragma endregion
+
+		#pragma region Manifolds
+
+		void Add(Manifold& manifold, const glm::vec3& point, float depth)
+		{
+			if (manifold.count < MOST_POINTS)
+			{
+				manifold.points[manifold.count] = point;
+				manifold.depths[manifold.count] = depth;
+				manifold.count++;
+			};
+		};
+
+		// Keeps the deepest point and those spread farthest from the ones
+		// kept, which hold a resting face as well as all of them would.
+		void AddReduced(Manifold& manifold, const Polygon& candidates)
+		{
+			if (candidates.count == 0)
+				return;
+
+			bool taken[MOST_CORNERS] = { };
+
+			int deepest = 0;
+
+			for (int i = 1; i < candidates.count; i++)
+				if (candidates.depths[i] > candidates.depths[deepest])
+					deepest = i;
+
+			taken[deepest] = true;
+			Add(manifold, candidates.points[deepest], candidates.depths[deepest]);
+
+			while (manifold.count < MOST_POINTS && manifold.count < candidates.count)
+			{
+				int farthest = 0;
+				float most = -1.0f;
+
+				for (int i = 0; i < candidates.count; i++)
+				{
+					if (taken[i])
+						continue;
+
+					// Squared, which orders them the same.
+					float nearest = INFINITE_DISTANCE;
+
+					for (int k = 0; k < manifold.count; k++)
+					{
+						const glm::vec3 apart = candidates.points[i] - manifold.points[k];
+						nearest = std::min(nearest, glm::dot(apart, apart));
+					};
+
+					if (nearest > most)
+					{
+						most = nearest;
+						farthest = i;
+					};
+				};
+
+				taken[farthest] = true;
+				Add(manifold, candidates.points[farthest], candidates.depths[farthest]);
+			};
+		};
+
+		// Turns the manifolds from first on to run the other way.
+		void Reverse(std::vector<Manifold>& manifolds, size_t first)
+		{
+			for (size_t i = first; i < manifolds.size(); i++)
+				manifolds[i].normal = -manifolds[i].normal;
+		};
+
+		#pragma endregion
+
+		#pragma region Closest Points
 
 		// The closest points between the segments from p1 to q1 and p2 to q2,
 		// after Ericson's Real-Time Collision Detection.
@@ -339,6 +364,10 @@ namespace Contacts
 
 			return a + ab * (vb * denominator) + ac * (vc * denominator);
 		};
+
+		#pragma endregion
+
+		#pragma region Solid Pairs
 
 		// Normal from the sphere into the other shape.
 		void SphereSphere(const Sphere& a, const Sphere& b, float margin, std::vector<Manifold>& manifolds)
@@ -548,6 +577,10 @@ namespace Contacts
 			if (manifold.count > 0)
 				manifolds.push_back(manifold);
 		};
+
+		#pragma endregion
+
+		#pragma region Mesh Pairs
 
 		// Normal from the sphere into the triangle.
 		void SphereTriangle(const Sphere& sphere, const Triangle& triangle, float margin, std::vector<Manifold>& manifolds)
@@ -817,13 +850,10 @@ namespace Contacts
 			manifolds.resize(kept);
 		};
 
-		// Turns the manifolds from first on to run the other way.
-		void Reverse(std::vector<Manifold>& manifolds, size_t first)
-		{
-			for (size_t i = first; i < manifolds.size(); i++)
-				manifolds[i].normal = -manifolds[i].normal;
-		};
+		#pragma endregion
 	};
+
+	#pragma region Shapes
 
 	Shape Pose(const Collider& collider, const glm::mat4& world)
 	{
@@ -932,6 +962,10 @@ namespace Contacts
 		return true;
 	};
 
+	#pragma endregion
+
+	#pragma region Collision
+
 	void Collide(const Shape& first, const Shape& second, float margin, std::vector<Manifold>& manifolds)
 	{
 		const size_t before = manifolds.size();
@@ -978,5 +1012,7 @@ namespace Contacts
 		if (swapped)
 			Reverse(manifolds, before);
 	};
+
+	#pragma endregion
 };
 };

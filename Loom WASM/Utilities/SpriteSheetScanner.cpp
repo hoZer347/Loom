@@ -9,6 +9,8 @@ namespace Loom
 		return sheet.pixels[(size_t(y) * size_t(sheet.width) + size_t(x)) * 4 + 3];
 	};
 
+	#pragma region Frames
+
 	/// True when every pixel of the cell at (x, y) is below the alpha floor.
 	static bool IsEmpty(
 		const PixelSheet& sheet,
@@ -56,6 +58,10 @@ namespace Loom
 
 		return lengths;
 	};
+
+	#pragma endregion
+
+	#pragma region Content
 
 	// The union of every inked pixel across a range of rows, as a box in normalised cell
 	// space. Shared by the sheet-wide measure and the per-clip one, which differ only in
@@ -147,4 +153,6 @@ namespace Loom
 
 		return boxes;
 	};
+
+	#pragma endregion
 };

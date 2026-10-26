@@ -20,6 +20,8 @@
 
 namespace Loom
 {
+	#pragma region Override Traits
+
 	// Trait to detect if a method exists and matches a given signature
 	template <typename T, typename Ret, typename... Args>
 	struct has_method {
@@ -73,9 +75,13 @@ namespace Loom
 
 	// TODO: Turn the above templates into a macro
 
+	#pragma endregion
+
 	struct LOOM_API GameObject final :
 		public LoomObject
 	{
+		#pragma region Components
+
 		template <typename T>
 		T* Attach(auto&&... args)
 		{
@@ -161,6 +167,18 @@ namespace Loom
 			return nullptr;
 		};
 
+		// Removes one component instance. By instance rather than by type: a
+		// GameObject is free to carry two of the same kind.
+		void DetachComponent(ComponentBase* component);
+
+		// Puts the components in the order given, those it does not name after
+		// them as they were.
+		void OrderComponents(const std::vector<ComponentBase*>& order);
+
+		#pragma endregion
+
+		#pragma region Hierarchy
+
 		// Read-only views of the hierarchy, for tooling that draws it (the editor).
 		const std::vector<GameObject*>& GetChildren() const { return m_children; };
 		const std::vector<ComponentBase*>& GetComponents() const { return m_components; };
@@ -171,18 +189,31 @@ namespace Loom
 		// found, so it costs as much as it has moved since.
 		size_t GetSiblingIndex() const;
 
-		// Removes one component instance. By instance rather than by type: a
-		// GameObject is free to carry two of the same kind.
-		void DetachComponent(ComponentBase* component);
-
-		// Puts the components in the order given, those it does not name after
-		// them as they were.
-		void OrderComponents(const std::vector<ComponentBase*>& order);
-
 		// Deletes gameObject once the queue reaches it, wherever it has been
 		// moved to by then. Does nothing when it is not this object's child, or
 		// it or what it is under is already on its way out.
 		void RemoveChild(GameObject* gameObject);
+
+		void Destroy();
+
+		GameObject* AddChild(const std::string& name = "New GameObject");
+
+		// Moves this object under parent, in front of before, or last when before
+		// is null or not one of parent's children. Deferred like AddChild, and
+		// ignored for a root, a move that would put an object under itself, or
+		// placing it before itself.
+		void SetParent(GameObject* parent, const GameObject* before = nullptr);
+
+		static size_t GetObjectCount() { return num_objects.load(); };
+
+		// Counts every child added, removed or moved and every component
+		// attached or detached, so a cache of what is under an object can tell
+		// when to look again.
+		static unsigned long long HierarchyChanges() { return hierarchy_changes.load(); };
+
+		#pragma endregion
+
+		#pragma region Processing
 
 		// The thread whose turn runs the object's OnUpdate: 0 is the thread
 		// updating the scenes, the main one, and each above a Lane of its own
@@ -201,28 +232,15 @@ namespace Loom
 		bool InheritsThreadID() const { return m_inherit_thread_id; };
 		void SetInheritThreadID(bool inherit);
 
-		void Destroy();
-
 		// A disabled object and everything under it is left out of updates,
 		// rendering, physics and FindComponent, so its cameras and lights go
 		// dark with it.
 		bool IsDisabled() const { return m_disabled; };
 		void SetDisabled(bool disabled) { m_disabled = disabled; };
 
-		GameObject* AddChild(const std::string& name = "New GameObject");
+		#pragma endregion
 
-		// Moves this object under parent, in front of before, or last when before
-		// is null or not one of parent's children. Deferred like AddChild, and
-		// ignored for a root, a move that would put an object under itself, or
-		// placing it before itself.
-		void SetParent(GameObject* parent, const GameObject* before = nullptr);
-
-		static size_t GetObjectCount() { return num_objects.load(); };
-
-		// Counts every child added, removed or moved and every component
-		// attached or detached, so a cache of what is under an object can tell
-		// when to look again.
-		static unsigned long long HierarchyChanges() { return hierarchy_changes.load(); };
+		#pragma region Transform
 
 		// Scale, then rotation, then translation, relative to the parent.
 		[[nodiscard]] glm::mat4 LocalMatrix() const;
@@ -230,17 +248,29 @@ namespace Loom
 		// Every ancestor's local matrix applied over this one's.
 		[[nodiscard]] glm::mat4 WorldMatrix() const;
 
+		#pragma endregion
+
 	protected:
 		friend struct Scene;
 		friend struct Engine;
+
+		#pragma region Lifetime
 
 		GameObject(GameObject* parent, const std::string& name, const int& thread_id);
 
 		virtual ~GameObject();
 
+		#pragma endregion
+
+		#pragma region Counters
+
 		static inline std::atomic<size_t> num_objects = 0;
 		static inline std::atomic<unsigned long long> hierarchy_changes = 0;
 		static inline std::atomic<size_t> id_counter = 0;
+
+		#pragma endregion
+
+		#pragma region Serialized Fields
 
 		Serial<int> m_threadID;
 		Serial<bool> m_inherit_thread_id;
@@ -254,27 +284,46 @@ namespace Loom
 		// Last for the same reason.
 		Serial<bool> m_disabled;
 
+		#pragma endregion
+
+		#pragma region Contents
+
 		std::vector<GameObject*>	m_children{ };
 		std::vector<ComponentBase*> m_components{ };
 		std::vector<ComponentBase*> m_updateables{ };
 		std::vector<ComponentBase*> m_renderables{ };
 		std::vector<ComponentBase*> m_physicsables{ };
 
+		#pragma endregion
+
 	private:
-		GameObject* parent;
-		mutable size_t m_siblingAt = 0;
-		std::atomic<bool> m_removed = false;
+		#pragma region Hierarchy
 
 		// Whether something this is under is on its way out.
 		bool UnderRemoved() const;
 
-		char newName[128];
+		#pragma endregion
+
+		#pragma region Processing
 
 		// Adds the OnUpdate of this object and those under it to byLane, at
 		// the lane each one's thread ID falls to among lanes, 0 for the caller.
 		void Gather(std::vector<std::vector<ComponentBase*>>& byLane, size_t lanes);
 		void Render();
 		void Physics();
+
+		#pragma endregion
+
+		#pragma region Gui
+
 		void Gui();
+
+		#pragma endregion
+
+		GameObject* parent;
+		mutable size_t m_siblingAt = 0;
+		std::atomic<bool> m_removed = false;
+
+		char newName[128];
 	};
 };

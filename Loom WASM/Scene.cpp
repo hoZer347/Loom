@@ -26,6 +26,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Lights
+
 		template <typename T>
 		T* FirstAmong(const std::vector<Scene*>& scenes)
 		{
@@ -47,6 +49,10 @@ namespace Loom
 				? FirstAmong<Light>(scenes)
 				: nullptr;
 		};
+
+		#pragma endregion
+
+		#pragma region Updates
 
 		// What each lane updates, 0 being the caller, kept from one update to
 		// the next so gathering it does not allocate.
@@ -87,7 +93,11 @@ namespace Loom
 					ReportThrow(*updateable, " an unknown exception");
 				};
 		};
+
+		#pragma endregion
 	};
+
+	#pragma region Lifetime
 
 	Scene::Scene(
 		const std::string& name,
@@ -107,7 +117,27 @@ namespace Loom
 				allScenes.push_back(this);
 			});
 	};
-	
+
+	Scene::~Scene()
+	{
+		simulation.Drop();
+
+		Engine::QueueTask(
+			[this]()
+			{
+				allScenes.erase(
+					std::remove(
+						allScenes.begin(),
+						allScenes.end(),
+						this),
+					allScenes.end());
+			});
+	};
+
+	#pragma endregion
+
+	#pragma region Frame
+
 	void Scene::Update(const std::vector<Scene*>& scenes)
 	{
 		for (std::vector<ComponentBase*>& updates : s_updates)
@@ -239,34 +269,9 @@ namespace Loom
 		else Light::ApplyNone(program);
 	};
 
-	void Scene::MoveScene(Scene* scene, size_t index)
-	{
-		Engine::QueueTask(
-			[scene, index]()
-			{
-				if (std::erase(allScenes, scene) == 0)
-					return;
+	#pragma endregion
 
-				allScenes.insert(
-					allScenes.begin() + std::min(index, allScenes.size()),
-					scene);
-			});
-	};
-
-	void Scene::Unlist(Scene* scene)
-	{
-		Engine::QueueTask([scene]() { std::erase(allScenes, scene); });
-	};
-
-	void Scene::Relist(Scene* scene)
-	{
-		Engine::QueueTask(
-			[scene]()
-			{
-				if (std::find(allScenes.begin(), allScenes.end(), scene) == allScenes.end())
-					allScenes.push_back(scene);
-			});
-	};
+	#pragma region Physics
 
 	void Scene::Physics()
 	{
@@ -375,19 +380,38 @@ namespace Loom
 		return hits;
 	};
 
-	Scene::~Scene()
-	{
-		simulation.Drop();
+	#pragma endregion
 
+	#pragma region Scene List
+
+	void Scene::MoveScene(Scene* scene, size_t index)
+	{
 		Engine::QueueTask(
-			[this]()
+			[scene, index]()
 			{
-				allScenes.erase(
-					std::remove(
-						allScenes.begin(),
-						allScenes.end(),
-						this),
-					allScenes.end());
+				if (std::erase(allScenes, scene) == 0)
+					return;
+
+				allScenes.insert(
+					allScenes.begin() + std::min(index, allScenes.size()),
+					scene);
 			});
 	};
+
+	void Scene::Unlist(Scene* scene)
+	{
+		Engine::QueueTask([scene]() { std::erase(allScenes, scene); });
+	};
+
+	void Scene::Relist(Scene* scene)
+	{
+		Engine::QueueTask(
+			[scene]()
+			{
+				if (std::find(allScenes.begin(), allScenes.end(), scene) == allScenes.end())
+					allScenes.push_back(scene);
+			});
+	};
+
+	#pragma endregion
 };

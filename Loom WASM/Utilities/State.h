@@ -41,6 +41,8 @@ namespace Loom
 		template <typename _Self>
 		struct StateCommands
 		{
+			#pragma region Single States
+
 			/// Queues a state at the front and proceeds straight to it.
 			template <AState _State, typename... _Args>
 			_State* SetState(_Args&&... args)
@@ -84,6 +86,10 @@ namespace Loom
 				return static_cast<_State*>(Pump().QueueFirst(std::move(state)));
 			};
 
+			#pragma endregion
+
+			#pragma region Parallel States
+
 			/// Queues a number of states that then all run at once, and proceeds to them.
 			auto SetParallel(std::vector<std::shared_ptr<StateBase>> states)
 			{
@@ -101,6 +107,8 @@ namespace Loom
 			{
 				return Pump().QueueParallelFirst(std::move(states));
 			};
+
+			#pragma endregion
 
 		private:
 			// auto return types above, so these three are deduced when they are called
@@ -120,6 +128,8 @@ namespace Loom
 	{
 		virtual ~StateBase() = default;
 
+		#pragma region Machine
+
 		/// The object the owning machine is attached to. Null on a machine that is not on
 		/// one -- the StaticStateMachine, or a machine driven by hand.
 		GameObject* gameObject = nullptr;
@@ -128,6 +138,8 @@ namespace Loom
 
 		/// Where this state's commands land. What StateCommands asks of whoever mixes it in.
 		StateMachineBase& Machine() const { return *stateMachine; };
+
+		#pragma endregion
 
 		#pragma region Overrideables
 
@@ -151,8 +163,6 @@ namespace Loom
 		/// Called when Proceed takes this state out.
 		virtual void OnExit(StateBase* nextState) { };
 
-		#pragma endregion
-
 		/// What the monitor and the history call this state. typeid gives the concrete
 		/// type even through a StateBase*.
 		virtual std::string Name() const { return typeid(*this).name(); };
@@ -160,6 +170,8 @@ namespace Loom
 		/// Anything extra worth writing into the flushed history. A state that wants its
 		/// own fields in the log says so here.
 		virtual std::string Describe() const { return ""; };
+
+		#pragma endregion
 
 	protected:
 		friend struct detail::StateCommands<StateBase>;

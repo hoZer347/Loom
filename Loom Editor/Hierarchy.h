@@ -20,6 +20,8 @@ namespace Loom
 	*/
 	namespace Hierarchy
 	{
+		#pragma region Rows
+
 		// The open nodes under one node, each with its sibling index.
 		using OpenChildren = std::vector<std::pair<size_t, const GameObject*>>;
 		using OpenUnder = std::unordered_map<const GameObject*, OpenChildren>;
@@ -45,23 +47,6 @@ namespace Loom
 			GameObject* child = nullptr;
 		};
 
-		// Which part of a row a drop lands in: above it, into it or below it.
-		enum class Zone
-		{
-			Above,
-			Into,
-			Below,
-		};
-
-		// Under parent, ahead of before, or last when before is null.
-		struct Placement
-		{
-			GameObject* parent = nullptr;
-			const GameObject* before = nullptr;
-
-			bool operator==(const Placement&) const = default;
-		};
-
 		// Whether target is root or under it, walking up from target, which
 		// has to be alive.
 		bool Contains(const GameObject& root, const GameObject* target);
@@ -84,6 +69,27 @@ namespace Loom
 			const View& view,
 			const GameObject* kept);
 
+		#pragma endregion
+
+		#pragma region Dropping
+
+		// Which part of a row a drop lands in: above it, into it or below it.
+		enum class Zone
+		{
+			Above,
+			Into,
+			Below,
+		};
+
+		// Under parent, ahead of before, or last when before is null.
+		struct Placement
+		{
+			GameObject* parent = nullptr;
+			const GameObject* before = nullptr;
+
+			bool operator==(const Placement&) const = default;
+		};
+
 		// The part of the row from top to bottom that mouse is in. A root's
 		// row has nothing to drop beside it, so all of it is into.
 		Zone ZoneOf(float top, float bottom, float mouse, bool root);
@@ -92,5 +98,7 @@ namespace Loom
 		// not. moving is the GameObject the drop moves, null for one it makes,
 		// and is stepped over when it is the next after row.
 		Placement Place(GameObject& row, bool open, Zone zone, const GameObject* moving);
+
+		#pragma endregion
 	};
 };

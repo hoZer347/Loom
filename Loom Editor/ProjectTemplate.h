@@ -15,6 +15,8 @@ namespace Loom
 	*/
 	struct ProjectTemplate final
 	{
+		#pragma region Project
+
 		static constexpr const char* extension = ".loomproject";
 
 		// What the starter scene draws with, relative to the project folder.
@@ -45,6 +47,10 @@ namespace Loom
 			const std::string& name,
 			std::string* error = nullptr);
 
+		#pragma endregion
+
+		#pragma region Scripts
+
 		// Gives a project file a scripts project when it names none that is
 		// there: the first one under the project's folder, or failing that a
 		// new one from the template, and writes it into the file. Returns the
@@ -58,14 +64,6 @@ namespace Loom
 		// alone. False, with the reason in error, when it could not be written.
 		static bool Precompile(const std::string& scripts, std::string* error = nullptr);
 
-		// Where the engine lives, worked out from the running executable
-		// (<engine>/x64/<configuration>/Loom Editor.exe).
-		static std::string EngineRoot();
-
-		// Whether the engine at root is a git worktree beside its main
-		// checkout, such as an agent's slot, whose .git is a file naming it.
-		static bool IsWorktree(const std::string& root);
-
 		// EnsureScripts for the project in folder, writing it a .loomproject
 		// named after name first if it has none. Returns the .vcxproj, or an
 		// empty string with the reason in error.
@@ -77,6 +75,26 @@ namespace Loom
 		// The .vcxproj AddScripts writes for the project in folder.
 		static std::string ScriptsProject(const std::string& folder, const std::string& name);
 
+		// A line of a scripts build as the editor shows it: without the
+		// indent and the .vcxproj MSBuild ends it with.
+		static std::string BuildLine(const std::string& line);
+
+		#pragma endregion
+
+		#pragma region Engine
+
+		// Where the engine lives, worked out from the running executable
+		// (<engine>/x64/<configuration>/Loom Editor.exe).
+		static std::string EngineRoot();
+
+		// Whether the engine at root is a git worktree beside its main
+		// checkout, such as an agent's slot, whose .git is a file naming it.
+		static bool IsWorktree(const std::string& root);
+
+		#pragma endregion
+
+		#pragma region Names
+
 		static constexpr size_t maxNameLength = 64;
 
 		// A name a file system and MSBuild will both accept.
@@ -85,8 +103,6 @@ namespace Loom
 		// The name with what IsValidName refuses taken out.
 		static std::string UsableName(const std::string& name);
 
-		// A line of a scripts build as the editor shows it: without the
-		// indent and the .vcxproj MSBuild ends it with.
-		static std::string BuildLine(const std::string& line);
+		#pragma endregion
 	};
 };

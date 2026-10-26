@@ -7,6 +7,8 @@
 
 namespace Loom
 {
+	#pragma region Gui
+
 	void ComponentBase::DrawDefaultGui()
 	{
 		ImGui::PushID(this);
@@ -20,4 +22,6 @@ namespace Loom
 
 		ImGui::PopID();
 	};
+
+	#pragma endregion
 };

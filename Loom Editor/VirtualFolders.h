@@ -21,30 +21,36 @@ namespace Loom
 	*/
 	struct VirtualFolders
 	{
+		#pragma region Paths
+
 		static constexpr char separator = '/';
+
+		// Whether path is folder or a folder inside it.
+		static bool IsAtOrUnder(const std::string& path, const std::string& folder);
+
+		// The folder path up to its last separator, or empty at the top.
+		static std::string ParentOf(const std::string& folder);
+		static std::string NameOf(const std::string& folder);
+
+		#pragma endregion
+
+		#pragma region File
+
 		static constexpr const char* folder_key = "folder=";
 
 		// What a file of them puts between an item and its folder, so no
 		// folder's name holds one.
 		static constexpr char equals = '=';
 
-		struct Node
-		{
-			std::string name{ };
-
-			// From the top, empty for the top itself.
-			std::string path{ };
-
-			// Each alphabetical, the items by what follows their last separator.
-			std::vector<Node> children{ };
-			std::vector<std::string> items{ };
-		};
-
 		void Clear();
 
 		// Empty when the file is not there yet.
 		void Load(const std::string& file, const char* item_prefix);
 		bool Save(const std::string& file, const char* item_prefix) const;
+
+		#pragma endregion
+
+		#pragma region Folders
 
 		// Every folder, each by its path.
 		const std::set<std::string>& Folders() const { return m_folders; };
@@ -70,26 +76,39 @@ namespace Loom
 		// What the folder held goes to the one it was in.
 		void RemoveFolder(const std::string& folder);
 
+		#pragma endregion
+
+		#pragma region Tree
+
+		struct Node
+		{
+			std::string name{ };
+
+			// From the top, empty for the top itself.
+			std::string path{ };
+
+			// Each alphabetical, the items by what follows their last separator.
+			std::vector<Node> children{ };
+			std::vector<std::string> items{ };
+		};
+
 		// These items, filed into the folders. A folder an item is filed in is
 		// there even when the folders left it out.
 		Node Build(const std::vector<std::string>& items) const;
-
-		// Whether path is folder or a folder inside it.
-		static bool IsAtOrUnder(const std::string& path, const std::string& folder);
 
 		// Whether a goes before b, whatever their case: the order Build files
 		// folders and items in.
 		static bool Alphabetical(std::string_view a, std::string_view b);
 
-		// The folder path up to its last separator, or empty at the top.
-		static std::string ParentOf(const std::string& folder);
-		static std::string NameOf(const std::string& folder);
+		#pragma endregion
 
 	protected:
 		std::set<std::string> m_folders{ };
 		std::map<std::string, std::string> m_items{ };
 
 	private:
+		#pragma region Folders
+
 		// A trimmed name with no separator or '=' in it, or empty when there is none.
 		static std::string Tidy(const std::string& name);
 
@@ -97,5 +116,7 @@ namespace Loom
 
 		// Gives from, and every folder and item under it, the path to instead.
 		void Repath(const std::string& from, const std::string& to);
+
+		#pragma endregion
 	};
 };

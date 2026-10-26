@@ -15,6 +15,8 @@
 
 namespace Loom
 {
+	#pragma region Sections
+
 	// The lines that split a shader file into its sections. COMMON goes in
 	// front of both stages. SETTINGS is not GLSL: it holds the lines
 	// ShaderSettings reads.
@@ -23,6 +25,10 @@ namespace Loom
 	inline constexpr const char* FRAGMENT_SECTION = "===FRAGMENT===";
 	inline constexpr const char* SETTINGS_SECTION = "===SETTINGS===";
 	inline constexpr const char* PIXEL_PASS_SECTION = "===PIXEL PASS===";
+
+	#pragma endregion
+
+	#pragma region Settings
 
 	/**
 	* Loom::ShaderSettings
@@ -53,6 +59,18 @@ namespace Loom
 		// PS1-era models want.
 		bool pixelated = false;
 	};
+
+	// What the source's SETTINGS section turns on. Throws std::runtime_error,
+	// naming the line, at one that is not a setting.
+	LOOM_API ShaderSettings ParseShaderSettings(const std::string& source);
+
+	// Writes every setting into the shader file's SETTINGS section, over the
+	// line already saying it, adding the section at the top when there is none.
+	LOOM_API bool WriteShaderSettings(const std::string& path, const ShaderSettings& settings, std::string& error);
+
+	#pragma endregion
+
+	#pragma region Variables
 
 	// A name the engine gives a shader: a uniform Material, Mesh, Camera or
 	// Light sets, or a function of the GLSL it puts in front of a stage that
@@ -116,6 +134,23 @@ namespace Loom
 		UniformScope scope = UniformScope::Material;
 	};
 
+	// Every uniform the source declares, bar the ones the engine sets.
+	LOOM_API std::vector<ShaderVariable> ParseShaderVariables(const std::string& source);
+
+	// Writes the variable's declaration into the shader file: over the line
+	// declaring replacing when it names one, otherwise into the COMMON
+	// section, which it adds when the file has none. False, with why in error,
+	// when the name is not one a variable can have or the file cannot be
+	// written.
+	LOOM_API bool DeclareShaderVariable(const std::string& path, const std::string& replacing, const ShaderVariable& variable, std::string& error);
+
+	// Takes the line declaring the variable out of the shader file.
+	LOOM_API bool RemoveShaderVariable(const std::string& path, const std::string& name, std::string& error);
+
+	#pragma endregion
+
+	#pragma region Values
+
 	struct LOOM_API UniformValue
 	{
 		UniformType type = UniformType::Float;
@@ -157,27 +192,6 @@ namespace Loom
 		bool operator==(const UniformValues&) const = default;
 	};
 
-	// Every uniform the source declares, bar the ones the engine sets.
-	LOOM_API std::vector<ShaderVariable> ParseShaderVariables(const std::string& source);
-
-	// Writes the variable's declaration into the shader file: over the line
-	// declaring replacing when it names one, otherwise into the COMMON
-	// section, which it adds when the file has none. False, with why in error,
-	// when the name is not one a variable can have or the file cannot be
-	// written.
-	LOOM_API bool DeclareShaderVariable(const std::string& path, const std::string& replacing, const ShaderVariable& variable, std::string& error);
-
-	// Takes the line declaring the variable out of the shader file.
-	LOOM_API bool RemoveShaderVariable(const std::string& path, const std::string& name, std::string& error);
-
-	// What the source's SETTINGS section turns on. Throws std::runtime_error,
-	// naming the line, at one that is not a setting.
-	LOOM_API ShaderSettings ParseShaderSettings(const std::string& source);
-
-	// Writes every setting into the shader file's SETTINGS section, over the
-	// line already saying it, adding the section at the top when there is none.
-	LOOM_API bool WriteShaderSettings(const std::string& path, const ShaderSettings& settings, std::string& error);
-
 	// Hands each variable its value: a per-material one from material, a
 	// per-instance one from instance when there is one, the default otherwise.
 	// Every variable is set on every draw, since a program keeps the last
@@ -186,4 +200,6 @@ namespace Loom
 
 	// An editor for each variable of the scope. Whether any value changed.
 	LOOM_API bool DrawShaderVariables(const std::vector<ShaderVariable>& variables, UniformScope scope, UniformValues& values);
+
+	#pragma endregion
 };

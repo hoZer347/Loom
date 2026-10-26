@@ -27,12 +27,20 @@ namespace Loom
 	struct LOOM_API ComponentBase :
 		public LoomObject
 	{
+		#pragma region Lifecycle
+
 		constexpr virtual void OnAttach()	{ };
 		constexpr virtual void OnDetach()	{ };
 		constexpr virtual void OnGui()		{ };
 		constexpr virtual void OnUpdate()	{ };
 		constexpr virtual void OnRender()	{ };
 		constexpr virtual void OnPhysics()	{ };
+
+		virtual ~ComponentBase() { };
+
+		#pragma endregion
+
+		#pragma region Contacts
 
 		// Called on every component of a GameObject whose collider starts,
 		// keeps on or stops touching another, at most once a physics step for
@@ -45,7 +53,12 @@ namespace Loom
 		constexpr virtual void OnTriggerStay(Collider&)				{ };
 		constexpr virtual void OnTriggerExit(Collider&)				{ };
 
-		virtual ~ComponentBase() { };
+		// Whether it overrides any of the collision or trigger callbacks.
+		bool HearsContacts() const { return m_hearsContacts; };
+
+		#pragma endregion
+
+		#pragma region Identity
 
 		const std::string& GetClassName() const { return m_name; };
 
@@ -55,12 +68,10 @@ namespace Loom
 		GameObject const* GetGameObject() const { return m_gameObject; };
 		GameObject* GetGameObject() { return m_gameObject; };
 
-		// Whether it overrides any of the collision or trigger callbacks.
-		bool HearsContacts() const { return m_hearsContacts; };
+		#pragma endregion
 
 	protected:
-		friend struct GameObject;
-		GameObject* m_gameObject = nullptr;
+		#pragma region Gui
 
 		virtual void Gui() { };
 
@@ -73,6 +84,10 @@ namespace Loom
 		// component of its own does not have to link a UI to do it.
 		void DrawDefaultGui();
 
+		#pragma endregion
+
+		friend struct GameObject;
+		GameObject* m_gameObject = nullptr;
 		const char* m_type_name;
 
 		bool m_hearsContacts = false;

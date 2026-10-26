@@ -18,6 +18,8 @@ namespace Loom
 	*/
 	struct LOOM_API StageTiming final
 	{
+		#pragma region Layout
+
 		// Where a row sits across its thread's lanes, from 0 to 1.
 		struct Share
 		{
@@ -29,6 +31,10 @@ namespace Loom
 		// averages, and each one's parts fill its span from the left at the
 		// same scale, leaving what it spent outside them.
 		static std::vector<Share> Shares(const std::vector<Profiler::Row>& rows);
+
+		#pragma endregion
+
+		#pragma region Drawing
 
 		// An average frame of the window: for each thread a lane for each
 		// depth of its stages, laid out by their Shares.
@@ -43,6 +49,8 @@ namespace Loom
 		// while it is open: collapsed, the Profiler is off and only its title
 		// bar is drawn.
 		static void Overlay();
+
+		#pragma endregion
 	};
 };
 

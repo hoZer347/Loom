@@ -23,9 +23,15 @@ namespace Loom
 	struct LOOM_API Scene final :
 		public LoomObject
 	{
+		#pragma region Lifetime
+
 		Scene(const std::string& name = "Scene", int thread_id = 0);
 		virtual ~Scene();
-		
+
+		#pragma endregion
+
+		#pragma region Hierarchy
+
 		template <typename T>
 		T* Attach(auto&&... args) { return root.Attach<T>(args...); };
 		GameObject* AddChild(const std::string& m_name = "New GameObject") { return root.AddChild(m_name); };
@@ -36,6 +42,10 @@ namespace Loom
 		const GameObject& GetRoot() const { return root; };
 
 		int GetThreadID() const { return thread_id; };
+
+		#pragma endregion
+
+		#pragma region Frame
 
 		// One tick / draw / physics step of the whole hierarchy. Engine calls
 		// these every frame; the editor calls Render() itself when it is drawing
@@ -60,6 +70,10 @@ namespace Loom
 		// draws, since a program keeps its uniforms from one draw to the next.
 		static void ApplyView(uint32_t program);
 
+		#pragma endregion
+
+		#pragma region Physics
+
 		// One physics step: runs OnPhysics through the hierarchy, which syncs
 		// every enabled collider into this scene's collider tree and gathers
 		// its rigid bodies, then moves them by FixedDeltaTime.
@@ -74,6 +88,10 @@ namespace Loom
 		std::vector<RaycastHit> RaycastAll(const Ray& ray, float maxDistance = INFINITE_DISTANCE) const;
 
 		const ColliderTree& GetColliders() const { return colliders; };
+
+		#pragma endregion
+
+		#pragma region Scene List
 
 		static const std::vector<Scene*>& GetScenes() { return allScenes; };
 
@@ -92,16 +110,24 @@ namespace Loom
 		static void Relist(Scene* scene);
 
 		static inline std::atomic<bool> is_engine_running = false;
-		
+
+		#pragma endregion
 
 	protected:
 		friend struct MainMenu;
 		friend struct Engine;
-		int thread_id;
+
+		#pragma region Physics
 
 		// Walks the hierarchy's OnPhysics into the collider tree and the
 		// simulation, ready for a step of either kind.
 		void Sync();
+
+		#pragma endregion
+
+		#pragma region State
+
+		int thread_id;
 
 		// Before root, so they outlive the colliders root deletes on the spot.
 		ColliderTree colliders;
@@ -117,5 +143,7 @@ namespace Loom
 
 		// Whether Render is drawing, so ApplyView need give each program its view only once.
 		static inline bool s_drawing = false;
+
+		#pragma endregion
 	};
 };

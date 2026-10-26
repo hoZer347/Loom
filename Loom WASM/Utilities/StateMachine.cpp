@@ -74,7 +74,50 @@ namespace Loom
 
 	#pragma endregion
 
-	#pragma region ParallelState
+	#pragma region Lifetime
+
+	namespace
+	{
+		// Here rather than static members of an exported class, which a script
+		// module importing it could not define. Function-local, like the
+		// registry, so a machine built by a static initialiser finds them.
+		std::vector<StateMachineBase*>& Machines()
+		{
+			static std::vector<StateMachineBase*> machines{ };
+			return machines;
+		};
+
+		std::recursive_mutex& MachinesMutex()
+		{
+			static std::recursive_mutex mutex{ };
+			return mutex;
+		};
+	};
+
+	StateMachineBase::StateMachineBase()
+	{
+		std::scoped_lock lock(MachinesMutex());
+
+		Machines().push_back(this);
+	};
+
+	StateMachineBase::~StateMachineBase()
+	{
+		std::scoped_lock lock(MachinesMutex());
+
+		std::erase(Machines(), this);
+	};
+
+	std::vector<StateMachineBase*> StateMachineBase::All()
+	{
+		std::scoped_lock lock(MachinesMutex());
+
+		return Machines();
+	};
+
+	#pragma endregion
+
+	#pragma region Primitives
 
 	/// Handler for many sub-states running at the same time: does not proceed until every
 	/// sub-state inside it has triggered Proceed. (Sub-states still run their own OnExit
@@ -140,129 +183,6 @@ namespace Loom
 				if (state)
 					state->OnExit(nextState);
 		};
-	};
-
-	const std::vector<std::shared_ptr<StateBase>>* StateMachineBase::SubStatesOf(const StateBase* state)
-	{
-		const St_Parallel* parallel = dynamic_cast<const St_Parallel*>(state);
-
-		return parallel ? &parallel->SubStates : nullptr;
-	};
-
-	#pragma endregion
-
-	#pragma region Lifetime
-
-	namespace
-	{
-		// Here rather than static members of an exported class, which a script
-		// module importing it could not define. Function-local, like the
-		// registry, so a machine built by a static initialiser finds them.
-		std::vector<StateMachineBase*>& Machines()
-		{
-			static std::vector<StateMachineBase*> machines{ };
-			return machines;
-		};
-
-		std::recursive_mutex& MachinesMutex()
-		{
-			static std::recursive_mutex mutex{ };
-			return mutex;
-		};
-	};
-
-	StateMachineBase::StateMachineBase()
-	{
-		std::scoped_lock lock(MachinesMutex());
-
-		Machines().push_back(this);
-	};
-
-	StateMachineBase::~StateMachineBase()
-	{
-		std::scoped_lock lock(MachinesMutex());
-
-		std::erase(Machines(), this);
-	};
-
-	std::vector<StateMachineBase*> StateMachineBase::All()
-	{
-		std::scoped_lock lock(MachinesMutex());
-
-		return Machines();
-	};
-
-	#pragma endregion
-
-	#pragma region Frame
-
-	void StateMachineBase::StartMachine()
-	{
-		if (started)
-			return;
-
-		started = true;
-
-		OnStart();
-
-		if (std::shared_ptr<StateBase> first = FirstState())
-			Enter(std::move(first));
-	};
-
-	void StateMachineBase::Step()
-	{
-		StartMachine();
-
-		if (current)
-			current->OnPhysics();
-
-		Advance(Time::DeltaTime());
-
-		if (current)
-			current->OnLateUpdate();
-	};
-
-	void StateMachineBase::StepAttached()
-	{
-		// One snapshot holds for the whole frame: a GameObject or component is only
-		// ever destroyed by a queued task, at the start of the next one.
-		for (StateMachineBase* machine : All())
-			if (machine->GetGameObject())
-				machine->Step();
-	};
-
-	void StateMachineBase::Advance(float deltaTime)
-	{
-		elapsedTime += deltaTime;
-
-		if (current)
-			current->OnUpdate();
-	};
-
-	void StateMachineBase::PumpGui()
-	{
-		if (current)
-			current->OnGui();
-	};
-
-	void StateMachineBase::DrawMachineGui()
-	{
-		StateMachineMonitor::DrawInline(*this);
-
-		PumpGui();
-	};
-
-	#pragma endregion
-
-	#pragma region State Management
-
-	void StateMachineBase::Adopt(const std::shared_ptr<StateBase>& state)
-	{
-		if (!state)
-			return;
-
-		state->gameObject = GetGameObject();
-		state->stateMachine = this;
 	};
 
 	StateBase* StateMachineBase::Enter(std::shared_ptr<StateBase> state)
@@ -340,6 +260,19 @@ namespace Loom
 		Proceed();
 
 		return raw;
+	};
+
+	#pragma endregion
+
+	#pragma region Control
+
+	void StateMachineBase::Adopt(const std::shared_ptr<StateBase>& state)
+	{
+		if (!state)
+			return;
+
+		state->gameObject = GetGameObject();
+		state->stateMachine = this;
 	};
 
 	StateBase* StateMachineBase::Proceed()
@@ -421,7 +354,74 @@ namespace Loom
 
 	#pragma endregion
 
-	#pragma region Logging
+	#pragma region Frame
+
+	void StateMachineBase::StartMachine()
+	{
+		if (started)
+			return;
+
+		started = true;
+
+		OnStart();
+
+		if (std::shared_ptr<StateBase> first = FirstState())
+			Enter(std::move(first));
+	};
+
+	void StateMachineBase::Step()
+	{
+		StartMachine();
+
+		if (current)
+			current->OnPhysics();
+
+		Advance(Time::DeltaTime());
+
+		if (current)
+			current->OnLateUpdate();
+	};
+
+	void StateMachineBase::StepAttached()
+	{
+		// One snapshot holds for the whole frame: a GameObject or component is only
+		// ever destroyed by a queued task, at the start of the next one.
+		for (StateMachineBase* machine : All())
+			if (machine->GetGameObject())
+				machine->Step();
+	};
+
+	void StateMachineBase::Advance(float deltaTime)
+	{
+		elapsedTime += deltaTime;
+
+		if (current)
+			current->OnUpdate();
+	};
+
+	void StateMachineBase::PumpGui()
+	{
+		if (current)
+			current->OnGui();
+	};
+
+	void StateMachineBase::DrawMachineGui()
+	{
+		StateMachineMonitor::DrawInline(*this);
+
+		PumpGui();
+	};
+
+	#pragma endregion
+
+	#pragma region Inspection
+
+	const std::vector<std::shared_ptr<StateBase>>* StateMachineBase::SubStatesOf(const StateBase* state)
+	{
+		const St_Parallel* parallel = dynamic_cast<const St_Parallel*>(state);
+
+		return parallel ? &parallel->SubStates : nullptr;
+	};
 
 	std::string StateMachineBase::FlushStateHistory()
 	{

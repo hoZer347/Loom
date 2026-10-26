@@ -16,6 +16,8 @@ namespace Loom
 {
 	struct Mesh;
 
+	#pragma region Names
+
 	// The GameObjects under root, by name, root included. The first of a name wins.
 	LOOM_API std::unordered_map<std::string, GameObject*> DescendantsByName(GameObject& root);
 
@@ -53,6 +55,10 @@ namespace Loom
 		std::string m_text;
 		std::vector<std::string> m_names;
 	};
+
+	#pragma endregion
+
+	#pragma region Skin
 
 	/**
 	* Loom::Skin
@@ -133,4 +139,6 @@ namespace Loom
 		NameList m_shapeNames;
 		NamedObjects m_jointObjects;
 	};
+
+	#pragma endregion
 };

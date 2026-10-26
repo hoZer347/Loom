@@ -22,6 +22,8 @@ namespace Loom
 {
 	enum class Backend { OpenGL, Vulkan };
 
+	#pragma region Vertex Layout
+
 	// What each vertex handed to Renderer::Draw holds, its floats one after
 	// another: a position at location 0 (aPos), with PositionUV a texture
 	// coordinate after it at location 1 (aUV), with PositionUVNormal a
@@ -78,6 +80,8 @@ namespace Loom
 
 	LOOM_API UVSource SourceOf(const VertexLayout& layout, UVSlot slot);
 
+	#pragma endregion
+
 	/**
 	* Loom::Renderer
 	* - The graphics API behind everything the engine draws, picked once when
@@ -91,8 +95,7 @@ namespace Loom
 	*/
 	struct LOOM_API Renderer
 	{
-		// The pixels of a finished frame, red first and bottom row first.
-		typedef std::function<void(int width, int height, const std::vector<uint8_t>& rgb)> CaptureHandler;
+		#pragma region Lifetime
 
 		// Builds the renderer for a backend and sets the window hints it needs,
 		// which is why it comes before the window does.
@@ -106,9 +109,17 @@ namespace Loom
 
 		virtual Backend GetBackend() const = 0;
 
+		#pragma endregion
+
+		#pragma region Window
+
 		// Takes the window over. False when the API cannot run on it, which for
 		// Vulkan means the Engine falls back to OpenGL.
 		virtual bool Attach(GLFWwindow* window) = 0;
+
+		#pragma endregion
+
+		#pragma region ImGui
 
 		virtual void InitImGui(GLFWwindow* window) = 0;
 		virtual void ShutdownImGui() = 0;
@@ -117,6 +128,13 @@ namespace Loom
 
 		// The ImGui windows dragged out of the main one.
 		virtual void RenderImGuiWindows() = 0;
+
+		#pragma endregion
+
+		#pragma region Frames
+
+		// The pixels of a finished frame, red first and bottom row first.
+		typedef std::function<void(int width, int height, const std::vector<uint8_t>& rgb)> CaptureHandler;
 
 		// Starts a frame on the window, which is the target until something is
 		// pushed over it, and presents it.
@@ -127,10 +145,18 @@ namespace Loom
 		// frame has landed, as the frame ends.
 		virtual void Capture(const CaptureHandler& handler) = 0;
 
+		#pragma endregion
+
+		#pragma region Programs
+
 		// Compiles the two stages, which carry no #version line. Throws
 		// std::runtime_error with the compiler's log when either fails.
 		virtual uint32_t CreateProgram(const std::string& name, const std::string& vertex, const std::string& fragment) = 0;
 		virtual void DeleteProgram(uint32_t program) = 0;
+
+		#pragma endregion
+
+		#pragma region Uniforms
 
 		// A program keeps the values it is given until they are set again, the
 		// way a GL program does. A name the program does not declare is ignored.
@@ -144,6 +170,10 @@ namespace Loom
 		// or unsigned ints, and a bool as an int.
 		virtual void SetUniform(uint32_t program, const char* name, UniformType type, const void* components) = 0;
 		virtual void SetTexture(uint32_t program, const char* name, uint32_t texture) = 0;
+
+		#pragma endregion
+
+		#pragma region Drawing
 
 		// Draws vertices laid out as format says as the GL primitive given
 		// (GL_TRIANGLES and the rest). usage is the GL buffer usage hint. A
@@ -195,6 +225,10 @@ namespace Loom
 		// that reads them at the instance locations.
 		virtual void DrawInstances(uint32_t program, uint32_t primitive, uint32_t vertices, const float* instances, size_t count) = 0;
 
+		#pragma endregion
+
+		#pragma region Textures
+
 		// Whether the program samples its colour textures nearest, so each texel
 		// draws as a hard-edged square, rather than blending between them, from
 		// the textures it is next handed and the next draw on. Off until it is
@@ -203,6 +237,15 @@ namespace Loom
 
 		// Eight bit RGBA, bottom row first.
 		virtual uint32_t CreateTexture(int width, int height, const uint8_t* rgba) = 0;
+
+		virtual int MaxTextureSize() const = 0;
+
+		// A texture as ImGui::Image takes it.
+		virtual void* ImGuiTexture(uint32_t texture) = 0;
+
+		#pragma endregion
+
+		#pragma region Targets
 
 		// A depth texture a shader reads through a sampler2DShadow.
 		virtual uint32_t CreateDepthTarget(int size) = 0;
@@ -220,6 +263,10 @@ namespace Loom
 		// being drawn into before, viewport included.
 		virtual void PushTarget(uint32_t target) = 0;
 		virtual void PopTarget() = 0;
+
+		#pragma endregion
+
+		#pragma region Render State
 
 		// color is RGBA, or null to leave the colour alone.
 		virtual void Clear(const float* color, bool depth) = 0;
@@ -239,10 +286,7 @@ namespace Loom
 		// The size of what is being drawn into.
 		virtual glm::ivec2 TargetSize() const = 0;
 
-		virtual int MaxTextureSize() const = 0;
-
-		// A texture as ImGui::Image takes it.
-		virtual void* ImGuiTexture(uint32_t texture) = 0;
+		#pragma endregion
 
 	protected:
 		// Protected as well as the Engine's, so a renderer a test builds with no

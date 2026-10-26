@@ -49,10 +49,16 @@ namespace Loom
 		};
 	};
 
+	#pragma region Elements
+
 	EditableMesh::Edge EditableMesh::EdgeOf(uint32_t a, uint32_t b)
 	{
 		return a < b ? Edge(a, b) : Edge(b, a);
 	};
+
+	#pragma endregion
+
+	#pragma region Conversion
 
 	EditableMesh EditableMesh::FromTriangles(const std::vector<float>& positions, const std::vector<float>& uvs, const std::vector<float>& normals, const std::vector<float>& colors, const std::vector<UVLayer>& layers)
 	{
@@ -184,25 +190,9 @@ namespace Loom
 		mesh.SetUVLayers(ToUVLayers());
 	};
 
-	uint32_t EditableMesh::AddFace(const std::vector<uint32_t>& corners, const std::vector<glm::vec2>& uvs)
-	{
-		Face face;
+	#pragma endregion
 
-		for (size_t i = 0; i < corners.size(); i++)
-			face.corners.push_back(Corner{ corners[i], i < uvs.size() ? uvs[i] : glm::vec2(0.0f) });
-
-		return AddFace(std::move(face));
-	};
-
-	uint32_t EditableMesh::AddFace(Face face)
-	{
-		faces.push_back(std::move(face));
-
-		const uint32_t added = (uint32_t)faces.size() - 1;
-		Flatten(added);
-
-		return added;
-	};
+	#pragma region Primitives
 
 	EditableMesh EditableMesh::Cube(float size)
 	{
@@ -399,6 +389,30 @@ namespace Loom
 		return mesh;
 	};
 
+	uint32_t EditableMesh::AddFace(const std::vector<uint32_t>& corners, const std::vector<glm::vec2>& uvs)
+	{
+		Face face;
+
+		for (size_t i = 0; i < corners.size(); i++)
+			face.corners.push_back(Corner{ corners[i], i < uvs.size() ? uvs[i] : glm::vec2(0.0f) });
+
+		return AddFace(std::move(face));
+	};
+
+	uint32_t EditableMesh::AddFace(Face face)
+	{
+		faces.push_back(std::move(face));
+
+		const uint32_t added = (uint32_t)faces.size() - 1;
+		Flatten(added);
+
+		return added;
+	};
+
+	#pragma endregion
+
+	#pragma region Queries
+
 	glm::vec3 EditableMesh::FaceNormal(uint32_t face) const
 	{
 		const std::vector<Corner>& corners = faces[face].corners;
@@ -491,13 +505,69 @@ namespace Loom
 		return found;
 	};
 
-	void EditableMesh::Flatten(uint32_t face)
+	std::optional<EditableMesh::Hit> EditableMesh::Raycast(const glm::vec3& origin, const glm::vec3& direction) const
 	{
-		const glm::vec3 normal = FaceNormal(face);
+		std::optional<Hit> nearest{ };
 
-		for (Corner& corner : faces[face].corners)
-			corner.normal = normal;
+		for (uint32_t face = 0; face < faces.size(); face++)
+		{
+			const std::vector<Corner>& corners = faces[face].corners;
+
+			for (size_t i = 2; i < corners.size(); i++)
+			{
+				// Moller and Trumbore's test, against both sides.
+				const glm::vec3& a = vertices[corners[0].vertex];
+				const glm::vec3 ab = vertices[corners[i - 1].vertex] - a;
+				const glm::vec3 ac = vertices[corners[i].vertex] - a;
+
+				const glm::vec3 p = glm::cross(direction, ac);
+				const float determinant = glm::dot(ab, p);
+
+				if (std::abs(determinant) < ray_epsilon)
+					continue;
+
+				const glm::vec3 t = origin - a;
+				const float u = glm::dot(t, p) / determinant;
+
+				if (u < 0.0f || u > 1.0f)
+					continue;
+
+				const glm::vec3 q = glm::cross(t, ab);
+				const float v = glm::dot(direction, q) / determinant;
+
+				if (v < 0.0f || u + v > 1.0f)
+					continue;
+
+				const float distance = glm::dot(ac, q) / determinant;
+
+				if (distance > ray_epsilon && (!nearest || distance < nearest->distance))
+					nearest = Hit{ face, distance };
+			};
+		};
+
+		return nearest;
 	};
+
+	std::pair<glm::vec3, glm::vec3> EditableMesh::Bounds() const
+	{
+		if (vertices.empty())
+			return { glm::vec3(0.0f), glm::vec3(0.0f) };
+
+		glm::vec3 low = vertices.front();
+		glm::vec3 high = vertices.front();
+
+		for (const glm::vec3& vertex : vertices)
+		{
+			low = glm::min(low, vertex);
+			high = glm::max(high, vertex);
+		};
+
+		return { low, high };
+	};
+
+	#pragma endregion
+
+	#pragma region Editing
 
 	void EditableMesh::Transform(const std::set<uint32_t>& moved, const glm::mat4& matrix)
 	{
@@ -794,64 +864,12 @@ namespace Loom
 		faces = std::move(joined);
 	};
 
-	std::optional<EditableMesh::Hit> EditableMesh::Raycast(const glm::vec3& origin, const glm::vec3& direction) const
+	void EditableMesh::Flatten(uint32_t face)
 	{
-		std::optional<Hit> nearest{ };
+		const glm::vec3 normal = FaceNormal(face);
 
-		for (uint32_t face = 0; face < faces.size(); face++)
-		{
-			const std::vector<Corner>& corners = faces[face].corners;
-
-			for (size_t i = 2; i < corners.size(); i++)
-			{
-				// Moller and Trumbore's test, against both sides.
-				const glm::vec3& a = vertices[corners[0].vertex];
-				const glm::vec3 ab = vertices[corners[i - 1].vertex] - a;
-				const glm::vec3 ac = vertices[corners[i].vertex] - a;
-
-				const glm::vec3 p = glm::cross(direction, ac);
-				const float determinant = glm::dot(ab, p);
-
-				if (std::abs(determinant) < ray_epsilon)
-					continue;
-
-				const glm::vec3 t = origin - a;
-				const float u = glm::dot(t, p) / determinant;
-
-				if (u < 0.0f || u > 1.0f)
-					continue;
-
-				const glm::vec3 q = glm::cross(t, ab);
-				const float v = glm::dot(direction, q) / determinant;
-
-				if (v < 0.0f || u + v > 1.0f)
-					continue;
-
-				const float distance = glm::dot(ac, q) / determinant;
-
-				if (distance > ray_epsilon && (!nearest || distance < nearest->distance))
-					nearest = Hit{ face, distance };
-			};
-		};
-
-		return nearest;
-	};
-
-	std::pair<glm::vec3, glm::vec3> EditableMesh::Bounds() const
-	{
-		if (vertices.empty())
-			return { glm::vec3(0.0f), glm::vec3(0.0f) };
-
-		glm::vec3 low = vertices.front();
-		glm::vec3 high = vertices.front();
-
-		for (const glm::vec3& vertex : vertices)
-		{
-			low = glm::min(low, vertex);
-			high = glm::max(high, vertex);
-		};
-
-		return { low, high };
+		for (Corner& corner : faces[face].corners)
+			corner.normal = normal;
 	};
 
 	void EditableMesh::RemoveUnused()
@@ -878,4 +896,6 @@ namespace Loom
 
 		vertices = std::move(kept);
 	};
+
+	#pragma endregion
 };

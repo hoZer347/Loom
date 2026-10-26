@@ -50,6 +50,8 @@ namespace Loom
 		Asset,
 	};
 
+	#pragma region Names
+
 	// In front of a Serial's or Button's name, the category of the one
 	// declared before it.
 	inline constexpr std::string_view previous_category = ".../";
@@ -59,6 +61,11 @@ namespace Loom
 	// under. Either is empty when the name has none.
 	LOOM_API std::string_view NameDisplay(std::string_view name);
 	LOOM_API std::string_view NameCategory(std::string_view name);
+
+	// A member's identifier as a label: "m_fieldOfView" reads "Field Of View".
+	LOOM_API std::string NameFromIdentifier(const char* identifier);
+
+	#pragma endregion
 
 	/**
 	* Loom::SerializedField
@@ -72,6 +79,8 @@ namespace Loom
 	*/
 	struct LOOM_API SerializedField final
 	{
+		#pragma region Fields
+
 		FieldType type = FieldType::Int;
 		void* data = nullptr;
 
@@ -86,7 +95,6 @@ namespace Loom
 		// The Serial's count of changes, which Read and SetReference add to.
 		// Whatever else writes through data calls Changed after.
 		unsigned long long* version = nullptr;
-		void Changed() const;
 
 		// The object that declared the field.
 		LoomObject* owner = nullptr;
@@ -96,6 +104,10 @@ namespace Loom
 		// back to the category it stood for. Copied, so it outlives the module
 		// that declared it.
 		std::string name;
+
+		#pragma endregion
+
+		#pragma region Names
 
 		// Asset fields only: what the files it names end in, such as ".shader".
 		// Copied for the same reason.
@@ -107,14 +119,23 @@ namespace Loom
 		std::string_view Display() const;
 		std::string_view Category() const;
 
+		#pragma endregion
+
+		#pragma region Text
+
 		// The scene-file text for the current value, and the reverse. Reading a
 		// reference resolves the guid against the objects that exist right now
 		// and answers false when the target has not been built yet, which is the
 		// loader's cue to come back to it.
 		std::string Write() const;
 		bool Read(const std::string& text) const;
+		void Changed() const;
+
+		#pragma endregion
 
 	private:
+		#pragma region Text
+
 		bool ReadValue(const std::string& text) const;
 
 		template <typename T>
@@ -135,7 +156,10 @@ namespace Loom
 
 		mutable std::shared_ptr<WrittenArray> m_written{ };
 
+		#pragma endregion
+
 	public:
+		#pragma region References
 
 		LoomObject* GetReference() const;
 		void SetReference(LoomObject* object) const;
@@ -146,8 +170,8 @@ namespace Loom
 		// its components. A scene stands in for its root GameObject, which the
 		// hierarchy draws as the scene. Null when nothing fits.
 		LoomObject* ReferenceFor(LoomObject* object) const;
+
+		#pragma endregion
 	};
 
-	// A member's identifier as a label: "m_fieldOfView" reads "Field Of View".
-	LOOM_API std::string NameFromIdentifier(const char* identifier);
 };

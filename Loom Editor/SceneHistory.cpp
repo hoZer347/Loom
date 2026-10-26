@@ -12,6 +12,8 @@
 
 namespace Loom
 {
+	#pragma region Recording
+
 	void SceneHistory::Collect(const std::vector<Scene*>& scenes)
 	{
 		// AddChild and Destroy defer; what is kept has to show where they land.
@@ -41,158 +43,6 @@ namespace Loom
 
 		if (m_undo.size() > max_steps)
 			m_undo.erase(m_undo.begin());
-	};
-
-	bool SceneHistory::Undo(const std::vector<Scene*>& scenes)
-	{
-		return Move(m_undo, m_redo, &Change::before, scenes);
-	};
-
-	bool SceneHistory::Redo(const std::vector<Scene*>& scenes)
-	{
-		return Move(m_redo, m_undo, &Change::after, scenes);
-	};
-
-	std::unordered_set<GameObject*> SceneHistory::TakeChanged()
-	{
-		return std::exchange(m_changed, { });
-	};
-
-	void SceneHistory::Rewrite(GameObject& root, const std::string& text)
-	{
-		Tracker* tracker = TrackerOf(root);
-		const auto entry = m_entries.find(&root);
-
-		if (tracker == nullptr || entry == m_entries.end())
-			return;
-
-		// An object open in the text: its depth, where it is in states, and
-		// where its last child so far is.
-		struct Open
-		{
-			int depth;
-			size_t at;
-			size_t last;
-		};
-
-		constexpr size_t none = (size_t)-1;
-		const size_t keyword = strlen(SceneSerializer::gameobject_keyword);
-
-		States states{ };
-		std::vector<Open> open{ };
-		std::unordered_set<Guid> named{ };
-		std::istringstream lines(text);
-
-		for (std::string line; std::getline(lines, line);)
-		{
-			if (!line.empty() && line.back() == '\r')
-				line.pop_back();
-
-			size_t start = 0;
-			const int depth = SceneSerializer::DepthOf(line, start);
-
-			if (start >= line.size())
-				continue;
-
-			const std::string content = line.substr(start);
-
-			if (content.rfind(SceneSerializer::gameobject_keyword, 0) != 0)
-			{
-				if (open.empty())
-					return;
-
-				states[open.back().at].second->own += std::string(depth - open.back().depth, '\t') + content + '\n';
-
-				continue;
-			};
-
-			std::string name;
-			Guid guid;
-
-			if (!SceneSerializer::SplitNameAndGuid(content.substr(keyword), name, guid))
-				return;
-
-			while (!open.empty() && open.back().depth >= depth)
-				open.pop_back();
-
-			State state{ content + '\n' };
-
-			if (open.empty())
-			{
-				// One object, which keeps the place root has.
-				if (!states.empty())
-					return;
-
-				state.parent = entry->second.state.parent;
-				state.next = entry->second.state.next;
-			}
-			else
-			{
-				state.parent = states[open.back().at].first;
-
-				if (open.back().last != none)
-					states[open.back().last].second->next = guid;
-
-				open.back().last = states.size();
-			};
-
-			open.push_back({ depth, states.size(), none });
-			states.emplace_back(guid, std::move(state));
-			named.insert(guid);
-		};
-
-		if (states.empty())
-			return;
-
-		std::vector<const GameObject*> below{ &root };
-
-		while (!below.empty())
-		{
-			const GameObject* gameObject = below.back();
-			below.pop_back();
-
-			if (!named.contains(gameObject->GetGuid()))
-				states.emplace_back(gameObject->GetGuid(), std::nullopt);
-
-			below.insert(below.end(), gameObject->GetChildren().begin(), gameObject->GetChildren().end());
-		};
-
-		Apply({ { tracker, WantedOf(states) } });
-
-		Engine::DoTasks();
-		Take(m_scenes, true);
-	};
-
-	GameObject* SceneHistory::Find(const Scene& scene, const Guid& guid) const
-	{
-		for (const std::unique_ptr<Tracker>& tracker : m_trackers)
-			if (tracker->scene == &scene && tracker->id == scene.m_ID)
-			{
-				const auto found = tracker->objects.find(guid);
-
-				return found == tracker->objects.end() ? nullptr : found->second;
-			};
-
-		return nullptr;
-	};
-
-	Scene* SceneHistory::SceneOf(const GameObject& gameObject) const
-	{
-		const Tracker* tracker = TrackerOf(gameObject);
-
-		return tracker ? tracker->scene : nullptr;
-	};
-
-	SceneHistory::Wanted SceneHistory::WantedOf(const States& states)
-	{
-		Wanted wanted{ };
-
-		wanted.reserve(states.size());
-
-		for (const auto& [guid, state] : states)
-			wanted.emplace_back(guid, &state);
-
-		return wanted;
 	};
 
 	void SceneHistory::Take(const std::vector<Scene*>& scenes, bool record)
@@ -374,193 +224,6 @@ namespace Loom
 		std::erase_if(m_trackers, [&](const std::unique_ptr<Tracker>& kept) { return kept.get() == &tracker; });
 	};
 
-	SceneHistory::Tracker* SceneHistory::TrackerOf(const GameObject& gameObject) const
-	{
-		const GameObject* top = &gameObject;
-
-		while (top->GetParent())
-			top = top->GetParent();
-
-		const auto found = m_roots.find(top);
-
-		return found == m_roots.end() ? nullptr : found->second;
-	};
-
-	void SceneHistory::Place(State& state, const GameObject& gameObject)
-	{
-		state.parent = { };
-		state.next = { };
-
-		const GameObject* parent = gameObject.GetParent();
-
-		if (parent == nullptr)
-			return;
-
-		const std::vector<GameObject*>& siblings = parent->GetChildren();
-		const size_t at = gameObject.GetSiblingIndex();
-
-		state.parent = parent->GetGuid();
-
-		if (at + 1 < siblings.size())
-			state.next = siblings[at + 1]->GetGuid();
-	};
-
-	void SceneHistory::Rearranged(const Tracker& tracker, const Guid& parent)
-	{
-		if (const auto found = tracker.objects.find(parent); found != tracker.objects.end())
-			m_changed.insert(found->second);
-	};
-
-	void SceneHistory::Update(GameObject& gameObject, bool own, bool placed, bool record)
-	{
-		Tracker* tracker = TrackerOf(gameObject);
-		const auto found = m_entries.find(&gameObject);
-
-		if (tracker == nullptr)
-		{
-			if (found == m_entries.end())
-				return;
-
-			std::vector<GameObject*> below{ &gameObject };
-
-			while (!below.empty())
-			{
-				GameObject* gone = below.back();
-				below.pop_back();
-
-				Remove(gone, record);
-				below.insert(below.end(), gone->GetChildren().begin(), gone->GetChildren().end());
-			};
-
-			return;
-		};
-
-		if (found == m_entries.end() || found->second.tracker != tracker || found->second.guid != gameObject.GetGuid())
-		{
-			Adopt(gameObject, *tracker, record);
-
-			return;
-		};
-
-		Entry& entry = found->second;
-		State state = entry.state;
-
-		if (own)
-			state.own = SceneSerializer::SerializeOwn(gameObject);
-
-		if (placed)
-			Place(state, gameObject);
-
-		if (own)
-		{
-			std::vector<Guid> components{ };
-
-			for (ComponentBase* component : gameObject.GetComponents())
-			{
-				components.push_back(component->GetGuid());
-				tracker->components[component->GetGuid()] = component;
-			};
-
-			for (const Guid& had : entry.components)
-				if (std::find(components.begin(), components.end(), had) == components.end())
-					tracker->components.erase(had);
-
-			entry.components = std::move(components);
-		};
-
-		Set(entry, std::move(state), record);
-	};
-
-	void SceneHistory::Adopt(GameObject& top, Tracker& tracker, bool record)
-	{
-		std::vector<GameObject*> below{ &top };
-
-		while (!below.empty())
-		{
-			GameObject* gameObject = below.back();
-			below.pop_back();
-
-			const auto found = m_entries.find(gameObject);
-
-			if (found == m_entries.end() || found->second.tracker != &tracker || found->second.guid != gameObject->GetGuid())
-			{
-				Remove(gameObject, record);
-				Add(*gameObject, tracker, record);
-			};
-
-			below.insert(below.end(), gameObject->GetChildren().begin(), gameObject->GetChildren().end());
-		};
-	};
-
-	void SceneHistory::Add(GameObject& gameObject, Tracker& tracker, bool record)
-	{
-		// Guids are what a step finds objects by, so a scene may not have two
-		// objects under one.
-		const auto taken = tracker.objects.find(gameObject.GetGuid());
-
-		if (taken != tracker.objects.end() && taken->second != &gameObject)
-			gameObject.SetGuid(Guid::New());
-
-		Entry& entry = m_entries[&gameObject];
-
-		entry = { &tracker, &gameObject, gameObject.GetGuid(), State{ SceneSerializer::SerializeOwn(gameObject) } };
-		Place(entry.state, gameObject);
-
-		for (ComponentBase* component : gameObject.GetComponents())
-		{
-			entry.components.push_back(component->GetGuid());
-			tracker.components[component->GetGuid()] = component;
-		};
-
-		tracker.objects[entry.guid] = &gameObject;
-		m_changed.insert(&gameObject);
-		Rearranged(tracker, entry.state.parent);
-
-		Note(tracker, entry.guid, std::nullopt, entry.state, record);
-	};
-
-	void SceneHistory::Remove(const LoomObject* object, bool record)
-	{
-		const auto found = m_entries.find(object);
-
-		if (found == m_entries.end())
-			return;
-
-		Entry& entry = found->second;
-		Tracker& tracker = *entry.tracker;
-
-		Note(tracker, entry.guid, entry.state, std::nullopt, record);
-		Rearranged(tracker, entry.state.parent);
-
-		const auto at = tracker.objects.find(entry.guid);
-
-		if (at != tracker.objects.end() && at->second == entry.object)
-			tracker.objects.erase(at);
-
-		for (const Guid& component : entry.components)
-			tracker.components.erase(component);
-
-		m_changed.erase(entry.object);
-		m_entries.erase(found);
-	};
-
-	void SceneHistory::Set(Entry& entry, State state, bool record)
-	{
-		if (state == entry.state)
-			return;
-
-		Note(*entry.tracker, entry.guid, entry.state, state, record);
-
-		if (state.parent != entry.state.parent || state.next != entry.state.next)
-		{
-			Rearranged(*entry.tracker, entry.state.parent);
-			Rearranged(*entry.tracker, state.parent);
-		};
-
-		entry.state = std::move(state);
-		m_changed.insert(entry.object);
-	};
-
 	void SceneHistory::Note(
 		Tracker& tracker,
 		const Guid& object,
@@ -578,6 +241,32 @@ namespace Loom
 		if (first)
 			m_pending.push_back(Change{ tracker.guid, object, before, after });
 		else m_pending[at->second].after = after;
+	};
+
+	#pragma endregion
+
+	#pragma region Steps
+
+	bool SceneHistory::Undo(const std::vector<Scene*>& scenes)
+	{
+		return Move(m_undo, m_redo, &Change::before, scenes);
+	};
+
+	bool SceneHistory::Redo(const std::vector<Scene*>& scenes)
+	{
+		return Move(m_redo, m_undo, &Change::after, scenes);
+	};
+
+	SceneHistory::Wanted SceneHistory::WantedOf(const States& states)
+	{
+		Wanted wanted{ };
+
+		wanted.reserve(states.size());
+
+		for (const auto& [guid, state] : states)
+			wanted.emplace_back(guid, &state);
+
+		return wanted;
 	};
 
 	void SceneHistory::Apply(const std::unordered_map<Tracker*, Wanted>& wanted)
@@ -825,6 +514,156 @@ namespace Loom
 		return false;
 	};
 
+	#pragma endregion
+
+	#pragma region Queries
+
+	std::unordered_set<GameObject*> SceneHistory::TakeChanged()
+	{
+		return std::exchange(m_changed, { });
+	};
+
+	GameObject* SceneHistory::Find(const Scene& scene, const Guid& guid) const
+	{
+		for (const std::unique_ptr<Tracker>& tracker : m_trackers)
+			if (tracker->scene == &scene && tracker->id == scene.m_ID)
+			{
+				const auto found = tracker->objects.find(guid);
+
+				return found == tracker->objects.end() ? nullptr : found->second;
+			};
+
+		return nullptr;
+	};
+
+	Scene* SceneHistory::SceneOf(const GameObject& gameObject) const
+	{
+		const Tracker* tracker = TrackerOf(gameObject);
+
+		return tracker ? tracker->scene : nullptr;
+	};
+
+	SceneHistory::Tracker* SceneHistory::TrackerOf(const GameObject& gameObject) const
+	{
+		const GameObject* top = &gameObject;
+
+		while (top->GetParent())
+			top = top->GetParent();
+
+		const auto found = m_roots.find(top);
+
+		return found == m_roots.end() ? nullptr : found->second;
+	};
+
+	#pragma endregion
+
+	#pragma region Rewriting
+
+	void SceneHistory::Rewrite(GameObject& root, const std::string& text)
+	{
+		Tracker* tracker = TrackerOf(root);
+		const auto entry = m_entries.find(&root);
+
+		if (tracker == nullptr || entry == m_entries.end())
+			return;
+
+		// An object open in the text: its depth, where it is in states, and
+		// where its last child so far is.
+		struct Open
+		{
+			int depth;
+			size_t at;
+			size_t last;
+		};
+
+		constexpr size_t none = (size_t)-1;
+		const size_t keyword = strlen(SceneSerializer::gameobject_keyword);
+
+		States states{ };
+		std::vector<Open> open{ };
+		std::unordered_set<Guid> named{ };
+		std::istringstream lines(text);
+
+		for (std::string line; std::getline(lines, line);)
+		{
+			if (!line.empty() && line.back() == '\r')
+				line.pop_back();
+
+			size_t start = 0;
+			const int depth = SceneSerializer::DepthOf(line, start);
+
+			if (start >= line.size())
+				continue;
+
+			const std::string content = line.substr(start);
+
+			if (content.rfind(SceneSerializer::gameobject_keyword, 0) != 0)
+			{
+				if (open.empty())
+					return;
+
+				states[open.back().at].second->own += std::string(depth - open.back().depth, '\t') + content + '\n';
+
+				continue;
+			};
+
+			std::string name;
+			Guid guid;
+
+			if (!SceneSerializer::SplitNameAndGuid(content.substr(keyword), name, guid))
+				return;
+
+			while (!open.empty() && open.back().depth >= depth)
+				open.pop_back();
+
+			State state{ content + '\n' };
+
+			if (open.empty())
+			{
+				// One object, which keeps the place root has.
+				if (!states.empty())
+					return;
+
+				state.parent = entry->second.state.parent;
+				state.next = entry->second.state.next;
+			}
+			else
+			{
+				state.parent = states[open.back().at].first;
+
+				if (open.back().last != none)
+					states[open.back().last].second->next = guid;
+
+				open.back().last = states.size();
+			};
+
+			open.push_back({ depth, states.size(), none });
+			states.emplace_back(guid, std::move(state));
+			named.insert(guid);
+		};
+
+		if (states.empty())
+			return;
+
+		std::vector<const GameObject*> below{ &root };
+
+		while (!below.empty())
+		{
+			const GameObject* gameObject = below.back();
+			below.pop_back();
+
+			if (!named.contains(gameObject->GetGuid()))
+				states.emplace_back(gameObject->GetGuid(), std::nullopt);
+
+			below.insert(below.end(), gameObject->GetChildren().begin(), gameObject->GetChildren().end());
+		};
+
+		Apply({ { tracker, WantedOf(states) } });
+
+		Engine::DoTasks();
+		Take(m_scenes, true);
+	};
+
 	Scene* SceneHistory::Replace(Scene* scene, const std::string& text, std::string* error)
 	{
 		// Work queued against the old objects has to land before they go.
@@ -846,4 +685,185 @@ namespace Loom
 
 		return replacement;
 	};
+
+	#pragma endregion
+
+	#pragma region Entries
+
+	void SceneHistory::Place(State& state, const GameObject& gameObject)
+	{
+		state.parent = { };
+		state.next = { };
+
+		const GameObject* parent = gameObject.GetParent();
+
+		if (parent == nullptr)
+			return;
+
+		const std::vector<GameObject*>& siblings = parent->GetChildren();
+		const size_t at = gameObject.GetSiblingIndex();
+
+		state.parent = parent->GetGuid();
+
+		if (at + 1 < siblings.size())
+			state.next = siblings[at + 1]->GetGuid();
+	};
+
+	void SceneHistory::Rearranged(const Tracker& tracker, const Guid& parent)
+	{
+		if (const auto found = tracker.objects.find(parent); found != tracker.objects.end())
+			m_changed.insert(found->second);
+	};
+
+	void SceneHistory::Update(GameObject& gameObject, bool own, bool placed, bool record)
+	{
+		Tracker* tracker = TrackerOf(gameObject);
+		const auto found = m_entries.find(&gameObject);
+
+		if (tracker == nullptr)
+		{
+			if (found == m_entries.end())
+				return;
+
+			std::vector<GameObject*> below{ &gameObject };
+
+			while (!below.empty())
+			{
+				GameObject* gone = below.back();
+				below.pop_back();
+
+				Remove(gone, record);
+				below.insert(below.end(), gone->GetChildren().begin(), gone->GetChildren().end());
+			};
+
+			return;
+		};
+
+		if (found == m_entries.end() || found->second.tracker != tracker || found->second.guid != gameObject.GetGuid())
+		{
+			Adopt(gameObject, *tracker, record);
+
+			return;
+		};
+
+		Entry& entry = found->second;
+		State state = entry.state;
+
+		if (own)
+			state.own = SceneSerializer::SerializeOwn(gameObject);
+
+		if (placed)
+			Place(state, gameObject);
+
+		if (own)
+		{
+			std::vector<Guid> components{ };
+
+			for (ComponentBase* component : gameObject.GetComponents())
+			{
+				components.push_back(component->GetGuid());
+				tracker->components[component->GetGuid()] = component;
+			};
+
+			for (const Guid& had : entry.components)
+				if (std::find(components.begin(), components.end(), had) == components.end())
+					tracker->components.erase(had);
+
+			entry.components = std::move(components);
+		};
+
+		Set(entry, std::move(state), record);
+	};
+
+	void SceneHistory::Adopt(GameObject& top, Tracker& tracker, bool record)
+	{
+		std::vector<GameObject*> below{ &top };
+
+		while (!below.empty())
+		{
+			GameObject* gameObject = below.back();
+			below.pop_back();
+
+			const auto found = m_entries.find(gameObject);
+
+			if (found == m_entries.end() || found->second.tracker != &tracker || found->second.guid != gameObject->GetGuid())
+			{
+				Remove(gameObject, record);
+				Add(*gameObject, tracker, record);
+			};
+
+			below.insert(below.end(), gameObject->GetChildren().begin(), gameObject->GetChildren().end());
+		};
+	};
+
+	void SceneHistory::Add(GameObject& gameObject, Tracker& tracker, bool record)
+	{
+		// Guids are what a step finds objects by, so a scene may not have two
+		// objects under one.
+		const auto taken = tracker.objects.find(gameObject.GetGuid());
+
+		if (taken != tracker.objects.end() && taken->second != &gameObject)
+			gameObject.SetGuid(Guid::New());
+
+		Entry& entry = m_entries[&gameObject];
+
+		entry = { &tracker, &gameObject, gameObject.GetGuid(), State{ SceneSerializer::SerializeOwn(gameObject) } };
+		Place(entry.state, gameObject);
+
+		for (ComponentBase* component : gameObject.GetComponents())
+		{
+			entry.components.push_back(component->GetGuid());
+			tracker.components[component->GetGuid()] = component;
+		};
+
+		tracker.objects[entry.guid] = &gameObject;
+		m_changed.insert(&gameObject);
+		Rearranged(tracker, entry.state.parent);
+
+		Note(tracker, entry.guid, std::nullopt, entry.state, record);
+	};
+
+	void SceneHistory::Remove(const LoomObject* object, bool record)
+	{
+		const auto found = m_entries.find(object);
+
+		if (found == m_entries.end())
+			return;
+
+		Entry& entry = found->second;
+		Tracker& tracker = *entry.tracker;
+
+		Note(tracker, entry.guid, entry.state, std::nullopt, record);
+		Rearranged(tracker, entry.state.parent);
+
+		const auto at = tracker.objects.find(entry.guid);
+
+		if (at != tracker.objects.end() && at->second == entry.object)
+			tracker.objects.erase(at);
+
+		for (const Guid& component : entry.components)
+			tracker.components.erase(component);
+
+		m_changed.erase(entry.object);
+		m_entries.erase(found);
+	};
+
+	void SceneHistory::Set(Entry& entry, State state, bool record)
+	{
+		if (state == entry.state)
+			return;
+
+		Note(*entry.tracker, entry.guid, entry.state, state, record);
+
+		if (state.parent != entry.state.parent || state.next != entry.state.next)
+		{
+			Rearranged(*entry.tracker, entry.state.parent);
+			Rearranged(*entry.tracker, state.parent);
+		};
+
+		entry.state = std::move(state);
+		m_changed.insert(entry.object);
+	};
+
+	#pragma endregion
 };

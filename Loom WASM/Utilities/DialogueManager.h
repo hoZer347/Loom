@@ -54,12 +54,24 @@ namespace Loom
 	{
 		DialogueManager();
 
-		#pragma region Script
+		#pragma region Running
 
 		/// The script this manager streams. Set it before Begin.
 		void SetScript(std::string script);
 
 		const std::string& Script() const { return _script; };
+
+		/// Builds the bindings if needed, fills the queue from the script, and starts.
+		/// Re-fills the queue every call, so the full text streams however the last run
+		/// left it.
+		void Begin();
+
+		/// Streams one arbitrary line rather than the assigned script; same parse, same
+		/// bindings.
+		void Begin(const std::string& text);
+
+		/// False until the manager has what it needs to run -- a script, at minimum.
+		bool IsReady() const { return _ready; };
 
 		#pragma endregion
 
@@ -81,6 +93,11 @@ namespace Loom
 		/// would play at. The host plays it; the manager only announces. Pitch is rolled
 		/// fresh per blip, which is what makes the voice babble rather than beep.
 		std::function<void(char c, float level, float pitch)> onSpeak{ };
+
+		/// Seconds per character.
+		float startingTextSpeed = 0.03f;
+
+		float TextSpeed() const { return _textSpeed; };
 
 		#pragma endregion
 
@@ -106,31 +123,6 @@ namespace Loom
 
 		/// Blips one character, if it is one worth blipping.
 		void Speak(char c);
-
-		#pragma endregion
-
-		#pragma region Speed
-
-		/// Seconds per character.
-		float startingTextSpeed = 0.03f;
-
-		float TextSpeed() const { return _textSpeed; };
-
-		#pragma endregion
-
-		#pragma region Running
-
-		/// Builds the bindings if needed, fills the queue from the script, and starts.
-		/// Re-fills the queue every call, so the full text streams however the last run
-		/// left it.
-		void Begin();
-
-		/// Streams one arbitrary line rather than the assigned script; same parse, same
-		/// bindings.
-		void Begin(const std::string& text);
-
-		/// False until the manager has what it needs to run -- a script, at minimum.
-		bool IsReady() const { return _ready; };
 
 		#pragma endregion
 
@@ -181,7 +173,13 @@ namespace Loom
 		friend struct St_Dg_StreamRichText;
 		friend struct St_Dg_DialogueEnd;
 
+		#pragma region Running
+
 		void OnStart() override;
+
+		#pragma endregion
+
+		#pragma region Text
 
 		/// Appends to the box, and tells whoever is drawing it.
 		void Append(const std::string& text);
@@ -190,8 +188,10 @@ namespace Loom
 		/// Empties the box.
 		void ClearText();
 
+		#pragma endregion
+
 	private:
-		#pragma region Binding plumbing
+		#pragma region Bindings
 
 		template <typename _Callable, typename... _Args>
 		static bool Invoke(const _Callable& callable, const std::vector<std::string>& tokens, std::tuple<_Args...>*)
@@ -226,18 +226,26 @@ namespace Loom
 
 		static std::string Lowered(const std::string& s);
 
-		static bool IsClearBinding(const std::string& token);
-
 		/// content is a binding token without its brackets: "Name, Arg1, Arg2".
 		void InvokeBinding(const std::string& content);
 
 		#pragma endregion
+
+		#pragma region Parsing
+
+		static bool IsClearBinding(const std::string& token);
+
+		#pragma endregion
+
+		#pragma region Running
 
 		/// No-ops once ready, so Begin may call it after OnStart already has.
 		void Build();
 
 		void QueueScript();
 		void Queue(const std::string& text);
+
+		#pragma endregion
 
 		std::string _script{ };
 		std::string _text{ };

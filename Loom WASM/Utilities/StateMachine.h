@@ -24,15 +24,20 @@ namespace Loom
 	struct LOOM_API StateMachineBase :
 		public detail::StateCommands<StateMachineBase>
 	{
+		#pragma region Lifetime
+
 		StateMachineBase();
 		virtual ~StateMachineBase();
 
-		/// Where this machine's commands land. It is its own pump.
-		StateMachineBase& Machine() { return *this; };
+		/// Every machine currently alive, for the monitor.
+		static std::vector<StateMachineBase*> All();
 
-		StateBase* Current() const { return current.get(); };
+		#pragma endregion
 
 		#pragma region Primitives
+
+		/// Where this machine's commands land. It is its own pump.
+		StateMachineBase& Machine() { return *this; };
 
 		// What StateCommands lands on. Distinct names rather than overloads of the
 		// commands themselves, so it is always clear which layer a call is in: these take
@@ -58,6 +63,8 @@ namespace Loom
 
 		#pragma endregion
 
+		#pragma region Control
+
 		/// Takes the current state out and brings the head of the queue in. Returns what
 		/// is left at the head.
 		StateBase* Proceed();
@@ -70,6 +77,8 @@ namespace Loom
 
 		/// Reinstates the state Disable put aside.
 		void Enable();
+
+		#pragma endregion
 
 		#pragma region Frame
 
@@ -97,9 +106,18 @@ namespace Loom
 		/// test, or a machine ticking on something other than the frame clock.
 		void Advance(float deltaTime);
 
+		/// True once StartMachine has run.
+		bool IsStarted() const { return started; };
+
+		/// When the machine starts, before it enters its first state. A machine on a
+		/// GameObject starts on the first frame of play.
+		virtual void OnStart() { };
+
 		#pragma endregion
 
 		#pragma region Inspection
+
+		StateBase* Current() const { return current.get(); };
 
 		/// States waiting to run, next first. The current state is not among them.
 		const std::vector<std::shared_ptr<StateBase>>& Queued() const { return _stateQueue; };
@@ -120,11 +138,6 @@ namespace Loom
 		/// Writes every recorded past state (oldest first) out as text, and clears it.
 		std::string FlushStateHistory();
 
-		#pragma endregion
-
-		/// True once StartMachine has run.
-		bool IsStarted() const { return started; };
-
 		/// How much state history to keep before discarding the oldest. Keep it low or
 		/// zero unless debugging, to avoid memory over-use.
 		int maxSavedStates = 0;
@@ -135,14 +148,11 @@ namespace Loom
 		/// What the monitor lists the machine under.
 		virtual std::string MachineName() const { return "StateMachine"; };
 
-		/// Every machine currently alive, for the monitor.
-		static std::vector<StateMachineBase*> All();
-
-		/// When the machine starts, before it enters its first state. A machine on a
-		/// GameObject starts on the first frame of play.
-		virtual void OnStart() { };
+		#pragma endregion
 
 	protected:
+		#pragma region Control
+
 		/// After the current state changes, whether by Proceed, Disable or Enable.
 		virtual void OnMachineStateChanged() { };
 
@@ -153,7 +163,11 @@ namespace Loom
 		/// rather than it being enabled again.
 		void ExitDisabled();
 
+		#pragma endregion
+
 	private:
+		#pragma region Primitives
+
 		struct St_Parallel;
 
 		/// Wraps a set of states in one parallel state, and hands back the raw pointers.
@@ -162,7 +176,15 @@ namespace Loom
 			std::vector<std::shared_ptr<StateBase>> states,
 			std::shared_ptr<StateBase>& out);
 
+		#pragma endregion
+
+		#pragma region Control
+
 		void Adopt(const std::shared_ptr<StateBase>& state);
+
+		#pragma endregion
+
+		#pragma region State
 
 		std::shared_ptr<StateBase> current{ };
 		std::shared_ptr<StateBase> disabledState{ };
@@ -175,6 +197,8 @@ namespace Loom
 
 		/// Previously entered states, for debugging.
 		std::deque<std::pair<float, std::shared_ptr<StateBase>>> _stateStack{ };
+
+		#pragma endregion
 	};
 
 	// Now that the machine is a complete type, the two commands StateBase could not carry

@@ -29,6 +29,10 @@ namespace Loom
 	*/
 	struct LOOM_API Ui final
 	{
+		Ui() = delete;
+
+		#pragma region Pointer
+
 		struct Rect
 		{
 			glm::vec2 min{ 0.0f };
@@ -54,18 +58,26 @@ namespace Loom
 		// drawn last under it, by the overlay of this frame or the one before.
 		static bool IsPointedAt(const UiRect& rect);
 
+		#pragma endregion
+
+		#pragma region Overlay
+
 		// Between these, every UiRect and UiText rendered is queued, then the
 		// queue is drawn over everything already drawn, in the order queued.
 		static void BeginOverlay();
 		static void DrawOverlay();
 
-		Ui() = delete;
+		#pragma endregion
 
 	private:
+		#pragma region Overlay
+
 		friend struct UiRect;
 		friend struct UiText;
 
 		static void Queue(const ComponentBase* component);
+
+		#pragma endregion
 	};
 
 	/**

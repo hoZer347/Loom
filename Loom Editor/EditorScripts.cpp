@@ -44,6 +44,8 @@ namespace Loom
 		};
 	};
 
+	#pragma region Project
+
 	void Editor::LoadProjectFile()
 	{
 		m_scripts.Clear();
@@ -187,37 +189,6 @@ namespace Loom
 			RestoreAfterBuild();
 	};
 
-	void Editor::RestoreAfterBuild()
-	{
-		RestoreSnapshots(m_snapshots);
-		m_snapshots.clear();
-
-		if (!m_prefabBeforeBuild.empty())
-			OpenPrefab(std::exchange(m_prefabBeforeBuild, { }));
-
-		if (GameObject* selected = LoomObject::GetByGuid<GameObject>(m_selectedBeforeBuild))
-			Select(selected);
-	};
-
-	void Editor::CloseAllScenes()
-	{
-		const std::vector<Scene*> closing = m_ownedScenes;
-
-		m_ownedScenes.clear();
-		m_scenePaths.clear();
-		m_activeScene = nullptr;
-		Select(nullptr);
-
-		// Anything the hierarchy still had queued has to land before the
-		// objects it refers to are deleted.
-		Engine::DoTasks();
-
-		for (Scene* scene : closing)
-			delete scene;
-
-		Engine::DoTasks();
-	};
-
 	void Editor::PollScripts()
 	{
 		if (m_scripts.Poll() != ScriptLibrary::Progress::Finished)
@@ -262,6 +233,22 @@ namespace Loom
 			if (m_scripts.LastBuildSucceeded())
 				BeginPlay();
 		};
+	};
+
+	#pragma endregion
+
+	#pragma region Snapshots
+
+	void Editor::RestoreAfterBuild()
+	{
+		RestoreSnapshots(m_snapshots);
+		m_snapshots.clear();
+
+		if (!m_prefabBeforeBuild.empty())
+			OpenPrefab(std::exchange(m_prefabBeforeBuild, { }));
+
+		if (GameObject* selected = LoomObject::GetByGuid<GameObject>(m_selectedBeforeBuild))
+			Select(selected);
 	};
 
 	std::vector<Editor::SceneSnapshot> Editor::TakeSnapshots() const
@@ -320,30 +307,6 @@ namespace Loom
 		SceneSerializer::ResolveReferences(pending);
 	};
 
-	void Editor::TogglePlay()
-	{
-		if (Engine::updateScenes)
-		{
-			// A play left queued by an earlier build goes with it: a pause
-			// should not be undone by the next compile finishing.
-			Engine::updateScenes = false;
-			m_playAfterCompile = false;
-
-			return;
-		};
-
-		// A run starts from freshly compiled scripts. A paused one carries on
-		// with the library it started with.
-		if (!m_playing && m_scripts.HasProject() && !m_scripts.IsBuilding())
-		{
-			m_playAfterCompile = true;
-			CompileScripts();
-			return;
-		};
-
-		BeginPlay();
-	};
-
 	void Editor::BeginPlay()
 	{
 		// Mid-build the scenes are down and there is nothing to snapshot or to
@@ -367,6 +330,57 @@ namespace Loom
 		};
 
 		Engine::updateScenes = true;
+	};
+
+	#pragma endregion
+
+	#pragma region Scenes
+
+	void Editor::CloseAllScenes()
+	{
+		const std::vector<Scene*> closing = m_ownedScenes;
+
+		m_ownedScenes.clear();
+		m_scenePaths.clear();
+		m_activeScene = nullptr;
+		Select(nullptr);
+
+		// Anything the hierarchy still had queued has to land before the
+		// objects it refers to are deleted.
+		Engine::DoTasks();
+
+		for (Scene* scene : closing)
+			delete scene;
+
+		Engine::DoTasks();
+	};
+
+	#pragma endregion
+
+	#pragma region Play
+
+	void Editor::TogglePlay()
+	{
+		if (Engine::updateScenes)
+		{
+			// A play left queued by an earlier build goes with it: a pause
+			// should not be undone by the next compile finishing.
+			Engine::updateScenes = false;
+			m_playAfterCompile = false;
+
+			return;
+		};
+
+		// A run starts from freshly compiled scripts. A paused one carries on
+		// with the library it started with.
+		if (!m_playing && m_scripts.HasProject() && !m_scripts.IsBuilding())
+		{
+			m_playAfterCompile = true;
+			CompileScripts();
+			return;
+		};
+
+		BeginPlay();
 	};
 
 	void Editor::Stop()
@@ -443,6 +457,10 @@ namespace Loom
 
 		m_webPlayer.Launch(m_projectPath, scene.string());
 	};
+
+	#pragma endregion
+
+	#pragma region Project Panel
 
 	std::string Editor::BuildSettingsFile() const
 	{
@@ -538,6 +556,10 @@ namespace Loom
 			run ? m_buildSettings.Program(m_projectPath, m_projectName) : std::filesystem::path());
 	};
 
+	#pragma endregion
+
+	#pragma region Dialogs
+
 	void Editor::DrawNewProjectPrompt()
 	{
 		if (!m_askForNewProject)
@@ -612,4 +634,6 @@ namespace Loom
 			m_dialogs->newProjectFolder.ClearSelected();
 		};
 	};
+
+	#pragma endregion
 };

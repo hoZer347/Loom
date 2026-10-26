@@ -23,6 +23,8 @@ namespace Loom
 	*/
 	namespace Contacts
 	{
+		#pragma region Shapes
+
 		constexpr int MOST_POINTS = 4;
 		constexpr int AXES = 3;
 
@@ -58,6 +60,10 @@ namespace Loom
 		// its collider tests itself, and for one the ray starts inside.
 		bool Raycast(const Shape& shape, const glm::vec3& origin, const glm::vec3& direction, float maxDistance, float& distance, glm::vec3& normal);
 
+		#pragma endregion
+
+		#pragma region Collision
+
 		// The points of one touching surface, with the normal pointing out of
 		// the first collider into the second. A depth below zero is a gap.
 		struct Manifold
@@ -71,5 +77,7 @@ namespace Loom
 		// Appends a manifold for each surface where a touches b, or comes
 		// within margin of it; a mesh gives one for each of its triangles.
 		void Collide(const Shape& a, const Shape& b, float margin, std::vector<Manifold>& manifolds);
+
+		#pragma endregion
 	};
 };

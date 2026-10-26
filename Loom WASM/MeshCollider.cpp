@@ -30,10 +30,7 @@ namespace Loom
 		};
 	};
 
-	glm::vec3 MeshCollider::Triangle::Centre() const
-	{
-		return (corners[0] + corners[1] + corners[2]) / (float)CORNERS;
-	};
+	#pragma region Collider
 
 	bool MeshCollider::Refresh() const
 	{
@@ -69,6 +66,157 @@ namespace Loom
 		Rebuild();
 
 		return true;
+	};
+
+	Bounds MeshCollider::BoundsIn(const glm::mat4& world) const
+	{
+		if (m_nodes.empty())
+			return Around(glm::vec3(world[3]));
+
+		const Bounds& local = m_nodes[0].bounds;
+		const glm::vec3 middle = glm::vec3(world * glm::vec4(local.Center(), 1.0f));
+		const glm::vec3 half = local.Extents();
+
+		glm::vec3 reach(0.0f);
+
+		for (int axis = 0; axis < glm::vec3::length(); axis++)
+			reach += glm::abs(glm::vec3(world[axis])) * half[axis];
+
+		return { middle - reach, middle + reach };
+	};
+
+	bool MeshCollider::Intersect(const glm::mat4& world, const Ray& ray, float maxDistance, RaycastHit& hit) const
+	{
+		if (m_nodes.empty() || glm::determinant(glm::mat3(world)) == 0.0f)
+			return false;
+
+		const glm::mat4 toLocal = glm::inverse(world);
+
+		// As in BoxCollider: the same parameter is the world distance.
+		const Ray local
+		{
+			glm::vec3(toLocal * glm::vec4(ray.origin, 1.0f)),
+			glm::mat3(toLocal) * ray.direction
+		};
+
+		float nearest = maxDistance;
+		glm::vec3 normal(0.0f);
+		const bool found = Nearest(m_triangles, [&](uint32_t node) -> const Bounds& { return m_nodes[node].bounds; }, local, nearest, normal);
+
+		if (!found)
+			return false;
+
+		glm::vec3 outward = glm::normalize(glm::transpose(glm::mat3(toLocal)) * normal);
+
+		if (glm::dot(outward, ray.direction) > 0.0f)
+			outward = -outward;
+
+		hit.point = ray.GetPoint(nearest);
+		hit.normal = outward;
+		hit.distance = nearest;
+
+		return true;
+	};
+
+	#pragma endregion
+
+	#pragma region Posing
+
+	void MeshCollider::Pose(const glm::mat4& world) const
+	{
+		m_posed.resize(m_triangles.size());
+
+		for (size_t i = 0; i < m_triangles.size(); i++)
+			for (uint32_t corner = 0; corner < CORNERS; corner++)
+				m_posed[i].corners[corner] = glm::vec3(world * glm::vec4(m_triangles[i].corners[corner], 1.0f));
+
+		// A branch's children come after it, so from the back each node's
+		// are boxed before it is.
+		m_posedBounds.resize(m_nodes.size());
+
+		for (size_t i = m_nodes.size(); i-- > 0; )
+		{
+			const Node& node = m_nodes[i];
+
+			if (node.count == 0)
+			{
+				m_posedBounds[i] = m_posedBounds[i + 1].Union(m_posedBounds[node.second]);
+				continue;
+			};
+
+			Bounds bounds = Around(m_posed[node.first].corners[0]);
+
+			for (uint32_t t = node.first; t < node.first + node.count; t++)
+				for (const glm::vec3& corner : m_posed[t].corners)
+					bounds = bounds.Union(Around(corner));
+
+			m_posedBounds[i] = bounds;
+		};
+	};
+
+	void MeshCollider::TrianglesNear(const Bounds& near, std::vector<glm::vec3>& corners) const
+	{
+		if (m_posedBounds.empty())
+			return;
+
+		std::array<uint32_t, MOST_DEPTH> pending;
+		size_t count = 0;
+		pending[count++] = 0;
+
+		while (count > 0)
+		{
+			const uint32_t index = pending[--count];
+			const Node& node = m_nodes[index];
+
+			if (!m_posedBounds[index].Overlaps(near))
+				continue;
+
+			if (node.count == 0)
+			{
+				pending[count++] = node.second;
+				pending[count++] = index + 1;
+				continue;
+			};
+
+			// Only those whose own boxes reach near: a leaf's box covers
+			// several, and testing one against a shape costs far more.
+			for (uint32_t i = node.first; i < node.first + node.count; i++)
+			{
+				const glm::vec3* posed = m_posed[i].corners;
+
+				if (Around(posed[0]).Union(Around(posed[1])).Union(Around(posed[2])).Overlaps(near))
+					corners.insert(corners.end(), posed, posed + CORNERS);
+			};
+		};
+	};
+
+	bool MeshCollider::IntersectPosed(const Ray& ray, float maxDistance, RaycastHit& hit) const
+	{
+		float nearest = maxDistance;
+		glm::vec3 normal(0.0f);
+
+		if (m_posedBounds.empty() || !Nearest(m_posed, [&](uint32_t node) -> const Bounds& { return m_posedBounds[node]; }, ray, nearest, normal))
+			return false;
+
+		const float length = glm::length(normal);
+
+		if (length == 0.0f)
+			return false;
+
+		hit.point = ray.GetPoint(nearest);
+		hit.normal = glm::dot(normal, ray.direction) > 0.0f ? -normal / length : normal / length;
+		hit.distance = nearest;
+
+		return true;
+	};
+
+	#pragma endregion
+
+	#pragma region Tree
+
+	glm::vec3 MeshCollider::Triangle::Centre() const
+	{
+		return (corners[0] + corners[1] + corners[2]) / (float)CORNERS;
 	};
 
 	void MeshCollider::Rebuild() const
@@ -175,111 +323,6 @@ namespace Loom
 		Build(first + half, count - half);
 	};
 
-	Bounds MeshCollider::BoundsIn(const glm::mat4& world) const
-	{
-		if (m_nodes.empty())
-			return Around(glm::vec3(world[3]));
-
-		const Bounds& local = m_nodes[0].bounds;
-		const glm::vec3 middle = glm::vec3(world * glm::vec4(local.Center(), 1.0f));
-		const glm::vec3 half = local.Extents();
-
-		glm::vec3 reach(0.0f);
-
-		for (int axis = 0; axis < glm::vec3::length(); axis++)
-			reach += glm::abs(glm::vec3(world[axis])) * half[axis];
-
-		return { middle - reach, middle + reach };
-	};
-
-	bool MeshCollider::IntersectPosed(const Ray& ray, float maxDistance, RaycastHit& hit) const
-	{
-		float nearest = maxDistance;
-		glm::vec3 normal(0.0f);
-
-		if (m_posedBounds.empty() || !Nearest(m_posed, [&](uint32_t node) -> const Bounds& { return m_posedBounds[node]; }, ray, nearest, normal))
-			return false;
-
-		const float length = glm::length(normal);
-
-		if (length == 0.0f)
-			return false;
-
-		hit.point = ray.GetPoint(nearest);
-		hit.normal = glm::dot(normal, ray.direction) > 0.0f ? -normal / length : normal / length;
-		hit.distance = nearest;
-
-		return true;
-	};
-
-	void MeshCollider::Pose(const glm::mat4& world) const
-	{
-		m_posed.resize(m_triangles.size());
-
-		for (size_t i = 0; i < m_triangles.size(); i++)
-			for (uint32_t corner = 0; corner < CORNERS; corner++)
-				m_posed[i].corners[corner] = glm::vec3(world * glm::vec4(m_triangles[i].corners[corner], 1.0f));
-
-		// A branch's children come after it, so from the back each node's
-		// are boxed before it is.
-		m_posedBounds.resize(m_nodes.size());
-
-		for (size_t i = m_nodes.size(); i-- > 0; )
-		{
-			const Node& node = m_nodes[i];
-
-			if (node.count == 0)
-			{
-				m_posedBounds[i] = m_posedBounds[i + 1].Union(m_posedBounds[node.second]);
-				continue;
-			};
-
-			Bounds bounds = Around(m_posed[node.first].corners[0]);
-
-			for (uint32_t t = node.first; t < node.first + node.count; t++)
-				for (const glm::vec3& corner : m_posed[t].corners)
-					bounds = bounds.Union(Around(corner));
-
-			m_posedBounds[i] = bounds;
-		};
-	};
-
-	void MeshCollider::TrianglesNear(const Bounds& near, std::vector<glm::vec3>& corners) const
-	{
-		if (m_posedBounds.empty())
-			return;
-
-		std::array<uint32_t, MOST_DEPTH> pending;
-		size_t count = 0;
-		pending[count++] = 0;
-
-		while (count > 0)
-		{
-			const uint32_t index = pending[--count];
-			const Node& node = m_nodes[index];
-
-			if (!m_posedBounds[index].Overlaps(near))
-				continue;
-
-			if (node.count == 0)
-			{
-				pending[count++] = node.second;
-				pending[count++] = index + 1;
-				continue;
-			};
-
-			// Only those whose own boxes reach near: a leaf's box covers
-			// several, and testing one against a shape costs far more.
-			for (uint32_t i = node.first; i < node.first + node.count; i++)
-			{
-				const glm::vec3* posed = m_posed[i].corners;
-
-				if (Around(posed[0]).Union(Around(posed[1])).Union(Around(posed[2])).Overlaps(near))
-					corners.insert(corners.end(), posed, posed + CORNERS);
-			};
-		};
-	};
-
 	template<typename BoxOf>
 	bool MeshCollider::Nearest(const std::vector<Triangle>& triangles, const BoxOf& boxOf, const Ray& ray, float& nearest, glm::vec3& normal) const
 	{
@@ -346,36 +389,5 @@ namespace Loom
 		return found;
 	};
 
-	bool MeshCollider::Intersect(const glm::mat4& world, const Ray& ray, float maxDistance, RaycastHit& hit) const
-	{
-		if (m_nodes.empty() || glm::determinant(glm::mat3(world)) == 0.0f)
-			return false;
-
-		const glm::mat4 toLocal = glm::inverse(world);
-
-		// As in BoxCollider: the same parameter is the world distance.
-		const Ray local
-		{
-			glm::vec3(toLocal * glm::vec4(ray.origin, 1.0f)),
-			glm::mat3(toLocal) * ray.direction
-		};
-
-		float nearest = maxDistance;
-		glm::vec3 normal(0.0f);
-		const bool found = Nearest(m_triangles, [&](uint32_t node) -> const Bounds& { return m_nodes[node].bounds; }, local, nearest, normal);
-
-		if (!found)
-			return false;
-
-		glm::vec3 outward = glm::normalize(glm::transpose(glm::mat3(toLocal)) * normal);
-
-		if (glm::dot(outward, ray.direction) > 0.0f)
-			outward = -outward;
-
-		hit.point = ray.GetPoint(nearest);
-		hit.normal = outward;
-		hit.distance = nearest;
-
-		return true;
-	};
+	#pragma endregion
 };

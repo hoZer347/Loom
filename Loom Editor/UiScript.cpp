@@ -24,57 +24,7 @@ namespace Loom
 {
 	namespace
 	{
-		// How long a target that has not been drawn yet is waited for.
-		constexpr int target_wait_frames = 120;
-
-		// How far inside an item's left or right edge "left" and "right" aim.
-		constexpr float edge_inset = 4.0f;
-
-		// How far the mouse moves with the button down before it heads for
-		// the drop: past ImGui's drag threshold, so the drag has started.
-		constexpr float drag_nudge = 10.0f;
-
-		// What a chord names, what ImGui is told of it, and the key the game
-		// hears for it.
-		struct Modifier
-		{
-			const char* name;
-			ImGuiKey flag;
-			ImGuiKey key;
-		};
-
-		const Modifier modifiers[] =
-		{
-			{ "ctrl", ImGuiMod_Ctrl, ImGuiKey_LeftCtrl },
-			{ "shift", ImGuiMod_Shift, ImGuiKey_LeftShift },
-			{ "alt", ImGuiMod_Alt, ImGuiKey_LeftAlt },
-			{ "super", ImGuiMod_Super, ImGuiKey_LeftSuper },
-		};
-
-		// The key the game hears for one ImGui is told of, as GLFW numbers
-		// it, or -1 for none. The backend's mapping goes the other way, so it
-		// is run over every GLFW key once.
-		int GameKey(ImGuiKey key)
-		{
-			static const std::unordered_map<ImGuiKey, int> numbers = []()
-			{
-				std::unordered_map<ImGuiKey, int> found{ };
-
-				for (int number = 0; number < Input::keys; number++)
-					if (const ImGuiKey named = ImGui_ImplGlfw_KeyToImGuiKey(number, 0); named != ImGuiKey_None)
-						found.try_emplace(named, number);
-
-				return found;
-			}();
-
-			for (const Modifier& modifier : modifiers)
-				if (key == modifier.flag)
-					key = modifier.key;
-
-			const auto found = numbers.find(key);
-
-			return found == numbers.end() ? -1 : found->second;
-		};
+		#pragma region Commands
 
 		// Words and "quoted strings", the quotes taken off.
 		std::vector<std::string> Tokens(const std::string& line)
@@ -123,6 +73,52 @@ namespace Loom
 			return *end == '\0' && std::isfinite(*value);
 		};
 
+		#pragma endregion
+
+		#pragma region Keys
+
+		// What a chord names, what ImGui is told of it, and the key the game
+		// hears for it.
+		struct Modifier
+		{
+			const char* name;
+			ImGuiKey flag;
+			ImGuiKey key;
+		};
+
+		const Modifier modifiers[] =
+		{
+			{ "ctrl", ImGuiMod_Ctrl, ImGuiKey_LeftCtrl },
+			{ "shift", ImGuiMod_Shift, ImGuiKey_LeftShift },
+			{ "alt", ImGuiMod_Alt, ImGuiKey_LeftAlt },
+			{ "super", ImGuiMod_Super, ImGuiKey_LeftSuper },
+		};
+
+		// The key the game hears for one ImGui is told of, as GLFW numbers
+		// it, or -1 for none. The backend's mapping goes the other way, so it
+		// is run over every GLFW key once.
+		int GameKey(ImGuiKey key)
+		{
+			static const std::unordered_map<ImGuiKey, int> numbers = []()
+			{
+				std::unordered_map<ImGuiKey, int> found{ };
+
+				for (int number = 0; number < Input::keys; number++)
+					if (const ImGuiKey named = ImGui_ImplGlfw_KeyToImGuiKey(number, 0); named != ImGuiKey_None)
+						found.try_emplace(named, number);
+
+				return found;
+			}();
+
+			for (const Modifier& modifier : modifiers)
+				if (key == modifier.flag)
+					key = modifier.key;
+
+			const auto found = numbers.find(key);
+
+			return found == numbers.end() ? -1 : found->second;
+		};
+
 		ImGuiKey KeyNamed(const std::string& name)
 		{
 			for (int key = ImGuiKey_NamedKey_BEGIN; key < ImGuiKey_NamedKey_END; key++)
@@ -132,11 +128,27 @@ namespace Loom
 			return ImGuiKey_None;
 		};
 
+		#pragma endregion
+
+		#pragma region Targets
+
+		// How long a target that has not been drawn yet is waited for.
+		constexpr int target_wait_frames = 120;
+
+		// How far inside an item's left or right edge "left" and "right" aim.
+		constexpr float edge_inset = 4.0f;
+
+		// How far the mouse moves with the button down before it heads for
+		// the drop: past ImGui's drag threshold, so the drag has started.
+		constexpr float drag_nudge = 10.0f;
+
 		// The part of a label ImGui shows: everything before its ##.
 		std::string Shown(const std::string& label)
 		{
 			return label.substr(0, label.find("##"));
 		};
+
+		#pragma endregion
 	};
 
 	UiScript::UiScript(const std::filesystem::path& folder) :
@@ -155,6 +167,8 @@ namespace Loom
 		m_context->TestEngine = nullptr;
 		m_context->TestEngineHookItems = false;
 	};
+
+	#pragma region Script
 
 	bool UiScript::Load(const std::string& path)
 	{
@@ -200,17 +214,6 @@ namespace Loom
 		m_failed = false;
 
 		LoadText(text);
-	};
-
-	void UiScript::Listen(bool listening)
-	{
-		if (m_context->TestEngine == this)
-			m_context->TestEngineHookItems = listening;
-	};
-
-	bool UiScript::Listening() const
-	{
-		return m_context->TestEngine == this && m_context->TestEngineHookItems;
 	};
 
 	void UiScript::Step()
@@ -262,6 +265,21 @@ namespace Loom
 			Fail("its target was not drawn within " + std::to_string(target_wait_frames) + " frames");
 	};
 
+	#pragma endregion
+
+	#pragma region Items
+
+	void UiScript::Listen(bool listening)
+	{
+		if (m_context->TestEngine == this)
+			m_context->TestEngineHookItems = listening;
+	};
+
+	bool UiScript::Listening() const
+	{
+		return m_context->TestEngine == this && m_context->TestEngineHookItems;
+	};
+
 	void UiScript::ItemAdded(ImGuiID id, const ImRect& rect)
 	{
 		m_rects[id] = rect;
@@ -276,6 +294,57 @@ namespace Loom
 
 		m_drawing.push_back({ m_context->CurrentWindow->Name, label, rect->second.Min, rect->second.Max });
 	};
+
+	void UiScript::WriteItems(std::ostream& out, const std::string& window) const
+	{
+		const ImVec2 origin = ImGui::GetMainViewport()->Pos;
+
+		for (const Item& item : m_drawn)
+			if (item.window.find(window) != std::string::npos)
+				out
+					<< item.window << '\t'
+					<< item.label << '\t'
+					<< item.min.x - origin.x << '\t'
+					<< item.min.y - origin.y << '\t'
+					<< item.max.x - item.min.x << '\t'
+					<< item.max.y - item.min.y << '\n';
+
+		out.flush();
+	};
+
+	std::optional<Engine::Region> UiScript::WindowRegion(const std::string& window)
+	{
+		const ImVec2 origin = ImGui::GetMainViewport()->Pos;
+		const ImVec2 scale = ImGui::GetIO().DisplayFramebufferScale;
+
+		for (const ImGuiWindow* shown : ImGui::GetCurrentContext()->Windows)
+			if (std::string(shown->Name).find(window) != std::string::npos &&
+				((shown->Flags & ImGuiWindowFlags_ChildWindow) == 0 || shown->DockIsActive) &&
+				shown->Viewport == ImGui::GetMainViewport() &&
+				shown->WasActive &&
+				!shown->Hidden)
+				return Engine::Region{
+					(int)((shown->Pos.x - origin.x) * scale.x),
+					(int)((shown->Pos.y - origin.y) * scale.y),
+					(int)(shown->Size.x * scale.x),
+					(int)(shown->Size.y * scale.y) };
+
+		return std::nullopt;
+	};
+
+	const UiScript::Item* UiScript::Find(const std::string& window, const std::string& label) const
+	{
+		for (const Item& item : m_drawn)
+			if (item.window.find(window) != std::string::npos &&
+				(item.label == label || Shown(item.label) == label))
+				return &item;
+
+		return nullptr;
+	};
+
+	#pragma endregion
+
+	#pragma region Commands
 
 	bool UiScript::Parse(const std::string& line)
 	{
@@ -665,53 +734,6 @@ namespace Loom
 		Input::OnMouseMove((int)(m_mouse.x - window->Pos.x), (int)(m_mouse.y - window->Pos.y), (int)window->Size.x, (int)window->Size.y);
 	};
 
-	const UiScript::Item* UiScript::Find(const std::string& window, const std::string& label) const
-	{
-		for (const Item& item : m_drawn)
-			if (item.window.find(window) != std::string::npos &&
-				(item.label == label || Shown(item.label) == label))
-				return &item;
-
-		return nullptr;
-	};
-
-	void UiScript::WriteItems(std::ostream& out, const std::string& window) const
-	{
-		const ImVec2 origin = ImGui::GetMainViewport()->Pos;
-
-		for (const Item& item : m_drawn)
-			if (item.window.find(window) != std::string::npos)
-				out
-					<< item.window << '\t'
-					<< item.label << '\t'
-					<< item.min.x - origin.x << '\t'
-					<< item.min.y - origin.y << '\t'
-					<< item.max.x - item.min.x << '\t'
-					<< item.max.y - item.min.y << '\n';
-
-		out.flush();
-	};
-
-	std::optional<Engine::Region> UiScript::WindowRegion(const std::string& window)
-	{
-		const ImVec2 origin = ImGui::GetMainViewport()->Pos;
-		const ImVec2 scale = ImGui::GetIO().DisplayFramebufferScale;
-
-		for (const ImGuiWindow* shown : ImGui::GetCurrentContext()->Windows)
-			if (std::string(shown->Name).find(window) != std::string::npos &&
-				((shown->Flags & ImGuiWindowFlags_ChildWindow) == 0 || shown->DockIsActive) &&
-				shown->Viewport == ImGui::GetMainViewport() &&
-				shown->WasActive &&
-				!shown->Hidden)
-				return Engine::Region{
-					(int)((shown->Pos.x - origin.x) * scale.x),
-					(int)((shown->Pos.y - origin.y) * scale.y),
-					(int)(shown->Size.x * scale.x),
-					(int)(shown->Size.y * scale.y) };
-
-		return std::nullopt;
-	};
-
 	void UiScript::ReleaseHeld()
 	{
 		for (auto key = m_held.rbegin(); key != m_held.rend(); key++)
@@ -742,4 +764,6 @@ namespace Loom
 		m_finished = true;
 		m_failed = true;
 	};
+
+	#pragma endregion
 };

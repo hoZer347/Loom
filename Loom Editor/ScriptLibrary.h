@@ -29,27 +29,41 @@ namespace Loom
 	*/
 	struct ScriptLibrary final
 	{
+		#pragma region Lifetime
+
 		ScriptLibrary() = default;
 		~ScriptLibrary();
 
 		ScriptLibrary(const ScriptLibrary&) = delete;
 		ScriptLibrary& operator=(const ScriptLibrary&) = delete;
 
+		#pragma endregion
+
+		#pragma region Project
+
 		// Both absolute: the .vcxproj to build and the .dll it produces.
 		void SetProject(const std::string& project, const std::string& library);
 		void Clear();
 
 		bool HasProject() const { return !m_project.empty(); };
-		bool IsBuilding() const { return m_current && !m_current->done; };
-
-		// No build running, and none finished and waiting on Poll to hand over.
-		bool IsIdle() const { return !m_current; };
 
 		// Whether any script source is newer than the library built from it.
 		// Answered from a short-lived cache: the panel asks every frame, and
 		// scanning a directory tree at frame rate is pure waste.
 		bool IsStale() const;
 
+		const std::string& GetProject() const { return m_project; };
+		const std::string& GetLibrary() const { return m_library; };
+		const std::string& GetStatus() const { return m_status; };
+
+		#pragma endregion
+
+		#pragma region Building
+
+		bool IsBuilding() const { return m_current && !m_current->done; };
+
+		// No build running, and none finished and waiting on Poll to hand over.
+		bool IsIdle() const { return !m_current; };
 
 		// Kicks off a build. The caller unloads first (and puts back whatever it
 		// had to tear down) around Poll returning Finished.
@@ -67,16 +81,20 @@ namespace Loom
 
 		bool LastBuildSucceeded() const { return m_succeeded; };
 
+		#pragma endregion
+
+		#pragma region Loading
+
 		bool Load();
 		void Unload();
-
-		const std::string& GetProject() const { return m_project; };
-		const std::string& GetLibrary() const { return m_library; };
-		const std::string& GetStatus() const { return m_status; };
 
 		// The component types the loaded library registered.
 		const std::vector<std::string>& GetTypes() const { return m_types; };
 		const std::vector<std::string>& GetStates() const { return m_states; };
+
+		#pragma endregion
+
+		#pragma region Tools
 
 		// devenv.exe from the newest Visual Studio on this machine, or empty
 		// when there is none. Looked up once and held.
@@ -89,13 +107,27 @@ namespace Loom
 		// built to run inside it has to be built in too.
 		static const char* Configuration();
 
+		#pragma endregion
 
 	private:
+		#pragma region Building
+
 		// Lets go of a build that is no longer wanted. MSBuild is still running
 		// and there is no hurrying it, so the thread is left to finish into a
 		// result nothing reads - waiting here would stop the editor pumping for
 		// the rest of the compile.
 		void AbandonBuild();
+
+		// Whether the library predates the editor running it. MSBuild has no idea
+		// the engine moved, so this is also what decides a full rebuild.
+		bool BuiltAgainstOlderEditor() const;
+
+		// Where how long the library's builds took is kept between sessions.
+		std::filesystem::path TimingsFile() const;
+
+		#pragma endregion
+
+		#pragma region Loading
 
 		// Clears out the copies of a library that earlier editors loaded. The
 		// one a running editor still holds cannot be removed, and is left.
@@ -105,38 +137,22 @@ namespace Loom
 		// registries.
 		void RestoreRegistry();
 
-		// Whether the library predates the editor running it. MSBuild has no idea
-		// the engine moved, so this is also what decides a full rebuild.
-		bool BuiltAgainstOlderEditor() const;
+		#pragma endregion
 
-		// Where how long the library's builds took is kept between sessions.
-		std::filesystem::path TimingsFile() const;
+		#pragma region Project
 
 		std::string m_project{ };
 		std::string m_library{ };
 		std::string m_status{ "No script project." };
-		bool m_succeeded = false;
-
-		// The DLL is copied aside before loading, so a rebuild is not blocked by
-		// the editor holding the file it is trying to write. The copy is named
-		// after this process, so two editors on one project do not fight over it.
-		std::string m_loadedCopy{ };
-
-		void* m_module = nullptr;
-		std::vector<std::string> m_types{ };
-
-		// The state names this library registered.
-		std::vector<std::string> m_states{ };
-
-		// The whole registry as it stood before this library registered anything.
-		// Kept in full rather than just the entries it went on to displace, because
-		// std::functions cannot be compared: unloading puts all of it back, which
-		// restores anything the library registered over the top of and is a no-op
-		// for the rest. Each with the category it was filed under.
-		std::map<std::string, std::pair<ComponentRegistry::Factory, std::string>> m_before{ };
 
 		mutable std::chrono::steady_clock::time_point m_staleCheckedAt{ };
 		mutable bool m_stale = false;
+
+		#pragma endregion
+
+		#pragma region Building
+
+		bool m_succeeded = false;
 
 		// When the build under way started, whether it is a rebuild, how long
 		// the last of its kind took, and when the library was last written
@@ -163,5 +179,29 @@ namespace Loom
 		// destructor waits for them rather than letting them outlive the log
 		// they are writing to.
 		std::vector<std::thread> m_abandoned{ };
+
+		#pragma endregion
+
+		#pragma region Loading
+
+		// The DLL is copied aside before loading, so a rebuild is not blocked by
+		// the editor holding the file it is trying to write. The copy is named
+		// after this process, so two editors on one project do not fight over it.
+		std::string m_loadedCopy{ };
+
+		void* m_module = nullptr;
+		std::vector<std::string> m_types{ };
+
+		// The state names this library registered.
+		std::vector<std::string> m_states{ };
+
+		// The whole registry as it stood before this library registered anything.
+		// Kept in full rather than just the entries it went on to displace, because
+		// std::functions cannot be compared: unloading puts all of it back, which
+		// restores anything the library registered over the top of and is a no-op
+		// for the rest. Each with the category it was filed under.
+		std::map<std::string, std::pair<ComponentRegistry::Factory, std::string>> m_before{ };
+
+		#pragma endregion
 	};
 };

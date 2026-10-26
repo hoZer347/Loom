@@ -22,6 +22,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Shadow Map
+
 		// Pushes the casters' depth back by their slope, which is what keeps a
 		// lit surface from shadowing itself in stripes (shadow acne).
 		constexpr float SLOPE_OFFSET = 3.0f;
@@ -35,8 +37,49 @@ namespace Loom
 
 		constexpr int MIN_RESOLUTION = 1;
 
+		// A one-texel map at the far plane: nothing is in shadow. Bound in place
+		// of a light's own map when there is none, so a shadow sampler always
+		// has a depth texture behind it, and during the shadow pass, so a caster
+		// never samples the map it is drawing into. Shared, and lives until the
+		// process ends.
+		uint32_t NothingInShadow(Renderer& renderer)
+		{
+			static const uint32_t texture = [&renderer]() -> uint32_t
+			{
+				const uint32_t created = renderer.CreateDepthTarget(1);
+
+				if (created)
+				{
+					renderer.PushTarget(created);
+					renderer.Clear(nullptr, true);
+					renderer.PopTarget();
+				};
+
+				return created;
+			}();
+
+			return texture;
+		};
+
+		#pragma endregion
+
+		#pragma region Lighting
+
 		// With no light to shade by, a material shows its colour as it is.
 		constexpr float UNLIT_AMBIENT = 1.0f;
+
+		// A zero vector has no direction to normalise; straight down is the
+		// least surprising stand-in.
+		glm::vec3 Normalised(const glm::vec3& direction)
+		{
+			return glm::length(direction) > 0.0f
+				? glm::normalize(direction)
+				: glm::vec3(0.0f, -1.0f, 0.0f);
+		};
+
+		#pragma endregion
+
+		#pragma region Library
 
 		const char* const VERTEX_LIBRARY = R"(
 uniform mat4 u_lightViewProjection;
@@ -160,49 +203,10 @@ vec3 LoomLight(vec3 normal)
 			return false;
 		};
 
-		// A one-texel map at the far plane: nothing is in shadow. Bound in place
-		// of a light's own map when there is none, so a shadow sampler always
-		// has a depth texture behind it, and during the shadow pass, so a caster
-		// never samples the map it is drawing into. Shared, and lives until the
-		// process ends.
-		uint32_t NothingInShadow(Renderer& renderer)
-		{
-			static const uint32_t texture = [&renderer]() -> uint32_t
-			{
-				const uint32_t created = renderer.CreateDepthTarget(1);
-
-				if (created)
-				{
-					renderer.PushTarget(created);
-					renderer.Clear(nullptr, true);
-					renderer.PopTarget();
-				};
-
-				return created;
-			}();
-
-			return texture;
-		};
-
-		// A zero vector has no direction to normalise; straight down is the
-		// least surprising stand-in.
-		glm::vec3 Normalised(const glm::vec3& direction)
-		{
-			return glm::length(direction) > 0.0f
-				? glm::normalize(direction)
-				: glm::vec3(0.0f, -1.0f, 0.0f);
-		};
+		#pragma endregion
 	};
 
-	std::string Light::VertexLibrary(const std::string& source)
-	{
-		return Calls(source, { "LoomLightSpace" }) ? VERTEX_LIBRARY : "";
-	};
-
-	std::string Light::FragmentLibrary(const std::string& source)
-	{
-		return Calls(source, { "LoomShadow", "LoomLight" }) ? FRAGMENT_LIBRARY : "";
-	};
+	#pragma region Shadow Map
 
 	Light::~Light()
 	{
@@ -248,35 +252,6 @@ vec3 LoomLight(vec3 normal)
 		};
 
 		renderer->PopTarget();
-	};
-
-	void Light::Apply(uint32_t program) const
-	{
-		Renderer* renderer = Renderer::Get();
-
-		if (!renderer)
-			return;
-
-		// A map that failed to allocate still needs something behind the sampler.
-		renderer->SetTexture(program, "u_shadowMap", m_depth_texture ? m_depth_texture : NothingInShadow(*renderer));
-
-		renderer->SetUniform(program, "u_lightDirection", Normalised(direction));
-		renderer->SetUniform(program, "u_lightColor", *color * (float)intensity);
-		renderer->SetUniform(program, "u_ambient", (float)ambient);
-		renderer->SetUniform(program, "u_lightViewProjection", m_view_projection);
-		renderer->SetUniform(program, "u_shadowTexel", m_allocated_resolution > 0 ? ACROSS_EXTENTS * shadowExtent / m_allocated_resolution : 0.0f);
-	};
-
-	void Light::ApplyNone(uint32_t program)
-	{
-		Renderer* renderer = Renderer::Get();
-
-		if (!renderer)
-			return;
-
-		renderer->SetTexture(program, "u_shadowMap", NothingInShadow(*renderer));
-		renderer->SetUniform(program, "u_lightColor", glm::vec3(0.0f));
-		renderer->SetUniform(program, "u_ambient", UNLIT_AMBIENT);
 	};
 
 	bool Light::Allocate()
@@ -349,4 +324,49 @@ vec3 LoomLight(vec3 normal)
 		for (GameObject* child : gameObject.GetChildren())
 			DrawCasters(*child, batch);
 	};
+
+	#pragma endregion
+
+	#pragma region Lighting
+
+	void Light::Apply(uint32_t program) const
+	{
+		Renderer* renderer = Renderer::Get();
+
+		if (!renderer)
+			return;
+
+		// A map that failed to allocate still needs something behind the sampler.
+		renderer->SetTexture(program, "u_shadowMap", m_depth_texture ? m_depth_texture : NothingInShadow(*renderer));
+
+		renderer->SetUniform(program, "u_lightDirection", Normalised(direction));
+		renderer->SetUniform(program, "u_lightColor", *color * (float)intensity);
+		renderer->SetUniform(program, "u_ambient", (float)ambient);
+		renderer->SetUniform(program, "u_lightViewProjection", m_view_projection);
+		renderer->SetUniform(program, "u_shadowTexel", m_allocated_resolution > 0 ? ACROSS_EXTENTS * shadowExtent / m_allocated_resolution : 0.0f);
+	};
+
+	void Light::ApplyNone(uint32_t program)
+	{
+		Renderer* renderer = Renderer::Get();
+
+		if (!renderer)
+			return;
+
+		renderer->SetTexture(program, "u_shadowMap", NothingInShadow(*renderer));
+		renderer->SetUniform(program, "u_lightColor", glm::vec3(0.0f));
+		renderer->SetUniform(program, "u_ambient", UNLIT_AMBIENT);
+	};
+
+	std::string Light::VertexLibrary(const std::string& source)
+	{
+		return Calls(source, { "LoomLightSpace" }) ? VERTEX_LIBRARY : "";
+	};
+
+	std::string Light::FragmentLibrary(const std::string& source)
+	{
+		return Calls(source, { "LoomShadow", "LoomLight" }) ? FRAGMENT_LIBRARY : "";
+	};
+
+	#pragma endregion
 };

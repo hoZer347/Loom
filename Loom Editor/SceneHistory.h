@@ -30,6 +30,8 @@ namespace Loom
 	*/
 	struct SceneHistory final
 	{
+		#pragma region Recording
+
 		static constexpr size_t max_steps = 100;
 
 		// Brings what is kept of the scenes up to date with what changed. A
@@ -44,6 +46,10 @@ namespace Loom
 		// another, goes back as one.
 		void Record(const std::vector<Scene*>& scenes);
 
+		#pragma endregion
+
+		#pragma region Steps
+
 		// Record first, so an edit not recorded yet is the one taken back,
 		// then put the newest step with a scene still among scenes back in
 		// place. Steps with none are thrown away on the way. Returns whether
@@ -54,10 +60,23 @@ namespace Loom
 		bool CanUndo() const { return !m_undo.empty(); };
 		bool CanRedo() const { return !m_redo.empty(); };
 
+		#pragma endregion
+
+		#pragma region Queries
+
 		// The GameObjects seen changing since the last call, by an edit or a
 		// step put back: those written or moved, those whose children came,
 		// went or moved, and every one in a scene seen for the first time.
 		std::unordered_set<GameObject*> TakeChanged();
+
+		// As of the last Collect: the GameObject under guid in scene, and the
+		// scene gameObject is in. Null when there is none.
+		GameObject* Find(const Scene& scene, const Guid& guid) const;
+		Scene* SceneOf(const GameObject& gameObject) const;
+
+		#pragma endregion
+
+		#pragma region Rewriting
 
 		// Makes root and everything under it what the text says, as
 		// SceneSerializer writes one GameObject, in place, and collects that
@@ -65,18 +84,17 @@ namespace Loom
 		// says which are kept, which are made and which go.
 		void Rewrite(GameObject& root, const std::string& text);
 
-		// As of the last Collect: the GameObject under guid in scene, and the
-		// scene gameObject is in. Null when there is none.
-		GameObject* Find(const Scene& scene, const Guid& guid) const;
-		Scene* SceneOf(const GameObject& gameObject) const;
-
 		// Deletes the scene and builds its replacement from the text, at the same
 		// place in Scene::GetScenes. The delete comes first: a reference read
 		// while the old objects still answer to their guids would bind to them.
 		// Returns null, with error filled in, when the text is not a scene.
 		static Scene* Replace(Scene* scene, const std::string& text, std::string* error = nullptr);
 
+		#pragma endregion
+
 	private:
+		#pragma region Types
+
 		// A GameObject as it is kept: its own text, and its parent and the
 		// sibling after it, by guid. A scene's header is kept the same way
 		// under the scene's guid, with no parent.
@@ -124,12 +142,33 @@ namespace Loom
 		using Wanted = std::vector<std::pair<Guid, const std::optional<State>*>>;
 		using States = std::vector<std::pair<Guid, std::optional<State>>>;
 
-		static Wanted WantedOf(const States& states);
+		#pragma endregion
+
+		#pragma region Recording
 
 		void Take(const std::vector<Scene*>& scenes, bool record);
 		void Drop(Tracker& tracker);
+		void Note(Tracker& tracker, const Guid& object, const std::optional<State>& before, const std::optional<State>& after, bool record);
+
+		#pragma endregion
+
+		#pragma region Steps
+
+		static Wanted WantedOf(const States& states);
+
+		void Apply(const std::unordered_map<Tracker*, Wanted>& wanted);
+
+		bool Move(std::vector<Step>& from, std::vector<Step>& to, std::optional<State> Change::* side, const std::vector<Scene*>& scenes);
+
+		#pragma endregion
+
+		#pragma region Queries
 
 		Tracker* TrackerOf(const GameObject& gameObject) const;
+
+		#pragma endregion
+
+		#pragma region Entries
 
 		// Fills in where gameObject sits now.
 		static void Place(State& state, const GameObject& gameObject);
@@ -146,11 +185,8 @@ namespace Loom
 		void Add(GameObject& gameObject, Tracker& tracker, bool record);
 		void Remove(const LoomObject* object, bool record);
 		void Set(Entry& entry, State state, bool record);
-		void Note(Tracker& tracker, const Guid& object, const std::optional<State>& before, const std::optional<State>& after, bool record);
 
-		void Apply(const std::unordered_map<Tracker*, Wanted>& wanted);
-
-		bool Move(std::vector<Step>& from, std::vector<Step>& to, std::optional<State> Change::* side, const std::vector<Scene*>& scenes);
+		#pragma endregion
 
 		std::vector<Step> m_undo{ };
 		std::vector<Step> m_redo{ };

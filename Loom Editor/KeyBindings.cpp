@@ -16,6 +16,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Constants
+
 		constexpr int columns = 3;
 		constexpr const char* default_name = "Action";
 		constexpr const char* default_folder = "New Folder";
@@ -30,6 +32,10 @@ namespace Loom
 		// Between an action's name and where it is in the list, in what the
 		// folders file it by, since actions may share a name.
 		constexpr char index_mark = '\x1f';
+
+		#pragma endregion
+
+		#pragma region Helpers
 
 		std::string Numbered(const char* name, int number)
 		{
@@ -63,7 +69,11 @@ namespace Loom
 
 			return widest + ImGui::GetStyle().FramePadding.x * padded_sides + ImGui::GetFrameHeight();
 		};
+
+		#pragma endregion
 	};
+
+	#pragma region Panel
 
 	bool KeyBindings::Draw(bool* open, bool project_open)
 	{
@@ -175,6 +185,45 @@ namespace Loom
 		return hooks;
 	};
 
+	void KeyBindings::DrawAddItems(const std::string& folder, Edit& edit, bool menu)
+	{
+		if (menu ? ImGui::MenuItem("Add Action") : ImGui::Button("Add Action"))
+		{
+			// Its name may not match the search.
+			m_tree.ClearSearch();
+			edit.actions.push_back({ FreeName(edit.actions), { }, folder });
+			edit.changed = true;
+		};
+
+		if (!menu)
+			ImGui::SameLine();
+
+		if (menu ? ImGui::MenuItem("Add Folder") : ImGui::Button("Add Folder"))
+		{
+			std::string path = edit.folders.AddFolder(folder, default_folder);
+
+			for (int number = first_number; path.empty(); number++)
+				path = edit.folders.AddFolder(folder, Numbered(default_folder, number));
+
+			edit.refiled = true;
+			m_tree.Rename(path);
+		};
+	};
+
+	std::string KeyBindings::FreeName(const std::vector<InputActions::Action>& actions)
+	{
+		std::string name = default_name;
+
+		for (int number = first_number; HasAction(actions, name); number++)
+			name = Numbered(default_name, number);
+
+		return name;
+	};
+
+	#pragma endregion
+
+	#pragma region Rows
+
 	void KeyBindings::DrawAction(size_t index, Edit& edit, const FolderTree::Hooks& hooks)
 	{
 		InputActions::Action& action = edit.actions[index];
@@ -256,31 +305,6 @@ namespace Loom
 		ImGui::PopID();
 	};
 
-	void KeyBindings::DrawAddItems(const std::string& folder, Edit& edit, bool menu)
-	{
-		if (menu ? ImGui::MenuItem("Add Action") : ImGui::Button("Add Action"))
-		{
-			// Its name may not match the search.
-			m_tree.ClearSearch();
-			edit.actions.push_back({ FreeName(edit.actions), { }, folder });
-			edit.changed = true;
-		};
-
-		if (!menu)
-			ImGui::SameLine();
-
-		if (menu ? ImGui::MenuItem("Add Folder") : ImGui::Button("Add Folder"))
-		{
-			std::string path = edit.folders.AddFolder(folder, default_folder);
-
-			for (int number = first_number; path.empty(); number++)
-				path = edit.folders.AddFolder(folder, Numbered(default_folder, number));
-
-			edit.refiled = true;
-			m_tree.Rename(path);
-		};
-	};
-
 	bool KeyBindings::DrawInput(std::vector<Key>& keys, float key_width)
 	{
 		// An action with no key yet shows the one it is waiting for.
@@ -355,13 +379,5 @@ namespace Loom
 		return picked;
 	};
 
-	std::string KeyBindings::FreeName(const std::vector<InputActions::Action>& actions)
-	{
-		std::string name = default_name;
-
-		for (int number = first_number; HasAction(actions, name); number++)
-			name = Numbered(default_name, number);
-
-		return name;
-	};
+	#pragma endregion
 };

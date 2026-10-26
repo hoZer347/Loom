@@ -13,6 +13,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Key Names
+
 		static_assert(Input::mouse_buttons == GLFW_MOUSE_BUTTON_LAST + 1);
 		static_assert(Input::keys == GLFW_KEY_LAST + 1);
 
@@ -168,6 +170,10 @@ namespace Loom
 			return keys;
 		}();
 
+		#pragma endregion
+
+		#pragma region Buttons and Keys
+
 		bool has_focus = true;
 
 		// The mouse's buttons or the keyboard's keys, numbered from 0: what
@@ -257,6 +263,22 @@ namespace Loom
 		Switches<Input::mouse_buttons> buttons;
 		Switches<Input::keys> keyboard;
 
+		void mouse_button_callback(GLFWwindow*, int button, int action, int)
+		{
+			Input::OnMouseButton(button, action == GLFW_PRESS);
+		};
+
+		void key_callback(GLFWwindow*, int key, int, int action, int)
+		{
+			// A key held long enough repeats, which is no new press.
+			if (action != GLFW_REPEAT)
+				Input::OnKey(key, action == GLFW_PRESS);
+		};
+
+		#pragma endregion
+
+		#pragma region Mouse
+
 		// Notches heard since the last Tick, and the ones this frame answers with.
 		float wheel_turned = 0.0f;
 		float wheel_this_frame = 0.0f;
@@ -293,18 +315,10 @@ namespace Loom
 			return Input::mouse_x >= 0 && Input::mouse_y >= 0 && Input::mouse_x < Input::screen_width && Input::mouse_y < Input::screen_height;
 		};
 
-		void mouse_button_callback(GLFWwindow*, int button, int action, int)
-		{
-			Input::OnMouseButton(button, action == GLFW_PRESS);
-		};
-
-		void key_callback(GLFWwindow*, int key, int, int action, int)
-		{
-			// A key held long enough repeats, which is no new press.
-			if (action != GLFW_REPEAT)
-				Input::OnKey(key, action == GLFW_PRESS);
-		};
+		#pragma endregion
 	};
+
+	#pragma region Key Names
 
 	std::span<const Key> AllKeys()
 	{
@@ -328,6 +342,10 @@ namespace Loom
 
 		return Key::None;
 	};
+
+	#pragma endregion
+
+	#pragma region Mouse Buttons
 
 	bool Input::GetMouseButtonDown(int button)
 	{
@@ -354,45 +372,9 @@ namespace Loom
 		buttons.HeardThisFrame(button, pressed);
 	};
 
-	bool Input::GetKeyDown(int key)
-	{
-		return keyboard.Down(key);
-	};
+	#pragma endregion
 
-	bool Input::GetKey(int key)
-	{
-		return keyboard.Held(key);
-	};
-
-	bool Input::GetKeyUp(int key)
-	{
-		return keyboard.Up(key);
-	};
-
-	void Input::OnKey(int key, bool pressed)
-	{
-		keyboard.Heard(key, pressed);
-	};
-
-	void Input::OnKeyThisFrame(int key, bool pressed)
-	{
-		keyboard.HeardThisFrame(key, pressed);
-	};
-
-	float Input::GetMouseWheel()
-	{
-		return has_focus && IsCursorInView() ? wheel_this_frame : 0.0f;
-	};
-
-	void Input::OnMouseWheel(float notches)
-	{
-		wheel_turned += notches;
-	};
-
-	void Input::OnMouseWheelThisFrame(float notches)
-	{
-		wheel_this_frame += notches;
-	};
+	#pragma region Cursor
 
 	void Input::OnMouseMove(int x, int y, int window_width, int window_height)
 	{
@@ -426,6 +408,58 @@ namespace Loom
 		Place();
 	};
 
+	#pragma endregion
+
+	#pragma region Keys
+
+	bool Input::GetKeyDown(int key)
+	{
+		return keyboard.Down(key);
+	};
+
+	bool Input::GetKey(int key)
+	{
+		return keyboard.Held(key);
+	};
+
+	bool Input::GetKeyUp(int key)
+	{
+		return keyboard.Up(key);
+	};
+
+	void Input::OnKey(int key, bool pressed)
+	{
+		keyboard.Heard(key, pressed);
+	};
+
+	void Input::OnKeyThisFrame(int key, bool pressed)
+	{
+		keyboard.HeardThisFrame(key, pressed);
+	};
+
+	#pragma endregion
+
+	#pragma region Wheel
+
+	float Input::GetMouseWheel()
+	{
+		return has_focus && IsCursorInView() ? wheel_this_frame : 0.0f;
+	};
+
+	void Input::OnMouseWheel(float notches)
+	{
+		wheel_turned += notches;
+	};
+
+	void Input::OnMouseWheelThisFrame(float notches)
+	{
+		wheel_this_frame += notches;
+	};
+
+	#pragma endregion
+
+	#pragma region Frame
+
 	void Input::SetFocused(bool focused)
 	{
 		if (has_focus && !focused)
@@ -449,6 +483,10 @@ namespace Loom
 
 		wheel_this_frame = std::exchange(wheel_turned, 0.0f);
 	};
+
+	#pragma endregion
+
+	#pragma region Platform
 
 #if __EMSCRIPTEN__
 	EM_BOOL mouse_move_callback(int eventType, const EmscriptenMouseEvent* e, void* userData)
@@ -580,4 +618,6 @@ namespace Loom
 			Engine::window,
 			key_callback);
 	};
+
+	#pragma endregion
 };

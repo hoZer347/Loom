@@ -41,6 +41,8 @@ param(
     [switch] $Cleanup
 )
 
+#region Setup
+
 $ErrorActionPreference = 'Stop'
 
 $minimumBuild = 26100
@@ -52,6 +54,10 @@ if ([Environment]::OSVersion.Version.Build -lt $minimumBuild)
 {
     throw "Virtual desktop control needs Windows 11 build $minimumBuild or newer."
 }
+
+#endregion
+
+#region Desktops
 
 Add-Type -TypeDefinition @'
 using System;
@@ -350,6 +356,10 @@ function Close-Desktop([Guid] $id)
     [LoomAgentDesktop.Desktops]::Remove($id)
 }
 
+#endregion
+
+#region Cleanup
+
 if ($Cleanup)
 {
     $desktops = [LoomAgentDesktop.Desktops]::List()
@@ -366,6 +376,10 @@ if ($Cleanup)
     }
     exit 0
 }
+
+#endregion
+
+#region Run
 
 $desktop = [LoomAgentDesktop.Desktops]::Create("$namePrefix $PID")
 $process = $null
@@ -422,3 +436,5 @@ finally
 
 if ($dialogExitCode) { exit $dialogExitCode }
 exit $process.ExitCode
+
+#endregion

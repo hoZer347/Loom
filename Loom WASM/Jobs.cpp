@@ -25,6 +25,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Waiting
+
 		// How long a worker waits awake for the next job before sleeping: a
 		// physics step runs several back to back, and waking a sleeping thread
 		// takes longer than any of them. It looks at the clock only every so
@@ -36,33 +38,6 @@ namespace Loom
 		// it sleeps until woken: about as long as a short piece of work, and
 		// no longer, so one it waits on that has lost its core gets this one.
 		constexpr unsigned MOST_SPINS = 1024;
-
-		// The machine's cores, rather than the threads they run at once: two
-		// threads on one core share its units, so a second that only waits
-		// slows the first, and one that works gains little. A browser tells
-		// only the threads, as many as the page starts with.
-		unsigned MachineCores()
-		{
-#if defined(_WIN32)
-			DWORD length = 0;
-			GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &length);
-
-			std::vector<char> buffer(length);
-			auto* information = reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buffer.data());
-
-			if (GetLogicalProcessorInformationEx(RelationProcessorCore, information, &length))
-			{
-				unsigned cores = 0;
-
-				for (DWORD at = 0; at < length; at += reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buffer.data() + at)->Size)
-					cores++;
-
-				return cores;
-			};
-#endif
-
-			return std::max(1u, std::thread::hardware_concurrency());
-		};
 
 		// Waits a moment on a spinning thread, without handing its core to
 		// another thread for a whole time slice as a yield may.
@@ -90,6 +65,10 @@ namespace Loom
 				value.wait(seen);
 		};
 
+		#pragma endregion
+
+		#pragma region Jobs
+
 		// What a worker's share of a For started outside any stage counts as.
 		constexpr const char* UNSTAGED = "Jobs";
 
@@ -116,6 +95,37 @@ namespace Loom
 				job.done.fetch_add(1);
 				job.done.notify_all();
 			};
+		};
+
+		#pragma endregion
+
+		#pragma region Pool
+
+		// The machine's cores, rather than the threads they run at once: two
+		// threads on one core share its units, so a second that only waits
+		// slows the first, and one that works gains little. A browser tells
+		// only the threads, as many as the page starts with.
+		unsigned MachineCores()
+		{
+#if defined(_WIN32)
+			DWORD length = 0;
+			GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &length);
+
+			std::vector<char> buffer(length);
+			auto* information = reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buffer.data());
+
+			if (GetLogicalProcessorInformationEx(RelationProcessorCore, information, &length))
+			{
+				unsigned cores = 0;
+
+				for (DWORD at = 0; at < length; at += reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buffer.data() + at)->Size)
+					cores++;
+
+				return cores;
+			};
+#endif
+
+			return std::max(1u, std::thread::hardware_concurrency());
 		};
 
 		struct Pool
@@ -204,7 +214,11 @@ namespace Loom
 			static Pool pool;
 			return pool;
 		};
+
+		#pragma endregion
 	};
+
+	#pragma region Work
 
 	void Jobs::For(size_t count, size_t grain, const Work& work)
 	{
@@ -250,6 +264,10 @@ namespace Loom
 		Await(counter, [&]() { return counter.load(std::memory_order_acquire) >= value; });
 	};
 
+	#pragma endregion
+
+	#pragma region Threads
+
 	unsigned Jobs::Cores()
 	{
 		return (unsigned)Workers().workers.size() + 1;
@@ -267,4 +285,6 @@ namespace Loom
 	{
 		Workers().most = most;
 	};
+
+	#pragma endregion
 };

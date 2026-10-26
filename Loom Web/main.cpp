@@ -30,6 +30,7 @@
 using namespace Loom;
 using namespace glm;
 
+#pragma region Constants
 
 // The shader every object in the scene shares. Fetched over HTTP by
 // Shader::Request, so the path is relative to the page that loads index.js.
@@ -45,8 +46,9 @@ static const vec3 TARGET = vec3(0.0f, 0.0f, 0.0f);
 static const float NEAR_PLANE = 0.1f;
 static const float FAR_PLANE = 100.0f;
 
+#pragma endregion
 
-// --- Frame state -----------------------------------------------------------
+#pragma region Frame State
 
 // Seconds since the first frame, plus the projection matrix for the current
 // canvas size. One component owns this so every WireShape agrees on the frame.
@@ -139,8 +141,9 @@ private:
 	vec2 m_lean = vec2(0.0f);
 };
 
+#pragma endregion
 
-// --- Geometry --------------------------------------------------------------
+#pragma region Geometry
 
 // Model-space line lists. Each pair of points is one GL_LINES segment.
 
@@ -219,8 +222,9 @@ static std::vector<vec3> GridLines(int half, float step)
 	return lines;
 };
 
+#pragma endregion
 
-// --- The animating component ----------------------------------------------
+#pragma region Wire Shape
 
 // Holds a shape in model space and, each frame, spins it, orbits it, projects
 // it, and writes the result into the Mesh sitting on the same GameObject.
@@ -304,8 +308,9 @@ private:
 	Mesh* m_mesh = nullptr;
 };
 
+#pragma endregion
 
-// --- Scene assembly --------------------------------------------------------
+#pragma region Scene Assembly
 
 // Attach order matters: WireShape writes the geometry the Mesh then draws, and
 // components render in the order they were attached.
@@ -386,3 +391,5 @@ int main()
 
 	return 0;
 };
+
+#pragma endregion

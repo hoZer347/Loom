@@ -39,6 +39,8 @@ namespace Loom
 	*/
 	struct ModelEditor final
 	{
+		#pragma region Types
+
 		// What a click picks.
 		enum struct Pick
 		{
@@ -64,11 +66,19 @@ namespace Loom
 			bool operator==(const Selection&) const = default;
 		};
 
+		#pragma endregion
+
+		#pragma region Lifetime
+
 		ModelEditor() = default;
 		~ModelEditor();
 
 		ModelEditor(const ModelEditor&) = delete;
 		ModelEditor& operator=(const ModelEditor&) = delete;
+
+		#pragma endregion
+
+		#pragma region Opening
 
 		// Opens the prefab in a tab of its own, or brings its tab forward, and
 		// the panel with it.
@@ -82,14 +92,12 @@ namespace Loom
 		// Whether a tab has the prefab at path open.
 		bool IsOpen(const std::string& path) const;
 
-		void Draw(bool* open);
+		#pragma endregion
+
+		#pragma region Documents
 
 		// Keeps the tabs of prefabs that were moved saving to where they are now.
 		void Relocate(const std::string& from, const std::string& to);
-
-		// Whether the panel had the keyboard when it was last drawn, so the
-		// scene's own undo keeps out of its way.
-		bool IsFocused() const { return m_focused; };
 
 		// Every tab with unsaved changes, to its prefab. False when one could
 		// not be written.
@@ -98,29 +106,11 @@ namespace Loom
 		// The prefabs saved since the last call.
 		std::vector<std::string> TakeSaved();
 
-		// What the toolbar's buttons do, to the tab in front. Each change is one
-		// step for undo.
-		void SetPick(Pick pick);
-		void SetTool(Tool tool) { m_tool = tool; };
-		void SelectAll();
-		void SelectNone();
-		void Extrude();
-		void Duplicate();
-		void Delete();
-		void Flip();
-		void Add(Shapes::Shape shape);
-
-		// Gives a prefab with no mesh one on its top object, starting as a cube.
-		void AddMesh();
-
-		// The shaders the front tab's project has, relative to it, and which
-		// one every material of its prefab draws with.
-		std::vector<std::string> Shaders() const;
-		void SetShader(const std::string& path);
-
-		void Undo();
-		void Redo();
 		bool Save();
+
+		#pragma endregion
+
+		#pragma region Accessors
 
 		// The tab in front's mesh being edited, null with none open or none in
 		// its prefab.
@@ -131,7 +121,65 @@ namespace Loom
 		// it last drew, in screen pixels. None behind the camera.
 		std::optional<ImVec2> ScreenOf(const glm::vec3& point) const;
 
+		#pragma endregion
+
+		#pragma region Window
+
+		void Draw(bool* open);
+
+		// Whether the panel had the keyboard when it was last drawn, so the
+		// scene's own undo keeps out of its way.
+		bool IsFocused() const { return m_focused; };
+
+		#pragma endregion
+
+		#pragma region Undo
+
+		void Undo();
+		void Redo();
+
+		#pragma endregion
+
+		#pragma region Selection
+
+		// What the toolbar's buttons do, to the tab in front. Each change is one
+		// step for undo.
+		void SetPick(Pick pick);
+		void SetTool(Tool tool) { m_tool = tool; };
+		void SelectAll();
+		void SelectNone();
+
+		#pragma endregion
+
+		#pragma region Edits
+
+		void Extrude();
+		void Duplicate();
+		void Delete();
+		void Flip();
+		void Add(Shapes::Shape shape);
+
+		#pragma endregion
+
+		#pragma region New Mesh
+
+		// Gives a prefab with no mesh one on its top object, starting as a cube.
+		void AddMesh();
+
+		#pragma endregion
+
+		#pragma region Shaders
+
+		// The shaders the front tab's project has, relative to it, and which
+		// one every material of its prefab draws with.
+		std::vector<std::string> Shaders() const;
+		void SetShader(const std::string& path);
+
+		#pragma endregion
+
 	private:
+		#pragma region Types
+
 		// A GameObject of the prefab with a mesh, and that mesh as it is edited.
 		struct Part
 		{
@@ -256,33 +304,69 @@ namespace Loom
 			bool select = true;
 		};
 
+		#pragma endregion
+
+		#pragma region Lifetime
+
+		bool Compile();
+
+		#pragma endregion
+
+		#pragma region Documents
+
 		bool Load(Document& document);
 		bool SaveDocument(Document& document);
 		void Unload(Document& document);
 
+		#pragma endregion
+
+		#pragma region Accessors
+
+		Document* Front() const;
+
+		#pragma endregion
+
+		#pragma region Window
+
 		void DrawDocument(Document& document);
+		void HandleKeys(Document& document);
+
+		#pragma endregion
+
+		#pragma region Panels
+
 		void DrawToolbar(Document& document);
 		void DrawSide(Document& document);
-		void DrawCanvas(Document& document, const ImVec2& size);
 		void DrawStatus(const Document& document);
+
+		#pragma endregion
+
+		#pragma region Closing
+
 		void DrawCloseQuestion();
-		void HandleKeys(Document& document);
+		void Close(const Document* document);
+
+		#pragma endregion
+
+		#pragma region Canvas
+
+		void DrawCanvas(Document& document, const ImVec2& size);
+
+		#pragma endregion
+
+		#pragma region Camera
 
 		void Steer(Document& document, bool hovered);
 		void Frame(Document& document);
 		void Pose(Document& document);
 		void Measure(Document& document, const ImVec2& corner, const ImVec2& size);
-		void Hover(Document& document, const ImVec2& mouse);
-		void Click(Document& document, const ImVec2& mouse);
-		void Box(Document& document, const ImVec2& from, const ImVec2& to);
-		void DragHandle(Document& document, const ImVec2& mouse);
-
-		void Render(Document& document);
-		void DrawOverlay(Document& document);
-		void DrawHandles(const Document& document, ImDrawList* draw) const;
-
 		std::optional<ImVec2> Project(const View& view, const glm::vec3& world) const;
 		void Ray(const View& view, const ImVec2& mouse, glm::vec3& origin, glm::vec3& direction) const;
+
+		#pragma endregion
+
+		#pragma region Hit Testing
+
 		bool Visible(const Document& document, const glm::vec3& local) const;
 		std::optional<Handle> HandleAt(const Document& document, const ImVec2& mouse) const;
 
@@ -294,20 +378,58 @@ namespace Loom
 		// The faces an action on faces takes: those picked, or those whose
 		// every corner is picked.
 		const std::set<uint32_t>& PickedFaces(Document& document) const;
-		static const std::vector<EditableMesh::Edge>& Edges(Document& document);
+
+		#pragma endregion
+
+		#pragma region Picking
+
+		void Hover(Document& document, const ImVec2& mouse);
+		void Click(Document& document, const ImVec2& mouse);
+		void Box(Document& document, const ImVec2& from, const ImVec2& to);
+
+		#pragma endregion
+
+		#pragma region Dragging
+
+		void DragHandle(Document& document, const ImVec2& mouse);
+
+		#pragma endregion
+
+		#pragma region Rendering
+
+		void Render(Document& document);
+		void DrawOverlay(Document& document);
+		void DrawHandles(const Document& document, ImDrawList* draw) const;
+
+		#pragma endregion
+
+		#pragma region Undo
 
 		static Snapshot Take(const Document& document);
 		static void Commit(Document& document, Snapshot snapshot);
 		static void Remember(Document& document);
 		static void Step(Document& document, bool undo);
+
+		#pragma endregion
+
+		#pragma region Changes
+
 		static void Changed(Document& document);
-		static void SetShader(Document& document, const std::string& path);
+		static const std::vector<EditableMesh::Edge>& Edges(Document& document);
+
+		#pragma endregion
+
+		#pragma region Selection
+
 		static Selection Converted(const EditableMesh& mesh, const Selection& selection, Pick from, Pick to);
 
-		Document* Front() const;
-		void Close(const Document* document);
+		#pragma endregion
 
-		bool Compile();
+		#pragma region Shaders
+
+		static void SetShader(Document& document, const std::string& path);
+
+		#pragma endregion
 
 		std::vector<std::unique_ptr<Document>> m_documents;
 		Document* m_front = nullptr;

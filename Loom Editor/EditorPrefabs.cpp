@@ -39,6 +39,10 @@ namespace Loom
 		};
 	};
 
+	#pragma region Prefabs
+
+	#pragma region Files
+
 	std::filesystem::path Editor::PrefabFile(const std::string& path) const
 	{
 		return (std::filesystem::path(m_projectPath) / path).lexically_normal();
@@ -130,6 +134,10 @@ namespace Loom
 		return false;
 	};
 
+	#pragma endregion
+
+	#pragma region Instances
+
 	std::string Editor::SaveAsPrefab(GameObject* gameObject, const std::string& folder)
 	{
 		if (gameObject == nullptr || m_projectPath.empty())
@@ -212,6 +220,10 @@ namespace Loom
 
 		return instance;
 	};
+
+	#pragma endregion
+
+	#pragma region Syncing
 
 	void Editor::ReshowPrefab()
 	{
@@ -406,4 +418,8 @@ namespace Loom
 		root = GetPrefabRoot();
 		m_panelText = root ? SceneSerializer::Serialize(*root) : std::string();
 	};
+
+	#pragma endregion
+
+	#pragma endregion
 };

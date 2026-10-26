@@ -32,7 +32,7 @@ namespace Loom
 	*/
 	struct PlayHistory final
 	{
-		static constexpr size_t max_steps = 100;
+		#pragma region Recording
 
 		// A step's text, or a field's, either side of an edit.
 		struct Sides
@@ -68,6 +68,12 @@ namespace Loom
 		// it read as before. One that changed nothing is not a step.
 		void RecordComponents(Components before);
 
+		#pragma endregion
+
+		#pragma region Stepping
+
+		static constexpr size_t max_steps = 100;
+
 		// Puts the newest step whose object is still there back, or forward,
 		// and returns the GameObject it was on, or null when there was none.
 		GameObject* Undo();
@@ -78,7 +84,11 @@ namespace Loom
 
 		void Clear();
 
+		#pragma endregion
+
 	private:
+		#pragma region Stepping
+
 		static constexpr size_t components = (std::numeric_limits<size_t>::max)();
 
 		// A field step, or a component step whose index is components.
@@ -93,6 +103,8 @@ namespace Loom
 
 		// Makes gameObject read as to where it read as from, and leaves the rest.
 		static void PutComponents(GameObject& gameObject, const std::string& from, const std::string& to);
+
+		#pragma endregion
 
 		std::vector<Step> m_undo{ };
 		std::vector<Step> m_redo{ };

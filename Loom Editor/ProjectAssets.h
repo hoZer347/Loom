@@ -19,13 +19,7 @@ namespace Loom
 	*/
 	struct ProjectAssets final
 	{
-		// What a new script header starts out as.
-		enum struct ScriptKind
-		{
-			Component,
-			State,
-			StateMachine,
-		};
+		#pragma region File Kinds
 
 		static constexpr const char* shaderExtension = Shader::extension;
 		static constexpr const char* textureExtension = ".png";
@@ -49,9 +43,35 @@ namespace Loom
 		// scripts_folder is empty when there is no scripts project.
 		static Opener OpenerOf(const std::string& path, const std::string& scripts_folder);
 
-		// The shader every new one starts from: the mesh through the camera,
-		// in the material's colour, with every engine section off.
-		static const char* const defaultShader;
+		// Whether name is a scene, prefab, shader, texture, sprite, palette,
+		// sound or font, which the Project panel's tabs list along with
+		// models. The scripts are the Scripts tab's too, and anything else in
+		// the project folder (Visual Studio's files, notes) is not part of
+		// the game.
+		static bool IsGameFile(const std::string& name);
+		static bool IsScriptFile(const std::string& name);
+		static bool IsShaderFile(const std::string& name);
+		static bool IsTextureFile(const std::string& name);
+
+		// A texture, sprite or palette, which the 2D tab lists.
+		static bool IsTwoDFile(const std::string& name);
+		static bool IsSoundFile(const std::string& name);
+		static bool IsFontFile(const std::string& name);
+
+		#pragma endregion
+
+		#pragma region Creating
+
+		// What a new script header starts out as.
+		enum struct ScriptKind
+		{
+			Component,
+			State,
+			StateMachine,
+		};
+
+		// A name usable as a file name, and as a path in an MSBuild project.
+		static bool IsValidName(const std::string& name);
 
 		// Each returns the path written, or an empty string with the reason in
 		// error.
@@ -59,6 +79,19 @@ namespace Loom
 		static std::string CreateShader(const std::string& folder, const std::string& name, std::string* error = nullptr);
 		static std::string CreateTexture(const std::string& folder, const std::string& name, std::string* error = nullptr);
 		static std::string CreatePalette(const std::string& folder, const std::string& name, std::string* error = nullptr);
+
+		// Writes <name>.hpp into folder, which has to sit under the scripts
+		// project's own folder.
+		static std::string CreateScript(
+			const std::string& scripts_project,
+			const std::string& folder,
+			const std::string& name,
+			ScriptKind kind,
+			std::string* error = nullptr);
+
+		#pragma endregion
+
+		#pragma region Paths
 
 		// Copies file into folder under its own name, or with the first number
 		// after its stem that nothing there is using. A file already in folder
@@ -74,17 +107,16 @@ namespace Loom
 		// neither from nor inside it.
 		static std::string Relocate(const std::string& path, const std::string& from, const std::string& to);
 
-		// Writes <name>.hpp into folder, which has to sit under the scripts
-		// project's own folder.
-		static std::string CreateScript(
-			const std::string& scripts_project,
-			const std::string& folder,
-			const std::string& name,
-			ScriptKind kind,
-			std::string* error = nullptr);
+		// Whether path is folder or somewhere inside it.
+		static bool IsUnder(const std::string& path, const std::string& folder);
 
-		// A name usable as a file name, and as a path in an MSBuild project.
-		static bool IsValidName(const std::string& name);
+		// Where path is from folder, with / between folders, the way components
+		// name the files they use.
+		static std::string RelativeTo(const std::string& path, const std::string& folder);
+
+		#pragma endregion
+
+		#pragma region Scripts
 
 		// Why name cannot be a new script in the given project, or an empty
 		// string when it can: it has to be a C++ type name that no script,
@@ -111,32 +143,13 @@ namespace Loom
 		// Found before a compile, so a script shows before it is built.
 		static std::vector<DeclaredScript> DeclaredScripts(const std::string& text);
 
-		static std::string Replace(std::string text, const std::string& token, const std::string& value);
+		#pragma endregion
 
-		// Whether name is a scene, prefab, shader, texture, sprite, palette,
-		// sound or font, which the Project panel's tabs list along with
-		// models. The scripts are the Scripts tab's too, and anything else in
-		// the project folder (Visual Studio's files, notes) is not part of
-		// the game.
-		static bool IsGameFile(const std::string& name);
-		static bool IsScriptFile(const std::string& name);
-		static bool IsShaderFile(const std::string& name);
-		static bool IsTextureFile(const std::string& name);
+		#pragma region Shaders
 
-		// A texture, sprite or palette, which the 2D tab lists.
-		static bool IsTwoDFile(const std::string& name);
-		static bool IsSoundFile(const std::string& name);
-		static bool IsFontFile(const std::string& name);
-
-		// Whether path is folder or somewhere inside it.
-		static bool IsUnder(const std::string& path, const std::string& folder);
-
-		// Where path is from folder, with / between folders, the way components
-		// name the files they use.
-		static std::string RelativeTo(const std::string& path, const std::string& folder);
-
-		// The whole file, or an empty string when it cannot be read.
-		static std::string ReadText(const std::string& path);
+		// The shader every new one starts from: the mesh through the camera,
+		// in the material's colour, with every engine section off.
+		static const char* const defaultShader;
 
 		// Every shader under the project folder, relative to it with / between
 		// folders, in order.
@@ -146,7 +159,18 @@ namespace Loom
 		// folder has. The new project's for no folder.
 		static std::string ProjectShader(const std::string& folder);
 
+		#pragma endregion
+
+		#pragma region Text
+
+		static std::string Replace(std::string text, const std::string& token, const std::string& value);
+
+		// The whole file, or an empty string when it cannot be read.
+		static std::string ReadText(const std::string& path);
+
 		// What the first <tag> in an MSBuild project holds, or an empty string.
 		static std::string Element(const std::string& xml, const std::string& tag);
+
+		#pragma endregion
 	};
 };

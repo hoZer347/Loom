@@ -19,12 +19,18 @@ namespace Loom
 	*/
 	struct LOOM_API Texture final
 	{
+		#pragma region Lifetime
+
 		// Throws std::runtime_error when the file cannot be read or decoded.
 		explicit Texture(const std::string& file_path);
 		~Texture();
 
 		Texture(const Texture&) = delete;
 		Texture& operator=(const Texture&) = delete;
+
+		#pragma endregion
+
+		#pragma region Sharing
 
 		// One Texture per path, shared by everything that names it, and kept
 		// until the process ends. Null when the file will not load; a failure is
@@ -44,6 +50,10 @@ namespace Loom
 		// keeps what it had.
 		static void ReloadShared(const std::string& file_path);
 
+		#pragma endregion
+
+		#pragma region Decoding
+
 		// The file's pixels, eight bit RGBA, bottom row first, with no renderer
 		// texture made from them. Throws std::runtime_error as the constructor
 		// does.
@@ -52,6 +62,10 @@ namespace Loom
 		// As the file would, from its bytes.
 		static std::vector<uint8_t> Decode(const std::vector<char>& bytes, int& width, int& height);
 
+		#pragma endregion
+
+		#pragma region Image
+
 		const std::string file_path;
 
 		int width = 0;
@@ -59,5 +73,7 @@ namespace Loom
 		std::vector<uint8_t> pixels;
 
 		uint32_t handle = 0;
+
+		#pragma endregion
 	};
 };

@@ -16,21 +16,7 @@
 
 namespace Loom
 {
-	glm::vec3 Transform::EulerDegrees(const glm::quat& rotation)
-	{
-		// Matrix turns about Z, then X, then Y, which is glm's YXZ.
-		float y = 0.0f, x = 0.0f, z = 0.0f;
-		glm::extractEulerAngleYXZ(glm::mat4_cast(glm::normalize(rotation)), y, x, z);
-
-		return glm::degrees(glm::vec3(x, y, z));
-	};
-
-	glm::quat Transform::Rotation(const glm::vec3& degrees)
-	{
-		const glm::vec3 radians = glm::radians(degrees);
-
-		return glm::quat_cast(glm::eulerAngleYXZ(radians.y, radians.x, radians.z));
-	};
+	#pragma region Lifetime
 
 	GameObject::GameObject(
 		GameObject* parent,
@@ -65,6 +51,10 @@ namespace Loom
 		else task();
 	};
 
+	#pragma endregion
+
+	#pragma region Components
+
 	void GameObject::DetachComponent(ComponentBase* component)
 	{
 		if (component == nullptr)
@@ -95,6 +85,29 @@ namespace Loom
 				Touch();
 			});
 	};
+
+	void GameObject::OrderComponents(const std::vector<ComponentBase*>& order)
+	{
+		auto placed = m_components.begin();
+
+		for (ComponentBase* component : order)
+		{
+			const auto found = std::find(placed, m_components.end(), component);
+
+			if (found == m_components.end())
+				continue;
+
+			std::rotate(placed, found, found + 1);
+			placed++;
+		};
+
+		hierarchy_changes++;
+		Touch();
+	};
+
+	#pragma endregion
+
+	#pragma region Hierarchy
 
 	bool GameObject::UnderRemoved() const
 	{
@@ -136,22 +149,6 @@ namespace Loom
 				delete child;
 				hierarchy_changes++;
 			});
-	};
-
-	void GameObject::SetThreadID(int thread_id)
-	{
-		this->m_threadID = thread_id;
-		for (auto& child : m_children)
-			if (child->m_inherit_thread_id)
-				child->SetThreadID(thread_id);
-	};
-
-	void GameObject::SetInheritThreadID(bool inherit)
-	{
-		m_inherit_thread_id = inherit;
-
-		if (inherit && parent)
-			SetThreadID(parent->m_threadID);
 	};
 
 	void GameObject::Destroy()
@@ -247,39 +244,24 @@ namespace Loom
 		return count;
 	};
 
-	void GameObject::OrderComponents(const std::vector<ComponentBase*>& order)
+	#pragma endregion
+
+	#pragma region Processing
+
+	void GameObject::SetThreadID(int thread_id)
 	{
-		auto placed = m_components.begin();
-
-		for (ComponentBase* component : order)
-		{
-			const auto found = std::find(placed, m_components.end(), component);
-
-			if (found == m_components.end())
-				continue;
-
-			std::rotate(placed, found, found + 1);
-			placed++;
-		};
-
-		hierarchy_changes++;
-		Touch();
+		this->m_threadID = thread_id;
+		for (auto& child : m_children)
+			if (child->m_inherit_thread_id)
+				child->SetThreadID(thread_id);
 	};
 
-	glm::mat4 GameObject::LocalMatrix() const
+	void GameObject::SetInheritThreadID(bool inherit)
 	{
-		return transform.Matrix();
-	};
+		m_inherit_thread_id = inherit;
 
-	glm::mat4 GameObject::WorldMatrix() const
-	{
-		if (!parent)
-			return LocalMatrix();
-
-		// Under a parent that changes nothing, such as the scene's root.
-		const glm::mat4 above = parent->WorldMatrix();
-
-		return above == glm::mat4(1.0f) ? LocalMatrix() : above * LocalMatrix();
+		if (inherit && parent)
+			SetThreadID(parent->m_threadID);
 	};
 
 	void GameObject::Gather(std::vector<std::vector<ComponentBase*>>& byLane, size_t lanes)
@@ -325,6 +307,46 @@ namespace Loom
 		for (auto& child : m_children)
 			child->Physics();
 	};
+
+	#pragma endregion
+
+	#pragma region Transform
+
+	glm::vec3 Transform::EulerDegrees(const glm::quat& rotation)
+	{
+		// Matrix turns about Z, then X, then Y, which is glm's YXZ.
+		float y = 0.0f, x = 0.0f, z = 0.0f;
+		glm::extractEulerAngleYXZ(glm::mat4_cast(glm::normalize(rotation)), y, x, z);
+
+		return glm::degrees(glm::vec3(x, y, z));
+	};
+
+	glm::quat Transform::Rotation(const glm::vec3& degrees)
+	{
+		const glm::vec3 radians = glm::radians(degrees);
+
+		return glm::quat_cast(glm::eulerAngleYXZ(radians.y, radians.x, radians.z));
+	};
+
+	glm::mat4 GameObject::LocalMatrix() const
+	{
+		return transform.Matrix();
+	};
+
+	glm::mat4 GameObject::WorldMatrix() const
+	{
+		if (!parent)
+			return LocalMatrix();
+
+		// Under a parent that changes nothing, such as the scene's root.
+		const glm::mat4 above = parent->WorldMatrix();
+
+		return above == glm::mat4(1.0f) ? LocalMatrix() : above * LocalMatrix();
+	};
+
+	#pragma endregion
+
+	#pragma region Gui
 
 	void GameObject::Gui()
 	{
@@ -409,4 +431,6 @@ namespace Loom
 
 		ImGui::PopID();
 	};
+
+	#pragma endregion
 };

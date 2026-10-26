@@ -8,6 +8,8 @@
 
 namespace Loom
 {
+	#pragma region Bounds
+
 	bool Bounds::IntersectRay(const Ray& ray, float& entry, float& exit, int& entryAxis) const
 	{
 		entry = -INFINITE_DISTANCE;
@@ -50,6 +52,8 @@ namespace Loom
 		return true;
 	};
 
+	#pragma endregion
+
 	namespace Physics
 	{
 		namespace
@@ -58,6 +62,8 @@ namespace Loom
 			glm::vec3 s_gravity(0.0f, -9.81f, 0.0f);
 			float s_fixedDeltaTime = 1.0f / 60.0f;
 		};
+
+		#pragma region Settings
 
 		glm::vec3 GetGravity() { return s_gravity; };
 		void SetGravity(const glm::vec3& gravity) { s_gravity = gravity; };
@@ -68,6 +74,10 @@ namespace Loom
 			if (seconds > 0.0f && std::isfinite(seconds))
 				s_fixedDeltaTime = seconds;
 		};
+
+		#pragma endregion
+
+		#pragma region Raycasts
 
 		bool Raycast(const Ray& ray, RaycastHit& hit, float maxDistance)
 		{
@@ -114,5 +124,7 @@ namespace Loom
 		{
 			return RaycastAll(Ray{ origin, direction }, maxDistance);
 		};
+
+		#pragma endregion
 	};
 };

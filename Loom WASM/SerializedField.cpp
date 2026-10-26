@@ -25,6 +25,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Writing
+
 		constexpr size_t NUMBER_LENGTH = 64;
 
 		// Shorter arrays write quickly enough not to keep.
@@ -74,6 +76,26 @@ namespace Loom
 			return quoted + '"';
 		};
 
+		// "(x, y, z)" for however many components the field has.
+		std::string WriteVector(const float* values, int count)
+		{
+			std::string text = "(";
+
+			for (int i = 0; i < count; i++)
+			{
+				if (i)
+					text += ", ";
+
+				AppendNumber(text, values[i]);
+			};
+
+			return text + ')';
+		};
+
+		#pragma endregion
+
+		#pragma region Reading
+
 		std::string Unquote(const std::string& text)
 		{
 			if (text.size() < 2 || text.front() != '"' || text.back() != '"')
@@ -98,22 +120,6 @@ namespace Loom
 			};
 
 			return unquoted;
-		};
-
-		// "(x, y, z)" for however many components the field has.
-		std::string WriteVector(const float* values, int count)
-		{
-			std::string text = "(";
-
-			for (int i = 0; i < count; i++)
-			{
-				if (i)
-					text += ", ";
-
-				AppendNumber(text, values[i]);
-			};
-
-			return text + ')';
 		};
 
 		// All of text as an integer T holds, into data, or false with data as it was.
@@ -186,48 +192,11 @@ namespace Loom
 
 			return true;
 		};
+
+		#pragma endregion
 	};
 
-	LoomObject* SerializedField::GetReference() const
-	{
-		return get_reference
-			? get_reference(data)
-			: nullptr;
-	};
-
-	void SerializedField::SetReference(LoomObject* object) const
-	{
-		if (set_reference)
-			set_reference(data, object);
-
-		Changed();
-	};
-
-	LoomObject* SerializedField::ReferenceFor(LoomObject* object) const
-	{
-		if (accepts_reference == nullptr || object == nullptr)
-			return nullptr;
-
-		if (accepts_reference(object))
-			return object;
-
-		GameObject* gameObject = dynamic_cast<GameObject*>(object);
-
-		if (Scene* scene = dynamic_cast<Scene*>(object))
-			gameObject = &scene->GetRoot();
-
-		if (gameObject == nullptr)
-			return nullptr;
-
-		if (accepts_reference(gameObject))
-			return gameObject;
-
-		for (ComponentBase* component : gameObject->GetComponents())
-			if (accepts_reference(component))
-				return component;
-
-		return nullptr;
-	};
+	#pragma region Names
 
 	std::string_view NameDisplay(std::string_view name)
 	{
@@ -252,6 +221,48 @@ namespace Loom
 	{
 		return NameCategory(name);
 	};
+
+	std::string NameFromIdentifier(const char* identifier)
+	{
+		constexpr std::string_view MEMBER_PREFIX = "m_";
+
+		std::string_view rest = identifier;
+
+		if (rest.starts_with(MEMBER_PREFIX))
+			rest.remove_prefix(MEMBER_PREFIX.size());
+
+		std::string name;
+		bool word_start = true;
+		char previous = '\0';
+
+		for (const char c : rest)
+		{
+			if (c == '_')
+			{
+				word_start = true;
+				continue;
+			};
+
+			// camelCase breaks before an upper case letter, but an acronym like ID
+			// stays one word.
+			if (isupper((unsigned char)c) && islower((unsigned char)previous))
+				word_start = true;
+
+			if (word_start && !name.empty())
+				name += ' ';
+
+			name += word_start ? (char)toupper((unsigned char)c) : c;
+
+			word_start = false;
+			previous = c;
+		};
+
+		return name;
+	};
+
+	#pragma endregion
+
+	#pragma region Text
 
 	std::string SerializedField::Write() const
 	{
@@ -450,41 +461,50 @@ namespace Loom
 		return false;
 	};
 
-	std::string NameFromIdentifier(const char* identifier)
+	#pragma endregion
+
+	#pragma region References
+
+	LoomObject* SerializedField::GetReference() const
 	{
-		constexpr std::string_view MEMBER_PREFIX = "m_";
-
-		std::string_view rest = identifier;
-
-		if (rest.starts_with(MEMBER_PREFIX))
-			rest.remove_prefix(MEMBER_PREFIX.size());
-
-		std::string name;
-		bool word_start = true;
-		char previous = '\0';
-
-		for (const char c : rest)
-		{
-			if (c == '_')
-			{
-				word_start = true;
-				continue;
-			};
-
-			// camelCase breaks before an upper case letter, but an acronym like ID
-			// stays one word.
-			if (isupper((unsigned char)c) && islower((unsigned char)previous))
-				word_start = true;
-
-			if (word_start && !name.empty())
-				name += ' ';
-
-			name += word_start ? (char)toupper((unsigned char)c) : c;
-
-			word_start = false;
-			previous = c;
-		};
-
-		return name;
+		return get_reference
+			? get_reference(data)
+			: nullptr;
 	};
+
+	void SerializedField::SetReference(LoomObject* object) const
+	{
+		if (set_reference)
+			set_reference(data, object);
+
+		Changed();
+	};
+
+	LoomObject* SerializedField::ReferenceFor(LoomObject* object) const
+	{
+		if (accepts_reference == nullptr || object == nullptr)
+			return nullptr;
+
+		if (accepts_reference(object))
+			return object;
+
+		GameObject* gameObject = dynamic_cast<GameObject*>(object);
+
+		if (Scene* scene = dynamic_cast<Scene*>(object))
+			gameObject = &scene->GetRoot();
+
+		if (gameObject == nullptr)
+			return nullptr;
+
+		if (accepts_reference(gameObject))
+			return gameObject;
+
+		for (ComponentBase* component : gameObject->GetComponents())
+			if (accepts_reference(component))
+				return component;
+
+		return nullptr;
+	};
+
+	#pragma endregion
 };

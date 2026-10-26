@@ -40,6 +40,8 @@ namespace Loom
 	*/
 	struct LOOM_API Profiler final
 	{
+		#pragma region Constants
+
 		// The recorded frames all of a Row but its trend reaches back over.
 		static constexpr int Window = 100;
 
@@ -52,6 +54,10 @@ namespace Loom
 
 		// The polls a second, the most frames recorded unless SetEveryFrame.
 		static constexpr int Rate = 60;
+
+		#pragma endregion
+
+		#pragma region Results
 
 		// A stage as it has run on a thread, in milliseconds a frame: a frame
 		// it did not run in counts as none, and one it ran in more than once
@@ -80,11 +86,15 @@ namespace Loom
 			std::vector<Row> rows{ };
 		};
 
+		#pragma endregion
+
 #ifdef LOOM_FINAL
 		static void NameThread(const std::string&, int) { };
 		static const char* Current() { return nullptr; };
 		static void EndFrame() { };
 #else
+		#pragma region Stages
+
 		// Opens a stage, which closes when it goes. name is copied as the
 		// stage closes, so it need only last that long.
 		struct LOOM_API Stage final
@@ -104,6 +114,18 @@ namespace Loom
 			bool m_open;
 		};
 
+		// What the calling thread is listed as, and where: by order, then by
+		// when each first recorded. One never named is listed last as
+		// "Thread" and a number.
+		static void NameThread(const std::string& name, int order);
+
+		// The innermost stage open on the calling thread, or null.
+		static const char* Current();
+
+		#pragma endregion
+
+		#pragma region Recording
+
 		// Off until turned on. The frame that ends after turning it on is the
 		// first recorded, and turning it off forgets what was.
 		static void SetRecording(bool recording);
@@ -113,13 +135,9 @@ namespace Loom
 		static void SetEveryFrame(bool every);
 		static bool EveryFrame();
 
-		// What the calling thread is listed as, and where: by order, then by
-		// when each first recorded. One never named is listed last as
-		// "Thread" and a number.
-		static void NameThread(const std::string& name, int order);
+		#pragma endregion
 
-		// The innermost stage open on the calling thread, or null.
-		static const char* Current();
+		#pragma region Frames
 
 		// Gathers what every thread recorded since the last call as a frame,
 		// or drops it, when the frame was not recorded.
@@ -135,6 +153,8 @@ namespace Loom
 		// In milliseconds from the start of one recorded frame to the next,
 		// averaged over the window.
 		static double Spacing();
+
+		#pragma endregion
 #endif
 	};
 };

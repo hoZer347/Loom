@@ -36,6 +36,8 @@ namespace Loom
 	*/
 	struct LOOM_API SceneSerializer final
 	{
+		#pragma region Format
+
 		static constexpr const char* extension = ".loomscene";
 
 		// What starts a GameObject's line and a component's.
@@ -56,6 +58,10 @@ namespace Loom
 		// References written as guids whose objects did not exist yet when the
 		// line naming them was read.
 		using PendingReferences = std::vector<std::pair<const SerializedField*, Guid>>;
+
+		#pragma endregion
+
+		#pragma region Scenes
 
 		static std::string Serialize(Scene& scene);
 
@@ -78,6 +84,10 @@ namespace Loom
 			PendingReferences* pending = nullptr);
 
 		static void ResolveReferences(const PendingReferences& pending);
+
+		#pragma endregion
+
+		#pragma region Loading
 
 		// A scene read a slice at a time, for a caller that draws frames while
 		// it loads. Deserialize is one of these read to the end.
@@ -123,6 +133,10 @@ namespace Loom
 		// BeginLoadFromFile read to the end in one go.
 		static Scene* LoadFromFile(const std::string& path, std::string* error = nullptr);
 
+		#pragma endregion
+
+		#pragma region Subtrees
+
 		// One GameObject and everything under it, as a scene writes it. Nothing
 		// above it is written, so the text is what a clipboard holds.
 		static std::string Serialize(GameObject& gameObject);
@@ -131,6 +145,10 @@ namespace Loom
 		// Each gets a new guid, so the same text can go in any number of times,
 		// and references between them follow them to their new guids.
 		static GameObject* Deserialize(const std::string& text, GameObject& parent, std::string* error = nullptr);
+
+		#pragma endregion
+
+		#pragma region In Place
 
 		// One GameObject without its children: its line, its fields and its
 		// components, at the top level, as a scene writes it.
@@ -150,5 +168,7 @@ namespace Loom
 
 		// As ReadOwn, what SerializeHeader wrote back onto scene.
 		static bool ReadHeader(Scene& scene, const std::string& text, PendingReferences& pending);
+
+		#pragma endregion
 	};
 };

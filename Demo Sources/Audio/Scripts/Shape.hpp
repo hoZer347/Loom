@@ -19,6 +19,8 @@ namespace AudioScripts
 	// the GameObject.
 	struct Shape : Loom::Component<Shape>
 	{
+		#pragma region Component
+
 		void OnAttach() override
 		{
 			m_material = m_gameObject->GetComponent<Loom::Material>();
@@ -51,7 +53,11 @@ namespace AudioScripts
 			m_tint.reset();
 		};
 
+		#pragma endregion
+
 	private:
+		#pragma region Geometry
+
 		static constexpr int CUBE_FACES = 6;
 		static constexpr int FACES_PER_AXIS = 2;
 		static constexpr int SPHERE_STACKS = 16;
@@ -119,11 +125,17 @@ namespace AudioScripts
 			return vertices;
 		};
 
+		#pragma endregion
+
+		#pragma region State
+
 		Loom::Serial<bool> m_sphere;
 		Loom::Serial<glm::vec3> m_color = glm::vec3(0.8f, 0.8f, 0.8f);
 		Loom::Serial<Loom::Asset<".shader">> m_shader = "Assets/Lit.shader";
 
 		Loom::Material* m_material = nullptr;
 		std::optional<glm::vec3> m_tint{ };
+
+		#pragma endregion
 	};
 };

@@ -42,6 +42,8 @@ using namespace Loom;
 
 namespace
 {
+	#pragma region Desktop
+
 	// IVirtualDesktopManager from shobjidl.h, which only declares it for a
 	// Windows 10 target; the engine targets Windows 7.
 	MIDL_INTERFACE("a5cd92ff-29be-454c-8d04-d82879fb3f1b")
@@ -53,6 +55,59 @@ namespace
 	};
 
 	constexpr CLSID CLSID_DesktopManager = { 0xaa509086, 0x5ca9, 0x4c25, { 0x8f, 0x95, 0x58, 0x9d, 0x3c, 0x07, 0xb4, 0x8a } };
+
+	// Puts the (still hidden) window on another virtual desktop and shows it
+	// there without activating it, so it never takes the focus. The shell only
+	// tracks a window on a desktop once it has been shown, so it is shown
+	// cloaked first and uncloaked after the move.
+	bool ShowOnDesktop(GLFWwindow* window, const std::string& id)
+	{
+		const std::wstring braced = L"{" + std::wstring(id.begin(), id.end()) + L"}";
+
+		GUID desktop{ };
+
+		if (FAILED(CLSIDFromString(braced.c_str(), &desktop)))
+		{
+			std::cerr << "--desktop: " << id << " is not a desktop id" << std::endl;
+			return false;
+		};
+
+		const HRESULT com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+
+		DesktopManager* manager = nullptr;
+		HRESULT result = CoCreateInstance(CLSID_DesktopManager, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&manager));
+
+		const HWND hwnd = glfwGetWin32Window(window);
+		BOOL cloak = TRUE;
+
+		DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
+		ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+
+		if (SUCCEEDED(result))
+		{
+			result = manager->MoveWindowToDesktop(hwnd, desktop);
+			manager->Release();
+		};
+
+		if (SUCCEEDED(com))
+			CoUninitialize();
+
+		if (FAILED(result))
+		{
+			std::cerr << "--desktop: could not move the window to " << id << std::endl;
+			ShowWindow(hwnd, SW_HIDE);
+			return false;
+		};
+
+		cloak = FALSE;
+		DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
+
+		return true;
+	};
+
+	#pragma endregion
+
+	#pragma region File Types
 
 	struct FileType
 	{
@@ -71,25 +126,6 @@ namespace
 		{ FileTabs::Sounds.extension, L"Loom.SoundFolders", L"Loom Sound Folders" },
 		{ FileTabs::Fonts.extension, L"Loom.FontFolders", L"Loom Font Folders" },
 		{ InputActions::extension, L"Loom.InputActions", L"Loom Key Bindings" },
-	};
-
-	// --create-<kind> <name>, for each of these.
-	constexpr std::string_view createPrefix = "--create-";
-
-	std::optional<AssetKind> ScriptKindNamed(std::string_view kind)
-	{
-		constexpr std::pair<std::string_view, AssetKind> kinds[] =
-		{
-			{ "script", AssetKind::Script },
-			{ "state", AssetKind::State },
-			{ "state-machine", AssetKind::StateMachine },
-		};
-
-		for (const auto& [name, found] : kinds)
-			if (kind == name)
-				return found;
-
-		return std::nullopt;
 	};
 
 	// Makes this executable what opens the editor's files for the current
@@ -140,6 +176,29 @@ namespace
 
 		if (changed)
 			SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
+	};
+
+	#pragma endregion
+
+	#pragma region Options
+
+	// --create-<kind> <name>, for each of these.
+	constexpr std::string_view createPrefix = "--create-";
+
+	std::optional<AssetKind> ScriptKindNamed(std::string_view kind)
+	{
+		constexpr std::pair<std::string_view, AssetKind> kinds[] =
+		{
+			{ "script", AssetKind::Script },
+			{ "state", AssetKind::State },
+			{ "state-machine", AssetKind::StateMachine },
+		};
+
+		for (const auto& [name, found] : kinds)
+			if (kind == name)
+				return found;
+
+		return std::nullopt;
 	};
 
 	void Usage()
@@ -200,54 +259,8 @@ namespace
 			<< std::endl;
 	};
 
-	// Puts the (still hidden) window on another virtual desktop and shows it
-	// there without activating it, so it never takes the focus. The shell only
-	// tracks a window on a desktop once it has been shown, so it is shown
-	// cloaked first and uncloaked after the move.
-	bool ShowOnDesktop(GLFWwindow* window, const std::string& id)
-	{
-		const std::wstring braced = L"{" + std::wstring(id.begin(), id.end()) + L"}";
+	#pragma endregion
 
-		GUID desktop{ };
-
-		if (FAILED(CLSIDFromString(braced.c_str(), &desktop)))
-		{
-			std::cerr << "--desktop: " << id << " is not a desktop id" << std::endl;
-			return false;
-		};
-
-		const HRESULT com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-
-		DesktopManager* manager = nullptr;
-		HRESULT result = CoCreateInstance(CLSID_DesktopManager, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&manager));
-
-		const HWND hwnd = glfwGetWin32Window(window);
-		BOOL cloak = TRUE;
-
-		DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
-		ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-
-		if (SUCCEEDED(result))
-		{
-			result = manager->MoveWindowToDesktop(hwnd, desktop);
-			manager->Release();
-		};
-
-		if (SUCCEEDED(com))
-			CoUninitialize();
-
-		if (FAILED(result))
-		{
-			std::cerr << "--desktop: could not move the window to " << id << std::endl;
-			ShowWindow(hwnd, SW_HIDE);
-			return false;
-		};
-
-		cloak = FALSE;
-		DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
-
-		return true;
-	};
 };
 
 // With a project folder given, the editor starts on it. Without one it uses

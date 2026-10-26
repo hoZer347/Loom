@@ -30,6 +30,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Constants
+
 		// After the last keystroke, before the text is checked.
 		constexpr int check_delay_milliseconds = 300;
 
@@ -52,6 +54,10 @@ namespace Loom
 		constexpr float explanation_width = 30.0f;
 
 		constexpr char quote = '\'';
+
+		#pragma endregion
+
+		#pragma region Helpers
 
 		bool IsIdentifier(char c)
 		{
@@ -98,37 +104,11 @@ namespace Loom
 
 			return &language;
 		};
+
+		#pragma endregion
 	};
 
-	std::pair<size_t, size_t> ShaderEditor::MessageSpan(const std::string& line, const std::string& message)
-	{
-		const size_t open = message.find(quote);
-		const size_t close = open == std::string::npos ? std::string::npos : message.find(quote, open + 1);
-
-		if (close != std::string::npos && close > open + 1)
-		{
-			const std::string token = message.substr(open + 1, close - open - 1);
-
-			// The token itself, not the same letters inside a longer name.
-			for (size_t at = line.find(token); at != std::string::npos; at = line.find(token, at + 1))
-			{
-				const size_t end = at + token.size();
-
-				if ((at == 0 || !IsIdentifier(line[at - 1])) && (end == line.size() || !IsIdentifier(line[end])))
-					return { at, end };
-			};
-		};
-
-		const size_t start = line.find_first_not_of(" \t");
-
-		return start == std::string::npos ? std::pair<size_t, size_t>{ 0, line.size() } : std::pair<size_t, size_t>{ start, line.size() };
-	};
-
-	void ShaderEditor::Relocate(const std::string& from, const std::string& to)
-	{
-		for (const std::unique_ptr<Document>& document : m_documents)
-			document->path = ProjectAssets::Relocate(document->path, from, to);
-	};
+	#pragma region Documents
 
 	void ShaderEditor::Open(const std::string& path)
 	{
@@ -175,6 +155,49 @@ namespace Loom
 
 		m_documents.push_back(std::move(document));
 	};
+
+	void ShaderEditor::Relocate(const std::string& from, const std::string& to)
+	{
+		for (const std::unique_ptr<Document>& document : m_documents)
+			document->path = ProjectAssets::Relocate(document->path, from, to);
+	};
+
+	bool ShaderEditor::SaveAll()
+	{
+		bool saved = true;
+
+		for (const std::unique_ptr<Document>& document : m_documents)
+			if (document->unsaved)
+				saved = Save(*document) && saved;
+
+		return saved;
+	};
+
+	bool ShaderEditor::Save(Document& document)
+	{
+		std::ofstream file(document.path, std::ios::binary);
+		std::string text = document.editor.GetText();
+
+		if (!(file << text))
+		{
+			std::cerr << "Shaders: could not save " << document.path << std::endl;
+			return false;
+		};
+
+		document.savedText = std::move(text);
+		document.unsaved = false;
+
+		return true;
+	};
+
+	void ShaderEditor::Close(const Document* document)
+	{
+		std::erase_if(m_documents, [document](const std::unique_ptr<Document>& open) { return open.get() == document; });
+	};
+
+	#pragma endregion
+
+	#pragma region Drawing
 
 	void ShaderEditor::Draw(bool* open)
 	{
@@ -331,9 +354,32 @@ namespace Loom
 		ImGui::EndPopup();
 	};
 
-	void ShaderEditor::Close(const Document* document)
+	#pragma endregion
+
+	#pragma region Language
+
+	std::pair<size_t, size_t> ShaderEditor::MessageSpan(const std::string& line, const std::string& message)
 	{
-		std::erase_if(m_documents, [document](const std::unique_ptr<Document>& open) { return open.get() == document; });
+		const size_t open = message.find(quote);
+		const size_t close = open == std::string::npos ? std::string::npos : message.find(quote, open + 1);
+
+		if (close != std::string::npos && close > open + 1)
+		{
+			const std::string token = message.substr(open + 1, close - open - 1);
+
+			// The token itself, not the same letters inside a longer name.
+			for (size_t at = line.find(token); at != std::string::npos; at = line.find(token, at + 1))
+			{
+				const size_t end = at + token.size();
+
+				if ((at == 0 || !IsIdentifier(line[at - 1])) && (end == line.size() || !IsIdentifier(line[end])))
+					return { at, end };
+			};
+		};
+
+		const size_t start = line.find_first_not_of(" \t");
+
+		return start == std::string::npos ? std::pair<size_t, size_t>{ 0, line.size() } : std::pair<size_t, size_t>{ start, line.size() };
 	};
 
 	void ShaderEditor::Check(Document& document)
@@ -382,34 +428,6 @@ namespace Loom
 		};
 	};
 
-	bool ShaderEditor::SaveAll()
-	{
-		bool saved = true;
-
-		for (const std::unique_ptr<Document>& document : m_documents)
-			if (document->unsaved)
-				saved = Save(*document) && saved;
-
-		return saved;
-	};
-
-	bool ShaderEditor::Save(Document& document)
-	{
-		std::ofstream file(document.path, std::ios::binary);
-		std::string text = document.editor.GetText();
-
-		if (!(file << text))
-		{
-			std::cerr << "Shaders: could not save " << document.path << std::endl;
-			return false;
-		};
-
-		document.savedText = std::move(text);
-		document.unsaved = false;
-
-		return true;
-	};
-
 	void ShaderEditor::Suggest(const Document& document, TextEditor::AutoCompleteState& state)
 	{
 		std::set<std::string> words;
@@ -451,6 +469,8 @@ namespace Loom
 
 		ImGui::EndTooltip();
 	};
+
+	#pragma endregion
 };
 
 #endif

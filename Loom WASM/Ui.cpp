@@ -29,26 +29,14 @@ namespace Loom
 {
 	namespace
 	{
-		constexpr int LEFT_BUTTON = 0;
+		#pragma region Drawing
 
 		// Every item is drawn at one depth, nearer than the depth buffer is
 		// cleared to, so each lands over the ones before it.
 		constexpr float DEPTH = 0.0f;
 
-		constexpr float HALF = 0.5f;
-
-		// How far across the room beside it each alignment puts a line.
-		constexpr float ALIGNED[] = { 0.0f, HALF, 1.0f };
-
-		constexpr int FIRST_CHARACTER = 32;
-		constexpr int CHARACTERS = 95;
-		constexpr int ATLAS_START = 256;
-		constexpr int ATLAS_LARGEST = 4096;
 		constexpr int RGBA = 4;
 		constexpr uint8_t OPAQUE = 255;
-
-		// The most of a file stb_truetype reads to find a font in it.
-		constexpr size_t FONT_HEADER = 16;
 
 		const char* const UI_SHADER = R"(
 // ===VERTEX===
@@ -126,6 +114,52 @@ void main()
 
 			return handle != 0 ? handle : WhiteTexture();
 		};
+
+		// x, y, z, u, v for each corner of a quad's two triangles.
+		void AddQuad(std::vector<float>& vertices, glm::vec2 min, glm::vec2 max, glm::vec2 uvMin, glm::vec2 uvMax)
+		{
+			vertices.insert(vertices.end(),
+			{
+				min.x, min.y, DEPTH, uvMin.x, uvMin.y,
+				max.x, min.y, DEPTH, uvMax.x, uvMin.y,
+				max.x, max.y, DEPTH, uvMax.x, uvMax.y,
+				min.x, min.y, DEPTH, uvMin.x, uvMin.y,
+				max.x, max.y, DEPTH, uvMax.x, uvMax.y,
+				min.x, max.y, DEPTH, uvMin.x, uvMax.y,
+			});
+		};
+
+		void Draw(uint32_t program, uint32_t texture, const glm::vec4& color, const std::vector<float>& vertices)
+		{
+			if (vertices.empty() || texture == 0)
+				return;
+
+			Renderer* renderer = Renderer::Get();
+
+			renderer->SetTexture(program, "u_texture", texture);
+			renderer->SetUniform(program, "u_color", color);
+			renderer->Draw(program, Mesh::Triangles, vertices.data(), vertices.size() / FloatsPerVertex(VertexFormat::PositionUV), Mesh::Stream, VertexFormat::PositionUV);
+		};
+
+		bool overlay = false;
+		std::vector<const ComponentBase*> queued;
+
+		#pragma endregion
+
+		#pragma region Text
+
+		constexpr float HALF = 0.5f;
+
+		// How far across the room beside it each alignment puts a line.
+		constexpr float ALIGNED[] = { 0.0f, HALF, 1.0f };
+
+		constexpr int FIRST_CHARACTER = 32;
+		constexpr int CHARACTERS = 95;
+		constexpr int ATLAS_START = 256;
+		constexpr int ATLAS_LARGEST = 4096;
+
+		// The most of a file stb_truetype reads to find a font in it.
+		constexpr size_t FONT_HEADER = 16;
 
 		// The printable ASCII characters of one font at one size.
 		struct Font
@@ -247,34 +281,40 @@ void main()
 			return glm::vec2(width, font.lineHeight);
 		};
 
-		// x, y, z, u, v for each corner of a quad's two triangles.
-		void AddQuad(std::vector<float>& vertices, glm::vec2 min, glm::vec2 max, glm::vec2 uvMin, glm::vec2 uvMax)
+		void DrawText(uint32_t program, const UiText& text, std::vector<float>& vertices)
 		{
-			vertices.insert(vertices.end(),
-			{
-				min.x, min.y, DEPTH, uvMin.x, uvMin.y,
-				max.x, min.y, DEPTH, uvMax.x, uvMin.y,
-				max.x, max.y, DEPTH, uvMax.x, uvMax.y,
-				min.x, min.y, DEPTH, uvMin.x, uvMin.y,
-				max.x, max.y, DEPTH, uvMax.x, uvMax.y,
-				min.x, max.y, DEPTH, uvMin.x, uvMax.y,
-			});
-		};
+			const Font* font = FontFor(text.fontPath, text.fontSize);
 
-		void Draw(uint32_t program, uint32_t texture, const glm::vec4& color, const std::vector<float>& vertices)
-		{
-			if (vertices.empty() || texture == 0)
+			if (font == nullptr)
 				return;
 
-			Renderer* renderer = Renderer::Get();
+			const Ui::Rect within = text.Area();
+			const glm::vec2 measured = MeasureWith(*font, text.text);
+			const int alignment = std::clamp((int)*text.alignment, (int)UiText::Left, (int)UiText::Right);
 
-			renderer->SetTexture(program, "u_texture", texture);
-			renderer->SetUniform(program, "u_color", color);
-			renderer->Draw(program, Mesh::Triangles, vertices.data(), vertices.size() / FloatsPerVertex(VertexFormat::PositionUV), Mesh::Stream, VertexFormat::PositionUV);
+			float x = within.min.x + (within.size.x - measured.x) * ALIGNED[alignment];
+			float y = within.min.y + (within.size.y - font->lineHeight) * HALF + font->ascent;
+
+			for (const char character : *text.text)
+			{
+				if (!IsPrintable(character))
+					continue;
+
+				stbtt_aligned_quad quad;
+				stbtt_GetBakedQuad(font->characters, font->atlasSize, font->atlasSize, character - FIRST_CHARACTER, &x, &y, &quad, 1);
+
+				// The baker's t runs down from the atlas's top; the texture's v up from its bottom.
+				AddQuad(vertices, { quad.x0, quad.y0 }, { quad.x1, quad.y1 }, { quad.s0, 1.0f - quad.t0 }, { quad.s1, 1.0f - quad.t1 });
+			};
+
+			Draw(program, font->texture, text.color, vertices);
 		};
 
-		bool overlay = false;
-		std::vector<const ComponentBase*> queued;
+		#pragma endregion
+
+		#pragma region Pointer
+
+		constexpr int LEFT_BUTTON = 0;
 
 		// The rects that block the pointer the last overlay drew, in the order
 		// drawn, and the buttons they press, by their IDs, which are never
@@ -305,35 +345,10 @@ void main()
 			return nullptr;
 		};
 
-		void DrawText(uint32_t program, const UiText& text, std::vector<float>& vertices)
-		{
-			const Font* font = FontFor(text.fontPath, text.fontSize);
-
-			if (font == nullptr)
-				return;
-
-			const Ui::Rect within = text.Area();
-			const glm::vec2 measured = MeasureWith(*font, text.text);
-			const int alignment = std::clamp((int)*text.alignment, (int)UiText::Left, (int)UiText::Right);
-
-			float x = within.min.x + (within.size.x - measured.x) * ALIGNED[alignment];
-			float y = within.min.y + (within.size.y - font->lineHeight) * HALF + font->ascent;
-
-			for (const char character : *text.text)
-			{
-				if (!IsPrintable(character))
-					continue;
-
-				stbtt_aligned_quad quad;
-				stbtt_GetBakedQuad(font->characters, font->atlasSize, font->atlasSize, character - FIRST_CHARACTER, &x, &y, &quad, 1);
-
-				// The baker's t runs down from the atlas's top; the texture's v up from its bottom.
-				AddQuad(vertices, { quad.x0, quad.y0 }, { quad.x1, quad.y1 }, { quad.s0, 1.0f - quad.t0 }, { quad.s1, 1.0f - quad.t1 });
-			};
-
-			Draw(program, font->texture, text.color, vertices);
-		};
+		#pragma endregion
 	};
+
+	#pragma region Pointer
 
 	Ui::Rect Ui::Screen()
 	{
@@ -356,6 +371,10 @@ void main()
 
 		return hit != nullptr && hit->rect == rect.m_ID;
 	};
+
+	#pragma endregion
+
+	#pragma region Overlay
 
 	void Ui::BeginOverlay()
 	{
@@ -429,6 +448,10 @@ void main()
 			LetGoOfUnusedFonts();
 	};
 
+	#pragma endregion
+
+	#pragma region UiRect
+
 	Ui::Rect UiRect::LayOut(const Ui::Rect& parent) const
 	{
 		const glm::vec2 anchored = parent.min + parent.size * *anchor;
@@ -468,6 +491,10 @@ void main()
 			Ui::Queue(text);
 	};
 
+	#pragma endregion
+
+	#pragma region UiText
+
 	glm::vec2 UiText::Measure() const
 	{
 		const Font* font = FontFor(fontPath, fontSize);
@@ -488,6 +515,10 @@ void main()
 		if (m_gameObject->GetComponent<UiRect>() == nullptr)
 			Ui::Queue(this);
 	};
+
+	#pragma endregion
+
+	#pragma region UiButton
 
 	bool UiButton::IsHovered() const
 	{
@@ -514,4 +545,6 @@ void main()
 		if (onClick && WasClicked())
 			onClick();
 	};
+
+	#pragma endregion
 };

@@ -26,6 +26,8 @@ namespace Loom
 	*/
 	struct FolderTree final
 	{
+		#pragma region Drawing
+
 		struct Hooks
 		{
 			// What a dragged item and a dragged folder carry: its name or path.
@@ -71,6 +73,10 @@ namespace Loom
 		// The folders and items at the top, as the search leaves them.
 		void Draw(VirtualFolders& folders, const VirtualFolders::Node& top, const Hooks& hooks);
 
+		#pragma endregion
+
+		#pragma region Editing
+
 		// Takes an item or a folder dropped on the target begun last into folder.
 		static void Drop(VirtualFolders& folders, const std::string& folder, const Hooks& hooks);
 
@@ -78,21 +84,40 @@ namespace Loom
 		// it is in opened to show it.
 		void Rename(const std::string& folder);
 
+		#pragma endregion
+
 	private:
-		static constexpr size_t name_size = 128;
+		#pragma region Drawing
 
 		// The folder's row and, while it is open, the folders and items in it.
 		// found: a folder above matched the search, so all of this one shows.
 		void DrawFolder(VirtualFolders& folders, const VirtualFolders::Node& node, const Hooks& hooks, bool found);
+
+		#pragma endregion
+
+		#pragma region Editing
+
+		static constexpr size_t name_size = 128;
+
 		void DrawRename(VirtualFolders& folders, const Hooks& hooks);
+
+		#pragma endregion
+
+		#pragma region Search
 
 		bool Shows(const VirtualFolders::Node& node, const Hooks& hooks) const;
 		bool Shows(const std::string& item, const Hooks& hooks) const;
+
+		#pragma endregion
+
+		#pragma region State
 
 		SearchBar m_search{ };
 
 		std::string m_renaming{ };
 		char m_name[name_size]{ };
 		bool m_focus = false;
+
+		#pragma endregion
 	};
 };

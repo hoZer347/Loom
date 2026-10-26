@@ -41,15 +41,21 @@ namespace Loom
 	*/
 	struct Simulation final
 	{
+		#pragma region Joining
+
 		explicit Simulation(ColliderTree& tree);
 
 		Simulation(const Simulation&) = delete;
 		Simulation& operator=(const Simulation&) = delete;
 
-		~Simulation();
-
 		// A body joining this step, from its OnPhysics.
 		void Add(Rigidbody& rigidbody);
+
+		#pragma endregion
+
+		#pragma region Stepping
+
+		~Simulation();
 
 		// A collider the walk has found, from its OnPhysics. The walk calls a
 		// GameObject's physics components one after another, so a body's
@@ -74,13 +80,21 @@ namespace Loom
 		// a scene going away.
 		void Drop();
 
-		// A collider leaving its tree, so no pair outlives it.
-		void Forget(const Collider& collider);
-
 		// The simulation of the scene being stepped.
 		static inline Simulation* current = nullptr;
 
+		#pragma endregion
+
+		#pragma region Bodies
+
+		// A collider leaving its tree, so no pair outlives it.
+		void Forget(const Collider& collider);
+
+		#pragma endregion
+
 	private:
+		#pragma region Types
+
 		static constexpr int NONE = -1;
 
 		// Bodies and contacts each start a line of their own, so threads
@@ -235,24 +249,6 @@ namespace Loom
 			std::vector<Kept> kept;
 		};
 
-		// Readies every body Add noted, takes gravity and what AddForce
-		// gathered into its velocity, and finds how far that takes it.
-		void ReadyBodies(float seconds);
-
-		// Fills in a body Add only noted, false for one that cannot move.
-		bool Ready(Body& body, const Joining& joining);
-
-		// Its pose, mass and inertia, for one that is awake; false for one
-		// scaled to nothing.
-		bool Weigh(Body& body);
-
-		// Finds the bodies' contacts and solves them: all a step does off the
-		// caller's thread. Outside the simulation it writes only the pose and
-		// inertia Weigh keeps on each Rigidbody, which nothing else reads.
-		void Resolve(float seconds);
-
-		void Gather();
-
 		// What one chunk of candidates gave: its pairs, their contacts, and
 		// the sleepers they wake.
 		struct Considered
@@ -264,20 +260,6 @@ namespace Loom
 			// Reused from pair to pair.
 			std::vector<Contacts::Manifold> manifolds;
 		};
-
-		// Collides a candidate pair, adding it to out if they touch or soon
-		// will. Reads only, so chunks of candidates run at once.
-		void Consider(size_t candidate, Considered& out) const;
-
-		static Key Ordered(const Collider* a, const Collider* b);
-
-		bool Awake(int body) const;
-
-		// How far the body goes this step; none for a static collider.
-		float Travel(int body) const;
-
-		// Whether any of the body's leaves no longer covers its travel.
-		bool Outgrown(const Body& body, float seconds) const;
 
 		// What becomes of a candidate this step.
 		enum class Fate : char
@@ -291,16 +273,103 @@ namespace Loom
 			Live,
 		};
 
+		#pragma endregion
+
+		#pragma region Joining
+
+		// Fills in a body Add only noted, false for one that cannot move.
+		bool Ready(Body& body, const Joining& joining);
+
+		// Its pose, mass and inertia, for one that is awake; false for one
+		// scaled to nothing.
+		bool Weigh(Body& body);
+
+		#pragma endregion
+
+		#pragma region Solver Thread
+
+		// The physics thread, and the steps handed to it.
+		struct Solver;
+		static Solver& Solving();
+
+		// Waits until the physics thread has solved the step begun.
+		void Await();
+
+		#pragma endregion
+
+		#pragma region Stepping
+
+		// Finds the bodies' contacts and solves them: all a step does off the
+		// caller's thread. Outside the simulation it writes only the pose and
+		// inertia Weigh keeps on each Rigidbody, which nothing else reads.
+		void Resolve(float seconds);
+
+		// Lets go of the step's bodies and colliders, once it is over.
+		void Clear();
+
+		#pragma endregion
+
+		#pragma region Phases
+
+		// Readies every body Add noted, takes gravity and what AddForce
+		// gathered into its velocity, and finds how far that takes it.
+		void ReadyBodies(float seconds);
+
+		// Makes every pair's contacts ready at once.
+		void PrepareContacts(float seconds);
+
+		// Moves every body and places it in the tree, and keeps what each
+		// touching pair ended on.
+		void MoveBodies(float seconds);
+
+		#pragma endregion
+
+		#pragma region Bodies
+
+		static Key Ordered(const Collider* a, const Collider* b);
+
 		// Gravity and what AddForce gathered, into the body's velocity.
 		static void Accelerate(Body& body, const glm::vec3& gravity, float seconds);
+
+		void Wake(int body);
+
+		// The Rigidbody the collider moves with, if it has one, at once and
+		// from outside a step too.
+		static void WakeOwner(const Collider& collider);
+
+		int BodyOf(const Collider& collider) const;
+
+		// The body, or for NONE one that never moves.
+		Body& At(int body);
+		glm::vec3 VelocityAt(int body, const glm::vec3& point);
+
+		#pragma endregion
+
+		#pragma region Gathering
+
+		void Gather();
+
+		// Collides a candidate pair, adding it to out if they touch or soon
+		// will. Reads only, so chunks of candidates run at once.
+		void Consider(size_t candidate, Considered& out) const;
+
+		bool Awake(int body) const;
+
+		// How far the body goes this step; none for a static collider.
+		float Travel(int body) const;
+
+		#pragma endregion
+
+		#pragma region Contact Preparation
 
 		// Makes a pair's contacts ready to solve, from the velocities as they
 		// stand; reads the bodies and writes only the pair's own contacts, so
 		// many pairs are made ready at once.
 		void Prepare(Pair& pair, float seconds);
 
-		// Makes every pair's contacts ready at once.
-		void PrepareContacts(float seconds);
+		#pragma endregion
+
+		#pragma region Slabs
 
 		// Splits the pairs to solve between slabs of space, the borders
 		// between them, and those across more than one border: no two slabs
@@ -309,6 +378,10 @@ namespace Loom
 
 		// Warm starts and solves the slabs' pairs, each slab's on one thread.
 		void SolveSlabs();
+
+		#pragma endregion
+
+		#pragma region Impulses
 
 		// The body, for one the solver moves.
 		Body* Solved(int body);
@@ -322,15 +395,10 @@ namespace Loom
 
 		// Gives a -impulse along axis and b +impulse.
 		static void Push(Body& a, Body& b, const Axis& axis, float impulse);
-		void Wake(int body);
 
-		// The Rigidbody the collider moves with, if it has one, at once and
-		// from outside a step too.
-		static void WakeOwner(const Collider& collider);
+		#pragma endregion
 
-		// Moves every body and places it in the tree, and keeps what each
-		// touching pair ended on.
-		void MoveBodies(float seconds);
+		#pragma region Integration
 
 		// Moves an awake body, writes its transform and measures its
 		// colliders, touching nothing but the body, so many move at once.
@@ -339,31 +407,30 @@ namespace Loom
 		// Refits the leaves of a body that has outgrown them.
 		void Place(Body& body, float seconds);
 
+		// Whether any of the body's leaves no longer covers its travel.
+		bool Outgrown(const Body& body, float seconds) const;
+
+		#pragma endregion
+
+		#pragma region Moving
+
 		static int Depth(const GameObject& object);
 
 		// Keeps, with each touching pair's candidate, what it ended this step
 		// on; for pairs [begin, end), each its own, so many are kept at once.
 		void Keep(size_t begin, size_t end);
 
+		#pragma endregion
+
+		#pragma region Reporting
+
 		// Tells listeners of the pairs touching, and of those that no longer
 		// do, once Keep has kept them all.
 		void Report();
 
-		// Lets go of the step's bodies and colliders, once it is over.
-		void Clear();
+		#pragma endregion
 
-		// The physics thread, and the steps handed to it.
-		struct Solver;
-		static Solver& Solving();
-
-		// Waits until the physics thread has solved the step begun.
-		void Await();
-
-		int BodyOf(const Collider& collider) const;
-
-		// The body, or for NONE one that never moves.
-		Body& At(int body);
-		glm::vec3 VelocityAt(int body, const glm::vec3& point);
+		#pragma region Bodies
 
 		ColliderTree& m_tree;
 
@@ -383,6 +450,10 @@ namespace Loom
 		// This step's bodies with others hanging under them.
 		std::vector<Body*> m_parents{ };
 
+		#pragma endregion
+
+		#pragma region Pairs
+
 		// This step's, reused from step to step; their contacts are kept by
 		// the chunks of m_considered that found them.
 		std::vector<Pair> m_pairs{ };
@@ -400,6 +471,10 @@ namespace Loom
 		std::vector<float> m_cuts{ };
 		std::vector<size_t> m_histogram{ };
 
+		#pragma endregion
+
+		#pragma region Candidates
+
 		// Each step's, by chunk, reused from step to step.
 		std::vector<std::vector<Key>> m_found{ };
 		// Into m_candidates.
@@ -415,6 +490,10 @@ namespace Loom
 		// This step's candidates whose leaves parted while they touched.
 		std::vector<Candidate> m_parted{ };
 
+		#pragma endregion
+
+		#pragma region Stepping
+
 		unsigned m_step = 0;
 
 		// The step begun, and whether its bodies have moved yet.
@@ -424,5 +503,7 @@ namespace Loom
 
 		// Every simulation with a step begun, for EndAll.
 		static inline std::vector<Simulation*> s_begun{ };
+
+		#pragma endregion
 	};
 };

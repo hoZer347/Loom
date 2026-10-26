@@ -55,6 +55,10 @@ namespace Loom
 	/// deliberate blank frame mid-animation survives while trailing padding does not.
 	struct LOOM_API SpriteSheetScanner final
 	{
+		SpriteSheetScanner() = delete;
+
+		#pragma region Frames
+
 		/// Frame count per clip, one entry per row of the sheet, top row first. Rows that
 		/// are entirely blank come back as 0.
 		///
@@ -64,6 +68,10 @@ namespace Loom
 			const PixelSheet& sheet,
 			const Int2& cell,
 			unsigned char alphaThreshold = 1);
+
+		#pragma endregion
+
+		#pragma region Content
 
 		/// Where the art actually sits inside a cell, as a rect in normalised cell space
 		/// with its origin at the cell's bottom-left. Taken as the union across every cell,
@@ -96,6 +104,6 @@ namespace Loom
 			const Int2& cell,
 			unsigned char alphaThreshold = 1);
 
-		SpriteSheetScanner() = delete;
+		#pragma endregion
 	};
 };

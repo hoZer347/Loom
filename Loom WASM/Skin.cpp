@@ -24,6 +24,8 @@ namespace Loom
 		};
 	};
 
+	#pragma region Names
+
 	std::unordered_map<std::string, GameObject*> DescendantsByName(GameObject& root)
 	{
 		std::unordered_map<std::string, GameObject*> found;
@@ -84,6 +86,10 @@ namespace Loom
 
 		return m_names;
 	};
+
+	#pragma endregion
+
+	#pragma region Skin
 
 	Skin::Skin()
 	{ };
@@ -248,4 +254,6 @@ namespace Loom
 		for (size_t i = 0; i < names.size(); i++)
 			ImGui::SliderFloat(names[i].c_str(), &(*m_shapeWeights)[i], 0.0f, 1.0f);
 	};
+
+	#pragma endregion
 };

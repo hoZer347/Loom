@@ -13,6 +13,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Paths
+
 		bool IsSeparator(char c)
 		{
 			return c == '/' || c == '\\';
@@ -70,6 +72,10 @@ namespace Loom
 
 			return std::nullopt;
 		};
+
+		#pragma endregion
+
+		#pragma region Links
 
 		// A whole number at, moved past. Zero when there is none.
 		int Number(const std::string& text, size_t& at)
@@ -164,7 +170,11 @@ namespace Loom
 
 			return local;
 		};
+
+		#pragma endregion
 	};
+
+	#pragma region Installing
 
 	EditorLog& EditorLog::Get()
 	{
@@ -214,6 +224,10 @@ namespace Loom
 		installed = false;
 	};
 
+	#pragma endregion
+
+	#pragma region Lines
+
 	void EditorLog::Clear()
 	{
 		std::scoped_lock lock(mutex);
@@ -239,6 +253,10 @@ namespace Loom
 		for (size_t i = 0; i < lines.size(); i++)
 			visit(dropped + i, lines[i]);
 	};
+
+	#pragma endregion
+
+	#pragma region Sink
 
 	void EditorLog::Sink::Put(char c)
 	{
@@ -305,4 +323,6 @@ namespace Loom
 
 		return n;
 	};
+
+	#pragma endregion
 };

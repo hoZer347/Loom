@@ -37,6 +37,10 @@ namespace Loom
 
 		LoomObject() = default;
 
+		virtual ~LoomObject();
+
+		#pragma region Identity
+
 		const std::string& GetName();
 		void SetName(const std::string& name);
 
@@ -65,9 +69,11 @@ namespace Loom
 			return dynamic_cast<T*>(_GetByGuid(guid));
 		};
 
-		virtual ~LoomObject();
-
 		std::string NameAndID() const;
+
+		#pragma endregion
+
+		#pragma region Fields
 
 		// The Serial members this object declared, in the order they were
 		// declared, which is also how they are identified: the scene format
@@ -101,6 +107,10 @@ namespace Loom
 		// it does an enum's. Empty for a field that is just a number.
 		virtual std::vector<std::string> GetFieldChoices(const SerializedField& field) { return { }; };
 
+		#pragma endregion
+
+		#pragma region Journal
+
 		// What may have changed of what the scene format writes, since it was
 		// last taken: the objects whose name, guid or fields were written, or
 		// for a GameObject its components, the GameObjects whose parent or
@@ -133,7 +143,11 @@ namespace Loom
 		static unsigned long long WatchCount() { return watch_count.load(); };
 		static Journal TakeJournal();
 
+		#pragma endregion
+
 	protected:
+		#pragma region Identity
+
 		std::string m_name;
 		static inline std::recursive_mutex mutex;
 		static inline std::unordered_map<uint64_t, LoomObject*> by_id{ };
@@ -141,6 +155,10 @@ namespace Loom
 		static inline std::unordered_map<Guid, LoomObject*> by_guid{ };
 
 		uint64_t Initialize();
+
+		#pragma endregion
+
+		#pragma region Fields
 
 		// Declaring a Serial member is what fills these in.
 		friend LOOM_API LoomObject* RegisterSerialField(
@@ -160,7 +178,11 @@ namespace Loom
 
 		std::vector<FieldButton> m_buttons{ };
 
+		#pragma endregion
+
 	private:
+		#pragma region Journal
+
 		friend LOOM_API void SerialChanged(LoomObject* owner, bool reference);
 
 		static inline std::atomic<bool> watching = false;
@@ -176,6 +198,10 @@ namespace Loom
 		std::atomic<unsigned char> m_touched = 0;
 		size_t m_journalAt = 0;
 
+		#pragma endregion
+
+		#pragma region References
+
 		// Who points at whom, so a dying object scrubs only the fields that
 		// point at it. A holder whose references were written since is dirty
 		// and indexed again before the index is next used.
@@ -188,9 +214,17 @@ namespace Loom
 		void ReferencesWritten();
 		static void Reindex();
 
+		#pragma endregion
+
+		#pragma region Fields
+
 		// A name as a Serial or Button was declared with, a ".../" in front put
 		// back to the category of the one declared before it.
 		std::string TakeName(const char* given) const;
+
+		#pragma endregion
+
+		#pragma region Identity
 
 		static LoomObject* _GetByID(const uint64_t& ID);
 		static LoomObject* _GetByName(const std::string& name);
@@ -198,5 +232,7 @@ namespace Loom
 
 		// Takes this object out from under its name, holding mutex.
 		void Unname();
+
+		#pragma endregion
 	};
 };

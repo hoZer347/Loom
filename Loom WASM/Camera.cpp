@@ -30,6 +30,8 @@ namespace Loom
 		};
 	};
 
+	#pragma region View
+
 	glm::mat4 Camera::ViewProjection(float aspect) const
 	{
 		return ViewProjection(GetAim(lookAtTarget), aspect);
@@ -64,6 +66,10 @@ namespace Loom
 		renderer->SetUniform(program, "u_viewProjection", ViewProjection(aim, aspect));
 		renderer->SetUniform(program, "u_cameraPosition", aim.eye);
 	};
+
+	#pragma endregion
+
+	#pragma region Aiming
 
 	void Camera::SetLookAtTarget(bool on)
 	{
@@ -152,4 +158,6 @@ namespace Loom
 		const glm::vec3 degrees = glm::degrees(radians);
 		m_gameObject->transform.rotation = degrees;
 	};
+
+	#pragma endregion
 };

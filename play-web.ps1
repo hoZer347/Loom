@@ -41,6 +41,8 @@ param(
     [string] $Output
 )
 
+#region Setup
+
 # Native commands are judged by their exit codes: emcc writes ordinary notes to
 # stderr, which PowerShell 5.1 would otherwise turn into terminating errors.
 $ErrorActionPreference = 'Continue'
@@ -89,6 +91,10 @@ if (-not $library)
 {
     exit 1
 }
+
+#endregion
+
+#region Project
 
 # --- The project ------------------------------------------------------------
 
@@ -203,6 +209,10 @@ if (Test-Stale $module $linkInputs)
     }
 }
 
+#endregion
+
+#region Serving
+
 # Served, the page sits beside the build and its base is the root emrun
 # serves the project from. Written out, the page and the player sit at the top
 # of Output, with the project's files under it as they are under the project.
@@ -273,3 +283,6 @@ if ($Output)
 # Port 0 takes whatever is free; emrun prints the one it got.
 & $emrun --no_browser --no_emrun_detect --serve_after_close --hostname localhost --port 0 --serve_root $Project $page
 exit $LASTEXITCODE
+
+#endregion
+

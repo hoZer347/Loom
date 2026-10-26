@@ -21,6 +21,8 @@ namespace Loom
 		};
 	};
 
+	#pragma region Collider
+
 	Collider::~Collider()
 	{
 		if (m_tree)
@@ -89,6 +91,10 @@ namespace Loom
 		return true;
 	};
 
+	#pragma endregion
+
+	#pragma region Box Collider
+
 	bool BoxCollider::Refresh() const
 	{
 		if (*center == m_center && *size == m_size)
@@ -150,6 +156,10 @@ namespace Loom
 
 		return true;
 	};
+
+	#pragma endregion
+
+	#pragma region Sphere Collider
 
 	bool SphereCollider::Refresh() const
 	{
@@ -224,4 +234,6 @@ namespace Loom
 
 		return true;
 	};
+
+	#pragma endregion
 };

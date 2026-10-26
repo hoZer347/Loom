@@ -14,6 +14,8 @@ namespace Loom
 {
 	struct LOOM_API Material : Component<Material, "Rendering">
 	{
+		#pragma region Shader
+
 		// Names the shader to compile. Read by OnAttach, so a script sets it on
 		// the material it just attached. Changed after that, it takes effect the
 		// next time the material is attached, which for a scene means reloading,
@@ -35,8 +37,29 @@ namespace Loom
 		// nothing from disk, so it is cheap enough for every draw.
 		void PickUpShader();
 
+		// Recompiles every material's shader whose file has been written since,
+		// for after something outside the editor edits one, and compiles again
+		// any that failed to once its file has been written.
+		static void ReloadChangedShaders();
+
+		Shader* shader = nullptr;
+
+		#pragma endregion
+
+		#pragma region Rendering
+
 		void OnRender() override
 		{ };
+
+		// Hands the material's values to its program: u_color, whether it is
+		// shadowed, how its textures are sampled, and the shader's variables,
+		// the per-instance ones from instance. With them goes u_time, Time's
+		// SinceStart.
+		void Apply(uint32_t program, const UniformValues* instance = nullptr) const;
+
+		#pragma endregion
+
+		#pragma region Editor
 
 		// A link that opens the shader file, its settings, the values of its
 		// per-material variables, and the declarations themselves. The settings
@@ -45,24 +68,15 @@ namespace Loom
 
 		void OnFieldChanged(const SerializedField& field) override;
 
-		// Hands the material's values to its program: u_color, whether it is
-		// shadowed, how its textures are sampled, and the shader's variables,
-		// the per-instance ones from instance. With them goes u_time, Time's
-		// SinceStart.
-		void Apply(uint32_t program, const UniformValues* instance = nullptr) const;
-
-		// Recompiles every material's shader whose file has been written since,
-		// for after something outside the editor edits one, and compiles again
-		// any that failed to once its file has been written.
-		static void ReloadChangedShaders();
-
-		Shader* shader = nullptr;
+		#pragma endregion
 
 	private:
 		// Relative to the project folder, which is where the editor works from.
 		Serial<Asset<Shader::extension>, "Shader"> m_shader_path;
 
 	public:
+		#pragma region Values
+
 		// Declared after the path, which fixes its position in scene files.
 		Serial<glm::vec3> color = glm::vec3(1.0f, 1.0f, 1.0f);
 
@@ -86,7 +100,11 @@ namespace Loom
 		// without it.
 		Serial<Sampling> sampling = AsShader;
 
+		#pragma endregion
+
 	private:
+		#pragma region Editor
+
 		void DrawSettings();
 		void DrawDeclarations();
 
@@ -99,5 +117,7 @@ namespace Loom
 
 		// Why the last edit to the shader file failed, shown until the next one.
 		std::string m_edit_error;
+
+		#pragma endregion
 	};
 };

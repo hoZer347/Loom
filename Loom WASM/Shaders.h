@@ -26,6 +26,8 @@ namespace Loom
 
 	struct LOOM_API Shader final
 	{
+		#pragma region Construction
+
 		Shader();
 		Shader(const std::string& file_path);
 
@@ -36,7 +38,9 @@ namespace Loom
 
 		~Shader();
 
-		static constexpr char extension[] = ".shader";
+		#pragma endregion
+
+		#pragma region Assembly
 
 		// What a shader file compiles to: its stages with the engine's
 		// sections added as its settings ask, the shadow pass's stages, empty
@@ -58,6 +62,12 @@ namespace Loom
 		// centre.
 		static Stages Assemble(const std::string& source);
 
+		#pragma endregion
+
+		#pragma region Loading
+
+		static constexpr char extension[] = ".shader";
+
 		// Compiles the file again, for after it has been edited, and swaps the
 		// new program in. A file that no longer compiles keeps the old program
 		// and says why.
@@ -66,14 +76,26 @@ namespace Loom
 		// Reloads when the file has been written since it was last compiled.
 		void ReloadIfChanged();
 
+		#pragma endregion
+
+		#pragma region Queries
+
 		// Whether any shader compiled has a pixel pass.
 		static bool AnyPixelPass();
 
+		#pragma endregion
+
 #ifndef __EMSCRIPTEN__
+		#pragma region Checking
+
 		// Compiles the text of a shader file the way the Vulkan renderer would,
 		// whichever renderer is running, without making a program of it.
 		static std::vector<ShaderMessage> Check(const std::string& text);
+
+		#pragma endregion
 #endif
+
+		#pragma region Fields
 
 		const std::string file_path;
 
@@ -103,6 +125,8 @@ namespace Loom
 		// fills it in.
 		std::string vertex;
 
+		#pragma endregion
+
 	private:
 		std::filesystem::file_time_type m_written;
 
@@ -110,6 +134,8 @@ namespace Loom
 		uint32_t id;
 
 	private:
+		#pragma region Loading
+
 		struct Programs
 		{
 			uint32_t id = 0;
@@ -128,17 +154,27 @@ namespace Loom
 		// and answers its id.
 		uint32_t Cached(const Programs& programs);
 
+		// Throws std::runtime_error when there is nothing to read.
+		std::string ReadSource(const std::string& file_path);
+
+		#pragma endregion
+
+		#pragma region Assembly
+
 		// Assembles the source and links its programs. The caller holds the
 		// mutex.
 		uint32_t Build(const std::string& name, std::istream& source);
 
-		// Throws std::runtime_error when there is nothing to read.
-		std::string ReadSource(const std::string& file_path);
+		#pragma endregion
 
 #ifdef __EMSCRIPTEN__
+		#pragma region Fetching
+
 		void Request(
 			const std::string& file_path,
 			std::string& shader_source);
+
+		#pragma endregion
 #endif
 
 		static inline std::mutex mutex;

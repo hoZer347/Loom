@@ -14,6 +14,8 @@ namespace Loom::Hierarchy
 		constexpr float SIBLING_EDGE = 0.25f;
 	};
 
+	#pragma region Rows
+
 	bool Contains(const GameObject& root, const GameObject* target)
 	{
 		for (const GameObject* at = target; at; at = at->GetParent())
@@ -152,6 +154,10 @@ namespace Loom::Hierarchy
 		return steps;
 	};
 
+	#pragma endregion
+
+	#pragma region Dropping
+
 	Zone ZoneOf(float top, float bottom, float mouse, bool root)
 	{
 		const float edge = (bottom - top) * SIBLING_EDGE;
@@ -186,4 +192,6 @@ namespace Loom::Hierarchy
 
 		return { parent, next == siblings.end() ? nullptr : *next };
 	};
+
+	#pragma endregion
 };

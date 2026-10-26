@@ -49,6 +49,8 @@ namespace Loom
 	{
 		if (ImGui::Begin(EditorPanels::Console, open))
 		{
+			#pragma region Toolbar
+
 			if (ImGui::Button("Clear"))
 				EditorLog::Get().Clear();
 
@@ -70,12 +72,16 @@ namespace Loom
 			const bool copy = std::exchange(m_copy, false) || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_C);
 			const bool select_all = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_A);
 
+			#pragma endregion
+
 			if (ImGui::BeginChild(
 				"##lines",
 				ImVec2(0.0f, 0.0f),
 				ImGuiChildFlags_None,
 				ImGuiWindowFlags_HorizontalScrollbar))
 			{
+				#pragma region Lines
+
 				const char* filter = m_filter;
 				const bool tracking = m_dragging || ImGui::IsWindowHovered();
 
@@ -203,6 +209,10 @@ namespace Loom
 						run(line.size(), colour);
 					});
 
+				#pragma endregion
+
+				#pragma region Selection
+
 				if (any)
 				{
 					if (mouse.y >= text_bottom)
@@ -286,6 +296,8 @@ namespace Loom
 						m_caret = text_end;
 					};
 				};
+
+				#pragma endregion
 
 				if (copy && !copied.empty())
 					ImGui::SetClipboardText(copied.c_str());

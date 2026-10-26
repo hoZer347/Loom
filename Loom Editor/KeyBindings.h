@@ -24,11 +24,17 @@ namespace Loom
 	*/
 	struct KeyBindings final
 	{
+		#pragma region Panel
+
 		// Whether the actions changed, for the editor to save them. Without a
 		// project open there is nowhere to save them, so none are shown.
 		bool Draw(bool* open, bool project_open);
 
+		#pragma endregion
+
 	private:
+		#pragma region Panel
+
 		// The actions and their folders as this frame changes them.
 		struct Edit
 		{
@@ -50,10 +56,17 @@ namespace Loom
 		// How the FolderTree draws and files this frame's actions.
 		FolderTree::Hooks Hooks(Edit& edit);
 
-		void DrawAction(size_t index, Edit& edit, const FolderTree::Hooks& hooks);
-
 		// Add Action and Add Folder into folder, as buttons or menu items.
 		void DrawAddItems(const std::string& folder, Edit& edit, bool menu);
+
+		// "Action", or the first "Action 2", "Action 3" and on no action has.
+		static std::string FreeName(const std::vector<InputActions::Action>& actions);
+
+		#pragma endregion
+
+		#pragma region Rows
+
+		void DrawAction(size_t index, Edit& edit, const FolderTree::Hooks& hooks);
 
 		// A list for each key, joined by +, and a + that adds one. Whether the
 		// keys changed.
@@ -62,8 +75,9 @@ namespace Loom
 		// The key picked from the list this frame, the one key is included, or none.
 		static std::optional<Key> DrawKey(const char* label, Key key);
 
-		// "Action", or the first "Action 2", "Action 3" and on no action has.
-		static std::string FreeName(const std::vector<InputActions::Action>& actions);
+		#pragma endregion
+
+		#pragma region State
 
 		// The action whose name is being typed, by where it is in the list, and
 		// what it reads so far.
@@ -71,5 +85,7 @@ namespace Loom
 		std::string m_name{ };
 
 		FolderTree m_tree;
+
+		#pragma endregion
 	};
 };

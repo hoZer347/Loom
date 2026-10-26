@@ -48,6 +48,8 @@ namespace Loom
 	*/
 	struct LOOM_API Light : Component<Light, "Rendering">
 	{
+		#pragma region Shadow Map
+
 		~Light();
 
 		// The transform the shadow map is rendered with, from world space into
@@ -59,6 +61,10 @@ namespace Loom
 		// the framebuffer and viewport the way it found them, so it can run
 		// inside whatever target the scene is being drawn into.
 		void RenderShadowMap(const std::vector<GameObject*>& roots);
+
+		#pragma endregion
+
+		#pragma region Lighting
 
 		// Hands the light and its shadow map to the program a mesh is about to
 		// draw with.
@@ -79,10 +85,18 @@ namespace Loom
 		// Scene::Render is drawing it.
 		static inline Light* current = nullptr;
 
+		#pragma endregion
+
+		#pragma region Light
+
 		Serial<glm::vec3> direction = glm::vec3(-0.4f, -1.0f, -0.3f);
 		Serial<glm::vec3> color = glm::vec3(1.0f, 1.0f, 1.0f);
 		Serial<float> intensity = 1.0f;
 		Serial<float> ambient = 0.25f;
+
+		#pragma endregion
+
+		#pragma region Shadows
 
 		// Off still allocates the map, cleared to nothing in shadow: a shader
 		// that declares the sampler has to have a depth texture behind it.
@@ -92,7 +106,11 @@ namespace Loom
 		Serial<glm::vec3> shadowCenter;
 		Serial<float> shadowExtent = 8.0f;
 
+		#pragma endregion
+
 	private:
+		#pragma region Shadow Map
+
 		// Whether there is a shadow map of the current resolution to draw into.
 		bool Allocate();
 		void Release();
@@ -103,6 +121,10 @@ namespace Loom
 		// Readies a program to draw a mesh as seen from the light.
 		void ReadyCaster(Mesh& mesh, uint32_t program) const;
 
+		#pragma endregion
+
+		#pragma region State
+
 		uint32_t m_depth_texture = 0;
 
 		// What was last asked for, failed or not, so a resolution the driver
@@ -110,5 +132,7 @@ namespace Loom
 		int m_allocated_resolution = 0;
 
 		glm::mat4 m_view_projection = glm::mat4(1.0f);
+
+		#pragma endregion
 	};
 };

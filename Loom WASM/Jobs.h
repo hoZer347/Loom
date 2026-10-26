@@ -24,6 +24,8 @@ namespace Loom
 	*/
 	struct LOOM_API Jobs final
 	{
+		#pragma region Work
+
 		typedef std::function<void(size_t chunk, size_t begin, size_t end)> Work;
 
 		// Runs work over [0, count) in chunks of grain, the last one shorter. A
@@ -42,6 +44,10 @@ namespace Loom
 		// on all. Whatever raises counter notifies it.
 		static void WaitFor(const std::atomic<int>& counter, int value);
 
+		#pragma endregion
+
+		#pragma region Threads
+
 		// The caller and the workers the pool was made with. Unlike Threads,
 		// the same however many have started and whatever the limit, so work
 		// split by it splits the same way every run on a machine.
@@ -53,5 +59,7 @@ namespace Loom
 		// At most this many threads share a For, the caller among them, so a
 		// test can compare what fewer give; none for no limit.
 		static void SetMostThreads(unsigned most);
+
+		#pragma endregion
 	};
 };

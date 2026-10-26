@@ -17,7 +17,7 @@ namespace Loom
 {
 	namespace
 	{
-		constexpr const char* SCOPE_NAMES[] = { "Material", "Instance" };
+		#pragma region Shader Cache
 
 		// One Shader per path, shared by every Material that names it. Materials
 		// deliberately do not own theirs: ~Shader erases the entry in Shader's own
@@ -70,6 +70,12 @@ namespace Loom
 			return found != SharedShaders().end() ? found->second : Compile(path);
 		};
 
+		#pragma endregion
+
+		#pragma region Editor
+
+		constexpr const char* SCOPE_NAMES[] = { "Material", "Instance" };
+
 		bool TypeCombo(UniformType& type)
 		{
 			bool changed = false;
@@ -107,7 +113,11 @@ namespace Loom
 
 			return changed;
 		};
+
+		#pragma endregion
 	};
+
+	#pragma region Shader
 
 	void Material::OnAttach()
 	{
@@ -132,19 +142,49 @@ namespace Loom
 		shader = path.empty() ? nullptr : Shared(path);
 	};
 
-	void Material::OnFieldChanged(const SerializedField& field)
+	void Material::ReloadChangedShaders()
 	{
-		if (field.data != &*m_shader_path)
+		for (const auto& [path, shader] : SharedShaders())
+			shader->ReloadIfChanged();
+
+		// A copy, since compiling takes the path out of the map.
+		const auto failed = FailedShaders();
+
+		for (const auto& [path, written] : failed)
+		{
+			std::error_code code;
+
+			if (std::filesystem::last_write_time(path, code) != written)
+				Compile(path);
+		};
+	};
+
+	#pragma endregion
+
+	#pragma region Rendering
+
+	void Material::Apply(uint32_t program, const UniformValues* instance) const
+	{
+		Renderer* renderer = Renderer::Get();
+
+		if (!renderer)
 			return;
 
-		// Until it names a shader file, as one typed in over the MCP may not,
-		// the material keeps drawing with the one it has.
-		std::error_code code;
+		renderer->SetUniform(program, "u_color", *color);
+		renderer->SetUniform(program, "u_shadowsOff", shadows ? 0.0f : 1.0f);
+		renderer->SetUniform(program, "u_time", Time::SinceStart());
 
-		if (m_shader_path->empty() ||
-			(m_shader_path->ends_with(Shader::extension) && std::filesystem::is_regular_file(GetShaderPath(), code)))
-			ChangeShader(m_shader_path);
+		if (!shader)
+			return;
+
+		// Set for each draw, as materials sharing a program may sample apart.
+		renderer->SetPixelated(program, sampling == AsShader ? shader->settings.pixelated : sampling == Nearest);
+		ApplyShaderVariables(program, shader->variables, variables, instance);
 	};
+
+	#pragma endregion
+
+	#pragma region Editor
 
 	void Material::OnGui()
 	{
@@ -169,6 +209,20 @@ namespace Loom
 			variables = std::move(values);
 
 		DrawDeclarations();
+	};
+
+	void Material::OnFieldChanged(const SerializedField& field)
+	{
+		if (field.data != &*m_shader_path)
+			return;
+
+		// Until it names a shader file, as one typed in over the MCP may not,
+		// the material keeps drawing with the one it has.
+		std::error_code code;
+
+		if (m_shader_path->empty() ||
+			(m_shader_path->ends_with(Shader::extension) && std::filesystem::is_regular_file(GetShaderPath(), code)))
+			ChangeShader(m_shader_path);
 	};
 
 	void Material::DrawSettings()
@@ -307,39 +361,5 @@ namespace Loom
 		m_edit_error = shader->Reload() ? "" : shader->file_path + " no longer compiles. The console says why.";
 	};
 
-	void Material::Apply(uint32_t program, const UniformValues* instance) const
-	{
-		Renderer* renderer = Renderer::Get();
-
-		if (!renderer)
-			return;
-
-		renderer->SetUniform(program, "u_color", *color);
-		renderer->SetUniform(program, "u_shadowsOff", shadows ? 0.0f : 1.0f);
-		renderer->SetUniform(program, "u_time", Time::SinceStart());
-
-		if (!shader)
-			return;
-
-		// Set for each draw, as materials sharing a program may sample apart.
-		renderer->SetPixelated(program, sampling == AsShader ? shader->settings.pixelated : sampling == Nearest);
-		ApplyShaderVariables(program, shader->variables, variables, instance);
-	};
-
-	void Material::ReloadChangedShaders()
-	{
-		for (const auto& [path, shader] : SharedShaders())
-			shader->ReloadIfChanged();
-
-		// A copy, since compiling takes the path out of the map.
-		const auto failed = FailedShaders();
-
-		for (const auto& [path, written] : failed)
-		{
-			std::error_code code;
-
-			if (std::filesystem::last_write_time(path, code) != written)
-				Compile(path);
-		};
-	};
+	#pragma endregion
 };

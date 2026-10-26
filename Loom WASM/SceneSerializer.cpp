@@ -24,6 +24,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Text
+
 		std::string Indent(int depth)
 		{
 			return std::string(depth, '\t');
@@ -62,6 +64,10 @@ namespace Loom
 
 			return true;
 		};
+
+		#pragma endregion
+
+		#pragma region Writing
 
 		// What identifies a field is where its Serial member was declared, so
 		// that is what goes in the file. One the object does not save is left
@@ -105,6 +111,18 @@ namespace Loom
 			};
 		};
 
+		void WriteGameObject(std::string& text, GameObject& gameObject, int depth)
+		{
+			WriteOwn(text, gameObject, depth);
+
+			for (GameObject* child : gameObject.GetChildren())
+				WriteGameObject(text, *child, depth + 1);
+		};
+
+		#pragma endregion
+
+		#pragma region Reading
+
 		// The component registered under type, or until something registers
 		// it, one keeping its place.
 		ComponentBase* Make(const std::string& type, GameObject& gameObject)
@@ -118,14 +136,6 @@ namespace Loom
 		MissingComponent::Line LineOf(const std::string& content, size_t equals)
 		{
 			return { Trim(content.substr(0, equals)), Trim(content.substr(equals + 1)) };
-		};
-
-		void WriteGameObject(std::string& text, GameObject& gameObject, int depth)
-		{
-			WriteOwn(text, gameObject, depth);
-
-			for (GameObject* child : gameObject.GetChildren())
-				WriteGameObject(text, *child, depth + 1);
 		};
 
 		// A field line read onto object in place: left alone when it already
@@ -224,6 +234,10 @@ namespace Loom
 
 			return true;
 		};
+
+		#pragma endregion
+
+		#pragma region Reader
 
 		// Builds objects from the lines under a header. A scene and a pasted
 		// subtree differ only in what a GameObject one level down becomes.
@@ -396,7 +410,11 @@ namespace Loom
 					: found->second;
 			};
 		};
+
+		#pragma endregion
 	};
+
+	#pragma region Format
 
 	int SceneSerializer::DepthOf(const std::string& line, size_t& content_start)
 	{
@@ -442,6 +460,10 @@ namespace Loom
 		return Guid::TryParse(text.substr(open + 1, close - open - 1), guid);
 	};
 
+	#pragma endregion
+
+	#pragma region Scenes
+
 	std::string SceneSerializer::Serialize(Scene& scene)
 	{
 		std::string text =
@@ -450,165 +472,6 @@ namespace Loom
 		WriteFields(text, scene, 1);
 
 		WriteGameObject(text, scene.GetRoot(), 1);
-
-		return text;
-	};
-
-	std::string SceneSerializer::SerializeOwn(GameObject& gameObject)
-	{
-		std::string text;
-
-		WriteOwn(text, gameObject, 0);
-
-		return text;
-	};
-
-	std::string SceneSerializer::SerializeHeader(Scene& scene)
-	{
-		std::string text =
-			scene.GetName() + '(' + scene.GetGuid().ToString() + "):\n";
-
-		WriteFields(text, scene, 1);
-
-		return text;
-	};
-
-	bool SceneSerializer::ReadOwn(GameObject& gameObject, const std::string& text, PendingReferences& pending)
-	{
-		// Each component as the text has it, with the fields under it.
-		struct Wanted
-		{
-			std::string type;
-			Guid guid;
-			std::vector<std::string> fields{ };
-		};
-
-		std::string name;
-		Guid guid;
-		std::vector<std::string> fields{ };
-		std::vector<Wanted> components{ };
-		bool started = false;
-		int line_number = 0;
-
-		const bool read = ReadLines(
-			text,
-			line_number,
-			[&](int depth, const std::string& content)
-			{
-				if (!started)
-				{
-					started = true;
-
-					return depth == 0 &&
-						content.rfind(gameobject_keyword, 0) == 0 &&
-						SplitNameAndGuid(content.substr(strlen(gameobject_keyword)), name, guid);
-				};
-
-				if (depth == 1 && content.rfind(component_keyword, 0) == 0)
-				{
-					Wanted& component = components.emplace_back();
-
-					return SplitNameAndGuid(content.substr(strlen(component_keyword)), component.type, component.guid);
-				};
-
-				if (depth == 1)
-					fields.push_back(content);
-				else if (depth == 2 && !components.empty())
-					components.back().fields.push_back(content);
-				else return false;
-
-				return true;
-			});
-
-		if (!read || !started)
-			return false;
-
-		if (gameObject.GetName() != name)
-			gameObject.SetName(name);
-
-		for (const std::string& field : fields)
-			ReadOwnField(gameObject, field, pending);
-
-		std::vector<ComponentBase*> kept{ };
-
-		for (const Wanted& wanted : components)
-		{
-			ComponentBase* component = nullptr;
-
-			for (ComponentBase* had : gameObject.GetComponents())
-				if (had->GetGuid() == wanted.guid && ComponentRegistry::NameOf(*had) == wanted.type)
-					component = had;
-
-			if (component == nullptr)
-			{
-				component = Make(wanted.type, gameObject);
-				component->SetGuid(wanted.guid);
-			};
-
-			kept.push_back(component);
-
-			if (MissingComponent* missing = dynamic_cast<MissingComponent*>(component))
-			{
-				missing->lines.clear();
-
-				for (const std::string& field : wanted.fields)
-					if (const size_t equals = field.find('='); equals != std::string::npos)
-						missing->lines.push_back(LineOf(field, equals));
-			}
-			else for (const std::string& field : wanted.fields)
-				ReadOwnField(*component, field, pending);
-		};
-
-		for (ComponentBase* had : gameObject.GetComponents())
-			if (std::find(kept.begin(), kept.end(), had) == kept.end())
-				gameObject.DetachComponent(had);
-
-		if (kept != gameObject.GetComponents())
-			gameObject.OrderComponents(kept);
-
-		return true;
-	};
-
-	bool SceneSerializer::ReadHeader(Scene& scene, const std::string& text, PendingReferences& pending)
-	{
-		bool started = false;
-		int line_number = 0;
-
-		return ReadLines(
-			text,
-			line_number,
-			[&](int depth, const std::string& content)
-			{
-				if (started)
-				{
-					if (depth != 1)
-						return false;
-
-					ReadOwnField(scene, content, pending);
-
-					return true;
-				};
-
-				started = true;
-
-				std::string name;
-				Guid guid;
-
-				if (depth != 0 || content.back() != ':' || !SplitNameAndGuid(content.substr(0, content.size() - 1), name, guid))
-					return false;
-
-				if (scene.GetName() != name)
-					scene.SetName(name);
-
-				return true;
-			}) && started;
-	};
-
-	std::string SceneSerializer::Serialize(GameObject& gameObject)
-	{
-		std::string text;
-
-		WriteGameObject(text, gameObject, 0);
 
 		return text;
 	};
@@ -636,6 +499,42 @@ namespace Loom
 
 		return true;
 	};
+
+	Scene* SceneSerializer::Deserialize(
+		const std::string& text,
+		std::string* error,
+		PendingReferences* pending_out)
+	{
+		return Loading(text).Finish(error, pending_out);
+	};
+
+	void SceneSerializer::ResolveReferences(const PendingReferences& pending)
+	{
+		for (const auto& [field, guid] : pending)
+		{
+			LoomObject* target = LoomObject::GetByGuid(guid);
+
+			if (target == nullptr)
+			{
+				std::cerr
+					<< "Scene load: a reference points at " << guid.ToString()
+					<< ", which is not loaded" << std::endl;
+
+				continue;
+			};
+
+			field->SetReference(target);
+
+			if (field->GetReference() == nullptr)
+				std::cerr
+					<< "Scene load: a reference cannot point at " << guid.ToString()
+					<< ", which is not the type it holds" << std::endl;
+		};
+	};
+
+	#pragma endregion
+
+	#pragma region Loading
 
 	// Everything a scene being read needs to pick up where the last slice left
 	// off. The text is either its own or one the caller keeps alive.
@@ -833,36 +732,17 @@ namespace Loom
 			: nullptr;
 	};
 
-	Scene* SceneSerializer::Deserialize(
-		const std::string& text,
-		std::string* error,
-		PendingReferences* pending_out)
+	#pragma endregion
+
+	#pragma region Subtrees
+
+	std::string SceneSerializer::Serialize(GameObject& gameObject)
 	{
-		return Loading(text).Finish(error, pending_out);
-	};
+		std::string text;
 
-	void SceneSerializer::ResolveReferences(const PendingReferences& pending)
-	{
-		for (const auto& [field, guid] : pending)
-		{
-			LoomObject* target = LoomObject::GetByGuid(guid);
+		WriteGameObject(text, gameObject, 0);
 
-			if (target == nullptr)
-			{
-				std::cerr
-					<< "Scene load: a reference points at " << guid.ToString()
-					<< ", which is not loaded" << std::endl;
-
-				continue;
-			};
-
-			field->SetReference(target);
-
-			if (field->GetReference() == nullptr)
-				std::cerr
-					<< "Scene load: a reference cannot point at " << guid.ToString()
-					<< ", which is not the type it holds" << std::endl;
-		};
+		return text;
 	};
 
 	GameObject* SceneSerializer::Deserialize(const std::string& text, GameObject& parent, std::string* error)
@@ -929,4 +809,160 @@ namespace Loom
 
 		return nullptr;
 	};
+
+	#pragma endregion
+
+	#pragma region In Place
+
+	std::string SceneSerializer::SerializeOwn(GameObject& gameObject)
+	{
+		std::string text;
+
+		WriteOwn(text, gameObject, 0);
+
+		return text;
+	};
+
+	std::string SceneSerializer::SerializeHeader(Scene& scene)
+	{
+		std::string text =
+			scene.GetName() + '(' + scene.GetGuid().ToString() + "):\n";
+
+		WriteFields(text, scene, 1);
+
+		return text;
+	};
+
+	bool SceneSerializer::ReadOwn(GameObject& gameObject, const std::string& text, PendingReferences& pending)
+	{
+		// Each component as the text has it, with the fields under it.
+		struct Wanted
+		{
+			std::string type;
+			Guid guid;
+			std::vector<std::string> fields{ };
+		};
+
+		std::string name;
+		Guid guid;
+		std::vector<std::string> fields{ };
+		std::vector<Wanted> components{ };
+		bool started = false;
+		int line_number = 0;
+
+		const bool read = ReadLines(
+			text,
+			line_number,
+			[&](int depth, const std::string& content)
+			{
+				if (!started)
+				{
+					started = true;
+
+					return depth == 0 &&
+						content.rfind(gameobject_keyword, 0) == 0 &&
+						SplitNameAndGuid(content.substr(strlen(gameobject_keyword)), name, guid);
+				};
+
+				if (depth == 1 && content.rfind(component_keyword, 0) == 0)
+				{
+					Wanted& component = components.emplace_back();
+
+					return SplitNameAndGuid(content.substr(strlen(component_keyword)), component.type, component.guid);
+				};
+
+				if (depth == 1)
+					fields.push_back(content);
+				else if (depth == 2 && !components.empty())
+					components.back().fields.push_back(content);
+				else return false;
+
+				return true;
+			});
+
+		if (!read || !started)
+			return false;
+
+		if (gameObject.GetName() != name)
+			gameObject.SetName(name);
+
+		for (const std::string& field : fields)
+			ReadOwnField(gameObject, field, pending);
+
+		std::vector<ComponentBase*> kept{ };
+
+		for (const Wanted& wanted : components)
+		{
+			ComponentBase* component = nullptr;
+
+			for (ComponentBase* had : gameObject.GetComponents())
+				if (had->GetGuid() == wanted.guid && ComponentRegistry::NameOf(*had) == wanted.type)
+					component = had;
+
+			if (component == nullptr)
+			{
+				component = Make(wanted.type, gameObject);
+				component->SetGuid(wanted.guid);
+			};
+
+			kept.push_back(component);
+
+			if (MissingComponent* missing = dynamic_cast<MissingComponent*>(component))
+			{
+				missing->lines.clear();
+
+				for (const std::string& field : wanted.fields)
+					if (const size_t equals = field.find('='); equals != std::string::npos)
+						missing->lines.push_back(LineOf(field, equals));
+			}
+			else for (const std::string& field : wanted.fields)
+				ReadOwnField(*component, field, pending);
+		};
+
+		for (ComponentBase* had : gameObject.GetComponents())
+			if (std::find(kept.begin(), kept.end(), had) == kept.end())
+				gameObject.DetachComponent(had);
+
+		if (kept != gameObject.GetComponents())
+			gameObject.OrderComponents(kept);
+
+		return true;
+	};
+
+	bool SceneSerializer::ReadHeader(Scene& scene, const std::string& text, PendingReferences& pending)
+	{
+		bool started = false;
+		int line_number = 0;
+
+		return ReadLines(
+			text,
+			line_number,
+			[&](int depth, const std::string& content)
+			{
+				if (started)
+				{
+					if (depth != 1)
+						return false;
+
+					ReadOwnField(scene, content, pending);
+
+					return true;
+				};
+
+				started = true;
+
+				std::string name;
+				Guid guid;
+
+				if (depth != 0 || content.back() != ':' || !SplitNameAndGuid(content.substr(0, content.size() - 1), name, guid))
+					return false;
+
+				if (scene.GetName() != name)
+					scene.SetName(name);
+
+				return true;
+			}) && started;
+	};
+
+	#pragma endregion
 };

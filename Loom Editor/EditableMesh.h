@@ -28,6 +28,8 @@ namespace Loom
 	*/
 	struct EditableMesh final
 	{
+		#pragma region Elements
+
 		struct Corner
 		{
 			uint32_t vertex = 0;
@@ -54,6 +56,10 @@ namespace Loom
 
 		static Edge EdgeOf(uint32_t a, uint32_t b);
 
+		#pragma endregion
+
+		#pragma region Conversion
+
 		// Unindexed triangles, as Mesh keeps them: three floats a vertex for
 		// positions and normals, two for UVs and four for colours. UVs,
 		// normals and colours count only when there are as many of them as
@@ -70,6 +76,10 @@ namespace Loom
 		// Both into the Mesh, in place of what it drew.
 		void WriteTo(Mesh& mesh) const;
 
+		#pragma endregion
+
+		#pragma region Primitives
+
 		// Centred on the origin, with flat normals and each face's UVs spanning
 		// the texture.
 		static EditableMesh Cube(float size);
@@ -81,6 +91,10 @@ namespace Loom
 		// Height end to end, each round end a half sphere of cap_rings rings.
 		// No shorter than a sphere.
 		static EditableMesh Capsule(float radius, float height, int segments, int cap_rings);
+
+		#pragma endregion
+
+		#pragma region Queries
 
 		// Unit length, by Newell's method so it holds for any flat polygon.
 		// Zero for a face with no area.
@@ -96,6 +110,23 @@ namespace Loom
 		// Faces and edges whose every vertex is in the set.
 		std::set<uint32_t> FacesWithin(const std::set<uint32_t>& vertices) const;
 		std::set<Edge> EdgesWithin(const std::set<uint32_t>& vertices) const;
+
+		// The nearest face the ray goes into from either side, and how far
+		// along the ray it is, in lengths of direction.
+		struct Hit
+		{
+			uint32_t face = 0;
+			float distance = 0.0f;
+		};
+
+		std::optional<Hit> Raycast(const glm::vec3& origin, const glm::vec3& direction) const;
+
+		// The smallest box round every vertex. Both corners zero for none.
+		std::pair<glm::vec3, glm::vec3> Bounds() const;
+
+		#pragma endregion
+
+		#pragma region Editing
 
 		// Moves the vertices by the matrix, and flattens the normals of every
 		// face they are in.
@@ -131,18 +162,7 @@ namespace Loom
 		// model file that split its quads in two had them.
 		void JoinTriangles();
 
-		// The nearest face the ray goes into from either side, and how far
-		// along the ray it is, in lengths of direction.
-		struct Hit
-		{
-			uint32_t face = 0;
-			float distance = 0.0f;
-		};
-
-		std::optional<Hit> Raycast(const glm::vec3& origin, const glm::vec3& direction) const;
-
-		// The smallest box round every vertex. Both corners zero for none.
-		std::pair<glm::vec3, glm::vec3> Bounds() const;
+		#pragma endregion
 
 		std::vector<glm::vec3> vertices;
 		std::vector<Face> faces;
@@ -157,15 +177,23 @@ namespace Loom
 		bool operator==(const EditableMesh&) const = default;
 
 	private:
+		#pragma region Editing
+
 		void Flatten(uint32_t face);
 
 		// Drops the vertices no face uses, numbering the rest down.
 		void RemoveUnused();
+
+		#pragma endregion
+
+		#pragma region Primitives
 
 		// A face from vertices given in order, with flat normals and the UVs given.
 		uint32_t AddFace(const std::vector<uint32_t>& corners, const std::vector<glm::vec2>& uvs);
 
 		// The face on the end, with flat normals.
 		uint32_t AddFace(Face face);
+
+		#pragma endregion
 	};
 };

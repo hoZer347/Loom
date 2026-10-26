@@ -9,14 +9,6 @@
 
 namespace Loom
 {
-	bool VirtualFolders::Alphabetical(std::string_view a, std::string_view b)
-	{
-		return std::ranges::lexicographical_compare(
-			a,
-			b,
-			[](unsigned char x, unsigned char y) { return std::tolower(x) < std::tolower(y); });
-	};
-
 	namespace
 	{
 		// By what follows the last separator, as a FileTab shows its files by
@@ -74,6 +66,32 @@ namespace Loom
 		};
 	};
 
+	#pragma region Paths
+
+	bool VirtualFolders::IsAtOrUnder(const std::string& path, const std::string& folder)
+	{
+		return path == folder ||
+			(path.size() > folder.size() &&
+			path.compare(0, folder.size(), folder) == 0 &&
+			path[folder.size()] == separator);
+	};
+
+	std::string VirtualFolders::ParentOf(const std::string& folder)
+	{
+		const size_t last = folder.rfind(separator);
+
+		return last == std::string::npos ? "" : folder.substr(0, last);
+	};
+
+	std::string VirtualFolders::NameOf(const std::string& folder)
+	{
+		return folder.substr(folder.rfind(separator) + 1);
+	};
+
+	#pragma endregion
+
+	#pragma region File
+
 	void VirtualFolders::Clear()
 	{
 		m_folders.clear();
@@ -125,6 +143,10 @@ namespace Loom
 
 		return (bool)out;
 	};
+
+	#pragma endregion
+
+	#pragma region Folders
 
 	std::string VirtualFolders::FolderOf(const std::string& item) const
 	{
@@ -225,41 +247,6 @@ namespace Loom
 		m_folders = std::move(folders);
 	};
 
-	VirtualFolders::Node VirtualFolders::Build(const std::vector<std::string>& items) const
-	{
-		Node root{ };
-
-		for (const std::string& folder : m_folders)
-			NodeAt(root, folder);
-
-		for (const std::string& item : items)
-			NodeAt(root, FolderOf(item)).items.push_back(item);
-
-		Sort(root);
-
-		return root;
-	};
-
-	bool VirtualFolders::IsAtOrUnder(const std::string& path, const std::string& folder)
-	{
-		return path == folder ||
-			(path.size() > folder.size() &&
-			path.compare(0, folder.size(), folder) == 0 &&
-			path[folder.size()] == separator);
-	};
-
-	std::string VirtualFolders::ParentOf(const std::string& folder)
-	{
-		const size_t last = folder.rfind(separator);
-
-		return last == std::string::npos ? "" : folder.substr(0, last);
-	};
-
-	std::string VirtualFolders::NameOf(const std::string& folder)
-	{
-		return folder.substr(folder.rfind(separator) + 1);
-	};
-
 	std::string VirtualFolders::Tidy(const std::string& name)
 	{
 		constexpr const char* blank = " \t";
@@ -300,4 +287,33 @@ namespace Loom
 
 		m_folders = std::move(folders);
 	};
+
+	#pragma endregion
+
+	#pragma region Tree
+
+	bool VirtualFolders::Alphabetical(std::string_view a, std::string_view b)
+	{
+		return std::ranges::lexicographical_compare(
+			a,
+			b,
+			[](unsigned char x, unsigned char y) { return std::tolower(x) < std::tolower(y); });
+	};
+
+	VirtualFolders::Node VirtualFolders::Build(const std::vector<std::string>& items) const
+	{
+		Node root{ };
+
+		for (const std::string& folder : m_folders)
+			NodeAt(root, folder);
+
+		for (const std::string& item : items)
+			NodeAt(root, FolderOf(item)).items.push_back(item);
+
+		Sort(root);
+
+		return root;
+	};
+
+	#pragma endregion
 };

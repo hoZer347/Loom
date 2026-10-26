@@ -9,30 +9,10 @@ namespace Loom
 {
 	namespace
 	{
-		constexpr char name_end = '=';
-		constexpr char key_join = '+';
-		constexpr char folder_start = '[';
-		constexpr char folder_end = ']';
-
-		// What split a key from its alternate in a file before actions shared names.
-		constexpr char older_alternate = ',';
+		#pragma region Actions
 
 		std::vector<InputActions::Action> actions{ };
 		std::vector<std::string> folders{ };
-
-		std::string_view Trimmed(std::string_view text)
-		{
-			constexpr std::string_view blank = " \t\r";
-
-			const size_t first = text.find_first_not_of(blank);
-
-			return first == std::string_view::npos ? std::string_view{ } : text.substr(first, text.find_last_not_of(blank) - first + 1);
-		};
-
-		bool Contains(const std::vector<std::string>& folders_in, const std::string& folder)
-		{
-			return std::find(folders_in.begin(), folders_in.end(), folder) != folders_in.end();
-		};
 
 		bool IsSet(Key key)
 		{
@@ -69,6 +49,32 @@ namespace Loom
 			return std::any_of(actions.begin(), actions.end(), [name, edge](const InputActions::Action& action) { return action.name == name && Together(action.keys, edge); });
 		};
 
+		#pragma endregion
+
+		#pragma region Parsing
+
+		constexpr char name_end = '=';
+		constexpr char key_join = '+';
+		constexpr char folder_start = '[';
+		constexpr char folder_end = ']';
+
+		// What split a key from its alternate in a file before actions shared names.
+		constexpr char older_alternate = ',';
+
+		std::string_view Trimmed(std::string_view text)
+		{
+			constexpr std::string_view blank = " \t\r";
+
+			const size_t first = text.find_first_not_of(blank);
+
+			return first == std::string_view::npos ? std::string_view{ } : text.substr(first, text.find_last_not_of(blank) - first + 1);
+		};
+
+		bool Contains(const std::vector<std::string>& folders_in, const std::string& folder)
+		{
+			return std::find(folders_in.begin(), folders_in.end(), folder) != folders_in.end();
+		};
+
 		// The keys of a part of a line, Key+Key, those that are no key left out.
 		std::vector<Key> KeysIn(std::string_view part)
 		{
@@ -86,7 +92,11 @@ namespace Loom
 
 			return keys;
 		};
+
+		#pragma endregion
 	};
+
+	#pragma region Actions
 
 	bool InputActions::Down(std::string_view name)
 	{
@@ -125,6 +135,10 @@ namespace Loom
 
 		return trimmed.find(name_end) == std::string_view::npos ? std::string(trimmed) : std::string{ };
 	};
+
+	#pragma endregion
+
+	#pragma region Files
 
 	void InputActions::Load(const std::string& file)
 	{
@@ -242,4 +256,6 @@ namespace Loom
 			write(folder);
 		};
 	};
+
+	#pragma endregion
 };

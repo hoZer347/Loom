@@ -209,6 +209,10 @@ namespace Loom
 		renderer->Draw(m_program, GL_TRIANGLES, s_quad, QUAD_VERTICES, GL_DYNAMIC_DRAW);
 	};
 
+	#pragma endregion
+
+	#pragma region Inspector
+
 	void SpriteManager::OnGui()
 	{
 		ImGui::Text("Sheet: %u (%d x %d)", texture, sheetSize.x, sheetSize.y);

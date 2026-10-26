@@ -25,6 +25,8 @@ namespace Loom
 	*/
 	struct SpriteAsset final
 	{
+		#pragma region Constants
+
 		static constexpr const char* extension = ".loomsprite";
 		static constexpr int defaultDuration = 100;
 
@@ -37,6 +39,10 @@ namespace Loom
 
 		// Bounds what one cel allocates.
 		static constexpr int maxSide = 16384;
+
+		#pragma endregion
+
+		#pragma region Image
 
 		using Colour = std::array<uint8_t, 4>;
 
@@ -72,33 +78,6 @@ namespace Loom
 			bool operator==(const Image&) const = default;
 		};
 
-		struct Layer
-		{
-			std::string name;
-			bool visible = true;
-
-			// One for each frame.
-			std::vector<Image> cels;
-
-			// Whether the Sprites panel draws round its pixels, to show what is
-			// on it. Nothing in the image changes.
-			bool outlined = false;
-
-			bool operator==(const Layer&) const = default;
-		};
-
-		// Where the sprite's own file is linked to.
-		struct Links
-		{
-			// Absolute.
-			std::string image;
-
-			// Absolute, or empty for none.
-			std::string palette;
-
-			bool operator==(const Links&) const = default;
-		};
-
 		// Each says what went wrong on std::cerr.
 		static bool LoadImage(const std::string& path, Image& image);
 		static bool SaveImage(const std::string& path, const Image& image);
@@ -111,8 +90,21 @@ namespace Loom
 		// one it cannot write.
 		static std::vector<char> Encode(const std::string& extension, const Image& image);
 
-		// One frame of one layer, the whole image.
-		static SpriteAsset FromImage(Image image);
+		#pragma endregion
+
+		#pragma region Files
+
+		// Where the sprite's own file is linked to.
+		struct Links
+		{
+			// Absolute.
+			std::string image;
+
+			// Absolute, or empty for none.
+			std::string palette;
+
+			bool operator==(const Links&) const = default;
+		};
 
 		// The sprite kept for an image: beside it, under its stem.
 		static std::string For(const std::string& image_path);
@@ -130,17 +122,29 @@ namespace Loom
 		static bool Load(const std::string& path, SpriteAsset& sprite, Links& links);
 		static bool Save(const std::string& path, const SpriteAsset& sprite, const Links& links);
 
+		#pragma endregion
+
+		#pragma region Editing
+
+		struct Layer
+		{
+			std::string name;
+			bool visible = true;
+
+			// One for each frame.
+			std::vector<Image> cels;
+
+			// Whether the Sprites panel draws round its pixels, to show what is
+			// on it. Nothing in the image changes.
+			bool outlined = false;
+
+			bool operator==(const Layer&) const = default;
+		};
+
+		// One frame of one layer, the whole image.
+		static SpriteAsset FromImage(Image image);
+
 		int Frames() const { return (int)durations.size(); };
-
-		// The visible layers of a frame, each over those under it.
-		Image Flatten(int frame) const;
-
-		// Every frame flattened, side by side, the first on the left.
-		Image Sheet() const;
-
-		// Every colour any visible layer of any frame holds, but clear, in the
-		// order first met, at most limit of them.
-		std::vector<Colour> Colours(size_t limit) const;
 
 		void AddLayer(int at, const std::string& name);
 
@@ -155,8 +159,24 @@ namespace Loom
 		void AddFrame(int at, bool copy_previous);
 		void RemoveFrame(int frame);
 
+		#pragma endregion
+
+		#pragma region Contents
+
+		// The visible layers of a frame, each over those under it.
+		Image Flatten(int frame) const;
+
+		// Every frame flattened, side by side, the first on the left.
+		Image Sheet() const;
+
+		// Every colour any visible layer of any frame holds, but clear, in the
+		// order first met, at most limit of them.
+		std::vector<Colour> Colours(size_t limit) const;
+
 		// Pixels of every cel, so undo can keep fewer of a large sprite.
 		size_t Bytes() const;
+
+		#pragma endregion
 
 		int width = 0;
 		int height = 0;
@@ -169,6 +189,8 @@ namespace Loom
 
 		bool operator==(const SpriteAsset&) const = default;
 	};
+
+	#pragma region Palette
 
 	/**
 	* Loom::Palette
@@ -188,4 +210,6 @@ namespace Loom
 
 		bool operator==(const Palette&) const = default;
 	};
+
+	#pragma endregion
 };

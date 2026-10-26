@@ -29,10 +29,18 @@ namespace Loom
 	*/
 	struct LOOM_API MeshCollider : Component<MeshCollider, "Physics", Collider>
 	{
+		#pragma region Collider
+
 		size_t TriangleCount() const { return m_triangles.size(); };
 
 		bool IsTrigger() const override { return isTrigger; };
 		ColliderShape Shape() const override { return ColliderShape::Mesh; };
+
+		Serial<bool> isTrigger;
+
+		#pragma endregion
+
+		#pragma region Posing
 
 		// Puts the triangles where world has them, for TrianglesNear: done
 		// when the collider is synced somewhere new, so that finding contacts
@@ -46,15 +54,21 @@ namespace Loom
 		// Intersect, against the triangles where the last Pose put them.
 		bool IntersectPosed(const Ray& ray, float maxDistance, RaycastHit& hit) const;
 
-		Serial<bool> isTrigger;
+		#pragma endregion
 
 	protected:
+		#pragma region Collider
+
 		bool Refresh() const override;
 
 		Bounds BoundsIn(const glm::mat4& world) const override;
 		bool Intersect(const glm::mat4& world, const Ray& ray, float maxDistance, RaycastHit& hit) const override;
 
+		#pragma endregion
+
 	private:
+		#pragma region Tree
+
 		struct Triangle
 		{
 			glm::vec3 corners[3];
@@ -84,6 +98,10 @@ namespace Loom
 		bool Nearest(const std::vector<Triangle>& triangles, const BoxOf& boxOf, const Ray& ray, float& nearest, glm::vec3& normal) const;
 		void Build(uint32_t first, uint32_t count) const;
 
+		#pragma endregion
+
+		#pragma region Source
+
 		// What the tree was built from, to tell when the mesh has changed: the
 		// mesh, the version of its vertices, and the vertices themselves, for
 		// when a new version holds the same ones.
@@ -93,6 +111,10 @@ namespace Loom
 		mutable std::vector<uint32_t> m_indices{ };
 		mutable uint32_t m_primitive = 0;
 
+		#pragma endregion
+
+		#pragma region Tree
+
 		mutable std::vector<Triangle> m_triangles{ };
 		mutable std::vector<Node> m_nodes{ };
 
@@ -100,5 +122,7 @@ namespace Loom
 		// put them.
 		mutable std::vector<Triangle> m_posed{ };
 		mutable std::vector<Bounds> m_posedBounds{ };
+
+		#pragma endregion
 	};
 };

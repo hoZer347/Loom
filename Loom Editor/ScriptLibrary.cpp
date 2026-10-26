@@ -80,32 +80,7 @@ namespace Loom
 		};
 	};
 
-	// The copies left behind by editors that are no longer running. One still
-	// mapped by a live editor refuses to be removed, and its symbols are left
-	// alone with it: that editor is still debugging scripts through them.
-	void ScriptLibrary::SweepLoadedCopies(const std::string& library)
-	{
-		const std::filesystem::path path(library);
-		const std::string prefix = path.stem().string() + ".loaded.";
-
-		std::error_code code;
-
-		for (const auto& entry :
-			std::filesystem::directory_iterator(path.parent_path(), code))
-		{
-			const std::filesystem::path& copy = entry.path();
-
-			if (copy.extension() != ".dll" ||
-				copy.filename().string().rfind(prefix, 0) != 0)
-				continue;
-
-			std::error_code removing;
-
-			if (std::filesystem::remove(copy, removing) && !removing)
-				std::filesystem::remove(
-					std::filesystem::path(copy).replace_extension(".pdb"), code);
-		};
-	};
+	#pragma region Lifetime
 
 	ScriptLibrary::~ScriptLibrary()
 	{
@@ -121,57 +96,9 @@ namespace Loom
 		Unload();
 	};
 
-	std::string ScriptLibrary::FindMSBuild()
-	{
-		const std::string found = VsWhere(
-			"-requires Microsoft.Component.MSBuild "
-			"-find MSBuild\\**\\Bin\\MSBuild.exe");
+	#pragma endregion
 
-		if (!found.empty())
-			return found;
-
-		const char* const fallbacks[] =
-		{
-			"C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe",
-			"C:\\Program Files\\Microsoft Visual Studio\\18\\Professional\\MSBuild\\Current\\Bin\\MSBuild.exe",
-			"C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\MSBuild\\Current\\Bin\\MSBuild.exe",
-		};
-
-		std::error_code code;
-
-		for (const char* fallback : fallbacks)
-			if (std::filesystem::exists(fallback, code))
-				return fallback;
-
-		return "";
-	};
-
-	const char* ScriptLibrary::Configuration()
-	{
-		return configuration;
-	};
-
-	const std::string& ScriptLibrary::FindVisualStudio()
-	{
-		// vswhere is a process, so the answer is kept: an installation does not
-		// come and go while the editor is up.
-		static const std::string devenv = VsWhere("-find Common7\\IDE\\devenv.exe");
-
-		return devenv;
-	};
-
-	void ScriptLibrary::AbandonBuild()
-	{
-		if (!m_worker.joinable())
-			return;
-
-		// Dropped, not waited for: it is blocked in MSBuild and the editor has a
-		// frame to draw. The worker holds the only other reference to its result
-		// and finishes into that, where nothing reads it.
-		m_current.reset();
-
-		m_abandoned.push_back(std::move(m_worker));
-	};
+	#pragma region Project
 
 	void ScriptLibrary::SetProject(const std::string& project, const std::string& library)
 	{
@@ -202,19 +129,6 @@ namespace Loom
 		m_library.clear();
 		m_staleCheckedAt = { };
 		m_status = "No script project.";
-	};
-
-	bool ScriptLibrary::BuiltAgainstOlderEditor() const
-	{
-		if (m_library.empty())
-			return false;
-
-		std::error_code code;
-
-		if (!std::filesystem::exists(m_library, code))
-			return false;
-
-		return std::filesystem::last_write_time(m_library, code) < EditorBuildTime();
 	};
 
 	bool ScriptLibrary::IsStale() const
@@ -282,6 +196,10 @@ namespace Loom
 		return false;
 	};
 
+	#pragma endregion
+
+	#pragma region Building
+
 	bool ScriptLibrary::Build()
 	{
 		if (m_project.empty() || IsBuilding())
@@ -344,21 +262,6 @@ namespace Loom
 		return true;
 	};
 
-	std::optional<float> ScriptLibrary::BuildProgress() const
-	{
-		if (IsIdle())
-			return std::nullopt;
-
-		return BuildTimings::Progress(
-			std::chrono::duration<double>(std::chrono::steady_clock::now() - m_buildStarted).count(),
-			m_expected);
-	};
-
-	std::filesystem::path ScriptLibrary::TimingsFile() const
-	{
-		return std::filesystem::path(m_library).replace_extension(BuildTimings::Extension);
-	};
-
 	ScriptLibrary::Progress ScriptLibrary::Poll()
 	{
 		if (!m_current)
@@ -408,6 +311,51 @@ namespace Loom
 
 		return Progress::Finished;
 	};
+
+	std::optional<float> ScriptLibrary::BuildProgress() const
+	{
+		if (IsIdle())
+			return std::nullopt;
+
+		return BuildTimings::Progress(
+			std::chrono::duration<double>(std::chrono::steady_clock::now() - m_buildStarted).count(),
+			m_expected);
+	};
+
+	void ScriptLibrary::AbandonBuild()
+	{
+		if (!m_worker.joinable())
+			return;
+
+		// Dropped, not waited for: it is blocked in MSBuild and the editor has a
+		// frame to draw. The worker holds the only other reference to its result
+		// and finishes into that, where nothing reads it.
+		m_current.reset();
+
+		m_abandoned.push_back(std::move(m_worker));
+	};
+
+	bool ScriptLibrary::BuiltAgainstOlderEditor() const
+	{
+		if (m_library.empty())
+			return false;
+
+		std::error_code code;
+
+		if (!std::filesystem::exists(m_library, code))
+			return false;
+
+		return std::filesystem::last_write_time(m_library, code) < EditorBuildTime();
+	};
+
+	std::filesystem::path ScriptLibrary::TimingsFile() const
+	{
+		return std::filesystem::path(m_library).replace_extension(BuildTimings::Extension);
+	};
+
+	#pragma endregion
+
+	#pragma region Loading
 
 	bool ScriptLibrary::Load()
 	{
@@ -519,25 +467,6 @@ namespace Loom
 		return true;
 	};
 
-	void ScriptLibrary::RestoreRegistry()
-	{
-		for (const std::string& type : m_types)
-			ComponentRegistry::Unregister(type);
-
-		for (const std::string& state : m_states)
-			StateRegistry::Unregister(state);
-
-		m_states.clear();
-
-		// And put back what was there before, which restores anything the
-		// library registered over the top of.
-		for (const auto& [name, entry] : m_before)
-			ComponentRegistry::Register(name, nullptr, entry.first, entry.second);
-
-		m_types.clear();
-		m_before.clear();
-	};
-
 	void ScriptLibrary::Unload()
 	{
 		if (m_module == nullptr)
@@ -560,4 +489,95 @@ namespace Loom
 
 		m_status = "Unloaded.";
 	};
+
+	// The copies left behind by editors that are no longer running. One still
+	// mapped by a live editor refuses to be removed, and its symbols are left
+	// alone with it: that editor is still debugging scripts through them.
+	void ScriptLibrary::SweepLoadedCopies(const std::string& library)
+	{
+		const std::filesystem::path path(library);
+		const std::string prefix = path.stem().string() + ".loaded.";
+
+		std::error_code code;
+
+		for (const auto& entry :
+			std::filesystem::directory_iterator(path.parent_path(), code))
+		{
+			const std::filesystem::path& copy = entry.path();
+
+			if (copy.extension() != ".dll" ||
+				copy.filename().string().rfind(prefix, 0) != 0)
+				continue;
+
+			std::error_code removing;
+
+			if (std::filesystem::remove(copy, removing) && !removing)
+				std::filesystem::remove(
+					std::filesystem::path(copy).replace_extension(".pdb"), code);
+		};
+	};
+
+	void ScriptLibrary::RestoreRegistry()
+	{
+		for (const std::string& type : m_types)
+			ComponentRegistry::Unregister(type);
+
+		for (const std::string& state : m_states)
+			StateRegistry::Unregister(state);
+
+		m_states.clear();
+
+		// And put back what was there before, which restores anything the
+		// library registered over the top of.
+		for (const auto& [name, entry] : m_before)
+			ComponentRegistry::Register(name, nullptr, entry.first, entry.second);
+
+		m_types.clear();
+		m_before.clear();
+	};
+
+	#pragma endregion
+
+	#pragma region Tools
+
+	const std::string& ScriptLibrary::FindVisualStudio()
+	{
+		// vswhere is a process, so the answer is kept: an installation does not
+		// come and go while the editor is up.
+		static const std::string devenv = VsWhere("-find Common7\\IDE\\devenv.exe");
+
+		return devenv;
+	};
+
+	std::string ScriptLibrary::FindMSBuild()
+	{
+		const std::string found = VsWhere(
+			"-requires Microsoft.Component.MSBuild "
+			"-find MSBuild\\**\\Bin\\MSBuild.exe");
+
+		if (!found.empty())
+			return found;
+
+		const char* const fallbacks[] =
+		{
+			"C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe",
+			"C:\\Program Files\\Microsoft Visual Studio\\18\\Professional\\MSBuild\\Current\\Bin\\MSBuild.exe",
+			"C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise\\MSBuild\\Current\\Bin\\MSBuild.exe",
+		};
+
+		std::error_code code;
+
+		for (const char* fallback : fallbacks)
+			if (std::filesystem::exists(fallback, code))
+				return fallback;
+
+		return "";
+	};
+
+	const char* ScriptLibrary::Configuration()
+	{
+		return configuration;
+	};
+
+	#pragma endregion
 };

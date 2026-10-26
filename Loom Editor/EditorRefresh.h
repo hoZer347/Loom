@@ -25,11 +25,17 @@ namespace Loom
 	*/
 	struct EditorRefresh final
 	{
+		#pragma region Lifetime
+
 		EditorRefresh() = default;
 		~EditorRefresh();
 
 		EditorRefresh(const EditorRefresh&) = delete;
 		EditorRefresh& operator=(const EditorRefresh&) = delete;
+
+		#pragma endregion
+
+		#pragma region Build
 
 		// Started and not yet handed over by Poll.
 		bool IsRunning() const { return m_current != nullptr; };
@@ -47,12 +53,18 @@ namespace Loom
 
 		bool Succeeded() const { return m_succeeded; };
 
+		#pragma endregion
+
+		#pragma region Relaunch
+
 		// The executable this process was started from, which the build may
 		// have replaced.
 		const std::filesystem::path& GetExecutable() const { return m_executable; };
 
 		// Starts it with those arguments after it.
 		static bool Relaunch(const std::filesystem::path& executable, const std::string& arguments);
+
+		#pragma endregion
 
 	private:
 		struct Build

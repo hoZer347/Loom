@@ -65,6 +65,8 @@ namespace Loom
 		UiScript(const UiScript&) = delete;
 		UiScript& operator=(const UiScript&) = delete;
 
+		#pragma region Script
+
 		// False, with why on stderr, when the file cannot be read.
 		bool Load(const std::string& path);
 		void LoadText(const std::string& text);
@@ -77,6 +79,10 @@ namespace Loom
 
 		bool Finished() const { return m_finished; };
 		bool Failed() const { return m_failed; };
+
+		#pragma endregion
+
+		#pragma region Items
 
 		// Whether ImGui tells it about the items it draws, which it does from
 		// the start. Not hearing them costs nothing, and leaves nothing to aim
@@ -95,7 +101,11 @@ namespace Loom
 		void ItemAdded(ImGuiID id, const ImRect& rect) override;
 		void ItemLabelled(ImGuiID id, const char* label) override;
 
+		#pragma endregion
+
 	private:
+		#pragma region Items
+
 		struct Item
 		{
 			std::string window;
@@ -103,6 +113,12 @@ namespace Loom
 			ImVec2 min;
 			ImVec2 max;
 		};
+
+		const Item* Find(const std::string& window, const std::string& label) const;
+
+		#pragma endregion
+
+		#pragma region Commands
 
 		// Retry is for a target not drawn yet: the action runs again next frame.
 		enum class Result
@@ -119,7 +135,6 @@ namespace Loom
 		// Queues the actions that put the mouse on target, from tokens[first] on.
 		bool Aim(const std::vector<std::string>& tokens, size_t first, size_t* end);
 
-		const Item* Find(const std::string& window, const std::string& label) const;
 		void Fail(const std::string& why);
 
 		// The cursor to m_mouse, for ImGui and the game alike.
@@ -128,6 +143,8 @@ namespace Loom
 		// Lets go of whatever hold left down, so a script that stops early
 		// leaves no key stuck for the person at the keyboard.
 		void ReleaseHeld();
+
+		#pragma endregion
 
 		ImGuiContext* m_context = nullptr;
 		std::filesystem::path m_folder{ };

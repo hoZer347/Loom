@@ -42,6 +42,8 @@ namespace Loom
 		};
 	};
 
+	#pragma region Categories
+
 	std::string ComponentMenu::Tidy(const std::string& category)
 	{
 		std::string tidy, part;
@@ -62,6 +64,36 @@ namespace Loom
 
 		return tidy;
 	};
+
+	void ComponentMenu::Set(const std::string& component, const std::string& category)
+	{
+		if (component.empty())
+			return;
+
+		const std::string tidy = Tidy(category);
+
+		if (tidy.empty())
+			m_categories.erase(component);
+		else
+			m_categories[component] = tidy;
+	};
+
+	std::string ComponentMenu::CategoryOf(const std::string& component, bool script) const
+	{
+		if (const auto found = m_categories.find(component); found != m_categories.end())
+			return found->second;
+
+		if (const std::string declared = Tidy(ComponentRegistry::CategoryOf(component)); !declared.empty())
+			return declared;
+
+		return script
+			? custom_category
+			: "";
+	};
+
+	#pragma endregion
+
+	#pragma region Project File
 
 	void ComponentMenu::Read(const std::string& line)
 	{
@@ -115,31 +147,9 @@ namespace Loom
 		return (bool)out;
 	};
 
-	void ComponentMenu::Set(const std::string& component, const std::string& category)
-	{
-		if (component.empty())
-			return;
+	#pragma endregion
 
-		const std::string tidy = Tidy(category);
-
-		if (tidy.empty())
-			m_categories.erase(component);
-		else
-			m_categories[component] = tidy;
-	};
-
-	std::string ComponentMenu::CategoryOf(const std::string& component, bool script) const
-	{
-		if (const auto found = m_categories.find(component); found != m_categories.end())
-			return found->second;
-
-		if (const std::string declared = Tidy(ComponentRegistry::CategoryOf(component)); !declared.empty())
-			return declared;
-
-		return script
-			? custom_category
-			: "";
-	};
+	#pragma region Menu
 
 	ComponentMenu::Node ComponentMenu::Build(const std::vector<std::string>& scripts) const
 	{
@@ -161,4 +171,6 @@ namespace Loom
 
 		return root;
 	};
+
+	#pragma endregion
 };

@@ -21,6 +21,8 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Fitting
+
 		// How far a leaf's bounds reach past its collider's, so a collider
 		// moving a little each frame stays in its leaf.
 		constexpr float PADDING = 0.05f;
@@ -34,19 +36,6 @@ namespace Loom
 		// Measured against three and six on the Crowd benchmark, as the
 		// padding was against a tenth.
 		constexpr float PREDICTION = 10.0f;
-
-		// The inverse of a ray's direction along an axis it runs parallel to:
-		// large enough that it crosses that axis's slab nowhere near.
-		constexpr float PARALLEL = 1e30f;
-
-		// The shuffles that bring a vector's y and z to its first lane, and
-		// the mask of the first three lanes' signs.
-		constexpr int Y_LANE = 1;
-		constexpr int Z_LANE = 2;
-		constexpr int AXIS_LANES = 0b0111;
-
-		// What a ray's entry into a node it misses is taken as.
-		constexpr float MISSED = std::numeric_limits<float>::infinity();
 
 		// bounds stretched along ahead, to cover where it is going.
 		Bounds Stretched(Bounds bounds, const glm::vec3& ahead)
@@ -71,6 +60,23 @@ namespace Loom
 		// Box2D's insertion cost: a new branch costs twice the area it covers,
 		// once for itself and once for the leaf beside it.
 		constexpr float BRANCH_COST = 2.0f;
+
+		#pragma endregion
+
+		#pragma region Queries
+
+		// The inverse of a ray's direction along an axis it runs parallel to:
+		// large enough that it crosses that axis's slab nowhere near.
+		constexpr float PARALLEL = 1e30f;
+
+		// The shuffles that bring a vector's y and z to its first lane, and
+		// the mask of the first three lanes' signs.
+		constexpr int Y_LANE = 1;
+		constexpr int Z_LANE = 2;
+		constexpr int AXIS_LANES = 0b0111;
+
+		// What a ray's entry into a node it misses is taken as.
+		constexpr float MISSED = std::numeric_limits<float>::infinity();
 
 		// Deep enough for any tree the rotations leave balanced, so a raycast
 		// never touches the heap; a deeper one spills over rather than fails.
@@ -118,9 +124,11 @@ namespace Loom
 			int node;
 			float entry;
 		};
+
+		#pragma endregion
 	};
 
-	std::shared_mutex ColliderTree::guard;
+	#pragma region Lifetime
 
 	ColliderTree::~ColliderTree()
 	{
@@ -128,6 +136,10 @@ namespace Loom
 			if (node.collider)
 				node.collider->m_tree = nullptr;
 	};
+
+	#pragma endregion
+
+	#pragma region Syncing
 
 	void ColliderTree::BeginSync()
 	{
@@ -252,19 +264,6 @@ namespace Loom
 		m_nodes[collider.m_node].sync = m_sync;
 	};
 
-	void ColliderTree::Resize(const Collider& collider)
-	{
-		if (collider.m_tree != this)
-			return;
-
-		if (onChange)
-			onChange();
-
-		collider.m_bounds = collider.BoundsIn(collider.m_synced);
-		collider.m_shape = Contacts::Pose(collider, collider.m_synced);
-		Fit(collider.m_node, collider.m_bounds, glm::vec3(0.0f));
-	};
-
 	void ColliderTree::Reach(const Collider& collider, const glm::vec3& travel)
 	{
 		if (collider.m_tree == this)
@@ -305,6 +304,10 @@ namespace Loom
 				Remove(*m_nodes[i].collider);
 	};
 
+	#pragma endregion
+
+	#pragma region Changes
+
 	void ColliderTree::Remove(Collider& collider)
 	{
 		if (collider.m_tree != this)
@@ -322,6 +325,25 @@ namespace Loom
 		collider.m_node = NONE;
 		m_leaves--;
 	};
+
+	void ColliderTree::Resize(const Collider& collider)
+	{
+		if (collider.m_tree != this)
+			return;
+
+		if (onChange)
+			onChange();
+
+		collider.m_bounds = collider.BoundsIn(collider.m_synced);
+		collider.m_shape = Contacts::Pose(collider, collider.m_synced);
+		Fit(collider.m_node, collider.m_bounds, glm::vec3(0.0f));
+	};
+
+	#pragma endregion
+
+	#pragma region Queries
+
+	std::shared_mutex ColliderTree::guard;
 
 	void ColliderTree::Raycast(const Ray& ray, float maxDistance, const Visitor& visit) const
 	{
@@ -487,6 +509,10 @@ namespace Loom
 		return collider.m_tree == this ? &m_nodes[collider.m_node].bounds : nullptr;
 	};
 
+	#pragma endregion
+
+	#pragma region Nodes
+
 	int ColliderTree::Allocate()
 	{
 		if (m_free == NONE)
@@ -509,6 +535,10 @@ namespace Loom
 		m_nodes[node].height = -1;
 		m_free = node;
 	};
+
+	#pragma endregion
+
+	#pragma region Hierarchy
 
 	void ColliderTree::InsertLeaf(int leaf)
 	{
@@ -667,4 +697,6 @@ namespace Loom
 			node = branch.parent;
 		};
 	};
+
+	#pragma endregion
 };

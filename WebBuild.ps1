@@ -2,6 +2,8 @@
 # flags every web build shares, and the engine compiled once into a library
 # they all link.
 
+#region Settings
+
 $webRoot = $PSScriptRoot
 
 $webWasm = Join-Path $webRoot 'Loom WASM'
@@ -35,6 +37,10 @@ $webLinkFlags = @(
     '-sPTHREAD_POOL_SIZE=2*navigator.hardwareConcurrency'  # Pre-spawned, since a later one cannot start while main blocks: the job workers, the physics thread and an update lane for each thread ID the editor offers.
     '-Wno-pthreads-mem-growth'
 )
+
+#endregion
+
+#region Emscripten
 
 function Find-Emcc
 {
@@ -75,6 +81,10 @@ function Get-EmscriptenTool([string] $Emcc, [string] $Name)
 {
     Join-Path (Split-Path -Parent $Emcc) ($Name + [IO.Path]::GetExtension($Emcc))
 }
+
+#endregion
+
+#region Building
 
 function Test-Stale([string] $Target, $Inputs)
 {
@@ -234,3 +244,5 @@ function Build-WebEngine([string] $Emcc)
 
     $library
 }
+
+#endregion

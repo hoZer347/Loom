@@ -55,6 +55,8 @@ namespace Loom
 		};
 	};
 
+	#pragma region Layout
+
 	std::vector<StageTiming::Share> StageTiming::Shares(const std::vector<Profiler::Row>& rows)
 	{
 		double total = 0.0;
@@ -92,6 +94,10 @@ namespace Loom
 
 		return shares;
 	};
+
+	#pragma endregion
+
+	#pragma region Drawing
 
 	void StageTiming::Lanes()
 	{
@@ -353,6 +359,8 @@ namespace Loom
 
 		ImGui::End();
 	};
+
+	#pragma endregion
 };
 
 #endif
