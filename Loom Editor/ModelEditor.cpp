@@ -69,7 +69,12 @@ namespace Loom
 		constexpr float pick_radius = 10.0f;
 		constexpr float drag_threshold = 4.0f;
 		constexpr float dot_half_size = 3.5f;
+		constexpr float min_dot_half_size = 1.0f;
 		constexpr float joint_half_size = 5.0f;
+
+		// A vertex's dot spans at most this share of the mesh's mean edge as
+		// drawn where the dot is, so dots shrink apart as the view backs off.
+		constexpr float dot_edge_share = 0.25f;
 
 		// How near a joint's position, size or turn in degrees, back out of
 		// its matrix, is taken to be the one it had, so changing one of them
@@ -2147,13 +2152,16 @@ void main()
 			triangles.insert(triangles.end(), { a - at_a, b - at_b, b + at_b, a - at_a, b + at_b, a + at_a });
 		};
 
-		const auto dots = [&](const std::vector<glm::vec3>& at, float half_size)
+		// Spaced a world length apart, each dot keeps to its share of that.
+		const auto dots = [&](const std::vector<glm::vec3>& at, float half_size, float spacing = 0.0f)
 		{
 			std::vector<glm::vec3> triangles{ };
 
 			for (const glm::vec3& p : at)
 			{
-				const float size = half_size * view.pixel * glm::distance(view.eye, p);
+				const float distance = glm::distance(view.eye, p);
+				const float pixels = spacing > 0.0f ? std::clamp(dot_edge_share * spacing / (view.pixel * distance), min_dot_half_size, half_size) : half_size;
+				const float size = pixels * view.pixel * distance;
 				const glm::vec3 right = view.right * size;
 				const glm::vec3 up = view.up * size;
 
@@ -2306,11 +2314,24 @@ void main()
 
 		if (document.pick == Pick::Vertices)
 		{
-			draw(dots(points, dot_half_size), wire_colour);
-			draw(dots(points_of(document.selection.vertices), dot_half_size), picked_colour);
+			const auto mean_edge = [](Part& of, const std::vector<glm::vec3>& on)
+			{
+				const std::vector<EditableMesh::Edge>& edges = Edges(of);
+				float total = 0.0f;
+
+				for (const EditableMesh::Edge& edge : edges)
+					total += glm::distance(on[edge.first], on[edge.second]);
+
+				return edges.empty() ? 0.0f : total / edges.size();
+			};
+
+			const float spacing = mean_edge(part, points);
+
+			draw(dots(points, dot_half_size, spacing), wire_colour);
+			draw(dots(points_of(document.selection.vertices), dot_half_size, spacing), picked_colour);
 
 			if (document.hoveredVertex)
-				draw(dots({ hovered_points[*document.hoveredVertex] }, dot_half_size), hovered_colour);
+				draw(dots({ hovered_points[*document.hoveredVertex] }, dot_half_size, elsewhere ? mean_edge(document.parts[document.hoveredPart], hovered_points) : spacing), hovered_colour);
 		};
 	};
 

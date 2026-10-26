@@ -413,6 +413,59 @@ TEST_SUITE("ModelEditor")
 		CHECK(glm::distance(driven.Mesh().vertices[*driven.editor.Selected()->vertices.begin()], corner) < TOLERANCE);
 	};
 
+	TEST_CASE("The Model panel's vertex dots shrink as the view backs off, keeping apart")
+	{
+		constexpr size_t corners = 8;
+		constexpr size_t dot_corners = 6;
+		constexpr size_t position_floats = 3;
+		constexpr size_t opposite_corner = 2;
+		constexpr size_t dot_floats = corners * dot_corners * position_floats;
+		constexpr float notches_out = 18.0f;
+		constexpr float full_width = 7.0f;
+		constexpr double perspective = 0.05;
+		constexpr float edge_share = 0.5f;
+
+		Driven driven("model_dots");
+		driven.editor.SetPick(ModelEditor::Pick::Vertices);
+
+		// How wide the first dot of the corners' draw is on screen, and how
+		// long the cube's edge is as drawn where that dot is.
+		const auto measure = [&]()
+		{
+			driven.renderer.drawnVertices.clear();
+			driven.Frame();
+
+			const auto dots = std::find_if(driven.renderer.drawnVertices.begin(), driven.renderer.drawnVertices.end(), [](const std::vector<float>& floats) { return floats.size() == dot_floats; });
+			REQUIRE(dots != driven.renderer.drawnVertices.end());
+
+			const glm::vec3 low = glm::make_vec3(dots->data());
+			const glm::vec3 across = glm::make_vec3(dots->data() + position_floats);
+			const glm::vec3 high = glm::make_vec3(dots->data() + opposite_corner * position_floats);
+			const glm::vec3 centre = (low + high) / 2.0f;
+			const glm::vec3 half_edge = glm::normalize(across - low) / 2.0f;
+
+			const ImVec2 left = driven.Screen(low);
+			const ImVec2 right = driven.Screen(across);
+			const ImVec2 a = driven.Screen(centre - half_edge);
+			const ImVec2 b = driven.Screen(centre + half_edge);
+
+			return std::pair(std::hypot(right.x - left.x, right.y - left.y), std::hypot(b.x - a.x, b.y - a.y));
+		};
+
+		const auto [framed, framed_edge] = measure();
+		CHECK(framed == doctest::Approx(full_width).epsilon(perspective));
+
+		ImGuiIO& io = ImGui::GetIO();
+		const ImVec2 middle = driven.Screen(glm::vec3(0.0f));
+		io.AddMousePosEvent(middle.x, middle.y);
+		io.AddMouseWheelEvent(0.0f, -notches_out);
+
+		const auto [backed, backed_edge] = measure();
+		CHECK(backed_edge < framed_edge);
+		CHECK(backed < framed);
+		CHECK(backed == doctest::Approx(backed_edge * edge_share).epsilon(perspective));
+	};
+
 	TEST_CASE("The Model panel's box leaves out corners another part hides")
 	{
 		// A lid just above the cube and wider than it, which hides the cube's
