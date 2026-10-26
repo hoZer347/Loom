@@ -1690,6 +1690,8 @@ namespace Loom
 		// A run changes the scenes every frame, and Stop puts them back.
 		LoomObject::Watch(!m_playing);
 
+		TakeSavedModels();
+
 		if (!ImGui::IsAnyItemActive() && !ImGui::IsAnyMouseDown())
 		{
 			RecordPlayEdit();
@@ -1707,7 +1709,6 @@ namespace Loom
 		HandleShortcuts();
 		PollShaders();
 		ReloadSavedSprites();
-		TakeSavedModels();
 
 		// Panels come and go as OS windows, so the callback is put on whichever
 		// exist this frame.
@@ -3240,6 +3241,8 @@ namespace Loom
 
 		if (saved || edited)
 			m_historyDirty = true;
+
+		m_modelsEdited = m_modelsEdited || edited;
 	};
 
 	void Editor::DrawInspector()

@@ -908,6 +908,47 @@ TEST_SUITE("ModelEditor")
 		CHECK(ReadFile(path) == unposed);
 	};
 
+	TEST_CASE("The Model panel told the Prefab panel's copy changed elsewhere edits it as changed")
+	{
+		Driven driven("model_live_outside");
+
+		Loom::Scene shown("Shown");
+		LoomTests::Pump();
+
+		Loom::GameObject* root = Loom::SceneSerializer::Deserialize(ReadFile(driven.path), shown.GetRoot());
+		LoomTests::Pump();
+		REQUIRE(root != nullptr);
+
+		driven.editor.SetLive(driven.path, &shown, root);
+		driven.Frame();
+		REQUIRE(driven.editor.Model() == root);
+
+		const EditableMesh larger = EditableMesh::Cube(2.0f);
+		Loom::Mesh* mesh = root->GetComponent<Loom::Mesh>();
+		larger.WriteTo(*mesh);
+
+		// Half the larger cube's side, which the smaller's corners fall short of.
+		constexpr float reach = 1.0f;
+
+		const auto widest = [](const std::vector<float>& values) { return std::abs(std::ranges::max(values, { }, [](float value) { return std::abs(value); })); };
+
+		driven.editor.SetLive(driven.path, &shown, root);
+		driven.Frame();
+
+		std::vector<float> corners{ };
+
+		for (const glm::vec3& vertex : driven.Mesh().vertices)
+			corners.insert(corners.end(), { vertex.x, vertex.y, vertex.z });
+
+		CHECK(std::abs(widest(corners) - reach) < TOLERANCE);
+
+		driven.editor.SelectAll();
+		driven.editor.Flip();
+		driven.Frame();
+
+		CHECK(std::abs(widest(*std::as_const(mesh->m_vertices)) - reach) < TOLERANCE);
+	};
+
 	// The mesh's new material reads the project's shader, which the web build
 	// fetches, and node cannot.
 #ifndef __EMSCRIPTEN__

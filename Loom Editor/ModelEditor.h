@@ -107,8 +107,8 @@ namespace Loom
 		std::vector<std::string> TakeSaved();
 
 		// The prefab the Prefab panel shows, and its copy there, which a tab
-		// here edits in place of one of its own. Told before that copy goes,
-		// with none.
+		// here edits in place of one of its own. Told again when something
+		// else changes that copy, and before it goes, with none.
 		void SetLive(const std::string& path, Scene* scene, GameObject* root);
 
 		// Whether the Prefab panel's copy was changed here since the last

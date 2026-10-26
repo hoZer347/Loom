@@ -885,8 +885,10 @@ namespace Loom
 		// scene and guid, checked against the scenes as they are when used.
 		std::map<std::string, std::set<std::pair<Scene*, Guid>>> m_instances{ };
 
-		// The Prefab panel's copy as the last pass left it.
+		// The Prefab panel's copy as the last pass left it, and whether the
+		// Model panel has changed it since.
 		std::string m_panelText{ };
+		bool m_modelsEdited = false;
 
 		// The instances known to agree with their prefab, by the guid of the
 		// Prefab component linking them and the path it names. One not in here

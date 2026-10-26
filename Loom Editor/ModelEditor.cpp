@@ -816,7 +816,9 @@ void main()
 		m_focused = false;
 		m_front = nullptr;
 
-		// Read again when changed elsewhere, unless there are edits here to keep.
+		// Read again when changed elsewhere, unless there are edits here to
+		// keep. The Prefab panel's copy is checked for objects gone or added,
+		// whose deletion may run before that panel says it changed.
 		for (const std::unique_ptr<Document>& document : m_documents)
 		{
 			if (document->borrowed && document->drag == Drag::None && MadeOf(*document->root) != document->made)

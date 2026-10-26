@@ -325,7 +325,16 @@ namespace Loom
 			m_prefabShape = Prefabs::Shape(shown, Prefabs::TransformKeys(*root), Prefabs::Part::Whole);
 
 		if (showing && panel_text != m_panelText)
+		{
 			paths.insert(m_prefabPath);
+
+			// Changed by something other than the Model panel, which reads it
+			// again.
+			if (!m_modelsEdited)
+				m_models.SetLive(PrefabFile(m_prefabPath).string(), m_prefabScene, root);
+		};
+
+		m_modelsEdited = false;
 
 		bool reshow = false;
 
