@@ -264,6 +264,60 @@ TEST_SUITE("Skin")
 		CHECK(*rig.mesh->m_vertices == std::vector<float>{ 0.0f, 1.0f, 0.0f });
 		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(2.0f, 1.0f, 0.0f), CLOSE)));
 	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a vertex's bindings are its influence then its offset in each shape key, and write back as they were read")
+	{
+		constexpr size_t vertices = 2;
+
+		Rig rig;
+		rig.mesh->m_vertices = { 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f };
+		rig.skin->m_influences = Bound({ 0.0f, 0.0f });
+		rig.skin->m_shapes = "Smile\n";
+		rig.skin->m_shapeOffsets = { 1.0f, 1.0f, 0.0f, 2.0f, 0.0f };
+
+		const size_t stride = rig.skin->BindingFloats();
+		REQUIRE(stride == Loom::Skin::FLOATS_PER_INFLUENCE + POSITION_FLOATS);
+
+		std::vector<float> bindings = rig.skin->Bindings(vertices);
+		REQUIRE(bindings.size() == vertices * stride);
+		CHECK(std::vector<float>(bindings.begin(), bindings.begin() + Loom::Skin::FLOATS_PER_INFLUENCE) == Bound({ 0.0f }));
+		CHECK(glm::make_vec3(bindings.data() + Loom::Skin::FLOATS_PER_INFLUENCE) == glm::vec3(0.0f));
+		CHECK(glm::make_vec3(bindings.data() + stride + Loom::Skin::FLOATS_PER_INFLUENCE) == glm::vec3(0.0f, 2.0f, 0.0f));
+
+		rig.skin->SetBindings(bindings);
+		CHECK(*rig.skin->m_influences == Bound({ 0.0f, 0.0f }));
+		CHECK(*rig.skin->m_shapeOffsets == std::vector<float>{ 1.0f, 1.0f, 0.0f, 2.0f, 0.0f });
+
+		// A vertex added after the others, as the first is bound.
+		bindings.insert(bindings.end(), bindings.begin(), bindings.begin() + stride);
+		rig.skin->SetBindings(bindings);
+		CHECK(*rig.skin->m_influences == Bound({ 0.0f, 0.0f, 0.0f }));
+		CHECK(*rig.skin->m_shapeOffsets == std::vector<float>{ 1.0f, 1.0f, 0.0f, 2.0f, 0.0f });
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "each vertex's bend moves it where Deform does")
+	{
+		constexpr size_t vertices = 2;
+		constexpr float half = 0.5f;
+
+		Rig rig;
+		rig.mesh->m_vertices = { 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f };
+		rig.skin->m_influences = Bound({ 0.0f, 0.0f });
+		rig.skin->m_shapes = "Smile\n";
+		rig.skin->m_shapeOffsets = { 1.0f, 1.0f, 0.0f, 2.0f, 0.0f };
+		rig.skin->m_shapeWeights = { half };
+		rig.bone->transform.position = glm::vec3(2.0f, 0.0f, 0.0f);
+		rig.bone->transform.rotation = glm::vec3(0.0f, 0.0f, QUARTER_TURN);
+
+		const std::vector<glm::mat4> bends = rig.skin->Bends(*rig.mesh, rig.skin->Bindings(vertices));
+		REQUIRE(bends.size() == vertices);
+
+		for (size_t v = 0; v < vertices; v++)
+		{
+			const glm::vec3 at = glm::make_vec3(rig.mesh->m_vertices->data() + v * POSITION_FLOATS);
+			CHECK(glm::all(glm::epsilonEqual(glm::vec3(bends[v] * glm::vec4(at, 1.0f)), rig.Bent(v), CLOSE)));
+		};
+	};
 };
 
 

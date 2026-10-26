@@ -23,6 +23,7 @@ namespace Loom
 	struct GameObject;
 	struct Mesh;
 	struct Scene;
+	struct Skin;
 
 	/**
 	* Loom::ModelEditor
@@ -32,8 +33,9 @@ namespace Loom
 	*   and drags the handles that move, turn and size it. The right mouse
 	*   orbits, the middle pans and the wheel zooms
 	* - The joints a Skin bends its mesh by are picked and posed the same way,
-	*   with the rest of the model faded behind them. A skinned mesh is shown,
-	*   and bends as they move, but is not shaped
+	*   with the rest of the model faded behind them. A skinned mesh is picked
+	*   and shaped where it is bent to, and each vertex made from another is
+	*   bound as it was
 	* - Every action has a button, named and greyed out until it can be used,
 	*   and the line along the bottom says what the mouse would do. Ctrl+Z and
 	*   Ctrl+Y step back and forward an action at a time
@@ -162,6 +164,15 @@ namespace Loom
 			GameObject* object = nullptr;
 			Mesh* mesh = nullptr;
 			EditableMesh editing;
+
+			// What bends it, if anything, with the matrix each vertex is bent
+			// by and where that puts it, as it is drawn.
+			Skin* skin = nullptr;
+			std::vector<glm::mat4> bends;
+			std::vector<glm::vec3> shown;
+
+			// Worked out from the mesh, and kept until it changes.
+			std::optional<std::vector<EditableMesh::Edge>> edges;
 		};
 
 		struct JointPose
@@ -281,16 +292,14 @@ namespace Loom
 			Snapshot pending;
 			bool wasUnsaved = false;
 
-			// The meshes that cannot be shaped here: skinned, made by a
-			// script, or not triangles. They are still shown.
+			// The meshes that cannot be shaped here: made by a script, or not
+			// triangles. They are still shown.
 			std::vector<GameObject*> fixed;
 
 			std::vector<Joint> joints;
 
-			// Worked out from the mesh being edited, and from it and what is
-			// picked, and kept until those change.
-			std::optional<size_t> edgesOf;
-			std::vector<EditableMesh::Edge> edges;
+			// Worked out from the mesh being edited and what is picked, and
+			// kept until those change.
 			std::optional<std::pair<size_t, Pick>> pickedOf;
 			Selection pickedFrom;
 			std::set<uint32_t> pickedFaces;
@@ -301,7 +310,7 @@ namespace Loom
 			std::optional<uint32_t> hoveredFace;
 			std::optional<uint32_t> hoveredJoint;
 
-			// The part hoveredFace is a face of, which may not be the one edited.
+			// The part what is hovered is part of, which may not be the one edited.
 			size_t hoveredPart = 0;
 
 			// What the last action did, shown for a while from when it did it.
@@ -339,7 +348,7 @@ namespace Loom
 
 		std::optional<ImVec2> Project(const View& view, const glm::vec3& world) const;
 		void Ray(const View& view, const ImVec2& mouse, glm::vec3& origin, glm::vec3& direction) const;
-		bool Visible(const Document& document, const glm::vec3& local) const;
+		bool Visible(const Document& document, const glm::vec3& point) const;
 		std::optional<Handle> HandleAt(const Document& document, const ImVec2& mouse) const;
 
 		// The vertices the selection moves, and the middle of them in the
@@ -350,7 +359,16 @@ namespace Loom
 		// The faces an action on faces takes: those picked, or those whose
 		// every corner is picked.
 		const std::set<uint32_t>& PickedFaces(Document& document) const;
-		static const std::vector<EditableMesh::Edge>& Edges(Document& document);
+		static const std::vector<EditableMesh::Edge>& Edges(Part& part);
+
+		// Where the part's vertices are drawn, in its own space: bent by its
+		// skin, if it has one.
+		static const std::vector<glm::vec3>& Shown(const Part& part);
+		static void Bend(Part& part);
+
+		// Moves the vertices by change, a matrix in the part's space as it is
+		// drawn, so a skinned part's vertices move where they are bent to.
+		static void Reshape(Part& part, const std::set<uint32_t>& vertices, const glm::mat4& change);
 
 		// Whether a click picks part of a mesh rather than a joint.
 		static bool Shaping(const Document& document);

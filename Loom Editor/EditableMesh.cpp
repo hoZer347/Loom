@@ -5,7 +5,6 @@
 #include "glm/gtc/constants.hpp"
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <map>
 
@@ -54,7 +53,7 @@ namespace Loom
 		return a < b ? Edge(a, b) : Edge(b, a);
 	};
 
-	EditableMesh EditableMesh::FromTriangles(const std::vector<float>& positions, const std::vector<float>& uvs, const std::vector<float>& normals, const std::vector<float>& colors, const std::vector<UVLayer>& layers)
+	EditableMesh EditableMesh::FromTriangles(const std::vector<float>& positions, const std::vector<float>& uvs, const std::vector<float>& normals, const std::vector<float>& colors, const std::vector<UVLayer>& layers, const std::vector<float>& bindings, size_t binding_floats)
 	{
 		const size_t count = positions.size() / floats_per_position / corners_per_triangle * corners_per_triangle;
 
@@ -72,18 +71,36 @@ namespace Loom
 				mesh.layers.push_back({ layer.id, layer.words });
 			};
 
-		std::map<std::array<float, floats_per_position>, uint32_t> welded{ };
+		const bool bound = binding_floats > 0 && bindings.size() == count * binding_floats;
+
+		if (bound)
+			mesh.bindingFloats = binding_floats;
+
+		std::map<std::vector<float>, uint32_t> welded{ };
 
 		for (size_t i = 0; i < count; i++)
 		{
 			const glm::vec3 position(positions[i * floats_per_position], positions[i * floats_per_position + 1], positions[i * floats_per_position + 2]);
+			const auto binding = bindings.begin() + (bound ? i * binding_floats : 0);
+
+			std::vector<float> key{ position.x, position.y, position.z };
+
+			if (bound)
+				key.insert(key.end(), binding, binding + binding_floats);
 
 			// Adding zero turns -0 into 0, which compare equal but would key apart.
-			const std::array<float, floats_per_position> key{ position.x + 0.0f, position.y + 0.0f, position.z + 0.0f };
-			const auto [found, added] = welded.try_emplace(key, (uint32_t)mesh.vertices.size());
+			for (float& value : key)
+				value += 0.0f;
+
+			const auto [found, added] = welded.try_emplace(std::move(key), (uint32_t)mesh.vertices.size());
 
 			if (added)
+			{
 				mesh.vertices.push_back(position);
+
+				if (bound)
+					mesh.bindings.insert(mesh.bindings.end(), binding, binding + binding_floats);
+			};
 
 			if (i % corners_per_triangle == 0)
 				mesh.faces.emplace_back();
@@ -130,6 +147,11 @@ namespace Loom
 				colors.insert(colors.end(), { corner.color.r, corner.color.g, corner.color.b, corner.color.a });
 		};
 
+		ForEachTriangleCorner(add);
+	};
+
+	void EditableMesh::ForEachTriangleCorner(const std::function<void(const Corner&)>& add) const
+	{
 		for (const Face& face : faces)
 			for (size_t i = 2; i < face.corners.size(); i++)
 			{
@@ -157,13 +179,20 @@ namespace Loom
 			};
 		};
 
-		for (const Face& face : faces)
-			for (size_t i = 2; i < face.corners.size(); i++)
-			{
-				add(face.corners[0]);
-				add(face.corners[i - 1]);
-				add(face.corners[i]);
-			};
+		ForEachTriangleCorner(add);
+
+		return out;
+	};
+
+	std::vector<float> EditableMesh::ToBindings() const
+	{
+		std::vector<float> out{ };
+
+		ForEachTriangleCorner([&](const Corner& corner)
+		{
+			const auto binding = bindings.begin() + corner.vertex * bindingFloats;
+			out.insert(out.end(), binding, binding + bindingFloats);
+		});
 
 		return out;
 	};
@@ -419,11 +448,16 @@ namespace Loom
 
 	glm::vec3 EditableMesh::FaceCentre(uint32_t face) const
 	{
+		return FaceCentre(face, vertices);
+	};
+
+	glm::vec3 EditableMesh::FaceCentre(uint32_t face, const std::vector<glm::vec3>& at) const
+	{
 		const std::vector<Corner>& corners = faces[face].corners;
 		glm::vec3 sum(0.0f);
 
 		for (const Corner& corner : corners)
-			sum += vertices[corner.vertex];
+			sum += at[corner.vertex];
 
 		return corners.empty() ? sum : sum / (float)corners.size();
 	};
@@ -501,12 +535,36 @@ namespace Loom
 
 	void EditableMesh::Transform(const std::set<uint32_t>& moved, const glm::mat4& matrix)
 	{
+		std::map<uint32_t, glm::vec3> places{ };
+
 		for (const uint32_t vertex : moved)
-			vertices[vertex] = glm::vec3(matrix * glm::vec4(vertices[vertex], 1.0f));
+			places[vertex] = glm::vec3(matrix * glm::vec4(vertices[vertex], 1.0f));
+
+		Place(places);
+	};
+
+	void EditableMesh::Place(const std::map<uint32_t, glm::vec3>& places)
+	{
+		for (const auto& [vertex, place] : places)
+			vertices[vertex] = place;
 
 		for (uint32_t face = 0; face < faces.size(); face++)
-			if (std::any_of(faces[face].corners.begin(), faces[face].corners.end(), [&](const Corner& corner) { return moved.contains(corner.vertex); }))
+			if (std::any_of(faces[face].corners.begin(), faces[face].corners.end(), [&](const Corner& corner) { return places.contains(corner.vertex); }))
 				Flatten(face);
+	};
+
+	uint32_t EditableMesh::CopyVertex(uint32_t vertex, const glm::vec3& at)
+	{
+		const uint32_t added = (uint32_t)vertices.size();
+		vertices.push_back(at);
+
+		if (bindingFloats > 0)
+		{
+			bindings.resize(bindings.size() + bindingFloats);
+			std::copy_n(bindings.begin() + vertex * bindingFloats, bindingFloats, bindings.begin() + added * bindingFloats);
+		};
+
+		return added;
 	};
 
 	bool EditableMesh::Extrude(const std::set<uint32_t>& selected, float distance)
@@ -535,10 +593,7 @@ namespace Loom
 		std::map<uint32_t, uint32_t> lifted{ };
 
 		for (const uint32_t vertex : VerticesOfFaces(selected))
-		{
-			lifted[vertex] = (uint32_t)vertices.size();
-			vertices.push_back(vertices[vertex] + offset);
-		};
+			lifted[vertex] = CopyVertex(vertex, vertices[vertex] + offset);
 
 		std::vector<Face> walls{ };
 
@@ -576,10 +631,7 @@ namespace Loom
 		std::map<uint32_t, uint32_t> copied{ };
 
 		for (const uint32_t vertex : VerticesOfFaces(selected))
-		{
-			copied[vertex] = (uint32_t)vertices.size();
-			vertices.push_back(vertices[vertex]);
-		};
+			copied[vertex] = CopyVertex(vertex, vertices[vertex]);
 
 		std::set<uint32_t> added{ };
 
@@ -634,6 +686,12 @@ namespace Loom
 
 		const uint32_t first_vertex = (uint32_t)vertices.size();
 		vertices.insert(vertices.end(), other.vertices.begin(), other.vertices.end());
+
+		// Bound otherwise, the other's vertices are bound to nothing.
+		if (bindingFloats > 0 && other.bindingFloats == bindingFloats)
+			bindings.insert(bindings.end(), other.bindings.begin(), other.bindings.end());
+		else
+			bindings.resize(vertices.size() * bindingFloats, 0.0f);
 
 		std::set<uint32_t> added{ };
 
@@ -796,6 +854,11 @@ namespace Loom
 
 	std::optional<EditableMesh::Hit> EditableMesh::Raycast(const glm::vec3& origin, const glm::vec3& direction) const
 	{
+		return Raycast(origin, direction, vertices);
+	};
+
+	std::optional<EditableMesh::Hit> EditableMesh::Raycast(const glm::vec3& origin, const glm::vec3& direction, const std::vector<glm::vec3>& at) const
+	{
 		std::optional<Hit> nearest{ };
 
 		for (uint32_t face = 0; face < faces.size(); face++)
@@ -805,9 +868,9 @@ namespace Loom
 			for (size_t i = 2; i < corners.size(); i++)
 			{
 				// Moller and Trumbore's test, against both sides.
-				const glm::vec3& a = vertices[corners[0].vertex];
-				const glm::vec3 ab = vertices[corners[i - 1].vertex] - a;
-				const glm::vec3 ac = vertices[corners[i].vertex] - a;
+				const glm::vec3& a = at[corners[0].vertex];
+				const glm::vec3 ab = at[corners[i - 1].vertex] - a;
+				const glm::vec3 ac = at[corners[i].vertex] - a;
 
 				const glm::vec3 p = glm::cross(direction, ac);
 				const float determinant = glm::dot(ab, p);
@@ -864,12 +927,14 @@ namespace Loom
 
 		std::vector<uint32_t> renumbered(vertices.size(), 0);
 		std::vector<glm::vec3> kept{ };
+		std::vector<float> kept_bindings{ };
 
 		for (size_t vertex = 0; vertex < vertices.size(); vertex++)
 			if (used[vertex])
 			{
 				renumbered[vertex] = (uint32_t)kept.size();
 				kept.push_back(vertices[vertex]);
+				kept_bindings.insert(kept_bindings.end(), bindings.begin() + vertex * bindingFloats, bindings.begin() + (vertex + 1) * bindingFloats);
 			};
 
 		for (Face& face : faces)
@@ -877,5 +942,6 @@ namespace Loom
 				corner.vertex = renumbered[corner.vertex];
 
 		vertices = std::move(kept);
+		bindings = std::move(kept_bindings);
 	};
 };

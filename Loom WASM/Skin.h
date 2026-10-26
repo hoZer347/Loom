@@ -7,6 +7,7 @@
 
 #include "glm/glm.hpp"
 
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -95,6 +96,19 @@ namespace Loom
 
 		std::vector<std::string> GetShapeNames();
 
+		// What bends each vertex, as one run of floats a vertex for the Model
+		// panel to carry along as it shapes the mesh: its influence, then its
+		// offset in each shape key. Bindings reads them for a mesh of that many
+		// vertices, and SetBindings writes them back, for as many vertices as
+		// they hold.
+		size_t BindingFloats() const;
+		std::vector<float> Bindings(size_t vertices) const;
+		void SetBindings(const std::vector<float>& bindings);
+
+		// The matrix in the mesh's space that Deform moves each vertex bound so
+		// by, the shape keys' offsets included.
+		std::vector<glm::mat4> Bends(const Mesh& mesh, const std::vector<float>& bindings);
+
 		// A slider for each shape key.
 		void OnGui() override;
 
@@ -128,6 +142,9 @@ namespace Loom
 
 		// From the mesh's space, bent by each joint as it now is.
 		std::vector<glm::mat4> JointMatrices(const Mesh& mesh);
+
+		// The joints' matrices weighed by an influence, none for one with no weight.
+		static std::optional<glm::mat4> Blend(const float* influence, const std::vector<glm::mat4>& matrices);
 
 		NameList m_jointNames;
 		NameList m_shapeNames;

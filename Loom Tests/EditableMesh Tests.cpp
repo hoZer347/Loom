@@ -355,6 +355,61 @@ TEST_SUITE("EditableMesh")
 		CHECK(mesh.vertices.size() == 20);
 	};
 
+	TEST_CASE("EditableMesh welds only corners bound alike, and gives back their bindings")
+	{
+		constexpr size_t binding_floats = 1;
+
+		// The two corners at (1, 1) are bound apart, the two at the origin alike.
+		const std::vector<float> bindings = { 0.0f, 1.0f, 2.0f, 0.0f, 3.0f, 4.0f };
+
+		const EditableMesh mesh = EditableMesh::FromTriangles(SQUARE, { }, { }, { }, { }, bindings, binding_floats);
+
+		CHECK(mesh.vertices.size() == 5);
+		CHECK(mesh.bindingFloats == binding_floats);
+		CHECK(mesh.ToBindings() == bindings);
+
+		// Bindings that do not cover every corner bind nothing.
+		const EditableMesh unbound = EditableMesh::FromTriangles(SQUARE, { }, { }, { }, { }, { 0.0f }, binding_floats);
+		CHECK(unbound.vertices.size() == 4);
+		CHECK(unbound.bindingFloats == 0);
+		CHECK(unbound.ToBindings().empty());
+	};
+
+	TEST_CASE("EditableMesh binds what Extrude and Duplicate add as what they came from, and what Append adds to nothing")
+	{
+		constexpr size_t binding_floats = 1;
+		constexpr float distance = 1.0f;
+
+		// Each corner bound by where it is across the square, so a copy of it is
+		// known by its place.
+		const auto bound = [](const glm::vec3& at) { return at.x + 2.0f * at.y; };
+
+		std::vector<float> bindings{ };
+
+		for (size_t i = 0; i < SQUARE.size(); i += 3)
+			bindings.push_back(bound(glm::vec3(SQUARE[i], SQUARE[i + 1], SQUARE[i + 2])));
+
+		EditableMesh mesh = EditableMesh::FromTriangles(SQUARE, { }, { }, { }, { }, bindings, binding_floats);
+		mesh.JoinTriangles();
+		REQUIRE(mesh.faces.size() == 1);
+
+		mesh.Extrude({ 0 }, distance);
+		mesh.Duplicate({ 0 });
+
+		REQUIRE(mesh.bindings.size() == mesh.vertices.size());
+
+		for (size_t v = 0; v < mesh.vertices.size(); v++)
+			CHECK(mesh.bindings[v] == doctest::Approx(bound(mesh.vertices[v])));
+
+		const size_t before = mesh.vertices.size();
+		mesh.Append(EditableMesh::Plane(1.0f));
+
+		REQUIRE(mesh.bindings.size() == mesh.vertices.size());
+
+		for (size_t v = before; v < mesh.vertices.size(); v++)
+			CHECK(mesh.bindings[v] == 0.0f);
+	};
+
 	TEST_CASE("EditableMesh keeps colours once either side of an append has them")
 	{
 		const std::vector<float> grey(SQUARE.size() / 3 * 4, 0.5f);

@@ -395,6 +395,24 @@ TEST_SUITE("ModelEditor")
 		CHECK(driven.editor.Selected()->faces == std::set<uint32_t>{ 0 });
 	};
 
+	TEST_CASE("The Model panel goes on to edit the part whose vertex is clicked, picking it")
+	{
+		EditableMesh lid = EditableMesh::Plane(1.0f);
+		lid.Transform({ 0, 1, 2, 3 }, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
+
+		Driven driven("model_part_vertex", &lid);
+		REQUIRE(driven.Mesh().faces.size() == 6);
+
+		const glm::vec3 corner(0.5f, 1.0f, 0.5f);
+
+		driven.editor.SetPick(ModelEditor::Pick::Vertices);
+		driven.Click(driven.Screen(corner));
+
+		REQUIRE(driven.Mesh().faces.size() == 1);
+		REQUIRE(driven.editor.Selected()->vertices.size() == 1);
+		CHECK(glm::distance(driven.Mesh().vertices[*driven.editor.Selected()->vertices.begin()], corner) < TOLERANCE);
+	};
+
 	TEST_CASE("The Model panel's box leaves out corners another part hides")
 	{
 		// A lid just above the cube and wider than it, which hides the cube's
@@ -670,32 +688,89 @@ TEST_SUITE("ModelEditor")
 		CHECK(reopened.Editing()->faces.size() == 12);
 	};
 
-	TEST_CASE("The Model panel leaves animated meshes out")
+	TEST_CASE("The Model panel shapes a skinned mesh where its joints bend it, and keeps it bound")
 	{
-		LoomTests::EngineFixture engine;
+		constexpr size_t corner_floats = 3;
+		constexpr size_t tip = 1;
 
-		const EditableMesh cube = EditableMesh::Cube(1.0f);
-		const std::string path = WritePrefab("model_skinned", nullptr, &cube, true);
+		const std::string path = WriteJointedPrefab("model_skin_shape");
 
-		ModelEditor editor;
-		editor.Open(path);
+		Driven driven("model_skin_shape", nullptr, path);
+		REQUIRE(driven.Mesh().faces.size() == 6);
+
+		Loom::GameObject* model = driven.editor.Model();
+		Loom::GameObject* lid = Named(*model, "Lid");
+		Loom::Skin* skin = lid->GetComponent<Loom::Skin>();
+		Loom::Mesh* mesh = lid->GetComponent<Loom::Mesh>();
+
+		// Bent aside by Tip, so the top face is drawn clear of where the mesh holds it.
+		const glm::vec3 bent(0.5f, 0.0f, 0.0f);
+		Named(*model, "Tip")->transform.position = glm::vec3(0.0f, 1.0f, 0.0f) + bent;
+		driven.Frame();
+
+		driven.editor.SetPick(ModelEditor::Pick::Faces);
+		driven.Click(driven.Screen(glm::vec3(0.25f, 0.5f, 0.1f) + bent));
+		REQUIRE(driven.editor.Selected()->faces.size() == 1);
+
+		const uint32_t face = *driven.editor.Selected()->faces.begin();
+		const glm::vec3 centre = driven.Mesh().FaceCentre(face);
+		CHECK(std::abs(centre.y - 0.5f) < TOLERANCE);
+
+		const ImVec2 middle = driven.Screen(centre + bent);
+		const ImVec2 above = driven.Screen(centre + bent + glm::vec3(0.0f, 0.1f, 0.0f));
+		const float reach = std::hypot(above.x - middle.x, above.y - middle.y);
+		const ImVec2 up((above.x - middle.x) / reach, (above.y - middle.y) / reach);
+
+		constexpr float grab = 60.0f;
+		constexpr float pull = 40.0f;
+
+		driven.Drag(ImVec2(middle.x + up.x * grab, middle.y + up.y * grab), ImVec2(middle.x + up.x * (grab + pull), middle.y + up.y * (grab + pull)));
+
+		// Moved in the mesh's own space by as much as it moved where drawn.
+		const glm::vec3 moved = driven.Mesh().FaceCentre(face);
+		CHECK(moved.y > centre.y + TOLERANCE);
+		CHECK(std::abs(moved.x - centre.x) < TOLERANCE);
+		CHECK(std::abs(moved.z - centre.z) < TOLERANCE);
+
+		// What Extrude adds is bound as what it came from.
+		driven.editor.Extrude();
+		REQUIRE(driven.Mesh().faces.size() > 6);
+
+		const std::vector<float>& influences = *std::as_const(skin->m_influences);
+		const size_t corners = (*std::as_const(mesh->m_vertices)).size() / corner_floats;
+		REQUIRE(influences.size() == corners * Loom::Skin::FLOATS_PER_INFLUENCE);
+
+		for (size_t i = 0; i < corners; i++)
+		{
+			CHECK(influences[i * Loom::Skin::FLOATS_PER_INFLUENCE] == (float)tip);
+			CHECK(influences[i * Loom::Skin::FLOATS_PER_INFLUENCE + Loom::Skin::JOINTS_PER_VERTEX] == 1.0f);
+		};
+
+		CHECK(driven.editor.Save());
+
+		Loom::Scene reader("Reader");
 		LoomTests::Pump();
 
-		CHECK(editor.Editing() == nullptr);
+		Loom::GameObject* saved = Loom::SceneSerializer::Deserialize(ReadFile(path), reader.GetRoot());
+		LoomTests::Pump();
+		REQUIRE(saved != nullptr);
 
-		std::error_code code;
-		std::filesystem::remove(path, code);
+		Loom::GameObject* saved_lid = Named(*saved, "Lid");
+		CHECK(*std::as_const(saved_lid->GetComponent<Loom::Skin>()->m_influences) == influences);
+		CHECK((*std::as_const(saved_lid->GetComponent<Loom::Mesh>()->m_vertices)).size() == corners * corner_floats);
 	};
 
-	TEST_CASE("The Model panel opens a skinned model on its joints, and the joint clicked is picked")
+	TEST_CASE("The Model panel opens a skinned model to shape, and the joint clicked is picked")
 	{
 		Driven driven("model_joints", nullptr, WriteJointedPrefab("model_joints"));
 
 		Loom::GameObject* model = driven.editor.Model();
 		REQUIRE(model != nullptr);
 
-		CHECK(driven.editor.Editing() == nullptr);
+		CHECK(driven.editor.Editing() != nullptr);
 		CHECK(!driven.renderer.clears.empty());
+
+		driven.editor.SetPick(ModelEditor::Pick::Joints);
 		CHECK(driven.editor.Joints() == std::vector<Loom::GameObject*>{ Named(*model, "Hinge"), Named(*model, "Tip") });
 		CHECK(driven.editor.Selected()->joints.empty());
 
@@ -724,6 +799,7 @@ TEST_SUITE("ModelEditor")
 
 		const glm::vec3 start = Placed(*tip);
 
+		driven.editor.SetPick(ModelEditor::Pick::Joints);
 		driven.Click(driven.Screen(start));
 		REQUIRE(driven.editor.Selected()->joints == std::set<uint32_t>{ 1 });
 
@@ -773,6 +849,7 @@ TEST_SUITE("ModelEditor")
 
 		const glm::vec3 reach = Placed(*tip) - Placed(*hinge);
 
+		driven.editor.SetPick(ModelEditor::Pick::Joints);
 		driven.editor.SelectAll();
 		REQUIRE(driven.editor.Selected()->joints == std::set<uint32_t>{ 0, 1 });
 
@@ -831,6 +908,7 @@ TEST_SUITE("ModelEditor")
 		Loom::GameObject* model = driven.editor.Model();
 		Loom::GameObject* tip = Named(*model, "Tip");
 
+		driven.editor.SetPick(ModelEditor::Pick::Joints);
 		driven.Click(driven.Screen(Placed(*tip)));
 		REQUIRE(driven.editor.Selected()->joints == std::set<uint32_t>{ 1 });
 
@@ -878,6 +956,7 @@ TEST_SUITE("ModelEditor")
 
 		Loom::GameObject* tip = Named(*root, "Tip");
 
+		driven.editor.SetPick(ModelEditor::Pick::Joints);
 		driven.Click(driven.Screen(Placed(*tip)));
 		REQUIRE(driven.editor.Selected()->joints == std::set<uint32_t>{ 1 });
 

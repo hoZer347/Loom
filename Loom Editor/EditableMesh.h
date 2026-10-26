@@ -6,6 +6,8 @@
 #include "glm/glm.hpp"
 
 #include <cstdint>
+#include <functional>
+#include <map>
 #include <optional>
 #include <set>
 #include <utility>
@@ -25,6 +27,8 @@ namespace Loom
 	*   so a quad stays one face through moves and extrusions
 	* - Each corner keeps its own UV, normal, colour and UV layers' words, as the Mesh had them. A face
 	*   whose shape changes takes its own flat normal at every corner
+	* - Each vertex keeps the floats a Skin bends it by, carried to the
+	*   vertices made from it
 	*/
 	struct EditableMesh final
 	{
@@ -57,8 +61,9 @@ namespace Loom
 		// Unindexed triangles, as Mesh keeps them: three floats a vertex for
 		// positions and normals, two for UVs and four for colours. UVs,
 		// normals and colours count only when there are as many of them as
-		// vertices, and so do the UV layers.
-		static EditableMesh FromTriangles(const std::vector<float>& positions, const std::vector<float>& uvs, const std::vector<float>& normals, const std::vector<float>& colors, const std::vector<UVLayer>& layers = { });
+		// vertices, and so do the UV layers and the bindings, binding_floats a
+		// vertex. Only corners at the same place bound alike share a vertex.
+		static EditableMesh FromTriangles(const std::vector<float>& positions, const std::vector<float>& uvs, const std::vector<float>& normals, const std::vector<float>& colors, const std::vector<UVLayer>& layers = { }, const std::vector<float>& bindings = { }, size_t binding_floats = 0);
 
 		// Back to Mesh's arrays. UVs, normals and colours stay empty for a
 		// mesh that had none.
@@ -66,6 +71,9 @@ namespace Loom
 
 		// The UV layers, a vertex for each ToTriangles gives.
 		std::vector<UVLayer> ToUVLayers() const;
+
+		// The bindings, a vertex for each ToTriangles gives.
+		std::vector<float> ToBindings() const;
 
 		// Both into the Mesh, in place of what it drew.
 		void WriteTo(Mesh& mesh) const;
@@ -87,6 +95,9 @@ namespace Loom
 		glm::vec3 FaceNormal(uint32_t face) const;
 		glm::vec3 FaceCentre(uint32_t face) const;
 
+		// With each vertex at, as it is drawn, in place of where it is.
+		glm::vec3 FaceCentre(uint32_t face, const std::vector<glm::vec3>& at) const;
+
 		// Every edge once, in the order faces first reach them.
 		std::vector<Edge> Edges() const;
 
@@ -100,6 +111,10 @@ namespace Loom
 		// Moves the vertices by the matrix, and flattens the normals of every
 		// face they are in.
 		void Transform(const std::set<uint32_t>& vertices, const glm::mat4& matrix);
+
+		// Puts each vertex where it is mapped to, and flattens the normals of
+		// every face they are in.
+		void Place(const std::map<uint32_t, glm::vec3>& places);
 
 		// Lifts the faces off the rest of the mesh by distance along their
 		// average normal, walling in the gap from where they were. The faces
@@ -140,6 +155,7 @@ namespace Loom
 		};
 
 		std::optional<Hit> Raycast(const glm::vec3& origin, const glm::vec3& direction) const;
+		std::optional<Hit> Raycast(const glm::vec3& origin, const glm::vec3& direction, const std::vector<glm::vec3>& at) const;
 
 		// The smallest box round every vertex. Both corners zero for none.
 		std::pair<glm::vec3, glm::vec3> Bounds() const;
@@ -154,10 +170,20 @@ namespace Loom
 		// The UV layers every corner holds words of.
 		std::vector<UVLayout> layers;
 
+		// bindingFloats floats a vertex, in the order of vertices.
+		std::vector<float> bindings;
+		size_t bindingFloats = 0;
+
 		bool operator==(const EditableMesh&) const = default;
 
 	private:
 		void Flatten(uint32_t face);
+
+		// A new vertex at, bound as vertex is.
+		uint32_t CopyVertex(uint32_t vertex, const glm::vec3& at);
+
+		// Calls add with each corner ToTriangles gives, in turn.
+		void ForEachTriangleCorner(const std::function<void(const Corner&)>& add) const;
 
 		// Drops the vertices no face uses, numbering the rest down.
 		void RemoveUnused();

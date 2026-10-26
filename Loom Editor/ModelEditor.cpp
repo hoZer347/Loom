@@ -27,6 +27,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 
@@ -331,13 +332,11 @@ void main()
 				MergeFields(shown.children[i], file.children[i], edited);
 		};
 
-		// A Skin keeps a weight for each of the mesh's corners as it is, which
-		// a change to them would scramble, so a skinned mesh is fixed.
 		void FindParts(GameObject& object, std::vector<GameObject*>& found, std::vector<GameObject*>& fixed)
 		{
 			if (const Mesh* mesh = object.GetComponent<Mesh>())
 			{
-				if (!mesh->m_generated && *std::as_const(mesh->primitive_id) == Mesh::Triangles && !object.GetComponent<Skin>())
+				if (!mesh->m_generated && *std::as_const(mesh->primitive_id) == Mesh::Triangles)
 					found.push_back(&object);
 				else fixed.push_back(&object);
 			};
@@ -584,10 +583,15 @@ void main()
 		for (GameObject* object : found)
 		{
 			Mesh* mesh = object->GetComponent<Mesh>();
-			EditableMesh editing = EditableMesh::FromTriangles(*std::as_const(mesh->m_vertices), *std::as_const(mesh->m_textureCoordinates), *std::as_const(mesh->m_normals), *std::as_const(mesh->m_colors), mesh->UVLayers());
+			Skin* skin = object->GetComponent<Skin>();
+			const std::vector<float>& positions = *std::as_const(mesh->m_vertices);
+			const std::vector<float> bindings = skin ? skin->Bindings(positions.size() / floats_per_position) : std::vector<float>{ };
+
+			EditableMesh editing = EditableMesh::FromTriangles(positions, *std::as_const(mesh->m_textureCoordinates), *std::as_const(mesh->m_normals), *std::as_const(mesh->m_colors), mesh->UVLayers(), bindings, skin ? skin->BindingFloats() : 0);
 			editing.JoinTriangles();
 
-			document.parts.push_back(Part{ object, mesh, std::move(editing) });
+			document.parts.push_back(Part{ object, mesh, std::move(editing), skin });
+			Bend(document.parts.back());
 		};
 
 		document.joints.clear();
@@ -639,7 +643,6 @@ void main()
 		document.hoveredEdge.reset();
 		document.hoveredFace.reset();
 		document.hoveredJoint.reset();
-		document.edgesOf.reset();
 		document.pickedOf.reset();
 	};
 
@@ -708,19 +711,27 @@ void main()
 			return false;
 		};
 
-		// Each mesh's geometry, under the keys of its fields that are not
-		// references, which point at this copy's objects rather than the file's,
-		// and each material's shader.
+		// Each mesh's geometry, and its skin's bindings, under the keys of their
+		// fields that are not references, which point at this copy's objects
+		// rather than the file's, and each material's shader.
 		std::map<std::string, std::vector<std::string>> edited{ };
+
+		const auto values = [&edited](const LoomObject& object)
+		{
+			std::vector<std::string>& keys = edited[object.GetGuid().ToString()];
+			const std::vector<SerializedField>& fields = object.GetFields();
+
+			for (size_t i = 0; i < fields.size(); i++)
+				if (fields[i].get_reference == nullptr && object.IsSaved(fields[i]))
+					keys.push_back(std::to_string(i));
+		};
 
 		for (const Part& part : document.parts)
 		{
-			std::vector<std::string>& keys = edited[part.mesh->GetGuid().ToString()];
-			const std::vector<SerializedField>& fields = part.mesh->GetFields();
+			values(*part.mesh);
 
-			for (size_t i = 0; i < fields.size(); i++)
-				if (fields[i].get_reference == nullptr && part.mesh->IsSaved(fields[i]))
-					keys.push_back(std::to_string(i));
+			if (part.skin)
+				values(*part.skin);
 		};
 
 		std::vector<Material*> materials{ };
@@ -1143,7 +1154,7 @@ void main()
 
 				if (changed && shaping)
 				{
-					document.parts[document.part].editing.Transform(Moving(document), glm::translate(glm::mat4(1.0f), centre - *pivot));
+					Reshape(document.parts[document.part], Moving(document), glm::translate(glm::mat4(1.0f), centre - *pivot));
 					Changed(document);
 				}
 				else if (changed)
@@ -1219,8 +1230,8 @@ void main()
 		if (!document.fixed.empty())
 		{
 			const char* format = document.parts.empty() ?
-				"%zu cannot be shaped here: skinned, made by a script, or not triangles." :
-				"%zu more cannot be shaped here: skinned, made by a script, or not triangles.";
+				"%zu cannot be shaped here: made by a script, or not triangles." :
+				"%zu more cannot be shaped here: made by a script, or not triangles.";
 
 			ImGui::PushTextWrapPos();
 			ImGui::TextDisabled(format, document.fixed.size());
@@ -1251,8 +1262,8 @@ void main()
 				document.hoveredHandle->tool == Tool::Rotate ? "Drag round to turn what is picked." :
 				document.hoveredHandle->axis ? "Drag out along the arrow to make what is picked bigger, in to make it smaller." :
 				"Drag right or up to make what is picked bigger, left or down to make it smaller.";
-		else if (document.hoveredFace && document.hoveredPart != document.part)
-			hint = "Click to edit this part, picking this face.";
+		else if ((document.hoveredVertex || document.hoveredEdge || document.hoveredFace) && document.hoveredPart != document.part)
+			hint = "Click to edit this part, picking this.";
 		else if (document.hoveredVertex || document.hoveredEdge || document.hoveredFace || document.hoveredJoint)
 			hint = "Click to pick this. Shift + click adds it to, or takes it from, what is picked.";
 		else if (document.pick == Pick::Joints)
@@ -1490,6 +1501,11 @@ void main()
 		view.pixel = 2.0f * std::tan(glm::radians((float)document.camera.fieldOfView) / 2.0f) / size.y;
 		view.world = Shaping(document) ? document.parts[document.part].object->WorldMatrix() : glm::mat4(1.0f);
 		view.local = glm::inverse(view.world);
+
+		// The joints may have moved since, posed or played.
+		if (Shaping(document))
+			for (Part& part : document.parts)
+				Bend(part);
 	};
 
 	void ModelEditor::Frame(Document& document)
@@ -1510,11 +1526,11 @@ void main()
 			const glm::mat4 world = part.object->WorldMatrix();
 
 			if (whole)
-				for (const glm::vec3& vertex : part.editing.vertices)
+				for (const glm::vec3& vertex : Shown(part))
 					framed.push_back(glm::vec3(world * glm::vec4(vertex, 1.0f)));
 			else if (i == document.part)
 				for (const uint32_t vertex : picked)
-					framed.push_back(glm::vec3(world * glm::vec4(part.editing.vertices[vertex], 1.0f)));
+					framed.push_back(glm::vec3(world * glm::vec4(Shown(part)[vertex], 1.0f)));
 		};
 
 		if (whole)
@@ -1579,20 +1595,18 @@ void main()
 		direction = glm::normalize(glm::vec3(distant) / distant.w - view.eye);
 	};
 
-	bool ModelEditor::Visible(const Document& document, const glm::vec3& local) const
+	bool ModelEditor::Visible(const Document& document, const glm::vec3& point) const
 	{
 		if (m_seeThrough)
 			return true;
 
 		// Against every part, each in its own space along the same ray from
 		// the eye, so another part in front hides it too.
-		const glm::vec3 point(document.view.world * glm::vec4(local, 1.0f));
-
 		for (const Part& part : document.parts)
 		{
 			const glm::mat4 inverse = glm::inverse(part.object->WorldMatrix());
 			const glm::vec3 eye(inverse * glm::vec4(document.view.eye, 1.0f));
-			const std::optional<EditableMesh::Hit> hit = part.editing.Raycast(eye, glm::vec3(inverse * glm::vec4(point, 1.0f)) - eye);
+			const std::optional<EditableMesh::Hit> hit = part.editing.Raycast(eye, glm::vec3(inverse * glm::vec4(point, 1.0f)) - eye, Shown(part));
 
 			if (hit && hit->distance < 1.0f - seen_share)
 				return false;
@@ -1636,7 +1650,7 @@ void main()
 		glm::vec3 sum(0.0f);
 
 		for (const uint32_t vertex : moving)
-			sum += document.parts[document.part].editing.vertices[vertex];
+			sum += Shown(document.parts[document.part])[vertex];
 
 		return sum / (float)moving.size();
 	};
@@ -1751,23 +1765,21 @@ void main()
 			return;
 		};
 
-		const EditableMesh& mesh = document.parts[document.part].editing;
-
+		// Every part, nearest first, so a click on another goes on to edit it.
 		if (document.pick == Pick::Faces)
 		{
 			glm::vec3 origin;
 			glm::vec3 direction;
 			Ray(view, mouse, origin, direction);
 
-			// Every part, nearest first, so a click on another goes on to edit
-			// it. Each is hit in its own space along the same ray, so how far
-			// along it compares across them.
+			// Each is hit in its own space along the same ray, so how far along
+			// it compares across them.
 			std::optional<EditableMesh::Hit> nearest{ };
 
 			for (size_t i = 0; i < document.parts.size(); i++)
 			{
 				const glm::mat4 local = glm::inverse(document.parts[i].object->WorldMatrix());
-				const std::optional<EditableMesh::Hit> hit = document.parts[i].editing.Raycast(glm::vec3(local * glm::vec4(origin, 1.0f)), glm::vec3(local * glm::vec4(direction, 0.0f)));
+				const std::optional<EditableMesh::Hit> hit = document.parts[i].editing.Raycast(glm::vec3(local * glm::vec4(origin, 1.0f)), glm::vec3(local * glm::vec4(direction, 0.0f)), Shown(document.parts[i]));
 
 				if (hit && (!nearest || hit->distance < nearest->distance))
 				{
@@ -1783,43 +1795,63 @@ void main()
 		// Nearest first, so only those in reach are tested for being seen.
 		if (document.pick == Pick::Vertices)
 		{
-			std::vector<std::pair<float, uint32_t>> found{ };
+			std::vector<std::tuple<float, size_t, uint32_t, glm::vec3>> found{ };
 
-			for (uint32_t vertex = 0; vertex < mesh.vertices.size(); vertex++)
-				if (const std::optional<ImVec2> point = Project(view, glm::vec3(view.world * glm::vec4(mesh.vertices[vertex], 1.0f))))
-					if (const float distance = Distance(mouse, *point); distance < pick_radius)
-						found.push_back({ distance, vertex });
+			for (size_t i = 0; i < document.parts.size(); i++)
+			{
+				const glm::mat4 world = document.parts[i].object->WorldMatrix();
+				const std::vector<glm::vec3>& shown = Shown(document.parts[i]);
 
-			std::sort(found.begin(), found.end());
+				for (uint32_t vertex = 0; vertex < shown.size(); vertex++)
+				{
+					const glm::vec3 placed(world * glm::vec4(shown[vertex], 1.0f));
 
-			for (const auto& [distance, vertex] : found)
-				if (Visible(document, mesh.vertices[vertex]))
+					if (const std::optional<ImVec2> point = Project(view, placed))
+						if (const float distance = Distance(mouse, *point); distance < pick_radius)
+							found.push_back({ distance, i, vertex, placed });
+				};
+			};
+
+			std::sort(found.begin(), found.end(), [](const auto& a, const auto& b) { return std::get<0>(a) < std::get<0>(b); });
+
+			for (const auto& [distance, part, vertex, placed] : found)
+				if (Visible(document, placed))
 				{
 					document.hoveredVertex = vertex;
+					document.hoveredPart = part;
 					return;
 				};
 
 			return;
 		};
 
-		std::vector<std::pair<float, EditableMesh::Edge>> found{ };
+		std::vector<std::tuple<float, size_t, EditableMesh::Edge, glm::vec3>> found{ };
 
-		for (const EditableMesh::Edge& edge : Edges(document))
+		for (size_t i = 0; i < document.parts.size(); i++)
 		{
-			const std::optional<ImVec2> a = Project(view, glm::vec3(view.world * glm::vec4(mesh.vertices[edge.first], 1.0f)));
-			const std::optional<ImVec2> b = Project(view, glm::vec3(view.world * glm::vec4(mesh.vertices[edge.second], 1.0f)));
+			const glm::mat4 world = document.parts[i].object->WorldMatrix();
+			const std::vector<glm::vec3>& shown = Shown(document.parts[i]);
 
-			if (a && b)
-				if (const float distance = SegmentDistance(mouse, *a, *b); distance < pick_radius)
-					found.push_back({ distance, edge });
+			for (const EditableMesh::Edge& edge : Edges(document.parts[i]))
+			{
+				const glm::vec3 from(world * glm::vec4(shown[edge.first], 1.0f));
+				const glm::vec3 to(world * glm::vec4(shown[edge.second], 1.0f));
+				const std::optional<ImVec2> a = Project(view, from);
+				const std::optional<ImVec2> b = Project(view, to);
+
+				if (a && b)
+					if (const float distance = SegmentDistance(mouse, *a, *b); distance < pick_radius)
+						found.push_back({ distance, i, edge, (from + to) / 2.0f });
+			};
 		};
 
-		std::sort(found.begin(), found.end());
+		std::sort(found.begin(), found.end(), [](const auto& a, const auto& b) { return std::get<0>(a) < std::get<0>(b); });
 
-		for (const auto& [distance, edge] : found)
-			if (Visible(document, (mesh.vertices[edge.first] + mesh.vertices[edge.second]) / 2.0f))
+		for (const auto& [distance, part, edge, middle] : found)
+			if (Visible(document, middle))
 			{
 				document.hoveredEdge = edge;
+				document.hoveredPart = part;
 				return;
 			};
 	};
@@ -1840,6 +1872,12 @@ void main()
 
 		Hover(document, mouse);
 
+		if ((document.hoveredVertex || document.hoveredEdge || document.hoveredFace) && document.hoveredPart != document.part)
+		{
+			document.part = document.hoveredPart;
+			selection = { };
+		};
+
 		if (document.hoveredJoint)
 			toggle(selection.joints, *document.hoveredJoint);
 		else if (document.hoveredVertex)
@@ -1847,15 +1885,7 @@ void main()
 		else if (document.hoveredEdge)
 			toggle(selection.edges, *document.hoveredEdge);
 		else if (document.hoveredFace)
-		{
-			if (document.hoveredPart != document.part)
-			{
-				document.part = document.hoveredPart;
-				selection = { };
-			};
-
 			toggle(selection.faces, *document.hoveredFace);
-		}
 		else if (!adding)
 			selection = { };
 	};
@@ -1888,26 +1918,28 @@ void main()
 			return;
 		};
 
-		const EditableMesh& mesh = document.parts[document.part].editing;
+		Part& part = document.parts[document.part];
+		const EditableMesh& mesh = part.editing;
+		const std::vector<glm::vec3>& shown = Shown(part);
+		const auto seen = [&](const glm::vec3& local) { return Visible(document, glm::vec3(view.world * glm::vec4(local, 1.0f))); };
 
 		switch (document.pick)
 		{
 		case Pick::Vertices:
-			for (uint32_t vertex = 0; vertex < mesh.vertices.size(); vertex++)
-				if (inside(mesh.vertices[vertex]) && Visible(document, mesh.vertices[vertex]))
+			for (uint32_t vertex = 0; vertex < shown.size(); vertex++)
+				if (inside(shown[vertex]) && seen(shown[vertex]))
 					selection.vertices.insert(vertex);
 			break;
 
 		case Pick::Edges:
-			for (const EditableMesh::Edge& edge : Edges(document))
-				if (inside(mesh.vertices[edge.first]) && inside(mesh.vertices[edge.second]) &&
-					Visible(document, (mesh.vertices[edge.first] + mesh.vertices[edge.second]) / 2.0f))
+			for (const EditableMesh::Edge& edge : Edges(part))
+				if (inside(shown[edge.first]) && inside(shown[edge.second]) && seen((shown[edge.first] + shown[edge.second]) / 2.0f))
 					selection.edges.insert(edge);
 			break;
 
 		default:
 			for (uint32_t face = 0; face < mesh.faces.size(); face++)
-				if (inside(mesh.FaceCentre(face)) && Visible(document, mesh.FaceCentre(face)))
+				if (const glm::vec3 centre = mesh.FaceCentre(face, shown); inside(centre) && seen(centre))
 					selection.faces.insert(face);
 			break;
 		};
@@ -2044,9 +2076,9 @@ void main()
 			return;
 		};
 
-		EditableMesh& mesh = document.parts[document.part].editing;
-		mesh = document.pending.mesh;
-		mesh.Transform(Moving(document), view.local * change * view.world);
+		Part& part = document.parts[document.part];
+		part.editing = document.pending.mesh;
+		Reshape(part, Moving(document), view.local * change * view.world);
 
 		Changed(document);
 	};
@@ -2084,6 +2116,7 @@ void main()
 		const auto fill = [&](const Part& part, const std::set<uint32_t>& faces)
 		{
 			const glm::mat4 world = part.object->WorldMatrix();
+			const std::vector<glm::vec3>& shown = Shown(part);
 			std::vector<glm::vec3> triangles{ };
 
 			for (const uint32_t face : faces)
@@ -2092,7 +2125,7 @@ void main()
 
 				for (size_t i = 2; i < corners.size(); i++)
 					for (const size_t corner : { (size_t)0, i - 1, i })
-						triangles.push_back(glm::vec3(world * glm::vec4(part.editing.vertices[corners[corner].vertex], 1.0f)));
+						triangles.push_back(glm::vec3(world * glm::vec4(shown[corners[corner].vertex], 1.0f)));
 			};
 
 			return triangles;
@@ -2214,18 +2247,31 @@ void main()
 			return;
 		};
 
-		const EditableMesh& mesh = document.parts[document.part].editing;
-		std::vector<glm::vec3> points{ };
+		// Where each part's vertices are drawn in the world.
+		const auto placed = [](const Part& part)
+		{
+			const glm::mat4 world = part.object->WorldMatrix();
+			std::vector<glm::vec3> at{ };
 
-		for (const glm::vec3& vertex : mesh.vertices)
-			points.push_back(glm::vec3(view.world * glm::vec4(vertex, 1.0f)));
+			for (const glm::vec3& vertex : Shown(part))
+				at.push_back(glm::vec3(world * glm::vec4(vertex, 1.0f)));
 
-		const auto strips = [&](const std::vector<EditableMesh::Edge>& edges, float half_width)
+			return at;
+		};
+
+		Part& part = document.parts[document.part];
+		const std::vector<glm::vec3> points = placed(part);
+
+		// What is under the mouse may be on another part.
+		const bool elsewhere = (document.hoveredVertex || document.hoveredEdge) && document.hoveredPart != document.part;
+		const std::vector<glm::vec3> hovered_points = elsewhere ? placed(document.parts[document.hoveredPart]) : points;
+
+		const auto strips = [&](const std::vector<EditableMesh::Edge>& edges, float half_width, const std::vector<glm::vec3>& on)
 		{
 			std::vector<glm::vec3> triangles{ };
 
 			for (const EditableMesh::Edge& edge : edges)
-				strip(points[edge.first], points[edge.second], half_width, triangles);
+				strip(on[edge.first], on[edge.second], half_width, triangles);
 
 			return triangles;
 		};
@@ -2243,20 +2289,20 @@ void main()
 		const std::set<uint32_t> moving = Moving(document);
 		std::vector<EditableMesh::Edge> picked_edges{ };
 
-		for (const EditableMesh::Edge& edge : Edges(document))
+		for (const EditableMesh::Edge& edge : Edges(part))
 			if (document.pick == Pick::Edges ? document.selection.edges.contains(edge) : moving.contains(edge.first) && moving.contains(edge.second))
 				picked_edges.push_back(edge);
 
-		draw(fill(document.parts[document.part], PickedFaces(document)), picked_fill);
+		draw(fill(part, PickedFaces(document)), picked_fill);
 
 		if (document.hoveredFace)
 			draw(fill(document.parts[document.hoveredPart], { *document.hoveredFace }), hovered_fill);
 
-		draw(strips(Edges(document), wire_half_width), wire_colour);
-		draw(strips(picked_edges, picked_wire_half_width), picked_colour);
+		draw(strips(Edges(part), wire_half_width, points), wire_colour);
+		draw(strips(picked_edges, picked_wire_half_width, points), picked_colour);
 
 		if (document.hoveredEdge)
-			draw(strips({ *document.hoveredEdge }, picked_wire_half_width), hovered_colour);
+			draw(strips({ *document.hoveredEdge }, picked_wire_half_width, hovered_points), hovered_colour);
 
 		if (document.pick == Pick::Vertices)
 		{
@@ -2264,7 +2310,7 @@ void main()
 			draw(dots(points_of(document.selection.vertices), dot_half_size), picked_colour);
 
 			if (document.hoveredVertex)
-				draw(dots({ points[*document.hoveredVertex] }, dot_half_size), hovered_colour);
+				draw(dots({ hovered_points[*document.hoveredVertex] }, dot_half_size), hovered_colour);
 		};
 	};
 
@@ -2443,7 +2489,8 @@ void main()
 		SetPoses(document, snapshot.poses);
 		Posed(document);
 
-		if (document.parts.empty())
+		// A step that only posed joints leaves the mesh as the file has it.
+		if (document.parts.empty() || document.parts[snapshot.part].editing == snapshot.mesh)
 			return;
 
 		document.parts[snapshot.part].editing = snapshot.mesh;
@@ -2488,13 +2535,17 @@ void main()
 
 		part.editing.WriteTo(*part.mesh);
 
+		if (part.skin)
+			part.skin->SetBindings(part.editing.ToBindings());
+
+		Bend(part);
 		document.unsaved = true;
 
 		// What was under the mouse may be gone, and is found again once it moves.
 		document.hoveredVertex.reset();
 		document.hoveredEdge.reset();
 		document.hoveredFace.reset();
-		document.edgesOf.reset();
+		part.edges.reset();
 		document.pickedOf.reset();
 	};
 
@@ -2504,15 +2555,48 @@ void main()
 		document.hoveredJoint.reset();
 	};
 
-	const std::vector<EditableMesh::Edge>& ModelEditor::Edges(Document& document)
+	const std::vector<EditableMesh::Edge>& ModelEditor::Edges(Part& part)
 	{
-		if (document.edgesOf != document.part)
+		if (!part.edges)
+			part.edges = part.editing.Edges();
+
+		return *part.edges;
+	};
+
+	const std::vector<glm::vec3>& ModelEditor::Shown(const Part& part)
+	{
+		return part.skin ? part.shown : part.editing.vertices;
+	};
+
+	void ModelEditor::Bend(Part& part)
+	{
+		if (part.skin == nullptr)
+			return;
+
+		const std::vector<glm::vec3>& vertices = part.editing.vertices;
+
+		part.bends = part.skin->Bends(*part.mesh, part.editing.bindings);
+		part.bends.resize(vertices.size(), glm::mat4(1.0f));
+		part.shown.resize(vertices.size());
+
+		for (size_t v = 0; v < vertices.size(); v++)
+			part.shown[v] = glm::vec3(part.bends[v] * glm::vec4(vertices[v], 1.0f));
+	};
+
+	void ModelEditor::Reshape(Part& part, const std::set<uint32_t>& vertices, const glm::mat4& change)
+	{
+		if (part.skin == nullptr)
 		{
-			document.edges = document.parts[document.part].editing.Edges();
-			document.edgesOf = document.part;
+			part.editing.Transform(vertices, change);
+			return;
 		};
 
-		return document.edges;
+		std::map<uint32_t, glm::vec3> places{ };
+
+		for (const uint32_t vertex : vertices)
+			places[vertex] = glm::vec3(glm::inverse(part.bends[vertex]) * change * part.bends[vertex] * glm::vec4(part.editing.vertices[vertex], 1.0f));
+
+		part.editing.Place(places);
 	};
 
 	ModelEditor::Selection ModelEditor::Converted(const EditableMesh& mesh, const Selection& selection, Pick from, Pick to)
