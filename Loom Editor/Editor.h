@@ -463,6 +463,10 @@ namespace Loom
 		// putting it above onto or below it by the half under the mouse, and
 		// marks where with a line.
 		void DropComponent(GameObject& gameObject, ComponentBase& onto, const ImRect& area);
+
+		// Scrolls the Inspector on while a component is held near its top or
+		// bottom, to reorder past what is in sight.
+		void ScrollWhileReordering();
 		void DrawComponentMenu(GameObject* gameObject, const ComponentMenu::Node& node);
 
 		// Right-click on a component in the Add Component menu: the category it
@@ -1104,6 +1108,9 @@ namespace Loom
 		ComponentMenu m_componentMenu;
 		char m_categoryBuffer[max_category_length + 1]{ };
 		bool m_openAddComponent = false;
+
+		// The part of a pixel ScrollWhileReordering has yet to scroll.
+		float m_reorderScroll = 0.0f;
 
 		// The source of the component whose popup is open, found as it opens.
 		SourceLine m_componentSource{ };
