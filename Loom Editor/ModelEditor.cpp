@@ -72,8 +72,9 @@ namespace Loom
 		constexpr float min_dot_half_size = 1.0f;
 		constexpr float joint_half_size = 5.0f;
 
-		// A vertex's dot spans at most this share of the mesh's mean edge as
-		// drawn where the dot is, so dots shrink apart as the view backs off.
+		// A vertex dot's half size is this share of the mesh's mean edge as
+		// drawn there, down to min_dot_half_size, so dots shrink apart as the
+		// view backs off.
 		constexpr float dot_edge_share = 0.25f;
 
 		// How near a joint's position, size or turn in degrees, back out of
