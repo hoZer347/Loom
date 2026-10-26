@@ -361,6 +361,7 @@ namespace Loom
 		if (!m_playing)
 		{
 			m_playSnapshots = TakeSnapshots();
+			m_playHistory.Clear();
 			m_playing = true;
 		};
 

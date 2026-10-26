@@ -148,6 +148,9 @@
     <ClCompile Include="SceneHistory.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
+    <ClCompile Include="TransformHistory.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
     <ClCompile Include="Prefabs.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
@@ -301,6 +304,9 @@
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="SceneHistory.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="TransformHistory.h">
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="Prefabs.h">

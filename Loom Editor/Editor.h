@@ -26,6 +26,7 @@
 #include "SceneHistory.h"
 #include "SceneSerializer.h"
 #include "SearchBar.h"
+#include "TransformHistory.h"
 #include "FileTab.h"
 #include "FolderTree.h"
 #include "ScriptFolders.h"
@@ -278,7 +279,8 @@ namespace Loom
 		void Select(GameObject* gameObject);
 
 		// Steps the owned scenes back or forward through the edits made to them.
-		// Not while playing: what a run changes is not an edit.
+		// While playing, only through the Transform edits made in the
+		// Inspector since Play: what a run changes is not an edit.
 		void Undo();
 		void Redo();
 
@@ -527,6 +529,8 @@ namespace Loom
 		// the last time, which on a large scene takes long enough to be felt.
 		void RecordHistory();
 		bool CanStepHistory() const;
+		bool CanUndo() const;
+		bool CanRedo() const;
 
 		// Undo or Redo, keeping the selection on its object when the step
 		// takes it out and makes it again.
@@ -970,6 +974,11 @@ namespace Loom
 		std::vector<SceneSnapshot> m_playSnapshots{ };
 
 		SceneHistory m_history{ };
+		TransformHistory m_playHistory{ };
+
+		// What the Transform field being edited in the Inspector held when
+		// the edit began, for m_playHistory.
+		glm::vec3 m_transformBefore{ };
 
 		// Set when a click lands or a widget is let go of in a window that
 		// CanEditScenes, or a scene arrives; a step is recorded on the first

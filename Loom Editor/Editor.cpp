@@ -1410,11 +1410,27 @@ namespace Loom
 
 	void Editor::Undo()
 	{
+		if (m_playing)
+		{
+			if (GameObject* stepped = m_playHistory.Undo())
+				Select(stepped);
+
+			return;
+		};
+
 		StepHistory(&SceneHistory::Undo);
 	};
 
 	void Editor::Redo()
 	{
+		if (m_playing)
+		{
+			if (GameObject* stepped = m_playHistory.Redo())
+				Select(stepped);
+
+			return;
+		};
+
 		StepHistory(&SceneHistory::Redo);
 	};
 
@@ -1446,6 +1462,20 @@ namespace Loom
 		// Mid-build the scenes are down, and every step would look like it
 		// belonged to a closed scene.
 		return !m_playing && m_scripts.IsIdle();
+	};
+
+	bool Editor::CanUndo() const
+	{
+		return m_playing
+			? m_playHistory.CanUndo()
+			: CanStepHistory() && m_history.CanUndo();
+	};
+
+	bool Editor::CanRedo() const
+	{
+		return m_playing
+			? m_playHistory.CanRedo()
+			: CanStepHistory() && m_history.CanRedo();
 	};
 
 	void Editor::RecordHistory()
@@ -2186,10 +2216,10 @@ namespace Loom
 
 		if (ImGui::BeginMenu("Edit"))
 		{
-			if (ImGui::MenuItem("Undo", "Ctrl+Z", false, CanStepHistory() && m_history.CanUndo()))
+			if (ImGui::MenuItem("Undo", "Ctrl+Z", false, CanUndo()))
 				Undo();
 
-			if (ImGui::MenuItem("Redo", "Ctrl+Y", false, CanStepHistory() && m_history.CanRedo()))
+			if (ImGui::MenuItem("Redo", "Ctrl+Y", false, CanRedo()))
 				Redo();
 
 			ImGui::Separator();
@@ -3328,26 +3358,32 @@ namespace Loom
 		if (!open)
 			return;
 
-		Transform& transform = gameObject->transform;
-
 		const auto row =
-			[column](const char* name, Serial<glm::vec3>& field, float speed)
+			[this, gameObject, column](const char* name, TransformHistory::Field field, float speed)
 			{
 				ImGui::PushID(name);
 				Label(name, column);
-				glm::vec3 value = field;
+				Serial<glm::vec3>& serial = gameObject->transform.*field;
+				const glm::vec3 before = serial;
+				glm::vec3 value = before;
 
 				if (AxisGui::DragFloatN("##value", glm::value_ptr(value), 3, speed, float_format))
-					field = value;
+					serial = value;
+
+				if (ImGui::IsItemActivated())
+					m_transformBefore = before;
+
+				if (m_playing && ImGui::IsItemDeactivatedAfterEdit())
+					m_playHistory.Record(*gameObject, field, m_transformBefore);
 
 				ImGui::PopID();
 			};
 
 		ImGui::PushItemWidth(-FLT_MIN);
 
-		row("Position", transform.position, drag_speed);
-		row("Rotation", transform.rotation, rotation_drag_speed);
-		row("Scale", transform.scale, drag_speed);
+		row("Position", &Transform::position, drag_speed);
+		row("Rotation", &Transform::rotation, rotation_drag_speed);
+		row("Scale", &Transform::scale, drag_speed);
 
 		ImGui::PopItemWidth();
 	};
