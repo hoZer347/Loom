@@ -150,6 +150,7 @@
     <ClCompile Include="TextFit.cpp" />
     <ClCompile Include="KindFilter.cpp" />
     <ClCompile Include="Hierarchy.cpp" />
+    <ClCompile Include="ComponentDrag.cpp" />
     <ClCompile Include="FolderWatch.cpp" />
     <ClCompile Include="WebPlayer.cpp" />
     <ClCompile Include="GameBuilder.cpp" />
@@ -208,6 +209,7 @@
     <ClInclude Include="TextFit.h" />
     <ClInclude Include="KindFilter.h" />
     <ClInclude Include="Hierarchy.h" />
+    <ClInclude Include="ComponentDrag.h" />
     <ClInclude Include="FolderWatch.h" />
     <ClInclude Include="WebPlayer.h" />
     <ClInclude Include="GameBuilder.h" />

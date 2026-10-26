@@ -29,6 +29,7 @@
 #include "Utilities/StateMachine.h"
 #include "Utilities/StateMachineMonitor.h"
 
+#include "ComponentDrag.h"
 #include "EditCommands.h"
 #include "EditorFileDialogs.h"
 #include "EditorIcons.h"
@@ -76,10 +77,6 @@ namespace Loom
 		constexpr ImGuiTreeNodeFlags header_flags =
 			ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap;
 
-		// Held within this many rows of the Inspector's top or bottom while
-		// reordering components, it scrolls on this many rows a second.
-		constexpr float reorder_scroll_edge_rows = 2.0f;
-		constexpr float reorder_scroll_rows = 12.0f;
 
 		// A category of a component's fields, inside that component's own
 		// header, folded until it is opened.
@@ -561,9 +558,7 @@ namespace Loom
 			if (payload == nullptr || !payload->IsDataType(Editor::object_payload))
 				return nullptr;
 
-			ComponentBase* component = LoomObject::GetByGuid<ComponentBase>(*(const Guid*)payload->Data);
-
-			return component != nullptr && component->GetGameObject() == &gameObject ? component : nullptr;
+			return ComponentDrag::Dragged(gameObject, *(const Guid*)payload->Data);
 		};
 
 		// A header on gameObject's Inspector, which shows folded while one of
@@ -571,18 +566,7 @@ namespace Loom
 		// as it was.
 		bool ComponentHeader(const char* label, const GameObject& gameObject)
 		{
-			if (DraggedComponent(gameObject) == nullptr)
-				return ImGui::CollapsingHeader(label, header_flags);
-
-			ImGuiStorage* storage = ImGui::GetStateStorage();
-			const ImGuiID id = ImGui::GetID(label);
-			const int was_open = storage->GetInt(id, (header_flags & ImGuiTreeNodeFlags_DefaultOpen) != 0);
-
-			ImGui::SetNextItemOpen(false);
-			ImGui::CollapsingHeader(label, header_flags);
-			storage->SetInt(id, was_open);
-
-			return false;
+			return ComponentDrag::Header(label, header_flags, DraggedComponent(gameObject) != nullptr);
 		};
 
 		// The object being dragged, as the field would hold it. Null when nothing
@@ -3661,29 +3645,17 @@ namespace Loom
 
 	void Editor::ScrollWhileReordering()
 	{
-		const ImRect inner = ImGui::GetCurrentWindow()->InnerRect;
-		const ImVec2 mouse = ImGui::GetMousePos();
+		const ComponentDrag::Scroll scroll = ComponentDrag::Step(
+			ImGui::GetMousePos(),
+			ImGui::GetCurrentWindow()->InnerRect,
+			ImGui::GetFrameHeightWithSpacing(),
+			ImGui::GetIO().DeltaTime,
+			m_reorderScroll);
 
-		if (mouse.x < inner.Min.x || mouse.x > inner.Max.x)
-			return;
+		m_reorderScroll = scroll.carried;
 
-		const float row = ImGui::GetFrameHeightWithSpacing();
-		const float edge = reorder_scroll_edge_rows * row;
-		const float step = ImGui::GetIO().DeltaTime * reorder_scroll_rows * row;
-
-		if (mouse.y < inner.Min.y + edge)
-			m_reorderScroll -= step;
-		else if (mouse.y > inner.Max.y - edge)
-			m_reorderScroll += step;
-		else
-			return;
-
-		// ImGui scrolls by whole pixels, which a fast frame's step falls short
-		// of, so what is left over carries to the next.
-		const float whole = std::trunc(m_reorderScroll);
-
-		m_reorderScroll -= whole;
-		ImGui::SetScrollY(std::clamp(ImGui::GetScrollY() + whole, 0.0f, ImGui::GetScrollMaxY()));
+		if (scroll.pixels != 0.0f)
+			ImGui::SetScrollY(std::clamp(ImGui::GetScrollY() + scroll.pixels, 0.0f, ImGui::GetScrollMaxY()));
 	};
 
 	void Editor::DropComponent(GameObject& gameObject, ComponentBase& onto, const ImRect& area)

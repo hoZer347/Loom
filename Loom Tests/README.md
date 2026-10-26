@@ -105,6 +105,7 @@ needs Chrome or Edge installed.
 | `PlayHistory` | The editor's undo and redo while playing: one field's text both ways, a no-op edit, redo cleared by a new edit, gone objects passed over, the step cap, components taken off, put on and reordered in place, references to them coming back from their own and other GameObjects, edits to a component outliving its removal and return, and what the run did since left alone |
 | `EditCommands` | The editor's Ctrl+Z/Y/X/C/V and Delete read from real ImGui key events, a text box keeping them, held keys not repeating, which object can be taken and where a paste lands, cut/copy/paste through undo |
 | `ProjectAssets` | Create > Script writing one self-registering header in the project's namespace, refusing a taken, registered or non-C++ name |
+| `ComponentDrag` | Reordering components in the Inspector: every header folded while one of the shown GameObject's components is dragged and each open again after as it was, nothing else counted as that drag, scrolling on within or past the edge rows both ways and not between them or beside the Inspector, fast frames carrying part of a pixel on |
 | `AxisGui` | One axis-coloured stripe over each of the first three drag boxes, nothing else added beside ImGui's own `DragScalarN`, nothing drawn in a collapsed window |
 | `Render` | Desktop only: a frame read back at the window's size, top row first, a whole `renderFrame` drawing a scene, and a screenshot saved as a PNG of that size |
 
@@ -200,5 +201,5 @@ and letting that fire after the object has gone runs it against freed memory.
   when `Loom WASM/State.h` and `State.cpp` were deleted.
 - `Loom SQL`, `Loom Demos`, `Space Explorers`, and `Loom Editor` beyond the
   sources of it that need no window, such as `SceneHistory.cpp`,
-  `EditCommands.cpp` and `PlayHistory.cpp`, which are compiled into the suite
+  `EditCommands.cpp`, `PlayHistory.cpp` and `ComponentDrag.cpp`, which are compiled into the suite
   beside the engine's.
