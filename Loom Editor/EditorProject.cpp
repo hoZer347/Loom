@@ -2172,6 +2172,33 @@ namespace Loom
 		return nullptr;
 	};
 
+	bool Editor::RevealFile(const std::string& path)
+	{
+		FileTab* tab = FileTabOf(path);
+
+		if (tab == nullptr)
+			return false;
+
+		tab->selected = std::filesystem::path(path).lexically_normal().lexically_relative(m_projectPath).generic_string();
+		tab->reveal = true;
+		ShowProjectTab(tab->kind.title);
+
+		return true;
+	};
+
+	void Editor::PingAsset(const std::string& path)
+	{
+		m_selectedAsset = std::filesystem::path(path).lexically_normal().string();
+		m_revealSelectedAsset = true;
+		ShowProjectTab(ProjectTabs::Scenes);
+		m_pingedAsset = m_selectedAsset;
+		m_pingedSince = ImGui::GetTime();
+	};
+
+	#pragma endregion
+
+	#pragma region Field Pickers
+
 	void Editor::DrawPickerButton(const std::string& shown)
 	{
 		if (ImGui::Button((shown + "###picker").c_str(), ImVec2(ImGui::CalcItemWidth(), 0.0f)))
@@ -2342,29 +2369,6 @@ namespace Loom
 		EndPicker();
 
 		return changed;
-	};
-
-	bool Editor::RevealFile(const std::string& path)
-	{
-		FileTab* tab = FileTabOf(path);
-
-		if (tab == nullptr)
-			return false;
-
-		tab->selected = std::filesystem::path(path).lexically_normal().lexically_relative(m_projectPath).generic_string();
-		tab->reveal = true;
-		ShowProjectTab(tab->kind.title);
-
-		return true;
-	};
-
-	void Editor::PingAsset(const std::string& path)
-	{
-		m_selectedAsset = std::filesystem::path(path).lexically_normal().string();
-		m_revealSelectedAsset = true;
-		ShowProjectTab(ProjectTabs::Scenes);
-		m_pingedAsset = m_selectedAsset;
-		m_pingedSince = ImGui::GetTime();
 	};
 
 	#pragma endregion

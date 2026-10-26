@@ -571,11 +571,16 @@ namespace Loom
 		#pragma region Dragging
 
 		// Components carry no name of their own, so one is shown as its type on
-		// the GameObject that holds it.
+		// the GameObject that holds it. A scene's root is shown as the scene,
+		// as the hierarchy draws it.
 		std::string Describe(const LoomObject& object)
 		{
 			if (const ComponentBase* component = dynamic_cast<const ComponentBase*>(&object))
-				return ComponentRegistry::NameOf(*component) + " on " + component->GetGameObject()->NameAndID();
+				return ComponentRegistry::NameOf(*component) + " on " + Describe(*component->GetGameObject());
+
+			if (const GameObject* gameObject = dynamic_cast<const GameObject*>(&object); gameObject && gameObject->GetParent() == nullptr)
+				if (const Scene* scene = EditCommands::SceneOf(*gameObject))
+					return scene->NameAndID();
 
 			return object.NameAndID();
 		};

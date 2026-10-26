@@ -461,27 +461,6 @@ namespace Loom
 		// The FileTab that holds the file, or none.
 		FileTab* FileTabOf(const std::string& path);
 
-		// A field's value on a button the field's width, which a click opens
-		// the field's picker under.
-		void DrawPickerButton(const std::string& shown);
-
-		// While the picker of the button drawn last is open: its search, and
-		// the list the field draws its rows in until EndPicker. appearing, when
-		// given: whether it opened this frame.
-		bool BeginPicker(bool* appearing = nullptr);
-		void EndPicker();
-
-		// One of the open picker's rows. Whether it was picked, which closes
-		// the picker.
-		static bool PickerRow(const std::string& id, const std::string& label, bool selected);
-
-		// An Asset field: the file it names, which a click swaps for another
-		// picked from the project's files of the field's extension, filed as
-		// the tab holding them files them, shaders as the Scripts tab does,
-		// and by their paths where no tab holds them.
-		// Takes such a file dragged onto it. Whether it changed.
-		bool DrawAssetField(const SerializedField& field);
-
 		// Selects and shows the file at path in its FileTab. False when none
 		// holds it.
 		bool RevealFile(const std::string& path);
@@ -503,6 +482,31 @@ namespace Loom
 
 		// Rereads the scripts project's headers for the types they declare.
 		void RefreshScripts();
+
+		#pragma endregion
+
+		#pragma region Field Pickers
+
+		// A field's value on a button the field's width, which a click opens
+		// the field's picker under.
+		void DrawPickerButton(const std::string& shown);
+
+		// While the picker of the button drawn last is open: its search, and
+		// the list the field draws its rows in until EndPicker. appearing, when
+		// given: whether it opened this frame.
+		bool BeginPicker(bool* appearing = nullptr);
+		void EndPicker();
+
+		// One of the open picker's rows. Whether it was picked, which closes
+		// the picker.
+		static bool PickerRow(const std::string& id, const std::string& label, bool selected);
+
+		// An Asset field: the file it names, which a click swaps for another
+		// picked from the project's files of the field's extension, filed as
+		// the tab holding them files them, shaders as the Scripts tab does,
+		// and by their paths where no tab holds them.
+		// Takes such a file dragged onto it. Whether it changed.
+		bool DrawAssetField(const SerializedField& field);
 
 		#pragma endregion
 
