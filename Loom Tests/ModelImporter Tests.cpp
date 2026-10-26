@@ -11,6 +11,7 @@
 #include "Mesh.h"
 #include "Scene.h"
 
+#include <bit>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -31,14 +32,20 @@ namespace
 	const std::vector<float> POSITIONS = { 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
 	const std::vector<float> NORMALS = { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f };
 	const std::vector<float> UVS = { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f };
+	const std::vector<float> SECOND_UVS = { 0.25f, 0.5f, 0.75f, 1.0f, -1.0f, 2.0f };
+
+	// SECOND_UVS as imported: glTF counts V down the texture, and every set
+	// of coordinates comes in counting it up, as aUV does.
+	const std::vector<float> SECOND_UVS_IMPORTED = { 0.25f, 0.5f, 0.75f, 0.0f, -1.0f, -1.0f };
 	const std::vector<float> COLORS = { 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.5f };
 	const std::vector<float> TIMES = { 0.0f, 1.0f };
 	const std::vector<float> STEPS = { 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
 
 	/**
 	* A glTF of two triangles sharing one buffer, written to path:
-	* - "Painted", coloured by its corners, in a half blue material with a
-	*   texture sampled nearest and cut out below CUTOFF
+	* - "Painted", coloured by its corners, with a second set of texture
+	*   coordinates, in a half blue material with a texture sampled nearest
+	*   and cut out below CUTOFF
 	* - "Glowing", in a material drawn by its emission's texture alone
 	* - Animated, moving "Painted", which makes the importer rig it
 	*/
@@ -73,6 +80,7 @@ namespace
 		const json plain = json{ { "POSITION", positions }, { "NORMAL", add(NORMALS, "VEC3", corners) }, { "TEXCOORD_0", add(UVS, "VEC2", corners) } };
 		json painted = plain;
 		painted["COLOR_0"] = add(COLORS, "VEC4", corners);
+		painted["TEXCOORD_1"] = add(SECOND_UVS, "VEC2", corners);
 
 		const json texture = json{ { "index", 0 } };
 
@@ -127,8 +135,9 @@ namespace
 	};
 
 	// Each part drawn as the file's material says: Model.shader, the base
-	// colour, the texture copied out, the vertex colours and the cutout, or
-	// for the glowing part its emission's colour and texture.
+	// colour, the texture copied out, the vertex colours, the second texture
+	// coordinates as UV_1 and the cutout, or for the glowing part its
+	// emission's colour and texture.
 	void CheckDressed(Loom::GameObject& model)
 	{
 		Loom::GameObject* painted = Named(model, "Painted");
@@ -150,6 +159,15 @@ namespace
 		CHECK(std::filesystem::exists(paint->variables->Find(texture)->texture));
 		CHECK(*painted->GetComponent<Loom::Mesh>()->m_colors == COLORS);
 
+		const std::vector<Loom::UVLayer> layers = painted->GetComponent<Loom::Mesh>()->UVLayers();
+		REQUIRE(layers.size() == 1);
+		CHECK(layers[0].id == 1);
+		CHECK(layers[0].words == 2);
+		REQUIRE(layers[0].values.size() == SECOND_UVS_IMPORTED.size());
+
+		for (size_t i = 0; i < SECOND_UVS_IMPORTED.size(); i++)
+			CHECK(std::bit_cast<float>(layers[0].values[i]) == SECOND_UVS_IMPORTED[i]);
+
 		Loom::Material* glow = glowing->GetComponent<Loom::Material>();
 		REQUIRE(glow != nullptr);
 		CHECK(glow->GetShaderPath() == Loom::model_shader_path);
@@ -158,6 +176,7 @@ namespace
 		REQUIRE(glow->variables->Find(texture) != nullptr);
 		CHECK(std::filesystem::exists(glow->variables->Find(texture)->texture));
 		CHECK(glowing->GetComponent<Loom::Mesh>()->m_colors->empty());
+		CHECK(glowing->GetComponent<Loom::Mesh>()->UVLayers().empty());
 	};
 
 	// The importer writes Model.shader and the textures into the project it

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "UVLayer.h"
+
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -37,6 +39,11 @@ namespace Loom
 		std::vector<float> uvs;
 		std::vector<float> normals;
 		std::vector<float> colors;
+
+		// Texture coordinates past the first, a layer for each, numbered by
+		// its channel.
+		std::vector<UVLayer> layers;
+
 		unsigned int material = 0;
 	};
 

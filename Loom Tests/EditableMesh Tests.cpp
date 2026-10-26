@@ -129,6 +129,52 @@ TEST_SUITE("EditableMesh")
 		CHECK_FALSE(mesh.hasNormals);
 	};
 
+	TEST_CASE("EditableMesh gives back the UV layers of the triangles it was made from, and none that do not cover every vertex")
+	{
+		constexpr uint32_t WEIGHT = 1;
+		constexpr uint32_t TINT = 2;
+		constexpr uint32_t SHORT_OF = 3;
+		constexpr uint32_t TINT_WORDS = 3;
+		constexpr size_t CORNERS = 6;
+
+		Loom::UVLayer weight{ WEIGHT, 1 };
+		Loom::UVLayer tint{ TINT, TINT_WORDS };
+
+		for (uint32_t i = 0; i < CORNERS; i++)
+		{
+			weight.values.push_back(i);
+			tint.values.insert(tint.values.end(), { i, i * 2, i * 3 });
+		};
+
+		const Loom::UVLayer short_of{ SHORT_OF, 1, { 0 } };
+
+		const EditableMesh mesh = EditableMesh::FromTriangles(SQUARE, { }, { }, { }, { weight, short_of, tint });
+
+		const std::vector<Loom::UVLayout> layouts = { { WEIGHT, 1 }, { TINT, TINT_WORDS } };
+		CHECK(mesh.layers == layouts);
+
+		const std::vector<Loom::UVLayer> layers = { weight, tint };
+		CHECK(mesh.ToUVLayers() == layers);
+	};
+
+	TEST_CASE("EditableMesh keeps triangles whose corners hold different UV layer words apart")
+	{
+		constexpr size_t CORNERS = 6;
+
+		Loom::UVLayer same{ 1, 1, std::vector<uint32_t>(CORNERS, 0) };
+		EditableMesh joined = EditableMesh::FromTriangles(SQUARE, { }, { }, { }, { same });
+		joined.JoinTriangles();
+		CHECK(joined.faces.size() == 1);
+
+		// The second triangle's copy of the shared diagonal holds other words.
+		Loom::UVLayer seam = same;
+		seam.values[3] = 1;
+		seam.values[4] = 1;
+		EditableMesh apart = EditableMesh::FromTriangles(SQUARE, { }, { }, { }, { seam });
+		apart.JoinTriangles();
+		CHECK(apart.faces.size() == 2);
+	};
+
 	TEST_CASE("EditableMesh's primitives are closed and face outwards")
 	{
 		constexpr float SIZE = 2.0f;
@@ -245,6 +291,23 @@ TEST_SUITE("EditableMesh")
 				CHECK(corner.color == red);
 	};
 
+	TEST_CASE("EditableMesh's extruded walls take the UV layer words of the edges they rise from")
+	{
+		constexpr uint32_t WORD = 7;
+		constexpr size_t CORNERS = 6;
+
+		EditableMesh mesh = EditableMesh::FromTriangles(SQUARE, { }, { }, { }, { { 1, 1, std::vector<uint32_t>(CORNERS, WORD) } });
+		mesh.Extrude({ 0, 1 }, 1.0f);
+
+		REQUIRE(mesh.faces.size() == 6);
+
+		const std::vector<uint32_t> words = { WORD };
+
+		for (const EditableMesh::Face& face : mesh.faces)
+			for (const EditableMesh::Corner& corner : face.corners)
+				CHECK(corner.layers == words);
+	};
+
 	TEST_CASE("EditableMesh deletes faces and the vertices only they used")
 	{
 		EditableMesh mesh = EditableMesh::Cube(2.0f);
@@ -305,6 +368,40 @@ TEST_SUITE("EditableMesh")
 		EditableMesh square = coloured;
 		square.Append(EditableMesh::Plane(1.0f));
 		CHECK(square.hasColors);
+	};
+
+	TEST_CASE("EditableMesh keeps its own UV layers through an append, and the other's words of those it shares")
+	{
+		constexpr uint32_t SHARED = 1;
+		constexpr uint32_t OURS = 2;
+		constexpr uint32_t THEIRS = 3;
+		constexpr uint32_t OUR_WORD = 5;
+		constexpr uint32_t THEIR_WORD = 9;
+		constexpr size_t CORNERS = 6;
+
+		const std::vector<uint32_t> ours(CORNERS, OUR_WORD);
+		const std::vector<uint32_t> theirs(CORNERS, THEIR_WORD);
+
+		const EditableMesh other = EditableMesh::FromTriangles(SQUARE, { }, { }, { }, { { SHARED, 1, theirs }, { THEIRS, 1, theirs } });
+
+		EditableMesh empty{ };
+		empty.Append(other);
+		CHECK(empty.layers == other.layers);
+
+		EditableMesh mesh = EditableMesh::FromTriangles(SQUARE, { }, { }, { }, { { SHARED, 1, ours }, { OURS, 1, ours } });
+		const std::vector<Loom::UVLayout> layouts = mesh.layers;
+		mesh.Append(other);
+		CHECK(mesh.layers == layouts);
+
+		const std::vector<uint32_t> kept = { OUR_WORD, OUR_WORD };
+		const std::vector<uint32_t> padded = { THEIR_WORD, 0 };
+		CHECK(mesh.faces.front().corners.front().layers == kept);
+		CHECK(mesh.faces.back().corners.front().layers == padded);
+
+		EditableMesh cube = EditableMesh::Cube(2.0f);
+		cube.Append(other);
+		CHECK(cube.layers.empty());
+		CHECK(cube.faces.back().corners.front().layers.empty());
 	};
 
 	TEST_CASE("EditableMesh flips faces round")

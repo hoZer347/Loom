@@ -1,5 +1,8 @@
 #pragma once
 
+#include "Renderer.h"
+#include "UVLayer.h"
+
 #include "glm/glm.hpp"
 
 #include <cstdint>
@@ -18,7 +21,7 @@ namespace Loom
 	*   part of
 	* - A face has any number of corners and goes back to triangles as a fan,
 	*   so a quad stays one face through moves and extrusions
-	* - Each corner keeps its own UV, normal and colour, as the Mesh had them. A face
+	* - Each corner keeps its own UV, normal, colour and UV layers' words, as the Mesh had them. A face
 	*   whose shape changes takes its own flat normal at every corner
 	*/
 	struct EditableMesh final
@@ -29,6 +32,9 @@ namespace Loom
 			glm::vec2 uv{ 0.0f };
 			glm::vec3 normal{ 0.0f };
 			glm::vec4 color{ 1.0f };
+
+			// Its words of each of EditableMesh::layers in turn.
+			std::vector<uint32_t> layers;
 
 			bool operator==(const Corner&) const = default;
 		};
@@ -49,12 +55,15 @@ namespace Loom
 		// Unindexed triangles, as Mesh keeps them: three floats a vertex for
 		// positions and normals, two for UVs and four for colours. UVs,
 		// normals and colours count only when there are as many of them as
-		// vertices.
-		static EditableMesh FromTriangles(const std::vector<float>& positions, const std::vector<float>& uvs, const std::vector<float>& normals, const std::vector<float>& colors);
+		// vertices, and so do the UV layers.
+		static EditableMesh FromTriangles(const std::vector<float>& positions, const std::vector<float>& uvs, const std::vector<float>& normals, const std::vector<float>& colors, const std::vector<UVLayer>& layers = { });
 
 		// Back to Mesh's arrays. UVs, normals and colours stay empty for a
 		// mesh that had none.
 		void ToTriangles(std::vector<float>& positions, std::vector<float>& uvs, std::vector<float>& normals, std::vector<float>& colors) const;
+
+		// The UV layers, a vertex for each ToTriangles gives.
+		std::vector<UVLayer> ToUVLayers() const;
 
 		// Centred on the origin, with flat normals and each face's UVs spanning
 		// the texture.
@@ -95,7 +104,8 @@ namespace Loom
 		std::set<uint32_t> Duplicate(const std::set<uint32_t>& faces);
 
 		// Each of the other's faces on the end, onto vertices of their own. The
-		// indices of the faces added.
+		// indices of the faces added. Their corners keep the words of the
+		// layers this mesh has too, and read zeros for the rest.
 		std::set<uint32_t> Append(const EditableMesh& other);
 
 		void DeleteFaces(const std::set<uint32_t>& faces);
@@ -131,6 +141,9 @@ namespace Loom
 		bool hasUVs = false;
 		bool hasNormals = false;
 		bool hasColors = false;
+
+		// The UV layers every corner holds words of.
+		std::vector<UVLayout> layers;
 
 		bool operator==(const EditableMesh&) const = default;
 

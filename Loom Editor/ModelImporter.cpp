@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cctype>
 #include <filesystem>
 #include <fstream>
@@ -102,6 +103,26 @@ void main()
 }
 )";
 
+		// A layer for each of the mesh's sets of texture coordinates past the
+		// first, numbered by its channel, each vertex's coordinates its words.
+		std::vector<UVLayer> UVLayersOf(const aiMesh& mesh)
+		{
+			std::vector<UVLayer> layers;
+
+			for (unsigned int channel = 1; channel < AI_MAX_NUMBER_OF_TEXTURECOORDS; channel++)
+				if (mesh.HasTextureCoords(channel))
+					layers.push_back({ channel, mesh.mNumUVComponents[channel] });
+
+			return layers;
+		};
+
+		void AppendUVs(const aiMesh& mesh, unsigned int index, std::vector<UVLayer>& layers)
+		{
+			for (UVLayer& layer : layers)
+				for (uint32_t i = 0; i < layer.words; i++)
+					layer.values.push_back(std::bit_cast<uint32_t>(mesh.mTextureCoords[layer.id][index][i]));
+		};
+
 		void Collect(
 			const aiScene& scene,
 			const aiNode& node,
@@ -124,6 +145,7 @@ void main()
 
 				ModelPart& part = parts.emplace_back();
 				part.material = mesh.mMaterialIndex;
+				part.layers = UVLayersOf(mesh);
 
 				part.name =
 					node.mName.length ? node.mName.C_Str() :
@@ -174,6 +196,8 @@ void main()
 
 							part.colors.insert(part.colors.end(), { color.r, color.g, color.b, color.a });
 						};
+
+						AppendUVs(mesh, face.mIndices[i], part.layers);
 					};
 				};
 			};
@@ -380,6 +404,7 @@ void main()
 			std::vector<float> uvs;
 			std::vector<float> normals;
 			std::vector<float> colors;
+			std::vector<UVLayer> layers;
 			std::vector<std::string> joints;
 			std::vector<float> inverseBinds;
 			std::vector<float> influences;
@@ -428,6 +453,8 @@ void main()
 					order.insert(order.end(), face.mIndices, face.mIndices + face.mNumIndices);
 			};
 
+			part.layers = UVLayersOf(mesh);
+
 			for (const unsigned int index : order)
 			{
 				const aiVector3D& vertex = mesh.mVertices[index];
@@ -444,6 +471,8 @@ void main()
 
 				if (mesh.HasBones())
 					part.influences.insert(part.influences.end(), influences[index].begin(), influences[index].end());
+
+				AppendUVs(mesh, index, part.layers);
 			};
 
 			for (unsigned int a = 0; a < mesh.mNumAnimMeshes; a++)
@@ -489,6 +518,9 @@ void main()
 			drawing->m_textureCoordinates = std::move(part.uvs);
 			drawing->m_normals = std::move(part.normals);
 			drawing->m_colors = std::move(part.colors);
+
+			for (const UVLayer& layer : part.layers)
+				drawing->SetUVWords(layer);
 
 			if (part.joints.empty() && part.shapes.empty())
 				return;
@@ -895,6 +927,9 @@ void main()
 			drawing->m_textureCoordinates = std::move(part.uvs);
 			drawing->m_normals = std::move(part.normals);
 			drawing->m_colors = std::move(part.colors);
+
+			for (const UVLayer& layer : part.layers)
+				drawing->SetUVWords(layer);
 		};
 
 		return model;

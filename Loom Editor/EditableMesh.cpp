@@ -52,7 +52,7 @@ namespace Loom
 		return a < b ? Edge(a, b) : Edge(b, a);
 	};
 
-	EditableMesh EditableMesh::FromTriangles(const std::vector<float>& positions, const std::vector<float>& uvs, const std::vector<float>& normals, const std::vector<float>& colors)
+	EditableMesh EditableMesh::FromTriangles(const std::vector<float>& positions, const std::vector<float>& uvs, const std::vector<float>& normals, const std::vector<float>& colors, const std::vector<UVLayer>& layers)
 	{
 		const size_t count = positions.size() / floats_per_position / corners_per_triangle * corners_per_triangle;
 
@@ -60,6 +60,15 @@ namespace Loom
 		mesh.hasUVs = count > 0 && uvs.size() == count * floats_per_uv;
 		mesh.hasNormals = count > 0 && normals.size() == count * floats_per_position;
 		mesh.hasColors = count > 0 && colors.size() == count * floats_per_color;
+
+		std::vector<const UVLayer*> kept{ };
+
+		for (const UVLayer& layer : layers)
+			if (count > 0 && layer.values.size() == count * layer.words)
+			{
+				kept.push_back(&layer);
+				mesh.layers.push_back({ layer.id, layer.words });
+			};
 
 		std::map<std::array<float, floats_per_position>, uint32_t> welded{ };
 
@@ -87,6 +96,9 @@ namespace Loom
 
 			if (mesh.hasColors)
 				corner.color = glm::vec4(colors[i * floats_per_color], colors[i * floats_per_color + 1], colors[i * floats_per_color + 2], colors[i * floats_per_color + 3]);
+
+			for (const UVLayer* layer : kept)
+				corner.layers.insert(corner.layers.end(), layer->values.begin() + i * layer->words, layer->values.begin() + (i + 1) * layer->words);
 
 			mesh.faces.back().corners.push_back(corner);
 		};
@@ -123,6 +135,35 @@ namespace Loom
 				add(face.corners[i - 1]);
 				add(face.corners[i]);
 			};
+	};
+
+	std::vector<UVLayer> EditableMesh::ToUVLayers() const
+	{
+		std::vector<UVLayer> out{ };
+
+		for (const UVLayout& layer : layers)
+			out.push_back({ layer.id, layer.words });
+
+		const auto add = [&](const Corner& corner)
+		{
+			auto words = corner.layers.begin();
+
+			for (UVLayer& layer : out)
+			{
+				layer.values.insert(layer.values.end(), words, words + layer.words);
+				words += layer.words;
+			};
+		};
+
+		for (const Face& face : faces)
+			for (size_t i = 2; i < face.corners.size(); i++)
+			{
+				add(face.corners[0]);
+				add(face.corners[i - 1]);
+				add(face.corners[i]);
+			};
+
+		return out;
 	};
 
 	uint32_t EditableMesh::AddFace(const std::vector<uint32_t>& corners, const std::vector<glm::vec2>& uvs)
@@ -444,10 +485,10 @@ namespace Loom
 
 				if (uses[EdgeOf(from.vertex, to.vertex)] == 1)
 					walls.push_back({ {
-						{ from.vertex, from.uv, { }, from.color },
-						{ to.vertex, to.uv, { }, to.color },
-						{ lifted[to.vertex], to.uv, { }, to.color },
-						{ lifted[from.vertex], from.uv, { }, from.color } } });
+						{ from.vertex, from.uv, { }, from.color, from.layers },
+						{ to.vertex, to.uv, { }, to.color, to.layers },
+						{ lifted[to.vertex], to.uv, { }, to.color, to.layers },
+						{ lifted[from.vertex], from.uv, { }, from.color, from.layers } } });
 			};
 
 			for (Corner& corner : corners)
@@ -497,9 +538,31 @@ namespace Loom
 			hasUVs = other.hasUVs;
 			hasNormals = other.hasNormals;
 			hasColors = other.hasColors;
+			layers = other.layers;
 		}
 		else
 			hasColors = hasColors || other.hasColors;
+
+		// Where each of this mesh's layers' words come from in the other's
+		// corners, if it has that layer.
+		std::vector<std::optional<size_t>> from{ };
+		size_t words = 0;
+
+		for (const UVLayout& layer : layers)
+		{
+			size_t offset = 0;
+			from.emplace_back();
+
+			for (const UVLayout& theirs : other.layers)
+			{
+				if (theirs == layer)
+					from.back() = offset;
+
+				offset += theirs.words;
+			};
+
+			words += layer.words;
+		};
 
 		const uint32_t first_vertex = (uint32_t)vertices.size();
 		vertices.insert(vertices.end(), other.vertices.begin(), other.vertices.end());
@@ -511,7 +574,25 @@ namespace Loom
 			Face copy = face;
 
 			for (Corner& corner : copy.corners)
+			{
 				corner.vertex += first_vertex;
+
+				if (layers == other.layers)
+					continue;
+
+				std::vector<uint32_t> theirs = std::move(corner.layers);
+				corner.layers.assign(words, 0);
+
+				auto into = corner.layers.begin();
+
+				for (size_t i = 0; i < layers.size(); i++)
+				{
+					if (from[i])
+						std::copy_n(theirs.begin() + *from[i], layers[i].words, into);
+
+					into += layers[i].words;
+				};
+			};
 
 			added.insert((uint32_t)faces.size());
 			faces.push_back(std::move(copy));

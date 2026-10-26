@@ -518,7 +518,7 @@ void main()
 		for (GameObject* object : found)
 		{
 			Mesh* mesh = object->GetComponent<Mesh>();
-			EditableMesh editing = EditableMesh::FromTriangles(*std::as_const(mesh->m_vertices), *std::as_const(mesh->m_textureCoordinates), *std::as_const(mesh->m_normals), *std::as_const(mesh->m_colors));
+			EditableMesh editing = EditableMesh::FromTriangles(*std::as_const(mesh->m_vertices), *std::as_const(mesh->m_textureCoordinates), *std::as_const(mesh->m_normals), *std::as_const(mesh->m_colors), mesh->UVLayers());
 			editing.JoinTriangles();
 
 			document.parts.push_back(Part{ object, mesh, std::move(editing) });
@@ -2079,6 +2079,12 @@ void main()
 		part.mesh->m_textureCoordinates = std::move(uvs);
 		part.mesh->m_normals = std::move(normals);
 		part.mesh->m_colors = std::move(colors);
+
+		for (const UVLayer& layer : part.mesh->UVLayers())
+			part.mesh->ClearUV(layer.id);
+
+		for (const UVLayer& layer : part.editing.ToUVLayers())
+			part.mesh->SetUVWords(layer);
 
 		document.unsaved = true;
 
