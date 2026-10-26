@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cctype>
+#include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <iterator>
@@ -26,7 +27,7 @@ namespace Loom
 	{
 		constexpr size_t NUMBER_LENGTH = 64;
 
-		// Shorter FloatArrays write quickly enough not to keep.
+		// Shorter arrays write quickly enough not to keep.
 		constexpr size_t KEPT_ARRAY_LENGTH = 1024;
 
 		// %g with enough digits to round-trip, so a value written and read back
@@ -271,33 +272,8 @@ namespace Loom
 		case FieldType::Vec3:	return WriteVector((float*)data, 3);
 		case FieldType::Vec4:	return WriteVector((float*)data, 4);
 
-		case FieldType::FloatArray:
-		{
-			const std::vector<float>& values = *(std::vector<float>*)data;
-
-			// Byte for byte, since -0 and 0 compare equal but write apart.
-			if (m_written &&
-				m_written->values.size() == values.size() &&
-				std::memcmp(m_written->values.data(), values.data(), values.size() * sizeof(float)) == 0)
-				return m_written->text;
-
-			std::string text = "[";
-
-			for (size_t i = 0; i < values.size(); i++)
-			{
-				if (i)
-					text += ", ";
-
-				AppendNumber(text, values[i]);
-			};
-
-			text += ']';
-
-			if (values.size() >= KEPT_ARRAY_LENGTH)
-				m_written = std::make_shared<WrittenArray>(WrittenArray{ values, text });
-
-			return text;
-		};
+		case FieldType::FloatArray:	return WriteArray(*(std::vector<float>*)data);
+		case FieldType::UIntArray:	return WriteArray(*(std::vector<unsigned int>*)data);
 
 		case FieldType::Uniforms:	return Quote(((UniformValues*)data)->Write());
 
@@ -329,6 +305,74 @@ namespace Loom
 			(*version)++;
 
 		SerialChanged(owner, type == FieldType::Reference);
+	};
+
+	template <typename T>
+	std::string SerializedField::WriteArray(const std::vector<T>& values) const
+	{
+		const size_t bytes = values.size() * sizeof(T);
+
+		// Byte for byte, since -0 and 0 compare equal but write apart.
+		if (m_written &&
+			m_written->bytes.size() == bytes &&
+			std::memcmp(m_written->bytes.data(), values.data(), bytes) == 0)
+			return m_written->text;
+
+		std::string text = "[";
+
+		for (size_t i = 0; i < values.size(); i++)
+		{
+			if (i)
+				text += ", ";
+
+			if constexpr (std::is_floating_point_v<T>)
+				AppendNumber(text, values[i]);
+			else
+				text += std::to_string(values[i]);
+		};
+
+		text += ']';
+
+		if (values.size() >= KEPT_ARRAY_LENGTH)
+		{
+			const std::byte* const first = (const std::byte*)values.data();
+
+			m_written = std::make_shared<WrittenArray>(WrittenArray{ { first, first + bytes }, text });
+		};
+
+		return text;
+	};
+
+	template <typename T>
+	bool SerializedField::ReadArray(const std::string& text, std::vector<T>& values) const
+	{
+		values.clear();
+
+		for (size_t at = 0; at < text.size(); )
+		{
+			const size_t start = text.find_first_not_of(" \t[],", at);
+
+			if (start == std::string::npos)
+				break;
+
+			const size_t end = text.find_first_of(" \t[],", start);
+
+			if constexpr (std::is_floating_point_v<T>)
+				values.push_back(strtof(text.substr(start, end - start).c_str(), nullptr));
+			else
+			{
+				T value{ };
+
+				if (!ReadInteger<T>(text.substr(start, end - start), &value))
+					return false;
+
+				values.push_back(value);
+			};
+
+			at = end == std::string::npos ? text.size() : end;
+		};
+
+		return true;
 	};
 
 	bool SerializedField::Read(const std::string& text) const
@@ -366,28 +410,8 @@ namespace Loom
 		case FieldType::Vec3:	return ReadVector(text, (float*)data, 3);
 		case FieldType::Vec4:	return ReadVector(text, (float*)data, 4);
 
-		case FieldType::FloatArray:
-		{
-			std::vector<float>& values = *(std::vector<float>*)data;
-
-			values.clear();
-
-			for (size_t at = 0; at < text.size(); )
-			{
-				const size_t start = text.find_first_not_of(" \t[],", at);
-
-				if (start == std::string::npos)
-					break;
-
-				const size_t end = text.find_first_of(" \t[],", start);
-
-				values.push_back(strtof(text.substr(start, end - start).c_str(), nullptr));
-
-				at = end == std::string::npos ? text.size() : end;
-			};
-
-			return true;
-		};
+		case FieldType::FloatArray:	return ReadArray(text, *(std::vector<float>*)data);
+		case FieldType::UIntArray:	return ReadArray(text, *(std::vector<unsigned int>*)data);
 
 		case FieldType::Uniforms:	((UniformValues*)data)->Read(Unquote(text));	return true;
 

@@ -20,8 +20,10 @@
 #include <array>
 #include <cstring>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <string_view>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
@@ -44,6 +46,32 @@ namespace Loom
 		constexpr int FLIP_SHIFT = 41;
 		constexpr int COLOR_WRITE_SHIFT = 42;
 		constexpr int VERTEX_FORMAT_SHIFT = 43;
+
+		// A pipeline's key: the state packed as above, then the vertices'
+		// stride, and for each UV layer slot the program reads, in turn, where
+		// in each vertex it reads from and how many words, packed by
+		// SLOT_WORDS_BITS, or 0 when it reads the zeros of NO_UV_BINDING.
+		struct PipelineKey
+		{
+			uint64_t state = 0;
+			uint32_t stride = 0;
+			std::array<uint32_t, Renderer::UVLayerLocations> slots{ };
+
+			bool operator==(const PipelineKey&) const = default;
+		};
+
+		constexpr int SLOT_WORDS_BITS = 3;
+
+		static_assert(Renderer::WordsPerUVLocation < 1 << SLOT_WORDS_BITS);
+		static_assert(std::has_unique_object_representations_v<PipelineKey>);
+
+		struct PipelineKeyHash
+		{
+			size_t operator()(const PipelineKey& key) const
+			{
+				return std::hash<std::string_view>{ }(std::string_view((const char*)&key, sizeof(key)));
+			};
+		};
 
 		constexpr VkFormat COLOR_TARGET_FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
 		constexpr VkFormat DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
@@ -71,11 +99,22 @@ namespace Loom
 
 		// The vertices' binding, the one aNormal reads its zeros from when
 		// they have no normals, the one DrawInstances hands its instances in,
-		// and the one aColor reads its white from when they have no colours.
+		// the one aColor reads its white from when they have no colours, and
+		// the one a UV layer slot reads its zeros from when they lack its layer.
 		constexpr uint32_t VERTEX_BINDING = 0;
 		constexpr uint32_t NO_NORMAL_BINDING = 1;
 		constexpr uint32_t INSTANCE_BINDING = 2;
 		constexpr uint32_t NO_COLOR_BINDING = 3;
+		constexpr uint32_t NO_UV_BINDING = 4;
+		constexpr uint32_t UV_SLOT_SIZE = Renderer::WordsPerUVLocation * sizeof(uint32_t);
+
+		// A UV layer slot's format, by how many words of it the vertices hold.
+		constexpr VkFormat UV_SLOT_FORMATS[Renderer::WordsPerUVLocation + 1] = {
+			VK_FORMAT_UNDEFINED,
+			VK_FORMAT_R32_UINT,
+			VK_FORMAT_R32G32_UINT,
+			VK_FORMAT_R32G32B32_UINT,
+			VK_FORMAT_R32G32B32A32_UINT };
 		constexpr uint32_t INSTANCE_SIZE = Renderer::FloatsPerInstance * sizeof(float);
 		constexpr uint32_t INSTANCE_COLUMNS = 4;
 		constexpr uint32_t INSTANCE_COLUMN_SIZE = INSTANCE_COLUMNS * sizeof(float);
@@ -631,7 +670,7 @@ namespace Loom
 			return handle;
 		};
 
-		void SetVertices(uint32_t handle, const float* data, size_t count, uint32_t usage, VertexFormat format) override
+		void SetVertices(uint32_t handle, const float* data, size_t count, uint32_t usage, const VertexLayout& layout) override
 		{
 			const auto found = m_kept.find(handle);
 
@@ -642,8 +681,8 @@ namespace Loom
 			Release(kept);
 
 			kept.count = count;
-			kept.format = format;
-			kept.streamed.assign(data, data + count * FloatsPerVertex(format));
+			kept.layout = layout;
+			kept.streamed.assign(data, data + count * FloatsPerVertex(layout));
 			kept.settles = usage == GL_STATIC_DRAW_ && count > 0;
 			kept.setOn = m_framesBegun;
 		};
@@ -675,7 +714,7 @@ namespace Loom
 			if (!kept.buffer && kept.settles && kept.setOn != m_framesBegun)
 				Settle(kept);
 
-			DrawWith(program, primitive, kept.count, kept.format, instanceCount,
+			DrawWith(program, primitive, kept.count, kept.layout, instanceCount,
 				[&](VkCommandBuffer command, size_t drawn, size_t stride)
 				{
 					if (kept.buffer)
@@ -706,12 +745,12 @@ namespace Loom
 			m_kept.erase(found);
 		};
 
-		// Draws count vertices laid out as format says, once for each of
+		// Draws count vertices laid out as layout says, once for each of
 		// instances, which bind puts in VERTEX_BINDING, and the instances in
 		// INSTANCE_BINDING, given the command, how many are drawn (one more
 		// than count for a loop, closed on its first) and their stride.
 		template<typename Bind>
-		void DrawWith(uint32_t handle, uint32_t primitive, size_t count, VertexFormat format, size_t instances, const Bind& bind)
+		void DrawWith(uint32_t handle, uint32_t primitive, size_t count, const VertexLayout& layout, size_t instances, const Bind& bind)
 		{
 			if (!m_recording || count == 0)
 				return;
@@ -729,7 +768,8 @@ namespace Loom
 
 			EnsureRendering(target);
 
-			const VkPipeline pipeline = PipelineFor(program, Topology(primitive), target, format);
+			const VertexFormat format = layout.format;
+			const VkPipeline pipeline = PipelineFor(program, Topology(primitive), target, layout);
 
 			if (!pipeline)
 				return;
@@ -744,9 +784,9 @@ namespace Loom
 
 			// A loop is a strip with its first vertex again at the end.
 			const size_t drawn = primitive == GL_LINE_LOOP_ ? count + 1 : count;
-			const size_t stride = FloatsPerVertex(format) * sizeof(float);
+			const size_t stride = FloatsPerVertex(layout) * sizeof(float);
 
-			if (program.hasPosition || program.hasUV || program.hasNormal || program.hasColor || program.hasInstance)
+			if (program.hasPosition || program.hasUV || program.hasNormal || program.hasColor || program.hasInstance || !program.uvSlots.empty())
 				bind(command, drawn, stride);
 
 			if (program.hasNormal && !HasNormals(format))
@@ -763,6 +803,19 @@ namespace Loom
 				memcpy(noColor.mapped, NO_COLOR, COLOR_SIZE);
 
 				vkCmdBindVertexBuffers(command, NO_COLOR_BINDING, 1, &noColor.buffer, &noColor.offset);
+			};
+
+			const bool lacksLayer = std::any_of(
+				program.uvSlots.begin(),
+				program.uvSlots.end(),
+				[&layout](const UVBinding& binding) { return SourceOf(layout, binding.slot).words == 0; });
+
+			if (lacksLayer)
+			{
+				const Allocation noUV = Allocate(UV_SLOT_SIZE, sizeof(uint32_t));
+				memset(noUV.mapped, 0, UV_SLOT_SIZE);
+
+				vkCmdBindVertexBuffers(command, NO_UV_BINDING, 1, &noUV.buffer, &noUV.offset);
 			};
 
 			// Members, so a draw allocates nothing; reserved, so the writes'
@@ -1092,6 +1145,13 @@ namespace Loom
 			bool Shadow() const { return !color.image && !borrowed; };
 		};
 
+		// A UV layer slot a program's vertex stage reads, and where.
+		struct UVBinding
+		{
+			UVSlot slot;
+			uint32_t location = 0;
+		};
+
 		struct Program
 		{
 			struct Member
@@ -1120,15 +1180,14 @@ namespace Loom
 			bool hasNormal = false;
 			bool hasColor = false;
 			bool hasInstance = false;
+			std::vector<UVBinding> uvSlots;
 			bool pixelated = false;
 			uint32_t blockSize = 0;
 			std::vector<uint8_t> block;
 			ByName<Member> members;
 			ByName<Sampler> samplers;
 
-			// By topology, attachment formats, whether the viewport is flipped
-			// and the vertex format.
-			std::unordered_map<uint64_t, VkPipeline> pipelines;
+			std::unordered_map<PipelineKey, VkPipeline, PipelineKeyHash> pipelines;
 		};
 
 		struct Chunk
@@ -1149,7 +1208,7 @@ namespace Loom
 			VkDeviceMemory memory = VK_NULL_HANDLE;
 			std::vector<float> streamed;
 			size_t count = 0;
-			VertexFormat format = VertexFormat::Position;
+			VertexLayout layout;
 			bool settles = false;
 			unsigned long long setOn = 0;
 		};
@@ -1756,16 +1815,29 @@ namespace Loom
 				1, &barrier);
 		};
 
-		VkPipeline PipelineFor(Program& program, VkPrimitiveTopology topology, uint32_t target, VertexFormat format)
+		VkPipeline PipelineFor(Program& program, VkPrimitiveTopology topology, uint32_t target, const VertexLayout& layout)
 		{
+			const VertexFormat format = layout.format;
 			const bool flipped = target == WINDOW;
-			const uint64_t key =
+			const uint32_t stride = (uint32_t)(FloatsPerVertex(layout) * sizeof(float));
+
+			PipelineKey key;
+			key.state =
 				(uint64_t)topology
 				| ((uint64_t)m_renderingFormat << FORMAT_SHIFT)
 				| ((uint64_t)m_renderingDepth << DEPTH_SHIFT)
 				| ((uint64_t)flipped << FLIP_SHIFT)
 				| ((uint64_t)m_colorWrite << COLOR_WRITE_SHIFT)
 				| ((uint64_t)format << VERTEX_FORMAT_SHIFT);
+			key.stride = stride;
+
+			std::array<UVSource, UVLayerLocations> sources{ };
+
+			for (size_t i = 0; i < program.uvSlots.size(); i++)
+			{
+				sources[i] = SourceOf(layout, program.uvSlots[i].slot);
+				key.slots[i] = (uint32_t)(sources[i].offset << SLOT_WORDS_BITS) | sources[i].words;
+			};
 
 			const auto found = program.pipelines.find(key);
 
@@ -1789,8 +1861,6 @@ namespace Loom
 			stages[1].module = program.modules[1];
 			stages[1].pName = "main";
 			stages[1].pSpecializationInfo = &specialization;
-
-			const uint32_t stride = (uint32_t)(FloatsPerVertex(format) * sizeof(float));
 
 			// Without texture coordinates, aUV reads the position's x and y,
 			// without normals, aNormal reads one normal of zeros for the whole
@@ -1823,6 +1893,20 @@ namespace Loom
 				bindings.push_back({ NO_COLOR_BINDING, 0, VK_VERTEX_INPUT_RATE_VERTEX });
 				attributes.push_back({ COLOR_LOCATION, NO_COLOR_BINDING, VK_FORMAT_R32G32B32A32_SFLOAT, 0 });
 			};
+
+			bool noUV = false;
+
+			for (size_t i = 0; i < program.uvSlots.size(); i++)
+				if (sources[i].words)
+					attributes.push_back({ program.uvSlots[i].location, VERTEX_BINDING, UV_SLOT_FORMATS[sources[i].words], (uint32_t)(sources[i].offset * sizeof(float)) });
+				else
+				{
+					attributes.push_back({ program.uvSlots[i].location, NO_UV_BINDING, UV_SLOT_FORMATS[WordsPerUVLocation], 0 });
+					noUV = true;
+				};
+
+			if (noUV)
+				bindings.push_back({ NO_UV_BINDING, 0, VK_VERTEX_INPUT_RATE_VERTEX });
 
 			if (program.hasInstance)
 			{
@@ -1982,6 +2066,11 @@ namespace Loom
 					program.hasNormal |= variable->location == NORMAL_LOCATION;
 					program.hasColor |= variable->location == COLOR_LOCATION;
 					program.hasInstance |= variable->location >= InstanceModelLocation && variable->location <= InstanceColorLocation;
+
+					const std::optional<UVSlot> slot = variable->name ? ParseUVSlot(variable->name) : std::nullopt;
+
+					if (slot && variable->location >= UVLayerLocation && variable->location < InstanceModelLocation)
+						program.uvSlots.push_back({ *slot, variable->location });
 				};
 			};
 
@@ -2230,7 +2319,7 @@ namespace Loom
 		{
 			kept.settles = false;
 
-			const VkDeviceSize stride = FloatsPerVertex(kept.format) * sizeof(float);
+			const VkDeviceSize stride = FloatsPerVertex(kept.layout) * sizeof(float);
 			const VkDeviceSize size = (kept.count + 1) * stride;
 
 			VkBuffer staging = VK_NULL_HANDLE;

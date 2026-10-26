@@ -3544,6 +3544,10 @@ namespace Loom
 			}
 			break;
 
+			case FieldType::UIntArray:
+				ImGui::Text("%d words", (int)((std::vector<unsigned int>*)field.data)->size());
+				break;
+
 			case FieldType::Reference:
 				changed = DrawReferenceField(field);
 				break;

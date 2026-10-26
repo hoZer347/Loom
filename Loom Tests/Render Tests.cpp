@@ -15,6 +15,7 @@
 #include <iterator>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <vector>
 
 using LoomTests::Image;
@@ -75,6 +76,61 @@ namespace
 
 	private:
 		float m_previous[std::size(Loom::Engine::clearColor)];
+	};
+
+	// Coloured by three UV layers the mesh holds, one of them past four
+	// words, and one it lacks, which reads zeros.
+	const std::string CLIP_SPACE_LAYERED =
+		"// ===VERTEX===\n"
+		"layout(location = 0) in vec3 aPos;\n"
+		"UV_1<float red, bool lit>;\n"
+		"UV_2<vec4 skipped, float blue>;\n"
+		"UV_3<float>;\n"
+		"out vec4 v_color;\n"
+		"void main() { v_color = vec4(UV_1.red - UV_3, UV_1.lit ? 1.0 : 0.0, UV_2.blue, 1.0); gl_Position = vec4(aPos, 1.0); }\n"
+		"// ===FRAGMENT===\n"
+		"in vec4 v_color;\n"
+		"out vec4 FragColor;\n"
+		"void main() { FragColor = v_color; }\n";
+
+	const glm::u8vec3 WHITE(255, 255, 255);
+
+	struct VulkanRenderFixture : RenderFixture
+	{
+		VulkanRenderFixture() : RenderFixture(DEFAULT_SIZE, Loom::Backend::Vulkan) { };
+	};
+
+	// The right half drawn with CLIP_SPACE_LAYERED, its layers making it white.
+	Image LayeredFrame(RenderFixture& fixture, const std::string& name)
+	{
+		const ClearedTo cleared(CLEAR);
+
+		std::istringstream source(CLIP_SPACE_LAYERED);
+		Loom::Shader shader(name, source);
+
+		Loom::Scene scene(name);
+		Pump();
+
+		scene.Attach<Loom::Camera>();
+		Loom::GameObject* half = scene.AddChild("Right Half");
+		Pump();
+
+		half->Attach<Loom::Material>()->shader = &shader;
+
+		Loom::Mesh* mesh = half->Attach<Loom::Mesh>();
+		constexpr size_t POSITION_COMPONENTS = 3;
+		const size_t vertices = RIGHT_HALF.size() / POSITION_COMPONENTS;
+
+		mesh->m_vertices = RIGHT_HALF;
+		mesh->SetUV<float, bool>(1, std::vector<std::tuple<float, bool>>(vertices, { 1.0f, true }));
+		mesh->SetUV<glm::vec4, float>(2, std::vector<std::tuple<glm::vec4, float>>(vertices, { glm::vec4(0.5f), 1.0f }));
+		Pump();
+
+		const Image image = fixture.Frame();
+
+		image.Save(name);
+
+		return image;
 	};
 
 	uint32_t BigEndian(const std::vector<char>& bytes, size_t at)
@@ -204,6 +260,26 @@ TEST_SUITE("Render")
 		CHECK(std::string(bytes.begin(), bytes.begin() + SIGNATURE.size()) == SIGNATURE);
 		CHECK(BigEndian(bytes, WIDTH_AT) == (uint32_t)image.width);
 		CHECK(BigEndian(bytes, HEIGHT_AT) == (uint32_t)image.height);
+	};
+
+	TEST_CASE_FIXTURE(RenderFixture, "a vertex stage reads a mesh's UV layers as the types it declares, on OpenGL")
+	{
+		const Image image = LayeredFrame(*this, "Render - UV layers on OpenGL");
+		const int middle = image.height / 2;
+
+		CHECK(image.At(image.width / 4, middle) == CLEARED);
+		CHECK(image.At(image.width * 3 / 4, middle) == WHITE);
+	};
+
+	TEST_CASE_FIXTURE(VulkanRenderFixture, "a vertex stage reads a mesh's UV layers as the types it declares, on Vulkan")
+	{
+		REQUIRE(Loom::Engine::backend == Loom::Backend::Vulkan);
+
+		const Image image = LayeredFrame(*this, "Render - UV layers on Vulkan");
+		const int middle = image.height / 2;
+
+		CHECK(image.At(image.width / 4, middle) == CLEARED);
+		CHECK(image.At(image.width * 3 / 4, middle) == WHITE);
 	};
 };
 

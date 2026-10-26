@@ -85,6 +85,7 @@ namespace Loom
 		else if constexpr (std::is_same_v<T, glm::vec3>)			return FieldType::Vec3;
 		else if constexpr (std::is_same_v<T, glm::vec4>)			return FieldType::Vec4;
 		else if constexpr (std::is_same_v<T, std::vector<float>>)	return FieldType::FloatArray;
+		else if constexpr (std::is_same_v<T, std::vector<unsigned int>>)	return FieldType::UIntArray;
 		else if constexpr (std::is_same_v<T, UniformValues>)		return FieldType::Uniforms;
 		else if constexpr (std::is_same_v<T, StateReference>)		return FieldType::State;
 		else if constexpr (std::is_pointer_v<T>)					return FieldType::Reference;

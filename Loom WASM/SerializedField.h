@@ -4,6 +4,7 @@
 
 #include "Guid.h"
 
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -39,6 +40,10 @@ namespace Loom
 
 		// A state machine's state, written as the name it is registered under.
 		State,
+
+		// Raw words, such as a mesh's UV layers, written as integers so every
+		// bit comes back.
+		UIntArray,
 	};
 
 	// In front of a Serial's or Button's name, the category of the one
@@ -104,13 +109,19 @@ namespace Loom
 	private:
 		bool ReadValue(const std::string& text) const;
 
-		// A long FloatArray's last Write, kept with the values it was written
-		// from: writing a mesh's vertices out again each time the editor
-		// compares a scene is most of what that costs. The copies of a field
-		// share it, as they share the values.
+		template <typename T>
+		std::string WriteArray(const std::vector<T>& values) const;
+
+		template <typename T>
+		bool ReadArray(const std::string& text, std::vector<T>& values) const;
+
+		// A long array's last Write, kept with the bytes it was written from:
+		// writing a mesh's vertices out again each time the editor compares a
+		// scene is most of what that costs. The copies of a field share it, as
+		// they share the values.
 		struct WrittenArray
 		{
-			std::vector<float> values;
+			std::vector<std::byte> bytes;
 			std::string text;
 		};
 

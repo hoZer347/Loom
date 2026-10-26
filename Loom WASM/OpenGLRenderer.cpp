@@ -28,6 +28,43 @@ namespace Loom
 	{
 		constexpr int LOG_SIZE = 512;
 
+		// A UV layer slot a program's vertex stage reads, and where.
+		struct UVBinding
+		{
+			UVSlot slot;
+			GLuint location = 0;
+		};
+
+		// Where the program reads the UV layer slots its vertex stage uses.
+		std::vector<UVBinding> UVSlotsOf(GLuint program)
+		{
+			GLint attributes = 0;
+			GLint longest = 0;
+			glGetProgramiv(program, GL_ACTIVE_ATTRIBUTES, &attributes);
+			glGetProgramiv(program, GL_ACTIVE_ATTRIBUTE_MAX_LENGTH, &longest);
+
+			std::vector<UVBinding> slots;
+			std::vector<GLchar> name((size_t)longest);
+
+			for (GLint i = 0; i < attributes; i++)
+			{
+				GLsizei length = 0;
+				GLint size = 0;
+				GLenum type = 0;
+				glGetActiveAttrib(program, (GLuint)i, longest, &length, &size, &type, name.data());
+
+				const std::string attribute(name.data(), (size_t)length);
+
+				const std::optional<UVSlot> slot = ParseUVSlot(attribute);
+				const GLint location = slot ? glGetAttribLocation(program, attribute.c_str()) : -1;
+
+				if (location >= (GLint)Renderer::UVLayerLocation && location < (GLint)Renderer::InstanceModelLocation)
+					slots.push_back({ *slot, (GLuint)location });
+			};
+
+			return slots;
+		};
+
 		// Clamps the shadow sampler's reads to the map, and compares rather than
 		// returns depth: linear filtering on a compared texture is a free 2x2 PCF.
 		void SetShadowSampling()
@@ -132,6 +169,9 @@ namespace Loom
 			if (m_noColor)
 				glDeleteBuffers(1, &m_noColor);
 
+			if (m_noUV)
+				glDeleteBuffers(1, &m_noUV);
+
 			for (const auto& [buffer, kept] : m_kept)
 				glDeleteBuffers(1, &buffer);
 
@@ -227,6 +267,11 @@ namespace Loom
 			glGenBuffers(1, &m_noColor);
 			glBindBuffer(GL_ARRAY_BUFFER, m_noColor);
 			glBufferData(GL_ARRAY_BUFFER, sizeof(NO_COLOR), NO_COLOR, GL_STATIC_DRAW);
+
+			constexpr GLuint NO_UV[WordsPerUVLocation] = { };
+			glGenBuffers(1, &m_noUV);
+			glBindBuffer(GL_ARRAY_BUFFER, m_noUV);
+			glBufferData(GL_ARRAY_BUFFER, sizeof(NO_UV), NO_UV, GL_STATIC_DRAW);
 			glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 			glGenSamplers(1, &m_nearest);
@@ -380,6 +425,8 @@ namespace Loom
 				glDeleteProgram(program);
 				throw std::runtime_error("Shader link error in " + name + ":\n" + log);
 			};
+
+			m_programs[program].uvSlots = UVSlotsOf(program);
 
 			return program;
 		};
@@ -540,17 +587,17 @@ namespace Loom
 			return buffer;
 		};
 
-		void SetVertices(uint32_t vertices, const float* data, size_t count, uint32_t usage, VertexFormat format) override
+		void SetVertices(uint32_t vertices, const float* data, size_t count, uint32_t usage, const VertexLayout& layout) override
 		{
 			const auto found = m_kept.find(vertices);
 
 			if (found == m_kept.end())
 				return;
 
-			found->second = { count, format };
+			found->second = { count, layout };
 
 			glBindBuffer(GL_ARRAY_BUFFER, vertices);
-			glBufferData(GL_ARRAY_BUFFER, count * FloatsPerVertex(format) * sizeof(float), data, usage);
+			glBufferData(GL_ARRAY_BUFFER, count * FloatsPerVertex(layout) * sizeof(float), data, usage);
 			glBindBuffer(GL_ARRAY_BUFFER, 0);
 		};
 
@@ -559,7 +606,7 @@ namespace Loom
 			const auto found = m_kept.find(vertices);
 
 			if (found != m_kept.end())
-				DrawBuffer(program, primitive, vertices, found->second.count, found->second.format);
+				DrawBuffer(program, primitive, vertices, found->second.count, found->second.layout);
 		};
 
 		void DrawInstances(uint32_t program, uint32_t primitive, uint32_t vertices, const float* instances, size_t count) override
@@ -567,7 +614,7 @@ namespace Loom
 			const auto found = m_kept.find(vertices);
 
 			if (found != m_kept.end())
-				DrawBuffer(program, primitive, vertices, found->second.count, found->second.format, instances, count);
+				DrawBuffer(program, primitive, vertices, found->second.count, found->second.layout, instances, count);
 		};
 
 		void DestroyVertices(uint32_t vertices) override
@@ -576,9 +623,9 @@ namespace Loom
 				glDeleteBuffers(1, &vertices);
 		};
 
-		// Draws count vertices laid out as format says from buffer, which holds
+		// Draws count vertices laid out as layout says from buffer, which holds
 		// them already: once, or once for each of instanceCount instances.
-		void DrawBuffer(uint32_t program, uint32_t primitive, GLuint buffer, size_t count, VertexFormat format, const float* instances = nullptr, size_t instanceCount = 0)
+		void DrawBuffer(uint32_t program, uint32_t primitive, GLuint buffer, size_t count, const VertexLayout& layout, const float* instances = nullptr, size_t instanceCount = 0)
 		{
 			constexpr GLint POSITION_COMPONENTS = 3;
 			constexpr GLint UV_COMPONENTS = 2;
@@ -594,7 +641,8 @@ namespace Loom
 			constexpr GLuint PER_VERTEX = 0;
 			constexpr GLuint PER_DRAW = std::numeric_limits<GLuint>::max();
 
-			const GLsizei stride = (GLsizei)(FloatsPerVertex(format) * sizeof(float));
+			const VertexFormat format = layout.format;
+			const GLsizei stride = (GLsizei)(FloatsPerVertex(layout) * sizeof(float));
 
 			glUseProgram(program);
 			BindTextures(program);
@@ -646,10 +694,38 @@ namespace Loom
 
 			glEnableVertexAttribArray(COLOR_LOCATION);
 
+			// A slot the vertices lack reads m_noUV's zeros.
+			const std::vector<UVBinding>& slots = m_programs[program].uvSlots;
+
+			for (const UVBinding& binding : slots)
+			{
+				const UVSource source = SourceOf(layout, binding.slot);
+
+				if (source.words)
+				{
+					glBindBuffer(GL_ARRAY_BUFFER, buffer);
+					glVertexAttribIPointer(binding.location, (GLint)source.words, GL_UNSIGNED_INT, stride, (void*)(source.offset * sizeof(float)));
+					glVertexAttribDivisor(binding.location, PER_VERTEX);
+				}
+				else
+				{
+					glBindBuffer(GL_ARRAY_BUFFER, m_noUV);
+					glVertexAttribIPointer(binding.location, WordsPerUVLocation, GL_UNSIGNED_INT, 0, (void*)0);
+					glVertexAttribDivisor(binding.location, PER_DRAW);
+				};
+
+				glEnableVertexAttribArray(binding.location);
+			};
+
 			if (!instances)
 				glDrawArrays(primitive, 0, (GLsizei)count);
 			else
 				DrawInstanced(primitive, count, instances, instanceCount);
+
+			// Off again, as the instances are, since the next program may read
+			// these locations as attributes of another type.
+			for (const UVBinding& binding : slots)
+				glDisableVertexAttribArray(binding.location);
 
 			glBindBuffer(GL_ARRAY_BUFFER, 0);
 		};
@@ -972,7 +1048,7 @@ namespace Loom
 		struct Kept
 		{
 			size_t count = 0;
-			VertexFormat format = VertexFormat::Position;
+			VertexLayout layout;
 		};
 
 		std::unordered_map<GLuint, Kept> m_kept;
@@ -982,6 +1058,9 @@ namespace Loom
 
 		// White, what aColor reads from vertices without colours.
 		GLuint m_noColor = 0;
+
+		// Zeros, what a UV layer slot reads from vertices without its layer.
+		GLuint m_noUV = 0;
 
 		// What a pixelated program samples its colour textures through.
 		GLuint m_nearest = 0;
@@ -1001,12 +1080,14 @@ namespace Loom
 		typedef std::unordered_map<std::string, GLint, NameHash, std::equal_to<>> Locations;
 
 		// What each program has been given: where its uniforms are, the unit
-		// each sampler has, and the texture set for each unit.
+		// each sampler has and the texture set for each unit, and where it
+		// reads UV layers.
 		struct Program
 		{
 			Locations locations;
 			Locations units;
 			std::vector<GLuint> textures;
+			std::vector<UVBinding> uvSlots;
 		};
 
 		std::unordered_map<uint32_t, Program> m_programs;

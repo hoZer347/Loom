@@ -491,4 +491,58 @@ TEST_SUITE("Shader")
 			CHECK(message.line == 9);
 	};
 #endif
+
+	TEST_CASE("a vertex stage's UV layer reads its fields from raw words, past four of them in a second attribute")
+	{
+		const std::string source =
+			"// ===VERTEX===\n"
+			"layout(location = 0) in vec3 aPos;\n"
+			"UV_1<float weight, bool lit, ivec3 cell>;\n"
+			"UV_4<vec2>;\n"
+			"out vec4 v_color;\n"
+			"void main() { v_color = vec4(UV_1.weight, UV_1.lit ? 1.0 : 0.0, float(UV_1.cell.z), UV_4.y); gl_Position = vec4(aPos, 1.0); }\n" +
+			FRAGMENT;
+
+		const Loom::Shader::Stages stages = Loom::Shader::Assemble(source);
+
+		CHECK(stages.vertex.find("layout(location = 4) in uvec4 loom_UV_1_0;\n") != std::string::npos);
+		CHECK(stages.vertex.find("layout(location = 5) in uvec4 loom_UV_1_1;\n") != std::string::npos);
+		CHECK(stages.vertex.find("layout(location = 6) in uvec4 loom_UV_4_0;\n") != std::string::npos);
+		CHECK(stages.vertex.find("struct loom_UV_1 { float weight; bool lit; ivec3 cell; };") != std::string::npos);
+		CHECK(stages.vertex.find(
+			"#define UV_1 loom_UV_1(uintBitsToFloat(loom_UV_1_0.x), (loom_UV_1_0.y != 0u), "
+			"ivec3(int(loom_UV_1_0.z), int(loom_UV_1_0.w), int(loom_UV_1_1.x)))\n") != std::string::npos);
+		CHECK(stages.vertex.find("#define UV_4 vec2(uintBitsToFloat(loom_UV_4_0.x), uintBitsToFloat(loom_UV_4_0.y))\n") != std::string::npos);
+
+		// The lines after a declaration keep their numbers in the file.
+		CHECK(stages.vertex.find("#line 4 0\nlayout(location = 6)") != std::string::npos);
+		CHECK(stages.vertex.find("#line 5 0\nout vec4 v_color;") != std::string::npos);
+#ifndef __EMSCRIPTEN__
+		CHECK(Loom::Shader::Check(source).empty());
+#endif
+	};
+
+	TEST_CASE("a UV layer declared wrongly is refused")
+	{
+		const std::string wrong[] = {
+			"UV_1<double weight>;\n",
+			"UV_1<vec5>;\n",
+			"UV_1<float weight, vec3>;\n",
+			"UV_1<float, vec3>;\n",
+			"UV_1<>;\n",
+			"UV_1<float>;\nUV_1<int>;\n",
+			"UV_1<vec4 a, vec4 b, vec4 c, vec4 d>;\nUV_2<vec4 a, vec4 b, vec4 c, float d>;\n",
+		};
+
+		for (const std::string& declared : wrong)
+			CHECK_THROWS_AS(Loom::Shader::Assemble("// ===VERTEX===\n" + declared + "void main() { }\n" + FRAGMENT), std::runtime_error);
+
+		// Seven attributes' worth is as many as a stage reads.
+		CHECK_NOTHROW(Loom::Shader::Assemble("// ===VERTEX===\nUV_1<vec4 a, vec4 b, vec4 c, vec4 d>;\nUV_2<vec4 a, vec4 b, vec4 c>;\nvoid main() { }\n" + FRAGMENT));
+
+		// A fragment stage's UV_ is its own business.
+		const Loom::Shader::Stages stages = Loom::Shader::Assemble(VERTEX + "// ===FRAGMENT===\nUV_1<double weight>;\nvoid main() { }\n");
+
+		CHECK(stages.fragment.find("UV_1<double weight>;") != std::string::npos);
+	};
 };

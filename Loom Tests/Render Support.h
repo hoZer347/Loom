@@ -84,8 +84,9 @@ namespace LoomTests
 	{
 		static constexpr glm::ivec2 DEFAULT_SIZE{ 160, 90 };
 
-		explicit RenderFixture(glm::ivec2 size = DEFAULT_SIZE)
+		explicit RenderFixture(glm::ivec2 size = DEFAULT_SIZE, Loom::Backend backend = Loom::Backend::OpenGL)
 		{
+			Loom::Engine::backend = backend;
 			m_engine = std::make_unique<Loom::Engine>();
 
 			if (!Loom::Engine::window)

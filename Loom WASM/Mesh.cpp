@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <bit>
 #include <climits>
+#include <cstring>
 #include <iostream>
 #include <utility>
 
@@ -79,9 +80,12 @@ namespace Loom
 			return (float)(hash >> (sizeof(hash) * CHAR_BIT - SEED_BITS)) * SEED_SCALE;
 		};
 
-		uint64_t Hashed(const std::vector<float>& vertices, VertexFormat format)
+		uint64_t Hashed(const std::vector<float>& vertices, const VertexLayout& layout)
 		{
-			uint64_t hash = Mixed(FNV_OFFSET_BASIS, (uint32_t)format);
+			uint64_t hash = Mixed(FNV_OFFSET_BASIS, (uint32_t)layout.format);
+
+			for (const UVLayout& layer : layout.layers)
+				hash = Mixed(Mixed(hash, layer.id), layer.words);
 
 			for (const float value : vertices)
 				hash = Mixed(hash, std::bit_cast<uint32_t>(value));
@@ -107,7 +111,11 @@ namespace Loom
 		if (!m_generated)
 			return true;
 
-		return field.data != &*m_vertices && field.data != &*m_textureCoordinates && field.data != &*m_normals && field.data != &*m_colors;
+		return field.data != &*m_vertices &&
+			field.data != &*m_textureCoordinates &&
+			field.data != &*m_normals &&
+			field.data != &*m_colors &&
+			field.data != &*m_uvLayers;
 	};
 
 	bool Mesh::IsDrawable()
@@ -214,6 +222,7 @@ namespace Loom
 			m_textureCoordinates.Version(),
 			m_normals.Version(),
 			m_colors.Version(),
+			m_uvLayers.Version(),
 			m_draw_type.Version(),
 			deformed,
 			deformed ? m_deformedFrame : 0 };
@@ -238,31 +247,42 @@ namespace Loom
 			const bool hasNormals = normals.size() == count * NORMAL_COMPONENTS;
 			const bool hasColors = colors.size() == count * COLOR_COMPONENTS;
 
+			std::vector<UVLayer> layers = UVLayers();
+			std::erase_if(layers, [count](const UVLayer& layer) { return layer.values.size() != count * layer.words; });
+
+			VertexLayout layout = hasColors
+				? VertexFormat::PositionUVNormalColor
+				: hasNormals
+					? VertexFormat::PositionUVNormal
+					: hasUVs
+						? VertexFormat::PositionUV
+						: VertexFormat::Position;
+
+			for (const UVLayer& layer : layers)
+				layout.layers.push_back({ layer.id, layer.words });
+
 			// Only vertices that can join a batch are worth hashing.
 			const bool batchable = *std::as_const(m_draw_type) == Static && !deformed;
 
-			if (!hasUVs && !hasNormals && !hasColors)
+			if (layout == VertexFormat::Position)
 			{
-				renderer.SetVertices(m_kept, positions.data(), count, *std::as_const(m_draw_type), VertexFormat::Position);
-				m_geometry = batchable ? Hashed(positions, VertexFormat::Position) : 0;
+				renderer.SetVertices(m_kept, positions.data(), count, *std::as_const(m_draw_type), layout);
+				m_geometry = batchable ? Hashed(positions, layout) : 0;
 			}
 			else
 			{
-				const VertexFormat format = hasColors
-					? VertexFormat::PositionUVNormalColor
-					: hasNormals
-						? VertexFormat::PositionUVNormal
-						: VertexFormat::PositionUV;
 				constexpr float NO_NORMAL[NORMAL_COMPONENTS] = { };
-				std::vector<float> interleaved(count * FloatsPerVertex(format));
+				std::vector<float> interleaved(count * FloatsPerVertex(layout));
 				float* out = interleaved.data();
 
 				for (size_t i = 0; i < count; i++)
 				{
+					out = std::copy_n(positions.data() + i * POSITION_COMPONENTS, POSITION_COMPONENTS, out);
+
 					// Without texture coordinates, aUV reads the position's x and y,
 					// as it does from vertices drawn without normals.
-					out = std::copy_n(positions.data() + i * POSITION_COMPONENTS, POSITION_COMPONENTS, out);
-					out = std::copy_n(hasUVs ? textureCoordinates.data() + i * UV_COMPONENTS : positions.data() + i * POSITION_COMPONENTS, UV_COMPONENTS, out);
+					if (layout.format != VertexFormat::Position)
+						out = std::copy_n(hasUVs ? textureCoordinates.data() + i * UV_COMPONENTS : positions.data() + i * POSITION_COMPONENTS, UV_COMPONENTS, out);
 
 					// With colours and no normals, aNormal reads zeros, as it does
 					// from vertices drawn without normals.
@@ -273,14 +293,109 @@ namespace Loom
 
 					if (hasColors)
 						out = std::copy_n(colors.data() + i * COLOR_COMPONENTS, COLOR_COMPONENTS, out);
+
+					// Copied as bytes, so each word's bits arrive as they were.
+					for (const UVLayer& layer : layers)
+					{
+						std::memcpy(out, layer.values.data() + i * layer.words, layer.words * sizeof(uint32_t));
+						out += layer.words;
+					};
 				};
 
-				renderer.SetVertices(m_kept, interleaved.data(), count, *std::as_const(m_draw_type), format);
-				m_geometry = batchable ? Hashed(interleaved, format) : 0;
+				renderer.SetVertices(m_kept, interleaved.data(), count, *std::as_const(m_draw_type), layout);
+				m_geometry = batchable ? Hashed(interleaved, layout) : 0;
 			};
 		};
 
 		return true;
+	};
+
+	namespace
+	{
+		// Each layer m_uvLayers holds starts with its id, its words a vertex
+		// and its vertices.
+		constexpr size_t LAYER_ID = 0;
+		constexpr size_t LAYER_WORDS = 1;
+		constexpr size_t LAYER_VERTICES = 2;
+		constexpr size_t LAYER_HEADER = 3;
+
+		// Calls found with each whole layer in the words, in turn, with where
+		// its words start and end.
+		template <typename Found>
+		void EachLayer(const std::vector<unsigned int>& words, const Found& found)
+		{
+			for (size_t at = 0; at + LAYER_HEADER <= words.size(); )
+			{
+				const size_t length = (size_t)words[at + LAYER_WORDS] * words[at + LAYER_VERTICES];
+				const size_t first = at + LAYER_HEADER;
+
+				if (length > words.size() - first)
+					return;
+
+				found(words[at + LAYER_ID], words[at + LAYER_WORDS], first, first + length);
+				at = first + length;
+			};
+		};
+
+		// As many whole vertices as the layer holds.
+		void AppendLayer(std::vector<unsigned int>& words, const UVLayer& layer)
+		{
+			const size_t vertices = layer.words ? layer.values.size() / layer.words : 0;
+
+			words.insert(words.end(), { layer.id, layer.words, (unsigned int)vertices });
+			words.insert(words.end(), layer.values.begin(), layer.values.begin() + vertices * layer.words);
+		};
+	};
+
+	void Mesh::SetUVWords(const UVLayer& layer)
+	{
+		const std::vector<UVLayer> others = UVLayers();
+		std::vector<unsigned int>& words = *m_uvLayers;
+
+		words.clear();
+
+		bool placed = false;
+
+		for (const UVLayer& other : others)
+		{
+			if (!placed && other.id >= layer.id)
+			{
+				AppendLayer(words, layer);
+				placed = true;
+			};
+
+			if (other.id != layer.id)
+				AppendLayer(words, other);
+		};
+
+		if (!placed)
+			AppendLayer(words, layer);
+	};
+
+	void Mesh::ClearUV(uint32_t id)
+	{
+		const std::vector<UVLayer> layers = UVLayers();
+		std::vector<unsigned int>& words = *m_uvLayers;
+
+		words.clear();
+
+		for (const UVLayer& layer : layers)
+			if (layer.id != id)
+				AppendLayer(words, layer);
+	};
+
+	std::vector<UVLayer> Mesh::UVLayers() const
+	{
+		const std::vector<unsigned int>& words = *std::as_const(m_uvLayers);
+		std::vector<UVLayer> layers;
+
+		EachLayer(words, [&](uint32_t id, uint32_t perVertex, size_t first, size_t last)
+		{
+			if (perVertex)
+				layers.push_back({ id, perVertex, { words.begin() + first, words.begin() + last } });
+		});
+
+		return layers;
 	};
 
 	void Mesh::DrawTransparent(const std::vector<Mesh*>& meshes)
@@ -406,6 +521,9 @@ namespace Loom
 		ImGui::Text("UVs:      %zu", std::as_const(m_textureCoordinates)->size());
 		ImGui::Text("Normals:  %zu", std::as_const(m_normals)->size());
 		ImGui::Text("Colours:  %zu", std::as_const(m_colors)->size());
+
+		for (const UVLayer& layer : UVLayers())
+			ImGui::Text("UV_%u:     %zu x %u words", layer.id, layer.values.size() / layer.words, layer.words);
 
 		if (m_generated)
 			ImGui::TextDisabled("Generated by a script: not saved");

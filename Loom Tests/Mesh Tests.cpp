@@ -9,8 +9,11 @@
 #include "Shaders.h"
 #include "Skin.h"
 
+#include <bit>
+#include <optional>
 #include <sstream>
 #include <string>
+#include <vector>
 
 using LoomTests::Pump;
 using LoomTests::RecordingRenderer;
@@ -391,5 +394,146 @@ TEST_SUITE("Mesh")
 
 		// ...and then stops, because the material has no shader to bind.
 		CHECK(mesh->material->shader == nullptr);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh's UV layers hold each vertex's values as raw words, in order of id")
+	{
+		Loom::Mesh mesh;
+		Pump();
+
+		mesh.SetUV<float, glm::vec3>(2, { { 0.5f, glm::vec3(1.0f, 2.0f, 3.0f) }, { -1.0f, glm::vec3(4.0f, 5.0f, 6.0f) } });
+		mesh.SetUV<bool, int>(0, { { true, -2 }, { false, 7 } });
+
+		std::vector<Loom::UVLayer> layers = mesh.UVLayers();
+
+		REQUIRE(layers.size() == 2);
+		const Loom::UVLayer flags{ 0, 2, { 1u, std::bit_cast<uint32_t>(-2), 0u, 7u } };
+
+		CHECK(layers[0] == flags);
+		CHECK(layers[1].id == 2);
+		CHECK(layers[1].words == 4);
+		REQUIRE(layers[1].values.size() == 8);
+		CHECK(layers[1].values[0] == std::bit_cast<uint32_t>(0.5f));
+		CHECK(layers[1].values[3] == std::bit_cast<uint32_t>(3.0f));
+		CHECK(layers[1].values[4] == std::bit_cast<uint32_t>(-1.0f));
+
+		// Set again, a layer is replaced rather than added.
+		mesh.SetUV<unsigned int>(2, std::vector<unsigned int>{ 9u, 10u });
+		layers = mesh.UVLayers();
+
+		REQUIRE(layers.size() == 2);
+		const Loom::UVLayer replaced{ 2, 1, { 9u, 10u } };
+
+		CHECK(layers[1] == replaced);
+
+		mesh.ClearUV(0);
+		layers = mesh.UVLayers();
+
+		REQUIRE(layers.size() == 1);
+		CHECK(layers[0].id == 2);
+
+		mesh.ClearUV(2);
+
+		CHECK(mesh.UVLayers().empty());
+		CHECK(mesh.m_uvLayers->empty());
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh hands its UV layers over after the rest of each vertex, and leaves out one that does not fit")
+	{
+		RecordingRenderer renderer;
+
+		Loom::Scene scene("layers");
+		Pump();
+
+		Loom::Mesh* mesh = scene.AddChild("Layered")->Attach<Loom::Mesh>(Loom::Mesh::Triangles);
+		Pump();
+
+		mesh->m_vertices = std::vector<float>(9, 1.0f);
+		mesh->SetUV<float>(3, std::vector<float>{ 0.25f, 0.5f, 0.75f });
+		mesh->SetUV<glm::ivec2>(1, std::vector<glm::ivec2>{ { 1, 2 }, { 3, 4 }, { 5, 6 } });
+
+		// One value short of the three vertices.
+		mesh->SetUV<float>(5, std::vector<float>{ 1.0f, 2.0f });
+
+		mesh->Draw(1);
+
+		Loom::VertexLayout layout = Loom::VertexFormat::Position;
+		layout.layers = { { 1, 2 }, { 3, 1 } };
+
+		CHECK(renderer.lastLayout == layout);
+		REQUIRE(renderer.lastVertices.size() == 18);
+		CHECK(renderer.lastVertices[0] == 1.0f);
+		CHECK(std::bit_cast<int>(renderer.lastVertices[3]) == 1);
+		CHECK(std::bit_cast<int>(renderer.lastVertices[4]) == 2);
+		CHECK(renderer.lastVertices[5] == 0.25f);
+		CHECK(std::bit_cast<int>(renderer.lastVertices[15]) == 5);
+		CHECK(renderer.lastVertices[17] == 0.75f);
+
+		// Normals put the layers after them, and a change to a layer hands the
+		// vertices over again.
+		mesh->m_normals = std::vector<float>(9, 0.0f);
+		mesh->ClearUV(1);
+		mesh->Draw(1);
+
+		layout = Loom::VertexFormat::PositionUVNormal;
+		layout.layers = { { 3, 1 } };
+
+		CHECK(renderer.handed == 2);
+		CHECK(renderer.lastLayout == layout);
+		REQUIRE(renderer.lastVertices.size() == 3 * Loom::FloatsPerVertex(layout));
+		CHECK(renderer.lastVertices[Loom::FloatsPerVertex(Loom::VertexFormat::PositionUVNormal)] == 0.25f);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh's UV layers are written and read back, unless the mesh is generated")
+	{
+		Loom::Scene scene("layers");
+		Pump();
+
+		Loom::GameObject* holder = scene.AddChild("Layered");
+		Loom::Mesh* mesh = holder->Attach<Loom::Mesh>(Loom::Mesh::Triangles);
+		Pump();
+
+		mesh->SetUV<glm::vec2>(4, std::vector<glm::vec2>{ { 0.1f, -0.0f }, { 1e20f, 2.0f } });
+
+		std::string error;
+		Loom::GameObject* copy = Loom::SceneSerializer::Deserialize(Loom::SceneSerializer::Serialize(*holder), scene.GetRoot(), &error);
+		Pump();
+
+		REQUIRE(copy != nullptr);
+		REQUIRE(copy->GetComponent<Loom::Mesh>() != nullptr);
+		CHECK(copy->GetComponent<Loom::Mesh>()->UVLayers() == mesh->UVLayers());
+
+		mesh->m_generated = true;
+		copy = Loom::SceneSerializer::Deserialize(Loom::SceneSerializer::Serialize(*holder), scene.GetRoot(), &error);
+		Pump();
+
+		REQUIRE(copy != nullptr);
+		CHECK(copy->GetComponent<Loom::Mesh>()->UVLayers().empty());
+	};
+
+	TEST_CASE("a UV layer slot is found in its attribute's name, and in the vertices by their layout")
+	{
+		CHECK_FALSE(Loom::ParseUVSlot("aPos").has_value());
+		CHECK_FALSE(Loom::ParseUVSlot("loom_UV_1").has_value());
+		CHECK_FALSE(Loom::ParseUVSlot("loom_UV_1_x").has_value());
+
+		const std::optional<Loom::UVSlot> slot = Loom::ParseUVSlot("loom_UV_12_1");
+
+		REQUIRE(slot.has_value());
+		CHECK(slot->layer == 12);
+		CHECK(slot->slot == 1);
+
+		Loom::VertexLayout layout = Loom::VertexFormat::PositionUV;
+		layout.layers = { { 2, 3 }, { 12, 6 } };
+
+		const size_t first = Loom::FloatsPerVertex(Loom::VertexFormat::PositionUV);
+
+		CHECK(Loom::FloatsPerVertex(layout) == first + 9);
+		CHECK(Loom::SourceOf(layout, { 2, 0 }).offset == first);
+		CHECK(Loom::SourceOf(layout, { 2, 0 }).words == 3);
+		CHECK(Loom::SourceOf(layout, { 12, 1 }).offset == first + 3 + 4);
+		CHECK(Loom::SourceOf(layout, { 12, 1 }).words == 2);
+		CHECK(Loom::SourceOf(layout, { 12, 2 }).words == 0);
+		CHECK(Loom::SourceOf(layout, { 7, 0 }).words == 0);
 	};
 };

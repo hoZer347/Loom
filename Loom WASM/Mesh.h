@@ -4,8 +4,11 @@
 
 #include "Component.h"
 #include "ShaderVariables.h"
+#include "UVLayer.h"
 
+#include <cstdint>
 #include <functional>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -51,10 +54,10 @@ namespace Loom
 		// pass that is not the material's (the shadow pass) draws the same
 		// geometry. A shader that declares no u_model draws the vertices
 		// untransformed. A Skin on the GameObject bends them first, and
-		// m_textureCoordinates go with them as aUV, m_normals as aNormal and
-		// m_colors as aColor. The renderer keeps them between draws, and they
-		// are handed over again only once one of those fields has changed, or
-		// the Skin has bent them again.
+		// m_textureCoordinates go with them as aUV, m_normals as aNormal,
+		// m_colors as aColor and the UV layers as UV_<id>. The renderer keeps
+		// them between draws, and they are handed over again only once one of
+		// those fields has changed, or the Skin has bent them again.
 		void Draw(uint32_t program);
 
 		// Gives the program the mesh's material and the scene's view, as its
@@ -75,6 +78,35 @@ namespace Loom
 		static inline MeshBatch* batch = nullptr;
 
 		void OnGui() override;
+
+		// A raw layer of values, one tuple a vertex, which a vertex stage
+		// declaring UV_<id> with the same types in the same order reads back:
+		// SetUV<float, glm::vec3>(1, values) for UV_1<float weight, vec3 tint>.
+		// Drawn while it holds one for every vertex; a stage reading a layer
+		// the mesh lacks reads zeros. Any number of layers can be set, and a
+		// stage reads up to Renderer::UVLayerLocations of four words at once.
+		template <typename... Ts>
+			requires (sizeof...(Ts) > 1)
+		void SetUV(uint32_t id, const std::vector<std::tuple<Ts...>>& values)
+		{
+			SetUVWords({ id, UVWordsOf<Ts...>, PackUV(values) });
+		};
+
+		// The same for a layer of one type, read as UV_<id><T>, so that a
+		// braced list of them is not also a list of one-element tuples.
+		template <typename T>
+		void SetUV(uint32_t id, const std::vector<T>& values)
+		{
+			SetUVWords({ id, UVWords<T>::count, PackUV(values) });
+		};
+
+		// Sets a layer already packed into words, in place of any with its id.
+		void SetUVWords(const UVLayer& layer);
+
+		void ClearUV(uint32_t id);
+
+		// The layers set, by id.
+		std::vector<UVLayer> UVLayers() const;
 
 		Serial<Material*> material;
 		Serial<Primitive> primitive_id;
@@ -99,12 +131,16 @@ namespace Loom
 		// the same reason.
 		Serial<std::vector<float>> m_colors;
 
+		// The raw UV layers, each written as its id, its words a vertex, its
+		// vertices, then its words. After m_colors for the same reason.
+		Serial<std::vector<unsigned int>, "UV Layers"> m_uvLayers;
+
 		// Leaves a generated mesh's geometry out of what is written.
 		bool IsSaved(const SerializedField& field) const override;
 
 		std::vector<uint32_t> m_indices;
 
-		// On, the vertices, texture coordinates, normals and colours are made by a
+		// On, the vertices, texture coordinates, normals, colours and UV layers are made by a
 		// script as it runs, such as ground grown from a seed: never written
 		// to a scene or prefab, so neither saved nor compared with a prefab's.
 		// Not saved itself, since the script sets it again as it makes them
@@ -137,6 +173,7 @@ namespace Loom
 			unsigned long long textureCoordinates = 0;
 			unsigned long long normals = 0;
 			unsigned long long colors = 0;
+			unsigned long long uvLayers = 0;
 			unsigned long long drawType = 0;
 			bool deformed = false;
 			unsigned long long deformedFrame = 0;

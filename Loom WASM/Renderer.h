@@ -9,7 +9,9 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 struct GLFWwindow;
@@ -29,6 +31,52 @@ namespace Loom
 	enum class VertexFormat { Position, PositionUV, PositionUVNormal, PositionUVNormalColor };
 
 	LOOM_API size_t FloatsPerVertex(VertexFormat format);
+
+	// A raw layer each vertex carries after its format's attributes: its id,
+	// which a vertex stage reads it by as UV_<id>, and how many 32 bit words
+	// of it each vertex holds.
+	struct UVLayout
+	{
+		uint32_t id = 0;
+		uint32_t words = 0;
+
+		bool operator==(const UVLayout&) const = default;
+	};
+
+	// What each vertex handed to Renderer::SetVertices holds: its format's
+	// floats, then each layer's words in turn, carried in the floats' bits.
+	struct VertexLayout
+	{
+		VertexLayout(VertexFormat format = VertexFormat::Position) : format(format) { };
+
+		VertexFormat format;
+		std::vector<UVLayout> layers;
+
+		bool operator==(const VertexLayout&) const = default;
+	};
+
+	LOOM_API size_t FloatsPerVertex(const VertexLayout& layout);
+
+	// A vertex stage declaring UV_<id> reads it through attributes named
+	// loom_UV_<id>_<slot>, four words a slot, which Shader::Assemble puts at
+	// UVLayerLocation on. Parses one of those names, or nullopt for any other.
+	struct UVSlot
+	{
+		uint32_t layer = 0;
+		uint32_t slot = 0;
+	};
+
+	LOOM_API std::optional<UVSlot> ParseUVSlot(std::string_view attribute);
+
+	// Where in each vertex, in floats, a slot's words start and how many of
+	// its four the vertices hold, 0 when they hold none.
+	struct UVSource
+	{
+		size_t offset = 0;
+		uint32_t words = 0;
+	};
+
+	LOOM_API UVSource SourceOf(const VertexLayout& layout, UVSlot slot);
 
 	/**
 	* Loom::Renderer
@@ -118,9 +166,16 @@ namespace Loom
 		// go a whole frame without being set again move to the GPU, and the
 		// rest are handed over afresh with each draw.
 		virtual uint32_t CreateVertices() = 0;
-		virtual void SetVertices(uint32_t vertices, const float* data, size_t count, uint32_t usage, VertexFormat format) = 0;
+		virtual void SetVertices(uint32_t vertices, const float* data, size_t count, uint32_t usage, const VertexLayout& layout) = 0;
 		virtual void DrawVertices(uint32_t program, uint32_t primitive, uint32_t vertices) = 0;
 		virtual void DestroyVertices(uint32_t vertices) = 0;
+
+		// The locations a vertex stage's UV layers take, between the vertex
+		// attributes and the instance ones, and the words each holds. A layer
+		// the vertices lack reads zeros.
+		static constexpr uint32_t UVLayerLocation = 4;
+		static constexpr uint32_t UVLayerLocations = 7;
+		static constexpr uint32_t WordsPerUVLocation = 4;
 
 		// Where an instanced program's vertex stage reads each instance's model
 		// matrix, a column a location from the first, and its colour with its
@@ -133,6 +188,8 @@ namespace Loom
 		// after another: its model matrix, column by column, its colour, then
 		// its seed.
 		static constexpr size_t FloatsPerInstance = 20;
+
+		static_assert(UVLayerLocation + UVLayerLocations == InstanceModelLocation);
 
 		// Draws kept vertices once for each of count instances, with a program
 		// that reads them at the instance locations.

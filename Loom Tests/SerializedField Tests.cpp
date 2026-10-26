@@ -13,6 +13,7 @@
 #include "SceneSerializer.h"
 #include "SerializedField.h"
 
+#include <bit>
 #include <limits>
 #include <string>
 #include <utility>
@@ -144,6 +145,11 @@ namespace
 		Loom::Serial<std::vector<float>> values;
 	};
 
+	struct Raw final : Loom::LoomObject
+	{
+		Loom::Serial<std::vector<unsigned int>> words;
+	};
+
 	// Fields are numbered by declaration order; these are EveryField's.
 	enum Every { Flag, Count, UnsignedCount, Big, UnsignedBig, Ratio, Precise, Label, Pair, Triple, Quad, Numbers };
 
@@ -249,8 +255,8 @@ TEST_SUITE("SerializedField")
 		const std::vector<const std::vector<Loom::FieldNames::Enumerator>*> enumerators = Loom::FieldNames::EnumeratorsOf(mesh);
 
 		// Material, primitive, draw type, vertices, per-instance variables,
-		// texture coordinates, normals, colours.
-		REQUIRE(labels.size() == 8);
+		// texture coordinates, normals, colours, UV layers.
+		REQUIRE(labels.size() == 9);
 		REQUIRE(enumerators[1] != nullptr);
 		REQUIRE(enumerators[2] != nullptr);
 
@@ -261,6 +267,7 @@ TEST_SUITE("SerializedField")
 		CHECK(labels[5] == "Texture Coordinates");
 		CHECK(labels[6] == "Normals");
 		CHECK(labels[7] == "Colors");
+		CHECK(labels[8] == "UV Layers");
 	};
 #endif
 
@@ -805,5 +812,28 @@ TEST_SUITE("SerializedField")
 
 		again.values = { 1.0f };
 		CHECK(again.values.Version() != first);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "raw words are written as integers and read back bit for bit")
+	{
+		Raw object;
+		Pump();
+
+		REQUIRE(Field(object, 0).type == Loom::FieldType::UIntArray);
+
+		const std::vector<unsigned int> words = { 0u, std::numeric_limits<unsigned int>::max(), std::bit_cast<unsigned int>(-0.0f) };
+		object.words = words;
+
+		const std::string text = Field(object, 0).Write();
+
+		CHECK(text == "[0, 4294967295, 2147483648]");
+
+		object.words = std::vector<unsigned int>();
+
+		REQUIRE(Field(object, 0).Read(text));
+		CHECK(*object.words == words);
+
+		CHECK_FALSE(Field(object, 0).Read("[1, 2.5]"));
+		CHECK_FALSE(Field(object, 0).Read("[-1]"));
 	};
 };

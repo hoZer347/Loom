@@ -182,8 +182,11 @@ namespace LoomTests
 		{
 			drawn.push_back(program);
 			drawnInto.push_back(m_targets.empty() ? WINDOW : m_targets.back());
-			lastVertices.assign(vertices, vertices + count * Loom::FloatsPerVertex(format));
+			const Loom::VertexLayout layout = m_drawing ? *m_drawing : Loom::VertexLayout(format);
+
+			lastVertices.assign(vertices, vertices + count * Loom::FloatsPerVertex(layout));
 			lastFormat = format;
+			lastLayout = layout;
 
 			const auto color = vec4s.find("u_color");
 			const auto texture = textures.find("u_texture");
@@ -202,16 +205,19 @@ namespace LoomTests
 			return m_handles;
 		};
 
-		void SetVertices(uint32_t vertices, const float* data, size_t count, uint32_t, Loom::VertexFormat format) override
+		void SetVertices(uint32_t vertices, const float* data, size_t count, uint32_t, const Loom::VertexLayout& layout) override
 		{
-			kept[vertices] = { std::vector<float>(data, data + count * Loom::FloatsPerVertex(format)), format };
+			kept[vertices] = { std::vector<float>(data, data + count * Loom::FloatsPerVertex(layout)), layout };
 			handed++;
 		};
 
 		void DrawVertices(uint32_t program, uint32_t primitive, uint32_t vertices) override
 		{
 			const Kept& drawing = kept.at(vertices);
-			Draw(program, primitive, drawing.vertices.data(), drawing.vertices.size() / Loom::FloatsPerVertex(drawing.format), 0, drawing.format);
+
+			m_drawing = &drawing.layout;
+			Draw(program, primitive, drawing.vertices.data(), drawing.vertices.size() / Loom::FloatsPerVertex(drawing.layout), 0, drawing.layout.format);
+			m_drawing = nullptr;
 		};
 
 		void DestroyVertices(uint32_t vertices) override { kept.erase(vertices); };
@@ -295,6 +301,7 @@ namespace LoomTests
 		// The vertices of the last draw, as handed over, and how they were laid out.
 		std::vector<float> lastVertices;
 		Loom::VertexFormat lastFormat = Loom::VertexFormat::Position;
+		Loom::VertexLayout lastLayout;
 
 		// For each of drawn: u_color, u_texture and u_scene as they were set, and its vertices.
 		std::vector<glm::vec4> drawnColors;
@@ -317,7 +324,7 @@ namespace LoomTests
 		struct Kept
 		{
 			std::vector<float> vertices;
-			Loom::VertexFormat format = Loom::VertexFormat::Position;
+			Loom::VertexLayout layout;
 		};
 
 		// What CreateVertices handed out and SetVertices filled, and how many
@@ -336,6 +343,9 @@ namespace LoomTests
 		Renderer* m_previous;
 		uint32_t m_handles = 0;
 		std::vector<uint32_t> m_targets;
+
+		// The layout of the kept vertices DrawVertices is drawing, if it is.
+		const Loom::VertexLayout* m_drawing = nullptr;
 	};
 
 

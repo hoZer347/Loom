@@ -20,6 +20,8 @@
 #include <optional>
 #include <regex>
 #include <stdexcept>
+#include <string_view>
+#include <unordered_set>
 
 #define SHADER_PATH ""
 
@@ -801,6 +803,185 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		return Build(name, source);
 	};
 
+	namespace
+	{
+		// A scalar type a UV layer's field can be, the vectors of it, and how
+		// one of the layer's words reads as it.
+		struct UVScalar
+		{
+			std::string_view name;
+			std::string_view vector;
+			std::string_view before;
+			std::string_view after;
+		};
+
+		constexpr UVScalar UV_SCALARS[] = {
+			{ "float", "vec", "uintBitsToFloat(", ")" },
+			{ "int", "ivec", "int(", ")" },
+			{ "uint", "uvec", "", "" },
+			{ "bool", "bvec", "(", " != 0u)" },
+		};
+
+		constexpr uint32_t MIN_VECTOR = 2;
+		constexpr uint32_t MAX_VECTOR = 4;
+		constexpr std::string_view SWIZZLE = "xyzw";
+
+		static_assert(SWIZZLE.size() == Renderer::WordsPerUVLocation);
+
+		// A vertex stage's UV_<id> declarations, each turned into the
+		// attributes loom_UV_<id>_<slot> at the locations from
+		// Renderer::UVLayerLocation on, and a UV_<id> that reads them as the
+		// declared types.
+		struct UVDeclarations
+		{
+			uint32_t nextLocation = Renderer::UVLayerLocation;
+			std::unordered_set<uint32_t> declared;
+
+			// UV_<id><type name, ...>; with a name for every type, read as a
+			// struct, or UV_<id><type>; read as the type itself.
+			static const std::regex& Pattern()
+			{
+				static const std::regex pattern(R"(^\s*UV_(\d+)\s*<([^>]*)>\s*;\s*(?://.*)?$)");
+				return pattern;
+			};
+
+			// The GLSL for the declaration on the line, or nullopt when the
+			// line is not one. Throws std::runtime_error for one that is
+			// wrong.
+			std::optional<std::string> Expand(const std::string& line, size_t number)
+			{
+				std::smatch match;
+
+				if (!std::regex_match(line, match, Pattern()))
+					return std::nullopt;
+
+				const std::string where = "UV_" + match[1].str() + " on line " + std::to_string(number) + ": ";
+				uint32_t id = 0;
+
+				try
+				{
+					id = (uint32_t)std::stoul(match[1].str());
+				}
+				catch (const std::exception&)
+				{
+					throw std::runtime_error(where + "the id is too large");
+				};
+
+				if (!declared.insert(id).second)
+					throw std::runtime_error(where + "declared twice");
+
+				struct Field
+				{
+					std::string type;
+					std::string name;
+					const UVScalar* scalar = nullptr;
+					uint32_t components = 1;
+				};
+
+				static const std::regex fieldPattern(R"(^\s*(\w+)(?:\s+(\w+))?\s*$)");
+				std::vector<Field> fields;
+				std::stringstream list(match[2].str());
+
+				for (std::string text; std::getline(list, text, ',');)
+				{
+					std::smatch parts;
+
+					if (!std::regex_match(text, parts, fieldPattern))
+						throw std::runtime_error(where + "'" + text + "' is not a type and a name");
+
+					Field field{ parts[1].str(), parts[2].str() };
+
+					for (const UVScalar& scalar : UV_SCALARS)
+					{
+						if (field.type == scalar.name)
+							field.scalar = &scalar;
+						else if (field.type.size() == scalar.vector.size() + 1 && field.type.starts_with(scalar.vector))
+						{
+							const uint32_t components = (uint32_t)(field.type.back() - '0');
+
+							if (components >= MIN_VECTOR && components <= MAX_VECTOR)
+							{
+								field.scalar = &scalar;
+								field.components = components;
+							};
+						};
+					};
+
+					if (!field.scalar)
+						throw std::runtime_error(where + "'" + field.type + "' is not a type a UV layer can hold");
+
+					fields.push_back(field);
+				};
+
+				if (fields.empty())
+					throw std::runtime_error(where + "no types");
+
+				const bool named = !fields.front().name.empty();
+
+				for (const Field& field : fields)
+					if (field.name.empty() == named)
+						throw std::runtime_error(where + "every type needs a name, or there is only one type and no name");
+
+				if (!named && fields.size() > 1)
+					throw std::runtime_error(where + "every type needs a name, or there is only one type and no name");
+
+				uint32_t words = 0;
+
+				for (const Field& field : fields)
+					words += field.components;
+
+				const uint32_t locations = (words + Renderer::WordsPerUVLocation - 1) / Renderer::WordsPerUVLocation;
+
+				if (nextLocation + locations > Renderer::UVLayerLocation + Renderer::UVLayerLocations)
+					throw std::runtime_error(
+						where + "a vertex stage's UV layers hold at most " +
+						std::to_string(Renderer::UVLayerLocations * Renderer::WordsPerUVLocation) + " words between them");
+
+				const std::string attribute = "loom_UV_" + std::to_string(id);
+				std::string code;
+
+				for (uint32_t slot = 0; slot < locations; slot++)
+					code += "layout(location = " + std::to_string(nextLocation + slot) + ") in uvec4 " + attribute + '_' + std::to_string(slot) + ";\n";
+
+				nextLocation += locations;
+
+				std::vector<std::string> reads;
+				uint32_t word = 0;
+
+				for (const Field& field : fields)
+				{
+					std::string read;
+
+					for (uint32_t i = 0; i < field.components; i++, word++)
+					{
+						if (i)
+							read += ", ";
+
+						read += std::string(field.scalar->before) + attribute + '_' + std::to_string(word / Renderer::WordsPerUVLocation) + '.' +
+							SWIZZLE[word % Renderer::WordsPerUVLocation] + std::string(field.scalar->after);
+					};
+
+					reads.push_back(field.components == 1 ? read : field.type + '(' + read + ')');
+				};
+
+				if (!named)
+					return code + "#define UV_" + std::to_string(id) + ' ' + reads.front() + '\n';
+
+				code += "struct " + attribute + " {";
+
+				for (const Field& field : fields)
+					code += ' ' + field.type + ' ' + field.name + ';';
+
+				code += " };\n#define UV_" + std::to_string(id) + ' ' + attribute + '(';
+
+				for (size_t i = 0; i < reads.size(); i++)
+					code += (i ? ", " : "") + reads[i];
+
+				return code + ")\n";
+			};
+		};
+	};
+
 	Shader::Stages Shader::Assemble(const std::string& source)
 	{
 		std::istringstream lines(source);
@@ -808,6 +989,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		std::unordered_map<ShaderType, std::stringstream> sections;
 		ShaderType current = ShaderType::NONE;
 		bool has_vertex = false;
+		UVDeclarations uvDeclarations;
 
 		size_t number = 0;
 
@@ -830,6 +1012,18 @@ vec3 LoomSceneNormal(ivec2 pixel)
 				current = ShaderType::SETTINGS;
 			else if (line.find(PIXEL_PASS_SECTION) != std::string::npos)
 				current = ShaderType::PIXEL_PASS;
+			else if (current == ShaderType::VERTEX)
+			{
+				const std::optional<std::string> expanded = uvDeclarations.Expand(line, number);
+
+				if (!expanded)
+				{
+					sections[current] << line << '\n';
+					continue;
+				};
+
+				sections[current] << *expanded;
+			}
 			else
 			{
 				if (current != ShaderType::NONE)

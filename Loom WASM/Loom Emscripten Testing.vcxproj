@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -236,6 +236,7 @@
     <ClInclude Include="Macro Helpers.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="Mesh.h" />
+    <ClInclude Include="UVLayer.h" />
     <ClInclude Include="MissingComponent.h" />
     <ClInclude Include="Skin.h" />
     <ClInclude Include="Animator.h" />
