@@ -20,13 +20,19 @@ namespace Loom
 		constexpr float stripe_width = 3.0f;
 	};
 
-	// ImGui::DragScalarN, with the stripe drawn over each box after it.
 	bool AxisGui::DragFloatN(const char* label, float* values, int count, float speed, const char* format)
+	{
+		return DragScalarN(label, ImGuiDataType_Float, values, count, speed, nullptr, nullptr, format);
+	};
+
+	// ImGui::DragScalarN, with the stripe drawn over each box after it.
+	bool AxisGui::DragScalarN(const char* label, int data_type, void* values, int count, float speed, const void* min, const void* max, const char* format)
 	{
 		if (ImGui::GetCurrentWindow()->SkipItems)
 			return false;
 
 		const ImGuiStyle& style = ImGui::GetStyle();
+		const size_t size = ImGui::DataTypeGetInfo(data_type)->Size;
 		bool changed = false;
 
 		ImGui::BeginGroup();
@@ -40,7 +46,7 @@ namespace Loom
 			if (i > 0)
 				ImGui::SameLine(0.0f, style.ItemInnerSpacing.x);
 
-			changed |= ImGui::DragFloat("", &values[i], speed, 0.0f, 0.0f, format);
+			changed |= ImGui::DragScalar("", data_type, (char*)values + i * size, speed, min, max, format);
 
 			if (i < axis_count)
 			{

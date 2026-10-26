@@ -231,12 +231,33 @@ namespace Loom
 
 			ImGui::PushID(variable.name.c_str());
 
-			ImGui::TableNextColumn();
-			ImGui::AlignTextToFramePadding();
-			ImGui::TextUnformatted(variable.name.c_str());
-
 			ShaderVariable changed = variable;
 			std::string error;
+
+			ImGui::TableNextColumn();
+			std::string name = m_renaming == variable.name ? m_rename : variable.name;
+			ImGui::SetNextItemWidth(-FLT_MIN);
+
+			if (InputTextString("##name", name))
+			{
+				m_renaming = variable.name;
+				m_rename = name;
+			};
+
+			if (ImGui::IsItemDeactivatedAfterEdit() && m_renaming == variable.name)
+			{
+				if (m_rename != variable.name)
+				{
+					const bool written = RenameShaderVariable(shader->file_path, variable.name, m_rename, error);
+
+					if (written)
+						RenameLocal(variable.name, m_rename);
+
+					Edited(written, error);
+				};
+
+				m_renaming.clear();
+			};
 
 			ImGui::TableNextColumn();
 			const bool retyped = TypeCombo(changed.type);
@@ -339,6 +360,18 @@ namespace Loom
 	{
 		UniformValues values = variables;
 		values.values[name] = value;
+		variables = std::move(values);
+	};
+
+	void Material::RenameLocal(const std::string& name, const std::string& renamed)
+	{
+		UniformValues values = variables;
+		auto value = values.values.extract(name);
+
+		if (value.empty())
+			return;
+
+		values.values.insert_or_assign(renamed, std::move(value.mapped()));
 		variables = std::move(values);
 	};
 

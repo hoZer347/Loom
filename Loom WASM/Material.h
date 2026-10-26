@@ -91,12 +91,20 @@ namespace Loom
 
 		void SetLocal(const std::string& name, const UniformValue& value);
 
+		// Moves the local value to the variable's new name, over any already there.
+		void RenameLocal(const std::string& name, const std::string& renamed);
+
 		// After the shader file has been rewritten, or failed to be, with why
 		// in error.
 		void Edited(bool written, const std::string& error);
 
 		// The declaration being typed into the table's last row.
 		ShaderVariable m_new_variable;
+
+		// The variable whose name is being typed over, and what has been typed,
+		// kept until the field is left.
+		std::string m_renaming;
+		std::string m_rename;
 
 		// Why the last edit to the shader file failed, shown until the next one.
 		std::string m_edit_error;

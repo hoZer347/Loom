@@ -3,6 +3,7 @@
 #include "EditorGui.h"
 #include "Renderer.h"
 #include "Textures.h"
+#include "Utilities/AxisGui.h"
 
 #include "imgui.h"
 
@@ -221,6 +222,19 @@ namespace Loom
 			return std::regex_match(name, identifier);
 		};
 
+		// Whether a variable can take the name, with why not in error.
+		bool CanBeNamed(const std::string& name, std::string& error)
+		{
+			if (!IsIdentifier(name) || name.starts_with(RESERVED_PREFIX))
+				error = "'" + name + "' is not a name GLSL allows";
+			else if (IsEngineUniform(name))
+				error = name + " is set by the engine";
+			else
+				return true;
+
+			return false;
+		};
+
 		const UniformValue& DefaultOf(UniformType type)
 		{
 			static const std::vector<UniformValue> defaults = []()
@@ -286,7 +300,12 @@ namespace Loom
 				ImGui::SetCursorPosX(x);
 				ImGui::SetNextItemWidth(-FLT_MIN);
 
-				if (ImGui::DragScalarN("##value", ImGuiDataType_Double, shown.data(), count, speed, min, max, format))
+				// Each component edged in its axis colour, as a vector field is.
+				const bool dragged = count > 1 ?
+					AxisGui::DragScalarN("##value", ImGuiDataType_Double, shown.data(), count, speed, min, max, format) :
+					ImGui::DragScalarN("##value", ImGuiDataType_Double, shown.data(), count, speed, min, max, format);
+
+				if (dragged)
 				{
 					changed = true;
 
@@ -531,17 +550,8 @@ namespace Loom
 
 	bool DeclareShaderVariable(const std::string& path, const std::string& replacing, const ShaderVariable& variable, std::string& error)
 	{
-		if (!IsIdentifier(variable.name) || variable.name.starts_with(RESERVED_PREFIX))
-		{
-			error = "'" + variable.name + "' is not a name GLSL allows";
+		if (!CanBeNamed(variable.name, error))
 			return false;
-		};
-
-		if (IsEngineUniform(variable.name))
-		{
-			error = variable.name + " is set by the engine";
-			return false;
-		};
 
 		ShaderFile file;
 
@@ -592,6 +602,36 @@ namespace Loom
 		// From the last, so the lines still to go keep their places.
 		for (auto line = declaring.rbegin(); line != declaring.rend(); line++)
 			file.lines.erase(file.lines.begin() + *line);
+
+		return file.Write(path, error);
+	};
+
+	bool RenameShaderVariable(const std::string& path, const std::string& name, const std::string& renamed, std::string& error)
+	{
+		if (!CanBeNamed(renamed, error))
+			return false;
+
+		ShaderFile file;
+
+		if (!file.Read(path, error))
+			return false;
+
+		if (file.Declaring(name).empty())
+		{
+			error = path + " does not declare " + name;
+			return false;
+		};
+
+		if (!file.Declaring(renamed).empty())
+		{
+			error = path + " already declares " + renamed;
+			return false;
+		};
+
+		const std::regex word("\\b" + name + "\\b");
+
+		for (std::string& line : file.lines)
+			line = std::regex_replace(line, word, renamed);
 
 		return file.Write(path, error);
 	};

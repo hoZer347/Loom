@@ -17,6 +17,18 @@ namespace Loom
 			float speed = 1.0f,
 			const char* format = "%.3f");
 
+		/// The same for components of an ImGuiDataType, held between min and
+		/// max when they are given.
+		static bool DragScalarN(
+			const char* label,
+			int data_type,
+			void* values,
+			int count,
+			float speed,
+			const void* min,
+			const void* max,
+			const char* format);
+
 		AxisGui() = delete;
 	};
 };

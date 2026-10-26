@@ -376,6 +376,41 @@ TEST_SUITE("Shader variables")
 		CHECK(Loom::ParseShaderVariables(file.Text()).empty());
 	};
 
+	TEST_CASE("a renamed variable is renamed in every stage and the code reading it, and nowhere else")
+	{
+		const ShaderFile file(
+			"rename.shader",
+			"// ===VERTEX===\nuniform float u_wave; // global 2\nuniform float u_waves;\nvoid main() { gl_PointSize = u_wave + u_waves; }\n"
+			"// ===FRAGMENT===\nuniform float u_wave; // global 2\nvoid main() { }\n");
+
+		std::string error;
+		REQUIRE(Loom::RenameShaderVariable(file.path.string(), "u_wave", "u_swell", error));
+
+		CHECK(file.Text() ==
+			"// ===VERTEX===\nuniform float u_swell; // global 2\nuniform float u_waves;\nvoid main() { gl_PointSize = u_swell + u_waves; }\n"
+			"// ===FRAGMENT===\nuniform float u_swell; // global 2\nvoid main() { }\n");
+
+		SUBCASE("not to a name another variable has")
+		{
+			CHECK_FALSE(Loom::RenameShaderVariable(file.path.string(), "u_swell", "u_waves", error));
+		};
+
+		SUBCASE("not to a name the engine sets")
+		{
+			CHECK_FALSE(Loom::RenameShaderVariable(file.path.string(), "u_swell", "u_time", error));
+		};
+
+		SUBCASE("not to a name GLSL does not allow")
+		{
+			CHECK_FALSE(Loom::RenameShaderVariable(file.path.string(), "u_swell", "2nd", error));
+		};
+
+		SUBCASE("not a variable the file does not declare")
+		{
+			CHECK_FALSE(Loom::RenameShaderVariable(file.path.string(), "u_wave", "u_other", error));
+		};
+	};
+
 #ifndef __EMSCRIPTEN__
 	// Native only, for the reason the Shader suite gives: the web build fetches
 	// shader files over HTTP, which needs a browser.
