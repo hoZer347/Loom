@@ -426,6 +426,21 @@ TEST_SUITE("Mesh")
 
 		CHECK(layers[1] == replaced);
 
+		// A layer set between two others, and one grown in place, keep the rest.
+		mesh.SetUV<int>(1, std::vector<int>{ 3, 4 });
+		mesh.SetUV<glm::vec2>(0, { glm::vec2(1.0f, 2.0f), glm::vec2(3.0f, 4.0f) });
+		layers = mesh.UVLayers();
+
+		REQUIRE(layers.size() == 3);
+		CHECK(layers[0].words == 2);
+		CHECK(layers[0].values[3] == std::bit_cast<uint32_t>(4.0f));
+		const Loom::UVLayer between{ 1, 1, { 3u, 4u } };
+
+		CHECK(layers[1] == between);
+		CHECK(layers[2] == replaced);
+
+		mesh.ClearUV(1);
+		mesh.ClearUV(5);
 		mesh.ClearUV(0);
 		layers = mesh.UVLayers();
 
@@ -435,6 +450,19 @@ TEST_SUITE("Mesh")
 		mesh.ClearUV(2);
 
 		CHECK(mesh.UVLayers().empty());
+		CHECK(mesh.m_uvLayers->empty());
+
+		// Set all at once, the layers fall in order of id.
+		const Loom::UVLayer high{ 7, 1, { 5u } };
+		const Loom::UVLayer low{ 3, 2, { 6u, 7u } };
+		mesh.SetUVLayers({ high, low });
+
+		const std::vector<Loom::UVLayer> ordered{ low, high };
+
+		CHECK(mesh.UVLayers() == ordered);
+
+		mesh.SetUVLayers({ });
+
 		CHECK(mesh.m_uvLayers->empty());
 	};
 

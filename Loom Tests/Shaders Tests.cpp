@@ -508,9 +508,9 @@ TEST_SUITE("Shader")
 		CHECK(stages.vertex.find("layout(location = 4) in uvec4 loom_UV_1_0;\n") != std::string::npos);
 		CHECK(stages.vertex.find("layout(location = 5) in uvec4 loom_UV_1_1;\n") != std::string::npos);
 		CHECK(stages.vertex.find("layout(location = 6) in uvec4 loom_UV_4_0;\n") != std::string::npos);
-		CHECK(stages.vertex.find("struct loom_UV_1 { float weight; bool lit; ivec3 cell; };") != std::string::npos);
+		CHECK(stages.vertex.find("struct loom_UVLayer1 { float weight; bool lit; ivec3 cell; };") != std::string::npos);
 		CHECK(stages.vertex.find(
-			"#define UV_1 loom_UV_1(uintBitsToFloat(loom_UV_1_0.x), (loom_UV_1_0.y != 0u), "
+			"#define UV_1 loom_UVLayer1(uintBitsToFloat(loom_UV_1_0.x), (loom_UV_1_0.y != 0u), "
 			"ivec3(int(loom_UV_1_0.z), int(loom_UV_1_0.w), int(loom_UV_1_1.x)))\n") != std::string::npos);
 		CHECK(stages.vertex.find("#define UV_4 vec2(uintBitsToFloat(loom_UV_4_0.x), uintBitsToFloat(loom_UV_4_0.y))\n") != std::string::npos);
 

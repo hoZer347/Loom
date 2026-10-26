@@ -136,6 +136,11 @@ left, and `Save(name)` writes `<name>.png` to `Screenshots` beside the
 executable, which `main` empties as a run starts. A demo's review can show
 them with `review.ps1 -ShowImages`.
 
+The fixture takes a `Loom::Backend` after the size, OpenGL unless told
+otherwise, so a case can draw the same scene on Vulkan through a fixture of its
+own that passes `Loom::Backend::Vulkan`. Those cases need a Vulkan driver on
+the machine running them.
+
 These cases are desktop only, inside `#ifndef __EMSCRIPTEN__`, since node has
 no GL.
 

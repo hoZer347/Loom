@@ -831,7 +831,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		// A vertex stage's UV_<id> declarations, each turned into the
 		// attributes loom_UV_<id>_<slot> at the locations from
 		// Renderer::UVLayerLocation on, and a UV_<id> that reads them as the
-		// declared types.
+		// declared types, in a struct loom_UVLayer<id> when they are named.
 		struct UVDeclarations
 		{
 			uint32_t nextLocation = Renderer::UVLayerLocation;
@@ -967,12 +967,16 @@ vec3 LoomSceneNormal(ivec2 pixel)
 				if (!named)
 					return code + "#define UV_" + std::to_string(id) + ' ' + reads.front() + '\n';
 
-				code += "struct " + attribute + " {";
+				// Chrome's ANGLE on Direct3D fails to draw with a struct named
+				// as the start of an attribute's name, so the struct has its own.
+				const std::string type = "loom_UVLayer" + std::to_string(id);
+
+				code += "struct " + type + " {";
 
 				for (const Field& field : fields)
 					code += ' ' + field.type + ' ' + field.name + ';';
 
-				code += " };\n#define UV_" + std::to_string(id) + ' ' + attribute + '(';
+				code += " };\n#define UV_" + std::to_string(id) + ' ' + type + '(';
 
 				for (size_t i = 0; i < reads.size(); i++)
 					code += (i ? ", " : "") + reads[i];

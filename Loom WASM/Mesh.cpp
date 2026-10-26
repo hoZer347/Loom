@@ -19,6 +19,7 @@
 #include <climits>
 #include <cstring>
 #include <iostream>
+#include <optional>
 #include <utility>
 
 
@@ -91,6 +92,58 @@ namespace Loom
 				hash = Mixed(hash, std::bit_cast<uint32_t>(value));
 
 			return hash;
+		};
+
+		// Each layer m_uvLayers holds starts with its id, its words a vertex
+		// and its vertices.
+		constexpr size_t LAYER_ID = 0;
+		constexpr size_t LAYER_WORDS = 1;
+		constexpr size_t LAYER_VERTICES = 2;
+		constexpr size_t LAYER_HEADER = 3;
+
+		// Calls found with each whole layer in the words, in turn, with where
+		// its words start and end.
+		template <typename Found>
+		void EachLayer(const std::vector<unsigned int>& words, const Found& found)
+		{
+			for (size_t at = 0; at + LAYER_HEADER <= words.size(); )
+			{
+				const size_t length = (size_t)words[at + LAYER_WORDS] * words[at + LAYER_VERTICES];
+				const size_t first = at + LAYER_HEADER;
+
+				if (length > words.size() - first)
+					return;
+
+				found(words[at + LAYER_ID], words[at + LAYER_WORDS], first, first + length);
+				at = first + length;
+			};
+		};
+
+		// As many whole vertices as the layer holds.
+		void AppendLayer(std::vector<unsigned int>& words, const UVLayer& layer)
+		{
+			const size_t vertices = layer.words ? layer.values.size() / layer.words : 0;
+
+			words.insert(words.end(), { layer.id, layer.words, (unsigned int)vertices });
+			words.insert(words.end(), layer.values.begin(), layer.values.begin() + vertices * layer.words);
+		};
+
+		// Where the layer with the id starts and ends in the words, its id and
+		// all, or where it would go when there is none.
+		std::pair<size_t, size_t> LayerAt(const std::vector<unsigned int>& words, uint32_t id)
+		{
+			std::optional<std::pair<size_t, size_t>> at;
+			size_t end = 0;
+
+			EachLayer(words, [&](uint32_t other, uint32_t, size_t first, size_t last)
+			{
+				if (!at && other >= id)
+					at = { first - LAYER_HEADER, other == id ? last : first - LAYER_HEADER };
+
+				end = last;
+			});
+
+			return at.value_or(std::pair{ end, end });
 		};
 	};
 
@@ -247,9 +300,6 @@ namespace Loom
 			const bool hasNormals = normals.size() == count * NORMAL_COMPONENTS;
 			const bool hasColors = colors.size() == count * COLOR_COMPONENTS;
 
-			std::vector<UVLayer> layers = UVLayers();
-			std::erase_if(layers, [count](const UVLayer& layer) { return layer.values.size() != count * layer.words; });
-
 			VertexLayout layout = hasColors
 				? VertexFormat::PositionUVNormalColor
 				: hasNormals
@@ -258,8 +308,24 @@ namespace Loom
 						? VertexFormat::PositionUV
 						: VertexFormat::Position;
 
-			for (const UVLayer& layer : layers)
-				layout.layers.push_back({ layer.id, layer.words });
+			// Each layer with words for every vertex, read straight from m_uvLayers.
+			struct Drawn
+			{
+				uint32_t words;
+				const unsigned int* values;
+			};
+
+			const std::vector<unsigned int>& words = *std::as_const(m_uvLayers);
+			std::vector<Drawn> layers;
+
+			EachLayer(words, [&](uint32_t id, uint32_t perVertex, size_t first, size_t last)
+			{
+				if (perVertex && last - first == count * perVertex)
+				{
+					layers.push_back({ perVertex, words.data() + first });
+					layout.layers.push_back({ id, perVertex });
+				};
+			});
 
 			// Only vertices that can join a batch are worth hashing.
 			const bool batchable = *std::as_const(m_draw_type) == Static && !deformed;
@@ -295,9 +361,9 @@ namespace Loom
 						out = std::copy_n(colors.data() + i * COLOR_COMPONENTS, COLOR_COMPONENTS, out);
 
 					// Copied as bytes, so each word's bits arrive as they were.
-					for (const UVLayer& layer : layers)
+					for (const Drawn& layer : layers)
 					{
-						std::memcpy(out, layer.values.data() + i * layer.words, layer.words * sizeof(uint32_t));
+						std::memcpy(out, layer.values + i * layer.words, layer.words * sizeof(uint32_t));
 						out += layer.words;
 					};
 				};
@@ -310,78 +376,41 @@ namespace Loom
 		return true;
 	};
 
-	namespace
-	{
-		// Each layer m_uvLayers holds starts with its id, its words a vertex
-		// and its vertices.
-		constexpr size_t LAYER_ID = 0;
-		constexpr size_t LAYER_WORDS = 1;
-		constexpr size_t LAYER_VERTICES = 2;
-		constexpr size_t LAYER_HEADER = 3;
-
-		// Calls found with each whole layer in the words, in turn, with where
-		// its words start and end.
-		template <typename Found>
-		void EachLayer(const std::vector<unsigned int>& words, const Found& found)
-		{
-			for (size_t at = 0; at + LAYER_HEADER <= words.size(); )
-			{
-				const size_t length = (size_t)words[at + LAYER_WORDS] * words[at + LAYER_VERTICES];
-				const size_t first = at + LAYER_HEADER;
-
-				if (length > words.size() - first)
-					return;
-
-				found(words[at + LAYER_ID], words[at + LAYER_WORDS], first, first + length);
-				at = first + length;
-			};
-		};
-
-		// As many whole vertices as the layer holds.
-		void AppendLayer(std::vector<unsigned int>& words, const UVLayer& layer)
-		{
-			const size_t vertices = layer.words ? layer.values.size() / layer.words : 0;
-
-			words.insert(words.end(), { layer.id, layer.words, (unsigned int)vertices });
-			words.insert(words.end(), layer.values.begin(), layer.values.begin() + vertices * layer.words);
-		};
-	};
-
 	void Mesh::SetUVWords(const UVLayer& layer)
 	{
-		const std::vector<UVLayer> others = UVLayers();
 		std::vector<unsigned int>& words = *m_uvLayers;
+		const auto [first, last] = LayerAt(words, layer.id);
+		const size_t vertices = layer.words ? layer.values.size() / layer.words : 0;
+		const size_t length = LAYER_HEADER + vertices * layer.words;
 
+		if (length > last - first)
+			words.insert(words.begin() + last, length - (last - first), 0u);
+		else
+			words.erase(words.begin() + first + length, words.begin() + last);
+
+		words[first + LAYER_ID] = layer.id;
+		words[first + LAYER_WORDS] = layer.words;
+		words[first + LAYER_VERTICES] = (unsigned int)vertices;
+		std::copy_n(layer.values.begin(), vertices * layer.words, words.begin() + first + LAYER_HEADER);
+	};
+
+	void Mesh::SetUVLayers(std::vector<UVLayer> layers)
+	{
+		std::ranges::sort(layers, { }, &UVLayer::id);
+
+		std::vector<unsigned int>& words = *m_uvLayers;
 		words.clear();
 
-		bool placed = false;
-
-		for (const UVLayer& other : others)
-		{
-			if (!placed && other.id >= layer.id)
-			{
-				AppendLayer(words, layer);
-				placed = true;
-			};
-
-			if (other.id != layer.id)
-				AppendLayer(words, other);
-		};
-
-		if (!placed)
+		for (const UVLayer& layer : layers)
 			AppendLayer(words, layer);
 	};
 
 	void Mesh::ClearUV(uint32_t id)
 	{
-		const std::vector<UVLayer> layers = UVLayers();
 		std::vector<unsigned int>& words = *m_uvLayers;
+		const auto [first, last] = LayerAt(words, id);
 
-		words.clear();
-
-		for (const UVLayer& layer : layers)
-			if (layer.id != id)
-				AppendLayer(words, layer);
+		words.erase(words.begin() + first, words.begin() + last);
 	};
 
 	std::vector<UVLayer> Mesh::UVLayers() const

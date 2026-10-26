@@ -103,6 +103,10 @@ namespace Loom
 		// Sets a layer already packed into words, in place of any with its id.
 		void SetUVWords(const UVLayer& layer);
 
+		// Sets these layers in place of every one the mesh holds.
+		void SetUVLayers(std::vector<UVLayer> layers);
+
+		// Takes away the layer with the id, if there is one.
 		void ClearUV(uint32_t id);
 
 		// The layers set, by id.

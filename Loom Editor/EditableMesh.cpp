@@ -580,7 +580,7 @@ namespace Loom
 				if (layers == other.layers)
 					continue;
 
-				std::vector<uint32_t> theirs = std::move(corner.layers);
+				const std::vector<uint32_t> theirs = std::move(corner.layers);
 				corner.layers.assign(words, 0);
 
 				auto into = corner.layers.begin();

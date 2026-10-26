@@ -73,7 +73,7 @@ Derived from settled files: Loom WASM/Camera.h, Camera.cpp, Audio.h, Audio.cpp, 
 - British spelling (`colour`, `normalise`, `initialiser`).
 
 ## Shaders (.shader)
-- One file, sections marked `// ===SETTINGS===`, `// ===VERTEX===`, `// ===FRAGMENT===`; a one-line header comment.
+- One file, sections marked `// ===SETTINGS===`, `// ===VERTEX===`, `// ===FRAGMENT===`; a short header comment.
 - Settings as `key = value`. Uniforms `u_camelCase`, attributes `aPos`, output `FragColor`. Allman, tabs.
 
 ## PowerShell

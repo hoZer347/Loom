@@ -2080,11 +2080,7 @@ void main()
 		part.mesh->m_normals = std::move(normals);
 		part.mesh->m_colors = std::move(colors);
 
-		for (const UVLayer& layer : part.mesh->UVLayers())
-			part.mesh->ClearUV(layer.id);
-
-		for (const UVLayer& layer : part.editing.ToUVLayers())
-			part.mesh->SetUVWords(layer);
+		part.mesh->SetUVLayers(part.editing.ToUVLayers());
 
 		document.unsaved = true;
 

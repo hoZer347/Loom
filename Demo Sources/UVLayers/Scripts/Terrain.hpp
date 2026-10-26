@@ -146,13 +146,17 @@ namespace UVLayersScripts
 		};
 
 		Loom::Serial<int> m_cells = 48;
+		// Units across a cell.
 		Loom::Serial<float> m_cellSize = 0.4f;
+		// Units the main hills rise above, and fall below, the middle height.
 		Loom::Serial<float> m_hill = 1.2f;
 		Loom::Serial<float> m_frequency = 0.35f;
+		// Units of height each band spans.
 		Loom::Serial<float> m_bandHeight = 0.4f;
 		Loom::Serial<int> m_lineEvery = 8;
 		// Units a second the ring of glow spreads.
 		Loom::Serial<float> m_glowSpeed = 3.0f;
+		// Units from the ring's middle out to where its glow ends.
 		Loom::Serial<float> m_glowWidth = 1.0f;
 		Loom::Serial<std::string> m_shader = "Assets/Terrain.shader";
 

@@ -17,6 +17,7 @@
 #include "glm/gtc/matrix_transform.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -58,6 +59,7 @@ namespace
 		mesh->m_textureCoordinates = uvs;
 		mesh->m_normals = normals;
 		mesh->m_colors = colors;
+		mesh->SetUVLayers(shape.ToUVLayers());
 	};
 
 	// A prefab drawn with a mesh of the shape given on its top object, and
@@ -462,6 +464,61 @@ TEST_SUITE("ModelEditor")
 		const EditableMesh* mesh = reopened.Editing();
 		REQUIRE(mesh != nullptr);
 		CHECK(mesh->Bounds().second.y > 0.5f + TOLERANCE);
+	};
+
+	TEST_CASE("The Model panel saves an extrusion's walls with the UV layer words of the corners they rise from")
+	{
+		constexpr uint32_t LAYER = 1;
+		constexpr size_t POSITION_COMPONENTS = 3;
+		constexpr size_t WALLS = 4;
+		constexpr size_t CORNERS_PER_WALL = 6;
+
+		// A cube whose layer holds each corner's height as its word.
+		const EditableMesh cube = EditableMesh::Cube(1.0f);
+		std::vector<float> positions{ };
+		std::vector<float> uvs{ };
+		std::vector<float> normals{ };
+		std::vector<float> colors{ };
+		cube.ToTriangles(positions, uvs, normals, colors);
+
+		Loom::UVLayer heights{ LAYER, 1, { } };
+
+		for (size_t i = 1; i < positions.size(); i += POSITION_COMPONENTS)
+			heights.values.push_back(std::bit_cast<uint32_t>(positions[i]));
+
+		const EditableMesh layered = EditableMesh::FromTriangles(positions, uvs, normals, colors, { heights });
+		const uint32_t top = std::bit_cast<uint32_t>(0.5f);
+		const uint32_t bottom = std::bit_cast<uint32_t>(-0.5f);
+
+		Driven driven("model_save_layers", nullptr, WritePrefab("model_save_layers", &layered));
+
+		driven.editor.SetPick(ModelEditor::Pick::Faces);
+		driven.Click(driven.Screen(glm::vec3(0.1f, 0.5f, 0.1f)));
+		REQUIRE(driven.editor.Selected()->faces.size() == 1);
+
+		driven.editor.Extrude();
+		REQUIRE(driven.editor.Save());
+
+		ModelEditor reopened;
+		reopened.Open(driven.path);
+		LoomTests::Pump();
+
+		const EditableMesh* mesh = reopened.Editing();
+		REQUIRE(mesh != nullptr);
+
+		const std::vector<Loom::UVLayer> layers = mesh->ToUVLayers();
+		REQUIRE(layers.size() == 1);
+		CHECK(layers[0].id == LAYER);
+
+		std::vector<float> saved{ };
+		mesh->ToTriangles(saved, uvs, normals, colors);
+		REQUIRE(layers[0].values.size() == saved.size() / POSITION_COMPONENTS);
+
+		for (const uint32_t word : layers[0].values)
+			CHECK((word == top || word == bottom));
+
+		const auto tops = [top](const std::vector<uint32_t>& words) { return std::ranges::count(words, top); };
+		CHECK(tops(layers[0].values) == tops(heights.values) + WALLS * CORNERS_PER_WALL);
 	};
 
 	TEST_CASE("The Model panel adds a shape, deletes what is picked, and steps back through both")
