@@ -72,11 +72,10 @@ namespace Loom
 		constexpr float pingOutlineThickness = 2.0f;
 		constexpr float pingRounding = 3.0f;
 
-		// The Asset field picker's list: at least this wide, and this many
-		// rows tall.
-		constexpr float assetPickerMinWidth = 240.0f;
-		constexpr float assetPickerRows = 12.0f;
-		constexpr const char* ASSET_PICKER = "##asset_picker";
+		// A field picker's list: at least this wide, and this many rows tall.
+		constexpr float pickerMinWidth = 240.0f;
+		constexpr float pickerRows = 12.0f;
+		constexpr const char* PICKER = "##picker";
 
 		// How far NewShader, NewShader1, ... counts before leaving the name to
 		// the user to sort out.
@@ -2173,25 +2172,75 @@ namespace Loom
 		return nullptr;
 	};
 
+	void Editor::DrawPickerButton(const std::string& shown)
+	{
+		if (ImGui::Button((shown + "###picker").c_str(), ImVec2(ImGui::CalcItemWidth(), 0.0f)))
+		{
+			m_fieldPicker.ClearSearch();
+			ImGui::OpenPopup(PICKER);
+		};
+	};
+
+	bool Editor::BeginPicker(bool* appearing)
+	{
+		const ImVec2 under(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y);
+		const float width = (std::max)(ImGui::GetItemRectSize().x, pickerMinWidth);
+
+		ImGui::SetNextWindowPos(under, ImGuiCond_Appearing);
+
+		if (!ImGui::BeginPopup(PICKER))
+			return false;
+
+		const bool opened = ImGui::IsWindowAppearing();
+
+		if (appearing)
+			*appearing = opened;
+
+		if (opened)
+			ImGui::SetKeyboardFocusHere();
+
+		m_fieldPicker.DrawSearch();
+
+		ImGui::BeginChild("##choices", ImVec2(width, ImGui::GetFrameHeightWithSpacing() * pickerRows), ImGuiChildFlags_Borders);
+
+		return true;
+	};
+
+	void Editor::EndPicker()
+	{
+		ImGui::EndChild();
+		ImGui::EndPopup();
+	};
+
+	bool Editor::PickerRow(const std::string& id, const std::string& label, bool selected)
+	{
+		ImGuiTreeNodeFlags flags =
+			ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanAvailWidth;
+
+		if (selected)
+			flags |= ImGuiTreeNodeFlags_Selected;
+
+		ImGui::TreeNodeEx(("pick:" + id).c_str(), flags, "%s", label.c_str());
+
+		if (!ImGui::IsItemClicked(ImGuiMouseButton_Left))
+			return false;
+
+		ImGui::CloseCurrentPopup();
+
+		return true;
+	};
+
 	bool Editor::DrawAssetField(const SerializedField& field)
 	{
 		std::string& path = *(std::string*)field.data;
 
-		const std::string shown = path.empty()
+		DrawPickerButton(path.empty()
 			? std::string("None")
-			: std::string(IconOf(path)) + " " + std::filesystem::path(path).stem().string();
-
-		if (ImGui::Button((shown + "###asset").c_str(), ImVec2(ImGui::CalcItemWidth(), 0.0f)))
-		{
-			m_assetPicker.ClearSearch();
-			ImGui::OpenPopup(ASSET_PICKER);
-		};
+			: std::string(IconOf(path)) + " " + std::filesystem::path(path).stem().string());
 
 		if (!path.empty())
 			ImGui::SetItemTooltip("%s", path.c_str());
 
-		const ImVec2 under(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y);
-		const float width = (std::max)(ImGui::GetItemRectSize().x, assetPickerMinWidth);
 		const bool shader = field.extension == ProjectAssets::shaderExtension;
 
 		bool changed = false;
@@ -2215,43 +2264,23 @@ namespace Loom
 		if (shader)
 			changed |= AcceptShaderDrop(path);
 
-		ImGui::SetNextWindowPos(under, ImGuiCond_Appearing);
+		bool appearing = false;
 
-		if (!ImGui::BeginPopup(ASSET_PICKER))
+		if (!BeginPicker(&appearing))
 			return changed;
-
-		const bool appearing = ImGui::IsWindowAppearing();
-
-		if (appearing)
-			ImGui::SetKeyboardFocusHere();
-
-		m_assetPicker.DrawSearch();
-
-		ImGui::BeginChild("##assets", ImVec2(width, ImGui::GetFrameHeightWithSpacing() * assetPickerRows), ImGuiChildFlags_Borders);
 
 		const auto row = [&](const std::string& file, const std::string& label)
 		{
-			ImGuiTreeNodeFlags flags =
-				ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanAvailWidth;
-
-			if (file == path)
-				flags |= ImGuiTreeNodeFlags_Selected;
-
-			ImGui::TreeNodeEx(("pick:" + file).c_str(), flags, "%s", label.c_str());
+			const bool picked = PickerRow(file, label, file == path);
 
 			if (!file.empty())
 				ImGui::SetItemTooltip("%s", file.c_str());
 
-			if (!ImGui::IsItemClicked(ImGuiMouseButton_Left))
-				return;
-
-			if (file != path)
+			if (picked && file != path)
 			{
 				path = file;
 				changed = true;
 			};
-
-			ImGui::CloseCurrentPopup();
 		};
 
 		const auto label = [](const std::string& file, const std::string& name)
@@ -2275,7 +2304,7 @@ namespace Loom
 			hooks.create = nullptr;
 			hooks.item = [&](const std::string& name) { row(name, label(name, m_scriptEntries.at(name).label)); };
 
-			m_assetPicker.Draw(m_scriptFolders, ScriptsByLabel(names), hooks);
+			m_fieldPicker.Draw(m_scriptFolders, ScriptsByLabel(names), hooks);
 		}
 		else if (FileTab* tab = FileTabOf("file" + field.extension))
 		{
@@ -2291,7 +2320,7 @@ namespace Loom
 			hooks.create = nullptr;
 			hooks.item = [&](const std::string& file) { row(file, label(file, std::filesystem::path(file).filename().string())); };
 
-			m_assetPicker.Draw(tab->folders, tab->folders.Build(files), hooks);
+			m_fieldPicker.Draw(tab->folders, tab->folders.Build(files), hooks);
 		}
 		else
 		{
@@ -2307,11 +2336,10 @@ namespace Loom
 			hooks.arrange = false;
 			hooks.item = [&](const std::string& file) { row(file, label(file, file)); };
 
-			m_assetPicker.Draw(flat, flat.Build(files), hooks);
+			m_fieldPicker.Draw(flat, flat.Build(files), hooks);
 		};
 
-		ImGui::EndChild();
-		ImGui::EndPopup();
+		EndPicker();
 
 		return changed;
 	};

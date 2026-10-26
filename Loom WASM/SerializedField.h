@@ -171,6 +171,11 @@ namespace Loom
 		// hierarchy draws as the scene. Null when nothing fits.
 		LoomObject* ReferenceFor(LoomObject* object) const;
 
+		// Everything at or under top, a scene or a GameObject, that this field
+		// could hold, in the order the hierarchy draws them: the scene, then
+		// each GameObject before its components and its children.
+		std::vector<LoomObject*> ReferencesUnder(LoomObject& top) const;
+
 		#pragma endregion
 	};
 

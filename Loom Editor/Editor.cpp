@@ -638,51 +638,6 @@ namespace Loom
 				[data](const SerializedField& field) { return field.data == data; }) - fields.begin();
 		};
 
-		// Whether the field was cleared or given something dropped on it.
-		bool DrawReferenceField(const SerializedField& field)
-		{
-			LoomObject* target = field.GetReference();
-
-			const std::string shown = (target ? Describe(*target) : "none") + "###target";
-
-			const float spacing = ImGui::GetStyle().ItemInnerSpacing.x;
-			const float clear_width = ImGui::GetFrameHeight();
-
-			bool changed = false;
-
-			// A button for its frame: something the width of the other fields to
-			// drop onto, sharing that width with the clear button when there is
-			// something to clear.
-			ImGui::Button(
-				shown.c_str(),
-				ImVec2(ImGui::CalcItemWidth() - (target ? clear_width + spacing : 0.0f), 0.0f));
-
-			if (LoomObject* dropped = DraggedInto(field))
-				if (ImGui::BeginDragDropTarget())
-				{
-					if (ImGui::AcceptDragDropPayload(Editor::object_payload))
-					{
-						field.SetReference(dropped);
-						changed = true;
-					};
-
-					ImGui::EndDragDropTarget();
-				};
-
-			if (target)
-			{
-				ImGui::SameLine(0.0f, spacing);
-
-				if (ImGui::Button("x", ImVec2(clear_width, 0.0f)))
-				{
-					field.SetReference(nullptr);
-					changed = true;
-				};
-			};
-
-			return changed;
-		};
-
 		// An enum is stored as its underlying integer, which is one of these.
 		long long IntegerOf(const SerializedField& field)
 		{
@@ -3947,7 +3902,7 @@ namespace Loom
 				break;
 
 			case FieldType::Reference:
-				changed = DrawReferenceField(field);
+				changed = DrawReferenceField(object, field);
 				break;
 
 			case FieldType::Asset:
@@ -3996,6 +3951,85 @@ namespace Loom
 		DrawFieldGroup(GroupFields(object), draw_item);
 
 		ImGui::PopItemWidth();
+	};
+
+	bool Editor::DrawReferenceField(const LoomObject& object, const SerializedField& field)
+	{
+		LoomObject* target = field.GetReference();
+
+		DrawPickerButton(target ? Describe(*target) : "None");
+
+		bool changed = false;
+
+		if (LoomObject* dropped = DraggedInto(field))
+			if (ImGui::BeginDragDropTarget())
+			{
+				if (ImGui::AcceptDragDropPayload(Editor::object_payload))
+				{
+					field.SetReference(dropped);
+					changed = true;
+				};
+
+				ImGui::EndDragDropTarget();
+			};
+
+		if (!BeginPicker())
+			return changed;
+
+		const GameObject* holder = dynamic_cast<const GameObject*>(&object);
+
+		if (const ComponentBase* component = dynamic_cast<const ComponentBase*>(&object))
+			holder = component->GetGameObject();
+
+		GameObject* prefab = GetPrefabRoot();
+		std::vector<LoomObject*> tops{ };
+
+		if (holder && prefab && Hierarchy::Contains(*prefab, holder))
+			tops.push_back(prefab);
+		else if (Scene* scene = holder ? EditCommands::SceneOf(*holder) : nullptr)
+			tops.push_back(scene);
+		else
+			tops.assign(Scene::GetScenes().begin(), Scene::GetScenes().end());
+
+		VirtualFolders::Node listed{ };
+		std::unordered_map<std::string, LoomObject*> candidates{ };
+
+		for (LoomObject* top : tops)
+			for (LoomObject* candidate : field.ReferencesUnder(*top))
+			{
+				const std::string key = candidate->GetGuid().ToString();
+
+				listed.items.push_back(key);
+				candidates.emplace(key, candidate);
+			};
+
+		if (PickerRow("", "None", target == nullptr) && target != nullptr)
+		{
+			field.SetReference(nullptr);
+			changed = true;
+		};
+
+		VirtualFolders flat{ };
+
+		FolderTree::Hooks hooks{ };
+		hooks.arrange = false;
+		hooks.name = [&](const std::string& key) { return Describe(*candidates.at(key)); };
+		hooks.item = [&](const std::string& key)
+		{
+			LoomObject* candidate = candidates.at(key);
+
+			if (PickerRow(key, Describe(*candidate), candidate == target) && candidate != target)
+			{
+				field.SetReference(candidate);
+				changed = true;
+			};
+		};
+
+		m_fieldPicker.Draw(flat, listed, hooks);
+
+		EndPicker();
+
+		return changed;
 	};
 
 	#pragma endregion

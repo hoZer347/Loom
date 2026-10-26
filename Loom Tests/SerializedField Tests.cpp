@@ -814,6 +814,37 @@ TEST_SUITE("SerializedField")
 		CHECK(Field(values, Count).ReferenceFor(plain) == nullptr);
 	};
 
+	// What the editor's inspector offers to pick for a reference.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a reference lists what it could hold under a scene, in hierarchy order")
+	{
+		Loom::Scene scene("choices");
+		Pump();
+
+		Slots* slots = scene.GetRoot().Attach<Slots>();
+		Loom::GameObject* first = scene.AddChild("First");
+		Loom::GameObject* nested = first->AddChild("Nested");
+		Loom::GameObject* second = scene.AddChild("Second");
+		Loom::Material* rootMaterial = scene.GetRoot().Attach<Loom::Material>();
+		Loom::Material* nestedMaterial = nested->Attach<Loom::Material>();
+		Loom::Material* secondMaterial = second->Attach<Loom::Material>();
+		Pump();
+
+		using Found = std::vector<Loom::LoomObject*>;
+
+		CHECK(Field(*slots, 0).ReferencesUnder(scene) == Found{ &scene });
+		CHECK(Field(*slots, 1).ReferencesUnder(scene) == Found{ &scene.GetRoot(), first, nested, second });
+		CHECK(Field(*slots, 2).ReferencesUnder(scene) == Found{ rootMaterial, nestedMaterial, secondMaterial });
+
+		// Under a GameObject, as a prefab's root is.
+		CHECK(Field(*slots, 1).ReferencesUnder(*first) == Found{ first, nested });
+		CHECK(Field(*slots, 2).ReferencesUnder(*first) == Found{ nestedMaterial });
+
+		EveryField values;
+		Pump();
+
+		CHECK(Field(values, Count).ReferencesUnder(scene).empty());
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a field counts its changes, and looking at it through const is not one")
 	{
 		Counted counted;

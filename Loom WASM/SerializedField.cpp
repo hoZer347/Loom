@@ -506,5 +506,43 @@ namespace Loom
 		return nullptr;
 	};
 
+	std::vector<LoomObject*> SerializedField::ReferencesUnder(LoomObject& top) const
+	{
+		std::vector<LoomObject*> found{ };
+
+		if (accepts_reference == nullptr)
+			return found;
+
+		std::vector<GameObject*> pending{ };
+
+		if (Scene* scene = dynamic_cast<Scene*>(&top))
+		{
+			if (accepts_reference(scene))
+				found.push_back(scene);
+
+			pending.push_back(&scene->GetRoot());
+		}
+		else if (GameObject* gameObject = dynamic_cast<GameObject*>(&top))
+			pending.push_back(gameObject);
+
+		while (!pending.empty())
+		{
+			GameObject* gameObject = pending.back();
+			pending.pop_back();
+
+			if (accepts_reference(gameObject))
+				found.push_back(gameObject);
+
+			for (ComponentBase* component : gameObject->GetComponents())
+				if (accepts_reference(component))
+					found.push_back(component);
+
+			const std::vector<GameObject*>& children = gameObject->GetChildren();
+			pending.insert(pending.end(), children.rbegin(), children.rend());
+		};
+
+		return found;
+	};
+
 	#pragma endregion
 };
