@@ -4,6 +4,7 @@
 
 #include "ModelEditor.h"
 #include "Prefabs.h"
+#include "UiScript.h"
 
 #include "GameObject.h"
 #include "Material.h"
@@ -170,6 +171,23 @@ namespace
 		void Click(const ImVec2& at)
 		{
 			Drag(at, at);
+		};
+
+		// Frames until a UiScript of text has run, aiming at what the panel draws.
+		void Run(const std::string& text)
+		{
+			constexpr int most_frames = 600;
+
+			Loom::UiScript script{ std::filesystem::path() };
+			script.LoadText(text);
+
+			for (int frame = 0; frame < most_frames && !script.Finished(); frame++)
+			{
+				script.Step();
+				Frame();
+			};
+
+			CHECK_FALSE(script.Failed());
 		};
 
 		void Key(ImGuiKey key)
@@ -760,5 +778,15 @@ TEST_SUITE("ModelEditor")
 
 		CHECK(driven.editor.Editing() == nullptr);
 		CHECK(captured.Says(driven.path));
+	};
+
+	TEST_CASE("The Model panel's ? opens its controls in a popup")
+	{
+		Driven driven("model_controls");
+		REQUIRE_FALSE(ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId));
+
+		driven.Run("click \"Model\" \"?\"\nwait 2\n");
+
+		CHECK(ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId));
 	};
 };
