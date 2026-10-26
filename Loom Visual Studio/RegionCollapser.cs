@@ -33,7 +33,7 @@ namespace LoomVisualStudio
 			if (manager == null)
 				return;
 
-			void Collapse(object sender, RegionsChangedEventArgs e) => CollapseRegions(manager, e.AffectedSpan);
+			void Collapse(object sender, RegionsChangedEventArgs e) => CollapseRegions(view, manager, e.AffectedSpan);
 
 			void Stop(object sender, EventArgs e)
 			{
@@ -48,14 +48,23 @@ namespace LoomVisualStudio
 			view.TextBuffer.Changed += Stop;
 			view.Closed += Stop;
 
-			CollapseRegions(manager, new SnapshotSpan(view.TextSnapshot, 0, view.TextSnapshot.Length));
+			CollapseRegions(view, manager, new SnapshotSpan(view.TextSnapshot, 0, view.TextSnapshot.Length));
 		}
 
-		static void CollapseRegions(IOutliningManager manager, SnapshotSpan span)
+		// A region holding the caret stays open, so a file opened at a line,
+		// by Go To Definition or a breakpoint, shows that line.
+		static void CollapseRegions(IWpfTextView view, IOutliningManager manager, SnapshotSpan span)
 		{
+			SnapshotPoint caret = view.Caret.Position.BufferPosition.TranslateTo(span.Snapshot, PointTrackingMode.Positive);
+
 			manager.CollapseAll(span, region =>
 			{
-				string line = region.Extent.GetStartPoint(span.Snapshot).GetContainingLine().GetText().TrimStart();
+				SnapshotSpan extent = region.Extent.GetSpan(span.Snapshot);
+
+				if (caret >= extent.Start && caret <= extent.End)
+					return false;
+
+				string line = extent.Start.GetContainingLine().GetText().TrimStart();
 				return directives.Any(directive => line.StartsWith(directive, StringComparison.Ordinal));
 			});
 		}
