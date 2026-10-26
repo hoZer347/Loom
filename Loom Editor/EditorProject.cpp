@@ -245,15 +245,15 @@ namespace Loom
 		// The scenes and prefabs, and the folders they are in: folders first,
 		// then files, each alphabetically. Dot-prefixed folders (.vs) and the
 		// build output are left out, and so is a folder whose files are all
-		// something else, though an empty one stays, as a new folder is. The
-		// other files the game uses, which the Scripts tab and the FileTabs
-		// list, go in others. Whether there were files under folder.
+		// something else, though an empty one stays, as a new folder is. Every
+		// file, those included, goes in files. Whether there were files under
+		// folder.
 		bool Scan(
 			const std::filesystem::path& folder,
 			const std::filesystem::path& skip,
 			AssetNode& node,
 			std::vector<std::string>& scenes,
-			std::vector<std::string>& others)
+			std::vector<std::string>& files)
 		{
 			std::error_code code;
 			bool held = false;
@@ -273,7 +273,7 @@ namespace Loom
 					if (path == skip)
 						continue;
 
-					const bool held_files = Scan(path, skip, child, scenes, others);
+					const bool held_files = Scan(path, skip, child, scenes, files);
 
 					held = held || held_files;
 
@@ -283,16 +283,12 @@ namespace Loom
 				else
 				{
 					held = true;
+					files.push_back(child.path);
 
 					const bool scene = path.extension() == SceneSerializer::extension;
 
 					if (!scene && path.extension() != Prefab::extension)
-					{
-						if (ProjectAssets::IsGameFile(name) || IsModelFile(name))
-							others.push_back(child.path);
-
 						continue;
-					};
 
 					child.icon = IconOf(child.path);
 
@@ -672,6 +668,7 @@ namespace Loom
 			m_projectWatch.Watch(m_projectPath, false);
 
 		m_projectScenes.clear();
+		m_projectFiles.clear();
 		m_projectShaders.clear();
 		m_noThumbnail.clear();
 
@@ -686,17 +683,21 @@ namespace Loom
 				? std::filesystem::path(m_scripts.GetLibrary()).parent_path().lexically_normal()
 				: std::filesystem::path();
 
-			std::vector<std::string> others{ };
+			std::vector<std::string> files{ };
 
-			Scan(m_projectPath, build, m_assets, m_projectScenes, others);
+			Scan(m_projectPath, build, m_assets, m_projectScenes, files);
 
 			std::sort(m_projectScenes.begin(), m_projectScenes.end());
 
-			for (const std::string& file : others)
+			for (const std::string& file : files)
+			{
+				m_projectFiles.push_back(ProjectAssets::RelativeTo(file, m_projectPath));
+
 				if (FileTab* tab = FileTabOf(file))
-					tab->files.push_back(ProjectAssets::RelativeTo(file, m_projectPath));
+					tab->files.push_back(m_projectFiles.back());
 				else if (ProjectAssets::IsShaderFile(file))
 					m_projectShaders.push_back(file);
+			};
 		};
 
 		// After the scan, which finds the shaders.
@@ -2181,6 +2182,7 @@ namespace Loom
 
 			FolderTree::Hooks hooks = ScriptFolderHooks();
 			hooks.reveal = [&](const std::string& folder) { return appearing && VirtualFolders::IsAtOrUnder(m_scriptFolders.FolderOf(path), folder); };
+			hooks.arrange = false;
 			hooks.create = nullptr;
 			hooks.item = [&](const std::string& name) { row(name, label(name, m_scriptEntries.at(name).label)); };
 
@@ -2196,10 +2198,27 @@ namespace Loom
 
 			FolderTree::Hooks hooks = FileFolderHooks(*tab);
 			hooks.reveal = [&](const std::string& folder) { return appearing && VirtualFolders::IsAtOrUnder(tab->folders.FolderOf(path), folder); };
+			hooks.arrange = false;
 			hooks.create = nullptr;
 			hooks.item = [&](const std::string& file) { row(file, label(file, std::filesystem::path(file).filename().string())); };
 
 			m_assetPicker.Draw(tab->folders, tab->folders.Build(files), hooks);
+		}
+		else
+		{
+			std::vector<std::string> files{ };
+
+			for (const std::string& file : m_projectFiles)
+				if (file.ends_with(field.extension))
+					files.push_back(file);
+
+			VirtualFolders flat{ };
+
+			FolderTree::Hooks hooks{ };
+			hooks.arrange = false;
+			hooks.item = [&](const std::string& file) { row(file, label(file, file)); };
+
+			m_assetPicker.Draw(flat, flat.Build(files), hooks);
 		};
 
 		ImGui::EndChild();

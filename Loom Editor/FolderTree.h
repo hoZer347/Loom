@@ -48,6 +48,10 @@ namespace Loom
 			// Whether a folder must be open, to show something in it.
 			std::function<bool(const std::string& folder)> reveal{ };
 
+			// Whether its folders can be renamed, removed and dragged, which a
+			// picker's cannot.
+			bool arrange = true;
+
 			// The top of a folder's right-click menu, which makes things in it.
 			std::function<void(const std::string& folder)> create{ };
 

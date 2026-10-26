@@ -46,20 +46,20 @@ namespace Loom
 			EditorIcons::Folder,
 			renaming ? "" : node.name.c_str());
 
-		if (!renaming && ImGui::BeginDragDropSource())
+		if (hooks.arrange && !renaming && ImGui::BeginDragDropSource())
 		{
 			ImGui::SetDragDropPayload(hooks.folder_payload, node.path.c_str(), node.path.size() + 1);
 			ImGui::Text("%s %s", EditorIcons::Folder, node.name.c_str());
 			ImGui::EndDragDropSource();
 		};
 
-		if (ImGui::BeginDragDropTarget())
+		if (hooks.arrange && ImGui::BeginDragDropTarget())
 		{
 			Drop(folders, node.path, hooks);
 			ImGui::EndDragDropTarget();
 		};
 
-		if (ImGui::BeginPopupContextItem())
+		if (hooks.arrange && ImGui::BeginPopupContextItem())
 		{
 			if (hooks.create)
 			{

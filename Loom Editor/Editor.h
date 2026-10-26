@@ -386,7 +386,8 @@ namespace Loom
 
 		// An Asset field: the file it names, which a click swaps for another
 		// picked from the project's files of the field's extension, filed as
-		// the tab holding them files them, shaders as the Scripts tab does.
+		// the tab holding them files them, shaders as the Scripts tab does,
+		// and by their paths where no tab holds them.
 		// Takes such a file dragged onto it. Whether it changed.
 		bool DrawAssetField(const SerializedField& field);
 
@@ -931,6 +932,10 @@ namespace Loom
 		double m_shadersPolled = 0.0;
 		std::string m_projectName{ };
 		std::vector<std::string> m_projectScenes{ };
+
+		// Every file in the project from the last scan, by its path from the
+		// project folder.
+		std::vector<std::string> m_projectFiles{ };
 
 		// The shaders from the last scan, which the Scripts tab lists.
 		std::vector<std::string> m_projectShaders{ };
