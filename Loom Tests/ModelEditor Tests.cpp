@@ -783,6 +783,7 @@ TEST_SUITE("ModelEditor")
 	TEST_CASE("The Model panel's ? opens its controls in a popup")
 	{
 		Driven driven("model_controls");
+
 		REQUIRE_FALSE(ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId));
 
 		driven.Run("click \"Model\" \"?\"\nwait 2\n");
