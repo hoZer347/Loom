@@ -70,9 +70,11 @@ namespace Loom
 		constexpr float dot_half_size = 3.5f;
 		constexpr float joint_half_size = 5.0f;
 
-		// How near a joint's position or size, back out of its matrix, is
-		// taken to be the one it had, so a turn writes no rounding into them.
+		// How near a joint's position, size or turn in degrees, back out of
+		// its matrix, is taken to be the one it had, so changing one of them
+		// writes no rounding into the others.
 		constexpr float pose_tolerance = 1e-5f;
+		constexpr float turn_tolerance = 1e-3f;
 		constexpr float wire_half_width = 0.6f;
 		constexpr float picked_wire_half_width = 1.4f;
 		constexpr float handle_length = 90.0f;
@@ -697,10 +699,10 @@ void main()
 		document.unwritten.clear();
 		document.unsaved = false;
 		document.message = "Saved.";
+		document.messageTime = ImGui::GetTime();
 
 		for (size_t i = 0; i < poses.size(); i++)
 			document.joints[i].saved = poses[i];
-		document.messageTime = ImGui::GetTime();
 
 		m_saved.push_back(document.path);
 
@@ -2149,7 +2151,7 @@ void main()
 			return triangles;
 		};
 
-		const auto pointsOf = [&](const std::set<uint32_t>& vertices)
+		const auto points_of = [&](const std::set<uint32_t>& vertices)
 		{
 			std::vector<glm::vec3> at{ };
 
@@ -2180,7 +2182,7 @@ void main()
 		if (document.pick == Pick::Vertices)
 		{
 			draw(dots(points, dot_half_size), wire_colour);
-			draw(dots(pointsOf(document.selection.vertices), dot_half_size), picked_colour);
+			draw(dots(points_of(document.selection.vertices), dot_half_size), picked_colour);
 
 			if (document.hoveredVertex)
 				draw(dots({ points[*document.hoveredVertex] }, dot_half_size), hovered_colour);
@@ -2310,6 +2312,11 @@ void main()
 		// as they come back out of its matrix.
 		const bool moving = glm::mat3(change) == glm::mat3(1.0f);
 
+		const auto kept = [](const glm::vec3& from, const glm::vec3& to, float tolerance)
+		{
+			return glm::all(glm::lessThan(glm::abs(to - from), glm::vec3(tolerance))) ? from : to;
+		};
+
 		for (const uint32_t index : document.selection.joints)
 		{
 			GameObject* joint = document.joints[index].object;
@@ -2325,12 +2332,7 @@ void main()
 
 			const glm::mat4 local = glm::inverse(parent ? parent->WorldMatrix() : glm::mat4(1.0f)) * change * joint->WorldMatrix();
 
-			const auto kept = [](const glm::vec3& from, const glm::vec3& to)
-			{
-				return glm::all(glm::lessThan(glm::abs(to - from), glm::vec3(pose_tolerance))) ? from : to;
-			};
-
-			joint->transform.position = kept(*std::as_const(joint->transform.position), glm::vec3(local[3]));
+			joint->transform.position = kept(*std::as_const(joint->transform.position), glm::vec3(local[3]), pose_tolerance);
 
 			if (moving)
 				continue;
@@ -2338,8 +2340,8 @@ void main()
 			const glm::vec3 scale(glm::length(glm::vec3(local[0])), glm::length(glm::vec3(local[1])), glm::length(glm::vec3(local[2])));
 			const glm::mat3 turn(glm::vec3(local[0]) / scale.x, glm::vec3(local[1]) / scale.y, glm::vec3(local[2]) / scale.z);
 
-			joint->transform.rotation = Transform::EulerDegrees(glm::quat_cast(turn));
-			joint->transform.scale = kept(*std::as_const(joint->transform.scale), scale);
+			joint->transform.rotation = kept(*std::as_const(joint->transform.rotation), Transform::EulerDegrees(glm::quat_cast(turn)), turn_tolerance);
+			joint->transform.scale = kept(*std::as_const(joint->transform.scale), scale, pose_tolerance);
 		};
 	};
 

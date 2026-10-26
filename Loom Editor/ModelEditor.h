@@ -37,8 +37,9 @@ namespace Loom
 	* - Every action has a button, named and greyed out until it can be used,
 	*   and the line along the bottom says what the mouse would do. Ctrl+Z and
 	*   Ctrl+Y step back and forward an action at a time
-	* - Ctrl+S writes the meshes and the joints' poses back into the prefab,
-	*   and every instance of it picks the change up
+	* - Ctrl+S writes the meshes and the joints' poses back into the prefab.
+	*   Every instance of it picks up the meshes, but one already placed
+	*   keeps its own joints' poses
 	*/
 	struct ModelEditor final
 	{

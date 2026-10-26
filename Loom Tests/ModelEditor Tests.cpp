@@ -760,7 +760,9 @@ TEST_SUITE("ModelEditor")
 
 	TEST_CASE("The Model panel moves and turns a picked joint with those under it")
 	{
-		// A quarter of the way round the outer ring.
+		// How far handles are dragged, in screen pixels, and a quarter of the
+		// way round the outer ring.
+		constexpr float pull = 40.0f;
 		constexpr float ring = 112.5f;
 
 		Driven driven("model_joint_turn", nullptr, WriteJointedPrefab("model_joint_turn"));
@@ -780,7 +782,6 @@ TEST_SUITE("ModelEditor")
 		const ImVec2 right((aside.x - middle.x) / across, (aside.y - middle.y) / across);
 
 		constexpr float grab = 60.0f;
-		constexpr float pull = 40.0f;
 
 		driven.Drag(ImVec2(middle.x + right.x * grab, middle.y + right.y * grab), ImVec2(middle.x + right.x * (grab + pull), middle.y + right.y * (grab + pull)));
 
@@ -806,6 +807,19 @@ TEST_SUITE("ModelEditor")
 		// Turned about itself, so where it is and its size are as they were.
 		CHECK(*hinge->transform.position == hinged);
 		CHECK(*hinge->transform.scale == glm::vec3(1.0f));
+
+		// Sized under the turned Hinge, Tip keeps its own turn.
+		driven.editor.SelectNone();
+		driven.Click(driven.Screen(Placed(*tip)));
+		REQUIRE(driven.editor.Selected()->joints == std::set<uint32_t>{ 1 });
+
+		const ImVec2 sized = driven.Screen(Placed(*tip));
+
+		driven.editor.SetTool(ModelEditor::Tool::Scale);
+		driven.Drag(sized, ImVec2(sized.x + pull, sized.y - pull));
+
+		CHECK((*tip->transform.scale).x > 1.0f + TOLERANCE);
+		CHECK(*tip->transform.rotation == glm::vec3(0.0f));
 	};
 
 	TEST_CASE("The Model panel saves the joints posed into the prefab, and only those")
