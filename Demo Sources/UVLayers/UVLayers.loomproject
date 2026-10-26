@@ -1,0 +1,3 @@
+name=UVLayers
+scripts=Scripts/UVLayersScripts.vcxproj
+library=Build/UVLayersScripts.dll

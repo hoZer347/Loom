@@ -1,0 +1,30 @@
+Main(35dc2c83-6467-4fb5-95b5-fcf417b09630):
+	GameObject Root(2d74362d-5cb7-49af-a586-98199e833bc3)
+		0 = 0
+		1 = false
+		GameObject Camera(9c06f8d0-1993-4e06-8808-13149e105031)
+			0 = 0
+			1 = false
+			2 = (0, 15, 19)
+			Component Camera(a1a620f9-34e8-488c-b533-db0e3c19bb9c)
+				0 = true
+				1 = (0, 0, 0)
+				2 = 45
+				3 = 0.1
+				4 = 100
+		GameObject Sun(136de249-befe-4985-b08c-e0ff2ec25fdf)
+			0 = 0
+			1 = false
+			Component Light(6036269f-c7f6-4494-b521-efb6dab6f791)
+				0 = (-0.6, -1, -0.4)
+				1 = (1, 1, 1)
+				2 = 1
+				3 = 0.3
+				4 = true
+				5 = 2048
+				6 = (0, 0, 0)
+				7 = 11
+		GameObject Terrain(2d7ce2d1-aa19-451e-895f-c59beaffe4d9)
+			0 = 0
+			1 = false
+			Component Terrain(dca9918f-a8f5-472c-9673-db1bc74fcec8)
