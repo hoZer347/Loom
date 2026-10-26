@@ -134,6 +134,40 @@ namespace Loom
 			return true;
 		};
 
+		enum CardLayer { CARD_BACK, CARD_CONTENTS, CARD_LAYERS };
+
+		// Of the space around a card's contents, as far out as the window draws.
+		constexpr float CARD_REACH = 0.5f;
+
+		// What follows is drawn over a card of its own, which EndCard puts
+		// behind it, so where one variable ends and the next begins shows.
+		void BeginCard(ImDrawListSplitter& card)
+		{
+			ImDrawList* draw = ImGui::GetWindowDrawList();
+			card.Split(draw, CARD_LAYERS);
+			card.SetCurrentChannel(draw, CARD_CONTENTS);
+			ImGui::BeginGroup();
+		};
+
+		void EndCard(ImDrawListSplitter& card)
+		{
+			ImGui::EndGroup();
+
+			ImDrawList* draw = ImGui::GetWindowDrawList();
+			card.SetCurrentChannel(draw, CARD_BACK);
+
+			const ImGuiStyle& style = ImGui::GetStyle();
+			const ImVec2 contents_min = ImGui::GetItemRectMin();
+			const ImVec2 contents_max = ImGui::GetItemRectMax();
+			const ImVec2 margin(style.WindowPadding.x * CARD_REACH, style.ItemSpacing.y * CARD_REACH);
+			const ImVec2 min(contents_min.x - margin.x, contents_min.y - margin.y);
+			const ImVec2 max(contents_max.x + margin.x, contents_max.y + margin.y);
+
+			draw->AddRectFilled(min, max, ImGui::GetColorU32(ImGuiCol_TableHeaderBg), style.FrameRounding);
+			draw->AddRect(min, max, ImGui::GetColorU32(ImGuiCol_Border), style.FrameRounding);
+			card.Merge(draw);
+		};
+
 		// Every Material on the object or under it, disabled ones included.
 		template <typename Visit>
 		void EachMaterial(GameObject& gameObject, const Visit& visit)
@@ -244,8 +278,14 @@ namespace Loom
 			// Under the variable's row, across the inspector, so a vector's
 			// components have room. Its table shares the others' ID, and with
 			// it their columns' widths.
+			ImDrawListSplitter card;
+			BeginCard(card);
+
 			if (!BeginVariableRow())
+			{
+				EndCard(card);
 				continue;
+			};
 
 			ImGui::PushID(variable.name.c_str());
 
@@ -330,6 +370,8 @@ namespace Loom
 				SetLocal(variable.name, local);
 
 			ImGui::PopID();
+			EndCard(card);
+			ImGui::Spacing();
 		};
 
 		if (BeginVariableRow())
