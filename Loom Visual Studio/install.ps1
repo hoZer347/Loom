@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
     Builds the Loom Visual Studio extension and installs it, adding
-    Add > Loom Script... to a Loom project's scripts in Solution Explorer.
+    Add > Loom Script... to a Loom project's scripts in Solution Explorer, and
+    opening every file with its #pragma region and #region blocks collapsed.
 
 .NOTES
     Takes effect the next time Visual Studio starts.
