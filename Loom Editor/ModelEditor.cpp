@@ -348,18 +348,7 @@ void main()
 		// Every shader the project of the prefab has, relative to the project, in order.
 		std::vector<std::string> ProjectShaders(const std::string& prefab)
 		{
-			const std::filesystem::path folder = ProjectFolder(prefab);
-			std::vector<std::string> shaders{ };
-			std::error_code code;
-
-			if (!folder.empty())
-				for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator(folder, code))
-					if (entry.path().extension() == ProjectAssets::shaderExtension)
-						shaders.push_back(entry.path().lexically_relative(folder).generic_string());
-
-			std::sort(shaders.begin(), shaders.end());
-
-			return shaders;
+			return ProjectAssets::ShadersIn(ProjectFolder(prefab).string());
 		};
 
 		// The shader another mesh of the prefab draws with, so a mesh added to
@@ -376,20 +365,6 @@ void main()
 			return "";
 		};
 
-		// Failing that, the shader a new project draws with, or else the first
-		// the project of the prefab has, relative to the project.
-		std::string ProjectShader(const std::string& prefab)
-		{
-			const std::filesystem::path folder = ProjectFolder(prefab);
-			std::error_code code;
-
-			if (folder.empty() || std::filesystem::exists(folder / ProjectTemplate::shader_path, code))
-				return ProjectTemplate::shader_path;
-
-			const std::vector<std::string> shaders = ProjectShaders(prefab);
-
-			return shaders.empty() ? ProjectTemplate::shader_path : shaders.front();
-		};
 	};
 
 	ModelEditor::~ModelEditor()
@@ -2059,18 +2034,7 @@ void main()
 	{
 		Part& part = document.parts[document.part];
 
-		std::vector<float> positions{ };
-		std::vector<float> uvs{ };
-		std::vector<float> normals{ };
-		std::vector<float> colors{ };
-		part.editing.ToTriangles(positions, uvs, normals, colors);
-
-		part.mesh->m_vertices = std::move(positions);
-		part.mesh->m_textureCoordinates = std::move(uvs);
-		part.mesh->m_normals = std::move(normals);
-		part.mesh->m_colors = std::move(colors);
-
-		part.mesh->SetUVLayers(part.editing.ToUVLayers());
+		part.editing.WriteTo(*part.mesh);
 
 		document.unsaved = true;
 
@@ -2326,7 +2290,7 @@ void main()
 		if (document->root->GetComponent<Material>() == nullptr)
 		{
 			const std::string shader = ShaderOf(*document->root);
-			document->root->Attach<Material>()->SetShaderPath(shader.empty() ? ProjectShader(document->path) : shader);
+			document->root->Attach<Material>()->SetShaderPath(shader.empty() ? ProjectAssets::ProjectShader(ProjectFolder(document->path).string()) : shader);
 		};
 
 		Mesh* mesh = document->root->Attach<Mesh>(Mesh::Triangles);

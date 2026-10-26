@@ -138,6 +138,14 @@ namespace Loom
 		// The whole file, or an empty string when it cannot be read.
 		static std::string ReadText(const std::string& path);
 
+		// Every shader under the project folder, relative to it with / between
+		// folders, in order.
+		static std::vector<std::string> ShadersIn(const std::string& folder);
+
+		// The shader a new project draws with, or else the first the project
+		// folder has. The new project's for no folder.
+		static std::string ProjectShader(const std::string& folder);
+
 		// What the first <tag> in an MSBuild project holds, or an empty string.
 		static std::string Element(const std::string& xml, const std::string& tag);
 	};

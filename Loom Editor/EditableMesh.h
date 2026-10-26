@@ -14,6 +14,8 @@
 
 namespace Loom
 {
+	struct Mesh;
+
 	/**
 	* Loom::EditableMesh
 	* - A Mesh's triangles as the Model panel edits them: corners that sat at
@@ -64,6 +66,9 @@ namespace Loom
 
 		// The UV layers, a vertex for each ToTriangles gives.
 		std::vector<UVLayer> ToUVLayers() const;
+
+		// Both into the Mesh, in place of what it drew.
+		void WriteTo(Mesh& mesh) const;
 
 		// Centred on the origin, with flat normals and each face's UVs spanning
 		// the texture.

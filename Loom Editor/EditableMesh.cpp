@@ -1,5 +1,7 @@
 #include "EditableMesh.h"
 
+#include "Mesh.h"
+
 #include "glm/gtc/constants.hpp"
 
 #include <algorithm>
@@ -164,6 +166,22 @@ namespace Loom
 			};
 
 		return out;
+	};
+
+	void EditableMesh::WriteTo(Mesh& mesh) const
+	{
+		std::vector<float> positions{ };
+		std::vector<float> uvs{ };
+		std::vector<float> normals{ };
+		std::vector<float> colors{ };
+		ToTriangles(positions, uvs, normals, colors);
+
+		mesh.m_vertices = std::move(positions);
+		mesh.m_textureCoordinates = std::move(uvs);
+		mesh.m_normals = std::move(normals);
+		mesh.m_colors = std::move(colors);
+
+		mesh.SetUVLayers(ToUVLayers());
 	};
 
 	uint32_t EditableMesh::AddFace(const std::vector<uint32_t>& corners, const std::vector<glm::vec2>& uvs)

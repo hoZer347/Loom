@@ -2,6 +2,7 @@
 
 #include "ComponentRegistry.h"
 #include "Prefab.h"
+#include "ProjectTemplate.h"
 #include "SceneSerializer.h"
 #include "SpriteAsset.h"
 
@@ -345,6 +346,33 @@ void main()
 		std::ifstream in(path, std::ios::binary);
 
 		return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+	};
+
+	std::vector<std::string> ProjectAssets::ShadersIn(const std::string& folder)
+	{
+		std::vector<std::string> shaders{ };
+		std::error_code code;
+
+		if (!folder.empty())
+			for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator(folder, code))
+				if (entry.path().extension() == shaderExtension)
+					shaders.push_back(entry.path().lexically_relative(folder).generic_string());
+
+		std::sort(shaders.begin(), shaders.end());
+
+		return shaders;
+	};
+
+	std::string ProjectAssets::ProjectShader(const std::string& folder)
+	{
+		std::error_code code;
+
+		if (folder.empty() || std::filesystem::exists(std::filesystem::path(folder) / ProjectTemplate::shader_path, code))
+			return ProjectTemplate::shader_path;
+
+		const std::vector<std::string> shaders = ShadersIn(folder);
+
+		return shaders.empty() ? ProjectTemplate::shader_path : shaders.front();
 	};
 
 	std::string ProjectAssets::Element(const std::string& xml, const std::string& tag)

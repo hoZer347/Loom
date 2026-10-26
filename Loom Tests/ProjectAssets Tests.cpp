@@ -1,6 +1,7 @@
 #include "doctest.h"
 
 #include "ProjectAssets.h"
+#include "ProjectTemplate.h"
 
 #include "Utilities/StateReference.h"
 
@@ -381,5 +382,27 @@ TEST_SUITE("ProjectAssets")
 		CHECK(Loom::ProjectAssets::Relocate((root / "Sprites" / "Hero.png").string(), from, to) == (root / "Art" / "Sprites" / "Hero.png").string());
 		CHECK(Loom::ProjectAssets::Relocate((root / "SpritesOld" / "Hero.png").string(), from, to) == (root / "SpritesOld" / "Hero.png").string());
 		CHECK(Loom::ProjectAssets::Relocate((root / "Scenes" / "Main.loomscene").string(), from, to) == (root / "Scenes" / "Main.loomscene").string());
+	};
+
+	TEST_CASE("a project draws with a new project's shader while it has one, or else its first")
+	{
+		const std::filesystem::path root = std::filesystem::temp_directory_path() / "loom project assets shader";
+		std::filesystem::remove_all(root);
+		std::filesystem::create_directories(root / "Assets" / "Units");
+
+		CHECK(Loom::ProjectAssets::ProjectShader("") == Loom::ProjectTemplate::shader_path);
+		CHECK(Loom::ProjectAssets::ProjectShader(root.string()) == Loom::ProjectTemplate::shader_path);
+
+		std::ofstream(root / "Assets" / "Units" / "Tank.shader") << "tank";
+		std::ofstream(root / "Assets" / "Terrain.shader") << "terrain";
+
+		CHECK(Loom::ProjectAssets::ShadersIn(root.string()) == std::vector<std::string>{ "Assets/Terrain.shader", "Assets/Units/Tank.shader" });
+		CHECK(Loom::ProjectAssets::ProjectShader(root.string()) == "Assets/Terrain.shader");
+
+		std::ofstream(root / Loom::ProjectTemplate::shader_path) << "template";
+
+		CHECK(Loom::ProjectAssets::ProjectShader(root.string()) == Loom::ProjectTemplate::shader_path);
+
+		std::filesystem::remove_all(root);
 	};
 };

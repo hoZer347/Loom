@@ -16,6 +16,7 @@
 #include "Hierarchy.h"
 #include "EditorSettings.h"
 #include "ShaderEditor.h"
+#include "Shapes.h"
 #include "BuildSettings.h"
 #include "GameBuilder.h"
 #include "SpriteEditor.h"
@@ -416,9 +417,8 @@ namespace Loom
 		// selected. Disabled with no parent.
 		void DrawShapeMenu(GameObject* parent);
 
-		// A child of parent drawing the shape, one unit across, with the
-		// shader most meshes open already draw with.
-		GameObject* AddShape(GameObject& parent, Shapes::Shape shape);
+		// The shader most meshes open already draw with, or else the
+		// project's.
 		std::string ShapeShader() const;
 		static void SkipRows(size_t rows);
 

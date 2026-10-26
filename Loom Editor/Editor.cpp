@@ -14,7 +14,6 @@
 #include "Light.h"
 #include "LoomObject.h"
 #include "Material.h"
-#include "Mesh.h"
 #include "MissingComponent.h"
 #include "Prefab.h"
 #include "Profiler.h"
@@ -38,6 +37,7 @@
 #include "ModelImporter.h"
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
+#include "Shapes.h"
 #include "SpriteAsset.h"
 #include "TextFit.h"
 #include "UiScript.h"
@@ -680,15 +680,6 @@ namespace Loom
 			};
 
 			return changed;
-		};
-
-		void CountShaders(GameObject& object, std::unordered_map<std::string, int>& counts)
-		{
-			if (const Material* material = object.GetComponent<Material>(); material && !material->GetShaderPath().empty())
-				counts[material->GetShaderPath()]++;
-
-			for (GameObject* child : object.GetChildren())
-				CountShaders(*child, counts);
 		};
 	};
 
@@ -2732,65 +2723,24 @@ namespace Loom
 
 		for (const Shapes::Info& info : Shapes::All())
 			if (ImGui::MenuItem(info.label))
-				Select(AddShape(*parent, info.shape));
+				Select(Shapes::Add(*parent, info.shape, ShapeShader()));
 
 		ImGui::EndMenu();
 	};
 
-	GameObject* Editor::AddShape(GameObject& parent, Shapes::Shape shape)
-	{
-		constexpr float size = 1.0f;
-
-		GameObject* object = parent.AddChild(Shapes::Label(shape));
-		object->Attach<Material>()->SetShaderPath(ShapeShader());
-
-		std::vector<float> positions{ };
-		std::vector<float> uvs{ };
-		std::vector<float> normals{ };
-		std::vector<float> colors{ };
-		Shapes::Build(shape, size).ToTriangles(positions, uvs, normals, colors);
-
-		Mesh* mesh = object->Attach<Mesh>(Mesh::Triangles);
-		mesh->m_vertices = std::move(positions);
-		mesh->m_textureCoordinates = std::move(uvs);
-		mesh->m_normals = std::move(normals);
-		mesh->m_colors = std::move(colors);
-
-		return object;
-	};
-
 	std::string Editor::ShapeShader() const
 	{
-		std::unordered_map<std::string, int> counts{ };
+		std::vector<GameObject*> roots{ };
 
 		for (Scene* scene : Scene::GetScenes())
-			CountShaders(scene->GetRoot(), counts);
+			roots.push_back(&scene->GetRoot());
 
 		if (GameObject* prefab = GetPrefabRoot())
-			CountShaders(*prefab, counts);
+			roots.push_back(prefab);
 
-		const auto most = std::max_element(
-			counts.begin(),
-			counts.end(),
-			[](const auto& a, const auto& b) { return a.second < b.second; });
+		const std::string most = Shapes::MostUsedShader(roots);
 
-		if (most != counts.end())
-			return most->first;
-
-		// Failing that, the shader a new project draws with, or else the
-		// first the project has.
-		std::error_code code;
-
-		if (m_projectPath.empty() || std::filesystem::exists(std::filesystem::path(m_projectPath) / ProjectTemplate::shader_path, code))
-			return ProjectTemplate::shader_path;
-
-		std::vector<std::string> shaders{ };
-
-		for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator(m_projectPath, code))
-			if (entry.path().extension() == ProjectAssets::shaderExtension)
-				shaders.push_back(entry.path().lexically_relative(m_projectPath).generic_string());
-
-		return shaders.empty() ? ProjectTemplate::shader_path : *std::min_element(shaders.begin(), shaders.end());
+		return most.empty() ? ProjectAssets::ProjectShader(m_projectPath) : most;
 	};
 
 	void Editor::DrawChildNodes(GameObject& parent, bool disabled, bool in_prefab)

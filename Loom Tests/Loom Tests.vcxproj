@@ -165,6 +165,7 @@
     <ClCompile Include="ScriptFolders Tests.cpp" />
     <ClCompile Include="EditorLayouts Tests.cpp" />
     <ClCompile Include="ShaderEditor Tests.cpp" />
+    <ClCompile Include="Shapes Tests.cpp" />
     <ClCompile Include="SpriteAsset Tests.cpp" />
     <ClCompile Include="SpriteEditor Tests.cpp" />
     <ClCompile Include="EditableMesh Tests.cpp" />
