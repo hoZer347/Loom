@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Builds a Loom project for the web and serves it. The editor's Play Web runs this.
+    Builds a Loom project for the web and serves it, or writes it to a folder of its own. The editor's Play Web runs this.
 
 .DESCRIPTION
     The engine is compiled into a static library under x64\WebPlayer, rebuilt
@@ -13,20 +13,32 @@
     to open a browser: the editor opens the page once emrun says it is
     listening, so the browser is not left a child of this script.
 
+    Given -Output, nothing is served. The build goes under the project's
+    Build\Web, and Output is mirrored to the page, the player and the files
+    of the project it reads, leaving out what build-game.ps1 leaves out. Its
+    URLs are relative, so any web server can host the folder at any path,
+    as long as it sends the same cross-origin isolation headers. A folder
+    that is not empty and holds no earlier build is left alone.
+
 .EXAMPLE
     .\play-web.ps1 -Project "C:\Games\MyGame" -Scene "C:\Games\MyGame\Build\Web\Scene.loomscene"
 
+.EXAMPLE
+    .\play-web.ps1 -Project "C:\Games\MyGame" -Scene "C:\Games\MyGame\Scenes\Main.loomscene" -Output "C:\Site\MyGame"
+
 .NOTES
-    Needs an installed emsdk; see WebBuild.ps1. Serves until it is killed.
+    Needs an installed emsdk; see WebBuild.ps1. Without -Output, serves until it is killed.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
     [string] $Project,
 
-    # Inside the project folder. The build goes beside it.
+    # Inside the project folder. Served, the build goes beside it.
     [Parameter(Mandatory = $true)]
-    [string] $Scene
+    [string] $Scene,
+
+    [string] $Output
 )
 
 # Native commands are judged by their exit codes: emcc writes ordinary notes to
@@ -38,15 +50,15 @@ $root = $PSScriptRoot
 
 $Project = (Resolve-Path -LiteralPath $Project -ErrorAction Stop).Path
 $Scene = (Resolve-Path -LiteralPath $Scene -ErrorAction Stop).Path
-$output = Split-Path -Parent $Scene
+$web = if ($Output) { Join-Path $Project 'Build\Web' } else { Split-Path -Parent $Scene }
 
 $emcc = Find-Emcc
 $emrun = Get-EmscriptenTool $emcc 'emrun'
 
-# A path under the project as the page addresses it: from the root it is served from.
+# A path under the project as the page addresses it: from its base, the project folder.
 function Get-UrlPath([string] $Path)
 {
-    '/' + $Path.Substring($Project.Length).TrimStart('\').Replace('\', '/')
+    $Path.Substring($Project.Length).TrimStart('\').Replace('\', '/')
 }
 
 $library = Build-WebEngine $emcc
@@ -80,8 +92,8 @@ if ($projectFile)
 }
 
 $player = Join-Path $root 'Loom Web\Player.cpp'
-$module = Join-Path $output 'player.js'
-$intermediate = Join-Path $output 'Intermediate'
+$module = Join-Path $web 'player.js'
+$intermediate = Join-Path $web 'Intermediate'
 
 New-Item -ItemType Directory -Force -Path $intermediate | Out-Null
 
@@ -169,26 +181,86 @@ if (Test-Stale $module $linkInputs)
     }
 }
 
-$page = Join-Path $output 'index.html'
-
 # Every font and image in the project but the builds, by its path under it, for
 # the page to preload where a UiText or UiRect opens it.
-$preloaded = @(Get-ChildItem -LiteralPath $Project -Recurse -File -Include '*.ttf', '*.otf', '*.ttc', '*.png', '*.jpg', '*.jpeg', '*.bmp', '*.tga' |
-    Where-Object { -not $_.FullName.StartsWith((Join-Path $Project 'Build\'), [StringComparison]::OrdinalIgnoreCase) } |
-    ForEach-Object { (Get-UrlPath $_.FullName).TrimStart('/') } |
+# -Include is ignored beside -LiteralPath, so the extensions are matched here.
+$preloadedTypes = @('.ttf', '.otf', '.ttc', '.png', '.jpg', '.jpeg', '.bmp', '.tga')
+$preloaded = @(Get-ChildItem -LiteralPath $Project -Recurse -File |
+    Where-Object { $preloadedTypes -contains $_.Extension.ToLowerInvariant() -and
+        -not $_.FullName.StartsWith((Join-Path $Project 'Build\'), [StringComparison]::OrdinalIgnoreCase) } |
+    ForEach-Object { Get-UrlPath $_.FullName } |
     Sort-Object)
 
 # The project's key bindings, beside its .loomproject, or none.
 $bindings = if ($projectFile) { [IO.Path]::ChangeExtension($projectFile.FullName, '.loominput') } else { $null }
 $bindingsUrl = if ($bindings -and (Test-Path -LiteralPath $bindings)) { Get-UrlPath $bindings } else { '' }
 
+# Served, the page sits beside the build and its base is the root emrun
+# serves the project from. Written out, the page and the player sit at the top
+# of Output, with the project's files under it as they are under the project.
+if ($Output)
+{
+    $Output = [IO.Path]::GetFullPath($Output).TrimEnd('\')
+    $page = Join-Path $Output 'index.html'
+    $base = './'
+    $script = Split-Path -Leaf $module
+
+    if ((Test-Path -LiteralPath $Output) -and -not (Test-Path -LiteralPath (Join-Path $Output $script)) -and
+        (Get-ChildItem -LiteralPath $Output -Force | Select-Object -First 1))
+    {
+        Write-Host "$Output holds something other than a web build."
+        exit 1
+    }
+
+    # What build-game.ps1 leaves out: the scripts are in the player, and the rest is the editor's.
+    $folders = @((Join-Path $Project 'Build'), '.*')
+    $files = @('*.loomproject', '*.loomscripts', '*.loomsounds', '*.loomfonts', '*.loombuild', '*.loomgame',
+        '*.ps1', '*.py', '*.md', '*.ini', '*.log', '.*', '*.exe', '*.dll', '*.pdb')
+
+    if ($scriptDir)
+    {
+        $folders += $scriptDir
+    }
+
+    if ($Output.StartsWith("$Project\", [StringComparison]::OrdinalIgnoreCase))
+    {
+        $folders += $Output
+    }
+
+    # Below 8, robocopy's exit code says what it copied rather than that it failed.
+    $robocopyFailed = 8
+
+    $said = robocopy $Project $Output /MIR /XD $folders /XF $files /NJH /NJS /NP /NFL /NDL 2>&1
+
+    if ($LASTEXITCODE -ge $robocopyFailed)
+    {
+        $said | ForEach-Object { Write-Host "$_" }
+        Write-Host "Could not copy the project into $Output."
+        exit 1
+    }
+
+    Copy-Item -Path (Join-Path $web 'player.*') -Destination $Output
+}
+else
+{
+    $page = Join-Path $web 'index.html'
+    $base = '/'
+    $script = Get-UrlPath $module
+}
+
 (Get-Content -LiteralPath (Join-Path $root 'Loom Web\Player.html') -Raw).
     Replace('{TITLE}', (Split-Path -Leaf $Project)).
-    Replace('{SCRIPT}', (Get-UrlPath $module)).
+    Replace('{BASE}', $base).
+    Replace('{SCRIPT}', $script).
     Replace('{SCENE}', (Get-UrlPath $Scene)).
     Replace('{FILES}', (ConvertTo-Json -InputObject $preloaded -Compress)).
     Replace('{INPUT}', $bindingsUrl) |
     Set-Content -LiteralPath $page -Encoding UTF8 -NoNewline
+
+if ($Output)
+{
+    exit 0
+}
 
 # --- Serving ----------------------------------------------------------------
 

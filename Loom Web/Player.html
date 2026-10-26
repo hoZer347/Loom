@@ -1,15 +1,16 @@
 <!DOCTYPE html>
 <!--
-  The page play-web.ps1 writes beside a Play Web build, with {TITLE}, {SCRIPT},
-  {SCENE} and {FILES} filled in. It is served from the project folder, and the
-  base URL is that folder, so the relative shader paths a scene stores resolve
-  there.
+  The page play-web.ps1 writes for a Play Web build, with its title, base,
+  script, scene, files and key bindings filled in where they are named in
+  braces. The base is the project folder as the page addresses it, and every
+  URL here is relative to it, so the relative shader paths a scene stores
+  resolve there.
 -->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <base href="/" />
+    <base href="{BASE}" />
     <link rel="icon" href="data:," />
     <title>{TITLE}</title>
     <style>
@@ -58,7 +59,7 @@
               const folder = "/" + file.substring(0, file.lastIndexOf("/") + 1);
 
               Module.FS.mkdirTree(folder);
-              Module.FS.createPreloadedFile(folder, file.substring(file.lastIndexOf("/") + 1), "/" + file, true, false);
+              Module.FS.createPreloadedFile(folder, file.substring(file.lastIndexOf("/") + 1), file, true, false);
             }
           },
         ],
