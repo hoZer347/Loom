@@ -6,7 +6,6 @@
 #include "Shaders.h"
 #include "Utilities/Clock.h"
 
-#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <string>
@@ -20,7 +19,7 @@ namespace Loom
 	{
 		constexpr const char* SCOPE_NAMES[] = { "Global", "Local" };
 
-		// As wide as their choice, so the value has what is left of the row.
+		// As wide as their choice, so the name has what is left of the row.
 		constexpr ImGuiComboFlags FITTED_COMBO = ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_WidthFitPreview;
 
 		// One Shader per path, shared by every Material that names it. Materials
@@ -111,6 +110,25 @@ namespace Loom
 
 			return changed;
 		};
+
+		// A row of the variables' table: the name across what is left, then the
+		// type, the scope and a button. Every row is a table of its own under
+		// one ID, so a value can go between them.
+		bool BeginVariableRow()
+		{
+			constexpr int columns = 4;
+
+			if (!ImGui::BeginTable("##variables", columns))
+				return false;
+
+			ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+			ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed);
+			ImGui::TableSetupColumn("Scope", ImGuiTableColumnFlags_WidthFixed);
+			ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
+			ImGui::TableNextRow();
+
+			return true;
+		};
 	};
 
 	void Material::OnAttach()
@@ -199,86 +217,76 @@ namespace Loom
 		if (!ImGui::TreeNodeEx("Shader Variables", ImGuiTreeNodeFlags_DefaultOpen))
 			return;
 
-		constexpr int COLUMNS = 5;
+		// A copy: rewriting the file reloads the shader, which replaces the
+		// list being drawn.
+		const std::vector<ShaderVariable> declared = shader->variables;
 
-		// How wide the new variable's name is to type into, at the least.
-		constexpr const char* NEW_NAME_WIDTH = "u_name";
-
-		if (ImGui::BeginTable("##variables", COLUMNS))
+		for (const ShaderVariable& variable : declared)
 		{
-			// Every column but the value's fits what it holds.
-			ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed);
-			ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed);
-			ImGui::TableSetupColumn("Scope", ImGuiTableColumnFlags_WidthFixed);
-			ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
-			ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
+			// Under the variable's row, across the inspector, so a vector's
+			// components have room. Its table shares the others' ID, and with
+			// it their columns' widths.
+			if (!BeginVariableRow())
+				continue;
 
-			// A copy: rewriting the file reloads the shader, which replaces the
-			// list being drawn.
-			const std::vector<ShaderVariable> declared = shader->variables;
-
-			float name_width = ImGui::CalcTextSize(NEW_NAME_WIDTH).x;
-
-			for (const ShaderVariable& variable : declared)
-				name_width = std::max(name_width, ImGui::CalcTextSize(variable.name.c_str()).x);
-
-			for (const ShaderVariable& variable : declared)
-			{
-				ImGui::PushID(variable.name.c_str());
-				ImGui::TableNextRow();
-
-				ImGui::TableNextColumn();
-				ImGui::AlignTextToFramePadding();
-				ImGui::TextUnformatted(variable.name.c_str());
-
-				ShaderVariable changed = variable;
-				std::string error;
-
-				ImGui::TableNextColumn();
-				const bool retyped = TypeCombo(changed.type);
-
-				ImGui::TableNextColumn();
-				const bool rescoped = ScopeCombo(changed.scope);
-
-				const UniformValue* found = std::as_const(variables)->Find(variable);
-				const bool set = found != nullptr;
-				UniformValue local = set ? *found : UniformValue::Default(variable.type);
-
-				// A variable keeps its value across a change of scope.
-				if (rescoped && changed.scope == UniformScope::Global && set)
-					changed.global = local;
-
-				if (rescoped && changed.scope == UniformScope::Local)
-					SetLocal(variable.name, variable.global);
-
-				if (retyped || rescoped)
-					Edited(DeclareShaderVariable(shader->file_path, variable.name, changed, error), error);
-
-				ImGui::TableNextColumn();
-
-				if (variable.scope == UniformScope::Global)
-				{
-					if (DrawUniformValue(variable.type, changed.global))
-						Edited(DeclareShaderVariable(shader->file_path, variable.name, changed, error), error);
-				}
-				else if (DrawUniformValue(variable.type, local))
-					SetLocal(variable.name, local);
-
-				ImGui::TableNextColumn();
-
-				if (ImGui::SmallButton("x"))
-					Edited(RemoveShaderVariable(shader->file_path, variable.name, error), error);
-
-				ImGui::SetItemTooltip("Take %s out of the shader file", variable.name.c_str());
-
-				ImGui::PopID();
-			};
-
-			ImGui::PushID("##new");
-			ImGui::TableNextRow();
+			ImGui::PushID(variable.name.c_str());
 
 			ImGui::TableNextColumn();
-			ImGui::SetNextItemWidth(name_width + ImGui::GetStyle().FramePadding.x * 2);
+			ImGui::AlignTextToFramePadding();
+			ImGui::TextUnformatted(variable.name.c_str());
+
+			ShaderVariable changed = variable;
+			std::string error;
+
+			ImGui::TableNextColumn();
+			const bool retyped = TypeCombo(changed.type);
+
+			ImGui::TableNextColumn();
+			const bool rescoped = ScopeCombo(changed.scope);
+
+			const UniformValue* found = std::as_const(variables)->Find(variable);
+			const bool set = found != nullptr;
+			UniformValue local = set ? *found : UniformValue::Default(variable.type);
+
+			// A variable keeps its value across a change of scope.
+			if (rescoped && changed.scope == UniformScope::Global && set)
+				changed.global = local;
+
+			if (rescoped && changed.scope == UniformScope::Local)
+				SetLocal(variable.name, variable.global);
+
+			if (retyped || rescoped)
+				Edited(DeclareShaderVariable(shader->file_path, variable.name, changed, error), error);
+
+			ImGui::TableNextColumn();
+
+			if (ImGui::SmallButton("x"))
+				Edited(RemoveShaderVariable(shader->file_path, variable.name, error), error);
+
+			ImGui::SetItemTooltip("Take %s out of the shader file", variable.name.c_str());
+
+			// The table pops its own ID as it ends.
+			ImGui::PopID();
+			ImGui::EndTable();
+			ImGui::PushID(variable.name.c_str());
+
+			if (variable.scope == UniformScope::Global)
+			{
+				if (DrawUniformValue(variable.type, changed.global))
+					Edited(DeclareShaderVariable(shader->file_path, variable.name, changed, error), error);
+			}
+			else if (DrawUniformValue(variable.type, local))
+				SetLocal(variable.name, local);
+
+			ImGui::PopID();
+		};
+
+		if (BeginVariableRow())
+		{
+			ImGui::PushID("##new");
+
+			ImGui::TableNextColumn();
+			ImGui::SetNextItemWidth(-FLT_MIN);
 			InputTextString("##name", m_new_variable.name);
 			ImGui::SetItemTooltip("The new variable's name, as the shader will use it");
 
@@ -288,8 +296,6 @@ namespace Loom
 			ImGui::TableNextColumn();
 			ScopeCombo(m_new_variable.scope);
 
-			// Past the value, which it has none of until it is declared.
-			ImGui::TableNextColumn();
 			ImGui::TableNextColumn();
 			ImGui::BeginDisabled(m_new_variable.name.empty());
 

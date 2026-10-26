@@ -64,7 +64,7 @@ namespace Loom
 		// is read without compiling, so a global can be dragged.
 		bool Reload();
 
-		// Reloads when the file has been written since it was last compiled.
+		// Reloads when the file has been written since it was last read.
 		void ReloadIfChanged();
 
 		// Whether any shader compiled has a pixel pass.

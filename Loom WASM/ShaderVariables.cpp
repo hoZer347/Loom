@@ -520,7 +520,7 @@ namespace Loom
 			if (!line.empty() && line.back() == '\r')
 				line.pop_back();
 
-			if (std::regex_match(line, match, DeclarationPattern()))
+			if (std::regex_match(line, match, DeclarationPattern()) && match[TAG_MATCH].matched)
 				line = line.substr(0, line.find(';') + 1);
 
 			code += line + '\n';

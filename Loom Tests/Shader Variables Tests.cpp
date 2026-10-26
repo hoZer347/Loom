@@ -215,6 +215,7 @@ TEST_SUITE("Shader variables")
 
 		CHECK(Loom::ShaderCode("uniform vec3 u_tint; // local\n") != Loom::ShaderCode("uniform vec2 u_tint; // local\n"));
 		CHECK(Loom::ShaderCode("void main() { } // one\n") != Loom::ShaderCode("void main() { } // two\n"));
+		CHECK(Loom::ShaderCode("uniform float a; uniform float b;\n") != Loom::ShaderCode("uniform float a; uniform vec2 b;\n"));
 	};
 
 	TEST_CASE("a value of another type than the variable's is not its value")
