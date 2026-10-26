@@ -386,9 +386,17 @@ TEST_SUITE("Shader variables")
 		std::string error;
 		REQUIRE(Loom::RenameShaderVariable(file.path.string(), "u_wave", "u_swell", error));
 
-		CHECK(file.Text() ==
+		const std::string renamed =
 			"// ===VERTEX===\nuniform float u_swell; // global 2\nuniform float u_waves;\nvoid main() { gl_PointSize = u_swell + u_waves; }\n"
-			"// ===FRAGMENT===\nuniform float u_swell; // global 2\nvoid main() { }\n");
+			"// ===FRAGMENT===\nuniform float u_swell; // global 2\nvoid main() { }\n";
+
+		CHECK(file.Text() == renamed);
+
+		SUBCASE("not to a word the code already uses, leaving the file as it was")
+		{
+			CHECK_FALSE(Loom::RenameShaderVariable(file.path.string(), "u_swell", "main", error));
+			CHECK(file.Text() == renamed);
+		};
 
 		SUBCASE("not to a name another variable has")
 		{

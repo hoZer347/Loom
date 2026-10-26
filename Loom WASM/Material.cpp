@@ -1,14 +1,18 @@
 #include "Material.h"
 
 #include "EditorGui.h"
+#include "GameObject.h"
 #include "RenderMath.h"
 #include "Renderer.h"
+#include "Scene.h"
 #include "Shaders.h"
 #include "Utilities/Clock.h"
 
+#include <cstring>
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <typeinfo>
 #include <unordered_map>
 #include <utility>
 
@@ -128,6 +132,20 @@ namespace Loom
 			ImGui::TableNextRow();
 
 			return true;
+		};
+
+		// Every Material on the object or under it, disabled ones included.
+		template <typename Visit>
+		void EachMaterial(GameObject& gameObject, const Visit& visit)
+		{
+			// By type name, the way GetComponent matches: a script library's
+			// Material carries its own copy of the type info.
+			for (ComponentBase* component : gameObject.GetComponents())
+				if (strcmp(component->GetTypeName(), typeid(Material).name()) == 0)
+					visit(*(Material*)component);
+
+			for (GameObject* child : gameObject.GetChildren())
+				EachMaterial(*child, visit);
 		};
 	};
 
@@ -251,7 +269,12 @@ namespace Loom
 					const bool written = RenameShaderVariable(shader->file_path, variable.name, m_rename, error);
 
 					if (written)
-						RenameLocal(variable.name, m_rename);
+						for (Scene* scene : Scene::GetScenes())
+							EachMaterial(scene->GetRoot(), [&](Material& material)
+							{
+								if (material.shader == shader)
+									material.RenameLocal(variable.name, m_rename);
+							});
 
 					Edited(written, error);
 				};

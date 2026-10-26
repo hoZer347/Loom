@@ -622,9 +622,12 @@ namespace Loom
 			return false;
 		};
 
-		if (!file.Declaring(renamed).empty())
+		// Any use, not only a declaration, so a rename never merges two names.
+		const std::regex taken("\\b" + renamed + "\\b");
+
+		if (std::ranges::any_of(file.lines, [&](const std::string& line) { return std::regex_search(line, taken); }))
 		{
-			error = path + " already declares " + renamed;
+			error = path + " already uses " + renamed;
 			return false;
 		};
 

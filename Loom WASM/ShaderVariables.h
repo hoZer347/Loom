@@ -187,7 +187,8 @@ namespace Loom
 	LOOM_API bool RemoveShaderVariable(const std::string& path, const std::string& name, std::string& error);
 
 	// Renames the variable everywhere the shader file names it, its
-	// declarations in every stage and the code reading it.
+	// declarations in every stage and the code reading it. False, with why in
+	// error, when the file already uses the new name for anything.
 	LOOM_API bool RenameShaderVariable(const std::string& path, const std::string& name, const std::string& renamed, std::string& error);
 
 	// What the source's SETTINGS section turns on. Throws std::runtime_error,

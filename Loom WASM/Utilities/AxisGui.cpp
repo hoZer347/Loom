@@ -50,12 +50,12 @@ namespace Loom
 
 			if (i < axis_count)
 			{
-				const ImVec2 min = ImGui::GetItemRectMin();
-				const ImVec2 max = ImGui::GetItemRectMax();
+				const ImVec2 top_left = ImGui::GetItemRectMin();
+				const ImVec2 bottom_right = ImGui::GetItemRectMax();
 
 				ImGui::GetWindowDrawList()->AddRectFilled(
-					min,
-					ImVec2(min.x + stripe_width, max.y),
+					top_left,
+					ImVec2(top_left.x + stripe_width, bottom_right.y),
 					axis_colors[i],
 					style.FrameRounding,
 					ImDrawFlags_RoundCornersLeft);
