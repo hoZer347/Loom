@@ -87,15 +87,15 @@ TEST_SUITE("Shapes")
 		Loom::Scene second("Second");
 
 		Loom::GameObject* crate = Drawing(first.GetRoot(), "Crate", UNLIT);
-		Drawing(first.GetRoot(), "Wall", UNLIT);
-		Drawing(second.GetRoot(), "Barrel", LIT);
-		Drawing(second.GetRoot(), "Tower", LIT);
+		Drawing(second.GetRoot(), "Barrel", UNLIT);
+		Drawing(second.GetRoot(), "Tower", UNLIT);
 		LoomTests::Pump();
 		Drawing(*crate, "Lid", LIT);
+		Drawing(*crate, "Hinge", LIT);
 		LoomTests::Pump();
 
-		CHECK(Shapes::MostUsedShader({ &first.GetRoot() }) == UNLIT);
-		CHECK(Shapes::MostUsedShader({ &first.GetRoot(), &second.GetRoot() }) == LIT);
+		CHECK(Shapes::MostUsedShader({ &first.GetRoot() }) == LIT);
+		CHECK(Shapes::MostUsedShader({ &first.GetRoot(), &second.GetRoot() }) == UNLIT);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a tie goes to the first shader by path, whichever came first")
