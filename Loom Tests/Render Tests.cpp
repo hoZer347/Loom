@@ -37,6 +37,24 @@ namespace
 		"out vec4 FragColor;\n"
 		"void main() { FragColor = vec4(1.0, 0.0, 0.0, 1.0); }\n";
 
+	// Moved by its model matrix alone, and as red as its seed.
+	const std::string SEED_AS_RED =
+		"// ===VERTEX===\n"
+		"layout(location = 0) in vec3 aPos;\n"
+		"uniform mat4 u_model;\n"
+		"void main() { gl_Position = u_model * vec4(aPos, 1.0); }\n"
+		"// ===FRAGMENT===\n"
+		"uniform float u_seed;\n"
+		"out vec4 FragColor;\n"
+		"void main() { FragColor = vec4(u_seed, 0.0, 0.0, 1.0); }\n";
+
+	// Half of clip space wide, centred on its origin.
+	const std::vector<float> CENTRED_HALF
+	{
+		-0.5f, -1.0f, 0.0f,  0.5f, -1.0f, 0.0f,  0.5f, 1.0f, 0.0f,
+		-0.5f, -1.0f, 0.0f,  0.5f,  1.0f, 0.0f, -0.5f, 1.0f, 0.0f,
+	};
+
 	// The right half of clip space.
 	const std::vector<float> RIGHT_HALF
 	{
@@ -113,6 +131,56 @@ TEST_SUITE("Render")
 		CHECK(image.At(image.width / 4, middle) == CLEARED);
 		CHECK(image.At(image.width * 3 / 4, middle) == RED);
 		CHECK(image.At(image.width - 1, middle) == RED);
+	};
+
+	TEST_CASE_FIXTURE(RenderFixture, "alike meshes drawn as instances each read their own seed, the one they read when drawn alone")
+	{
+		const ClearedTo cleared(CLEAR);
+
+		std::istringstream source(SEED_AS_RED);
+		Loom::Shader shader("render seeds", source);
+		REQUIRE(shader.instanced_id != 0);
+
+		Loom::Scene scene("render seeds");
+		Pump();
+
+		scene.Attach<Loom::Camera>();
+
+		constexpr float HALF_OFFSET = 0.5f;
+		Loom::GameObject* left = scene.AddChild("Left");
+		Loom::GameObject* right = scene.AddChild("Right");
+		Pump();
+
+		left->transform.position = glm::vec3(-HALF_OFFSET, 0.0f, 0.0f);
+		right->transform.position = glm::vec3(HALF_OFFSET, 0.0f, 0.0f);
+
+		for (Loom::GameObject* half : { left, right })
+		{
+			half->Attach<Loom::Material>()->shader = &shader;
+			half->Attach<Loom::Mesh>()->m_vertices = CENTRED_HALF;
+		};
+
+		const Loom::Guid first(1, 2);
+		left->SetGuid(first);
+		right->SetGuid(Loom::Guid(3, 4));
+		Pump();
+
+		const auto reds = [this]()
+		{
+			const Image image = Frame();
+			const int middle = image.height / 2;
+
+			return std::pair(image.At(image.width / 4, middle).r, image.At(image.width * 3 / 4, middle).r);
+		};
+
+		const auto [instanced, other] = reds();
+		CHECK(instanced != other);
+
+		right->SetGuid(first);
+		CHECK(reds().second == instanced);
+
+		right->GetComponent<Loom::Mesh>()->m_draw_type = Loom::Mesh::Dynamic;
+		CHECK(reds() == std::pair(instanced, instanced));
 	};
 
 	TEST_CASE_FIXTURE(RenderFixture, "a screenshot is a PNG of the frame in the suite's screenshot folder")

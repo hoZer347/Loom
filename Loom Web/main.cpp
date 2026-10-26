@@ -122,7 +122,6 @@ struct FrameState final :
 
 		glUseProgram(shader->id);
 
-		SetFloat("u_time", time);
 		SetFloat("u_near", NEAR_PLANE);
 		SetFloat("u_far", FAR_PLANE);
 	};

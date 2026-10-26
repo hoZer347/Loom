@@ -12,12 +12,16 @@
 #include "ShaderVariables.h"
 #include "Utilities/Clock.h"
 
+#include "OpenGL.h"
+
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <iterator>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -513,6 +517,12 @@ TEST_SUITE("Shader variables")
 		CHECK(vertex.find("uniform float u_seed") == std::string::npos);
 		CHECK(vertex.find("#define u_seed loom_InstanceColorSeed.a") != std::string::npos);
 		CHECK(vertex.find("loom_instance_main()") != std::string::npos);
+
+		const std::string& fragment = renderer.fragments.at("instanced instanced");
+		CHECK(fragment.find("uniform vec3 u_color") == std::string::npos);
+		CHECK(fragment.find("uniform float u_seed") == std::string::npos);
+		CHECK(fragment.find("#define u_color loom_Color") != std::string::npos);
+		CHECK(fragment.find("#define u_seed loom_Seed") != std::string::npos);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader that declares no model matrix, whose fragment stage reads it, or that declares its colour or seed otherwise, has no instanced program")
@@ -601,6 +611,8 @@ TEST_SUITE("Shader variables")
 		CHECK(renderer.floats["u_shadowsOff"] == 1.0f);
 	};
 
+	// The web's clock is the browser's, which cannot be stepped here.
+#ifndef __EMSCRIPTEN__
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a material hands its program the game time")
 	{
 		RecordingRenderer renderer;
@@ -611,12 +623,30 @@ TEST_SUITE("Shader variables")
 		Loom::Material* material = scene.AddChild("Timed")->Attach<Loom::Material>();
 		Pump();
 
-		constexpr float unset = -1.0f;
-		renderer.floats["u_time"] = unset;
-		material->Apply(1);
+		// The clock reads GLFW's time, so it only runs once GLFW is up, and
+		// GLFW's time starts again with it. Two frames from there, so the time
+		// since the start is neither still nor the last frame's alone.
+		constexpr std::chrono::milliseconds frame_length{ 20 };
+		constexpr int frames = 2;
+		glfwInit();
+		Loom::Utilities::Tick();
+		const float before = Loom::Time::SinceStart();
 
+		for (int frame = 0; frame < frames; frame++)
+		{
+			std::this_thread::sleep_for(frame_length);
+			Loom::Utilities::Tick();
+		};
+
+		REQUIRE(Loom::Time::SinceStart() - before > Loom::Time::DeltaTime());
+		REQUIRE(Loom::Time::SinceStart() != 0.0f);
+
+		material->Apply(1);
 		CHECK(renderer.floats["u_time"] == Loom::Time::SinceStart());
+
+		glfwTerminate();
 	};
+#endif
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "casters alike are drawn into the shadow map as instances of one")
 	{

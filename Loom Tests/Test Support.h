@@ -150,6 +150,7 @@ namespace LoomTests
 				throw std::runtime_error("Shader compile error in " + name);
 
 			vertices[name] = vertex;
+			fragments[name] = fragment;
 			return programs[name] = ++m_handles;
 		};
 
@@ -326,6 +327,7 @@ namespace LoomTests
 
 		std::map<std::string, uint32_t> programs;
 		std::map<std::string, std::string> vertices;
+		std::map<std::string, std::string> fragments;
 		std::map<uint32_t, glm::ivec2> targetSizes;
 		std::map<uint32_t, uint32_t> targetDepths;
 		glm::ivec2 windowSize = glm::ivec2(1);
