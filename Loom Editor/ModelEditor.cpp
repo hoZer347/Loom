@@ -692,8 +692,7 @@ void main()
 		// The Prefab panel writes its copy as it saves its own changes.
 		if (document.borrowed)
 		{
-			document.unsaved = false;
-			m_edited = true;
+			m_edited = std::exchange(document.unsaved, false) || m_edited;
 			return true;
 		};
 

@@ -334,8 +334,6 @@ namespace Loom
 				m_models.SetLive(PrefabFile(m_prefabPath).string(), m_prefabScene, root);
 		};
 
-		m_modelsEdited = false;
-
 		bool reshow = false;
 
 		for (const std::string& path : paths)

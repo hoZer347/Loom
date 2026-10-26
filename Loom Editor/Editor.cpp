@@ -1579,6 +1579,8 @@ namespace Loom
 		if (!changed.empty() || PrefabsNeedSync())
 			SyncPrefabs(changed);
 
+		m_modelsEdited = false;
+
 		m_history.Record(m_ownedScenes);
 
 		// What the sync changed is its own doing, not an edit for it to carry.
