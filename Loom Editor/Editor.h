@@ -137,7 +137,6 @@ namespace Loom
 		// in it, they just cannot be closed from it.
 		Scene* CreateScene(const std::string& name = "New Scene");
 		Scene* OpenScene(const std::string& path);
-		bool SaveScene(Scene* scene, const std::string& path);
 		void CloseScene(Scene* scene);
 
 		// What the Hierarchy drags: a GameObject's guid rather than its address,
@@ -150,6 +149,17 @@ namespace Loom
 		// over the frames that follow, with a bar in the views; false when it
 		// cannot start.
 		bool OpenSceneAlone(const std::string& path);
+
+		void SetActiveScene(Scene* scene);
+
+		// Makes the scene active and brings the Scene view, opened if closed,
+		// to the front.
+		void ShowInSceneView(Scene* scene);
+		bool IsOwned(Scene* scene) const;
+
+		// The file an owned scene was opened from or saved to, empty for one
+		// never saved.
+		std::string ScenePathOf(Scene* scene) const;
 
 		#pragma endregion
 
@@ -177,6 +187,8 @@ namespace Loom
 		#pragma endregion
 
 		#pragma region Saving
+
+		bool SaveScene(Scene* scene, const std::string& path);
 
 		// File > Save Scene and Ctrl+S: the active scene, to the file it was
 		// opened from, or, for one never saved, a new file named after it in
@@ -255,7 +267,7 @@ namespace Loom
 
 		#pragma endregion
 
-		#pragma region Components
+		#pragma region Inspector
 
 		// The Inspector's Add Component menu, opened on the selection the next
 		// time it is drawn.
@@ -332,17 +344,15 @@ namespace Loom
 
 		#pragma region Selection
 
-		void SetActiveScene(Scene* scene);
-
-		// Makes the scene active and brings the Scene view, opened if closed,
-		// to the front.
-		void ShowInSceneView(Scene* scene);
-
 		// Deselects any GameObject; the Inspector shows the model instead.
 		void SelectModel(const std::string& path);
 
 		// Clears the selected model too.
 		void Select(GameObject* gameObject);
+
+		// Selects the GameObject with this name once its scene has loaded, so a
+		// screenshot can show it in the inspector.
+		void RequestSelection(const std::string& name);
 
 		#pragma endregion
 
@@ -374,9 +384,6 @@ namespace Loom
 		void Paste();
 
 		void DeleteSelected();
-		// Selects the GameObject with this name once its scene has loaded, so a
-		// screenshot can show it in the inspector.
-		void RequestSelection(const std::string& name);
 
 		#pragma endregion
 
@@ -400,11 +407,6 @@ namespace Loom
 		Scene* GetActiveScene() const { return m_activeScene; };
 		GameObject* GetSelected() const { return m_selected; };
 		const ScriptLibrary& GetScripts() const { return m_scripts; };
-		bool IsOwned(Scene* scene) const;
-
-		// The file an owned scene was opened from or saved to, empty for one
-		// never saved.
-		std::string ScenePathOf(Scene* scene) const;
 
 		// An edit made other than through the panels, recorded for undo like
 		// theirs once nothing is held down.
@@ -649,6 +651,10 @@ namespace Loom
 
 		void HandleShortcuts();
 
+		#pragma endregion
+
+		#pragma region Screenshots
+
 		// Writes the frame being drawn to the screenshot's path once it is
 		// finished, and ends the run if the screenshot asked to.
 		void CaptureFrame();
@@ -888,11 +894,20 @@ namespace Loom
 		// SaveActiveScene's choice of file, for any owned scene.
 		bool SaveToProject(Scene* scene);
 
+		#pragma endregion
+
+		#pragma region Settings
+
 		// The chosen folder and the scene that was open in it, remembered beside
 		// the executable so the prompt is a first-run thing rather than an
 		// every-run thing, and so a session picks up where the last one left off.
 		void LoadSettings();
 		void SaveSettings() const;
+
+		// Which of the project's scenes a session opens with: the one it was
+		// last on, or its only one. None when there is a choice to make, which
+		// the views then offer.
+		std::string StartupScene() const;
 
 		#pragma endregion
 
@@ -901,11 +916,6 @@ namespace Loom
 		// Deletes every open scene here and now, rather than on the task queue:
 		// the callers are about to unload the code those scenes are made of.
 		void CloseAllScenes();
-
-		// Which of the project's scenes a session opens with: the one it was
-		// last on, or its only one. None when there is a choice to make, which
-		// the views then offer.
-		std::string StartupScene() const;
 
 		// Starts reading the scene a slice a frame, in place of any other being
 		// opened, so the views can show how far it has got.

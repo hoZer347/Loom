@@ -1102,6 +1102,99 @@ namespace Loom
 		return true;
 	};
 
+	bool Editor::OpenDemo(const std::string& name)
+	{
+		for (const std::filesystem::path& demo : DemoProjects())
+			if (demo.filename() == name)
+			{
+				if (!OpenProject(demo.string()))
+					return false;
+
+				m_askForFolder = false;
+				return true;
+			};
+
+		std::cerr << "No demo called '" << name << "' in "
+			<< (std::filesystem::path(ProjectTemplate::EngineRoot()) / "Demos").string()
+			<< std::endl;
+
+		return false;
+	};
+
+	bool Editor::SaveToProject(Scene* scene)
+	{
+		std::string path = m_scenePaths[scene];
+
+		if (path.empty())
+		{
+			if (m_projectPath.empty())
+			{
+				std::cerr << "Save Scene needs a project to put '" << scene->GetName() << "' in" << std::endl;
+				return false;
+			};
+
+			const std::filesystem::path folder = std::filesystem::path(m_projectPath) / ProjectTemplate::scenes_folder;
+			std::filesystem::path file = folder / (scene->GetName() + SceneSerializer::extension);
+
+			// A scene of the same name already saved keeps its file.
+			std::error_code code;
+
+			for (int copy = 2; std::filesystem::exists(file, code); copy++)
+				file = folder / (scene->GetName() + " " + std::to_string(copy) + SceneSerializer::extension);
+
+			path = file.string();
+		};
+
+		return SaveScene(scene, path);
+	};
+
+	bool Editor::SaveProject()
+	{
+		// Scenes Stop or a build just put back are only whole once the queue
+		// has run, since AddChild defers.
+		Engine::DoTasks();
+
+		bool saved = true;
+
+		for (Scene* scene : m_ownedScenes)
+			saved = SaveToProject(scene) && saved;
+
+		saved = m_shaders.SaveAll() && saved;
+		saved = m_sprites.SaveAll() && saved;
+		saved = m_models.SaveAll() && saved;
+
+		// An active scene saved for the first time just now is the one the
+		// next session starts on.
+		SetActiveScene(m_activeScene);
+
+		return saved;
+	};
+
+	void Editor::PollRefresh()
+	{
+		// Mid-build the scenes are down, held as text until the scripts are
+		// back, and there is nothing to save until they are.
+		if (!m_scripts.IsIdle() || m_refresh.Poll() != EditorRefresh::Progress::Finished)
+			return;
+
+		if (!m_refresh.Succeeded())
+		{
+			std::cerr << "Full refresh: the editor did not build, so this one carries on." << std::endl;
+			return;
+		};
+
+		Stop();
+
+		if (!SaveProject())
+		{
+			std::cerr << "Full refresh: not everything saved, so this editor stays up rather than lose it." << std::endl;
+			return;
+		};
+
+		m_relaunch = true;
+		Engine::Stop();
+	};
+
 	#pragma endregion
 
 	#pragma region Scenes
@@ -1286,55 +1379,6 @@ namespace Loom
 			RefreshProjectAssets();
 	};
 
-	bool Editor::SaveToProject(Scene* scene)
-	{
-		std::string path = m_scenePaths[scene];
-
-		if (path.empty())
-		{
-			if (m_projectPath.empty())
-			{
-				std::cerr << "Save Scene needs a project to put '" << scene->GetName() << "' in" << std::endl;
-				return false;
-			};
-
-			const std::filesystem::path folder = std::filesystem::path(m_projectPath) / ProjectTemplate::scenes_folder;
-			std::filesystem::path file = folder / (scene->GetName() + SceneSerializer::extension);
-
-			// A scene of the same name already saved keeps its file.
-			std::error_code code;
-
-			for (int copy = 2; std::filesystem::exists(file, code); copy++)
-				file = folder / (scene->GetName() + " " + std::to_string(copy) + SceneSerializer::extension);
-
-			path = file.string();
-		};
-
-		return SaveScene(scene, path);
-	};
-
-	bool Editor::SaveProject()
-	{
-		// Scenes Stop or a build just put back are only whole once the queue
-		// has run, since AddChild defers.
-		Engine::DoTasks();
-
-		bool saved = true;
-
-		for (Scene* scene : m_ownedScenes)
-			saved = SaveToProject(scene) && saved;
-
-		saved = m_shaders.SaveAll() && saved;
-		saved = m_sprites.SaveAll() && saved;
-		saved = m_models.SaveAll() && saved;
-
-		// An active scene saved for the first time just now is the one the
-		// next session starts on.
-		SetActiveScene(m_activeScene);
-
-		return saved;
-	};
-
 	#pragma endregion
 
 	#pragma region Refresh
@@ -1343,31 +1387,6 @@ namespace Loom
 	{
 		if (!IsRefreshing())
 			m_refresh.Start();
-	};
-
-	void Editor::PollRefresh()
-	{
-		// Mid-build the scenes are down, held as text until the scripts are
-		// back, and there is nothing to save until they are.
-		if (!m_scripts.IsIdle() || m_refresh.Poll() != EditorRefresh::Progress::Finished)
-			return;
-
-		if (!m_refresh.Succeeded())
-		{
-			std::cerr << "Full refresh: the editor did not build, so this one carries on." << std::endl;
-			return;
-		};
-
-		Stop();
-
-		if (!SaveProject())
-		{
-			std::cerr << "Full refresh: not everything saved, so this editor stays up rather than lose it." << std::endl;
-			return;
-		};
-
-		m_relaunch = true;
-		Engine::Stop();
 	};
 
 	std::string Editor::RelaunchTarget() const
@@ -1741,9 +1760,23 @@ namespace Loom
 		m_history.TakeChanged();
 	};
 
+	bool Editor::CanEditScenes(const ImGuiWindow* window) const
+	{
+		if (window == nullptr)
+			return true;
+
+		const ImGuiWindow* root = window->RootWindow;
+
+		for (const char* files_only : { EditorPanels::Shaders, EditorPanels::Sprites })
+			if (root == ImGui::FindWindowByName(files_only))
+				return false;
+
+		return root != ImGui::FindWindowByName(EditorPanels::Project) || m_projectTab == ProjectTabs::Scenes;
+	};
+
 	#pragma endregion
 
-	#pragma region Shortcuts
+	#pragma region Workspace
 
 	void Editor::HandleShortcuts()
 	{
@@ -1774,10 +1807,6 @@ namespace Loom
 			break;
 		};
 	};
-
-	#pragma endregion
-
-	#pragma region Frame
 
 	void Editor::DrawGui()
 	{
@@ -1894,24 +1923,6 @@ namespace Loom
 				m_historyDirty = true;
 	};
 
-	bool Editor::CanEditScenes(const ImGuiWindow* window) const
-	{
-		if (window == nullptr)
-			return true;
-
-		const ImGuiWindow* root = window->RootWindow;
-
-		for (const char* files_only : { EditorPanels::Shaders, EditorPanels::Sprites })
-			if (root == ImGui::FindWindowByName(files_only))
-				return false;
-
-		return root != ImGui::FindWindowByName(EditorPanels::Project) || m_projectTab == ProjectTabs::Scenes;
-	};
-
-	#pragma endregion
-
-	#pragma region Workspace
-
 	void Editor::DrawWorkspace()
 	{
 		DrawMainMenuBar();
@@ -2026,36 +2037,6 @@ namespace Loom
 			DrawBuildSettings();
 	};
 
-	bool Editor::TabDoubleClicked()
-	{
-		const ImGuiWindow* window = ImGui::GetCurrentWindow();
-		const ImGuiWindow* hovered = ImGui::GetCurrentContext()->HoveredWindow;
-		const ImVec2 mouse = ImGui::GetIO().MousePos;
-
-		if (!ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-			return false;
-
-		if (!window->DockIsActive)
-			return hovered == window && window->TitleBarRect().Contains(mouse);
-
-		// The tab is drawn in the window that hosts its dock node, so that is
-		// the one the cursor is on, and a hidden tab bar keeps the rect it
-		// last had.
-		const ImGuiDockNode* node = window->DockNode;
-
-		return node != nullptr && !node->IsHiddenTabBar() && !node->IsNoTabBar() &&
-			hovered == node->HostWindow && window->DC.DockTabItemRect.Contains(mouse);
-	};
-
-	void Editor::Watch(View view)
-	{
-		if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
-			m_lastView = view;
-
-		if (TabDoubleClicked())
-			EnterFullscreen(view);
-	};
-
 	void Editor::DrawFullscreen()
 	{
 		// How long the way back out shows for once the view fills the monitor,
@@ -2140,6 +2121,186 @@ namespace Loom
 	{
 		m_fullscreen.reset();
 		m_windowFullscreen.Leave(Engine::window);
+	};
+
+	void Editor::DrawMainMenuBar()
+	{
+		if (!ImGui::BeginMainMenuBar())
+			return;
+
+		if (ImGui::BeginMenu("File"))
+		{
+			if (ImGui::MenuItem((std::string(EditorIcons::Project) + " New Project...").c_str()))
+			{
+				snprintf(
+					m_newProjectFolder,
+					sizeof(m_newProjectFolder),
+					"%s",
+					DesktopPath().c_str());
+
+				m_askForNewProject = true;
+			};
+
+			if (ImGui::MenuItem((std::string(EditorIcons::Project) + " Open Project...").c_str()))
+				ShowOpenProjectDialog();
+
+			ImGui::Separator();
+
+			if (ImGui::MenuItem("New Scene"))
+				CreateScene("Scene " + std::to_string(++m_sceneCounter));
+
+			if (ImGui::MenuItem("Save Scene", "Ctrl+S", false, m_activeScene != nullptr && !m_playing))
+				SaveActiveScene();
+
+			ImGui::Separator();
+
+			if (ImGui::MenuItem("Build Settings...", nullptr, false, !m_projectFile.empty()))
+			{
+				m_showBuildSettings = true;
+				m_focusBuildSettings = true;
+			};
+
+			ImGui::Separator();
+
+			if (ImGui::BeginMenu("Open Demo"))
+			{
+				if (ImGui::IsWindowAppearing())
+					m_demos = DemoProjects();
+
+				if (m_demos.empty())
+					ImGui::TextDisabled("No demos found.");
+
+				for (const std::filesystem::path& demo : m_demos)
+					if (ImGui::MenuItem(demo.filename().string().c_str()))
+						OpenDemo(demo.filename().string());
+
+				ImGui::EndMenu();
+			};
+
+			ImGui::Separator();
+
+			if (ImGui::MenuItem("Full Refresh", "Ctrl+Shift+R", false, !IsRefreshing()))
+				FullRefresh();
+
+			if (ImGui::MenuItem("Exit"))
+				Engine::Stop();
+
+			ImGui::EndMenu();
+		};
+
+		if (ImGui::BeginMenu("Edit"))
+		{
+			if (ImGui::MenuItem("Undo", "Ctrl+Z", false, CanUndo()))
+				Undo();
+
+			if (ImGui::MenuItem("Redo", "Ctrl+Y", false, CanRedo()))
+				Redo();
+
+			ImGui::Separator();
+
+			if (ImGui::MenuItem("Cut", "Ctrl+X", false, EditCommands::CanTake(m_selected)))
+				Cut();
+
+			if (ImGui::MenuItem("Copy", "Ctrl+C", false, EditCommands::CanTake(m_selected)))
+				Copy();
+
+			if (ImGui::MenuItem("Paste", "Ctrl+V"))
+				Paste();
+
+			if (ImGui::MenuItem("Delete", "Delete", false, EditCommands::CanTake(m_selected)))
+				DeleteSelected();
+
+			ImGui::EndMenu();
+		};
+
+		if (ImGui::BeginMenu("GameObject"))
+		{
+			if (ImGui::MenuItem("Create Empty", nullptr, false, m_activeScene != nullptr))
+				Select(m_activeScene->AddChild());
+
+			if (ImGui::MenuItem("Create Child", nullptr, false, m_selected != nullptr))
+				Select(m_selected->AddChild());
+
+			DrawShapeMenu(m_activeScene ? &m_activeScene->GetRoot() : nullptr);
+
+			ImGui::Separator();
+
+			if (ImGui::MenuItem("Delete", nullptr, false, EditCommands::CanTake(m_selected)))
+				DeleteSelected();
+
+			ImGui::EndMenu();
+		};
+
+		if (ImGui::BeginMenu("Window"))
+		{
+			for (const Panel& panel : Panels())
+				ImGui::MenuItem(panel.title, nullptr, panel.shown);
+
+			ImGui::Separator();
+			ImGui::MenuItem("ImGui Demo", nullptr, &m_showImGuiDemo);
+
+			ImGui::Separator();
+			ImGui::MenuItem(EditorPanels::Settings, nullptr, &m_showSettings);
+
+			ImGui::EndMenu();
+		};
+
+		const std::string layout_menu = m_currentLayout.empty()
+			? std::string("Layout###Layout")
+			: "Layout: " + m_currentLayout + "###Layout";
+
+		if (ImGui::BeginMenu(layout_menu.c_str()))
+		{
+			if (ImGui::IsWindowAppearing())
+				m_layouts = EditorLayouts::Names(LayoutsFolder());
+
+			if (m_layouts.empty())
+				ImGui::TextDisabled("No saved layouts.");
+
+			for (const std::string& layout : m_layouts)
+				if (ImGui::MenuItem(layout.c_str(), nullptr, EditorLayouts::SameName(layout, m_currentLayout)))
+					m_pendingLayout = layout;
+
+			ImGui::Separator();
+
+			if (ImGui::MenuItem("Save Layout..."))
+				ShowSaveLayoutPrompt();
+
+			if (ImGui::BeginMenu("Delete Layout", !m_layouts.empty()))
+			{
+				for (const std::string& layout : m_layouts)
+					if (ImGui::MenuItem(layout.c_str()))
+					{
+						if (!EditorLayouts::Delete(LayoutsFolder(), layout))
+							std::cerr << "Could not delete the layout '" << layout << "'" << std::endl;
+						else if (EditorLayouts::SameName(layout, m_currentLayout))
+							SetCurrentLayout("");
+					};
+
+				ImGui::EndMenu();
+			};
+
+			ImGui::Separator();
+
+			if (ImGui::MenuItem("Reset Layout"))
+				m_rebuildLayout = true;
+
+			ImGui::EndMenu();
+		};
+
+		// Play control, mirrored in the Game and Debug windows' toolbars.
+		ImGui::Separator();
+
+		if (ImGui::MenuItem(Engine::updateScenes ? "Pause" : "Play"))
+			TogglePlay();
+
+		if (ImGui::MenuItem("Stop", nullptr, false, IsPlaying()))
+			Stop();
+
+		if (ImGui::MenuItem("Play Web", nullptr, false, m_activeScene != nullptr && !m_projectPath.empty()))
+			PlayWeb();
+
+		ImGui::EndMainMenuBar();
 	};
 
 	#pragma endregion
@@ -2358,190 +2519,6 @@ namespace Loom
 
 	#pragma endregion
 
-	#pragma region Main Menu
-
-	void Editor::DrawMainMenuBar()
-	{
-		if (!ImGui::BeginMainMenuBar())
-			return;
-
-		if (ImGui::BeginMenu("File"))
-		{
-			if (ImGui::MenuItem((std::string(EditorIcons::Project) + " New Project...").c_str()))
-			{
-				snprintf(
-					m_newProjectFolder,
-					sizeof(m_newProjectFolder),
-					"%s",
-					DesktopPath().c_str());
-
-				m_askForNewProject = true;
-			};
-
-			if (ImGui::MenuItem((std::string(EditorIcons::Project) + " Open Project...").c_str()))
-				ShowOpenProjectDialog();
-
-			ImGui::Separator();
-
-			if (ImGui::MenuItem("New Scene"))
-				CreateScene("Scene " + std::to_string(++m_sceneCounter));
-
-			if (ImGui::MenuItem("Save Scene", "Ctrl+S", false, m_activeScene != nullptr && !m_playing))
-				SaveActiveScene();
-
-			ImGui::Separator();
-
-			if (ImGui::MenuItem("Build Settings...", nullptr, false, !m_projectFile.empty()))
-			{
-				m_showBuildSettings = true;
-				m_focusBuildSettings = true;
-			};
-
-			ImGui::Separator();
-
-			if (ImGui::BeginMenu("Open Demo"))
-			{
-				if (ImGui::IsWindowAppearing())
-					m_demos = DemoProjects();
-
-				if (m_demos.empty())
-					ImGui::TextDisabled("No demos found.");
-
-				for (const std::filesystem::path& demo : m_demos)
-					if (ImGui::MenuItem(demo.filename().string().c_str()))
-						OpenDemo(demo.filename().string());
-
-				ImGui::EndMenu();
-			};
-
-			ImGui::Separator();
-
-			if (ImGui::MenuItem("Full Refresh", "Ctrl+Shift+R", false, !IsRefreshing()))
-				FullRefresh();
-
-			if (ImGui::MenuItem("Exit"))
-				Engine::Stop();
-
-			ImGui::EndMenu();
-		};
-
-		if (ImGui::BeginMenu("Edit"))
-		{
-			if (ImGui::MenuItem("Undo", "Ctrl+Z", false, CanUndo()))
-				Undo();
-
-			if (ImGui::MenuItem("Redo", "Ctrl+Y", false, CanRedo()))
-				Redo();
-
-			ImGui::Separator();
-
-			if (ImGui::MenuItem("Cut", "Ctrl+X", false, EditCommands::CanTake(m_selected)))
-				Cut();
-
-			if (ImGui::MenuItem("Copy", "Ctrl+C", false, EditCommands::CanTake(m_selected)))
-				Copy();
-
-			if (ImGui::MenuItem("Paste", "Ctrl+V"))
-				Paste();
-
-			if (ImGui::MenuItem("Delete", "Delete", false, EditCommands::CanTake(m_selected)))
-				DeleteSelected();
-
-			ImGui::EndMenu();
-		};
-
-		if (ImGui::BeginMenu("GameObject"))
-		{
-			if (ImGui::MenuItem("Create Empty", nullptr, false, m_activeScene != nullptr))
-				Select(m_activeScene->AddChild());
-
-			if (ImGui::MenuItem("Create Child", nullptr, false, m_selected != nullptr))
-				Select(m_selected->AddChild());
-
-			DrawShapeMenu(m_activeScene ? &m_activeScene->GetRoot() : nullptr);
-
-			ImGui::Separator();
-
-			if (ImGui::MenuItem("Delete", nullptr, false, EditCommands::CanTake(m_selected)))
-				DeleteSelected();
-
-			ImGui::EndMenu();
-		};
-
-		if (ImGui::BeginMenu("Window"))
-		{
-			for (const Panel& panel : Panels())
-				ImGui::MenuItem(panel.title, nullptr, panel.shown);
-
-			ImGui::Separator();
-			ImGui::MenuItem("ImGui Demo", nullptr, &m_showImGuiDemo);
-
-			ImGui::Separator();
-			ImGui::MenuItem(EditorPanels::Settings, nullptr, &m_showSettings);
-
-			ImGui::EndMenu();
-		};
-
-		const std::string layout_menu = m_currentLayout.empty()
-			? std::string("Layout###Layout")
-			: "Layout: " + m_currentLayout + "###Layout";
-
-		if (ImGui::BeginMenu(layout_menu.c_str()))
-		{
-			if (ImGui::IsWindowAppearing())
-				m_layouts = EditorLayouts::Names(LayoutsFolder());
-
-			if (m_layouts.empty())
-				ImGui::TextDisabled("No saved layouts.");
-
-			for (const std::string& layout : m_layouts)
-				if (ImGui::MenuItem(layout.c_str(), nullptr, EditorLayouts::SameName(layout, m_currentLayout)))
-					m_pendingLayout = layout;
-
-			ImGui::Separator();
-
-			if (ImGui::MenuItem("Save Layout..."))
-				ShowSaveLayoutPrompt();
-
-			if (ImGui::BeginMenu("Delete Layout", !m_layouts.empty()))
-			{
-				for (const std::string& layout : m_layouts)
-					if (ImGui::MenuItem(layout.c_str()))
-					{
-						if (!EditorLayouts::Delete(LayoutsFolder(), layout))
-							std::cerr << "Could not delete the layout '" << layout << "'" << std::endl;
-						else if (EditorLayouts::SameName(layout, m_currentLayout))
-							SetCurrentLayout("");
-					};
-
-				ImGui::EndMenu();
-			};
-
-			ImGui::Separator();
-
-			if (ImGui::MenuItem("Reset Layout"))
-				m_rebuildLayout = true;
-
-			ImGui::EndMenu();
-		};
-
-		// Play control, mirrored in the Game and Debug windows' toolbars.
-		ImGui::Separator();
-
-		if (ImGui::MenuItem(Engine::updateScenes ? "Pause" : "Play"))
-			TogglePlay();
-
-		if (ImGui::MenuItem("Stop", nullptr, false, IsPlaying()))
-			Stop();
-
-		if (ImGui::MenuItem("Play Web", nullptr, false, m_activeScene != nullptr && !m_projectPath.empty()))
-			PlayWeb();
-
-		ImGui::EndMainMenuBar();
-	};
-
-	#pragma endregion
-
 	#pragma region Dialogs
 
 	void Editor::DrawFolderPrompt()
@@ -2592,25 +2569,6 @@ namespace Loom
 		};
 
 		ImGui::End();
-	};
-
-	bool Editor::OpenDemo(const std::string& name)
-	{
-		for (const std::filesystem::path& demo : DemoProjects())
-			if (demo.filename() == name)
-			{
-				if (!OpenProject(demo.string()))
-					return false;
-
-				m_askForFolder = false;
-				return true;
-			};
-
-		std::cerr << "No demo called '" << name << "' in "
-			<< (std::filesystem::path(ProjectTemplate::EngineRoot()) / "Demos").string()
-			<< std::endl;
-
-		return false;
 	};
 
 	void Editor::ShowOpenProjectDialog()
@@ -4185,6 +4143,36 @@ namespace Loom
 		};
 	};
 
+	bool Editor::TabDoubleClicked()
+	{
+		const ImGuiWindow* window = ImGui::GetCurrentWindow();
+		const ImGuiWindow* hovered = ImGui::GetCurrentContext()->HoveredWindow;
+		const ImVec2 mouse = ImGui::GetIO().MousePos;
+
+		if (!ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+			return false;
+
+		if (!window->DockIsActive)
+			return hovered == window && window->TitleBarRect().Contains(mouse);
+
+		// The tab is drawn in the window that hosts its dock node, so that is
+		// the one the cursor is on, and a hidden tab bar keeps the rect it
+		// last had.
+		const ImGuiDockNode* node = window->DockNode;
+
+		return node != nullptr && !node->IsHiddenTabBar() && !node->IsNoTabBar() &&
+			hovered == node->HostWindow && window->DC.DockTabItemRect.Contains(mouse);
+	};
+
+	void Editor::Watch(View view)
+	{
+		if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
+			m_lastView = view;
+
+		if (TabDoubleClicked())
+			EnterFullscreen(view);
+	};
+
 	void Editor::DrawToolbar()
 	{
 		constexpr const char* play_label = "Play";
@@ -4317,6 +4305,87 @@ namespace Loom
 				ImVec2((float)view.GetWidth(), (float)view.GetHeight()),
 				ImVec2(0.0f, 1.0f),	// The framebuffer is bottom-up,
 				ImVec2(1.0f, 0.0f));// so the V axis is flipped
+	};
+
+	void Editor::DrawSceneData()
+	{
+		if (ImGui::Begin(EditorPanels::SceneData, &m_showSceneData))
+		{
+			if (m_activeScene == nullptr)
+				ImGui::TextDisabled("No scene open.");
+			else
+			{
+				// Rebuilt every frame on purpose: this is the scene as it would
+				// be written right now, edits included.
+				const std::string text = SceneSerializer::Serialize(*m_activeScene);
+
+				if (ImGui::Button("Copy"))
+					ImGui::SetClipboardText(text.c_str());
+
+				ImGui::SameLine();
+				ImGui::TextDisabled("%d lines", (int)std::count(text.begin(), text.end(), '\n'));
+
+				ImGui::Separator();
+
+				if (ImGui::BeginChild(
+					"##text",
+					ImVec2(0.0f, 0.0f),
+					ImGuiChildFlags_None,
+					ImGuiWindowFlags_HorizontalScrollbar))
+					ImGui::TextUnformatted(text.c_str());
+
+				ImGui::EndChild();
+			};
+		};
+
+		ImGui::End();
+	};
+
+	void Editor::DrawStats()
+	{
+		if (ImGui::Begin(EditorPanels::Stats, &m_showStats))
+		{
+			const ImGuiIO& io = ImGui::GetIO();
+
+			constexpr float milliseconds_per_second = 1000.0f;
+
+			// ImGui already averages Framerate over its last 60 frames.
+			ImGui::Text(
+				"%d FPS (%d ms/frame)",
+				(int)std::ceil(io.Framerate),
+				(int)std::ceil(milliseconds_per_second / io.Framerate));
+			ImGui::Text("Graphics API: %s", EditorSettings::BackendLabel(Engine::backend));
+			ImGui::Text("Job threads: %u of %u", Jobs::Threads(), Jobs::Cores());
+
+			ImGui::Text("Scenes: %d", (int)Scene::GetScenes().size());
+			ImGui::Text("GameObjects: %d", (int)GameObject::GetObjectCount());
+			ImGui::Text("Registered components: %d", (int)ComponentRegistry::All().size());
+
+			const char* const updating =
+				Engine::updateScenes
+					? "yes"
+					: "paused";
+
+			ImGui::Text("Updating: %s", IsPlaying() ? updating : "stopped");
+			ImGui::Text("Game view: %d x %d", m_gameView.GetWidth(), m_gameView.GetHeight());
+
+			if (m_activeScene)
+			{
+				ImGui::Text("Active scene: %s", m_activeScene->NameAndID().c_str());
+				ImGui::TextDisabled("%s", m_activeScene->GetGuid().ToString().c_str());
+			}
+			else ImGui::TextDisabled("No active scene");
+
+#ifndef LOOM_FINAL
+			if (ImGui::CollapsingHeader("Frame stages"))
+			{
+				m_stagesShown = true;
+				StageTiming::Details();
+			};
+#endif
+		};
+
+		ImGui::End();
 	};
 
 	#pragma endregion
@@ -4469,91 +4538,6 @@ namespace Loom
 
 		m_selectedAsset = std::filesystem::path(copied).lexically_normal().string();
 		m_revealSelectedAsset = true;
-	};
-
-	#pragma endregion
-
-	#pragma region Info Panels
-
-	void Editor::DrawSceneData()
-	{
-		if (ImGui::Begin(EditorPanels::SceneData, &m_showSceneData))
-		{
-			if (m_activeScene == nullptr)
-				ImGui::TextDisabled("No scene open.");
-			else
-			{
-				// Rebuilt every frame on purpose: this is the scene as it would
-				// be written right now, edits included.
-				const std::string text = SceneSerializer::Serialize(*m_activeScene);
-
-				if (ImGui::Button("Copy"))
-					ImGui::SetClipboardText(text.c_str());
-
-				ImGui::SameLine();
-				ImGui::TextDisabled("%d lines", (int)std::count(text.begin(), text.end(), '\n'));
-
-				ImGui::Separator();
-
-				if (ImGui::BeginChild(
-					"##text",
-					ImVec2(0.0f, 0.0f),
-					ImGuiChildFlags_None,
-					ImGuiWindowFlags_HorizontalScrollbar))
-					ImGui::TextUnformatted(text.c_str());
-
-				ImGui::EndChild();
-			};
-		};
-
-		ImGui::End();
-	};
-
-	void Editor::DrawStats()
-	{
-		if (ImGui::Begin(EditorPanels::Stats, &m_showStats))
-		{
-			const ImGuiIO& io = ImGui::GetIO();
-
-			constexpr float milliseconds_per_second = 1000.0f;
-
-			// ImGui already averages Framerate over its last 60 frames.
-			ImGui::Text(
-				"%d FPS (%d ms/frame)",
-				(int)std::ceil(io.Framerate),
-				(int)std::ceil(milliseconds_per_second / io.Framerate));
-			ImGui::Text("Graphics API: %s", EditorSettings::BackendLabel(Engine::backend));
-			ImGui::Text("Job threads: %u of %u", Jobs::Threads(), Jobs::Cores());
-
-			ImGui::Text("Scenes: %d", (int)Scene::GetScenes().size());
-			ImGui::Text("GameObjects: %d", (int)GameObject::GetObjectCount());
-			ImGui::Text("Registered components: %d", (int)ComponentRegistry::All().size());
-
-			const char* const updating =
-				Engine::updateScenes
-					? "yes"
-					: "paused";
-
-			ImGui::Text("Updating: %s", IsPlaying() ? updating : "stopped");
-			ImGui::Text("Game view: %d x %d", m_gameView.GetWidth(), m_gameView.GetHeight());
-
-			if (m_activeScene)
-			{
-				ImGui::Text("Active scene: %s", m_activeScene->NameAndID().c_str());
-				ImGui::TextDisabled("%s", m_activeScene->GetGuid().ToString().c_str());
-			}
-			else ImGui::TextDisabled("No active scene");
-
-#ifndef LOOM_FINAL
-			if (ImGui::CollapsingHeader("Frame stages"))
-			{
-				m_stagesShown = true;
-				StageTiming::Details();
-			};
-#endif
-		};
-
-		ImGui::End();
 	};
 
 	#pragma endregion
