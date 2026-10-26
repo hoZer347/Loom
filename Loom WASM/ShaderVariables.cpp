@@ -21,8 +21,8 @@ namespace Loom
 {
 	namespace
 	{
-		constexpr const char* INSTANCE_TAG = "instance";
-		constexpr const char* MATERIAL_TAG = "material";
+		constexpr const char* GLOBAL_TAG = "global";
+		constexpr const char* LOCAL_TAG = "local";
 
 		// GLSL keeps gl_ for itself.
 		constexpr std::string_view RESERVED_PREFIX = "gl_";
@@ -41,17 +41,19 @@ namespace Loom
 
 		const std::regex& DeclarationPattern()
 		{
-			// The indentation, the type, the name and the word in a trailing
-			// comment.
+			// The indentation, the type, the name, then the first word of a
+			// trailing comment and the rest of it.
 			static const std::regex pattern(
-				R"(^(\s*)uniform\s+(?:(?:lowp|mediump|highp)\s+)?(\w+)\s+(\w+)\s*;\s*(?://\s*(\w+))?.*$)");
+				R"(^(\s*)uniform\s+(?:(?:lowp|mediump|highp)\s+)?(\w+)\s+(\w+)\s*;\s*(?://\s*(\w*)\s*(.*?)|.*?)\s*$)");
 
 			return pattern;
 		};
 
+		constexpr size_t INDENT_MATCH = 1;
 		constexpr size_t TYPE_MATCH = 2;
 		constexpr size_t NAME_MATCH = 3;
 		constexpr size_t TAG_MATCH = 4;
+		constexpr size_t VALUE_MATCH = 5;
 
 		// Set by Material, Mesh, Camera and Light, so never a variable.
 		bool IsEngineUniform(std::string_view name)
@@ -201,9 +203,15 @@ namespace Loom
 
 		std::string Declaration(const ShaderVariable& variable)
 		{
-			return
-				std::string("uniform ") + InfoOf(variable.type).glsl + ' ' + variable.name + "; // " +
-				(variable.scope == UniformScope::Instance ? INSTANCE_TAG : MATERIAL_TAG);
+			const std::string declared = std::string("uniform ") + InfoOf(variable.type).glsl + ' ' + variable.name + "; // ";
+
+			if (variable.scope == UniformScope::Local)
+				return declared + LOCAL_TAG;
+
+			const UniformValue& global = variable.global.type == variable.type ? variable.global : UniformValue::Default(variable.type);
+			const std::string value = global.Write();
+
+			return declared + GLOBAL_TAG + (value.empty() ? "" : " " + value);
 		};
 
 		bool IsIdentifier(const std::string& name)
@@ -349,6 +357,53 @@ namespace Loom
 		return value;
 	};
 
+	std::string UniformValue::Write() const
+	{
+		const UniformTypeInfo& info = InfoOf(type);
+
+		if (info.kind == UniformKind::Texture)
+			return texture;
+
+		std::string text;
+
+		for (int i = 0; i < info.columns * info.rows; i++)
+		{
+			char number[NUMBER_LENGTH]{ };
+
+			if (info.kind == UniformKind::Float)
+				snprintf(number, sizeof(number), WRITTEN_FLOAT_FORMAT, (float)components[i]);
+			else snprintf(number, sizeof(number), WRITTEN_INTEGER_FORMAT, components[i]);
+
+			if (i > 0)
+				text += ' ';
+
+			text += number;
+		};
+
+		return text;
+	};
+
+	UniformValue UniformValue::Read(UniformType type, const std::string& text)
+	{
+		UniformValue value = Default(type);
+		const UniformTypeInfo& info = InfoOf(type);
+
+		if (info.kind == UniformKind::Texture)
+		{
+			value.texture = Trimmed(text);
+			return value;
+		};
+
+		std::istringstream words(text);
+		double component = 0.0;
+
+		// Through a copy, since a failed read writes zero over the default.
+		for (int i = 0; i < info.columns * info.rows && words >> component; i++)
+			value.components[i] = component;
+
+		return value;
+	};
+
 	const UniformValue* UniformValues::Find(const ShaderVariable& variable) const
 	{
 		const auto found = values.find(variable.name);
@@ -380,28 +435,7 @@ namespace Loom
 		std::string text;
 
 		for (const auto& [name, value] : values)
-		{
-			const UniformTypeInfo& info = InfoOf(value.type);
-
-			text += name + ' ' + info.glsl;
-
-			if (info.kind == UniformKind::Texture)
-				text += ' ' + value.texture;
-			else
-				for (int i = 0; i < info.columns * info.rows; i++)
-				{
-					char number[NUMBER_LENGTH]{ };
-
-					if (info.kind == UniformKind::Float)
-						snprintf(number, sizeof(number), WRITTEN_FLOAT_FORMAT, (float)value.components[i]);
-					else snprintf(number, sizeof(number), WRITTEN_INTEGER_FORMAT, value.components[i]);
-
-					text += ' ';
-					text += number;
-				};
-
-			text += '\n';
-		};
+			text += name + ' ' + InfoOf(value.type).glsl + ' ' + value.Write() + '\n';
 
 		return text;
 	};
@@ -423,16 +457,10 @@ namespace Loom
 			if (!(words >> name >> glsl) || !FindUniformType(glsl, type))
 				continue;
 
-			UniformValue value = UniformValue::Default(type);
-			const UniformTypeInfo& info = InfoOf(type);
+			std::string rest;
+			std::getline(words, rest);
 
-			if (info.kind == UniformKind::Texture)
-				std::getline(words >> std::ws, value.texture);
-			else
-				for (int i = 0; i < info.columns * info.rows; i++)
-					words >> value.components[i];
-
-			values[name] = value;
+			values[name] = UniformValue::Read(type, rest);
 		};
 	};
 
@@ -467,12 +495,38 @@ namespace Loom
 			if (seen)
 				continue;
 
-			variable.scope = match[TAG_MATCH] == INSTANCE_TAG ? UniformScope::Instance : UniformScope::Material;
+			if (match[TAG_MATCH] == GLOBAL_TAG)
+			{
+				variable.scope = UniformScope::Global;
+				variable.global = UniformValue::Read(variable.type, match[VALUE_MATCH]);
+			};
 
 			variables.push_back(variable);
 		};
 
 		return variables;
+	};
+
+	std::string ShaderCode(const std::string& source)
+	{
+		std::string code;
+
+		std::istringstream lines(source);
+		std::string line;
+		std::smatch match;
+
+		while (std::getline(lines, line))
+		{
+			if (!line.empty() && line.back() == '\r')
+				line.pop_back();
+
+			if (std::regex_match(line, match, DeclarationPattern()))
+				line = line.substr(0, line.find(';') + 1);
+
+			code += line + '\n';
+		};
+
+		return code;
 	};
 
 	bool DeclareShaderVariable(const std::string& path, const std::string& replacing, const ShaderVariable& variable, std::string& error)
@@ -507,7 +561,7 @@ namespace Loom
 			std::smatch match;
 			std::regex_match(file.lines[line], match, DeclarationPattern());
 
-			file.lines[line] = match[1].str() + Declaration(variable);
+			file.lines[line] = match[INDENT_MATCH].str() + Declaration(variable);
 		};
 
 		if (replaced.empty())
@@ -638,7 +692,7 @@ namespace Loom
 		return file.Write(path, error);
 	};
 
-	void ApplyShaderVariables(uint32_t program, const std::vector<ShaderVariable>& variables, const UniformValues& material, const UniformValues* instance)
+	void ApplyShaderVariables(uint32_t program, const std::vector<ShaderVariable>& variables, const UniformValues& locals)
 	{
 		Renderer* renderer = Renderer::Get();
 
@@ -647,8 +701,9 @@ namespace Loom
 
 		for (const ShaderVariable& variable : variables)
 		{
-			const UniformValues* values = variable.scope == UniformScope::Instance ? instance : &material;
-			const UniformValue* value = values ? values->Find(variable) : nullptr;
+			// A global value of another type, as one never parsed has, is no value.
+			const UniformValue* value = variable.scope == UniformScope::Local ? locals.Find(variable) :
+				variable.global.type == variable.type ? &variable.global : nullptr;
 			const UniformTypeInfo& info = InfoOf(variable.type);
 
 			if (info.kind == UniformKind::Texture)
@@ -674,52 +729,15 @@ namespace Loom
 		};
 	};
 
-	bool DrawShaderVariables(const std::vector<ShaderVariable>& variables, UniformScope scope, UniformValues& values)
+	bool DrawUniformValue(UniformType type, UniformValue& value)
 	{
-		float column = 0.0f;
+		const UniformTypeInfo& info = InfoOf(type);
 
-		for (const ShaderVariable& variable : variables)
-			if (variable.scope == scope)
-				column = std::max(column, ImGui::CalcTextSize(variable.name.c_str()).x);
-
-		column += ImGui::GetStyle().ItemSpacing.x;
-
-		bool changed = false;
-
-		for (const ShaderVariable& variable : variables)
+		switch (info.kind)
 		{
-			if (variable.scope != scope)
-				continue;
-
-			ImGui::PushID(variable.name.c_str());
-
-			ImGui::AlignTextToFramePadding();
-			ImGui::TextUnformatted(variable.name.c_str());
-			ImGui::SetItemTooltip("%s", InfoOf(variable.type).glsl);
-			ImGui::SameLine(column);
-
-			const UniformValue* found = values.Find(variable);
-			UniformValue value = found ? *found : UniformValue::Default(variable.type);
-			const UniformTypeInfo& info = InfoOf(variable.type);
-
-			bool edited = false;
-
-			switch (info.kind)
-			{
-			case UniformKind::Bool:		edited = DrawBools(info, value);	break;
-			case UniformKind::Texture:	edited = DrawTexture(value);		break;
-			default:					edited = DrawNumbers(info, value);	break;
-			};
-
-			if (edited)
-			{
-				values.values[variable.name] = value;
-				changed = true;
-			};
-
-			ImGui::PopID();
+		case UniformKind::Bool:		return DrawBools(info, value);
+		case UniformKind::Texture:	return DrawTexture(value);
+		default:					return DrawNumbers(info, value);
 		};
-
-		return changed;
 	};
 };

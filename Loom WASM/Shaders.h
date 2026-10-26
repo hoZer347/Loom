@@ -60,7 +60,8 @@ namespace Loom
 
 		// Compiles the file again, for after it has been edited, and swaps the
 		// new program in. A file that no longer compiles keeps the old program
-		// and says why.
+		// and says why. An edit only to its variables' scopes and global values
+		// is read without compiling, so a global can be dragged.
 		bool Reload();
 
 		// Reloads when the file has been written since it was last compiled.
@@ -105,6 +106,10 @@ namespace Loom
 
 	private:
 		std::filesystem::file_time_type m_written;
+
+		// The ShaderCode of the source the programs were built from. Declared
+		// before id, which is what fills it in.
+		std::string m_code;
 
 	public:
 		uint32_t id;

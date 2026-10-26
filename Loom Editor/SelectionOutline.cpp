@@ -257,7 +257,7 @@ void main()
 
 				const uint32_t program = MeshMask(*mesh->material->shader);
 
-				mesh->material->Apply(program, &*std::as_const(mesh->variables));
+				mesh->material->Apply(program);
 				camera.Apply(program);
 				mesh->Draw(program);
 				drew = true;

@@ -117,8 +117,11 @@ namespace Loom
 		Serial<DrawType> m_draw_type = Static;
 		Serial<std::vector<float>> m_vertices;
 
-		// This mesh's values for its material's per-instance shader variables.
-		Serial<UniformValues> variables;
+		// Values from when a mesh had its own for some of its material's
+		// variables, read from scenes saved then and handed to the material
+		// the first time the mesh is drawn. Kept so the fields after it keep
+		// their places.
+		Serial<UniformValues> m_formerVariables;
 
 		// Two floats a vertex, drawn as aUV, when there is a pair for every
 		// vertex. Last, so the fields before it keep their places in scenes

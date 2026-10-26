@@ -755,7 +755,15 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 		try
 		{
-			std::istringstream source(ReadSource(file_path));
+			const std::string text = ReadSource(file_path);
+
+			if (ShaderCode(text) == m_code)
+			{
+				variables = ParseShaderVariables(text);
+				return true;
+			};
+
+			std::istringstream source(text);
 			id = Build(file_path, source);
 		}
 		catch (const std::exception& e)
@@ -1125,6 +1133,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		// After the programs, so a reload that fails leaves these describing
 		// the ones still in use.
 		variables = ParseShaderVariables(text);
+		m_code = ShaderCode(text);
 		shaders[name] = programs;
 
 		return Cached(programs);

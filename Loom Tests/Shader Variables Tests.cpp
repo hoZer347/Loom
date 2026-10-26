@@ -77,7 +77,7 @@ TEST_SUITE("Shader variables")
 		const std::vector<Loom::ShaderVariable> variables = Loom::ParseShaderVariables(
 			"// ===COMMON===\n"
 			"uniform float u_speed;\n"
-			"uniform highp vec3 u_tint; // instance\n"
+			"uniform highp vec3 u_tint; // global 1 0.5 0.25\n"
 			"uniform mat3x3 u_basis; // material\n"
 			"uniform sampler2D u_albedo;\r\n"
 			"uniform highp sampler2DShadow u_custom;\n"
@@ -95,14 +95,19 @@ TEST_SUITE("Shader variables")
 
 		CHECK(variables[0].name == "u_speed");
 		CHECK(variables[0].type == Loom::UniformType::Float);
-		CHECK(variables[0].scope == Loom::UniformScope::Material);
+		CHECK(variables[0].scope == Loom::UniformScope::Local);
 
 		CHECK(variables[1].name == "u_tint");
 		CHECK(variables[1].type == Loom::UniformType::Vec3);
-		CHECK(variables[1].scope == Loom::UniformScope::Instance);
+		CHECK(variables[1].scope == Loom::UniformScope::Global);
+		CHECK(variables[1].global.type == Loom::UniformType::Vec3);
+		CHECK(variables[1].global.components[1] == 0.5);
+		CHECK(variables[1].global.components[2] == 0.25);
 
+		// Any other comment is local.
 		CHECK(variables[2].name == "u_basis");
 		CHECK(variables[2].type == Loom::UniformType::Mat3);
+		CHECK(variables[2].scope == Loom::UniformScope::Local);
 
 		CHECK(variables[3].name == "u_albedo");
 		CHECK(variables[3].type == Loom::UniformType::Sampler2D);
@@ -162,6 +167,56 @@ TEST_SUITE("Shader variables")
 		CHECK(read.values["u_albedo"].texture == "Assets/With Spaces/brick.png");
 	};
 
+	TEST_CASE("a global value is written into its declaration and read back from it")
+	{
+		Loom::ShaderVariable basis{ "u_basis", Loom::UniformType::Mat2, Loom::UniformScope::Global };
+		basis.global = Loom::UniformValue::Default(Loom::UniformType::Mat2);
+		basis.global.components = { 1.0, 2.0, 3.0, 4.0 };
+
+		Loom::ShaderVariable albedo{ "u_albedo", Loom::UniformType::Sampler2D, Loom::UniformScope::Global };
+		albedo.global = Loom::UniformValue::Default(Loom::UniformType::Sampler2D);
+		albedo.global.texture = "Assets/With Spaces/brick.png";
+
+		const ShaderFile file("global values.shader", STAGES);
+
+		std::string error;
+		REQUIRE(Loom::DeclareShaderVariable(file.path.string(), "", basis, error));
+		REQUIRE(Loom::DeclareShaderVariable(file.path.string(), "", albedo, error));
+
+		const std::string text = file.Text();
+
+		CHECK(text.find("uniform mat2 u_basis; // global 1 2 3 4\n") != std::string::npos);
+		CHECK(text.find("uniform sampler2D u_albedo; // global Assets/With Spaces/brick.png\n") != std::string::npos);
+
+		const std::vector<Loom::ShaderVariable> variables = Loom::ParseShaderVariables(text);
+
+		REQUIRE(variables.size() == 2);
+		CHECK(variables[0].global == basis.global);
+		CHECK(variables[1].global == albedo.global);
+	};
+
+	TEST_CASE("a global value missing components has the default's")
+	{
+		const std::vector<Loom::ShaderVariable> variables = Loom::ParseShaderVariables(
+			"uniform mat2 u_basis; // global 5\n"
+			"uniform vec2 u_offset; // global\n");
+
+		REQUIRE(variables.size() == 2);
+
+		CHECK(variables[0].global.components[0] == 5.0);
+		CHECK(variables[0].global.components[3] == 1.0);
+		CHECK(variables[1].global == Loom::UniformValue::Default(Loom::UniformType::Vec2));
+	};
+
+	TEST_CASE("only what follows a declaration's semicolon is left out of a shader's code")
+	{
+		CHECK(Loom::ShaderCode("uniform vec3 u_tint; // global 1 0 0\r\nvoid main() { } // global\n") ==
+			Loom::ShaderCode("uniform vec3 u_tint; // local\nvoid main() { } // global\n"));
+
+		CHECK(Loom::ShaderCode("uniform vec3 u_tint; // local\n") != Loom::ShaderCode("uniform vec2 u_tint; // local\n"));
+		CHECK(Loom::ShaderCode("void main() { } // one\n") != Loom::ShaderCode("void main() { } // two\n"));
+	};
+
 	TEST_CASE("a value of another type than the variable's is not its value")
 	{
 		Loom::UniformValues values;
@@ -177,16 +232,16 @@ TEST_SUITE("Shader variables")
 		const ShaderFile file("declare without common.shader", "// A header comment.\n\n" + STAGES);
 
 		std::string error;
-		REQUIRE(Loom::DeclareShaderVariable(file.path.string(), "", { "u_tint", Loom::UniformType::Vec3, Loom::UniformScope::Instance }, error));
+		REQUIRE(Loom::DeclareShaderVariable(file.path.string(), "", { "u_tint", Loom::UniformType::Vec3, Loom::UniformScope::Global }, error));
 
 		const std::string text = file.Text();
 
-		CHECK(text.find("// A header comment.\n\n// ===COMMON===\n\nuniform vec3 u_tint; // instance\n\n// ===VERTEX===") != std::string::npos);
+		CHECK(text.find("// A header comment.\n\n// ===COMMON===\n\nuniform vec3 u_tint; // global 0 0 0\n\n// ===VERTEX===") != std::string::npos);
 
 		const std::vector<Loom::ShaderVariable> variables = Loom::ParseShaderVariables(text);
 
 		REQUIRE(variables.size() == 1);
-		CHECK(variables[0].scope == Loom::UniformScope::Instance);
+		CHECK(variables[0].scope == Loom::UniformScope::Global);
 	};
 
 	TEST_CASE("a new declaration goes after the ones already in COMMON, keeping the file's line endings")
@@ -207,7 +262,7 @@ TEST_SUITE("Shader variables")
 			"// ===COMMON===\r\n"
 			"precision highp sampler2DShadow;\r\n"
 			"uniform float u_first; // material\r\n"
-			"uniform int u_second; // material\r\n"
+			"uniform int u_second; // local\r\n"
 			"\r\n"
 			"float Helper() { return 1.0; }\r\n"
 			"// ===VERTEX===\r\n");
@@ -264,9 +319,9 @@ TEST_SUITE("Shader variables")
 		const ShaderFile file("redeclare.shader", "// ===FRAGMENT===\n\tuniform float u_speed;\nvoid main() { }\n");
 
 		std::string error;
-		REQUIRE(Loom::DeclareShaderVariable(file.path.string(), "u_speed", { "u_speed", Loom::UniformType::Vec2, Loom::UniformScope::Instance }, error));
+		REQUIRE(Loom::DeclareShaderVariable(file.path.string(), "u_speed", { "u_speed", Loom::UniformType::Vec2, Loom::UniformScope::Global }, error));
 
-		CHECK(file.Text() == "// ===FRAGMENT===\n\tuniform vec2 u_speed; // instance\nvoid main() { }\n");
+		CHECK(file.Text() == "// ===FRAGMENT===\n\tuniform vec2 u_speed; // global 0 0\nvoid main() { }\n");
 	};
 
 	TEST_CASE("a name that is taken, the engine's or not GLSL is refused")
@@ -311,8 +366,8 @@ TEST_SUITE("Shader variables")
 		REQUIRE(Loom::DeclareShaderVariable(file.path.string(), "u_wave", { "u_wave", Loom::UniformType::Vec2 }, error));
 
 		CHECK(file.Text() ==
-			"// ===VERTEX===\nuniform vec2 u_wave; // material\nvoid main() { }\n"
-			"// ===FRAGMENT===\nuniform vec2 u_wave; // material\nvoid main() { }\n");
+			"// ===VERTEX===\nuniform vec2 u_wave; // local\nvoid main() { }\n"
+			"// ===FRAGMENT===\nuniform vec2 u_wave; // local\nvoid main() { }\n");
 
 		REQUIRE(Loom::RemoveShaderVariable(file.path.string(), "u_wave", error));
 
@@ -338,7 +393,7 @@ TEST_SUITE("Shader variables")
 		shader.ReloadIfChanged();
 		CHECK(shader.id == first);
 
-		file.Write("// ===COMMON===\nuniform float u_speed;\nuniform vec3 u_tint; // instance\n" + STAGES);
+		file.Write("// ===COMMON===\nuniform float u_speed;\nuniform vec3 u_tint; // global\n" + STAGES);
 
 		const uint32_t firstInstanced = shader.instanced_id;
 
@@ -346,7 +401,7 @@ TEST_SUITE("Shader variables")
 		CHECK(shader.id != first);
 		CHECK(renderer.deleted == std::vector<uint32_t>{ first, firstInstanced });
 		REQUIRE(shader.variables.size() == 2);
-		CHECK(shader.variables[1].scope == Loom::UniformScope::Instance);
+		CHECK(shader.variables[1].scope == Loom::UniformScope::Global);
 
 		const uint32_t second = shader.id;
 
@@ -359,6 +414,44 @@ TEST_SUITE("Shader variables")
 		CHECK(captured.Says("compile error"));
 		CHECK(shader.id == second);
 		CHECK(shader.variables.size() == 2);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader whose file changes only in its variables' scopes and global values reads them without compiling")
+	{
+		RecordingRenderer renderer;
+
+		const ShaderFile file("rescoped.shader", "// ===COMMON===\nuniform float u_speed;\n" + STAGES);
+		Loom::Shader shader(file.path.string());
+
+		const uint32_t first = shader.id;
+
+		Loom::ShaderVariable speed = shader.variables.at(0);
+		speed.scope = Loom::UniformScope::Global;
+		speed.global.components[0] = 2.0;
+
+		std::string error;
+		REQUIRE(Loom::DeclareShaderVariable(file.path.string(), "u_speed", speed, error));
+		REQUIRE(shader.Reload());
+
+		CHECK(shader.id == first);
+		CHECK(renderer.deleted.empty());
+		REQUIRE(shader.variables.size() == 1);
+		CHECK(shader.variables[0].scope == Loom::UniformScope::Global);
+		CHECK(shader.variables[0].global.components[0] == 2.0);
+
+		speed.scope = Loom::UniformScope::Local;
+		REQUIRE(Loom::DeclareShaderVariable(file.path.string(), "u_speed", speed, error));
+		REQUIRE(shader.Reload());
+
+		CHECK(shader.id == first);
+		CHECK(shader.variables[0].scope == Loom::UniformScope::Local);
+
+		// Anything else compiles again.
+		speed.type = Loom::UniformType::Vec2;
+		REQUIRE(Loom::DeclareShaderVariable(file.path.string(), "u_speed", speed, error));
+		REQUIRE(shader.Reload());
+
+		CHECK(shader.id != first);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "turning a shader's shadows on and off in its file builds and drops its shadow program")
@@ -420,31 +513,32 @@ TEST_SUITE("Shader variables")
 	};
 #endif
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "each variable gets its own scope's value, or the default")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a global variable gets its own value and a local one the material's, or the default")
 	{
 		RecordingRenderer renderer;
 
+		Loom::ShaderVariable tint{ "u_tint", Loom::UniformType::Vec3, Loom::UniformScope::Global };
+		tint.global = Loom::UniformValue::Default(Loom::UniformType::Vec3);
+		tint.global.components = { 0.5, 0.25, 1.0 };
+
 		const std::vector<Loom::ShaderVariable> variables =
 		{
-			{ "u_speed", Loom::UniformType::Float, Loom::UniformScope::Material },
-			{ "u_tint", Loom::UniformType::Vec3, Loom::UniformScope::Instance },
-			{ "u_basis", Loom::UniformType::Mat2, Loom::UniformScope::Material },
-			{ "u_count", Loom::UniformType::Int, Loom::UniformScope::Instance },
-			{ "u_albedo", Loom::UniformType::Sampler2D, Loom::UniformScope::Material },
+			{ "u_speed", Loom::UniformType::Float },
+			tint,
+			{ "u_basis", Loom::UniformType::Mat2 },
+			{ "u_count", Loom::UniformType::Int, Loom::UniformScope::Global },
+			{ "u_albedo", Loom::UniformType::Sampler2D },
 		};
 
-		Loom::UniformValues material;
-		material.Set("u_speed", Loom::UniformType::Float, { 2.0 });
+		Loom::UniformValues locals;
+		locals.Set("u_speed", Loom::UniformType::Float, { 2.0 });
 
-		// Neither is the variable's: the tint is per instance, and the basis
-		// is a mat2.
-		material.Set("u_tint", Loom::UniformType::Vec3, { 9.0, 9.0, 9.0 });
-		material.Set("u_basis", Loom::UniformType::Vec4, { 5.0, 5.0, 5.0, 5.0 });
+		// Neither is the variable's: the tint is global, and the basis is a
+		// mat2.
+		locals.Set("u_tint", Loom::UniformType::Vec3, { 9.0, 9.0, 9.0 });
+		locals.Set("u_basis", Loom::UniformType::Vec4, { 5.0, 5.0, 5.0, 5.0 });
 
-		Loom::UniformValues instance;
-		instance.Set("u_tint", Loom::UniformType::Vec3, { 0.5, 0.25, 1.0 });
-
-		Loom::ApplyShaderVariables(1, variables, material, &instance);
+		Loom::ApplyShaderVariables(1, variables, locals);
 
 		CHECK(renderer.uniforms["u_speed"].Float(0) == 2.0f);
 
@@ -462,11 +556,11 @@ TEST_SUITE("Shader variables")
 		// No image named still puts something behind the sampler.
 		CHECK(renderer.textures["u_albedo"] != 0);
 
-		// Drawn with no instance values, a per-instance variable is put back to
-		// its default rather than keeping the last object's.
-		Loom::ApplyShaderVariables(1, variables, material, nullptr);
+		// Drawn with no values, a local variable is put back to its default
+		// rather than keeping the last material's.
+		Loom::ApplyShaderVariables(1, variables, { });
 
-		CHECK(renderer.uniforms["u_tint"].Float(0) == 0.0f);
+		CHECK(renderer.uniforms["u_speed"].Float(0) == 0.0f);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader with shadows on has its own shadow program, deleted along with it")

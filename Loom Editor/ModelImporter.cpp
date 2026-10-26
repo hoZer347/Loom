@@ -83,8 +83,8 @@ void main()
 
 // ===FRAGMENT===
 
-uniform sampler2D u_texture; // material
-uniform float u_alphaCutoff; // material
+uniform sampler2D u_texture; // local
+uniform float u_alphaCutoff; // local
 uniform vec3 u_color;
 
 in vec2 v_uv;

@@ -96,25 +96,9 @@ namespace Loom
 		{ "NormalKernel", "NormalKernel_3x3 name;", "Pixel pass: as PixelKernel, with the world space normals of the pixels as name.normals." },
 	};
 
-	// Whether a variable is filled in once on the Material, or on each Mesh
-	// drawn with it.
-	enum class UniformScope { Material, Instance };
-
-	/**
-	* Loom::ShaderVariable
-	* - A uniform a shader declares for whoever uses it to fill in, as opposed
-	*   to one the engine sets (u_model, u_color, the camera's and the light's)
-	* - The shader file is where they live: each is a line such as
-	*     uniform vec3 u_tint; // instance
-	*   which the editor writes into the file's COMMON section. Without the
-	*   comment, or with "// material", it is per material
-	*/
-	struct ShaderVariable
-	{
-		std::string name;
-		UniformType type = UniformType::Float;
-		UniformScope scope = UniformScope::Material;
-	};
+	// Whether a variable has one value, written in the shader file for every
+	// Material drawing with it, or a value on each Material.
+	enum class UniformScope { Global, Local };
 
 	struct LOOM_API UniformValue
 	{
@@ -130,12 +114,40 @@ namespace Loom
 		// Zero, or the identity for a matrix.
 		static UniformValue Default(UniformType type);
 
+		// Its components, or a sampler's image, on one line.
+		std::string Write() const;
+
+		// What Write wrote, for a value of the type. Components it leaves out
+		// are the default's.
+		static UniformValue Read(UniformType type, const std::string& text);
+
 		bool operator==(const UniformValue&) const = default;
 	};
 
 	/**
+	* Loom::ShaderVariable
+	* - A uniform a shader declares for whoever uses it to fill in, as opposed
+	*   to one the engine sets (u_model, u_color, the camera's and the light's)
+	* - The shader file is where they live: each is a line such as
+	*     uniform vec3 u_tint; // local
+	*   which the editor writes into the file's COMMON section. A global one
+	*   carries its value after the word, as in
+	*     uniform vec3 u_tint; // global 1 0.5 0
+	*   Any other comment, or none, makes it local
+	*/
+	struct ShaderVariable
+	{
+		std::string name;
+		UniformType type = UniformType::Float;
+		UniformScope scope = UniformScope::Local;
+
+		// A global variable's value.
+		UniformValue global;
+	};
+
+	/**
 	* Loom::UniformValues
-	* - What a Material or a Mesh fills its shader's variables in with, by name
+	* - What a Material fills its shader's local variables in with, by name
 	* - Keeps a value its shader no longer declares, so taking a variable out
 	*   and putting it back loses nothing
 	*/
@@ -160,6 +172,10 @@ namespace Loom
 	// Every uniform the source declares, bar the ones the engine sets.
 	LOOM_API std::vector<ShaderVariable> ParseShaderVariables(const std::string& source);
 
+	// The source without what follows each declaration's semicolon, so two
+	// files whose variables differ only in scope or global value read the same.
+	LOOM_API std::string ShaderCode(const std::string& source);
+
 	// Writes the variable's declaration into the shader file: over the line
 	// declaring replacing when it names one, otherwise into the COMMON
 	// section, which it adds when the file has none. False, with why in error,
@@ -178,12 +194,12 @@ namespace Loom
 	// line already saying it, adding the section at the top when there is none.
 	LOOM_API bool WriteShaderSettings(const std::string& path, const ShaderSettings& settings, std::string& error);
 
-	// Hands each variable its value: a per-material one from material, a
-	// per-instance one from instance when there is one, the default otherwise.
-	// Every variable is set on every draw, since a program keeps the last
-	// value it was given and the previous draw may have been someone else's.
-	LOOM_API void ApplyShaderVariables(uint32_t program, const std::vector<ShaderVariable>& variables, const UniformValues& material, const UniformValues* instance);
+	// Hands each variable its value: a global one its own, a local one the
+	// value locals holds for it, or the default. Every variable is set on
+	// every draw, since a program keeps the last value it was given and the
+	// previous draw may have been someone else's.
+	LOOM_API void ApplyShaderVariables(uint32_t program, const std::vector<ShaderVariable>& variables, const UniformValues& locals);
 
-	// An editor for each variable of the scope. Whether any value changed.
-	LOOM_API bool DrawShaderVariables(const std::vector<ShaderVariable>& variables, UniformScope scope, UniformValues& values);
+	// An editor for a value of the type. Whether it changed.
+	LOOM_API bool DrawUniformValue(UniformType type, UniformValue& value);
 };

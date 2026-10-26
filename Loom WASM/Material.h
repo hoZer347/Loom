@@ -38,18 +38,17 @@ namespace Loom
 		void OnRender() override
 		{ };
 
-		// A link that opens the shader file, its settings, the values of its
-		// per-material variables, and the declarations themselves. The settings
-		// and declarations are edited in the file.
+		// A link that opens the shader file, its settings, and a row for each
+		// of its variables with its type, its scope and its value. The
+		// settings, declarations and global values are edited in the file.
 		void OnGui() override;
 
 		void OnFieldChanged(const SerializedField& field) override;
 
 		// Hands the material's values to its program: u_color, whether it is
-		// shadowed, how its textures are sampled, and the shader's variables,
-		// the per-instance ones from instance. With them goes u_time, Time's
-		// SinceStart.
-		void Apply(uint32_t program, const UniformValues* instance = nullptr) const;
+		// shadowed, how its textures are sampled, and the shader's variables.
+		// With them goes u_time, Time's SinceStart.
+		void Apply(uint32_t program) const;
 
 		// Recompiles every material's shader whose file has been written since,
 		// for after something outside the editor edits one, and compiles again
@@ -70,7 +69,7 @@ namespace Loom
 		// it, whatever its shader's settings say.
 		Serial<bool> shadows = true;
 
-		// The per-material variables' values.
+		// The local variables' values.
 		Serial<UniformValues> variables;
 
 		// How its textures are sampled: as its shader's Pixelated setting says,
@@ -88,7 +87,9 @@ namespace Loom
 
 	private:
 		void DrawSettings();
-		void DrawDeclarations();
+		void DrawVariables();
+
+		void SetLocal(const std::string& name, const UniformValue& value);
 
 		// After the shader file has been rewritten, or failed to be, with why
 		// in error.

@@ -6,6 +6,7 @@
 #include "Shaders.h"
 #include "Utilities/Clock.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <string>
@@ -17,7 +18,10 @@ namespace Loom
 {
 	namespace
 	{
-		constexpr const char* SCOPE_NAMES[] = { "Material", "Instance" };
+		constexpr const char* SCOPE_NAMES[] = { "Global", "Local" };
+
+		// As wide as their choice, so the value has what is left of the row.
+		constexpr ImGuiComboFlags FITTED_COMBO = ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_WidthFitPreview;
 
 		// One Shader per path, shared by every Material that names it. Materials
 		// deliberately do not own theirs: ~Shader erases the entry in Shader's own
@@ -74,7 +78,7 @@ namespace Loom
 		{
 			bool changed = false;
 
-			if (ImGui::BeginCombo("##type", InfoOf(type).glsl))
+			if (ImGui::BeginCombo("##type", InfoOf(type).glsl, FITTED_COMBO))
 			{
 				for (const UniformTypeInfo& info : UNIFORM_TYPES)
 					if (ImGui::Selectable(info.glsl, info.type == type))
@@ -93,7 +97,7 @@ namespace Loom
 		{
 			bool changed = false;
 
-			if (ImGui::BeginCombo("##scope", SCOPE_NAMES[(int)scope]))
+			if (ImGui::BeginCombo("##scope", SCOPE_NAMES[(int)scope], FITTED_COMBO))
 			{
 				for (int i = 0; i < (int)std::size(SCOPE_NAMES); i++)
 					if (ImGui::Selectable(SCOPE_NAMES[i], i == (int)scope))
@@ -163,12 +167,7 @@ namespace Loom
 			return;
 
 		DrawSettings();
-		UniformValues values = variables;
-
-		if (DrawShaderVariables(shader->variables, UniformScope::Material, values))
-			variables = std::move(values);
-
-		DrawDeclarations();
+		DrawVariables();
 	};
 
 	void Material::DrawSettings()
@@ -194,30 +193,34 @@ namespace Loom
 		Edited(WriteShaderSettings(shader->file_path, settings, error), error);
 	};
 
-	void Material::DrawDeclarations()
+	void Material::DrawVariables()
 	{
-		// Open to begin with: adding a variable is the reason to look here.
+		// Open to begin with: the values are what is edited most.
 		if (!ImGui::TreeNodeEx("Shader Variables", ImGuiTreeNodeFlags_DefaultOpen))
 			return;
 
-		constexpr int COLUMNS = 4;
+		constexpr int COLUMNS = 5;
 
-		// Wide enough for the longest choice and the combo's arrow.
-		const auto combo_width = [](const char* longest)
-			{
-				return ImGui::CalcTextSize(longest).x + ImGui::GetFrameHeight() + ImGui::GetStyle().FramePadding.x * 2;
-			};
+		// How wide the new variable's name is to type into, at the least.
+		constexpr const char* NEW_NAME_WIDTH = "u_name";
 
-		if (ImGui::BeginTable("##declarations", COLUMNS))
+		if (ImGui::BeginTable("##variables", COLUMNS))
 		{
-			ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
-			ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, combo_width(InfoOf(UniformType::Sampler2D).glsl));
-			ImGui::TableSetupColumn("Scope", ImGuiTableColumnFlags_WidthFixed, combo_width(SCOPE_NAMES[(int)UniformScope::Material]));
+			// Every column but the value's fits what it holds.
+			ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed);
+			ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed);
+			ImGui::TableSetupColumn("Scope", ImGuiTableColumnFlags_WidthFixed);
+			ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 			ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
 
-			// A copy: rewriting the file recompiles the shader, which replaces
-			// the list being drawn.
+			// A copy: rewriting the file reloads the shader, which replaces the
+			// list being drawn.
 			const std::vector<ShaderVariable> declared = shader->variables;
+
+			float name_width = ImGui::CalcTextSize(NEW_NAME_WIDTH).x;
+
+			for (const ShaderVariable& variable : declared)
+				name_width = std::max(name_width, ImGui::CalcTextSize(variable.name.c_str()).x);
 
 			for (const ShaderVariable& variable : declared)
 			{
@@ -232,15 +235,34 @@ namespace Loom
 				std::string error;
 
 				ImGui::TableNextColumn();
-				ImGui::SetNextItemWidth(-FLT_MIN);
 				const bool retyped = TypeCombo(changed.type);
 
 				ImGui::TableNextColumn();
-				ImGui::SetNextItemWidth(-FLT_MIN);
 				const bool rescoped = ScopeCombo(changed.scope);
+
+				const UniformValue* found = std::as_const(variables)->Find(variable);
+				const bool set = found != nullptr;
+				UniformValue local = set ? *found : UniformValue::Default(variable.type);
+
+				// A variable keeps its value across a change of scope.
+				if (rescoped && changed.scope == UniformScope::Global && set)
+					changed.global = local;
+
+				if (rescoped && changed.scope == UniformScope::Local)
+					SetLocal(variable.name, variable.global);
 
 				if (retyped || rescoped)
 					Edited(DeclareShaderVariable(shader->file_path, variable.name, changed, error), error);
+
+				ImGui::TableNextColumn();
+
+				if (variable.scope == UniformScope::Global)
+				{
+					if (DrawUniformValue(variable.type, changed.global))
+						Edited(DeclareShaderVariable(shader->file_path, variable.name, changed, error), error);
+				}
+				else if (DrawUniformValue(variable.type, local))
+					SetLocal(variable.name, local);
 
 				ImGui::TableNextColumn();
 
@@ -256,18 +278,18 @@ namespace Loom
 			ImGui::TableNextRow();
 
 			ImGui::TableNextColumn();
-			ImGui::SetNextItemWidth(-FLT_MIN);
+			ImGui::SetNextItemWidth(name_width + ImGui::GetStyle().FramePadding.x * 2);
 			InputTextString("##name", m_new_variable.name);
 			ImGui::SetItemTooltip("The new variable's name, as the shader will use it");
 
 			ImGui::TableNextColumn();
-			ImGui::SetNextItemWidth(-FLT_MIN);
 			TypeCombo(m_new_variable.type);
 
 			ImGui::TableNextColumn();
-			ImGui::SetNextItemWidth(-FLT_MIN);
 			ScopeCombo(m_new_variable.scope);
 
+			// Past the value, which it has none of until it is declared.
+			ImGui::TableNextColumn();
 			ImGui::TableNextColumn();
 			ImGui::BeginDisabled(m_new_variable.name.empty());
 
@@ -307,7 +329,14 @@ namespace Loom
 		m_edit_error = shader->Reload() ? "" : shader->file_path + " no longer compiles. The console says why.";
 	};
 
-	void Material::Apply(uint32_t program, const UniformValues* instance) const
+	void Material::SetLocal(const std::string& name, const UniformValue& value)
+	{
+		UniformValues values = variables;
+		values.values[name] = value;
+		variables = std::move(values);
+	};
+
+	void Material::Apply(uint32_t program) const
 	{
 		Renderer* renderer = Renderer::Get();
 
@@ -323,7 +352,7 @@ namespace Loom
 
 		// Set for each draw, as materials sharing a program may sample apart.
 		renderer->SetPixelated(program, sampling == AsShader ? shader->settings.pixelated : sampling == Nearest);
-		ApplyShaderVariables(program, shader->variables, variables, instance);
+		ApplyShaderVariables(program, shader->variables, variables);
 	};
 
 	void Material::ReloadChangedShaders()

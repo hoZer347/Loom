@@ -312,7 +312,7 @@ vec3 LoomLight(vec3 normal)
 
 		// The pass is the shader's own vertex stage seen from the light,
 		// so it is handed the light's view-projection in the camera's place.
-		mesh.material->Apply(program, &*std::as_const(mesh.variables));
+		mesh.material->Apply(program);
 		renderer.SetUniform(program, "u_viewProjection", m_view_projection);
 		// A transparent shader's pass runs its fragment stage, which may call LoomShadow.
 		if (mesh.material->shader->settings.transparency)

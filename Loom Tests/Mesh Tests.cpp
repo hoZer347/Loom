@@ -261,12 +261,12 @@ TEST_SUITE("Mesh")
 		CHECK(renderer.floats["u_seed"] == fromGuid);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "meshes differing in their material's variables, their own variables or a Skin are drawn alone")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "meshes differing in their material's variables or a Skin are drawn alone")
 	{
 		RecordingRenderer renderer;
 
 		std::istringstream source(
-			"// ===VERTEX===\nuniform mat4 u_model;\nuniform float u_speed;\nuniform float u_tint; // instance\nvoid main() { }\n"
+			"// ===VERTEX===\nuniform mat4 u_model;\nuniform float u_speed;\nuniform float u_tint;\nvoid main() { }\n"
 			"// ===FRAGMENT===\nuniform vec3 u_color;\nvoid main() { }\n");
 		Loom::Shader shader("instanced apart", source);
 
@@ -302,6 +302,7 @@ TEST_SUITE("Mesh")
 		faster.Set("u_speed", Loom::UniformType::Float, { 2.0 });
 
 		Loom::UniformValues tinted;
+		tinted.Set("u_speed", Loom::UniformType::Float, { 3.0 });
 		tinted.Set("u_tint", Loom::UniformType::Float, { 0.5 });
 
 		SUBCASE("alike, they are drawn as instances of one")
@@ -319,12 +320,19 @@ TEST_SUITE("Mesh")
 			CHECK(renderer.drawn == std::vector<uint32_t>{ id, id });
 		};
 
-		SUBCASE("the mesh's own variables")
+		SUBCASE("a mesh's former variables, which its material takes over theirs")
 		{
-			meshes[1]->variables = tinted;
+			materials[1]->variables = faster;
+			meshes[1]->m_formerVariables = tinted;
 			scene.Render();
 
 			CHECK(renderer.drawn == std::vector<uint32_t>{ id, id });
+			CHECK(meshes[1]->m_formerVariables->values.empty());
+
+			const Loom::UniformValues& taken = materials[1]->variables;
+
+			CHECK(taken.values.at("u_speed").components[0] == 3.0);
+			CHECK(taken.values.at("u_tint").components[0] == 0.5);
 		};
 
 		SUBCASE("a Skin bending each")
