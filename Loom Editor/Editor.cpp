@@ -1439,7 +1439,16 @@ namespace Loom
 			return;
 
 		ImGui::Separator();
-		ImGui::TextDisabled("%s %s", EditorIcons::Prefab, m_prefabPath.c_str());
+
+		const std::string lead = std::string(EditorIcons::Prefab) + " ";
+		const std::string shown = FitPath(
+			m_prefabPath,
+			ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(lead.c_str()).x);
+
+		ImGui::TextDisabled("%s%s", lead.c_str(), shown.c_str());
+
+		if (shown != m_prefabPath)
+			ImGui::SetItemTooltip("%s", m_prefabPath.c_str());
 
 		DrawGameObjectNode(root, false, false);
 	};

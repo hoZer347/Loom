@@ -501,8 +501,11 @@ namespace Loom
 		// One of the open picker's rows, its label fit as the button's is.
 		// Whether it was picked, which closes the picker.
 		static bool PickerRow(
-			const std::string& id, const std::string& label, bool selected,
-			const char* icon = nullptr, const std::string& tip = { });
+			const std::string& id,
+			const std::string& label,
+			bool selected,
+			const char* icon = nullptr,
+			const std::string& tip = { });
 
 		// An Asset field: the file it names, which a click swaps for another
 		// picked from the project's files of the field's extension, filed as

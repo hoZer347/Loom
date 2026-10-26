@@ -72,6 +72,14 @@ namespace Loom
 		constexpr float pingOutlineThickness = 2.0f;
 		constexpr float pingRounding = 3.0f;
 
+		// How far NewShader, NewShader1, ... counts before leaving the name to
+		// the user to sort out.
+		constexpr int maxDefaultNameSuffix = 1000;
+
+		#pragma endregion
+
+		#pragma region Field Pickers
+
 		// A field picker's list: at least this wide, and this many rows tall.
 		constexpr float pickerMinWidth = 240.0f;
 		constexpr float pickerRows = 12.0f;
@@ -99,10 +107,6 @@ namespace Loom
 			else if (cut)
 				ImGui::SetItemTooltip("%s", text.c_str());
 		};
-
-		// How far NewShader, NewShader1, ... counts before leaving the name to
-		// the user to sort out.
-		constexpr int maxDefaultNameSuffix = 1000;
 
 		#pragma endregion
 
@@ -2227,7 +2231,11 @@ namespace Loom
 		const float width = ImGui::CalcItemWidth();
 
 		bool cut = false;
-		const std::string label = FitPickerLabel(icon, shown, width - ImGui::GetStyle().FramePadding.x * 2.0f, cut);
+		const std::string label = FitPickerLabel(
+			icon,
+			shown,
+			width - ImGui::GetStyle().FramePadding.x * 2.0f,
+			cut);
 
 		if (ImGui::Button((label + "###picker").c_str(), ImVec2(width, 0.0f)))
 		{
@@ -2279,7 +2287,10 @@ namespace Loom
 
 		bool cut = false;
 		const std::string shown = FitPickerLabel(
-			icon, label, ImGui::GetContentRegionAvail().x - ImGui::GetTreeNodeToLabelSpacing(), cut);
+			icon,
+			label,
+			ImGui::GetContentRegionAvail().x - ImGui::GetTreeNodeToLabelSpacing(),
+			cut);
 
 		ImGui::TreeNodeEx(("pick:" + id).c_str(), flags, "%s", shown.c_str());
 
