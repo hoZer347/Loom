@@ -399,7 +399,7 @@ namespace Loom
 			m_actions.push_back(
 				[this, down]()
 				{
-					m_mouse_held = down;
+					m_mouseHeld = down;
 					return Result::Done;
 				});
 		}
@@ -722,11 +722,11 @@ namespace Loom
 
 		m_held.clear();
 
-		if (m_mouse_held)
+		if (m_mouseHeld)
 		{
 			m_context->IO.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
 			Input::OnMouseButtonThisFrame(ImGuiMouseButton_Left, false);
-			m_mouse_held = false;
+			m_mouseHeld = false;
 		};
 	};
 

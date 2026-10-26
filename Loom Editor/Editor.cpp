@@ -3557,7 +3557,8 @@ namespace Loom
 		// From halfway into the gap above the header to halfway into the one
 		// below the component, so neighbours' areas meet where a line marks
 		// the place between them.
-		const float gap = ImGui::GetStyle().ItemSpacing.y / 2.0f;
+		constexpr float half = 0.5f;
+		const float gap = ImGui::GetStyle().ItemSpacing.y * half;
 		const auto drop = [&]()
 		{
 			const ImRect area(header.Min.x, header.Min.y - gap, header.Max.x, ImGui::GetCursorScreenPos().y - gap);

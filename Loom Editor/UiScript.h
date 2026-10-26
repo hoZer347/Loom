@@ -141,7 +141,7 @@ namespace Loom
 		int m_retries = 0;
 
 		std::vector<ImGuiKey> m_held{ };
-		bool m_mouse_held = false;
+		bool m_mouseHeld = false;
 
 		ImVec2 m_mouse{ };
 		bool m_mouseSet = false;
