@@ -6,6 +6,7 @@
 #include "Prefabs.h"
 #include "UiScript.h"
 
+#include "Animator.h"
 #include "GameObject.h"
 #include "Material.h"
 #include "Mesh.h"
@@ -87,6 +88,33 @@ namespace
 				lid->Attach<Loom::Skin>();
 		};
 
+		LoomTests::Pump();
+
+		std::ofstream(path, std::ios::binary) << Loom::SceneSerializer::Serialize(*top);
+
+		return path;
+	};
+
+	// A crate whose skinned lid its Animator's clips lift and turn.
+	std::string WriteAnimatedPrefab(const std::string& name)
+	{
+		const EditableMesh cube = EditableMesh::Cube(1.0f);
+		const std::string path = WritePrefab(name, nullptr, &cube, true);
+
+		Loom::Scene source("Source");
+		LoomTests::Pump();
+
+		Loom::GameObject* top = Loom::SceneSerializer::Deserialize(ReadFile(path), source.GetRoot());
+		LoomTests::Pump();
+
+		Loom::Animator* animator = top->Attach<Loom::Animator>();
+		animator->m_clips = "Lift\t1\nTurn\t1\n";
+		animator->m_channels = "0\ttranslation\tLid\n1\trotation\tLid\n";
+		animator->m_keys =
+		{
+			2.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 2.0f, 0.0f,
+			2.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+		};
 		LoomTests::Pump();
 
 		std::ofstream(path, std::ios::binary) << Loom::SceneSerializer::Serialize(*top);
@@ -618,6 +646,67 @@ TEST_SUITE("ModelEditor")
 
 		std::error_code code;
 		std::filesystem::remove(path, code);
+	};
+
+	TEST_CASE("The Model panel shows a skinned model, plays the clip picked from its Animator, and puts the model back as its prefab holds it, saving no pose")
+	{
+		constexpr int half_clip_frames = 30;
+
+		const std::string path = WriteAnimatedPrefab("model_animated");
+		const std::string written = ReadFile(path);
+
+		Driven driven("model_animated", nullptr, path);
+
+		Loom::GameObject* model = driven.editor.Model();
+		REQUIRE(model != nullptr);
+		REQUIRE(model->GetChildren().size() == 1);
+
+		Loom::GameObject* lid = model->GetChildren().front();
+
+		CHECK(driven.editor.Editing() == nullptr);
+		CHECK(driven.editor.Clips() == std::vector<std::string>{ "Lift", "Turn" });
+		CHECK(driven.editor.Playing().empty());
+
+		driven.editor.Play("Lift");
+
+		for (int i = 0; i < half_clip_frames; i++)
+			driven.Frame();
+
+		CHECK(driven.editor.Playing() == "Lift");
+		CHECK((*lid->transform.position).y > TOLERANCE);
+
+		driven.editor.Play("Turn");
+		driven.Frame();
+
+		CHECK(driven.editor.Playing() == "Turn");
+
+		driven.editor.Play("");
+		driven.Frame();
+
+		CHECK(driven.editor.Playing().empty());
+		CHECK(*lid->transform.position == glm::vec3(0.0f));
+		CHECK(*lid->transform.rotation == glm::vec3(0.0f));
+
+		driven.editor.Play("Lift");
+
+		for (int i = 0; i < half_clip_frames; i++)
+			driven.Frame();
+
+		CHECK(driven.editor.Save());
+		CHECK(ReadFile(path) == written);
+	};
+
+	TEST_CASE("The Model panel puts the model back for a clip its Animator has none by")
+	{
+		Driven driven("model_unknown_clip", nullptr, WriteAnimatedPrefab("model_unknown_clip"));
+
+		driven.editor.Play("Lift");
+		driven.Frame();
+		driven.editor.Play("Jump");
+		driven.Frame();
+
+		CHECK(driven.editor.Playing().empty());
+		CHECK(*driven.editor.Model()->GetChildren().front()->transform.position == glm::vec3(0.0f));
 	};
 
 	// The mesh's new material reads the project's shader, which the web build

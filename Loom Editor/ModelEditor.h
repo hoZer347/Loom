@@ -20,9 +20,11 @@
 
 namespace Loom
 {
+	struct Animator;
 	struct GameObject;
 	struct Mesh;
 	struct Scene;
+	struct Skin;
 
 	/**
 	* Loom::ModelEditor
@@ -36,6 +38,9 @@ namespace Loom
 	*   Ctrl+Y step back and forward an action at a time
 	* - Ctrl+S writes the meshes back into the prefab, and every instance of
 	*   it picks the change up
+	* - A model with an Animator plays the clip picked from its list in the
+	*   view, which never changes what is saved. A skinned mesh is shown, and
+	*   plays, but is not shaped
 	*/
 	struct ModelEditor final
 	{
@@ -122,6 +127,18 @@ namespace Loom
 		void Redo();
 		bool Save();
 
+		// The clips of the front tab's Animator, and the one playing in the
+		// view, empty for none.
+		std::vector<std::string> Clips() const;
+		std::string Playing() const;
+
+		// Plays the named clip from its start, or with an empty name puts the
+		// model back in the pose its prefab holds.
+		void Play(const std::string& clip);
+
+		// The front tab's copy of its prefab, as the view shows it.
+		GameObject* Model() const;
+
 		// The tab in front's mesh being edited, null with none open or none in
 		// its prefab.
 		const EditableMesh* Editing() const;
@@ -138,6 +155,15 @@ namespace Loom
 			GameObject* object = nullptr;
 			Mesh* mesh = nullptr;
 			EditableMesh editing;
+		};
+
+		// Where an object stood before a clip moved it.
+		struct Rest
+		{
+			GameObject* object = nullptr;
+			glm::vec3 position{ 0.0f };
+			glm::vec3 rotation{ 0.0f };
+			glm::vec3 scale{ 1.0f };
 		};
 
 		struct Snapshot
@@ -228,9 +254,17 @@ namespace Loom
 			Snapshot pending;
 			bool wasUnsaved = false;
 
-			// The meshes that cannot be shaped here: animated, made by a
-			// script, or not triangles.
-			size_t skipped = 0;
+			// The meshes that cannot be shaped here: skinned, made by a
+			// script, or not triangles. They are still shown.
+			std::vector<GameObject*> fixed;
+
+			// The clip playing in the view, empty for none, and how everything
+			// under the root stood and the Skins' shape keys were weighted
+			// before it.
+			Animator* animator = nullptr;
+			std::string clip;
+			std::vector<Rest> rest;
+			std::vector<std::pair<Skin*, std::vector<float>>> weights;
 
 			// Worked out from the mesh being edited, and from it and what is
 			// picked, and kept until those change.
@@ -268,6 +302,7 @@ namespace Loom
 		void DrawCloseQuestion();
 		void HandleKeys(Document& document);
 
+		void Animate(Document& document);
 		void Steer(Document& document, bool hovered);
 		void Frame(Document& document);
 		void Pose(Document& document);
@@ -302,6 +337,7 @@ namespace Loom
 		static void Step(Document& document, bool undo);
 		static void Changed(Document& document);
 		static void SetShader(Document& document, const std::string& path);
+		static void Play(Document& document, const std::string& clip);
 		static Selection Converted(const EditableMesh& mesh, const Selection& selection, Pick from, Pick to);
 
 		Document* Front() const;

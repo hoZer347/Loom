@@ -5,6 +5,7 @@
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
 
+#include "Animator.h"
 #include "Engine.h"
 #include "GameObject.h"
 #include "Light.h"
@@ -303,18 +304,47 @@ void main()
 		};
 
 		// A Skin keeps a weight for each of the mesh's corners as it is, which
-		// a change to them would scramble, so an animated mesh is skipped.
-		void FindParts(GameObject& object, std::vector<GameObject*>& found, size_t& skipped)
+		// a change to them would scramble, so a skinned mesh is fixed.
+		void FindParts(GameObject& object, std::vector<GameObject*>& found, std::vector<GameObject*>& fixed)
 		{
 			if (const Mesh* mesh = object.GetComponent<Mesh>())
 			{
 				if (!mesh->m_generated && *std::as_const(mesh->primitive_id) == Mesh::Triangles && !object.GetComponent<Skin>())
 					found.push_back(&object);
-				else skipped++;
+				else fixed.push_back(&object);
 			};
 
 			for (GameObject* child : object.GetChildren())
-				FindParts(*child, found, skipped);
+				FindParts(*child, found, fixed);
+		};
+
+		Animator* AnimatorOf(GameObject& object)
+		{
+			if (Animator* animator = object.GetComponent<Animator>())
+				return animator;
+
+			for (GameObject* child : object.GetChildren())
+				if (Animator* found = AnimatorOf(*child))
+					return found;
+
+			return nullptr;
+		};
+
+		void SkinsOf(GameObject& object, std::vector<Skin*>& found)
+		{
+			if (Skin* skin = object.GetComponent<Skin>())
+				found.push_back(skin);
+
+			for (GameObject* child : object.GetChildren())
+				SkinsOf(*child, found);
+		};
+
+		void ObjectsOf(GameObject& object, std::vector<GameObject*>& found)
+		{
+			found.push_back(&object);
+
+			for (GameObject* child : object.GetChildren())
+				ObjectsOf(*child, found);
 		};
 
 		void MaterialsOf(GameObject& object, std::vector<Material*>& found)
@@ -469,8 +499,9 @@ void main()
 		document.text = text;
 
 		std::vector<GameObject*> found{ };
-		document.skipped = 0;
-		FindParts(*root, found, document.skipped);
+		document.fixed.clear();
+		FindParts(*root, found, document.fixed);
+		document.animator = AnimatorOf(*root);
 
 		for (GameObject* object : found)
 		{
@@ -502,6 +533,11 @@ void main()
 
 		document.root = nullptr;
 		document.parts.clear();
+		document.fixed.clear();
+		document.animator = nullptr;
+		document.clip.clear();
+		document.rest.clear();
+		document.weights.clear();
 		document.part = 0;
 		document.selection = { };
 		document.undo.clear();
@@ -738,17 +774,16 @@ void main()
 		const ImVec2 available = ImGui::GetContentRegionAvail();
 		const float height = available.y - status_height;
 
+		Animate(document);
 		DrawSide(document);
 		ImGui::SameLine();
 
-		if (document.parts.empty())
+		if (document.parts.empty() && document.fixed.empty())
 		{
 			ImGui::BeginGroup();
 
 			if (document.root == nullptr)
 				ImGui::TextDisabled("This prefab could not be read. It may have been moved, deleted or broken.");
-			else if (document.skipped > 0)
-				ImGui::TextDisabled("This prefab's meshes cannot be shaped here: they are animated, made by a script, or not triangles.");
 			else
 			{
 				ImGui::TextDisabled("This prefab has no mesh to shape yet.");
@@ -796,7 +831,7 @@ void main()
 		if (ImGui::Shortcut(ImGuiKey_Escape) && idle)
 			SelectNone();
 
-		if (ImGui::Shortcut(ImGuiKey_F) && idle)
+		if (ImGui::Shortcut(ImGuiKey_F) && !ImGui::GetIO().WantTextInput && document.drag == Drag::None)
 			Frame(document);
 	};
 
@@ -993,10 +1028,25 @@ void main()
 			};
 		};
 
-		if (document.skipped > 0)
+		if (document.animator && !document.animator->GetClipNames().empty())
+		{
+			ImGui::SeparatorText("Animation");
+
+			if (ImGui::Selectable("None", document.clip.empty()))
+				Play(document, "");
+
+			for (const std::string& clip : document.animator->GetClipNames())
+				if (ImGui::Selectable(clip.c_str(), clip == document.clip))
+					Play(document, clip);
+
+			if (!document.clip.empty())
+				document.animator->OnGui();
+		};
+
+		if (!document.fixed.empty())
 		{
 			ImGui::PushTextWrapPos();
-			ImGui::TextDisabled("%zu more cannot be shaped here: animated, made by a script, or not triangles.", document.skipped);
+			ImGui::TextDisabled("%zu more cannot be shaped here: skinned, made by a script, or not triangles.", document.fixed.size());
 			ImGui::PopTextWrapPos();
 		};
 
@@ -1013,7 +1063,9 @@ void main()
 
 		const char* hint = "Click the model to pick part of it, or drag a box round several. Right drag orbits, the wheel zooms.";
 
-		if (document.drag == Drag::Box)
+		if (document.parts.empty())
+			hint = "Right drag orbits, middle drag pans, the wheel zooms.";
+		else if (document.drag == Drag::Box)
 			hint = "Let go to pick everything in the box. Hold Shift to add to what is picked.";
 		else if (document.drag == Drag::Handle)
 			hint = "Hold Ctrl to snap. Press Esc to put it back.";
@@ -1096,6 +1148,9 @@ void main()
 
 		const bool hovered = ImGui::IsItemHovered();
 
+		// With only fixed meshes the view turns round them, and nothing is picked.
+		const bool editable = !document.parts.empty();
+
 		// The camera is steered before anything is measured from it, so the
 		// image and the picking keep up with the mouse.
 		Steer(document, hovered);
@@ -1107,7 +1162,7 @@ void main()
 
 		if (document.drag == Drag::None)
 		{
-			if (hovered)
+			if (hovered && editable)
 				Hover(document, mouse);
 			else
 			{
@@ -1118,7 +1173,7 @@ void main()
 			};
 		};
 
-		if (hovered && document.drag == Drag::None && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.KeyAlt)
+		if (hovered && editable && document.drag == Drag::None && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.KeyAlt)
 		{
 			document.pressed = mouse;
 
@@ -1179,7 +1234,8 @@ void main()
 
 		draw->PushClipRect(corner, end, true);
 
-		DrawHandles(document, draw);
+		if (editable)
+			DrawHandles(document, draw);
 
 		if (document.drag == Drag::Box)
 		{
@@ -1191,6 +1247,12 @@ void main()
 		};
 
 		draw->PopClipRect();
+	};
+
+	void ModelEditor::Animate(Document& document)
+	{
+		if (document.animator && !document.clip.empty())
+			document.animator->Advance(ImGui::GetIO().DeltaTime);
 	};
 
 	void ModelEditor::Steer(Document& document, bool hovered)
@@ -1274,6 +1336,16 @@ void main()
 				for (const uint32_t vertex : picked)
 					framed.push_back(glm::vec3(world * glm::vec4(part.editing.vertices[vertex], 1.0f)));
 		};
+
+		if (picked.empty())
+			for (GameObject* object : document.fixed)
+			{
+				const glm::mat4 world = object->WorldMatrix();
+				const std::vector<float>& vertices = *std::as_const(object->GetComponent<Mesh>()->m_vertices);
+
+				for (size_t i = 0; i + 2 < vertices.size(); i += 3)
+					framed.push_back(glm::vec3(world * glm::vec4(vertices[i], vertices[i + 1], vertices[i + 2], 1.0f)));
+			};
 
 		if (framed.empty())
 		{
@@ -1757,7 +1829,9 @@ void main()
 			[&]()
 			{
 				document.scene->Render(&document.camera, { document.scene });
-				DrawOverlay(document);
+
+				if (!document.parts.empty())
+					DrawOverlay(document);
 			});
 	};
 
@@ -2264,6 +2338,76 @@ void main()
 
 		document->message = std::string("Added a ") + Shapes::Label(shape) + " where the view is looking. It is picked, so the arrows move it; tick See Through if it is inside the model.";
 		document->messageTime = ImGui::GetTime();
+	};
+
+	std::vector<std::string> ModelEditor::Clips() const
+	{
+		const Document* document = Front();
+
+		return document && document->animator ? document->animator->GetClipNames() : std::vector<std::string>{ };
+	};
+
+	std::string ModelEditor::Playing() const
+	{
+		const Document* document = Front();
+
+		return document ? document->clip : "";
+	};
+
+	GameObject* ModelEditor::Model() const
+	{
+		const Document* document = Front();
+
+		return document ? document->root : nullptr;
+	};
+
+	void ModelEditor::Play(const std::string& clip)
+	{
+		if (Document* document = Front())
+			Play(*document, clip);
+	};
+
+	void ModelEditor::Play(Document& document, const std::string& clip)
+	{
+		if (document.animator == nullptr)
+			return;
+
+		if (document.clip.empty())
+		{
+			std::vector<GameObject*> objects{ };
+			ObjectsOf(*document.root, objects);
+
+			document.rest.clear();
+
+			for (GameObject* object : objects)
+				document.rest.push_back(Rest{ object, *object->transform.position, *object->transform.rotation, *object->transform.scale });
+
+			std::vector<Skin*> skins{ };
+			SkinsOf(*document.root, skins);
+
+			document.weights.clear();
+
+			for (Skin* skin : skins)
+				document.weights.emplace_back(skin, *std::as_const(skin->m_shapeWeights));
+		};
+
+		if (!clip.empty() && document.animator->Play(clip))
+		{
+			document.clip = clip;
+			return;
+		};
+
+		for (const Rest& rest : document.rest)
+		{
+			rest.object->transform.position = rest.position;
+			rest.object->transform.rotation = rest.rotation;
+			rest.object->transform.scale = rest.scale;
+		};
+
+		for (const auto& [skin, weights] : document.weights)
+			skin->m_shapeWeights = weights;
+
+		document.clip.clear();
 	};
 
 	void ModelEditor::Undo()

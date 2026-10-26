@@ -1021,7 +1021,7 @@ namespace Loom
 		if (!node.folder && ImGui::MenuItem("Open"))
 			m_assetToOpen = node.path;
 
-		if (std::filesystem::path(node.path).extension() == Prefab::extension &&
+		if ((std::filesystem::path(node.path).extension() == Prefab::extension || IsModelFile(node.path)) &&
 			ImGui::MenuItem((std::string(EditorIcons::Model) + " Edit Model").c_str()))
 			OpenModel(node.path);
 
