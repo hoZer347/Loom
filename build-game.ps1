@@ -40,6 +40,7 @@ $ErrorActionPreference = 'Continue'
 $root = $PSScriptRoot
 
 . (Join-Path $root 'MSBuild.ps1')
+. (Join-Path $root 'ProjectFiles.ps1')
 
 $Project = (Resolve-Path -LiteralPath $Project -ErrorAction Stop).Path.TrimEnd('\')
 $Scene = (Resolve-Path -LiteralPath $Scene -ErrorAction Stop).Path
@@ -106,21 +107,6 @@ if ($LASTEXITCODE -ne 0)
     exit 1
 }
 
-# The scripts are in the program, and the rest is the editor's.
-$folders = @($build, '.*')
-$files = @('*.loomproject', '*.loomscripts', '*.loomsounds', '*.loomfonts', '*.loombuild', '*.loomgame',
-    '*.ps1', '*.py', '*.md', '*.ini', '*.log', '.*', '*.exe', '*.dll', '*.pdb')
-
-if ($scripts)
-{
-    $folders += $scripts
-}
-
-if ($Output.StartsWith("$Project\", [System.StringComparison]::OrdinalIgnoreCase))
-{
-    $folders += $Output
-}
-
 $game = Join-Path $Output "$name.exe"
 $running = Get-Process -Name $name -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $game }
 
@@ -138,14 +124,8 @@ if ($running)
     }
 }
 
-# Below 8, robocopy's exit code says what it copied rather than that it failed.
-$robocopyFailed = 8
-
-$said = robocopy $Project $Output /MIR /XD $folders /XF $files /NJH /NJS /NP /NFL /NDL 2>&1
-
-if ($LASTEXITCODE -ge $robocopyFailed)
+if (-not (Copy-ProjectFiles $Project $Output $scripts))
 {
-    $said | ForEach-Object { Write-Output "$_" }
     Write-Output "Could not copy $name into $Output."
     exit 1
 }

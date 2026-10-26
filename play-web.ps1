@@ -47,10 +47,32 @@ $ErrorActionPreference = 'Continue'
 $root = $PSScriptRoot
 
 . (Join-Path $root 'WebBuild.ps1')
+. (Join-Path $root 'ProjectFiles.ps1')
 
 $Project = (Resolve-Path -LiteralPath $Project -ErrorAction Stop).Path
 $Scene = (Resolve-Path -LiteralPath $Scene -ErrorAction Stop).Path
 $web = if ($Output) { Join-Path $Project 'Build\Web' } else { Split-Path -Parent $Scene }
+
+if (-not $Scene.StartsWith("$Project\", [StringComparison]::OrdinalIgnoreCase))
+{
+    Write-Host "$Scene is not in the project."
+    exit 1
+}
+
+# The folder the page's base is: the project, or its copy in Output.
+$served = $Project
+
+if ($Output)
+{
+    $Output = [IO.Path]::GetFullPath($Output).TrimEnd('\')
+    $served = $Output
+
+    if ("$Project\".StartsWith("$Output\", [StringComparison]::OrdinalIgnoreCase))
+    {
+        Write-Host "The project is in $Output, which a build would empty."
+        exit 1
+    }
+}
 
 $emcc = Find-Emcc
 $emrun = Get-EmscriptenTool $emcc 'emrun'
@@ -181,26 +203,11 @@ if (Test-Stale $module $linkInputs)
     }
 }
 
-# Every font and image in the project but the builds, by its path under it, for
-# the page to preload where a UiText or UiRect opens it.
-# -Include is ignored beside -LiteralPath, so the extensions are matched here.
-$preloadedTypes = @('.ttf', '.otf', '.ttc', '.png', '.jpg', '.jpeg', '.bmp', '.tga')
-$preloaded = @(Get-ChildItem -LiteralPath $Project -Recurse -File |
-    Where-Object { $preloadedTypes -contains $_.Extension.ToLowerInvariant() -and
-        -not $_.FullName.StartsWith((Join-Path $Project 'Build\'), [StringComparison]::OrdinalIgnoreCase) } |
-    ForEach-Object { Get-UrlPath $_.FullName } |
-    Sort-Object)
-
-# The project's key bindings, beside its .loomproject, or none.
-$bindings = if ($projectFile) { [IO.Path]::ChangeExtension($projectFile.FullName, '.loominput') } else { $null }
-$bindingsUrl = if ($bindings -and (Test-Path -LiteralPath $bindings)) { Get-UrlPath $bindings } else { '' }
-
 # Served, the page sits beside the build and its base is the root emrun
 # serves the project from. Written out, the page and the player sit at the top
 # of Output, with the project's files under it as they are under the project.
 if ($Output)
 {
-    $Output = [IO.Path]::GetFullPath($Output).TrimEnd('\')
     $page = Join-Path $Output 'index.html'
     $base = './'
     $script = Split-Path -Leaf $module
@@ -212,30 +219,15 @@ if ($Output)
         exit 1
     }
 
-    # What build-game.ps1 leaves out: the scripts are in the player, and the rest is the editor's.
-    $folders = @((Join-Path $Project 'Build'), '.*')
-    $files = @('*.loomproject', '*.loomscripts', '*.loomsounds', '*.loomfonts', '*.loombuild', '*.loomgame',
-        '*.ps1', '*.py', '*.md', '*.ini', '*.log', '.*', '*.exe', '*.dll', '*.pdb')
-
-    if ($scriptDir)
+    if (-not (Copy-ProjectFiles $Project $Output $scriptDir))
     {
-        $folders += $scriptDir
-    }
-
-    if ($Output.StartsWith("$Project\", [StringComparison]::OrdinalIgnoreCase))
-    {
-        $folders += $Output
-    }
-
-    # Below 8, robocopy's exit code says what it copied rather than that it failed.
-    $robocopyFailed = 8
-
-    $said = robocopy $Project $Output /MIR /XD $folders /XF $files /NJH /NJS /NP /NFL /NDL 2>&1
-
-    if ($LASTEXITCODE -ge $robocopyFailed)
-    {
-        $said | ForEach-Object { Write-Host "$_" }
         Write-Host "Could not copy the project into $Output."
+        exit 1
+    }
+
+    if (-not (Test-Path -LiteralPath (Join-Path $Output (Get-UrlPath $Scene))))
+    {
+        Write-Host "$Scene is in a folder the web build leaves out."
         exit 1
     }
 
@@ -247,6 +239,20 @@ else
     $base = '/'
     $script = Get-UrlPath $module
 }
+
+# Every font and image served but the builds, by its path under the base, for
+# the page to preload where a UiText or UiRect opens it.
+# -Include is ignored beside -LiteralPath, so the extensions are matched here.
+$preloadedTypes = @('.ttf', '.otf', '.ttc', '.png', '.jpg', '.jpeg', '.bmp', '.tga')
+$preloaded = @(Get-ChildItem -LiteralPath $served -Recurse -File |
+    Where-Object { $preloadedTypes -contains $_.Extension.ToLowerInvariant() -and
+        -not $_.FullName.StartsWith((Join-Path $served 'Build\'), [StringComparison]::OrdinalIgnoreCase) } |
+    ForEach-Object { $_.FullName.Substring($served.Length).TrimStart('\').Replace('\', '/') } |
+    Sort-Object)
+
+# The project's key bindings, beside its .loomproject, or none.
+$bindings = if ($projectFile) { [IO.Path]::ChangeExtension($projectFile.FullName, '.loominput') } else { $null }
+$bindingsUrl = if ($bindings -and (Test-Path -LiteralPath (Join-Path $served (Get-UrlPath $bindings)))) { Get-UrlPath $bindings } else { '' }
 
 (Get-Content -LiteralPath (Join-Path $root 'Loom Web\Player.html') -Raw).
     Replace('{TITLE}', (Split-Path -Leaf $Project)).
