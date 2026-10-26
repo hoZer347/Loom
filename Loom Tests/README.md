@@ -201,5 +201,5 @@ and letting that fire after the object has gone runs it against freed memory.
   when `Loom WASM/State.h` and `State.cpp` were deleted.
 - `Loom SQL`, `Loom Demos`, `Space Explorers`, and `Loom Editor` beyond the
   sources of it that need no window, such as `SceneHistory.cpp`,
-  `EditCommands.cpp`, `PlayHistory.cpp` and `ComponentDrag.cpp`, which are compiled into the suite
-  beside the engine's.
+  `EditCommands.cpp`, `PlayHistory.cpp` and `ComponentDrag.cpp`, which are
+  compiled into the suite beside the engine's.
