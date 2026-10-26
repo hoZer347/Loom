@@ -486,6 +486,12 @@ SpinningTriangle is there as a worked example.
 		return std::filesystem::current_path(code).string();
 	};
 
+	bool ProjectTemplate::IsWorktree(const std::string& root)
+	{
+		std::error_code code;
+		return std::filesystem::is_regular_file(std::filesystem::path(root) / ".git", code);
+	};
+
 	bool ProjectTemplate::IsValidName(const std::string& name)
 	{
 		if (name.empty() || name.size() > maxNameLength)

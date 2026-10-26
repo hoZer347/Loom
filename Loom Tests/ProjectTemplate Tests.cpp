@@ -332,6 +332,20 @@ TEST_SUITE("ProjectTemplate")
 		CHECK(project.Text() == "name=Game\n");
 	};
 
+	TEST_CASE("an engine is a worktree only when its .git is a file")
+	{
+		const Folder main("loom template main checkout");
+		const Folder worktree("loom template worktree");
+		const Folder plain("loom template no git");
+
+		std::filesystem::create_directory(main.path / ".git");
+		std::ofstream(worktree.path / ".git") << "gitdir: C:/Loom/.git/worktrees/Loom-1\n";
+
+		CHECK_FALSE(Loom::ProjectTemplate::IsWorktree(main.path.string()));
+		CHECK(Loom::ProjectTemplate::IsWorktree(worktree.path.string()));
+		CHECK_FALSE(Loom::ProjectTemplate::IsWorktree(plain.path.string()));
+	};
+
 	TEST_CASE("a script build's line is shown without its indent and the project it came from")
 	{
 		const std::string error = "C:\\Games\\Raycasts\\Scripts\\Laser.hpp(111,1): error C2059: syntax error: 'this'";

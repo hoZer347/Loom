@@ -346,8 +346,9 @@ int main(int argc, char** argv)
 		Engine engine;
 
 		// An automated run is often a scratch build that is deleted afterwards,
-		// which must not take the file association with it.
-		if (Engine::showWindow)
+		// and a worktree's editor is an agent's, so neither takes the file
+		// association from the main checkout's.
+		if (Engine::showWindow && !ProjectTemplate::IsWorktree(ProjectTemplate::EngineRoot()))
 			ClaimFileTypes();
 
 		glfwSetWindowTitle(Engine::window, "Loom Editor");

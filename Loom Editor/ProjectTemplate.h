@@ -62,6 +62,10 @@ namespace Loom
 		// (<engine>/x64/<configuration>/Loom Editor.exe).
 		static std::string EngineRoot();
 
+		// Whether the engine at root is a git worktree beside its main
+		// checkout, such as an agent's slot, whose .git is a file naming it.
+		static bool IsWorktree(const std::string& root);
+
 		// EnsureScripts for the project in folder, writing it a .loomproject
 		// named after name first if it has none. Returns the .vcxproj, or an
 		// empty string with the reason in error.
