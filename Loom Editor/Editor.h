@@ -27,7 +27,7 @@
 #include "SceneHistory.h"
 #include "SceneSerializer.h"
 #include "SearchBar.h"
-#include "TransformHistory.h"
+#include "PlayHistory.h"
 #include "FileTab.h"
 #include "FolderTree.h"
 #include "ScriptFolders.h"
@@ -36,6 +36,7 @@
 #include "WindowFullscreen.h"
 
 #include <filesystem>
+#include <functional>
 #include <iterator>
 #include <map>
 #include <memory>
@@ -280,8 +281,8 @@ namespace Loom
 		void Select(GameObject* gameObject);
 
 		// Steps the owned scenes back or forward through the edits made to them.
-		// While playing, only through the Transform edits made in the
-		// Inspector since Play: what a run changes is not an edit.
+		// While playing, only through the edits made in the Inspector since
+		// Play: what a run changes is not an edit.
 		void Undo();
 		void Redo();
 
@@ -457,6 +458,10 @@ namespace Loom
 		void DrawTransform(GameObject* gameObject, float column);
 		void DrawThread(GameObject* gameObject, float column);
 		void DrawComponent(GameObject* gameObject, ComponentBase* component);
+
+		// Takes a component of gameObject dragged onto onto's header, putting
+		// it in onto's place.
+		void DropComponent(GameObject& gameObject, ComponentBase& onto);
 		void DrawComponentMenu(GameObject* gameObject, const ComponentMenu::Node& node);
 
 		// Right-click on a component in the Add Component menu: the category it
@@ -543,6 +548,16 @@ namespace Loom
 		bool CanStepHistory() const;
 		bool CanUndo() const;
 		bool CanRedo() const;
+
+		// While playing, the Inspector's field at index of object changed from
+		// before. The edit goes in m_playHistory once it is let go of, or
+		// another field is edited.
+		void TrackPlayEdit(LoomObject& object, size_t index, const std::string& before);
+		void RecordPlayEdit();
+
+		// Runs change, which adds, takes off or orders gameObject's
+		// components, and while playing puts it in m_playHistory.
+		void ChangeComponents(GameObject& gameObject, const std::function<void()>& change);
 
 		// Undo or Redo, keeping the selection on its object when the step
 		// takes it out and makes it again.
@@ -986,11 +1001,19 @@ namespace Loom
 		std::vector<SceneSnapshot> m_playSnapshots{ };
 
 		SceneHistory m_history{ };
-		TransformHistory m_playHistory{ };
+		PlayHistory m_playHistory{ };
 
-		// What the Transform field being edited in the Inspector held when
-		// the edit began, for m_playHistory.
-		glm::vec3 m_transformBefore{ };
+		// The field being edited in the Inspector while the game runs, with
+		// the text it held before, until the edit is let go of.
+		struct PlayEdit
+		{
+			LoomObject* object = nullptr;
+			uint64_t id = 0;
+			size_t index = 0;
+			std::string before{ };
+		};
+
+		std::optional<PlayEdit> m_playEdit{ };
 
 		// Set when a click lands or a widget is let go of in a window that
 		// CanEditScenes, or a scene arrives; a step is recorded on the first

@@ -362,6 +362,7 @@ namespace Loom
 		{
 			m_playSnapshots = TakeSnapshots();
 			m_playHistory.Clear();
+			m_playEdit.reset();
 			m_playing = true;
 		};
 

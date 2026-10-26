@@ -527,13 +527,23 @@ namespace Loom
 			return path;
 		};
 
+		// Components carry no name of their own, so one is shown as its type on
+		// the GameObject that holds it.
+		std::string Describe(const LoomObject& object)
+		{
+			if (const ComponentBase* component = dynamic_cast<const ComponentBase*>(&object))
+				return ComponentRegistry::NameOf(*component) + " on " + component->GetGameObject()->NameAndID();
+
+			return object.NameAndID();
+		};
+
 		void DragSource(const LoomObject& object)
 		{
 			if (!ImGui::BeginDragDropSource())
 				return;
 
 			ImGui::SetDragDropPayload(Editor::object_payload, &object.GetGuid(), sizeof(Guid));
-			ImGui::TextUnformatted(object.NameAndID().c_str());
+			ImGui::TextUnformatted(Describe(object).c_str());
 
 			ImGui::EndDragDropSource();
 		};
@@ -551,14 +561,15 @@ namespace Loom
 			return field.ReferenceFor(LoomObject::GetByGuid(*(const Guid*)payload->Data));
 		};
 
-		// Components carry no name of their own, so one is shown as its type on
-		// the GameObject that holds it.
-		std::string Describe(const LoomObject& object)
+		// The index among object's fields of the one whose value is at data.
+		size_t FieldAt(const LoomObject& object, const void* data)
 		{
-			if (const ComponentBase* component = dynamic_cast<const ComponentBase*>(&object))
-				return ComponentRegistry::NameOf(*component) + " on " + component->GetGameObject()->NameAndID();
+			const std::vector<SerializedField>& fields = object.GetFields();
 
-			return object.NameAndID();
+			return std::find_if(
+				fields.begin(),
+				fields.end(),
+				[data](const SerializedField& field) { return field.data == data; }) - fields.begin();
 		};
 
 		// Whether the field was cleared or given something dropped on it.
@@ -1413,6 +1424,8 @@ namespace Loom
 	{
 		if (m_playing)
 		{
+			RecordPlayEdit();
+
 			if (GameObject* stepped = m_playHistory.Undo())
 				Select(stepped);
 
@@ -1426,6 +1439,8 @@ namespace Loom
 	{
 		if (m_playing)
 		{
+			RecordPlayEdit();
+
 			if (GameObject* stepped = m_playHistory.Redo())
 				Select(stepped);
 
@@ -1477,6 +1492,50 @@ namespace Loom
 		return m_playing
 			? m_playHistory.CanRedo()
 			: CanStepHistory() && m_history.CanRedo();
+	};
+
+	void Editor::TrackPlayEdit(LoomObject& object, size_t index, const std::string& before)
+	{
+		if (m_playEdit && m_playEdit->object == &object && m_playEdit->index == index)
+			return;
+
+		RecordPlayEdit();
+
+		m_playEdit = PlayEdit{ &object, object.m_ID, index, before };
+	};
+
+	void Editor::RecordPlayEdit()
+	{
+		if (!m_playEdit)
+			return;
+
+		if (m_playing && LoomObject::GetByID(m_playEdit->id) == m_playEdit->object)
+			m_playHistory.RecordField(*m_playEdit->object, m_playEdit->index, m_playEdit->before);
+
+		m_playEdit.reset();
+	};
+
+	void Editor::ChangeComponents(GameObject& gameObject, const std::function<void()>& change)
+	{
+		if (!m_playing)
+		{
+			change();
+			return;
+		};
+
+		const std::string before = SceneSerializer::SerializeOwn(gameObject);
+		const uint64_t id = gameObject.m_ID;
+
+		change();
+
+		// Taking a component off waits for the queue, so what the change made
+		// is read once the queue gets this far.
+		Engine::QueueTask(
+			[this, &gameObject, id, before]()
+			{
+				if (m_playing && LoomObject::GetByID(id) == &gameObject)
+					m_playHistory.RecordComponents(gameObject, before);
+			});
 	};
 
 	void Editor::RecordHistory()
@@ -1604,8 +1663,13 @@ namespace Loom
 		// A run changes the scenes every frame, and Stop puts them back.
 		LoomObject::Watch(!m_playing);
 
-		if (m_historyDirty && !ImGui::IsAnyItemActive() && !ImGui::IsAnyMouseDown())
-			RecordHistory();
+		if (!ImGui::IsAnyItemActive() && !ImGui::IsAnyMouseDown())
+		{
+			RecordPlayEdit();
+
+			if (m_historyDirty)
+				RecordHistory();
+		};
 
 		if (!m_historySteps.empty() && m_importQueue.empty() && !m_historyDirty && CanStepHistory())
 		{
@@ -3066,12 +3130,17 @@ namespace Loom
 
 	void Editor::DropShader(GameObject* gameObject, const std::string& path)
 	{
-		Material* material = gameObject->GetComponent<Material>();
+		ChangeComponents(
+			*gameObject,
+			[gameObject, &path]()
+			{
+				Material* material = gameObject->GetComponent<Material>();
 
-		if (material == nullptr)
-			material = gameObject->Attach<Material>();
+				if (material == nullptr)
+					material = gameObject->Attach<Material>();
 
-		material->ChangeShader(path);
+				material->ChangeShader(path);
+			});
 
 		Select(gameObject);
 		m_historyDirty = true;
@@ -3103,7 +3172,11 @@ namespace Loom
 		if (!ImGui::AcceptDragDropPayload(script_payload))
 			return true;
 
-		if (ComponentRegistry::Create(name, *gameObject) == nullptr)
+		bool made = false;
+
+		ChangeComponents(*gameObject, [&]() { made = ComponentRegistry::Create(name, *gameObject) != nullptr; });
+
+		if (!made)
 		{
 			std::cerr << name << " is not a component the scripts have compiled. One written since the last compile attaches after the next." << std::endl;
 			return true;
@@ -3246,7 +3319,7 @@ namespace Loom
 		for (const std::string& component : node.components)
 		{
 			if (ImGui::MenuItem(component.c_str()))
-				ComponentRegistry::Create(component, *gameObject);
+				ChangeComponents(*gameObject, [&]() { ComponentRegistry::Create(component, *gameObject); });
 
 			if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
 				ImGui::SetTooltip("Right-click to change its category");
@@ -3403,31 +3476,31 @@ namespace Loom
 			return;
 
 		const auto row =
-			[this, gameObject, column](const char* name, TransformHistory::Field field, float speed)
+			[this, gameObject, column](const char* name, Serial<glm::vec3>& serial, float speed)
 			{
 				ImGui::PushID(name);
 				Label(name, column);
-				Serial<glm::vec3>& serial = gameObject->transform.*field;
-				const glm::vec3 before = serial;
-				glm::vec3 value = before;
+				glm::vec3 value = serial;
+
+				const size_t index = m_playing ? FieldAt(*gameObject, &(const glm::vec3&)serial) : 0;
+				const std::string before = m_playing ? gameObject->GetFields()[index].Write() : std::string();
 
 				if (AxisGui::DragFloatN("##value", glm::value_ptr(value), 3, speed, float_format))
+				{
 					serial = value;
 
-				if (ImGui::IsItemActivated())
-					m_transformBefore = before;
-
-				if (m_playing && ImGui::IsItemDeactivatedAfterEdit())
-					m_playHistory.Record(*gameObject, field, m_transformBefore);
+					if (m_playing)
+						TrackPlayEdit(*gameObject, index, before);
+				};
 
 				ImGui::PopID();
 			};
 
 		ImGui::PushItemWidth(-FLT_MIN);
 
-		row("Position", &Transform::position, drag_speed);
-		row("Rotation", &Transform::rotation, rotation_drag_speed);
-		row("Scale", &Transform::scale, drag_speed);
+		row("Position", gameObject->transform.position, drag_speed);
+		row("Rotation", gameObject->transform.rotation, rotation_drag_speed);
+		row("Scale", gameObject->transform.scale, drag_speed);
 
 		ImGui::PopItemWidth();
 	};
@@ -3477,12 +3550,14 @@ namespace Loom
 
 		const bool open = ImGui::CollapsingHeader(name.c_str(), header_flags);
 
+		DragSource(*component);
+		DropComponent(*gameObject, *component);
 		DrawSourcePopup(name);
 
 		// The remove button rides on the header's own line, Unity-style.
 		ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::GetFrameHeight());
 		if (ImGui::SmallButton("x"))
-			gameObject->DetachComponent(component);
+			ChangeComponents(*gameObject, [gameObject, component]() { gameObject->DetachComponent(component); });
 
 		if (!open)
 		{
@@ -3525,6 +3600,34 @@ namespace Loom
 		ImGui::PopID();
 	};
 
+	void Editor::DropComponent(GameObject& gameObject, ComponentBase& onto)
+	{
+		const ImGuiPayload* payload = ImGui::GetDragDropPayload();
+
+		if (payload == nullptr || !payload->IsDataType(object_payload))
+			return;
+
+		ComponentBase* dragged = LoomObject::GetByGuid<ComponentBase>(*(const Guid*)payload->Data);
+
+		if (dragged == nullptr || dragged == &onto || dragged->GetGameObject() != &gameObject || !ImGui::BeginDragDropTarget())
+			return;
+
+		if (ImGui::AcceptDragDropPayload(object_payload))
+		{
+			std::vector<ComponentBase*> order = gameObject.GetComponents();
+			const auto from = std::find(order.begin(), order.end(), dragged);
+			const bool down = from < std::find(order.begin(), order.end(), &onto);
+
+			order.erase(from);
+			order.insert(std::find(order.begin(), order.end(), &onto) + (down ? 1 : 0), dragged);
+
+			ChangeComponents(gameObject, [&gameObject, &order]() { gameObject.OrderComponents(order); });
+			m_historyDirty = true;
+		};
+
+		ImGui::EndDragDropTarget();
+	};
+
 	void Editor::DrawFields(LoomObject& object, const std::vector<std::string>& labels, float column)
 	{
 		ImGui::PushItemWidth(-FLT_MIN);
@@ -3548,6 +3651,10 @@ namespace Loom
 
 			const char* label = "##value";
 			bool changed = false;
+
+			// Vertex data is not edited here, and too long to write every frame.
+			const bool editable = field.type != FieldType::FloatArray && field.type != FieldType::UIntArray;
+			const std::string before = m_playing && editable ? field.Write() : std::string();
 
 			const std::vector<std::string> choices = object.GetFieldChoices(field);
 
@@ -3644,6 +3751,9 @@ namespace Loom
 			{
 				field.Changed();
 				object.OnFieldChanged(field);
+
+				if (m_playing)
+					TrackPlayEdit(object, i, before);
 			};
 
 			ImGui::PopID();

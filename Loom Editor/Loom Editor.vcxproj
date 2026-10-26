@@ -186,7 +186,7 @@
     <ClCompile Include="LoadProgress.cpp" />
     <ClCompile Include="WindowFullscreen.cpp" />
     <ClCompile Include="SceneHistory.cpp" />
-    <ClCompile Include="TransformHistory.cpp" />
+    <ClCompile Include="PlayHistory.cpp" />
     <ClCompile Include="Prefabs.cpp" />
     <ClCompile Include="EditorPrefabs.cpp" />
     <ClCompile Include="ColliderGizmos.cpp" />
@@ -242,7 +242,7 @@
     <ClInclude Include="LoadProgress.h" />
     <ClInclude Include="WindowFullscreen.h" />
     <ClInclude Include="SceneHistory.h" />
-    <ClInclude Include="TransformHistory.h" />
+    <ClInclude Include="PlayHistory.h" />
     <ClInclude Include="Prefabs.h" />
     <ClInclude Include="ColliderGizmos.h" />
     <ClInclude Include="EditCommands.h" />

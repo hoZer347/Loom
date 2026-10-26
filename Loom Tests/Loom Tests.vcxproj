@@ -148,7 +148,7 @@
     <ClCompile Include="Prefabs Tests.cpp" />
     <ClCompile Include="SceneSerializer Tests.cpp" />
     <ClCompile Include="SceneHistory Tests.cpp" />
-    <ClCompile Include="TransformHistory Tests.cpp" />
+    <ClCompile Include="PlayHistory Tests.cpp" />
     <ClCompile Include="EditorSettings Tests.cpp" />
     <ClCompile Include="EditorIcons Tests.cpp" />
     <ClCompile Include="ProjectAssets Tests.cpp" />
@@ -242,7 +242,7 @@
     <!-- The editor's undo history, edit shortcuts and console, the parts of
          it that do not need a window. The rest of the editor stays out. -->
     <ClCompile Include="..\Loom Editor\SceneHistory.cpp" />
-    <ClCompile Include="..\Loom Editor\TransformHistory.cpp" />
+    <ClCompile Include="..\Loom Editor\PlayHistory.cpp" />
     <ClCompile Include="..\Loom Editor\Prefabs.cpp" />
     <ClCompile Include="..\Loom Editor\EditCommands.cpp" />
     <ClCompile Include="..\Loom Editor\FieldNames.cpp" />
