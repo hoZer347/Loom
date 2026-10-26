@@ -704,8 +704,8 @@ namespace Loom
 		// it now is.
 		void ReloadSavedSprites();
 
-		// Has the instances of a prefab the Model panel saved take it as it
-		// now is.
+		// Has the instances of a prefab the Model panel saved, or changed in
+		// the Prefab panel's copy, take it as it now is.
 		void TakeSavedModels();
 
 		// Where the Create prompt's asset would be written: the file for most,

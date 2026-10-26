@@ -40,6 +40,8 @@ namespace Loom
 	* - Ctrl+S writes the meshes and the joints' poses back into the prefab.
 	*   Every instance of it picks up the meshes, but one already placed
 	*   keeps its own joints' poses
+	* - The prefab the Prefab panel shows is edited in that panel's copy, so
+	*   each change shows there as it is made, and is saved as it saves
 	*/
 	struct ModelEditor final
 	{
@@ -103,6 +105,15 @@ namespace Loom
 
 		// The prefabs saved since the last call.
 		std::vector<std::string> TakeSaved();
+
+		// The prefab the Prefab panel shows, and its copy there, which a tab
+		// here edits in place of one of its own. Told before that copy goes,
+		// with none.
+		void SetLive(const std::string& path, Scene* scene, GameObject* root);
+
+		// Whether the Prefab panel's copy was changed here since the last
+		// call, for that panel to save.
+		bool TakeEdited();
 
 		// What the toolbar's buttons do, to the tab in front. Each change is one
 		// step for undo.
@@ -223,6 +234,15 @@ namespace Loom
 			std::string path;
 			Scene* scene = nullptr;
 			GameObject* root = nullptr;
+
+			// The Prefab panel's copy rather than one of its own, and every
+			// object found in it, to tell when that panel changes them.
+			bool borrowed = false;
+			std::vector<GameObject*> made;
+
+			// Let go of, to be read again on the next frame.
+			bool stale = false;
+
 			std::vector<Part> parts;
 			size_t part = 0;
 
@@ -366,6 +386,11 @@ namespace Loom
 		Document* m_closing = nullptr;
 
 		std::vector<std::string> m_saved;
+
+		std::string m_live;
+		Scene* m_liveScene = nullptr;
+		GameObject* m_liveRoot = nullptr;
+		bool m_edited = false;
 
 		// What the shader menu lists, found again each time it opens.
 		std::vector<std::string> m_shaders;

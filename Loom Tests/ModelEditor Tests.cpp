@@ -857,6 +857,57 @@ TEST_SUITE("ModelEditor")
 		CHECK(ReadFile(path) == written);
 	};
 
+	TEST_CASE("The Model panel edits the Prefab panel's copy of the prefab it shows, and lets go of it when told")
+	{
+		const std::string path = WriteJointedPrefab("model_joint_live");
+		const std::string unposed = ReadFile(path);
+
+		Loom::Scene shown("Shown");
+		LoomTests::Pump();
+
+		Loom::GameObject* root = Loom::SceneSerializer::Deserialize(unposed, shown.GetRoot());
+		LoomTests::Pump();
+		REQUIRE(root != nullptr);
+
+		Driven driven("model_joint_live", nullptr, path);
+		REQUIRE(driven.editor.Model() != root);
+
+		driven.editor.SetLive(path, &shown, root);
+		driven.Frame();
+		REQUIRE(driven.editor.Model() == root);
+
+		Loom::GameObject* tip = Named(*root, "Tip");
+
+		driven.Click(driven.Screen(Placed(*tip)));
+		REQUIRE(driven.editor.Selected()->joints == std::set<uint32_t>{ 1 });
+
+		constexpr float pull = 40.0f;
+
+		const ImVec2 middle = driven.Screen(Placed(*tip));
+		driven.Drag(middle, ImVec2(middle.x, middle.y + pull));
+		CHECK((*tip->transform.position).y < 1.0f - TOLERANCE);
+		CHECK(ReadFile(path) == unposed);
+		CHECK(driven.editor.TakeEdited());
+		CHECK_FALSE(driven.editor.TakeEdited());
+
+		driven.editor.Undo();
+		driven.Frame();
+		CHECK(*tip->transform.position == glm::vec3(0.0f, 1.0f, 0.0f));
+		CHECK(driven.editor.TakeEdited());
+
+		// Found again when the Prefab panel changes its copy.
+		Named(*root, "Lid")->GetComponent<Loom::Skin>()->m_joints = "Hinge\n";
+		driven.Frame();
+		CHECK(driven.editor.Model() == root);
+		CHECK(driven.editor.Joints() == std::vector<Loom::GameObject*>{ Named(*root, "Hinge") });
+
+		driven.editor.SetLive("", nullptr, nullptr);
+		driven.Frame();
+		CHECK(driven.editor.Model() != nullptr);
+		CHECK(driven.editor.Model() != root);
+		CHECK(ReadFile(path) == unposed);
+	};
+
 	// The mesh's new material reads the project's shader, which the web build
 	// fetches, and node cannot.
 #ifndef __EMSCRIPTEN__

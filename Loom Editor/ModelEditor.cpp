@@ -368,6 +368,46 @@ void main()
 				JointsUnder(*child, joints, joint ? depth + 1 : depth, found);
 		};
 
+		// The meshes under root that can be shaped, those that cannot, and the
+		// joints its skins bend by, found by name under each skin's skeleton
+		// as the skin finds them.
+		void ContentsOf(GameObject& root, std::vector<GameObject*>& parts, std::vector<GameObject*>& fixed, std::vector<std::pair<GameObject*, int>>& joints)
+		{
+			FindParts(root, parts, fixed);
+
+			std::vector<Skin*> skins{ };
+			SkinsOf(root, skins);
+
+			std::set<GameObject*> named{ };
+
+			for (Skin* skin : skins)
+				if (GameObject* skeleton = *std::as_const(skin->skeleton))
+				{
+					const std::unordered_map<std::string, GameObject*> under = DescendantsByName(*skeleton);
+
+					for (const std::string& name : SplitLines(*std::as_const(skin->m_joints)))
+						if (const auto joint = under.find(name); joint != under.end())
+							named.insert(joint->second);
+				};
+
+			JointsUnder(root, named, 0, joints);
+		};
+
+		std::vector<GameObject*> MadeOf(GameObject& root)
+		{
+			std::vector<GameObject*> made{ };
+			std::vector<GameObject*> fixed{ };
+			std::vector<std::pair<GameObject*, int>> joints{ };
+			ContentsOf(root, made, fixed, joints);
+
+			made.insert(made.end(), fixed.begin(), fixed.end());
+
+			for (const auto& [joint, depth] : joints)
+				made.push_back(joint);
+
+			return made;
+		};
+
 		glm::vec3 Placed(const GameObject& object)
 		{
 			return glm::vec3(object.WorldMatrix()[3]);
@@ -491,42 +531,55 @@ void main()
 
 	bool ModelEditor::Load(Document& document)
 	{
-		const std::string text = PrefabText(document.path, document.unwritten);
-		Prefabs::ObjectNode prefab;
-		std::string error;
+		document.stale = false;
 
-		if (!Prefabs::Parse(text, prefab, &error))
+		if (document.path == m_live)
 		{
-			std::cerr << "Model panel: could not read " << document.path << ": " << error << std::endl;
-			return false;
-		};
-
-		Scene* scene = new Scene(std::filesystem::path(document.path).stem().string());
-		Scene::Unlist(scene);
-
-		GameObject* root = SceneSerializer::Deserialize(Prefabs::Write(prefab), scene->GetRoot(), &error);
-
-		if (root == nullptr)
+			document.scene = m_liveScene;
+			document.root = m_liveRoot;
+			document.borrowed = true;
+		}
+		else
 		{
-			std::cerr << "Model panel: could not open " << document.path << ": " << error << std::endl;
-			Engine::QueueTask([scene]() { delete scene; });
-			return false;
-		};
+			const std::string text = PrefabText(document.path, document.unwritten);
+			Prefabs::ObjectNode prefab;
+			std::string error;
 
-		scene->AddChild(model_light)->Attach<Light>();
+			if (!Prefabs::Parse(text, prefab, &error))
+			{
+				std::cerr << "Model panel: could not read " << document.path << ": " << error << std::endl;
+				return false;
+			};
+
+			Scene* scene = new Scene(std::filesystem::path(document.path).stem().string());
+			Scene::Unlist(scene);
+
+			GameObject* root = SceneSerializer::Deserialize(Prefabs::Write(prefab), scene->GetRoot(), &error);
+
+			if (root == nullptr)
+			{
+				std::cerr << "Model panel: could not open " << document.path << ": " << error << std::endl;
+				Engine::QueueTask([scene]() { delete scene; });
+				return false;
+			};
+
+			scene->AddChild(model_light)->Attach<Light>();
+
+			document.scene = scene;
+			document.root = root;
+			document.written = WriteTime(document.path);
+			document.text = text;
+		};
 
 		// Children join their parents through the queue, so the meshes under
 		// the top object are only found once it has run.
 		Engine::DoTasks();
 
-		document.scene = scene;
-		document.root = root;
-		document.written = WriteTime(document.path);
-		document.text = text;
-
 		std::vector<GameObject*> found{ };
+		std::vector<std::pair<GameObject*, int>> joints{ };
 		document.fixed.clear();
-		FindParts(*root, found, document.fixed);
+		ContentsOf(*document.root, found, document.fixed, joints);
+		document.made = MadeOf(*document.root);
 
 		for (GameObject* object : found)
 		{
@@ -536,25 +589,6 @@ void main()
 
 			document.parts.push_back(Part{ object, mesh, std::move(editing) });
 		};
-
-		// Found by name under each skin's skeleton, as the skin finds them.
-		std::vector<Skin*> skins{ };
-		SkinsOf(*root, skins);
-
-		std::set<GameObject*> named{ };
-
-		for (Skin* skin : skins)
-			if (GameObject* skeleton = *std::as_const(skin->skeleton))
-			{
-				const std::unordered_map<std::string, GameObject*> under = DescendantsByName(*skeleton);
-
-				for (const std::string& name : SplitLines(*std::as_const(skin->m_joints)))
-					if (const auto joint = under.find(name); joint != under.end())
-						named.insert(joint->second);
-			};
-
-		std::vector<std::pair<GameObject*, int>> joints{ };
-		JointsUnder(*root, named, 0, joints);
 
 		document.joints.clear();
 
@@ -584,13 +618,13 @@ void main()
 
 	void ModelEditor::Unload(Document& document)
 	{
-		if (document.scene)
-		{
-			// Deferred, as a closed scene is, to the next time the queue runs.
-			Scene* scene = std::exchange(document.scene, nullptr);
+		// Deferred, as a closed scene is, to the next time the queue runs. The
+		// Prefab panel's copy is that panel's to delete.
+		if (Scene* scene = std::exchange(document.scene, nullptr); scene && !document.borrowed)
 			Engine::QueueTask([scene]() { delete scene; });
-		};
 
+		document.borrowed = false;
+		document.made.clear();
 		document.root = nullptr;
 		document.parts.clear();
 		document.fixed.clear();
@@ -620,6 +654,28 @@ void main()
 		return std::exchange(m_saved, { });
 	};
 
+	void ModelEditor::SetLive(const std::string& path, Scene* scene, GameObject* root)
+	{
+		m_live = root ? Absolute(path) : "";
+		m_liveScene = scene;
+		m_liveRoot = root;
+
+		for (const std::unique_ptr<Document>& document : m_documents)
+			if (document->borrowed || document->path == m_live)
+			{
+				if (document->unsaved)
+					SaveDocument(*document);
+
+				Unload(*document);
+				document->stale = true;
+			};
+	};
+
+	bool ModelEditor::TakeEdited()
+	{
+		return std::exchange(m_edited, false);
+	};
+
 	bool ModelEditor::SaveAll()
 	{
 		bool saved = true;
@@ -633,6 +689,14 @@ void main()
 
 	bool ModelEditor::SaveDocument(Document& document)
 	{
+		// The Prefab panel writes its copy as it saves its own changes.
+		if (document.borrowed)
+		{
+			document.unsaved = false;
+			m_edited = true;
+			return true;
+		};
+
 		Prefabs::ObjectNode file;
 		Prefabs::ObjectNode shown;
 		std::string error;
@@ -755,7 +819,17 @@ void main()
 		// Read again when changed elsewhere, unless there are edits here to keep.
 		for (const std::unique_ptr<Document>& document : m_documents)
 		{
-			if (document->unsaved || document->drag != Drag::None || WriteTime(document->path) == document->written)
+			if (document->borrowed && document->drag == Drag::None && MadeOf(*document->root) != document->made)
+				document->stale = true;
+
+			if (document->stale)
+			{
+				Unload(*document);
+				Load(*document);
+				continue;
+			};
+
+			if (document->borrowed || document->unsaved || document->drag != Drag::None || WriteTime(document->path) == document->written)
 				continue;
 
 			document->written = WriteTime(document->path);
@@ -820,6 +894,10 @@ void main()
 		};
 
 		ImGui::End();
+
+		for (const std::unique_ptr<Document>& document : m_documents)
+			if (document->borrowed && document->unsaved)
+				SaveDocument(*document);
 	};
 
 	void ModelEditor::DrawDocument(Document& document)

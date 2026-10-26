@@ -1350,6 +1350,8 @@ namespace Loom
 		m_showPrefab = true;
 		m_prefabFocusFrames = scene_focus_frames;
 
+		m_models.SetLive(PrefabFile(opening).string(), m_prefabScene, root);
+
 		Select(root);
 	};
 
@@ -1360,6 +1362,8 @@ namespace Loom
 
 		if (IsSelectedIn(m_prefabScene->GetRoot()))
 			Select(nullptr);
+
+		m_models.SetLive("", nullptr, nullptr);
 
 		// Deferred, as CloseScene's is, past whatever the frame still draws.
 		Scene* scene = std::exchange(m_prefabScene, nullptr);
@@ -3229,8 +3233,12 @@ namespace Loom
 
 	void Editor::TakeSavedModels()
 	{
-		// The next pass over the prefabs finds the file newer and hands it on.
-		if (!m_models.TakeSaved().empty())
+		// The next pass over the prefabs finds the file newer, or the Prefab
+		// panel's copy changed, and hands it on.
+		const bool saved = !m_models.TakeSaved().empty();
+		const bool edited = m_models.TakeEdited();
+
+		if (saved || edited)
 			m_historyDirty = true;
 	};
 

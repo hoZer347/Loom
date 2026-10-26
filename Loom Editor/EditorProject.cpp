@@ -12,7 +12,9 @@
 #include "SpriteAsset.h"
 #include "TextFit.h"
 
+#include "ComponentRegistry.h"
 #include "Engine.h"
+#include "Mesh.h"
 #include "Renderer.h"
 #include "Scene.h"
 #include "SceneSerializer.h"
@@ -659,6 +661,14 @@ namespace Loom
 			Engine::QueueTask([scene]() { delete scene; });
 
 			return text;
+		};
+
+		bool HasMesh(const Prefabs::ObjectNode& prefab)
+		{
+			static const std::string mesh = PrettyTypeName(typeid(Mesh).name());
+
+			return std::ranges::any_of(prefab.components, [](const Prefabs::ComponentNode& component) { return component.type == mesh; })
+				|| std::ranges::any_of(prefab.children, HasMesh);
 		};
 	};
 
@@ -1506,6 +1516,9 @@ namespace Loom
 			OpenPrefab(std::filesystem::path(path).is_absolute()
 				? ProjectAssets::RelativeTo(path, m_projectPath)
 				: std::filesystem::path(path).generic_string());
+
+			if (const Prefabs::ObjectNode* prefab = GetPrefabRoot() ? LoadPrefab(m_prefabPath) : nullptr; prefab && HasMesh(*prefab))
+				OpenModel(m_prefabPath);
 			break;
 
 		case ProjectAssets::Opener::Shaders:

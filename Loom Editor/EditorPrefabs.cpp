@@ -233,6 +233,7 @@ namespace Loom
 			Select(nullptr);
 
 		std::string error;
+		m_models.SetLive("", nullptr, nullptr);
 		m_prefabScene = SceneHistory::Replace(m_prefabScene, text, &error);
 
 		if (m_prefabScene == nullptr)
@@ -245,6 +246,7 @@ namespace Loom
 
 		Scene::Unlist(m_prefabScene);
 		Engine::DoTasks();
+		m_models.SetLive(PrefabFile(m_prefabPath).string(), m_prefabScene, GetPrefabRoot());
 
 		// Agreed again on the next pass, from the copy as it now serializes.
 		m_prefabShape.clear();
