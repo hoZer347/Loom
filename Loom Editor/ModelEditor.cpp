@@ -931,7 +931,20 @@ void main()
 		if (action("Save", document.unsaved, "Write the meshes back into the prefab", "Nothing to save", "Ctrl+S"))
 			SaveDocument(document);
 
-		ImGui::NewLine();
+		ImGui::TextDisabled("|");
+		ImGui::SameLine();
+
+		if (ImGui::Button("?"))
+			ImGui::OpenPopup("##controls");
+
+		ImGui::SetItemTooltip("Controls");
+
+		if (ImGui::BeginPopup("##controls"))
+		{
+			ImGui::SeparatorText("Controls");
+			ImGui::TextUnformatted(controls);
+			ImGui::EndPopup();
+		};
 	};
 
 	void ModelEditor::DrawSide(Document& document)
@@ -1029,11 +1042,6 @@ void main()
 			ImGui::TextDisabled("%zu more cannot be shaped here: animated, made by a script, or not triangles.", document.skipped);
 			ImGui::PopTextWrapPos();
 		};
-
-		ImGui::SeparatorText("Controls");
-		ImGui::PushTextWrapPos();
-		ImGui::TextDisabled("%s", controls);
-		ImGui::PopTextWrapPos();
 
 		ImGui::EndChild();
 	};
