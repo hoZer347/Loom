@@ -4227,8 +4227,9 @@ namespace Loom
 
 	void Editor::DrawPrefab()
 	{
-		if (!m_showPrefab)
+		if (!m_showPrefab || (m_prefabPath.empty() && m_prefabBeforeBuild.empty()))
 		{
+			m_showPrefab = false;
 			ClosePrefab();
 			return;
 		};
@@ -4257,9 +4258,8 @@ namespace Loom
 	{
 		LOOM_STAGE("Editor::DrawPrefabView");
 
-		if (GetPrefabRoot() == nullptr)
-			ImGui::TextDisabled("No prefab open. Double-click one in the Project panel.");
-		else DrawView(m_prefabView, { m_prefabScene }, &m_prefabCamera, &m_prefabOutline);
+		if (GetPrefabRoot() != nullptr)
+			DrawView(m_prefabView, { m_prefabScene }, &m_prefabCamera, &m_prefabOutline);
 	};
 
 	void Editor::DrawGame()
