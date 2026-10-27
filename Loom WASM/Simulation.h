@@ -376,7 +376,7 @@ namespace Loom
 		// share a body the solver moves, nor two borders but neighbours.
 		void Partition();
 
-		// Warm starts and solves the slabs' pairs, each slab's on one thread.
+		// Warm starts and solves the slabs' pairs, pass by pass in solving order.
 		void SolveSlabs();
 
 		#pragma endregion

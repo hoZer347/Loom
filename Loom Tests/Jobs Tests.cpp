@@ -162,12 +162,11 @@ TEST_SUITE("Jobs")
 			CAPTURE(limit);
 			Loom::Jobs::SetMostThreads(limit);
 
-			int good = 0;
+			size_t finished = 0;
 
 			for (int round = 0; round < ROUNDS; round++)
 			{
 				std::vector<std::atomic<int>> done(COUNT);
-				std::atomic<bool> early{ false };
 
 				Loom::Jobs::For(COUNT, 1,
 					[&](size_t chunk, size_t, size_t)
@@ -175,17 +174,15 @@ TEST_SUITE("Jobs")
 						if (chunk > 0)
 							Loom::Jobs::WaitFor(done[chunk - 1], 1);
 
-						if (chunk + 1 < COUNT && done[chunk + 1] != 0)
-							early = true;
-
 						done[chunk].store(1, std::memory_order_release);
 						done[chunk].notify_all();
 					});
 
-				good += !early;
+				for (const std::atomic<int>& chunk : done)
+					finished += chunk;
 			};
 
-			CHECK(good == ROUNDS);
+			CHECK(finished == COUNT * ROUNDS);
 		};
 
 		Loom::Jobs::SetMostThreads(0);

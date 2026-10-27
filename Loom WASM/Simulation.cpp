@@ -1213,8 +1213,7 @@ namespace Loom
 						Solve(m_pairs[pair]);
 			};
 
-		// The groups in the order one thread would solve them each pass:
-		// the slabs, the even borders, the odd ones, then those alone.
+		// Slabs, even borders, odd borders, then those alone, each pass.
 		std::vector<size_t> order;
 
 		for (int k = 0; k < slabs; k++)
@@ -1227,9 +1226,7 @@ namespace Loom
 		if (lonely)
 			order.push_back(m_alone);
 
-		// Each group waits only on those before it that share its bodies.
-		// For hands chunks out in order, so the ones waited on are always
-		// taken, and it finishes however few threads take part.
+		// Each waits only on earlier groups sharing its bodies, which For has always handed out.
 		Jobs::For(order.size() * (ITERATIONS + 1), 1,
 			[&](size_t chunk, size_t, size_t)
 			{
