@@ -4,6 +4,7 @@
 
 #include "Component.h"
 #include "Serial.h"
+#include "Textures.h"
 
 #include "glm/glm.hpp"
 
@@ -116,7 +117,7 @@ namespace Loom
 		Serial<glm::vec2> size = glm::vec2(160.0f, 40.0f);
 		Serial<glm::vec4> color = glm::vec4(0.0f, 0.0f, 0.0f, 0.6f);
 		Serial<bool> blocksPointer = true;
-		Serial<std::string> imagePath;
+		Serial<TextureAsset> imagePath;
 
 	private:
 		friend struct Ui;
@@ -125,6 +126,9 @@ namespace Loom
 		// or on the nearest one above it, or null.
 		const UiButton* Button() const;
 	};
+
+	// What a UiText bakes its text from.
+	using FontAsset = Asset<".ttf", ".otf", ".ttc">;
 
 	/**
 	* Loom::UiText
@@ -153,7 +157,7 @@ namespace Loom
 		Ui::Rect Area() const;
 
 		Serial<std::string> text = std::string("Text");
-		Serial<std::string> fontPath;
+		Serial<FontAsset> fontPath;
 		Serial<float> fontSize = 24.0f;
 		Serial<glm::vec4> color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 		Serial<Alignment> alignment = Centre;

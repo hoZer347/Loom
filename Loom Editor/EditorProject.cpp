@@ -2313,7 +2313,7 @@ namespace Loom
 			path.empty() ? nullptr : IconOf(path),
 			path);
 
-		const bool shader = field.extension == ProjectAssets::shaderExtension;
+		const bool shader = field.extensions.front() == ProjectAssets::shaderExtension;
 
 		bool changed = false;
 
@@ -2323,7 +2323,7 @@ namespace Loom
 
 			if (dragged != nullptr &&
 				dragged->IsDataType(ASSET_PAYLOAD) &&
-				std::string_view((const char*)dragged->Data).ends_with(field.extension) &&
+				field.AcceptsFile((const char*)dragged->Data) &&
 				ImGui::AcceptDragDropPayload(ASSET_PAYLOAD))
 			{
 				path = (const char*)dragged->Data;
@@ -2370,12 +2370,12 @@ namespace Loom
 
 			m_fieldPicker.Draw(m_scriptFolders, ScriptsByLabel(names), hooks);
 		}
-		else if (FileTab* tab = FileTabOf("file" + field.extension))
+		else if (FileTab* tab = FileTabOf("file" + field.extensions.front()))
 		{
 			std::vector<std::string> files{ };
 
 			for (const std::string& file : tab->files)
-				if (file.ends_with(field.extension))
+				if (field.AcceptsFile(file))
 					files.push_back(file);
 
 			FolderTree::Hooks hooks = FileFolderHooks(*tab);
@@ -2391,7 +2391,7 @@ namespace Loom
 			std::vector<std::string> files{ };
 
 			for (const std::string& file : m_projectFiles)
-				if (file.ends_with(field.extension))
+				if (field.AcceptsFile(file))
 					files.push_back(file);
 
 			VirtualFolders flat{ };

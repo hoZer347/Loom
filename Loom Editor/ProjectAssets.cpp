@@ -1,10 +1,13 @@
 #include "ProjectAssets.h"
 
+#include "Audio.h"
 #include "ComponentRegistry.h"
 #include "Prefab.h"
 #include "ProjectTemplate.h"
 #include "SceneSerializer.h"
 #include "SpriteAsset.h"
+#include "Textures.h"
+#include "Ui.h"
 
 #include "Utilities/StateReference.h"
 
@@ -60,20 +63,11 @@ namespace Loom
 
 		constexpr std::string_view shaderExtensions[] = { ProjectAssets::shaderExtension };
 
-		// Whatever Textures.cpp has stb_image decode.
-		constexpr std::string_view textureExtensions[] = { ProjectAssets::textureExtension, ".jpg", ".jpeg", ".bmp", ".tga" };
-
 		// 2D art besides textures.
 		constexpr std::string_view twoDExtensions[] = { SpriteAsset::extension, Palette::extension };
 
-		// Whatever Audio.cpp has miniaudio decode.
-		constexpr std::string_view soundExtensions[] = { ".wav", ".mp3", ".flac" };
-
-		// What a UiText bakes its text from.
-		constexpr std::string_view fontExtensions[] = { ".ttf", ".otf", ".ttc" };
-
-		template <size_t count>
-		bool HasExtension(const std::string& name, const std::string_view (&extensions)[count])
+		template <typename Extensions>
+		bool HasExtension(const std::string& name, const Extensions& extensions)
 		{
 			std::string extension = std::filesystem::path(name).extension().string();
 
@@ -365,7 +359,7 @@ namespace {NAMESPACE}
 
 	bool ProjectAssets::IsTextureFile(const std::string& name)
 	{
-		return HasExtension(name, textureExtensions);
+		return HasExtension(name, TextureAsset::fileExtensions);
 	};
 
 	bool ProjectAssets::IsTwoDFile(const std::string& name)
@@ -375,12 +369,12 @@ namespace {NAMESPACE}
 
 	bool ProjectAssets::IsSoundFile(const std::string& name)
 	{
-		return HasExtension(name, soundExtensions);
+		return HasExtension(name, SoundAsset::fileExtensions);
 	};
 
 	bool ProjectAssets::IsFontFile(const std::string& name)
 	{
-		return HasExtension(name, fontExtensions);
+		return HasExtension(name, FontAsset::fileExtensions);
 	};
 
 	#pragma endregion

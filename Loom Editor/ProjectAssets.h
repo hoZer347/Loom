@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Shaders.h"
+#include "Textures.h"
 
 #include <string>
 #include <string_view>
@@ -22,7 +23,7 @@ namespace Loom
 		#pragma region File Kinds
 
 		static constexpr const char* shaderExtension = Shader::extension;
-		static constexpr const char* textureExtension = ".png";
+		static constexpr const char* textureExtension = TextureAsset::fileExtensions.front();
 		static constexpr std::string_view scriptExtensions[] = { ".hpp", ".h", ".cpp" };
 
 		enum struct Opener

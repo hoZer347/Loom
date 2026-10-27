@@ -222,6 +222,22 @@ namespace Loom
 		return NameCategory(name);
 	};
 
+	bool SerializedField::AcceptsFile(std::string_view file) const
+	{
+		const auto ends_in = [file](const std::string& extension)
+		{
+			return
+				file.size() >= extension.size() &&
+				std::equal(
+					extension.begin(),
+					extension.end(),
+					file.end() - extension.size(),
+					[](char a, char b) { return std::tolower((unsigned char)a) == std::tolower((unsigned char)b); });
+		};
+
+		return std::any_of(extensions.begin(), extensions.end(), ends_in);
+	};
+
 	std::string NameFromIdentifier(const char* identifier)
 	{
 		constexpr std::string_view MEMBER_PREFIX = "m_";

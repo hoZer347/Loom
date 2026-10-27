@@ -42,7 +42,7 @@ namespace AudioScripts
 	private:
 		static constexpr float GLOW_SECONDS = 0.3f;
 
-		Loom::Serial<std::string> m_clip = "Assets/Bell.wav";
+		Loom::Serial<Loom::SoundAsset> m_clip = "Assets/Bell.wav";
 		// A sound falls to a tenth of its volume ten units from the listener,
 		// so a bell across the room wants more than 1.
 		Loom::Serial<float> m_volume = 1.0f;

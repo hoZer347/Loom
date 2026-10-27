@@ -3,6 +3,7 @@
 #include "Loom API.h"
 
 #include "Component.h"
+#include "Textures.h"
 
 #include "glm/glm.hpp"
 
@@ -11,8 +12,6 @@
 
 namespace Loom
 {
-	struct Texture;
-
 	/**
 	* Loom::Sprite
 	* - An image on a quad in the GameObject's XY plane, facing +Z, sized by
@@ -47,7 +46,7 @@ namespace Loom
 		bool DrawQuad(uint32_t program);
 
 		// Relative to the project folder, which is where the editor works from.
-		Serial<std::string> texturePath;
+		Serial<TextureAsset> texturePath;
 		Serial<glm::vec4> color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 		Serial<float> pixelsPerUnit = 100.0f;
 		Serial<glm::vec2> pivot = glm::vec2(0.5f, 0.0f);

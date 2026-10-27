@@ -149,7 +149,7 @@ namespace Loom
 		bool (*accepts_reference)(LoomObject*),
 		const char* name,
 		unsigned long long* version,
-		const char* extension)
+		std::span<const char* const> extensions)
 	{
 		// Each field's count starts this far past the last one's, further than
 		// any field is ever changed.
@@ -185,8 +185,7 @@ namespace Loom
 		field.owner = owner;
 		field.name = owner->TakeName(name);
 
-		if (extension)
-			field.extension = extension;
+		field.extensions.assign(extensions.begin(), extensions.end());
 
 		owner->m_fields.push_back(field);
 

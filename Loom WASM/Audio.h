@@ -2,6 +2,7 @@
 
 #include "Loom API.h"
 
+#include "Asset.h"
 #include "Component.h"
 
 #include "glm/glm.hpp"
@@ -15,6 +16,9 @@ struct ma_sound;
 
 namespace Loom
 {
+	// What Audio.cpp has miniaudio decode.
+	using SoundAsset = Asset<".wav", ".mp3", ".flac">;
+
 	/**
 	* Loom::Audio
 	* - Plays sound files (wav, mp3 or flac, by path relative to the project
@@ -125,7 +129,7 @@ namespace Loom
 		#pragma endregion
 
 		// Relative to the project folder, which is where the editor works from.
-		Serial<std::string> clipPath;
+		Serial<SoundAsset> clipPath;
 		Serial<float> volume = 1.0f;
 
 		// A playback speed, so 2 is an octave up and twice as fast.

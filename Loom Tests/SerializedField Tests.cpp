@@ -13,6 +13,7 @@
 #include "Scene.h"
 #include "SceneSerializer.h"
 #include "SerializedField.h"
+#include "Ui.h"
 
 #include <bit>
 #include <limits>
@@ -607,9 +608,9 @@ TEST_SUITE("SerializedField")
 		Pump();
 
 		CHECK(Field(object, 0).type == Loom::FieldType::Asset);
-		CHECK(Field(object, 0).extension == ".shader");
+		CHECK(Field(object, 0).extensions == std::vector<std::string>{ ".shader" });
 		CHECK(Field(object, 1).type == Loom::FieldType::String);
-		CHECK(Field(object, 1).extension.empty());
+		CHECK(Field(object, 1).extensions.empty());
 
 		object.shader = "Assets/Lit.shader";
 
@@ -621,6 +622,22 @@ TEST_SUITE("SerializedField")
 		REQUIRE(Field(object, 0).Read("\"Assets/Lit.shader\""));
 
 		CHECK(*object.shader == "Assets/Lit.shader");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an asset of several extensions accepts a file ending in any of them, in any case")
+	{
+		Loom::UiText text;
+		Pump();
+
+		const Loom::SerializedField& font = Field(text, 1);
+
+		CHECK(font.type == Loom::FieldType::Asset);
+		CHECK(font.extensions.front() == ".ttf");
+		CHECK(font.AcceptsFile("Assets/Fonts/Body.ttf"));
+		CHECK(font.AcceptsFile("Assets/Fonts/Title.OTF"));
+		CHECK(font.AcceptsFile("Assets/Fonts/Family.ttc"));
+		CHECK_FALSE(font.AcceptsFile("Assets/Fonts/Body.png"));
+		CHECK_FALSE(font.AcceptsFile("ttf"));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an asset reads the path a string field saved")

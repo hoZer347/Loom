@@ -169,7 +169,7 @@ namespace Loom
 			bool (*accepts_reference)(LoomObject*),
 			const char* name,
 			unsigned long long* version,
-			const char* extension);
+			std::span<const char* const> extensions);
 
 		std::vector<SerializedField> m_fields{ };
 

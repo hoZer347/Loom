@@ -89,7 +89,7 @@ TEST_SUITE("Material")
 
 		// Picked in the editor from the project's shader files.
 		CHECK(material->GetFields().front().type == Loom::FieldType::Asset);
-		CHECK(material->GetFields().front().extension == Loom::Shader::extension);
+		CHECK(material->GetFields().front().extensions == std::vector<std::string>{ Loom::Shader::extension });
 	};
 
 	// The path comes first: it was the only field before colour was added, and

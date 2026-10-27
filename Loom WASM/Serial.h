@@ -11,6 +11,7 @@
 
 #include <functional>
 #include <initializer_list>
+#include <span>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -37,7 +38,7 @@ namespace Loom
 		bool (*accepts_reference)(LoomObject*),
 		const char* name,
 		unsigned long long* version,
-		const char* extension = nullptr);
+		std::span<const char* const> extensions = { });
 
 	// After a field of owner changed, for the journal of what changed and,
 	// for a reference, the index of who points where.
@@ -87,7 +88,7 @@ namespace Loom
 		else if constexpr (std::is_same_v<T, float>)				return FieldType::Float;
 		else if constexpr (std::is_same_v<T, double>)				return FieldType::Double;
 		else if constexpr (std::is_same_v<T, std::string>)			return FieldType::String;
-		else if constexpr (requires { T::fileExtension; })			return FieldType::Asset;
+		else if constexpr (requires { T::fileExtensions; })			return FieldType::Asset;
 		else if constexpr (std::is_same_v<T, glm::vec2>)			return FieldType::Vec2;
 		else if constexpr (std::is_same_v<T, glm::vec3>)			return FieldType::Vec3;
 		else if constexpr (std::is_same_v<T, glm::vec4>)			return FieldType::Vec4;
@@ -273,7 +274,7 @@ namespace Loom
 					&m_version);
 			}
 			else if constexpr (FieldTypeOf<T>() == FieldType::Asset)
-				m_owner = RegisterSerialField(FieldType::Asset, Data(), nullptr, nullptr, nullptr, name.value, &m_version, T::fileExtension);
+				m_owner = RegisterSerialField(FieldType::Asset, Data(), nullptr, nullptr, nullptr, name.value, &m_version, T::fileExtensions);
 			else m_owner = RegisterSerialField(FieldTypeOf<T>(), Data(), nullptr, nullptr, nullptr, name.value, &m_version);
 		};
 

@@ -2,6 +2,8 @@
 
 #include "Loom API.h"
 
+#include "Asset.h"
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -9,6 +11,9 @@
 
 namespace Loom
 {
+	// What Textures.cpp has stb_image decode.
+	using TextureAsset = Asset<".png", ".jpg", ".jpeg", ".bmp", ".tga">;
+
 	/**
 	* Loom::Texture
 	* - An image file decoded to eight bit RGBA, bottom row first, and the
