@@ -64,7 +64,7 @@ namespace Loom
 		size_t amountStreamed = 0;
 	};
 
-	/// Passes one markup token straight through -- it is an instruction to the box, not
+	/// Passes one RichText tag straight through -- it is an instruction to the box, not
 	/// something to type out.
 	struct St_Dg_StreamRichText final : StateOf<DialogueManager>
 	{

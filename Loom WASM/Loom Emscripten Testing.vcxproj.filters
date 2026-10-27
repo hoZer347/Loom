@@ -91,6 +91,9 @@
     <ClCompile Include="Ui.cpp">
       <Filter>UI</Filter>
     </ClCompile>
+    <ClCompile Include="RichText.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
     <ClCompile Include="Audio.cpp">
       <Filter>Audio</Filter>
     </ClCompile>
@@ -313,6 +316,9 @@
       <Filter>Sprite</Filter>
     </ClInclude>
     <ClInclude Include="Ui.h">
+      <Filter>UI</Filter>
+    </ClInclude>
+    <ClInclude Include="RichText.h">
       <Filter>UI</Filter>
     </ClInclude>
     <ClInclude Include="Textures.h">

@@ -183,6 +183,7 @@
     <ClCompile Include="PixelPass.cpp" />
     <ClCompile Include="Sprite.cpp" />
     <ClCompile Include="Ui.cpp" />
+    <ClCompile Include="RichText.cpp" />
     <ClCompile Include="Textures.cpp" />
     <ClCompile Include="ShaderVariables.cpp" />
     <ClCompile Include="EditorGui.cpp" />
@@ -252,6 +253,7 @@
     <ClInclude Include="PixelPass.h" />
     <ClInclude Include="Sprite.h" />
     <ClInclude Include="Ui.h" />
+    <ClInclude Include="RichText.h" />
     <ClInclude Include="Textures.h" />
     <ClInclude Include="ShaderVariables.h" />
     <ClInclude Include="EditorGui.h" />

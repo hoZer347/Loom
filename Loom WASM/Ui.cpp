@@ -4,6 +4,7 @@
 #include "Input.h"
 #include "Mesh.h"
 #include "Renderer.h"
+#include "RichText.h"
 #include "Shaders.h"
 #include "Textures.h"
 #include "Utilities/Clock.h"
@@ -270,7 +271,26 @@ void main()
 			return character >= FIRST_CHARACTER && character < FIRST_CHARACTER + CHARACTERS;
 		};
 
-		glm::vec2 MeasureWith(const Font& font, const std::string& text)
+		// One line's run in one font and colour.
+		struct Piece
+		{
+			const Font* font = nullptr;
+			glm::vec4 color{ 1.0f };
+			std::string text;
+		};
+
+		struct Line
+		{
+			std::vector<Piece> pieces;
+			float width = 0.0f;
+			float ascent = 0.0f;
+			float height = 0.0f;
+		};
+
+		constexpr char LINE_BREAK = '\n';
+		constexpr char SPACE = ' ';
+
+		float WidthOf(const Font& font, const std::string& text)
 		{
 			float width = 0.0f;
 
@@ -278,36 +298,144 @@ void main()
 				if (IsPrintable(character))
 					width += font.characters[character - FIRST_CHARACTER].xadvance;
 
-			return glm::vec2(width, font.lineHeight);
+			return width;
 		};
 
-		void DrawText(uint32_t program, const UiText& text, std::vector<float>& vertices)
+		void Grow(Line& line, const Font& font)
+		{
+			line.ascent = std::max(line.ascent, font.ascent);
+			line.height = std::max(line.height, font.lineHeight);
+		};
+
+		void Add(Line& line, const Font& font, const glm::vec4& color, const std::string& text, float width)
+		{
+			if (line.pieces.empty() || line.pieces.back().font != &font || line.pieces.back().color != color)
+				line.pieces.push_back({ &font, color, "" });
+
+			line.pieces.back().text += text;
+			line.width += width;
+
+			Grow(line, font);
+		};
+
+		// The text cut into lines at its breaks and, with wrap, at the spaces
+		// that keep each inside width; the spaces a line is cut at are left
+		// out. None when its font will not load.
+		std::vector<Line> LayOut(const UiText& text, float width)
 		{
 			const Font* font = FontFor(text.fontPath, text.fontSize);
 
 			if (font == nullptr)
-				return;
+				return { };
 
-			const Ui::Rect within = text.Area();
-			const glm::vec2 measured = MeasureWith(*font, text.text);
-			const int alignment = std::clamp((int)*text.alignment, (int)UiText::Left, (int)UiText::Right);
+			std::vector<Line> lines(1);
 
-			float x = within.min.x + (within.size.x - measured.x) * ALIGNED[alignment];
-			float y = within.min.y + (within.size.y - font->lineHeight) * HALF + font->ascent;
+			// Spaces after the last word, added only once the next word is
+			// on the same line.
+			Piece spaces{ };
+			float spacesWidth = 0.0f;
 
-			for (const char character : *text.text)
+			for (const RichText::Span& span : RichText::Spans(text.text, text.color, text.fontSize))
 			{
-				if (!IsPrintable(character))
-					continue;
+				font = FontFor(text.fontPath, span.size);
 
-				stbtt_aligned_quad quad;
-				stbtt_GetBakedQuad(font->characters, font->atlasSize, font->atlasSize, character - FIRST_CHARACTER, &x, &y, &quad, 1);
+				if (font == nullptr)
+					return { };
 
-				// The baker's t runs down from the atlas's top; the texture's v up from its bottom.
-				AddQuad(vertices, { quad.x0, quad.y0 }, { quad.x1, quad.y1 }, { quad.s0, 1.0f - quad.t0 }, { quad.s1, 1.0f - quad.t1 });
+				for (size_t at = 0; at < span.text.size(); )
+				{
+					if (span.text[at++] == LINE_BREAK)
+					{
+						Grow(lines.back(), *font);
+						lines.emplace_back();
+						spaces.text.clear();
+						spacesWidth = 0.0f;
+						continue;
+					};
+
+					const bool space = span.text[at - 1] == SPACE;
+					size_t end = at;
+
+					while (end < span.text.size() && span.text[end] != LINE_BREAK && (span.text[end] == SPACE) == space)
+						end++;
+
+					const std::string chunk = span.text.substr(at - 1, end - at + 1);
+					const float chunkWidth = WidthOf(*font, chunk);
+
+					at = end;
+
+					if (space)
+					{
+						spaces = { font, span.color, spaces.text + chunk };
+						spacesWidth += chunkWidth;
+						continue;
+					};
+
+					if (text.wrap && !lines.back().pieces.empty() && lines.back().width + spacesWidth + chunkWidth > width)
+						lines.emplace_back();
+					else if (!spaces.text.empty())
+						Add(lines.back(), *spaces.font, spaces.color, spaces.text, spacesWidth);
+
+					spaces.text.clear();
+					spacesWidth = 0.0f;
+					Add(lines.back(), *font, span.color, chunk, chunkWidth);
+				};
 			};
 
-			Draw(program, font->texture, text.color, vertices);
+			// An empty last line is as high as the font it ends in.
+			Grow(lines.back(), *font);
+
+			return lines;
+		};
+
+		glm::vec2 SizeOf(const std::vector<Line>& lines)
+		{
+			glm::vec2 size(0.0f);
+
+			for (const Line& line : lines)
+			{
+				size.x = std::max(size.x, line.width);
+				size.y += line.height;
+			};
+
+			return size;
+		};
+
+		void DrawText(uint32_t program, const UiText& text, std::vector<float>& vertices)
+		{
+			const Ui::Rect within = text.Area();
+			const std::vector<Line> lines = LayOut(text, within.size.x);
+			const int alignment = std::clamp((int)*text.alignment, (int)UiText::Left, (int)UiText::Right);
+			const int vertical = std::clamp((int)*text.verticalAlignment, (int)UiText::Top, (int)UiText::Bottom);
+
+			float top = within.min.y + (within.size.y - SizeOf(lines).y) * ALIGNED[vertical];
+
+			for (const Line& line : lines)
+			{
+				float x = within.min.x + (within.size.x - line.width) * ALIGNED[alignment];
+				float y = top + line.ascent;
+
+				for (const Piece& piece : line.pieces)
+				{
+					vertices.clear();
+
+					for (const char character : piece.text)
+					{
+						if (!IsPrintable(character))
+							continue;
+
+						stbtt_aligned_quad quad;
+						stbtt_GetBakedQuad(piece.font->characters, piece.font->atlasSize, piece.font->atlasSize, character - FIRST_CHARACTER, &x, &y, &quad, 1);
+
+						// The baker's t runs down from the atlas's top; the texture's v up from its bottom.
+						AddQuad(vertices, { quad.x0, quad.y0 }, { quad.x1, quad.y1 }, { quad.s0, 1.0f - quad.t0 }, { quad.s1, 1.0f - quad.t1 });
+					};
+
+					Draw(program, piece.font->texture, piece.color, vertices);
+				};
+
+				top += line.height;
+			};
 		};
 
 		#pragma endregion
@@ -497,9 +625,7 @@ void main()
 
 	glm::vec2 UiText::Measure() const
 	{
-		const Font* font = FontFor(fontPath, fontSize);
-
-		return font ? MeasureWith(*font, text) : glm::vec2(0.0f);
+		return SizeOf(LayOut(*this, Area().size.x));
 	};
 
 	Ui::Rect UiText::Area() const

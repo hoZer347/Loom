@@ -1,20 +1,25 @@
 #include "DialogueManager.h"
 
 #include "DialogueStates.h"
+#include "GameObject.h"
+#include "RichText.h"
+#include "Ui.h"
 
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
+#include <iterator>
 #include <regex>
 
 
 namespace Loom
 {
-	// Splits a script into [Binding, Arg...] commands, <markup> and the plain text between.
+	// Splits a script into [Name, Arg...] commands and the plain text between.
 	static const std::regex& TokenRegex()
 	{
-		static const std::regex regex(R"(\[[^\]]*\]|<[^>]*>)");
+		static const std::regex regex(R"(\[[^\]]*\])");
 
 		return regex;
 	};
@@ -62,16 +67,31 @@ namespace Loom
 	{
 		Build();
 
-		// Fills the queue for an auto-begin dialogue, but never clobbers a Begin() that
-		// ran first.
-		if (_ready && !_begun)
-			QueueScript();
+		// Starts an auto-begin dialogue, but never clobbers a Begin() that ran first.
+		if (!_ready || _begun)
+			return;
+
+		_begun = true;
+
+		QueueScript();
+
+		Proceed();
 	};
 
 	void DialogueManager::Build()
 	{
 		if (_ready)
 			return;
+
+		if (_script.empty() && !dialogue->empty())
+		{
+			std::ifstream file(*dialogue, std::ios::binary);
+
+			if (!file)
+				std::cerr << "[Dialogue] Could not open '" << *dialogue << "'." << std::endl;
+
+			_script.assign(std::istreambuf_iterator<char>(file), { });
+		};
 
 		if (_script.empty())
 		{
@@ -82,7 +102,7 @@ namespace Loom
 			return;
 		};
 
-		if (!onTextChanged)
+		if (!onTextChanged && Box() == nullptr)
 			std::cerr
 				<< "[Dialogue] No text sink assigned -- the streamed line will only be "
 				   "readable through Text()."
@@ -137,15 +157,15 @@ namespace Loom
 
 		for (const std::string& split : Tokens(text))
 		{
-			if (IsBinding(split))
+			if (IsRichText(split))
+				Push<St_Dg_StreamRichText>()->text = split;
+			else if (IsBinding(split))
 			{
 				const std::string content = split.substr(1, split.size() - 2);
 
 				Push<St_Dg_InvokeBinding>()->binding =
 					[this, content]() { InvokeBinding(content); };
 			}
-			else if (IsRichText(split))
-				Push<St_Dg_StreamRichText>()->text = split;
 			else Push<St_Dg_StreamPlainText>()->text = split;
 		};
 
@@ -168,16 +188,14 @@ namespace Loom
 
 		_text += text;
 
-		if (onTextChanged)
-			onTextChanged(_text);
+		Show();
 	};
 
 	void DialogueManager::Append(char c)
 	{
 		_text += c;
 
-		if (onTextChanged)
-			onTextChanged(_text);
+		Show();
 	};
 
 	void DialogueManager::ClearText()
@@ -187,8 +205,20 @@ namespace Loom
 
 		_text.clear();
 
+		Show();
+	};
+
+	void DialogueManager::Show()
+	{
 		if (onTextChanged)
 			onTextChanged(_text);
+		else if (UiText* box = Box())
+			box->text = _text;
+	};
+
+	UiText* DialogueManager::Box() const
+	{
+		return m_gameObject ? m_gameObject->FindComponent<UiText>() : nullptr;
 	};
 
 	#pragma endregion
@@ -240,6 +270,18 @@ namespace Loom
 		_bindings.erase(Lowered(name));
 	};
 
+	std::vector<std::string> DialogueManager::Commands() const
+	{
+		std::vector<std::string> names;
+
+		for (const auto& [lowered, binding] : _bindings)
+			names.push_back(binding.name);
+
+		std::sort(names.begin(), names.end());
+
+		return names;
+	};
+
 	void DialogueManager::InvokeBinding(const std::string& content)
 	{
 		const size_t comma = content.find(',');
@@ -260,7 +302,7 @@ namespace Loom
 
 		const std::vector<std::string> args = DialogueArgs::Split(argList);
 
-		for (const auto& form : found->second)
+		for (const auto& form : found->second.forms)
 			if (form(args))
 				return;
 
@@ -280,7 +322,7 @@ namespace Loom
 
 	bool DialogueManager::IsRichText(const std::string& token)
 	{
-		return token.size() >= 2 && token.front() == '<' && token.back() == '>';
+		return RichText::IsTag(token);
 	};
 
 	bool DialogueManager::IsClearBinding(const std::string& token)
@@ -352,13 +394,6 @@ namespace Loom
 
 				if (IsClearBinding(split))
 					pageStart = true;
-
-				continue;
-			};
-
-			if (IsRichText(split))
-			{
-				tokens.push_back(split);
 
 				continue;
 			};

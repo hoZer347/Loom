@@ -1,6 +1,8 @@
 #pragma once
 
+#include "Asset.h"
 #include "DialogueArgs.h"
+#include "Serial.h"
 #include "StateMachine.h"
 
 #include <functional>
@@ -12,6 +14,8 @@
 
 namespace Loom
 {
+	struct UiText;
+
 	namespace detail
 	{
 		/// What a callable takes, so a binding can be written as an ordinary lambda and
@@ -38,23 +42,27 @@ namespace Loom
 	/// Streams a script into a text box, a character at a time, running the commands
 	/// written into it as it goes.
 	///
-	/// A script is plain text with two kinds of token in it:
+	/// A script is plain text with commands in brackets in it:
 	///
 	///		[Binding, arg, arg]     runs a bound function
-	///		&lt;anything&gt;             passed through untouched, for the box's own markup
+	///		[Color, red]            a RichText tag, passed through whole for the box to draw
 	///
 	/// Everything else streams out one character at a time at the current text speed.
 	///
-	/// The manager owns the text and announces every change rather than drawing it: a
-	/// host draws Text() however it likes and plays Speak's blips however it likes,
-	/// Loom having neither a text renderer nor audio. Everything above that -- the
-	/// tokenising, the
-	/// bindings, the states, the timing -- is unchanged.
+	/// The script is the .dialogue file dialogue names, unless SetScript gives it one.
+	/// The manager owns the text and announces every change through onTextChanged; with
+	/// none set, it writes the text into the UiText on its GameObject or the first one
+	/// under it. Speak's blips go to onSpeak for a host to play however it likes.
 	struct LOOM_API DialogueManager : StateMachine<DialogueManager, "Logic">
 	{
 		DialogueManager();
 
+		static constexpr char extension[] = ".dialogue";
+
 		#pragma region Running
+
+		/// The file streamed when no script has been set.
+		Serial<Asset<extension>> dialogue;
 
 		/// The script this manager streams. Set it before Begin.
 		void SetScript(std::string script);
@@ -143,7 +151,12 @@ namespace Loom
 		{
 			using Args = typename detail::function_traits<_Callable>::args;
 
-			_bindings[Lowered(name)].push_back(
+			Binding& binding = _bindings[Lowered(name)];
+
+			if (binding.name.empty())
+				binding.name = name;
+
+			binding.forms.push_back(
 				[callable = std::forward<_Callable>(callable)](const std::vector<std::string>& tokens) -> bool
 				{
 					return Invoke(callable, tokens, static_cast<Args*>(nullptr));
@@ -153,12 +166,15 @@ namespace Loom
 		/// Drops every form bound under that name.
 		void Unbind(const std::string& name);
 
+		/// Every name bound, as it was first bound.
+		std::vector<std::string> Commands() const;
+
 		#pragma endregion
 
 		#pragma region Parsing
 
-		/// Splits a script into [Binding] commands, &lt;markup&gt; and the plain text
-		/// between, dropping the whitespace a cleared page would otherwise open with.
+		/// Splits a script into its [bracketed] commands and the plain text between,
+		/// dropping the whitespace a cleared page would otherwise open with.
 		static std::vector<std::string> Tokens(const std::string& text);
 
 		static bool IsBinding(const std::string& token);
@@ -187,6 +203,12 @@ namespace Loom
 
 		/// Empties the box.
 		void ClearText();
+
+		/// Hands the text to onTextChanged, or to the UiText that shows it.
+		void Show();
+
+		/// The UiText on this GameObject, or the first one under it that is enabled.
+		UiText* Box() const;
 
 		#pragma endregion
 
@@ -261,8 +283,12 @@ namespace Loom
 
 		int _voiceCharCount = 0;
 
-		std::unordered_map<
-			std::string,
-			std::vector<std::function<bool(const std::vector<std::string>&)>>> _bindings{ };
+		struct Binding
+		{
+			std::string name{ };
+			std::vector<std::function<bool(const std::vector<std::string>&)>> forms{ };
+		};
+
+		std::unordered_map<std::string, Binding> _bindings{ };
 	};
 };

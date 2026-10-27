@@ -132,8 +132,12 @@ namespace Loom
 
 	/**
 	* Loom::UiText
-	* - One line of text in the UiRect on its GameObject, or the whole screen
-	*   without one, centred on it upright and aligned across it
+	* - Text in the UiRect on its GameObject, or the whole screen without one,
+	*   each line aligned across it and the lines aligned down it
+	* - A line ends at a line break, and with wrap, at the last space that
+	*   keeps it inside the rect's width
+	* - Drawn as RichText, so [Color, red] and [Size, 32] tags in it colour
+	*   and size what follows them
 	* - fontPath names a TrueType file, relative to the project folder; the
 	*   printable ASCII characters are baked at fontSize pixels the first time
 	*   a size is asked for, and the rest of the text is left out
@@ -143,14 +147,15 @@ namespace Loom
 	struct LOOM_API UiText : Component<UiText, "UI">
 	{
 		enum Alignment : int { Left, Centre, Right };
+		enum VerticalAlignment : int { Top, Middle, Bottom };
 
 		// A baked size neither drawn nor measured for this many frames is let go.
 		static constexpr unsigned long long unusedFrames = 600;
 
 		void OnRender() override;
 
-		// The text's width and line height in pixels, or zero when the font
-		// will not load.
+		// The widest line's width and every line's height in pixels, or zero
+		// when the font will not load.
 		glm::vec2 Measure() const;
 
 		// Where the text is laid out: its UiRect, or the whole screen.
@@ -161,6 +166,8 @@ namespace Loom
 		Serial<float> fontSize = 24.0f;
 		Serial<glm::vec4> color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 		Serial<Alignment> alignment = Centre;
+		Serial<bool> wrap = false;
+		Serial<VerticalAlignment> verticalAlignment = Middle;
 	};
 
 	/**
