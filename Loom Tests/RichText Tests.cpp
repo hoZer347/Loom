@@ -111,11 +111,8 @@ TEST_SUITE("RichText")
 		CHECK(spans[0].text + spans[1].text == "ab");
 	};
 
-	TEST_CASE("every tag is named, opening and closing")
+	TEST_CASE("a tag is told apart by its name, whatever its case")
 	{
-		const std::vector<std::string> tags = Loom::RichText::Tags();
-
-		CHECK(tags == std::vector<std::string>{ "Color", "/Color", "Size", "/Size" });
 		CHECK(Loom::RichText::IsTag("[Color, red]"));
 		CHECK(Loom::RichText::IsTag("[/size]"));
 	};

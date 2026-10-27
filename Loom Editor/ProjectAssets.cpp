@@ -341,9 +341,9 @@ namespace {NAMESPACE}
 		const char* const bindingComment[] =
 		{
 			"// A DialogueBinding is a command this manager's .dialogue scripts can run.",
-			"// [NewBinding, 1, 2] in a script calls it with 1 and 2 when the dialogue",
-			"// reaches it. Its arguments are read as the types listed, so declaring the",
-			"// same name again with other types overloads it.",
+			"// [Name, 1, 2] in a script calls the binding named Name with 1 and 2 when",
+			"// the dialogue reaches it. Its arguments are read as the types listed, so",
+			"// declaring the same name again with other types overloads it.",
 		};
 
 		// Where a { or } that is code, not text in a literal or a comment, closes

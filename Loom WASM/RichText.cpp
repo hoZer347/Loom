@@ -125,19 +125,6 @@ namespace Loom
 		};
 	};
 
-	const std::vector<std::string>& RichText::Tags()
-	{
-		static const std::vector<std::string> tags =
-		{
-			std::string(ColorTag),
-			Close + std::string(ColorTag),
-			std::string(SizeTag),
-			Close + std::string(SizeTag),
-		};
-
-		return tags;
-	};
-
 	bool RichText::IsTag(const std::string& token)
 	{
 		return Parse(token).has_value();

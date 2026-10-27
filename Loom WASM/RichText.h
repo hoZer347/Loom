@@ -38,9 +38,6 @@ namespace Loom
 		static constexpr std::string_view SizeTag = "Size";
 		static constexpr char Close = '/';
 
-		// Every tag's name, opening and closing, as a script writes it.
-		static const std::vector<std::string>& Tags();
-
 		// Whether token, brackets and all, is one of the tags.
 		static bool IsTag(const std::string& token);
 

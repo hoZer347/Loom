@@ -116,6 +116,15 @@ TEST_SUITE("DialogueManager")
 		CHECK(box.manager->Text() == "Hi [Color, red]there[/Color].");
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a Size tag runs through its DialogueBinding and is written back as the script had it")
+	{
+		Box box;
+
+		box.manager->SetScript("[Size, 36]big[/Size][Pause]");
+
+		CHECK(box.Reads("[Size, 36]big[/Size]"));
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a space beside a RichText tag streams, and a line break between commands does not")
 	{
 		Box box;

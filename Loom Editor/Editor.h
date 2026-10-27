@@ -1451,6 +1451,7 @@ namespace Loom
 		Guid m_newScriptFor{ };
 		Guid m_attachAfterBuildTo{ };
 		std::string m_attachAfterBuild{ };
+		bool m_compileAfterBuild = false;
 
 		#pragma endregion
 

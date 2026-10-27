@@ -95,6 +95,11 @@ TEST_SUITE("StateMachine")
 		CHECK(Loom::ComponentRegistry::All().contains("StateMachine"));
 	};
 
+	TEST_CASE("a project's state machine is filed under Custom/StateMachines")
+	{
+		CHECK(Loom::ComponentRegistry::CategoryOf("StateTestMachine") == "Custom/StateMachines");
+	};
+
 	TEST_CASE("a State registers itself under its type name, and a StateOf does not")
 	{
 		CHECK(Loom::StateRegistry::Contains("StateTestIdle"));

@@ -162,8 +162,13 @@ namespace Loom
 			return;
 		};
 
+		// The build running began before the script waiting to be attached was
+		// written, so another follows it.
 		if (m_scripts.IsBuilding())
+		{
+			m_compileAfterBuild = !m_attachAfterBuild.empty();
 			return;
+		};
 
 		// A scene halfway in goes out with the rest rather than finishing on
 		// a library that has gone.
@@ -186,7 +191,11 @@ namespace Loom
 		m_scripts.Unload();
 
 		if (!m_scripts.Build())
+		{
+			m_attachAfterBuild.clear();
+			m_attachAfterBuildTo = Guid();
 			RestoreAfterBuild();
+		};
 	};
 
 	void Editor::PollScripts()
@@ -217,7 +226,9 @@ namespace Loom
 		CloseAllScenes();
 
 		RestoreAfterBuild();
-		AttachAfterBuild();
+
+		if (!m_compileAfterBuild)
+			AttachAfterBuild();
 
 		RefreshProjectAssets();
 
@@ -234,9 +245,10 @@ namespace Loom
 			if (m_scripts.LastBuildSucceeded())
 				BeginPlay();
 		};
-	};
 
-	#pragma endregion
+		if (std::exchange(m_compileAfterBuild, false))
+			CompileScripts();
+	};
 
 	void Editor::AttachAfterBuild()
 	{

@@ -44,12 +44,12 @@ namespace Loom
 	void DialogueManagerBase::SetTextSpeed(const std::string& speed)
 	{
 		// Each named speed against the one a line starts at.
-		constexpr float SLOWER = 2.0f;
-		constexpr float FASTER = 0.5f;
+		constexpr float slower = 2.0f;
+		constexpr float faster = 0.5f;
 
-		if (speed == "Slow") _textSpeed = startingTextSpeed * SLOWER;
+		if (speed == "Slow") _textSpeed = startingTextSpeed * slower;
 		else if (speed == "Normal") _textSpeed = startingTextSpeed;
-		else if (speed == "Fast") _textSpeed = startingTextSpeed * FASTER;
+		else if (speed == "Fast") _textSpeed = startingTextSpeed * faster;
 		else if (speed == "Default") _textSpeed = startingTextSpeed;
 		else std::cerr << "[Dialogue] Unrecognized text speed '" << speed << "'." << std::endl;
 	};

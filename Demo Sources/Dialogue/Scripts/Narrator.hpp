@@ -14,9 +14,9 @@ namespace DialogueScripts
 	struct Narrator : Loom::DialogueManager<Narrator>
 	{
 		// A DialogueBinding is a command this manager's .dialogue scripts can run.
-		// [NewBinding, 1, 2] in a script calls it with 1 and 2 when the dialogue
-		// reaches it. Its arguments are read as the types listed, so declaring the
-		// same name again with other types overloads it.
+		// [Name, 1, 2] in a script calls the binding named Name with 1 and 2 when
+		// the dialogue reaches it. Its arguments are read as the types listed, so
+		// declaring the same name again with other types overloads it.
 		Loom::DialogueBinding<"Shout", std::string> shout = [this](const std::string& word)
 		{
 			std::string loud = word;

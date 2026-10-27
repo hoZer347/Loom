@@ -72,7 +72,7 @@ namespace Loom
 	/**
 	* Loom::DialogueBinding
 	* - A command a .dialogue script can run, declared as a member the way a Serial is:
-	*   DialogueBinding<"Shake", float> m_shake = [this](float strength) { ... };
+	*   DialogueBinding<"Shake", float> shake = [this](float strength) { ... };
 	*   A script's [Shake, 0.5] runs it with 0.5 once a DialogueManager reaches it
 	* - Found by a DialogueManager on the components of its own GameObject and then of
 	*   each parent above it, after the bindings it was given with Bind
