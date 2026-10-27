@@ -17,6 +17,9 @@ param(
 
     [switch] $NoBuild,
 
+    # Many times what the suite takes on a loaded machine; past it the run has deadlocked.
+    [int] $TimeoutMinutes = 20,
+
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]] $TestArgs = @()
 )
@@ -25,6 +28,7 @@ $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 
 . (Join-Path $root 'MSBuild.ps1')
+. (Join-Path $root 'TestRun.ps1')
 
 if (-not $NoBuild)
 {
@@ -62,5 +66,4 @@ if (-not (Test-Path $exe))
 # the engine (one test deliberately makes a queued task throw). The exit code is
 # what says whether the run passed.
 $ErrorActionPreference = 'Continue'
-& $exe @TestArgs
-exit $LASTEXITCODE
+exit (Invoke-TestSuite $exe $TestArgs $TimeoutMinutes)

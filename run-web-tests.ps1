@@ -28,6 +28,9 @@ param(
 
     [switch] $NoBuild,
 
+    # Many times what the suite takes on a loaded machine; past it the run has deadlocked.
+    [int] $TimeoutMinutes = 20,
+
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]] $TestArgs = @()
 )
@@ -36,6 +39,7 @@ $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 
 . (Join-Path $root 'WebBuild.ps1')
+. (Join-Path $root 'TestRun.ps1')
 
 #region Sources
 
@@ -252,7 +256,6 @@ if (-not $node)
 # the engine (one test deliberately makes a queued task throw). The exit code is
 # what says whether the run passed.
 $ErrorActionPreference = 'Continue'
-& $node.Source $output @TestArgs
-exit $LASTEXITCODE
+exit (Invoke-TestSuite $node.Source (@($output) + $TestArgs) $TimeoutMinutes)
 
 #endregion
