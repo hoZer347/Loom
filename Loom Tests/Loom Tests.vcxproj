@@ -215,6 +215,7 @@
     <ClCompile Include="Clock Tests.cpp" />
     <ClCompile Include="GameFocus Tests.cpp" />
     <ClCompile Include="LoadProgress Tests.cpp" />
+    <ClCompile Include="WindowFrame Tests.cpp" />
     <ClCompile Include="WindowFullscreen Tests.cpp" />
     <ClCompile Include="Threading Tests.cpp" />
     <ClCompile Include="AxisGui Tests.cpp" />
@@ -281,6 +282,7 @@
     <ClCompile Include="..\Loom Editor\SelectionOutline.cpp" />
     <ClCompile Include="..\Loom Editor\GameFocus.cpp" />
     <ClCompile Include="..\Loom Editor\LoadProgress.cpp" />
+    <ClCompile Include="..\Loom Editor\WindowFrame.cpp" />
     <ClCompile Include="..\Loom Editor\WindowFullscreen.cpp" />
   </ItemGroup>
   <!-- Built against Assimp, which the web build has no wasm copy of. -->

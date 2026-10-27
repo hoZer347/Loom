@@ -33,6 +33,7 @@
 #include "ScriptFolders.h"
 #include "ScriptLibrary.h"
 #include "WebPlayer.h"
+#include "WindowFrame.h"
 #include "WindowFullscreen.h"
 
 #include <filesystem>
@@ -669,6 +670,10 @@ namespace Loom
 		void DrawGui();
 
 		void DrawMainMenuBar();
+
+		// Minimize, maximize and close, at the right of the menu bar, in place
+		// of the title bar the window frame takes away.
+		void DrawWindowButtons();
 
 		// The menu bar and the panels docked round the dock space.
 		void DrawWorkspace();
@@ -1316,6 +1321,7 @@ namespace Loom
 		std::optional<View> m_fullscreen;
 		View m_lastView = View::Game;
 		WindowFullscreen m_windowFullscreen;
+		WindowFrame m_windowFrame;
 		double m_fullscreenSince = 0.0;
 		bool m_showSceneData = true;
 		bool m_showConsole = true;

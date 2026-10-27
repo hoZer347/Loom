@@ -148,6 +148,9 @@
     <ClCompile Include="LoadProgress.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
+    <ClCompile Include="WindowFrame.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
     <ClCompile Include="WindowFullscreen.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
@@ -310,6 +313,9 @@
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="LoadProgress.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="WindowFrame.h">
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="WindowFullscreen.h">

@@ -184,6 +184,9 @@
     <ClCompile Include="LoadProgress Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="WindowFrame Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="WindowFullscreen Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

@@ -85,6 +85,18 @@ namespace Loom
 
 		#pragma endregion
 
+		#pragma region Window Buttons
+
+		constexpr int window_button_count = 3;
+		constexpr float window_button_aspect = 1.6f;
+		constexpr float window_glyph_size = 0.2f;
+		constexpr float window_glyph_offset = 0.25f;
+		constexpr ImU32 close_hovered = IM_COL32(196, 43, 28, 255);
+		constexpr ImU32 close_pressed = IM_COL32(148, 32, 21, 255);
+		constexpr ImU32 close_glyph = IM_COL32(255, 255, 255, 255);
+
+		#pragma endregion
+
 		#pragma region Field Groups
 
 		// One thing an object's inspector draws: a field or a Button, by where
@@ -754,6 +766,8 @@ namespace Loom
 
 		ImGui::GetPlatformIO().Platform_OpenInShellFn = OpenInShell;
 		ImGui::GetPlatformIO().Platform_OpenInShellUserData = this;
+
+		m_windowFrame.Install(Engine::window);
 
 		drop_receiver = this;
 
@@ -2084,12 +2098,14 @@ namespace Loom
 		m_fullscreen = view;
 		m_fullscreenSince = ImGui::GetTime();
 		m_windowFullscreen.Enter(Engine::window);
+		m_windowFrame.Fit();
 	};
 
 	void Editor::LeaveFullscreen()
 	{
 		m_fullscreen.reset();
 		m_windowFullscreen.Leave(Engine::window);
+		m_windowFrame.Fit();
 	};
 
 	void Editor::DrawMainMenuBar()
@@ -2269,7 +2285,87 @@ namespace Loom
 		if (ImGui::MenuItem("Play Web", nullptr, false, m_activeScene != nullptr && !m_projectPath.empty()))
 			PlayWeb();
 
+		DrawWindowButtons();
+
 		ImGui::EndMainMenuBar();
+	};
+
+	void Editor::DrawWindowButtons()
+	{
+		if (!m_windowFrame.IsInstalled())
+			return;
+
+		const ImVec2 bar_min = ImGui::GetWindowPos();
+		const ImVec2 bar_max(bar_min.x + ImGui::GetWindowWidth(), bar_min.y + ImGui::GetWindowHeight());
+		const float height = bar_max.y - bar_min.y;
+		const float width = height * window_button_aspect;
+		const float buttons_left = bar_max.x - width * window_button_count;
+		const float strip_left = ImGui::GetItemRectMax().x;
+		const ImVec2 origin = ImGui::GetMainViewport()->Pos;
+
+		// A click on the bar has to reach ImGui to close an open menu.
+		m_windowFrame.SetDragStrip(ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId)
+			? WindowFrame::Rect{ }
+			: WindowFrame::Rect{ strip_left - origin.x, bar_min.y - origin.y, buttons_left - origin.x, bar_max.y - origin.y });
+
+		ImDrawList& draw = *ImGui::GetWindowDrawList();
+		const float glyph = height * window_glyph_size;
+		const float offset = glyph * window_glyph_offset * 2.0f;
+		const bool maximized = glfwGetWindowAttrib(Engine::window, GLFW_MAXIMIZED);
+		ImVec2 center{ };
+		ImU32 color = 0;
+
+		const auto button = [&](int index, const char* id, ImU32 hovered, ImU32 pressed) -> bool
+		{
+			const ImVec2 corner(buttons_left + width * index, bar_min.y);
+
+			ImGui::SetCursorScreenPos(corner);
+
+			const bool clicked = ImGui::InvisibleButton(id, ImVec2(width, height));
+
+			center = ImVec2(corner.x + width * 0.5f, corner.y + height * 0.5f);
+			color = ImGui::GetColorU32(ImGuiCol_Text);
+
+			if (ImGui::IsItemHovered())
+				draw.AddRectFilled(corner, ImVec2(corner.x + width, bar_max.y), ImGui::IsItemActive() ? pressed : hovered);
+
+			return clicked;
+		};
+
+		draw.PushClipRect(bar_min, bar_max, false);
+
+		if (button(0, "##Minimize", ImGui::GetColorU32(ImGuiCol_HeaderHovered), ImGui::GetColorU32(ImGuiCol_HeaderActive)))
+			glfwIconifyWindow(Engine::window);
+
+		draw.AddLine(ImVec2(center.x - glyph, center.y), ImVec2(center.x + glyph, center.y), color);
+
+		if (button(1, "##Maximize", ImGui::GetColorU32(ImGuiCol_HeaderHovered), ImGui::GetColorU32(ImGuiCol_HeaderActive)))
+		{
+			if (maximized)
+				glfwRestoreWindow(Engine::window);
+			else glfwMaximizeWindow(Engine::window);
+		};
+
+		if (maximized)
+		{
+			draw.AddRect(ImVec2(center.x - glyph, center.y - glyph + offset), ImVec2(center.x + glyph - offset, center.y + glyph), color);
+			draw.AddLine(ImVec2(center.x - glyph + offset, center.y - glyph + offset), ImVec2(center.x - glyph + offset, center.y - glyph), color);
+			draw.AddLine(ImVec2(center.x - glyph + offset, center.y - glyph), ImVec2(center.x + glyph, center.y - glyph), color);
+			draw.AddLine(ImVec2(center.x + glyph, center.y - glyph), ImVec2(center.x + glyph, center.y + glyph - offset), color);
+			draw.AddLine(ImVec2(center.x + glyph, center.y + glyph - offset), ImVec2(center.x + glyph - offset, center.y + glyph - offset), color);
+		}
+		else draw.AddRect(ImVec2(center.x - glyph, center.y - glyph), ImVec2(center.x + glyph, center.y + glyph), color);
+
+		if (button(2, "##Close", close_hovered, close_pressed))
+			Engine::Stop();
+
+		if (ImGui::IsItemHovered())
+			color = close_glyph;
+
+		draw.AddLine(ImVec2(center.x - glyph, center.y - glyph), ImVec2(center.x + glyph, center.y + glyph), color);
+		draw.AddLine(ImVec2(center.x - glyph, center.y + glyph), ImVec2(center.x + glyph, center.y - glyph), color);
+
+		draw.PopClipRect();
 	};
 
 	#pragma endregion
