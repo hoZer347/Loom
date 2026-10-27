@@ -252,9 +252,12 @@ if (-not $node)
     exit 1
 }
 
+# Claude Code sets CLAUDECODE, so an agent's run can be watched case by case.
+$progress = if ($env:CLAUDECODE) { Join-Path $outputDir 'Loom Tests Progress.log' }
+
 # So a run stopped at its time limit reports it and still exits with its code.
 $ErrorActionPreference = 'Continue'
-Invoke-TestSuite $node.Source (@($output) + $TestArgs) $TimeoutMinutes
+Invoke-TestSuite $node.Source (@($output) + $TestArgs) $TimeoutMinutes $progress
 exit $LASTEXITCODE
 
 #endregion

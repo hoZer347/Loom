@@ -7,6 +7,7 @@
 //
 // Run the executable with no arguments to run everything, or pass
 // -ts=<suite> / -tc=<case> to narrow it down. --help lists the rest.
+// --progress-log=<file> writes each case's name and seconds there as it runs.
 
 #define DOCTEST_CONFIG_IMPLEMENT
 #include "doctest.h"
@@ -16,10 +17,14 @@
 
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <optional>
+#include <sstream>
 #include <streambuf>
 #include <string>
+#include <string_view>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -168,6 +173,47 @@ namespace
 
 	// Held until main counts what it held back.
 	std::optional<HeldBack> startup LOOM_FIRST_INITIALISED { std::in_place };
+
+	constexpr std::string_view PROGRESS_LOG_OPTION = "--progress-log=";
+
+	// Opened by main when the run is given PROGRESS_LOG_OPTION.
+	std::ofstream progressFile;
+
+	// Writes each case's name as it starts and its seconds once it ends, flushed
+	// as it goes, so a run that stalls shows which case it stalled in.
+	struct ProgressLog final : doctest::IReporter
+	{
+		static constexpr int SECONDS_PRECISION = 3;
+
+		explicit ProgressLog(std::ostream& out) : m_out(out) { };
+		explicit ProgressLog(const doctest::ContextOptions&) : m_out(progressFile) { };
+
+		void test_case_start(const doctest::TestCaseData& test) override
+		{
+			m_out << test.m_test_suite << " / " << test.m_name << std::flush;
+		};
+
+		void test_case_end(const doctest::CurrentTestCaseStats& stats) override
+		{
+			m_out << "  " << std::fixed << std::setprecision(SECONDS_PRECISION) << stats.seconds << " s" << std::endl;
+		};
+
+		void report_query(const doctest::QueryData&) override { };
+		void test_run_start() override { };
+		void test_run_end(const doctest::TestRunStats&) override { };
+		void test_case_reenter(const doctest::TestCaseData&) override { };
+		void test_case_exception(const doctest::TestCaseException&) override { };
+		void subcase_start(const doctest::SubcaseSignature&) override { };
+		void subcase_end() override { };
+		void log_assert(const doctest::AssertData&) override { };
+		void log_message(const doctest::MessageData&) override { };
+		void test_case_skipped(const doctest::TestCaseData&) override { };
+
+	private:
+		std::ostream& m_out;
+	};
+
+	REGISTER_LISTENER("progress-log", 0, ProgressLog);
 };
 
 
@@ -200,6 +246,23 @@ int main(int argc, char** argv)
 
 	context.applyCommandLine(argc, argv);
 
+	for (int i = 1; i < argc; i++)
+	{
+		const std::string_view argument = argv[i];
+
+		if (argument.starts_with(PROGRESS_LOG_OPTION))
+		{
+			const std::string path(argument.substr(PROGRESS_LOG_OPTION.size()));
+			progressFile.open(path);
+
+			if (!progressFile)
+			{
+				std::fprintf(stderr, "The suite could not open its progress log at %s\n", path.c_str());
+				return EXIT_FAILURE;
+			};
+		};
+	};
+
 #ifndef __EMSCRIPTEN__
 	// The executable's own path, since argv[0] is only what it was launched as.
 	char* executable = nullptr;
@@ -229,6 +292,23 @@ TEST_SUITE("Loom Tests")
 			REQUIRE(test.m_test_suite != nullptr);
 			CHECK(*test.m_test_suite != '\0');
 		};
+	};
+
+	TEST_CASE("the progress log names a case as it starts and adds its seconds once it ends")
+	{
+		constexpr double SECONDS = 1.25;
+		const std::string name = "Loom Tests / the progress log names a case as it starts and adds its seconds once it ends";
+
+		std::ostringstream out;
+		ProgressLog log(out);
+
+		log.test_case_start(*doctest::getContextOptions()->currentTest);
+		CHECK(out.str() == name);
+
+		doctest::CurrentTestCaseStats stats {};
+		stats.seconds = SECONDS;
+		log.test_case_end(stats);
+		CHECK(out.str() == name + "  1.250 s\n");
 	};
 
 #ifndef __EMSCRIPTEN__
