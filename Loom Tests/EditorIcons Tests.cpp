@@ -14,6 +14,8 @@ TEST_SUITE("EditorIcons")
 		CHECK(EditorIcons::Of("Scenes/Main.LOOMSCENE") == EditorIcons::Scene);
 		CHECK(EditorIcons::Of("Assets/Lit.shader") == EditorIcons::Shader);
 		CHECK(EditorIcons::Of("Assets/Lit.Shader") == EditorIcons::Shader);
+		CHECK(EditorIcons::Of("Assets/Intro.dialogue") == EditorIcons::Dialogue);
+		CHECK(EditorIcons::Of("Assets/Intro.Dialogue") == EditorIcons::Dialogue);
 		CHECK(EditorIcons::Of("Game.loomproject") == EditorIcons::Project);
 		CHECK(EditorIcons::Of("Game.LoomProject") == EditorIcons::Project);
 		CHECK(EditorIcons::Of("Game.loomscripts") == EditorIcons::Script);

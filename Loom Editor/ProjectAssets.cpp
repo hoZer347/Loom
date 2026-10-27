@@ -62,6 +62,7 @@ namespace Loom
 		};
 
 		constexpr std::string_view shaderExtensions[] = { ProjectAssets::shaderExtension };
+		constexpr std::string_view dialogueExtensions[] = { ProjectAssets::dialogueExtension };
 
 		// 2D art besides textures.
 		constexpr std::string_view twoDExtensions[] = { SpriteAsset::extension, Palette::extension };
@@ -331,6 +332,9 @@ namespace {NAMESPACE}
 		if (extension == shaderExtension)
 			return Opener::Shaders;
 
+		if (extension == dialogueExtension)
+			return Opener::Dialogues;
+
 		if (IsTextureFile(path) || extension == SpriteAsset::extension)
 			return Opener::Sprites;
 
@@ -344,7 +348,7 @@ namespace {NAMESPACE}
 
 	bool ProjectAssets::IsGameFile(const std::string& name)
 	{
-		return HasExtension(name, gameFileExtensions) || IsShaderFile(name) || IsTwoDFile(name) || IsSoundFile(name) || IsFontFile(name);
+		return HasExtension(name, gameFileExtensions) || IsShaderFile(name) || IsDialogueFile(name) || IsTwoDFile(name) || IsSoundFile(name) || IsFontFile(name);
 	};
 
 	bool ProjectAssets::IsScriptFile(const std::string& name)
@@ -355,6 +359,11 @@ namespace {NAMESPACE}
 	bool ProjectAssets::IsShaderFile(const std::string& name)
 	{
 		return HasExtension(name, shaderExtensions);
+	};
+
+	bool ProjectAssets::IsDialogueFile(const std::string& name)
+	{
+		return HasExtension(name, dialogueExtensions);
 	};
 
 	bool ProjectAssets::IsTextureFile(const std::string& name)
@@ -416,6 +425,16 @@ namespace {NAMESPACE}
 		const std::filesystem::path path = std::filesystem::path(folder) / (name + shaderExtension);
 
 		if (!IsValidName(name) || !WriteNew(path, defaultShader, error))
+			return "";
+
+		return path.string();
+	};
+
+	std::string ProjectAssets::CreateDialogue(const std::string& folder, const std::string& name, std::string* error)
+	{
+		const std::filesystem::path path = std::filesystem::path(folder) / (name + dialogueExtension);
+
+		if (!IsValidName(name) || !WriteNew(path, defaultDialogue, error))
 			return "";
 
 		return path.string();
@@ -748,6 +767,10 @@ void main()
 {
 	FragColor = vec4(u_color, 1.0);
 }
+)";
+
+	const char* const ProjectAssets::defaultDialogue = R"(Hello! This text streams out of a [Color, yellow].dialogue[/Color] file.[Pause]
+[Clear][Size, 32]Commands[/Size] are written in brackets.[Pause]
 )";
 
 	std::vector<std::string> ProjectAssets::ShadersIn(const std::string& folder)

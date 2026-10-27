@@ -16,6 +16,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -774,6 +775,126 @@ TEST_SUITE("Ui")
 
 		REQUIRE(!renderer.drawnVertices.empty());
 		CHECK(renderer.drawnVertices.back().size() == PRINTABLE * CORNERS_PER_QUAD * FLOATS_PER_CORNER);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "RichText tags colour the text they run over and are not drawn themselves")
+	{
+		LoomTests::RecordingRenderer renderer;
+		PointAt(glm::vec2(0.0f));
+
+		Loom::Scene scene("ui rich text");
+		Loom::UiText& text = *scene.Attach<Loom::UiText>();
+		Pump();
+
+		constexpr glm::vec4 RED = { 1.0f, 0.0f, 0.0f, 1.0f };
+
+		text.fontPath = ROBOTO;
+		text.text = std::string("[Color, red]AB[/Color]C");
+
+		Overlay({ &scene });
+
+		REQUIRE(renderer.drawnColors.size() == 2);
+		CHECK(renderer.drawnColors[0] == RED);
+		CHECK(renderer.drawnColors[1] == *text.color);
+		CHECK(renderer.drawnVertices[0].size() == std::string("AB").size() * CORNERS_PER_QUAD * FLOATS_PER_CORNER);
+		CHECK(renderer.drawnVertices[1].size() == CORNERS_PER_QUAD * FLOATS_PER_CORNER);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "wrapped text breaks at the spaces that would run past its rect, and breaks always at a new line")
+	{
+		LoomTests::RecordingRenderer renderer;
+		PointAt(glm::vec2(0.0f));
+
+		Loom::Scene scene("ui wrap");
+		Loom::GameObject* object = scene.AddChild("Label");
+		Pump();
+
+		Loom::UiRect* rect = object->Attach<Loom::UiRect>();
+		Loom::UiText* text = object->Attach<Loom::UiText>();
+		Pump();
+
+		rect->color = glm::vec4(0.0f);
+		text->fontPath = ROBOTO;
+		text->text = std::string("Wait Wait Wait Wait");
+
+		const float line = text->Measure().y;
+
+		constexpr float LINES_OF_ROOM = 4.0f;
+		rect->size = glm::vec2(text->Measure().x * HALF, line * LINES_OF_ROOM);
+
+		// How many lines the glyphs were drawn across.
+		const auto lines = [&]()
+		{
+			renderer.drawnVertices.clear();
+			Overlay({ &scene });
+
+			float top = std::numeric_limits<float>::max();
+			float bottom = std::numeric_limits<float>::lowest();
+
+			for (const std::vector<float>& glyphs : renderer.drawnVertices)
+				for (size_t corner = 0; corner < glyphs.size(); corner += FLOATS_PER_CORNER)
+				{
+					top = std::min(top, glyphs[corner + Y]);
+					bottom = std::max(bottom, glyphs[corner + Y]);
+				};
+
+			return (int)std::floor((bottom - top) / line) + 1;
+		};
+
+		CHECK(lines() == 1);
+
+		text->wrap = true;
+
+		CHECK(lines() == 2);
+
+		text->wrap = false;
+		text->text = std::string("Wait\nWait");
+
+		CHECK(lines() == 2);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "text sits at the top, middle or bottom of its rect")
+	{
+		LoomTests::RecordingRenderer renderer;
+		PointAt(glm::vec2(0.0f));
+
+		Loom::Scene scene("ui vertical alignment");
+		Loom::GameObject* object = scene.AddChild("Label");
+		Pump();
+
+		Loom::UiRect* rect = object->Attach<Loom::UiRect>();
+		Loom::UiText* text = object->Attach<Loom::UiText>();
+		Pump();
+
+		rect->color = glm::vec4(0.0f);
+		rect->size = glm::vec2(400.0f, 200.0f);
+		text->fontPath = ROBOTO;
+		text->text = std::string("Wait");
+
+		// The top of the highest glyph, as the text is drawn aligned so.
+		const auto top = [&](Loom::UiText::VerticalAlignment alignment)
+		{
+			text->verticalAlignment = alignment;
+			renderer.drawnVertices.clear();
+			Overlay({ &scene });
+
+			const std::vector<float>& glyphs = renderer.drawnVertices.back();
+			float highest = std::numeric_limits<float>::max();
+
+			for (size_t corner = 0; corner < glyphs.size(); corner += FLOATS_PER_CORNER)
+				highest = std::min(highest, glyphs[corner + Y]);
+
+			return highest;
+		};
+
+		const Loom::Ui::Rect area = rect->ScreenRect();
+		const float room = area.size.y - text->Measure().y;
+
+		constexpr float PIXEL = 1.0f;
+
+		CHECK(std::abs(top(Loom::UiText::Middle) - top(Loom::UiText::Top) - room * HALF) <= PIXEL);
+		CHECK(std::abs(top(Loom::UiText::Bottom) - top(Loom::UiText::Top) - room) <= PIXEL);
+		CHECK(top(Loom::UiText::Top) >= area.min.y - PIXEL);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a glyph samples the atlas the right way up")

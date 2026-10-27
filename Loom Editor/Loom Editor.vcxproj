@@ -168,7 +168,10 @@
     <ClCompile Include="KeyBindings.cpp" />
     <ClCompile Include="ComponentMenu.cpp" />
     <ClCompile Include="EditorLayouts.cpp" />
+    <ClCompile Include="TextFileEditor.cpp" />
     <ClCompile Include="ShaderEditor.cpp" />
+    <ClCompile Include="DialogueEditor.cpp" />
+    <ClCompile Include="Cutscenes.cpp" />
     <ClCompile Include="SpriteAsset.cpp" />
     <ClCompile Include="SpriteEditor.cpp" />
     <ClCompile Include="ModelEditor.cpp" />
@@ -227,7 +230,10 @@
     <ClInclude Include="ComponentMenu.h" />
     <ClInclude Include="EditorLayouts.h" />
     <ClInclude Include="EditorRefresh.h" />
+    <ClInclude Include="TextFileEditor.h" />
     <ClInclude Include="ShaderEditor.h" />
+    <ClInclude Include="DialogueEditor.h" />
+    <ClInclude Include="Cutscenes.h" />
     <ClInclude Include="SpriteAsset.h" />
     <ClInclude Include="SpriteEditor.h" />
     <ClInclude Include="ModelEditor.h" />

@@ -29,6 +29,7 @@ namespace Loom
 		constexpr const char* Model = "🧊";
 		constexpr const char* Script = "🧩";
 		constexpr const char* State = "🚦";
+		constexpr const char* Dialogue = "🗨";
 		constexpr const char* Bindings = "⌨";
 		constexpr const char* Build = "🔨";
 		constexpr const char* File = "📄";
@@ -54,6 +55,7 @@ namespace Loom
 		constexpr const char* SceneData = "📊 Scene Data###Scene Data";
 		constexpr const char* Console = "💬 Console###Console";
 		constexpr const char* Shaders = "✨ Shaders###Shaders";
+		constexpr const char* Dialogues = "🗨 Dialogues###Dialogues";
 		constexpr const char* Sprites = "🖌 Sprites###Sprites";
 		constexpr const char* Model = "🧊 Model###Model";
 		constexpr const char* Palette = "🌈 Palette###Palette";

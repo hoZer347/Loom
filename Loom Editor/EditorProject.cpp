@@ -22,6 +22,7 @@
 #include "imgui_internal.h"
 
 #include <algorithm>
+#include <optional>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -134,6 +135,7 @@ namespace Loom
 			{ AssetKind::State, EditorIcons::State, "State", "NewState", ProjectAssets::ScriptKind::State, "a state machine's Start and Current" },
 			{ AssetKind::StateMachine, EditorIcons::Script, "State Machine", "NewStateMachine", ProjectAssets::ScriptKind::StateMachine, "Add Component" },
 			{ AssetKind::Shader, EditorIcons::Shader, "Shader", "NewShader" },
+			{ AssetKind::Dialogue, EditorIcons::Dialogue, "Dialogue", "NewDialogue" },
 			{ AssetKind::Texture, EditorIcons::Texture, "Texture", "NewTexture" },
 			{ AssetKind::Palette, EditorIcons::Palette, "Palette", "NewPalette" },
 		};
@@ -166,10 +168,11 @@ namespace Loom
 			tree.Rename(path);
 		};
 
-		// What the Scripts tab's Create menu makes, as it lists the shaders.
+		// What the Scripts tab's Create menu makes, as it lists the shaders and
+		// dialogues.
 		bool IsScriptsPanels(AssetKind kind)
 		{
-			return IsScript(kind) || kind == AssetKind::Shader;
+			return IsScript(kind) || kind == AssetKind::Shader || kind == AssetKind::Dialogue;
 		};
 
 		// The FileTab whose Create menu makes kind, rather than the Scenes
@@ -213,6 +216,7 @@ namespace Loom
 			{ EditorIcons::Script, "Scripts" },
 			{ EditorIcons::State, "States" },
 			{ EditorIcons::Shader, "Shaders" },
+			{ EditorIcons::Dialogue, "Dialogues" },
 		};
 
 		const char* IconOf(ScriptEntryKind kind)
@@ -224,6 +228,9 @@ namespace Loom
 
 			case ScriptEntryKind::Shader:
 				return EditorIcons::Shader;
+
+			case ScriptEntryKind::Dialogue:
+				return EditorIcons::Dialogue;
 
 			default:
 				return EditorIcons::Script;
@@ -726,6 +733,7 @@ namespace Loom
 		m_projectScenes.clear();
 		m_projectFiles.clear();
 		m_projectShaders.clear();
+		m_projectDialogues.clear();
 		m_noThumbnail.clear();
 
 		for (FileTab& tab : m_fileTabs)
@@ -753,10 +761,12 @@ namespace Loom
 					tab->files.push_back(m_projectFiles.back());
 				else if (ProjectAssets::IsShaderFile(file))
 					m_projectShaders.push_back(file);
+				else if (ProjectAssets::IsDialogueFile(file))
+					m_projectDialogues.push_back(file);
 			};
 		};
 
-		// After the scan, which finds the shaders.
+		// After the scan, which finds the shaders and dialogues.
 		RefreshScripts();
 	};
 
@@ -1199,6 +1209,7 @@ namespace Loom
 		case AssetKind::Scene:		return (folder / (name + SceneSerializer::extension)).string();
 		case AssetKind::Prefab:		return (folder / (name + Prefab::extension)).string();
 		case AssetKind::Shader:		return (folder / (name + ProjectAssets::shaderExtension)).string();
+		case AssetKind::Dialogue:	return (folder / (name + ProjectAssets::dialogueExtension)).string();
 		case AssetKind::Texture:	return (folder / (name + ProjectAssets::textureExtension)).string();
 		default:					return (folder / name).string();
 		};
@@ -1301,6 +1312,10 @@ namespace Loom
 
 		case AssetKind::Shader:
 			path = ProjectAssets::CreateShader(folder, name, &error);
+			break;
+
+		case AssetKind::Dialogue:
+			path = ProjectAssets::CreateDialogue(folder, name, &error);
 			break;
 
 		case AssetKind::Texture:
@@ -1656,6 +1671,10 @@ namespace Loom
 			OpenShader(path);
 			break;
 
+		case ProjectAssets::Opener::Dialogues:
+			OpenDialogue(path);
+			break;
+
 		case ProjectAssets::Opener::Sprites:
 			OpenSprite(path);
 			break;
@@ -1678,6 +1697,12 @@ namespace Loom
 	{
 		m_shaders.Open(path);
 		m_showShaders = true;
+	};
+
+	void Editor::OpenDialogue(const std::string& path)
+	{
+		m_dialogues.Open(path);
+		m_showDialogues = true;
 	};
 
 	void Editor::OpenSprite(const std::string& path)
@@ -1843,6 +1868,7 @@ namespace Loom
 			m_selectedModel = ProjectAssets::Relocate(m_selectedModel, path, moved);
 
 		m_shaders.Relocate(path, moved);
+		m_dialogues.Relocate(path, moved);
 		m_sprites.Relocate(path, moved);
 		m_models.Relocate(path, moved);
 
@@ -1956,6 +1982,11 @@ namespace Loom
 			m_scriptEntries.try_emplace(
 				ProjectAssets::RelativeTo(shader, m_projectPath),
 				ScriptEntry{ shader, std::filesystem::path(shader).stem().string(), ScriptEntryKind::Shader, true });
+
+		for (const std::string& dialogue : m_projectDialogues)
+			m_scriptEntries.try_emplace(
+				ProjectAssets::RelativeTo(dialogue, m_projectPath),
+				ScriptEntry{ dialogue, std::filesystem::path(dialogue).stem().string(), ScriptEntryKind::Dialogue, true });
 
 		if (!m_scripts.HasProject())
 		{
@@ -2313,7 +2344,12 @@ namespace Loom
 			path.empty() ? nullptr : IconOf(path),
 			path);
 
-		const bool shader = field.extensions.front() == ProjectAssets::shaderExtension;
+		// The files the Scripts tab lists rather than one of the FileTabs.
+		const std::optional<ScriptEntryKind> listed = field.extensions.front() == ProjectAssets::shaderExtension
+			? std::optional(ScriptEntryKind::Shader)
+			: field.extensions.front() == ProjectAssets::dialogueExtension
+				? std::optional(ScriptEntryKind::Dialogue)
+				: std::nullopt;
 
 		bool changed = false;
 
@@ -2333,8 +2369,8 @@ namespace Loom
 			ImGui::EndDragDropTarget();
 		};
 
-		if (shader)
-			changed |= AcceptShaderDrop(path);
+		if (listed)
+			changed |= AcceptScriptsDrop(path, *listed);
 
 		bool appearing = false;
 
@@ -2354,12 +2390,12 @@ namespace Loom
 
 		row("", "None");
 
-		if (shader)
+		if (listed)
 		{
 			std::vector<std::string> names{ };
 
 			for (const auto& [name, entry] : m_scriptEntries)
-				if (entry.kind == ScriptEntryKind::Shader)
+				if (entry.kind == *listed)
 					names.push_back(name);
 
 			FolderTree::Hooks hooks = ScriptFolderHooks();

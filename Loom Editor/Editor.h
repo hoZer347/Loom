@@ -2,6 +2,7 @@
 
 #include "ColliderGizmos.h"
 #include "ComponentMenu.h"
+#include "DialogueEditor.h"
 #include "EditorCamera.h"
 #include "EditorConsole.h"
 #include "KeyBindings.h"
@@ -87,6 +88,7 @@ namespace Loom
 		State,
 		StateMachine,
 		Shader,
+		Dialogue,
 		Texture,
 		Palette,
 	};
@@ -97,6 +99,7 @@ namespace Loom
 		Script,
 		State,
 		Shader,
+		Dialogue,
 	};
 
 	/**
@@ -244,6 +247,9 @@ namespace Loom
 
 		// In a tab of the Shaders panel, which comes forward.
 		void OpenShader(const std::string& path);
+
+		// In a tab of the Dialogues panel, which comes forward.
+		void OpenDialogue(const std::string& path);
 
 		// In a tab of the Sprites panel, which comes forward.
 		void OpenSprite(const std::string& path);
@@ -534,6 +540,10 @@ namespace Loom
 		// The 3D Object submenu, each shape made a child of parent and
 		// selected. Disabled with no parent.
 		void DrawShapeMenu(GameObject* parent);
+		void DrawCutsceneMenu(GameObject* parent);
+
+		// What a new UiText is drawn in: the project's first font by path.
+		std::string FirstFont() const;
 
 		// The shader most meshes open already draw with, or else the
 		// project's.
@@ -855,9 +865,9 @@ namespace Loom
 		// placement says. Null when it fails to load.
 		GameObject* PlaceAsset(const std::string& path, const Hierarchy::Placement& placement);
 
-		// AcceptAssetDrop for a shader dragged out of the Scripts tab, which
-		// lists the shaders: path becomes the shader's path from the project.
-		bool AcceptShaderDrop(std::string& path);
+		// AcceptAssetDrop for a shader or dialogue dragged out of the Scripts
+		// tab, which lists them: path becomes the file's path from the project.
+		bool AcceptScriptsDrop(std::string& path, ScriptEntryKind kind);
 
 		// Gives the GameObject the shader, on its Material or a new one.
 		void DropShader(GameObject* gameObject, const std::string& path);
@@ -1159,6 +1169,7 @@ namespace Loom
 
 		// The shaders from the last scan, which the Scripts tab lists.
 		std::vector<std::string> m_projectShaders{ };
+		std::vector<std::string> m_projectDialogues{ };
 
 		#pragma endregion
 
@@ -1326,6 +1337,7 @@ namespace Loom
 		bool m_showSceneData = true;
 		bool m_showConsole = true;
 		bool m_showShaders = false;
+		bool m_showDialogues = false;
 		bool m_showSprites = false;
 		bool m_showModels = false;
 		bool m_showPalette = false;
@@ -1422,6 +1434,7 @@ namespace Loom
 		EditorConsole m_console;
 		KeyBindings m_keyBindings;
 		ShaderEditor m_shaders;
+		DialogueEditor m_dialogues;
 		SpriteEditor m_sprites;
 		ModelEditor m_models;
 

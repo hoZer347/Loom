@@ -157,6 +157,18 @@
     <ClCompile Include="DialogueArgs Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="DialogueManager Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="DialogueEditor Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="Cutscenes Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RichText Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="Jobs Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

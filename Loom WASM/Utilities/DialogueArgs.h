@@ -72,7 +72,7 @@ namespace Loom
 
 				// A suffixed literal (0.1f, 2d) is still a number, and a script author
 				// has no reason to know what is reading it.
-				if (!TryNumber(StripNumericSuffix(trimmed), value) || std::abs(value) > std::numeric_limits<_Type>::max())
+				if (!TryNumber(StripNumericSuffix(trimmed), value) || std::abs(value) > (std::numeric_limits<_Type>::max)())
 					return false;
 
 				out = static_cast<_Type>(value);

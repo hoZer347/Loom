@@ -39,6 +39,7 @@
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
 #include "Shapes.h"
+#include "Cutscenes.h"
 #include "SpriteAsset.h"
 #include "TextFit.h"
 #include "UiScript.h"
@@ -442,7 +443,7 @@ namespace Loom
 
 		// What is docked in the middle: the views, and the shader, sprite and
 		// model editors.
-		constexpr const char* centre_windows[] = { EditorPanels::SceneId, EditorPanels::Game, EditorPanels::Debug, EditorPanels::PrefabId, EditorPanels::Shaders, EditorPanels::Sprites, EditorPanels::Model };
+		constexpr const char* centre_windows[] = { EditorPanels::SceneId, EditorPanels::Game, EditorPanels::Debug, EditorPanels::PrefabId, EditorPanels::Shaders, EditorPanels::Dialogues, EditorPanels::Sprites, EditorPanels::Model };
 
 		// What lights the Prefab panel, which the Hierarchy leaves out.
 		constexpr const char* prefab_light = "Prefab Light";
@@ -1134,6 +1135,7 @@ namespace Loom
 			saved = SaveToProject(scene) && saved;
 
 		saved = m_shaders.SaveAll() && saved;
+		saved = m_dialogues.SaveAll() && saved;
 		saved = m_sprites.SaveAll() && saved;
 		saved = m_models.SaveAll() && saved;
 
@@ -1750,7 +1752,7 @@ namespace Loom
 
 		const ImGuiWindow* root = window->RootWindow;
 
-		for (const char* files_only : { EditorPanels::Shaders, EditorPanels::Sprites })
+		for (const char* files_only : { EditorPanels::Shaders, EditorPanels::Dialogues, EditorPanels::Sprites })
 			if (root == ImGui::FindWindowByName(files_only))
 				return false;
 
@@ -1785,7 +1787,7 @@ namespace Loom
 		case EditCommand::Delete:	DeleteSelected();	break;
 		case EditCommand::None:							break;
 		case EditCommand::Save:
-			if (!(m_showShaders && m_shaders.IsFocused()))
+			if (!(m_showShaders && m_shaders.IsFocused()) && !(m_showDialogues && m_dialogues.IsFocused()))
 				SaveActiveScene();
 			break;
 		};
@@ -2003,6 +2005,7 @@ namespace Loom
 		if (m_showSceneData)	DrawSceneData();
 		if (m_showConsole)		m_console.Draw(&m_showConsole, [this](const EditorLog::Link& link) { OpenInVisualStudio(link.path, link.line, link.column); });
 		if (m_showShaders)		m_shaders.Draw(&m_showShaders);
+		if (m_showDialogues)	m_dialogues.Draw(&m_showDialogues);
 		if (m_showModels)		m_models.Draw(&m_showModels);
 		if (m_showSprites)		m_sprites.Draw(&m_showSprites, &m_showPalette);
 		if (m_showPalette)		m_sprites.DrawPalette(&m_showPalette, m_projectPath);
@@ -2207,6 +2210,7 @@ namespace Loom
 				Select(m_selected->AddChild());
 
 			DrawShapeMenu(m_activeScene ? &m_activeScene->GetRoot() : nullptr);
+			DrawCutsceneMenu(m_activeScene ? &m_activeScene->GetRoot() : nullptr);
 
 			ImGui::Separator();
 
@@ -2440,6 +2444,7 @@ namespace Loom
 			{ EditorPanels::SceneData, &m_showSceneData, true },
 			{ EditorPanels::Console, &m_showConsole, true },
 			{ EditorPanels::Shaders, &m_showShaders, false },
+			{ EditorPanels::Dialogues, &m_showDialogues, false },
 			{ EditorPanels::Sprites, &m_showSprites, false },
 			{ EditorPanels::Model, &m_showModels, false },
 			{ EditorPanels::Palette, &m_showPalette, false },
@@ -2757,6 +2762,7 @@ namespace Loom
 					Select(last_rows->AddChild());
 
 				DrawShapeMenu(last_rows);
+				DrawCutsceneMenu(last_rows);
 
 				ImGui::EndPopup();
 			};
@@ -2826,6 +2832,7 @@ namespace Loom
 				Select(scene->AddChild());
 
 			DrawShapeMenu(&root);
+			DrawCutsceneMenu(&root);
 
 			ImGui::Separator();
 
@@ -2927,6 +2934,7 @@ namespace Loom
 				Select(gameObject->AddChild());
 
 			DrawShapeMenu(gameObject);
+			DrawCutsceneMenu(gameObject);
 
 			const std::filesystem::path prefab = PrefabFileOf(*gameObject);
 			std::error_code code;
@@ -2971,6 +2979,26 @@ namespace Loom
 				Select(Shapes::Add(*parent, info.shape, ShapeShader()));
 
 		ImGui::EndMenu();
+	};
+
+	void Editor::DrawCutsceneMenu(GameObject* parent)
+	{
+		if (!ImGui::BeginMenu("Cutscene", parent != nullptr))
+			return;
+
+		if (ImGui::MenuItem(Cutscenes::DialogueBoxLabel))
+			Select(Cutscenes::AddDialogueBox(*parent, FirstFont()));
+
+		ImGui::EndMenu();
+	};
+
+	std::string Editor::FirstFont() const
+	{
+		for (const FileTab& tab : m_fileTabs)
+			if (&tab.kind == &FileTabs::Fonts && !tab.files.empty())
+				return *std::min_element(tab.files.begin(), tab.files.end());
+
+		return "";
 	};
 
 	std::string Editor::ShapeShader() const
@@ -3300,7 +3328,7 @@ namespace Loom
 		return placed;
 	};
 
-	bool Editor::AcceptShaderDrop(std::string& path)
+	bool Editor::AcceptScriptsDrop(std::string& path, ScriptEntryKind kind)
 	{
 		if (!ImGui::BeginDragDropTarget())
 			return false;
@@ -3311,7 +3339,7 @@ namespace Loom
 		if (dragged != nullptr && dragged->IsDataType(script_payload))
 			if (const auto entry = m_scriptEntries.find((const char*)dragged->Data);
 				entry != m_scriptEntries.end() &&
-				entry->second.kind == ScriptEntryKind::Shader &&
+				entry->second.kind == kind &&
 				ImGui::AcceptDragDropPayload(script_payload))
 			{
 				path = entry->first;
@@ -3352,8 +3380,9 @@ namespace Loom
 
 		const auto entry = m_scriptEntries.find(name);
 
-		// A state goes in a state machine's Start or Current, not on an object.
-		if (entry != m_scriptEntries.end() && entry->second.kind == ScriptEntryKind::State)
+		// A state goes in a state machine's Start or Current, and a dialogue in a
+		// DialogueManager, not on an object.
+		if (entry != m_scriptEntries.end() && (entry->second.kind == ScriptEntryKind::State || entry->second.kind == ScriptEntryKind::Dialogue))
 			return true;
 
 		if (entry != m_scriptEntries.end() && entry->second.kind == ScriptEntryKind::Shader)
@@ -3984,7 +4013,7 @@ namespace Loom
 
 				changed = InputTextString(label, text);
 				changed |= AcceptAssetDrop(text);
-				changed |= AcceptShaderDrop(text);
+				changed |= AcceptScriptsDrop(text, ScriptEntryKind::Shader);
 			}
 			break;
 

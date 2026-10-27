@@ -1,0 +1,102 @@
+Main(76e3b4d1-a933-4da0-a6e6-62a965fe70ba):
+	GameObject Root(5582fda2-b4e9-4c0d-95fe-a55ad803cb1c)
+		0 = 0
+		1 = false
+		2 = (0, 0, 0)
+		3 = (0, 0, 0)
+		4 = (1, 1, 1)
+		5 = false
+		GameObject Camera(e66fe6aa-a64b-4206-8c51-000830b4e19d)
+			0 = 0
+			1 = false
+			2 = (0, 2.5, 6)
+			3 = (0, 0, 0)
+			4 = (1, 1, 1)
+			5 = false
+			Component Camera(b5795197-96b6-4a3d-b9ad-10f93c53166a)
+				0 = true
+				1 = (0, 0.800000012, 0)
+				2 = 45
+				3 = 0.100000001
+				4 = 100
+		GameObject Sun(0b13254c-30d5-493b-bbff-2aefe4f8e93b)
+			0 = 0
+			1 = false
+			2 = (0, 0, 0)
+			3 = (0, 0, 0)
+			4 = (1, 1, 1)
+			5 = false
+			Component Light(466873c5-ea47-4c7c-816d-ea2672cf4cc8)
+				0 = (-0.600000024, -1, -0.400000006)
+				1 = (1, 1, 1)
+				2 = 1
+				3 = 0.300000012
+				4 = true
+				5 = 2048
+				6 = (0, 0, 0)
+				7 = 9
+		GameObject Floor(de743579-9dd6-4ee7-bb95-9e4bcd71ba9b)
+			0 = 0
+			1 = false
+			2 = (0, 0, 0)
+			3 = (0, 0, 0)
+			4 = (1, 1, 1)
+			5 = false
+			Component Material(9530aa73-9aaf-49e7-8643-0930ad46b10e)
+				0 = "Assets/Lit.shader"
+				1 = (0.819999993, 0.800000012, 0.75999999)
+				2 = true
+				3 = ""
+				4 = 0
+			Component Mesh(84c04b41-b569-4ce7-a40e-a18ac3e9bdd4)
+				0 = 9530aa73-9aaf-49e7-8643-0930ad46b10e
+				1 = 4
+				2 = 35044
+				3 = [-4, 0, -4, 4, 0, -4, 4, 0, 4, -4, 0, -4, 4, 0, 4, -4, 0, 4]
+				4 = ""
+				5 = []
+				6 = []
+				7 = []
+				8 = []
+		GameObject Dialogue Box(273f0ab3-98ba-4a29-b6e6-fe42f44ce81a)
+			0 = 0
+			1 = false
+			2 = (0, 0, 0)
+			3 = (0, 0, 0)
+			4 = (1, 1, 1)
+			5 = false
+			Component UiRect(c59388b3-aa9e-462a-a1ee-953ad2f1e7a6)
+				0 = (0.5, 1)
+				1 = (0.5, 1)
+				2 = (0, -24)
+				3 = (720, 180)
+				4 = (0, 0, 0, 0.75)
+				5 = true
+				6 = ""
+			Component DialogueManager(3e94e8f8-867e-4e4d-ba08-bf680c8d1f95)
+				0 = null
+				1 = null
+				2 = "Assets/Intro.dialogue"
+			GameObject Text(a36bc78a-a387-4b25-8dee-4852b3fdaf57)
+				0 = 0
+				1 = false
+				2 = (0, 0, 0)
+				3 = (0, 0, 0)
+				4 = (1, 1, 1)
+				5 = false
+				Component UiRect(c560f1b0-70f3-41d9-906b-e1792fbcf837)
+					0 = (0.5, 0.5)
+					1 = (0.5, 0.5)
+					2 = (0, 0)
+					3 = (680, 140)
+					4 = (0, 0, 0, 0)
+					5 = false
+					6 = ""
+				Component UiText(372a96d6-72e0-41d4-9930-b8a76a579c92)
+					0 = ""
+					1 = "Assets/Fonts/Roboto-Medium.ttf"
+					2 = 24
+					3 = (1, 1, 1, 1)
+					4 = 0
+					5 = true
+					6 = 0

@@ -229,7 +229,7 @@ TEST_SUITE("ProjectAssets")
 		CHECK_FALSE(scripts[3].state);
 	};
 
-	TEST_CASE("scenes and shaders open in the editor, the scripts project's sources in Visual Studio")
+	TEST_CASE("scenes, shaders and dialogues open in the editor, the scripts project's sources in Visual Studio")
 	{
 		using Loom::ProjectAssets;
 
@@ -244,6 +244,7 @@ TEST_SUITE("ProjectAssets")
 		CHECK(opener("Scenes/Main.loomscene", scripts) == ProjectAssets::Opener::Editor);
 		CHECK(opener("Assets/Lit.shader", scripts) == ProjectAssets::Opener::Shaders);
 		CHECK(opener("Assets/Lit.shader", "") == ProjectAssets::Opener::Shaders);
+		CHECK(opener("Assets/Intro.dialogue", scripts) == ProjectAssets::Opener::Dialogues);
 		CHECK(opener("Scripts/Spinner.hpp", scripts) == ProjectAssets::Opener::VisualStudio);
 		CHECK(opener("Scripts/Spinner.hpp", "") == ProjectAssets::Opener::Shell);
 		CHECK(opener("Tools/Bake.cpp", scripts) == ProjectAssets::Opener::Shell);
@@ -262,7 +263,7 @@ TEST_SUITE("ProjectAssets")
 		CHECK(ReadAll(scripts.Create("Spinner")).find("namespace GameScripts") != std::string::npos);
 	};
 
-	TEST_CASE("scenes, shaders, sprites, palettes, textures and sounds are game files, scripts and the project's other files are not")
+	TEST_CASE("scenes, shaders, dialogues, sprites, palettes, textures and sounds are game files, scripts and the project's other files are not")
 	{
 		CHECK(Loom::ProjectAssets::IsGameFile("Level.loomscene"));
 		CHECK(Loom::ProjectAssets::IsGameFile("Flat.shader"));
@@ -275,6 +276,9 @@ TEST_SUITE("ProjectAssets")
 		CHECK_FALSE(Loom::ProjectAssets::IsShaderFile("Level.loomscene"));
 		CHECK(Loom::ProjectAssets::IsGameFile("Hero.loomsprite"));
 		CHECK(Loom::ProjectAssets::IsGameFile("Hero.loompalette"));
+		CHECK(Loom::ProjectAssets::IsGameFile("Intro.dialogue"));
+		CHECK(Loom::ProjectAssets::IsDialogueFile("Intro.Dialogue"));
+		CHECK_FALSE(Loom::ProjectAssets::IsDialogueFile("Flat.shader"));
 
 		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("Spinner.hpp"));
 		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("Spinner.CPP"));
