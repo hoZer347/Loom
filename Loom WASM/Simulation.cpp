@@ -1213,65 +1213,79 @@ namespace Loom
 						Solve(m_pairs[pair]);
 			};
 
-		const int team = (int)std::min<size_t>(Jobs::Threads(), m_slabs);
+		// The groups in the order one thread would solve them each pass:
+		// the slabs, the even borders, the odd ones, then those alone.
+		std::vector<size_t> order;
 
-		// Each member keeps its slabs, and the border after each, through
-		// every pass, waiting only on those it shares bodies with. Every
-		// body meets its slab, its even border, its odd border, then those
-		// alone, pass after pass: as one thread doing them all in that order
-		// would, so the result is the same however many share them.
-		Jobs::For(team, 1,
-			[&](size_t member, size_t, size_t)
+		for (int k = 0; k < slabs; k++)
+			order.push_back(k);
+
+		for (int parity = 0; parity < 2; parity++)
+			for (int k = parity; k < slabs - 1; k += 2)
+				order.push_back(m_slabs + k);
+
+		if (lonely)
+			order.push_back(m_alone);
+
+		// Each group waits only on those before it that share its bodies.
+		// For hands chunks out in order, so the ones waited on are always
+		// taken, and it finishes however few threads take part.
+		Jobs::For(order.size() * (ITERATIONS + 1), 1,
+			[&](size_t chunk, size_t, size_t)
 			{
-				for (int pass = 0; pass <= ITERATIONS; pass++)
+				const int pass = (int)(chunk / order.size());
+				const size_t group = order[chunk % order.size()];
+
+				if (group == m_alone)
 				{
-					for (int k = (int)member; k < slabs; k += team)
+					for (int k = 0; k < slabs; k++)
+						Jobs::WaitFor(slabsDone[k], pass + 1);
+
+					for (int k = 0; k < slabs - 1; k++)
+						Jobs::WaitFor(bordersDone[k], pass + 1);
+
+					run(group, pass);
+					aloneDone.store(pass + 1, std::memory_order_release);
+					aloneDone.notify_all();
+				}
+				else if (group < m_slabs)
+				{
+					const int k = (int)group;
+
+					Jobs::WaitFor(slabsDone[k], pass);
+
+					if (k > 0)
+						Jobs::WaitFor(bordersDone[k - 1], pass);
+
+					if (k < slabs - 1)
+						Jobs::WaitFor(bordersDone[k], pass);
+
+					if (lonely)
+						Jobs::WaitFor(aloneDone, pass);
+
+					run(group, pass);
+					slabsDone[k].store(pass + 1, std::memory_order_release);
+					slabsDone[k].notify_all();
+				}
+				else
+				{
+					const int k = (int)(group - m_slabs);
+
+					Jobs::WaitFor(slabsDone[k], pass + 1);
+					Jobs::WaitFor(slabsDone[k + 1], pass + 1);
+
+					// An odd border follows the even ones either side.
+					if (k % 2 == 1)
 					{
-						if (k > 0)
-							Jobs::WaitFor(bordersDone[k - 1], pass);
+						Jobs::WaitFor(bordersDone[k - 1], pass + 1);
 
-						if (lonely)
-							Jobs::WaitFor(aloneDone, pass);
-
-						run(k, pass);
-						slabsDone[k].store(pass + 1, std::memory_order_release);
-						slabsDone[k].notify_all();
+						if (k + 1 < slabs - 1)
+							Jobs::WaitFor(bordersDone[k + 1], pass + 1);
 					};
 
-					for (int parity = 0; parity < 2; parity++)
-						for (int k = (int)member; k < slabs - 1; k += team)
-						{
-							if (k % 2 != parity)
-								continue;
-
-							Jobs::WaitFor(slabsDone[k + 1], pass + 1);
-
-							// An odd border follows the even ones either side.
-							if (parity == 1)
-							{
-								Jobs::WaitFor(bordersDone[k - 1], pass + 1);
-
-								if (k + 1 < slabs - 1)
-									Jobs::WaitFor(bordersDone[k + 1], pass + 1);
-							};
-
-							run(m_slabs + k, pass);
-							bordersDone[k].store(pass + 1, std::memory_order_release);
-							bordersDone[k].notify_all();
-						};
-
-					if (lonely && member == 0)
-					{
-						for (int k = 0; k < slabs; k++)
-							Jobs::WaitFor(slabsDone[k], pass + 1);
-
-						for (int k = 0; k < slabs - 1; k++)
-							Jobs::WaitFor(bordersDone[k], pass + 1);
-
-						run(m_alone, pass);
-						aloneDone.store(pass + 1, std::memory_order_release);
-						aloneDone.notify_all();
-					};
+					run(group, pass);
+					bordersDone[k].store(pass + 1, std::memory_order_release);
+					bordersDone[k].notify_all();
 				};
 			});
 	};
