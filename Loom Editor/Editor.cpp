@@ -90,7 +90,7 @@ namespace Loom
 		constexpr int window_button_count = 3;
 		constexpr float window_button_aspect = 1.6f;
 		constexpr float window_glyph_size = 0.2f;
-		constexpr float window_glyph_offset = 0.25f;
+		constexpr float window_glyph_offset = 0.5f;
 		constexpr ImU32 close_hovered = IM_COL32(196, 43, 28, 255);
 		constexpr ImU32 close_pressed = IM_COL32(148, 32, 21, 255);
 		constexpr ImU32 close_glyph = IM_COL32(255, 255, 255, 255);
@@ -2308,9 +2308,11 @@ namespace Loom
 			? WindowFrame::Rect{ }
 			: WindowFrame::Rect{ strip_left - origin.x, bar_min.y - origin.y, buttons_left - origin.x, bar_max.y - origin.y });
 
+		constexpr float centred = 0.5f;
+
 		ImDrawList& draw = *ImGui::GetWindowDrawList();
 		const float glyph = height * window_glyph_size;
-		const float offset = glyph * window_glyph_offset * 2.0f;
+		const float offset = glyph * window_glyph_offset;
 		const bool maximized = glfwGetWindowAttrib(Engine::window, GLFW_MAXIMIZED);
 		ImVec2 center{ };
 		ImU32 color = 0;
@@ -2323,7 +2325,7 @@ namespace Loom
 
 			const bool clicked = ImGui::InvisibleButton(id, ImVec2(width, height));
 
-			center = ImVec2(corner.x + width * 0.5f, corner.y + height * 0.5f);
+			center = ImVec2(corner.x + width * centred, corner.y + height * centred);
 			color = ImGui::GetColorU32(ImGuiCol_Text);
 
 			if (ImGui::IsItemHovered())

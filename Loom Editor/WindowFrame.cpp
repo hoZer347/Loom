@@ -1,20 +1,71 @@
 #include "WindowFrame.h"
 
-#include <windows.h>
-#include <commctrl.h>
+// The editor only runs on Windows, but the web test build compiles this too.
+#ifndef __EMSCRIPTEN__
 
 #include "OpenGL.h"
 
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
 
+#include <windows.h>
+#include <commctrl.h>
+
 #pragma comment(lib, "comctl32.lib")
 
+#endif
+
+
+namespace Loom
+{
+	WindowFrame::Hit WindowFrame::HitTest(float x, float y, float width, float height, float border, bool maximized, const Rect& strip)
+	{
+		if (!maximized)
+		{
+			const bool left = x < border;
+			const bool right = x >= width - border;
+			const bool top = y < border;
+			const bool bottom = y >= height - border;
+
+			if (top && left)
+				return Hit::TopLeft;
+
+			if (top && right)
+				return Hit::TopRight;
+
+			if (bottom && left)
+				return Hit::BottomLeft;
+
+			if (bottom && right)
+				return Hit::BottomRight;
+
+			if (left)
+				return Hit::Left;
+
+			if (right)
+				return Hit::Right;
+
+			if (top)
+				return Hit::Top;
+
+			if (bottom)
+				return Hit::Bottom;
+		};
+
+		if (x >= strip.left && x < strip.right && y >= strip.top && y < strip.bottom)
+			return Hit::Caption;
+
+		return Hit::Client;
+	};
+};
+
+#ifndef __EMSCRIPTEN__
 
 namespace Loom
 {
 	namespace
 	{
+		// Tags this subclass on the window, among any others it has.
 		constexpr UINT_PTR SUBCLASS_ID = 0x4C4F4F4D;
 
 		// What a title bar gives a window: snapping, the maximize animation
@@ -38,6 +89,23 @@ namespace Loom
 			};
 		};
 
+		// The window's monitor's metric, through Windows 10's per-monitor calls,
+		// which the engine's Windows 7 target leaves undeclared.
+		int Metric(HWND window, int index)
+		{
+			using DpiForWindow = UINT(WINAPI*)(HWND);
+			using MetricForDpi = int(WINAPI*)(int, UINT);
+
+			static const HMODULE user32 = GetModuleHandleW(L"user32.dll");
+			static const DpiForWindow dpi_for_window = (DpiForWindow)GetProcAddress(user32, "GetDpiForWindow");
+			static const MetricForDpi metric_for_dpi = (MetricForDpi)GetProcAddress(user32, "GetSystemMetricsForDpi");
+
+			if (dpi_for_window == nullptr || metric_for_dpi == nullptr)
+				return GetSystemMetrics(index);
+
+			return metric_for_dpi(index, dpi_for_window(window));
+		};
+
 		LRESULT CALLBACK Procedure(HWND window, UINT message, WPARAM wparam, LPARAM lparam, UINT_PTR, DWORD_PTR data)
 		{
 			const WindowFrame& frame = *(const WindowFrame*)data;
@@ -48,10 +116,13 @@ namespace Loom
 			{
 				if (IsZoomed(window))
 				{
-					const int padding = GetSystemMetrics(SM_CXPADDEDBORDER);
+					const int padding = Metric(window, SM_CXPADDEDBORDER);
 					RECT& client = ((NCCALCSIZE_PARAMS*)lparam)->rgrc[0];
 
-					InflateRect(&client, -(GetSystemMetrics(SM_CXSIZEFRAME) + padding), -(GetSystemMetrics(SM_CYSIZEFRAME) + padding));
+					InflateRect(
+						&client,
+						-(Metric(window, SM_CXSIZEFRAME) + padding),
+						-(Metric(window, SM_CYSIZEFRAME) + padding));
 				};
 
 				return 0;
@@ -65,8 +136,14 @@ namespace Loom
 				ScreenToClient(window, &point);
 				GetClientRect(window, &client);
 
-				const float border = (float)GetSystemMetrics(SM_CXSIZEFRAME);
-				const WindowFrame::Hit hit = WindowFrame::HitTest((float)point.x, (float)point.y, (float)client.right, (float)client.bottom, border, IsZoomed(window) != FALSE, frame.DragStrip());
+				const WindowFrame::Hit hit = WindowFrame::HitTest(
+					(float)point.x,
+					(float)point.y,
+					(float)client.right,
+					(float)client.bottom,
+					(float)Metric(window, SM_CXSIZEFRAME),
+					IsZoomed(window) != FALSE,
+					frame.DragStrip());
 
 				return HitCode(hit);
 			};
@@ -112,44 +189,6 @@ namespace Loom
 		SetWindowLongW(hwnd, GWL_STYLE, fitted);
 		SetWindowPos(hwnd, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
 	};
-
-	WindowFrame::Hit WindowFrame::HitTest(float x, float y, float width, float height, float border, bool maximized, const Rect& strip)
-	{
-		if (!maximized)
-		{
-			const bool left = x < border;
-			const bool right = x >= width - border;
-			const bool top = y < border;
-			const bool bottom = y >= height - border;
-
-			if (top && left)
-				return Hit::TopLeft;
-
-			if (top && right)
-				return Hit::TopRight;
-
-			if (bottom && left)
-				return Hit::BottomLeft;
-
-			if (bottom && right)
-				return Hit::BottomRight;
-
-			if (left)
-				return Hit::Left;
-
-			if (right)
-				return Hit::Right;
-
-			if (top)
-				return Hit::Top;
-
-			if (bottom)
-				return Hit::Bottom;
-		};
-
-		if (x >= strip.left && x < strip.right && y >= strip.top && y < strip.bottom)
-			return Hit::Caption;
-
-		return Hit::Client;
-	};
 };
+
+#endif

@@ -31,6 +31,7 @@ namespace Loom
 		WindowFrame& operator=(const WindowFrame&) = delete;
 		~WindowFrame();
 
+		// Takes the title bar off window, keeping its client area the size it was.
 		void Install(GLFWwindow* window);
 
 		// Puts the frame back after the window has gone over a monitor or
