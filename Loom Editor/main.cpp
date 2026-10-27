@@ -219,6 +219,7 @@ namespace
 			<< "  --create-prompt <kind>         start with the Create prompt open for a\n"
 			<< "                                 script, state, state-machine or dialogue-manager\n"
 			<< "  --compile                      build the project's scripts on startup\n"
+			<< "  --log-scripts-project          print each scripts project opened\n"
 			<< "  --play                         start with the scene running\n"
 			<< "  --play-web                     build the scene for the web and open it\n"
 			<< "  --import <file> [x y]          import a model, as if dropped on the window;\n"
@@ -341,6 +342,9 @@ int main(int argc, char** argv)
 
 		if (argument == "--desktop" && i + 1 < argc)
 			desktop = argv[i + 1];
+
+		if (argument == "--log-scripts-project")
+			Editor::logScriptsProject = true;
 	};
 
 	if (!Engine::showWindow)
@@ -558,7 +562,7 @@ int main(int argc, char** argv)
 
 				i++;
 			}
-			else if (argument == "--vulkan" || argument == "--opengl")
+			else if (argument == "--vulkan" || argument == "--opengl" || argument == "--log-scripts-project")
 				continue;
 			else if (argument == "--compile")
 				compile = true;

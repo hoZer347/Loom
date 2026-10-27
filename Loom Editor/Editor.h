@@ -384,6 +384,10 @@ namespace Loom
 		// before the Engine opens its window. OpenGL when nothing is saved.
 		static Backend SavedBackend();
 
+		// Prints each scripts project it opens, for a launcher that checks which
+		// one a run built. Set before construction, which opens the last project.
+		static inline bool logScriptsProject = false;
+
 		#pragma endregion
 
 		#pragma region Editing

@@ -114,8 +114,8 @@ namespace Loom
 
 		m_scripts.SetProject(project, library);
 
-		std::cout
-			<< "Project '" << m_projectName << "' scripts: " << project << std::endl;
+		if (logScriptsProject)
+			std::cout << "Project '" << m_projectName << "' scripts: " << project << std::endl;
 
 		// Loaded before any scene opens: a scene that mentions a script type
 		// needs that type to exist by the time it is read. A library that has
