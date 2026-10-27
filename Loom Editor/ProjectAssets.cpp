@@ -336,14 +336,14 @@ namespace {NAMESPACE}
 		#pragma region Dialogue Bindings
 
 		constexpr const char* bindingName = "NewBinding";
-		constexpr const char* bindingMember = "newBinding";
+		constexpr const char* bindingMacro = "LOOM_DIALOGUE_BINDING(";
 
 		const char* const bindingComment[] =
 		{
-			"// A DialogueBinding is a command this manager's .dialogue scripts can run.",
-			"// [Name, 1, 2] in a script calls the binding named Name with 1 and 2 when",
-			"// the dialogue reaches it. Its arguments are read as the types listed, so",
-			"// declaring the same name again with other types overloads it.",
+			"// LOOM_DIALOGUE_BINDING(Name) makes the function after it a command this",
+			"// manager's .dialogue scripts can run. [Name, 1, 2] in a script calls it",
+			"// with 1 and 2 when the dialogue reaches it, read as the types it takes.",
+			"// To give a name several forms, declare each as a Loom::DialogueBinding.",
 		};
 
 		// Where a { or } that is code, not text in a literal or a comment, closes
@@ -804,7 +804,12 @@ namespace {NAMESPACE}
 
 		std::string suffix;
 
-		for (int number = 1; body.find('"' + std::string(bindingName) + suffix + '"') != std::string::npos; number++)
+		const auto taken = [&](const std::string& name)
+		{
+			return body.find('"' + name + '"') != std::string::npos || body.find(bindingMacro + name + ')') != std::string::npos;
+		};
+
+		for (int number = 1; taken(bindingName + suffix); number++)
 			suffix = std::to_string(number);
 
 		std::string block;
@@ -812,14 +817,14 @@ namespace {NAMESPACE}
 		if (body.find_first_not_of(" \t\r\n") != std::string::npos)
 			block += eol;
 
-		if (body.find("DialogueBinding<") == std::string::npos)
+		if (body.find("DialogueBinding<") == std::string::npos && body.find(bindingMacro) == std::string::npos)
 			for (const char* comment : bindingComment)
 				block += member + comment + eol;
 
 		const size_t declared = block.size();
 
 		block +=
-			member + "Loom::DialogueBinding<\"" + bindingName + suffix + "\", int, int> " + bindingMember + suffix + " = [this](int i, int j)" + eol +
+			member + bindingMacro + bindingName + suffix + ")(int i, int j)" + eol +
 			member + '{' + eol +
 			member + "};" + eol;
 

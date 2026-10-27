@@ -16,8 +16,8 @@ streams the file it names into the UiText under it, which draws
 key, and [Clear] starts a new page. Double-click Intro.dialogue in
 the Scripts tab to edit it in the Dialogues panel.
 
-Narrator.hpp's DialogueBinding members are commands too: [Shout, hey] writes
-HEY! into the box. The Inspector's New Binding adds another to it and opens
-it in Visual Studio. Add Component's Logic > DialogueManager makes a new
+Narrator.hpp's LOOM_DIALOGUE_BINDING functions are commands too: [Shout,
+hey] writes HEY! into the box. The Inspector's New Binding adds another to
+it and opens it in Visual Studio. Add Component's Logic > DialogueManager makes a new
 manager script for the object instead, and once it has compiled it is filed
 under Custom > Dialogues.

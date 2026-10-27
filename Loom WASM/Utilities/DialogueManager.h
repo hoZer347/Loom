@@ -339,7 +339,7 @@ namespace Loom
 	///
 	///		struct Narrator : Loom::DialogueManager&lt;Narrator&gt;
 	///		{
-	///			Loom::DialogueBinding&lt;"Shake", float&gt; shake = [this](float strength) { };
+	///			LOOM_DIALOGUE_BINDING(Shake)(float strength) { };
 	///		};
 	///
 	/// A project's are filed under Custom/Dialogues in Add Component.

@@ -52,6 +52,32 @@ namespace Loom
 
 		/// Goes up each time Names changes.
 		static unsigned long long NamesVersion();
+
+		/// Reads tokens as _Args and calls function with them, or is false when they do
+		/// not read as those types. A script may say more than a binding takes, but not
+		/// less: default arguments are not visible from here.
+		template <typename... _Args, typename _Function>
+		static bool Call(const std::vector<std::string>& tokens, const _Function& function)
+		{
+			if (tokens.size() < sizeof...(_Args))
+				return false;
+
+			return CallWith<_Args...>(tokens, function, std::index_sequence_for<_Args...>{ });
+		};
+
+	private:
+		template <typename... _Args, typename _Function, size_t... _Index>
+		static bool CallWith(const std::vector<std::string>& tokens, const _Function& function, std::index_sequence<_Index...>)
+		{
+			std::tuple<std::decay_t<_Args>...> args{ };
+
+			if (!(DialogueArgs::TryCoerce(tokens[_Index], std::get<_Index>(args)) && ...))
+				return false;
+
+			function(std::get<_Index>(args)...);
+
+			return true;
+		};
 	};
 
 	/// A binding type's name, held while the library that has the type is loaded.
@@ -74,6 +100,7 @@ namespace Loom
 	* - A command a .dialogue script can run, declared as a member the way a Serial is:
 	*   DialogueBinding<"Shake", float> shake = [this](float strength) { ... };
 	*   A script's [Shake, 0.5] runs it with 0.5 once a DialogueManager reaches it
+	* - LOOM_DIALOGUE_BINDING declares one from a member function instead
 	* - Found by a DialogueManager on the components of its own GameObject and then of
 	*   each parent above it, after the bindings it was given with Bind
 	* - The arguments are read from the script as the types listed, and a command whose
@@ -133,25 +160,7 @@ namespace Loom
 
 		bool Invoke(const std::vector<std::string>& tokens) const
 		{
-			// A script may say more than a form takes, but not less: default arguments
-			// are not visible from here.
-			if (!m_call || tokens.size() < sizeof...(_Args))
-				return false;
-
-			return InvokeWith(tokens, std::index_sequence_for<_Args...>{ });
-		};
-
-		template <size_t... _Index>
-		bool InvokeWith(const std::vector<std::string>& tokens, std::index_sequence<_Index...>) const
-		{
-			std::tuple<std::decay_t<_Args>...> args{ };
-
-			if (!(DialogueArgs::TryCoerce(tokens[_Index], std::get<_Index>(args)) && ...))
-				return false;
-
-			m_call(std::get<_Index>(args)...);
-
-			return true;
+			return m_call && DialogueBindings::Call<_Args...>(tokens, m_call);
 		};
 
 		void Register()
@@ -174,4 +183,71 @@ namespace Loom
 
 		#pragma endregion
 	};
+
+	/**
+	* Loom::DialogueMethod
+	* - The binding LOOM_DIALOGUE_BINDING declares for the member function written after
+	*   it, which a script's [name, ...] calls with its arguments read as the types that
+	*   function takes
+	* - Registered and named as a DialogueBinding is
+	*/
+	template <Str name>
+	struct DialogueMethod final
+	{
+		#pragma region Construction
+
+		template <typename _Self, typename _Class, typename _Return, typename... _Args>
+		DialogueMethod(_Self* self, _Return (_Class::*method)(_Args...)) : m_invoke(Bind<_Args...>(self, method)) { Register(); };
+
+		template <typename _Self, typename _Class, typename _Return, typename... _Args>
+		DialogueMethod(const _Self* self, _Return (_Class::*method)(_Args...) const) : m_invoke(Bind<_Args...>(self, method)) { Register(); };
+
+		~DialogueMethod() { DialogueBindings::Unregister(m_owner, &m_invoke); };
+
+		DialogueMethod(const DialogueMethod&) = delete;
+		DialogueMethod& operator=(const DialogueMethod&) = delete;
+
+		#pragma endregion
+
+	private:
+		#pragma region Invoking
+
+		template <typename... _Args, typename _Self, typename _Method>
+		static DialogueBindings::Invoke Bind(_Self* self, _Method method)
+		{
+			return [self, method](const std::vector<std::string>& tokens)
+			{
+				return DialogueBindings::Call<_Args...>(tokens, [&](auto&... args) { (self->*method)(args...); });
+			};
+		};
+
+		void Register()
+		{
+			static_cast<void>(&s_name);
+
+			m_owner = DialogueBindings::Register(name.value, &m_invoke);
+		};
+
+		#pragma endregion
+
+		#pragma region State
+
+		static inline const DialogueBindingName s_name{ name.value };
+
+		const DialogueBindings::Invoke m_invoke;
+		LoomObject* m_owner = nullptr;
+
+		#pragma endregion
+	};
 };
+
+/// Makes the member function written after it a command its class's .dialogue scripts
+/// can run, under the function's own name, as an attribute would in C#:
+///
+///		LOOM_DIALOGUE_BINDING(Shout)(const std::string& word) { Append(word + '!'); };
+///
+/// A script's [Shout, hey] then calls Shout("hey"). A name has one function this way;
+/// one with several forms declares each as a Loom::DialogueBinding.
+#define LOOM_DIALOGUE_BINDING(name) \
+	::Loom::DialogueMethod<#name> loomDialogueBinding##name{ this, &std::remove_pointer_t<decltype(this)>::name }; \
+	void name

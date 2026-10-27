@@ -95,6 +95,25 @@ namespace
 		std::string heard{ };
 	};
 
+	// Bindings written as member functions.
+	struct Audience final : Loom::Component<Audience>
+	{
+		LOOM_DIALOGUE_BINDING(Cheer)(int times, const std::string& word)
+		{
+			cheered = times;
+			heard = word;
+		};
+
+		LOOM_DIALOGUE_BINDING(Hush)() const
+		{
+			hushes++;
+		};
+
+		int cheered = 0;
+		std::string heard{ };
+		mutable int hushes = 0;
+	};
+
 	struct Announcer final : Loom::DialogueManager<Announcer>
 	{
 		Loom::DialogueBinding<"Shake", float> shake = [this](float strength) { shaken = strength; };
@@ -176,6 +195,44 @@ TEST_SUITE("DialogueManager")
 
 		CHECK(box.Reads("Shaken."));
 		CHECK(stage->shaken == doctest::Approx(0.5f));
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a LOOM_DIALOGUE_BINDING function runs with the script's arguments read as the types it takes, const or not")
+	{
+		Box box;
+		Audience* audience = box.object->Attach<Audience>();
+		Pump();
+
+		box.manager->SetScript("[Cheer, 3, hooray][Hush]Cheered.[Pause]");
+
+		CHECK(box.Reads("Cheered."));
+		CHECK(audience->cheered == 3);
+		CHECK(audience->heard == "hooray");
+		CHECK(audience->hushes == 1);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a LOOM_DIALOGUE_BINDING function is still called as itself, and declares its name until it is gone")
+	{
+		Box box;
+		Audience* audience = box.object->Attach<Audience>();
+		Pump();
+
+		audience->Cheer(2, "again");
+
+		CHECK(audience->cheered == 2);
+		CHECK(audience->heard == "again");
+
+		const std::vector<std::string> names = Loom::DialogueBindings::Names();
+
+		CHECK(std::find(names.begin(), names.end(), "Cheer") != names.end());
+		CHECK(std::find(names.begin(), names.end(), "Hush") != names.end());
+		CHECK(Loom::DialogueBindings::Of(audience).size() == 2);
+
+		const Loom::LoomObject* gone = audience;
+		box.object->DetachComponent(audience);
+		Pump();
+
+		CHECK(Loom::DialogueBindings::Of(gone).empty());
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a DialogueBinding on a parent of the manager's GameObject runs, and the manager names it")

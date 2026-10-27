@@ -124,18 +124,18 @@ TEST_SUITE("ProjectAssets")
 
 		int line = 0;
 		const std::string first = Loom::ProjectAssets::WithDialogueBinding(text, 3, &line);
-		const std::string declared = "\t\tLoom::DialogueBinding<\"NewBinding\", int, int> newBinding = [this](int i, int j)\n";
+		const std::string declared = "\t\tLOOM_DIALOGUE_BINDING(NewBinding)(int i, int j)\n";
 
 		REQUIRE(first.find(declared) != std::string::npos);
-		CHECK(first.find("// A DialogueBinding is") < first.find(declared));
+		CHECK(first.find("// LOOM_DIALOGUE_BINDING(Name) makes") < first.find(declared));
 		CHECK(first.find(declared) > first.find("void Brace()"));
 		CHECK(first.substr(first.find(declared) + declared.size()) == "\t\t{\n\t\t};\n\t};\n};\n");
 		CHECK(line == 1 + (int)std::count(first.begin(), first.begin() + first.find(declared), '\n'));
 
 		const std::string second = Loom::ProjectAssets::WithDialogueBinding(first, 3);
 
-		CHECK(second.find("\"NewBinding1\", int, int> newBinding1") != std::string::npos);
-		CHECK(second.find("// A DialogueBinding is") == second.rfind("// A DialogueBinding is"));
+		CHECK(second.find("LOOM_DIALOGUE_BINDING(NewBinding1)(int i, int j)") != std::string::npos);
+		CHECK(second.find("// LOOM_DIALOGUE_BINDING(Name) makes") == second.rfind("// LOOM_DIALOGUE_BINDING(Name) makes"));
 	};
 
 	TEST_CASE("a new binding opens a type written on one line, and keeps its line endings")
@@ -144,11 +144,26 @@ TEST_SUITE("ProjectAssets")
 		const std::string text = Loom::ProjectAssets::WithDialogueBinding("struct Narrator : Base<Narrator> { };\r\n", 1, &line);
 
 		CHECK(text.find("struct Narrator : Base<Narrator>\r\n") == 0);
-		CHECK(text.find("\tLoom::DialogueBinding<\"NewBinding\", int, int>") != std::string::npos);
+		CHECK(text.find("\tLOOM_DIALOGUE_BINDING(NewBinding)(int i, int j)") != std::string::npos);
 		CHECK(text.find("struct Narrator : Base<Narrator>\r\n{\r\n") == 0);
 		CHECK(text.ends_with("\t};\r\n};\r\n"));
 		CHECK(std::count(text.begin(), text.end(), '\n') == std::count(text.begin(), text.end(), '\r'));
 		CHECK(line == 7);
+	};
+
+	TEST_CASE("a new binding takes a name no binding of either form has, and only the first is explained")
+	{
+		const std::string text =
+			"struct Narrator : Base<Narrator>\n"
+			"{\n"
+			"\tLoom::DialogueBinding<\"NewBinding\"> a = [this]() { };\n"
+			"\tLOOM_DIALOGUE_BINDING(NewBinding1)() { };\n"
+			"};\n";
+
+		const std::string added = Loom::ProjectAssets::WithDialogueBinding(text, 1);
+
+		CHECK(added.find("LOOM_DIALOGUE_BINDING(NewBinding2)(int i, int j)") != std::string::npos);
+		CHECK(added.find("// LOOM_DIALOGUE_BINDING(Name) makes") == std::string::npos);
 	};
 
 	TEST_CASE("a type whose braces never close gets no binding")
