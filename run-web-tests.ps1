@@ -252,10 +252,9 @@ if (-not $node)
     exit 1
 }
 
-# Same NativeCommandError guard as above: doctest writes to stderr, and so does
-# the engine (one test deliberately makes a queued task throw). The exit code is
-# what says whether the run passed.
+# So a run stopped at its time limit reports it and still exits with its code.
 $ErrorActionPreference = 'Continue'
-exit (Invoke-TestSuite $node.Source (@($output) + $TestArgs) $TimeoutMinutes)
+Invoke-TestSuite $node.Source (@($output) + $TestArgs) $TimeoutMinutes
+exit $LASTEXITCODE
 
 #endregion
