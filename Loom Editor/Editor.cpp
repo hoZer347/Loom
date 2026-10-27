@@ -91,7 +91,7 @@ namespace Loom
 
 		// How much deeper the menu bar is than a frame, for room to take the
 		// window by now that it stands in for the title bar.
-		constexpr float menu_bar_padding = 1.75f;
+		constexpr float menu_bar_padding = 1.375f;
 
 		constexpr int window_button_count = 3;
 		constexpr float window_button_aspect = 1.6f;
