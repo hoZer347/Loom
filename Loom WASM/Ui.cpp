@@ -320,13 +320,16 @@ void main()
 
 		// The text cut into lines at its breaks and, with wrap, at the spaces
 		// that keep each inside width; the spaces a line is cut at are left
-		// out. None when its font will not load.
+		// out. None when its font will not load, and a span whose size will
+		// not load is drawn at the text's own.
 		std::vector<Line> LayOut(const UiText& text, float width)
 		{
-			const Font* font = FontFor(text.fontPath, text.fontSize);
+			const Font* const base = FontFor(text.fontPath, text.fontSize);
 
-			if (font == nullptr)
+			if (base == nullptr)
 				return { };
+
+			const Font* font = base;
 
 			std::vector<Line> lines(1);
 
@@ -340,7 +343,7 @@ void main()
 				font = FontFor(text.fontPath, span.size);
 
 				if (font == nullptr)
-					return { };
+					font = base;
 
 				for (size_t at = 0; at < span.text.size(); )
 				{

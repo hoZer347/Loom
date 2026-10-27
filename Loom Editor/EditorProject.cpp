@@ -22,7 +22,6 @@
 #include "imgui_internal.h"
 
 #include <algorithm>
-#include <optional>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -31,6 +30,7 @@
 #include <iostream>
 #include <map>
 #include <numbers>
+#include <optional>
 #include <span>
 #include <thread>
 #include <utility>

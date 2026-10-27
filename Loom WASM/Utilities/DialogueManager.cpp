@@ -377,15 +377,23 @@ namespace Loom
 
 		pieces.push_back(text.substr(consumed));
 
+		std::erase(pieces, std::string());
+
 		std::vector<std::string> tokens;
 
 		// An emptied box takes no leading whitespace, or the file's line breaks stream as
 		// text.
 		bool pageStart = true;
 
-		for (const std::string& split : pieces)
+		for (size_t at = 0; at < pieces.size(); at++)
 		{
-			if (split.empty() || IsAllWhitespace(split))
+			const std::string& split = pieces[at];
+
+			// Line breaks between commands are the file's layout; spaces beside a RichText
+			// tag are the line's own.
+			const bool besideTag = (at > 0 && IsRichText(pieces[at - 1])) || (at + 1 < pieces.size() && IsRichText(pieces[at + 1]));
+
+			if (IsAllWhitespace(split) && (!besideTag || split.find('\n') != std::string::npos))
 				continue;
 
 			if (IsBinding(split))

@@ -94,6 +94,15 @@ TEST_SUITE("DialogueManager")
 		CHECK(box.manager->Text() == "Hi [Color, red]there[/Color].");
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a space beside a RichText tag streams, and a line break between commands does not")
+	{
+		Box box;
+
+		box.manager->SetScript("[Color, red]red[/Color] [Color, blue]blue[/Color]\n[Pause]");
+
+		CHECK(box.Reads("[Color, red]red[/Color] [Color, blue]blue[/Color]"));
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "with no script set, a manager streams the .dialogue file it names once it starts")
 	{
 		const std::filesystem::path path = std::filesystem::temp_directory_path() / "DialogueManager Tests.dialogue";

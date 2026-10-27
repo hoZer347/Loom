@@ -800,6 +800,46 @@ TEST_SUITE("Ui")
 		CHECK(renderer.drawnVertices[1].size() == CORNERS_PER_QUAD * FLOATS_PER_CORNER);
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a RichText size tag draws the text it runs over taller, and a size that will not bake is drawn at the text's own")
+	{
+		LoomTests::RecordingRenderer renderer;
+		PointAt(glm::vec2(0.0f));
+
+		Loom::Scene scene("ui rich text size");
+		Loom::UiText& text = *scene.Attach<Loom::UiText>();
+		Pump();
+
+		constexpr size_t BOTTOM_CORNER = 2;
+
+		const auto height = [](const std::vector<float>& vertices)
+		{
+			return vertices[BOTTOM_CORNER * FLOATS_PER_CORNER + Y] - vertices[Y];
+		};
+
+		text.fontPath = ROBOTO;
+		text.text = std::string("AA");
+
+		const glm::vec2 plain = text.Measure();
+
+		text.text = std::string("[Size, 48]A[/Size]A");
+
+		Overlay({ &scene });
+
+		REQUIRE(renderer.drawnVertices.size() == 2);
+		CHECK(height(renderer.drawnVertices[0]) > height(renderer.drawnVertices[1]));
+		CHECK(text.Measure().y > plain.y);
+
+		renderer.drawnVertices.clear();
+		renderer.drawnColors.clear();
+		text.text = std::string("[Size, 100000]A[/Size]A");
+		NextFrame();
+		Overlay({ &scene });
+
+		REQUIRE(renderer.drawnVertices.size() == 1);
+		CHECK(renderer.drawnVertices[0].size() == std::string("AA").size() * CORNERS_PER_QUAD * FLOATS_PER_CORNER);
+		CHECK(text.Measure() == plain);
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "wrapped text breaks at the spaces that would run past its rect, and breaks always at a new line")
 	{
 		LoomTests::RecordingRenderer renderer;

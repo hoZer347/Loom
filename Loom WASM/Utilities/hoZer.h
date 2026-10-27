@@ -20,7 +20,9 @@
 ///	  Dialogue             A text script is tokenised and compiled into states. Bindings
 ///	                       are lambdas whose signatures declare what they take. Both the
 ///	                       line text and the voice blip are announced rather than rendered
-///	                       or played; the caller decides what to do with them.
+///	                       or played; the caller decides what to do with them. With no
+///	                       onTextChanged, the line is written into the UiText under the
+///	                       manager.
 ///
 ///	  Sprites              SpriteSheetScanner reads a raw RGBA buffer. SpriteManager is a
 ///	                       Component drawing the shared unit quad through Flipbook.shader

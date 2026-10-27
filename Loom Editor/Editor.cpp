@@ -30,6 +30,7 @@
 #include "Utilities/StateMachineMonitor.h"
 
 #include "ComponentDrag.h"
+#include "Cutscenes.h"
 #include "EditCommands.h"
 #include "EditorFileDialogs.h"
 #include "EditorIcons.h"
@@ -39,7 +40,6 @@
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
 #include "Shapes.h"
-#include "Cutscenes.h"
 #include "SpriteAsset.h"
 #include "TextFit.h"
 #include "UiScript.h"
@@ -441,8 +441,8 @@ namespace Loom
 
 		#pragma region Panels
 
-		// What is docked in the middle: the views, and the shader, sprite and
-		// model editors.
+		// What is docked in the middle: the views, and the shader, dialogue,
+		// sprite and model editors.
 		constexpr const char* centre_windows[] = { EditorPanels::SceneId, EditorPanels::Game, EditorPanels::Debug, EditorPanels::PrefabId, EditorPanels::Shaders, EditorPanels::Dialogues, EditorPanels::Sprites, EditorPanels::Model };
 
 		// What lights the Prefab panel, which the Hierarchy leaves out.

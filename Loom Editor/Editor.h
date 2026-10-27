@@ -540,6 +540,9 @@ namespace Loom
 		// The 3D Object submenu, each shape made a child of parent and
 		// selected. Disabled with no parent.
 		void DrawShapeMenu(GameObject* parent);
+
+		// The Cutscene submenu, each template made a child of parent and
+		// selected. Disabled with no parent.
 		void DrawCutsceneMenu(GameObject* parent);
 
 		// What a new UiText is drawn in: the project's first font by path.
