@@ -88,6 +88,10 @@ namespace Loom
 
 		#pragma region Window Buttons
 
+		// How much deeper the menu bar is than a frame, for room to take the
+		// window by now that it stands in for the title bar.
+		constexpr float menu_bar_padding = 1.75f;
+
 		constexpr int window_button_count = 3;
 		constexpr float window_button_aspect = 1.6f;
 		constexpr float window_glyph_size = 0.2f;
@@ -2113,8 +2117,15 @@ namespace Loom
 
 	void Editor::DrawMainMenuBar()
 	{
+		const ImVec2 padding = ImGui::GetStyle().FramePadding;
+
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padding.x, padding.y * menu_bar_padding));
+
 		if (!ImGui::BeginMainMenuBar())
+		{
+			ImGui::PopStyleVar();
 			return;
+		};
 
 		if (ImGui::BeginMenu("File"))
 		{
@@ -2292,6 +2303,7 @@ namespace Loom
 		DrawWindowButtons();
 
 		ImGui::EndMainMenuBar();
+		ImGui::PopStyleVar();
 	};
 
 	void Editor::DrawWindowButtons()
