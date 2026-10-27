@@ -2460,7 +2460,6 @@ namespace Loom
 			{ EditorPanels::Sprites, &m_showSprites, false },
 			{ EditorPanels::Model, &m_showModels, false },
 			{ EditorPanels::Palette, &m_showPalette, false },
-			{ EditorPanels::Prefab, &m_showPrefab, false },
 			{ EditorPanels::Stats, &m_showStats, true },
 			{ EditorPanels::KeyBindings, &m_showKeyBindings, true },
 			{ EditorPanels::BuildSettings, &m_showBuildSettings, true } };
