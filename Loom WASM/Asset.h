@@ -36,4 +36,21 @@ namespace Loom
 
 		static constexpr std::array<const char*, sizeof...(extensions)> fileExtensions{ extensions.value... };
 	};
+
+	/**
+	* Loom::Folder
+	* - A folder in the project, named by its path as an Asset is:
+	*   Serial<Folder> m_folder = "Assets/Prefabs"
+	* - An Asset of no extensions, which the inspector draws as a folder,
+	*   picked from the project's folders or dropped from the Project panel
+	*/
+	struct Folder final : std::string
+	{
+		using std::string::string;
+
+		Folder() = default;
+		Folder(std::string path) : std::string(std::move(path)) { };
+
+		static constexpr std::array<const char*, 0> fileExtensions{ };
+	};
 };

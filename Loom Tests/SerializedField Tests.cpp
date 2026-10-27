@@ -48,6 +48,7 @@ namespace
 	{
 		Loom::Serial<Loom::Asset<".shader">> shader;
 		Loom::Serial<std::string> path;
+		Loom::Serial<Loom::Folder> folder;
 	};
 
 	struct Pointer final : Loom::Component<Pointer>
@@ -650,6 +651,28 @@ TEST_SUITE("SerializedField")
 		REQUIRE(Field(object, 0).Read(Field(object, 1).Write()));
 
 		CHECK(*object.shader == "Assets/Old \"quoted\".shader");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a folder is an asset of no extensions, accepting no file, written as the string of its path")
+	{
+		Files object;
+		Pump();
+
+		const Loom::SerializedField& folder = Field(object, 2);
+
+		CHECK(folder.type == Loom::FieldType::Asset);
+		CHECK(folder.extensions.empty());
+		CHECK_FALSE(folder.AcceptsFile("Assets/Prefabs/Tank.loomprefab"));
+
+		object.folder = "Assets/Prefabs";
+
+		CHECK(folder.Write() == "\"Assets/Prefabs\"");
+
+		object.path = "Assets/Prefabs/Mechs";
+
+		REQUIRE(folder.Read(Field(object, 1).Write()));
+
+		CHECK(*object.folder == "Assets/Prefabs/Mechs");
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an empty float list is still a float list")

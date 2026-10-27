@@ -1170,6 +1170,9 @@ namespace Loom
 		// project folder.
 		std::vector<std::string> m_projectFiles{ };
 
+		// Every folder in the project from the last scan, the same way.
+		std::vector<std::string> m_projectFolders{ };
+
 		// The shaders from the last scan, which the Scripts tab lists.
 		std::vector<std::string> m_projectShaders{ };
 		std::vector<std::string> m_projectDialogues{ };

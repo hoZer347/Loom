@@ -293,14 +293,15 @@ namespace Loom
 		// then files, each alphabetically. Dot-prefixed folders (.vs) and the
 		// build output are left out, and so is a folder whose files are all
 		// something else, though an empty one stays, as a new folder is. Every
-		// file, those included, goes in files. Whether there were files under
-		// folder.
+		// file, those included, goes in files, and every folder in folders.
+		// Whether there were files under folder.
 		bool Scan(
 			const std::filesystem::path& folder,
 			const std::filesystem::path& skip,
 			AssetNode& node,
 			std::vector<std::string>& scenes,
-			std::vector<std::string>& files)
+			std::vector<std::string>& files,
+			std::vector<std::string>& folders)
 		{
 			std::error_code code;
 			bool held = false;
@@ -320,7 +321,9 @@ namespace Loom
 					if (path == skip)
 						continue;
 
-					const bool held_files = Scan(path, skip, child, scenes, files);
+					folders.push_back(child.path);
+
+					const bool held_files = Scan(path, skip, child, scenes, files, folders);
 
 					held = held || held_files;
 
@@ -732,6 +735,7 @@ namespace Loom
 
 		m_projectScenes.clear();
 		m_projectFiles.clear();
+		m_projectFolders.clear();
 		m_projectShaders.clear();
 		m_projectDialogues.clear();
 		m_noThumbnail.clear();
@@ -748,10 +752,16 @@ namespace Loom
 				: std::filesystem::path();
 
 			std::vector<std::string> files{ };
+			std::vector<std::string> folders{ };
 
-			Scan(m_projectPath, build, m_assets, m_projectScenes, files);
+			Scan(m_projectPath, build, m_assets, m_projectScenes, files, folders);
 
 			std::sort(m_projectScenes.begin(), m_projectScenes.end());
+
+			for (const std::string& folder : folders)
+				m_projectFolders.push_back(ProjectAssets::RelativeTo(folder, m_projectPath));
+
+			std::sort(m_projectFolders.begin(), m_projectFolders.end());
 
 			for (const std::string& file : files)
 			{
@@ -2339,15 +2349,29 @@ namespace Loom
 	{
 		std::string& path = *(std::string*)field.data;
 
+		const bool folder = field.extensions.empty();
+		const auto icon_of = [&](const std::string& file)
+		{
+			if (file.empty())
+				return (const char*)nullptr;
+
+			return folder
+				? EditorIcons::Folder
+				: IconOf(file);
+		};
+
+		const std::filesystem::path named(path);
+
 		DrawPickerButton(
-			path.empty() ? std::string("None") : std::filesystem::path(path).stem().string(),
-			path.empty() ? nullptr : IconOf(path),
+			path.empty() ? std::string("None") : (folder ? named.filename() : named.stem()).string(),
+			icon_of(path),
 			path);
 
 		// The files the Scripts tab lists rather than one of the FileTabs.
-		const std::optional<ScriptEntryKind> listed = field.extensions.front() == ProjectAssets::shaderExtension
+		const std::string_view extension = folder ? std::string_view() : field.extensions.front();
+		const std::optional<ScriptEntryKind> listed = extension == ProjectAssets::shaderExtension
 			? std::optional(ScriptEntryKind::Shader)
-			: field.extensions.front() == ProjectAssets::dialogueExtension
+			: extension == ProjectAssets::dialogueExtension
 				? std::optional(ScriptEntryKind::Dialogue)
 				: std::nullopt;
 
@@ -2356,11 +2380,12 @@ namespace Loom
 		if (ImGui::BeginDragDropTarget())
 		{
 			const ImGuiPayload* dragged = ImGui::GetDragDropPayload();
+			const char* payload = folder ? FOLDER_PAYLOAD : ASSET_PAYLOAD;
 
 			if (dragged != nullptr &&
-				dragged->IsDataType(ASSET_PAYLOAD) &&
-				field.AcceptsFile((const char*)dragged->Data) &&
-				ImGui::AcceptDragDropPayload(ASSET_PAYLOAD))
+				dragged->IsDataType(payload) &&
+				(folder || field.AcceptsFile((const char*)dragged->Data)) &&
+				ImGui::AcceptDragDropPayload(payload))
 			{
 				path = (const char*)dragged->Data;
 				changed = true;
@@ -2379,7 +2404,7 @@ namespace Loom
 
 		const auto row = [&](const std::string& file, const std::string& label)
 		{
-			const bool picked = PickerRow(file, label, file == path, file.empty() ? nullptr : IconOf(file), file);
+			const bool picked = PickerRow(file, label, file == path, icon_of(file), file);
 
 			if (picked && file != path)
 			{
@@ -2406,7 +2431,7 @@ namespace Loom
 
 			m_fieldPicker.Draw(m_scriptFolders, ScriptsByLabel(names), hooks);
 		}
-		else if (FileTab* tab = FileTabOf("file" + field.extensions.front()))
+		else if (FileTab* tab = folder ? nullptr : FileTabOf("file" + field.extensions.front()))
 		{
 			std::vector<std::string> files{ };
 
@@ -2426,9 +2451,12 @@ namespace Loom
 		{
 			std::vector<std::string> files{ };
 
-			for (const std::string& file : m_projectFiles)
-				if (field.AcceptsFile(file))
-					files.push_back(file);
+			if (folder)
+				files = m_projectFolders;
+			else
+				for (const std::string& file : m_projectFiles)
+					if (field.AcceptsFile(file))
+						files.push_back(file);
 
 			VirtualFolders flat{ };
 

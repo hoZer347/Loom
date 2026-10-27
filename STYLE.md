@@ -62,7 +62,7 @@ Derived from settled files: Loom WASM/Camera.h, Camera.cpp, Audio.h, Audio.cpp, 
 - No magic numbers: every meaningful literal is a named `constexpr` with a comment saying what it is.
   `// How far ahead a target goes when the old one sat on the camera.` / `constexpr float DEFAULT_TARGET_DISTANCE = 1.0f;`
 - Serialised field: `Serial<T> name = default;` with a unit or meaning comment above when not obvious: `// Vertical, in degrees.`
-- A field naming a file in the project is `Serial<Asset<".ext">>`, never a `Serial<std::string>` path, so the inspector picks it from the project's files: `Serial<Asset<".shader">> m_shader = "Assets/Lit.shader";`. It lists every extension its loader reads, the one it is filed under first; a kind with several is a `using` beside its loader and is used by name: `FontAsset`, `TextureAsset`, `SoundAsset`.
+- A field naming a file in the project is `Serial<Asset<".ext">>`, never a `Serial<std::string>` path, so the inspector picks it from the project's files: `Serial<Asset<".shader">> m_shader = "Assets/Lit.shader";`. It lists every extension its loader reads, the one it is filed under first; a kind with several is a `using` beside its loader and is used by name: `FontAsset`, `TextureAsset`, `SoundAsset`. A field naming a folder is `Serial<Folder>`.
 - React to inspector edits with `void OnFieldChanged(const SerializedField& field) override` and compare `field.data == &*member`.
 - Editor panels: `bool Draw(bool* open)` opening `ImGui::Begin(EditorPanels::<Name>, open)`; settings as `key=value` keyed by `constexpr const char* X_KEY`.
 

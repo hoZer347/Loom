@@ -46,7 +46,8 @@ namespace Loom
 		UIntArray,
 
 		// A file in the project, written as its path as a String is. The
-		// editor offers the project's files of its extensions to pick from.
+		// editor offers the project's files of its extensions to pick from, or
+		// its folders where it has none.
 		Asset,
 	};
 
@@ -110,7 +111,8 @@ namespace Loom
 		#pragma region Names
 
 		// Asset fields only: what the files it names may end in, such as
-		// ".shader", the one it is filed under first. Copied for the same reason.
+		// ".shader", the one it is filed under first, or none for a folder.
+		// Copied for the same reason.
 		std::vector<std::string> extensions;
 
 		// Whether file ends in one of extensions, in any case.
