@@ -147,13 +147,13 @@ namespace Loom
 
 		#pragma region Construction
 
-		DialogueBinding() : DialogueBindingSlot<name>(Bind()) { };
+		DialogueBinding() : DialogueBindingSlot<name>(Bind(this)) { };
 
 		template <typename _Callable>
 			requires (
 				!std::is_same_v<std::remove_cvref_t<_Callable>, DialogueBinding> &&
 				std::is_constructible_v<Function, _Callable&&>)
-		DialogueBinding(_Callable&& callable) : DialogueBindingSlot<name>(Bind()), m_call(std::forward<_Callable>(callable)) { };
+		DialogueBinding(_Callable&& callable) : DialogueBindingSlot<name>(Bind(this)), m_call(std::forward<_Callable>(callable)) { };
 
 		#pragma endregion
 
@@ -182,9 +182,9 @@ namespace Loom
 	private:
 		#pragma region Invoking
 
-		DialogueBindings::Invoke Bind()
+		static DialogueBindings::Invoke Bind(const DialogueBinding* self)
 		{
-			return [this](const std::vector<std::string>& tokens) { return m_call && DialogueBindings::Call<_Args...>(tokens, m_call); };
+			return [self](const std::vector<std::string>& tokens) { return self->m_call && DialogueBindings::Call<_Args...>(tokens, self->m_call); };
 		};
 
 		#pragma endregion
@@ -212,7 +212,6 @@ namespace Loom
 		DialogueMethod(const _Self* self, _Return (_Class::*method)(_Args...) const) : DialogueBindingSlot<name>(Bind<_Args...>(self, method)) { };
 
 	private:
-
 		template <typename... _Args, typename _Self, typename _Method>
 		static DialogueBindings::Invoke Bind(_Self* self, _Method method)
 		{
