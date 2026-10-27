@@ -266,7 +266,7 @@ namespace Loom
 		/// The GameObject the manager is on, or none.
 		GameObject* Object() const;
 
-		/// The manager's own DialogueBinding members, then those of the other components
+		/// The manager's own bindings, then those of the other components
 		/// on its GameObject, then of each parent above it.
 		std::vector<DialogueBindings::Form> Declared() const;
 
@@ -334,8 +334,8 @@ namespace Loom
 		#pragma endregion
 	};
 
-	/// A component streaming a .dialogue file, whose commands are its DialogueBinding
-	/// members and those of the components around it. Self-typed as a StateMachine is:
+	/// A component streaming a .dialogue file, whose commands are its bindings, written
+	/// either way, and those of the components around it. Self-typed as a StateMachine is:
 	///
 	///		struct Narrator : Loom::DialogueManager&lt;Narrator&gt;
 	///		{

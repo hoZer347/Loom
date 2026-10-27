@@ -140,10 +140,10 @@ namespace Loom
 		// A primary template is passed over, since no component is one.
 		static int DeclarationLine(const std::string& text, const std::string& name);
 
-		// text with a new DialogueBinding member at the end of the type defined at
-		// line, under a comment saying what one is when it is the type's first, or an
-		// empty string when that type's braces never close. binding_line is the line
-		// the member lands on.
+		// text with a new LOOM_DIALOGUE_BINDING function at the end of the type defined
+		// at line, under a comment saying what one is when it is the type's first, or
+		// an empty string when that type's braces never close. binding_line is the line
+		// that function lands on.
 		static std::string WithDialogueBinding(const std::string& text, int line, int* binding_line = nullptr);
 
 		struct DeclaredScript

@@ -18,8 +18,8 @@
 ///	                       walks.
 ///
 ///	  Dialogue             A text script is tokenised and compiled into states. Bindings
-///	                       are lambdas whose signatures declare what they take, given with
-///	                       Bind or declared as DialogueBinding members of the components on
+///	                       are lambdas or member functions whose signatures declare what
+///	                       they take, given with Bind or declared on the components on
 ///	                       the manager's GameObject and above it. Both the
 ///	                       line text and the voice blip are announced rather than rendered
 ///	                       or played; the caller decides what to do with them. With no

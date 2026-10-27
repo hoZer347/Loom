@@ -18,6 +18,6 @@ the Scripts tab to edit it in the Dialogues panel.
 
 Narrator.hpp's LOOM_DIALOGUE_BINDING functions are commands too: [Shout,
 hey] writes HEY! into the box. The Inspector's New Binding adds another to
-it and opens it in Visual Studio. Add Component's Logic > DialogueManager makes a new
-manager script for the object instead, and once it has compiled it is filed
-under Custom > Dialogues.
+it and opens it in Visual Studio. Add Component's Logic > DialogueManager
+makes a new manager script for the object instead, and once it has compiled
+it is filed under Custom > Dialogues.

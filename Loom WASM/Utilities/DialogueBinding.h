@@ -19,7 +19,7 @@ namespace Loom
 
 	#pragma region Registration
 
-	/// Every DialogueBinding member, by the object that declared it, and every name one
+	/// Every binding, by the object that declared it, and every name one
 	/// is declared under, for the editor to offer.
 	struct LOOM_API DialogueBindings final
 	{
@@ -93,6 +93,36 @@ namespace Loom
 		const char* m_name;
 	};
 
+	/**
+	* Loom::DialogueBindingSlot
+	* - What DialogueBinding and DialogueMethod share: the invoke registered under name
+	*   while it lives, by the object being built around it
+	*/
+	template <Str name>
+	struct DialogueBindingSlot
+	{
+		// Registered by its address, which is what a copy would not share.
+		DialogueBindingSlot(const DialogueBindingSlot&) = delete;
+		DialogueBindingSlot& operator=(const DialogueBindingSlot&) = delete;
+
+	protected:
+		explicit DialogueBindingSlot(DialogueBindings::Invoke invoke) : m_invoke(std::move(invoke))
+		{
+			// Using it is what has the library that holds this type name it.
+			static_cast<void>(&s_name);
+
+			m_owner = DialogueBindings::Register(name.value, &m_invoke);
+		};
+
+		~DialogueBindingSlot() { DialogueBindings::Unregister(m_owner, &m_invoke); };
+
+	private:
+		static inline const DialogueBindingName s_name{ name.value };
+
+		const DialogueBindings::Invoke m_invoke;
+		LoomObject* m_owner = nullptr;
+	};
+
 	#pragma endregion
 
 	/**
@@ -111,25 +141,19 @@ namespace Loom
 	* - A member of the LoomObject being built around it, as a Serial is, and only that
 	*/
 	template <Str name, typename... _Args>
-	struct DialogueBinding final
+	struct DialogueBinding final : DialogueBindingSlot<name>
 	{
 		using Function = std::function<void(_Args...)>;
 
 		#pragma region Construction
 
-		DialogueBinding() { Register(); };
+		DialogueBinding() : DialogueBindingSlot<name>(Bind()) { };
 
 		template <typename _Callable>
 			requires (
 				!std::is_same_v<std::remove_cvref_t<_Callable>, DialogueBinding> &&
 				std::is_constructible_v<Function, _Callable&&>)
-		DialogueBinding(_Callable&& callable) : m_call(std::forward<_Callable>(callable)) { Register(); };
-
-		~DialogueBinding() { DialogueBindings::Unregister(m_owner, &m_invoke); };
-
-		// Registered by its address, which is what a copy would not share.
-		DialogueBinding(const DialogueBinding&) = delete;
-		DialogueBinding& operator=(const DialogueBinding&) = delete;
+		DialogueBinding(_Callable&& callable) : DialogueBindingSlot<name>(Bind()), m_call(std::forward<_Callable>(callable)) { };
 
 		#pragma endregion
 
@@ -158,28 +182,16 @@ namespace Loom
 	private:
 		#pragma region Invoking
 
-		bool Invoke(const std::vector<std::string>& tokens) const
+		DialogueBindings::Invoke Bind()
 		{
-			return m_call && DialogueBindings::Call<_Args...>(tokens, m_call);
-		};
-
-		void Register()
-		{
-			// Using it is what has the library that holds this type name it.
-			static_cast<void>(&s_name);
-
-			m_owner = DialogueBindings::Register(name.value, &m_invoke);
+			return [this](const std::vector<std::string>& tokens) { return m_call && DialogueBindings::Call<_Args...>(tokens, m_call); };
 		};
 
 		#pragma endregion
 
 		#pragma region State
 
-		static inline const DialogueBindingName s_name{ name.value };
-
 		Function m_call{ };
-		const DialogueBindings::Invoke m_invoke{ [this](const std::vector<std::string>& tokens) { return Invoke(tokens); } };
-		LoomObject* m_owner = nullptr;
 
 		#pragma endregion
 	};
@@ -189,28 +201,17 @@ namespace Loom
 	* - The binding LOOM_DIALOGUE_BINDING declares for the member function written after
 	*   it, which a script's [name, ...] calls with its arguments read as the types that
 	*   function takes
-	* - Registered and named as a DialogueBinding is
 	*/
 	template <Str name>
-	struct DialogueMethod final
+	struct DialogueMethod final : DialogueBindingSlot<name>
 	{
-		#pragma region Construction
+		template <typename _Self, typename _Class, typename _Return, typename... _Args>
+		DialogueMethod(_Self* self, _Return (_Class::*method)(_Args...)) : DialogueBindingSlot<name>(Bind<_Args...>(self, method)) { };
 
 		template <typename _Self, typename _Class, typename _Return, typename... _Args>
-		DialogueMethod(_Self* self, _Return (_Class::*method)(_Args...)) : m_invoke(Bind<_Args...>(self, method)) { Register(); };
-
-		template <typename _Self, typename _Class, typename _Return, typename... _Args>
-		DialogueMethod(const _Self* self, _Return (_Class::*method)(_Args...) const) : m_invoke(Bind<_Args...>(self, method)) { Register(); };
-
-		~DialogueMethod() { DialogueBindings::Unregister(m_owner, &m_invoke); };
-
-		DialogueMethod(const DialogueMethod&) = delete;
-		DialogueMethod& operator=(const DialogueMethod&) = delete;
-
-		#pragma endregion
+		DialogueMethod(const _Self* self, _Return (_Class::*method)(_Args...) const) : DialogueBindingSlot<name>(Bind<_Args...>(self, method)) { };
 
 	private:
-		#pragma region Invoking
 
 		template <typename... _Args, typename _Self, typename _Method>
 		static DialogueBindings::Invoke Bind(_Self* self, _Method method)
@@ -220,24 +221,6 @@ namespace Loom
 				return DialogueBindings::Call<_Args...>(tokens, [&](auto&... args) { (self->*method)(args...); });
 			};
 		};
-
-		void Register()
-		{
-			static_cast<void>(&s_name);
-
-			m_owner = DialogueBindings::Register(name.value, &m_invoke);
-		};
-
-		#pragma endregion
-
-		#pragma region State
-
-		static inline const DialogueBindingName s_name{ name.value };
-
-		const DialogueBindings::Invoke m_invoke;
-		LoomObject* m_owner = nullptr;
-
-		#pragma endregion
 	};
 };
 

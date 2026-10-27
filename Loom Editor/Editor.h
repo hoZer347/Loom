@@ -626,8 +626,8 @@ namespace Loom
 		// Right-click on a component's header in the Inspector.
 		void DrawSourcePopup(const std::string& component);
 
-		// A DialogueManager's New Binding: a DialogueBinding member written into the
-		// header defining type, opened there in Visual Studio.
+		// A DialogueManager's New Binding: a LOOM_DIALOGUE_BINDING function written into
+		// the header defining type, opened there in Visual Studio.
 		void AddDialogueBinding(const std::string& type);
 		void DrawFields(LoomObject& object, const std::vector<std::string>& labels, float column);
 

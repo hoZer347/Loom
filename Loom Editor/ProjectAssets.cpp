@@ -323,8 +323,8 @@ namespace {NAMESPACE}
 {
 	// A component streaming a .dialogue file into the UiText under it.
 	// Deriving from Loom::DialogueManager is all it takes to appear under Add
-	// Component's Custom/Dialogues, and its DialogueBinding members are the
-	// commands its scripts can run.
+	// Component's Custom/Dialogues, and its LOOM_DIALOGUE_BINDING functions are
+	// the commands its scripts can run.
 	struct {NAME} : Loom::DialogueManager<{NAME}>
 	{
 	};
