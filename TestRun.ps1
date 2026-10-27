@@ -22,30 +22,40 @@ function Invoke-TestSuite
     $info.Arguments = $quoted -join ' '
 
     $process = [System.Diagnostics.Process]::Start($info)
-    $errors = $process.StandardError.BaseStream.CopyToAsync([Console]::OpenStandardError())
     $deadline = [DateTime]::Now.AddMinutes($TimeoutMinutes)
+    $left = { [int][Math]::Max(0, ($deadline - [DateTime]::Now).TotalMilliseconds) }
 
-    # Its output joins this script's, so a caller can still pipe or discard it.
-    for (;;)
+    # Stopped however this ends, even by a caller that stops reading early.
+    try
     {
-        $line = $process.StandardOutput.ReadLineAsync()
-        $left = [Math]::Max(0, ($deadline - [DateTime]::Now).TotalMilliseconds)
+        $errors = $process.StandardError.BaseStream.CopyToAsync([Console]::OpenStandardError())
 
-        if (-not $line.Wait([int]$left))
+        # Its output joins this script's, so a caller can still pipe or discard it.
+        for (;;)
         {
-            $process.Kill()
-            $process.WaitForExit()
-            $global:LASTEXITCODE = 1
-            Write-Error "$(Split-Path -Leaf $Path) ran past $TimeoutMinutes minutes and was stopped."
+            $line = $process.StandardOutput.ReadLineAsync()
+
+            if (-not $line.Wait((& $left)) -or $null -eq $line.Result) { break }
+
+            $line.Result
+        }
+
+        if ($process.WaitForExit((& $left)))
+        {
+            [void]$errors.Wait((& $left))
+            $global:LASTEXITCODE = $process.ExitCode
             return
         }
 
-        if ($null -eq $line.Result) { break }
-
-        $line.Result
+        $global:LASTEXITCODE = 1
+        Write-Error "$(Split-Path -Leaf $Path) ran past $TimeoutMinutes minutes and was stopped."
     }
-
-    $process.WaitForExit()
-    $errors.Wait()
-    $global:LASTEXITCODE = $process.ExitCode
+    finally
+    {
+        if (-not $process.HasExited)
+        {
+            $process.Kill()
+            $process.WaitForExit()
+        }
+    }
 }
