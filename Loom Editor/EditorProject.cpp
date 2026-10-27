@@ -1458,6 +1458,9 @@ namespace Loom
 
 	void Editor::OpenInVisualStudio(const std::string& path, int line, int column)
 	{
+		if (!opensVisualStudio)
+			return;
+
 		// A hand-written project need not have a solution beside it, even though
 		// every project the editor writes does.
 		const std::string solution = m_scripts.HasProject()

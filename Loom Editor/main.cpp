@@ -213,9 +213,11 @@ namespace
 			<< "  --create-script <name>         Create > Script in the project, adding a\n"
 			<< "                                 scripts project if it has none\n"
 			<< "  --create-state <name>          the same for Create > State\n"
-			<< "  --create-state-machine <name>  and for Create > State Machine\n"
+			<< "  --create-state-machine <name>  the same for Create > State Machine\n"
+			<< "  --create-dialogue-manager <name>\n"
+			<< "                                 and for Create > Dialogue Manager\n"
 			<< "  --create-prompt <kind>         start with the Create prompt open for a\n"
-			<< "                                 script, state or state-machine\n"
+			<< "                                 script, state, state-machine or dialogue-manager\n"
 			<< "  --compile                      build the project's scripts on startup\n"
 			<< "  --play                         start with the scene running\n"
 			<< "  --play-web                     build the scene for the web and open it\n"
@@ -508,7 +510,7 @@ int main(int argc, char** argv)
 			{
 				if (i + 1 >= argc || !ScriptKindNamed(argv[i + 1]))
 				{
-					std::cerr << "--create-prompt needs script, state or state-machine" << std::endl;
+					std::cerr << "--create-prompt needs script, state, state-machine or dialogue-manager" << std::endl;
 					return 1;
 				};
 
@@ -700,6 +702,8 @@ int main(int argc, char** argv)
 
 		if (!screenshot.empty())
 			editor.RequestScreenshot(screenshot, frames, true, screenshot_window);
+
+		editor.opensVisualStudio = screenshot.empty() && !exit_after_script;
 
 		// The server's ui tool runs its commands through the same UiScript as a
 		// --ui-script run, since only one can listen to ImGui's items.

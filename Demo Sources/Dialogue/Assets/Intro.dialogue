@@ -1,3 +1,4 @@
 Welcome to the [Color, yellow]Dialogue Box[/Color].[Pause]
 [Clear]Each line streams out of [Color, #66CCFF]Intro.dialogue[/Color], a letter at a time.[Pause]
 [Clear][Size, 36]Big[/Size] words, [Color, red]red[/Color] words and [TextSpeed, 0.12]slow words.[Pause]
+[Clear][TextSpeed, 0.03]Narrator.hpp adds its own commands: [Shout, hey][Pause]

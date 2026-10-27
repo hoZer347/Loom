@@ -338,6 +338,10 @@ namespace Loom
 		// the panels without the real mouse.
 		void QueueClick(float x, float y, float to_x, float to_y);
 
+		// False in a run that exits once its screenshot or UI script is done,
+		// which nobody is at to see Visual Studio come up.
+		bool opensVisualStudio = true;
+
 		#pragma endregion
 
 		#pragma region Dialogs

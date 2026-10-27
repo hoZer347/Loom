@@ -73,7 +73,7 @@ Main(76e3b4d1-a933-4da0-a6e6-62a965fe70ba):
 				4 = (0, 0, 0, 0.75)
 				5 = true
 				6 = ""
-			Component DialogueManager(3e94e8f8-867e-4e4d-ba08-bf680c8d1f95)
+			Component Narrator(3e94e8f8-867e-4e4d-ba08-bf680c8d1f95)
 				0 = null
 				1 = null
 				2 = "Assets/Intro.dialogue"
