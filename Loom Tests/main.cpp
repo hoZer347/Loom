@@ -176,11 +176,9 @@ namespace
 
 	constexpr std::string_view PROGRESS_LOG_OPTION = "--progress-log=";
 
-	// Opened by main when the run is given PROGRESS_LOG_OPTION.
 	std::ofstream progressFile;
 
-	// Writes each case's name as it starts and its seconds once it ends, flushed
-	// as it goes, so a run that stalls shows which case it stalled in.
+	// Each case's name as it starts and its seconds once it ends, flushed so a stall shows where.
 	struct ProgressLog final : doctest::IReporter
 	{
 		static constexpr int SECONDS_PRECISION = 3;

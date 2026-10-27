@@ -13,14 +13,14 @@ function Invoke-TestSuite
         [string] $ProgressLog
     )
 
-    # Quoted as CommandLineToArgvW reads them back: backslashes before a quote
-    # or the closing quote are doubled.
     if ($ProgressLog)
     {
         "Progress: $ProgressLog"
         $Arguments = @($Arguments) + "--progress-log=$ProgressLog"
     }
 
+    # Quoted as CommandLineToArgvW reads them back: backslashes before a quote
+    # or the closing quote are doubled.
     $quoted = $Arguments | ForEach-Object { '"' + (($_ -replace '(\\*)"', '$1$1\"') -replace '(\\+)$', '$1$1') + '"' }
 
     $info = New-Object System.Diagnostics.ProcessStartInfo $Path
