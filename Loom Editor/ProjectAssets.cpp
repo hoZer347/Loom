@@ -299,8 +299,8 @@ namespace {NAMESPACE}
 namespace {NAMESPACE}
 {
 	// A component whose behaviour is its states. Deriving from
-	// Loom::StateMachine is all it takes to appear under Add Component, with
-	// Start and Current to pick its states from.
+	// Loom::StateMachine is all it takes to appear under Add Component's
+	// Custom/StateMachines, with Start and Current to pick its states from.
 	struct {NAME} : Loom::StateMachine<{NAME}>
 	{
 		void OnStart() override
@@ -313,6 +313,67 @@ namespace {NAMESPACE}
 	};
 };
 )";
+
+		const char* const dialogue_manager = R"(#pragma once
+
+#include "Loom.h"
+
+
+namespace {NAMESPACE}
+{
+	// A component streaming a .dialogue file into the UiText under it.
+	// Deriving from Loom::DialogueManager is all it takes to appear under Add
+	// Component's Custom/Dialogues, and its DialogueBinding members are the
+	// commands its scripts can run.
+	struct {NAME} : Loom::DialogueManager<{NAME}>
+	{
+	};
+};
+)";
+
+		#pragma endregion
+
+		#pragma region Dialogue Bindings
+
+		constexpr const char* bindingName = "NewBinding";
+		constexpr const char* bindingMember = "newBinding";
+
+		const char* const bindingComment[] =
+		{
+			"// A DialogueBinding is a command this manager's .dialogue scripts can run.",
+			"// [NewBinding, 1, 2] in a script calls it with 1 and 2 when the dialogue",
+			"// reaches it. Its arguments are read as the types listed, so declaring the",
+			"// same name again with other types overloads it.",
+		};
+
+		// Where a { or } that is code, not text in a literal or a comment, closes
+		// the block opened at open.
+		size_t ClosingBrace(const std::string& text, size_t open)
+		{
+			int depth = 0;
+
+			for (size_t at = open; at < text.size(); at++)
+			{
+				const char c = text[at];
+
+				if (text.compare(at, 2, "//") == 0)
+					at = std::min(text.find('\n', at), text.size());
+				else if (text.compare(at, 2, "/*") == 0)
+					at = std::min(text.find("*/", at), text.size());
+				else if (c == '"' || c == '\'')
+				{
+					for (at++; at < text.size() && text[at] != c; at++)
+						if (text[at] == '\\')
+							at++;
+				}
+				else if (c == '{')
+					depth++;
+				else if (c == '}' && --depth == 0)
+					return at;
+			};
+
+			return std::string::npos;
+		};
 
 		#pragma endregion
 	};
@@ -498,7 +559,7 @@ namespace {NAMESPACE}
 				return "";
 			};
 
-		const char* const templates[] = { script, state, state_machine };
+		const char* const templates[] = { script, state, state_machine, dialogue_manager };
 
 		const std::string text = Replace(
 			Replace(templates[(int)kind], "{NAME}", name),
@@ -720,6 +781,75 @@ namespace {NAMESPACE}
 		return 0;
 	};
 
+	std::string ProjectAssets::WithDialogueBinding(const std::string& text, int line, int* binding_line)
+	{
+		size_t start = 0;
+
+		for (int at = 1; at < line && start != std::string::npos; at++)
+		{
+			const size_t newline = text.find('\n', start);
+			start = newline == std::string::npos ? newline : newline + 1;
+		};
+
+		const size_t open = start == std::string::npos ? start : text.find('{', start);
+		const size_t close = open == std::string::npos ? open : ClosingBrace(text, open);
+
+		if (close == std::string::npos)
+			return "";
+
+		const std::string eol = text.find("\r\n") == std::string::npos ? "\n" : "\r\n";
+		const std::string indent = text.substr(start, text.find_first_not_of(" \t", start) - start);
+		const std::string member = indent + '\t';
+		const std::string body = text.substr(open + 1, close - open - 1);
+
+		std::string suffix;
+
+		for (int number = 1; body.find('"' + std::string(bindingName) + suffix + '"') != std::string::npos; number++)
+			suffix = std::to_string(number);
+
+		std::string block;
+
+		if (body.find_first_not_of(" \t\r\n") != std::string::npos)
+			block += eol;
+
+		if (body.find("DialogueBinding<") == std::string::npos)
+			for (const char* comment : bindingComment)
+				block += member + comment + eol;
+
+		const size_t declared = block.size();
+
+		block +=
+			member + "Loom::DialogueBinding<\"" + bindingName + suffix + "\", int, int> " + bindingMember + suffix + " = [this](int i, int j)" + eol +
+			member + '{' + eol +
+			member + "};" + eol;
+
+		// A closing brace on a line of its own keeps it; one that shares a line
+		// moves down under the member, and { } on one line opens onto its own.
+		const size_t newline = text.rfind('\n', close);
+		const size_t close_line = newline == std::string::npos ? 0 : newline + 1;
+		const bool own_line = text.find_first_not_of(" \t", close_line) == close;
+
+		std::string head;
+
+		if (own_line)
+			head = text.substr(0, close_line);
+		else if (close_line <= open)
+		{
+			const size_t first = body.find_first_not_of(" \t");
+
+			head = text.substr(0, text.find_last_not_of(" \t", open - 1) + 1) + eol + indent + '{' + eol;
+
+			if (first != std::string::npos)
+				head += member + body.substr(first, body.find_last_not_of(" \t") - first + 1) + eol;
+		}
+		else head = text.substr(0, text.find_last_not_of(" \t", close - 1) + 1) + eol;
+
+		if (binding_line)
+			*binding_line = 1 + (int)std::count(head.begin(), head.end(), '\n') + (int)std::count(block.begin(), block.begin() + declared, '\n');
+
+		return head + block + (own_line ? text.substr(close_line) : indent + text.substr(close));
+	};
+
 	std::vector<ProjectAssets::DeclaredScript> ProjectAssets::DeclaredScripts(const std::string& text)
 	{
 		static const std::regex declared("\\b(?:struct|class)\\s+(\\w+)\\s*(?:final\\s*)?:([^{;]*)\\{");
@@ -819,6 +949,19 @@ void main()
 		std::ifstream in(path, std::ios::binary);
 
 		return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+	};
+
+	bool ProjectAssets::WriteText(const std::string& path, const std::string& text, std::string* error)
+	{
+		std::ofstream out(path, std::ios::binary);
+
+		if (!(out << text))
+		{
+			Fail(error, "Could not write " + path);
+			return false;
+		};
+
+		return true;
 	};
 
 	std::string ProjectAssets::Element(const std::string& xml, const std::string& tag)

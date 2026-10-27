@@ -31,7 +31,7 @@ namespace Loom
 		background->size = BOX_SIZE;
 		background->color = BOX_COLOR;
 
-		box->Attach<DialogueManager>();
+		box->Attach<Basic::DialogueManager>();
 
 		GameObject* line = box->AddChild(DialogueTextLabel);
 

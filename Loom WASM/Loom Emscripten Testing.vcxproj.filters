@@ -157,6 +157,9 @@
     <ClCompile Include="Utilities\DialogueArgs.cpp">
       <Filter>Utilities\Dialogue Manager</Filter>
     </ClCompile>
+    <ClCompile Include="Utilities\DialogueBinding.cpp">
+      <Filter>Utilities\Dialogue Manager</Filter>
+    </ClCompile>
     <ClCompile Include="Utilities\DialogueInput.cpp">
       <Filter>Utilities\Dialogue Manager</Filter>
     </ClCompile>
@@ -450,6 +453,9 @@
       <Filter>Utilities\Dialogue Manager</Filter>
     </ClInclude>
     <ClInclude Include="Utilities\DialogueArgs.h">
+      <Filter>Utilities\Dialogue Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\DialogueBinding.h">
       <Filter>Utilities\Dialogue Manager</Filter>
     </ClInclude>
     <ClInclude Include="Utilities\DialogueInput.h">

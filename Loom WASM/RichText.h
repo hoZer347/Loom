@@ -14,7 +14,7 @@ namespace Loom
 	/**
 	* Loom::RichText
 	* - Text with tags written as [Name, arg] in it, which a UiText draws and a
-	*   DialogueManager passes through rather than runs
+	*   DialogueManager writes into its text through bindings of the same names
 	* - [Color, red] or [Color, #FF8000] or [Color, #FF800080] colours the text
 	*   after it until [/Color]; [Size, 32] draws it at that many pixels until
 	*   [/Size]. Each closing tag goes back to what was in place before its

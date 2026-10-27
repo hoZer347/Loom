@@ -13,7 +13,7 @@ namespace Loom
 {
 	/// Opens a run. Nothing but a hand-off, so a script always has a state to proceed out
 	/// of rather than starting halfway through its first line.
-	struct St_Dg_Begin final : StateOf<DialogueManager>
+	struct St_Dg_Begin final : StateOf<DialogueManagerBase>
 	{
 		std::string Name() const override { return "St_Dg_Begin"; };
 
@@ -21,7 +21,7 @@ namespace Loom
 	};
 
 	/// Closes a run, emptying the box.
-	struct St_Dg_DialogueEnd final : StateOf<DialogueManager>
+	struct St_Dg_DialogueEnd final : StateOf<DialogueManagerBase>
 	{
 		std::string Name() const override { return "St_Dg_DialogueEnd"; };
 
@@ -29,7 +29,7 @@ namespace Loom
 	};
 
 	/// Runs one [Binding] token and moves on.
-	struct St_Dg_InvokeBinding final : StateOf<DialogueManager>
+	struct St_Dg_InvokeBinding final : StateOf<DialogueManagerBase>
 	{
 		std::function<void()> binding{ };
 
@@ -47,7 +47,7 @@ namespace Loom
 	};
 
 	/// Types one run of plain text out, a character at a time.
-	struct St_Dg_StreamPlainText final : StateOf<DialogueManager>
+	struct St_Dg_StreamPlainText final : StateOf<DialogueManagerBase>
 	{
 		std::string text{ };
 
@@ -64,21 +64,8 @@ namespace Loom
 		size_t amountStreamed = 0;
 	};
 
-	/// Passes one RichText tag straight through -- it is an instruction to the box, not
-	/// something to type out.
-	struct St_Dg_StreamRichText final : StateOf<DialogueManager>
-	{
-		std::string text{ };
-
-		std::string Name() const override { return "St_Dg_StreamRichText"; };
-
-		std::string Describe() const override { return text; };
-
-		void OnUpdate() override;
-	};
-
 	/// Holds a finished line on screen until the player says carry on.
-	struct St_Dg_WaitForInput final : StateOf<DialogueManager>
+	struct St_Dg_WaitForInput final : StateOf<DialogueManagerBase>
 	{
 		std::string Name() const override { return "St_Dg_WaitForInput"; };
 

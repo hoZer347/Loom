@@ -134,6 +134,7 @@ namespace Loom
 			{ AssetKind::Script, EditorIcons::Script, "Script", "NewScript", ProjectAssets::ScriptKind::Component, "Add Component" },
 			{ AssetKind::State, EditorIcons::State, "State", "NewState", ProjectAssets::ScriptKind::State, "a state machine's Start and Current" },
 			{ AssetKind::StateMachine, EditorIcons::Script, "State Machine", "NewStateMachine", ProjectAssets::ScriptKind::StateMachine, "Add Component" },
+			{ AssetKind::DialogueManager, EditorIcons::Dialogue, "Dialogue Manager", "NewDialogueManager", ProjectAssets::ScriptKind::DialogueManager, "Add Component" },
 			{ AssetKind::Shader, EditorIcons::Shader, "Shader", "NewShader" },
 			{ AssetKind::Dialogue, EditorIcons::Dialogue, "Dialogue", "NewDialogue" },
 			{ AssetKind::Texture, EditorIcons::Texture, "Texture", "NewTexture" },
@@ -1167,6 +1168,7 @@ namespace Loom
 		m_newAssetKind = kind;
 		m_newAssetFolder = folder;
 		m_newScriptFolder.clear();
+		m_newScriptFor = Guid();
 
 		for (FileTab& tab : m_fileTabs)
 			tab.newFolder.clear();
@@ -1247,6 +1249,7 @@ namespace Loom
 		m_newAssetKind = kind;
 		m_newAssetFolder = m_projectPath;
 		m_newScriptFolder.clear();
+		m_newScriptFor = Guid();
 		snprintf(m_newAssetName, sizeof(m_newAssetName), "%s", name.c_str());
 
 		CreateAsset();
@@ -1299,6 +1302,7 @@ namespace Loom
 		case AssetKind::Script:
 		case AssetKind::State:
 		case AssetKind::StateMachine:
+		case AssetKind::DialogueManager:
 		{
 			if (!m_scripts.HasProject())
 			{
@@ -1343,10 +1347,16 @@ namespace Loom
 			return "";
 		};
 
-		if (const char* appearsIn = InfoOf(m_newAssetKind).appearsIn)
-			std::cout << name << " shows up in " << appearsIn << " after the next compile." << std::endl;
-
 		m_askForAsset = false;
+
+		if (IsScript(m_newAssetKind) && m_newScriptFor.IsValid())
+		{
+			m_attachAfterBuildTo = std::exchange(m_newScriptFor, Guid());
+			m_attachAfterBuild = name;
+			CompileScripts();
+		}
+		else if (const char* appearsIn = InfoOf(m_newAssetKind).appearsIn)
+			std::cout << name << " shows up in " << appearsIn << " after the next compile." << std::endl;
 
 		if (IsScriptsPanels(m_newAssetKind))
 		{

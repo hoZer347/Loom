@@ -24,7 +24,7 @@ namespace Loom
 		#pragma region File Kinds
 
 		static constexpr const char* shaderExtension = Shader::extension;
-		static constexpr const char* dialogueExtension = DialogueManager::extension;
+		static constexpr const char* dialogueExtension = DialogueManagerBase::extension;
 		static constexpr const char* textureExtension = TextureAsset::fileExtensions.front();
 		static constexpr std::string_view scriptExtensions[] = { ".hpp", ".h", ".cpp" };
 
@@ -74,6 +74,7 @@ namespace Loom
 			Component,
 			State,
 			StateMachine,
+			DialogueManager,
 		};
 
 		// A name usable as a file name, and as a path in an MSBuild project.
@@ -139,6 +140,12 @@ namespace Loom
 		// A primary template is passed over, since no component is one.
 		static int DeclarationLine(const std::string& text, const std::string& name);
 
+		// text with a new DialogueBinding member at the end of the type defined at
+		// line, under a comment saying what one is when it is the type's first, or an
+		// empty string when that type's braces never close. binding_line is the line
+		// the member lands on.
+		static std::string WithDialogueBinding(const std::string& text, int line, int* binding_line = nullptr);
+
 		struct DeclaredScript
 		{
 			std::string name;
@@ -175,6 +182,9 @@ namespace Loom
 
 		// The whole file, or an empty string when it cannot be read.
 		static std::string ReadText(const std::string& path);
+
+		// Replaces the whole file, or is false with the reason in error.
+		static bool WriteText(const std::string& path, const std::string& text, std::string* error = nullptr);
 
 		// What the first <tag> in an MSBuild project holds, or an empty string.
 		static std::string Element(const std::string& xml, const std::string& tag);

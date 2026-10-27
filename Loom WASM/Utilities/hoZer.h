@@ -18,7 +18,9 @@
 ///	                       walks.
 ///
 ///	  Dialogue             A text script is tokenised and compiled into states. Bindings
-///	                       are lambdas whose signatures declare what they take. Both the
+///	                       are lambdas whose signatures declare what they take, given with
+///	                       Bind or declared as DialogueBinding members of the components on
+///	                       the manager's GameObject and above it. Both the
 ///	                       line text and the voice blip are announced rather than rendered
 ///	                       or played; the caller decides what to do with them. With no
 ///	                       onTextChanged, the line is written into the UiText under the
@@ -41,6 +43,7 @@
 #include "AxisGui.h"
 #include "CustomState.h"
 #include "DialogueArgs.h"
+#include "DialogueBinding.h"
 #include "DialogueInput.h"
 #include "DialogueManager.h"
 #include "DialogueStates.h"

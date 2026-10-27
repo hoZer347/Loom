@@ -217,6 +217,7 @@ namespace Loom
 		CloseAllScenes();
 
 		RestoreAfterBuild();
+		AttachAfterBuild();
 
 		RefreshProjectAssets();
 
@@ -233,6 +234,24 @@ namespace Loom
 			if (m_scripts.LastBuildSucceeded())
 				BeginPlay();
 		};
+	};
+
+	#pragma endregion
+
+	void Editor::AttachAfterBuild()
+	{
+		const std::string name = std::exchange(m_attachAfterBuild, { });
+		GameObject* object = LoomObject::GetByGuid<GameObject>(std::exchange(m_attachAfterBuildTo, Guid()));
+
+		if (name.empty() || object == nullptr)
+			return;
+
+		bool made = false;
+
+		ChangeComponents(*object, [&]() { made = ComponentRegistry::Create(name, *object) != nullptr; });
+
+		if (!made)
+			std::cerr << name << " did not compile, so it is not on " << object->GetName() << " yet." << std::endl;
 	};
 
 	#pragma endregion

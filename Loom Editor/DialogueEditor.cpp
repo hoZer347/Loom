@@ -75,15 +75,20 @@ namespace Loom
 
 	const std::vector<std::string>& DialogueEditor::Commands()
 	{
-		static const std::vector<std::string> commands = []()
-		{
-			std::vector<std::string> names = DialogueManager().Commands();
+		static std::vector<std::string> commands{ };
+		static unsigned long long version = 0;
 
-			names.insert(names.end(), RichText::Tags().begin(), RichText::Tags().end());
-			std::sort(names.begin(), names.end());
+		if (!commands.empty() && version == DialogueBindings::NamesVersion())
+			return commands;
 
-			return names;
-		}();
+		version = DialogueBindings::NamesVersion();
+		commands = Basic::DialogueManager().Commands();
+
+		for (const std::string& name : DialogueBindings::Names())
+			if (std::none_of(commands.begin(), commands.end(), [&name](const std::string& command) { return Lowered(command) == Lowered(name); }))
+				commands.push_back(name);
+
+		std::sort(commands.begin(), commands.end());
 
 		return commands;
 	};

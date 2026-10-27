@@ -193,6 +193,7 @@
     <ClCompile Include="Utilities\AttributeGui.cpp" />
     <ClCompile Include="Utilities\AxisGui.cpp" />
     <ClCompile Include="Utilities\DialogueArgs.cpp" />
+    <ClCompile Include="Utilities\DialogueBinding.cpp" />
     <ClCompile Include="Utilities\DialogueInput.cpp" />
     <ClCompile Include="Utilities\DialogueManager.cpp" />
     <ClCompile Include="Utilities\DialogueStates.cpp" />
@@ -266,6 +267,7 @@
     <ClInclude Include="Utilities\AttributeTriggers.h" />
     <ClInclude Include="Utilities\CustomState.h" />
     <ClInclude Include="Utilities\DialogueArgs.h" />
+    <ClInclude Include="Utilities\DialogueBinding.h" />
     <ClInclude Include="Utilities\DialogueInput.h" />
     <ClInclude Include="Utilities\DialogueManager.h" />
     <ClInclude Include="Utilities\DialogueStates.h" />

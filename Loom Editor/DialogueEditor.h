@@ -14,14 +14,16 @@ namespace Loom
 	* - The Dialogues panel: a tab for each open .dialogue file, the commands a
 	*   DialogueManager runs and the RichText tags a UiText draws coloured
 	*   where they are written as [Name, args], and completed by name
-	* - A bracket naming neither is left as text, as a game's own bindings are
-	*   bound where the editor cannot see them
+	* - Also coloured are the names of the DialogueBinding members in a library
+	*   loaded now. A bracket naming none of these is left as text, as a binding
+	*   given with Bind is bound where the editor cannot see it
 	*/
 	struct DialogueEditor final : TextFileEditor
 	{
 		#pragma region Language
 
-		// A DialogueManager's bindings and the RichText tags, sorted.
+		// A DialogueManager's bindings, every DialogueBinding's name in a library loaded
+		// now and the RichText tags, sorted.
 		static const std::vector<std::string>& Commands();
 
 		// How long the command text starts with is, brackets and all, with the

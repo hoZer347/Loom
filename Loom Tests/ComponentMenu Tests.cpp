@@ -100,7 +100,10 @@ TEST_SUITE("ComponentMenu")
 		CHECK(Holds(Find(root, { "Logic" }), "StateMachine"));
 		CHECK(Holds(Find(root, { "Gameplay", "Enemies" }), "Categorised"));
 		CHECK(Holds(&root, "Uncategorised"));
-		CHECK(Find(root, { Loom::ComponentMenu::custom_category }) == nullptr);
+
+		// Custom holds only what the tests' own machines and dialogues declare.
+		const Loom::ComponentMenu::Node* custom = Find(root, { Loom::ComponentMenu::custom_category });
+		CHECK((custom == nullptr || custom->components.empty()));
 	};
 
 	TEST_CASE("a script with no category of its own goes first, under Custom")

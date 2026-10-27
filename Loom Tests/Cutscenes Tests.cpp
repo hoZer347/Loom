@@ -35,7 +35,7 @@ TEST_SUITE("Cutscenes")
 		REQUIRE(background != nullptr);
 		CHECK(background->color->a > 0.0f);
 		CHECK(background->anchor->y == 1.0f);
-		CHECK(box->GetComponent<Loom::DialogueManager>() != nullptr);
+		CHECK(box->GetComponent<Loom::Basic::DialogueManager>() != nullptr);
 		CHECK(box->GetComponent<Loom::UiText>() == nullptr);
 
 		REQUIRE(box->GetChildren().size() == 1);

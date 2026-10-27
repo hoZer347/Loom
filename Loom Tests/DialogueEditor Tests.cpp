@@ -6,6 +6,7 @@
 #include "Test Support.h"
 
 #include "DialogueEditor.h"
+#include "Utilities/DialogueBinding.h"
 
 #include <algorithm>
 #include <string>
@@ -26,6 +27,11 @@ namespace
 		coloured.length = Loom::DialogueEditor::Command(text, coloured.color);
 		return coloured;
 	};
+
+	struct Narrator final : Loom::Component<Narrator>
+	{
+		Loom::DialogueBinding<"Narrate", std::string> narrate = [](const std::string&) { };
+	};
 };
 
 
@@ -42,6 +48,20 @@ TEST_SUITE("DialogueEditor")
 		};
 
 		CHECK(std::is_sorted(commands.begin(), commands.end()));
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a DialogueBinding's name is a command, coloured as a keyword")
+	{
+		Narrator narrator;
+		const std::vector<std::string>& commands = Loom::DialogueEditor::Commands();
+
+		CHECK(std::count(commands.begin(), commands.end(), "Narrate") == 1);
+		CHECK(std::is_sorted(commands.begin(), commands.end()));
+
+		const Coloured narrate = Command("[Narrate, once]");
+
+		CHECK(narrate.length == std::string("[Narrate, once]").size());
+		CHECK(narrate.color == TextEditor::Color::keyword);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a RichText tag is coloured as a declaration, brackets and all")

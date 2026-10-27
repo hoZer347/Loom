@@ -2,11 +2,15 @@
 
 #include "Asset.h"
 #include "DialogueArgs.h"
+#include "DialogueBinding.h"
+#include "RichText.h"
 #include "Serial.h"
 #include "StateMachine.h"
 
+#include <format>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <unordered_map>
 #include <vector>
@@ -39,30 +43,29 @@ namespace Loom
 		struct function_traits<R(A...)> { using args = std::tuple<std::decay_t<A>...>; };
 	};
 
-	/// Streams a script into a text box, a character at a time, running the commands
-	/// written into it as it goes.
+	/// What every DialogueManager does, written once: streams a script into a text box,
+	/// a character at a time, running the commands written into it as it goes.
 	///
-	/// A script is plain text with commands in brackets in it:
+	/// A script is plain text with commands in brackets in it, [Binding, arg, arg], each
+	/// a DialogueBinding or a Bind. Its own are Proceed, Clear, Pause and TextSpeed, and
+	/// Color and Size with their closing /Color and /Size, which write the RichText tag
+	/// into the text for the box to draw. Everything else streams out one character at
+	/// a time at the current text speed.
 	///
-	///		[Binding, arg, arg]     runs a bound function
-	///		[Color, red]            a RichText tag, passed through whole for the box to draw
-	///
-	/// Everything else streams out one character at a time at the current text speed.
-	///
-	/// The script is the .dialogue file dialogue names, unless SetScript gives it one.
-	/// The manager owns the text and announces every change through onTextChanged; with
-	/// none set, it writes the text into the UiText on its GameObject or the first one
-	/// under it. Speak's blips go to onSpeak for a host to play however it likes.
-	struct LOOM_API DialogueManager : StateMachine<DialogueManager, "Logic">
+	/// The script is the .dialogue file DialogueFile names, unless SetScript gives it
+	/// one. The manager owns the text and announces every change through onTextChanged;
+	/// with none set, it writes the text into the UiText on its GameObject or the first
+	/// one under it. Speak's blips go to onSpeak for a host to play however it likes.
+	struct LOOM_API DialogueManagerBase : StateMachineBase
 	{
-		DialogueManager();
+		DialogueManagerBase();
 
 		static constexpr char extension[] = ".dialogue";
 
 		#pragma region Running
 
 		/// The file streamed when no script has been set.
-		Serial<Asset<extension>> dialogue;
+		virtual std::string DialogueFile() const { return ""; };
 
 		/// The script this manager streams. Set it before Begin.
 		void SetScript(std::string script);
@@ -166,8 +169,13 @@ namespace Loom
 		/// Drops every form bound under that name.
 		void Unbind(const std::string& name);
 
-		/// Every name bound, as it was first bound.
+		/// Every name bound, as it was first bound, and every DialogueBinding's that
+		/// Declared finds.
 		std::vector<std::string> Commands() const;
+
+		/// What the inspector's New Binding runs, with the name of the component type it
+		/// was pressed on. The editor sets it, and without it the button is disabled.
+		static std::function<void(const std::string& type)> onNewBinding;
 
 		#pragma endregion
 
@@ -182,11 +190,8 @@ namespace Loom
 
 		#pragma endregion
 
-		std::string MachineName() const override { return "DialogueManager"; };
-
 	protected:
 		friend struct St_Dg_StreamPlainText;
-		friend struct St_Dg_StreamRichText;
 		friend struct St_Dg_DialogueEnd;
 
 		#pragma region Running
@@ -209,6 +214,16 @@ namespace Loom
 
 		/// The UiText on this GameObject, or the first one under it that is enabled.
 		UiText* Box() const;
+
+		/// Appends a RichText tag, [name, arg] or [name] when arg is empty.
+		void AppendTag(std::string_view name, const std::string& arg = "");
+
+		#pragma endregion
+
+		#pragma region Gui
+
+		/// The New Binding button, which hands this component's type to onNewBinding.
+		void DrawNewBinding();
 
 		#pragma endregion
 
@@ -248,7 +263,15 @@ namespace Loom
 
 		static std::string Lowered(const std::string& s);
 
-		/// content is a binding token without its brackets: "Name, Arg1, Arg2".
+		/// The GameObject the manager is on, or none.
+		GameObject* Object() const;
+
+		/// The manager's own DialogueBinding members, then those of the other components
+		/// on its GameObject, then of each parent above it.
+		std::vector<DialogueBindings::Form> Declared() const;
+
+		/// content is a binding token without its brackets: "Name, Arg1, Arg2". Bind's
+		/// forms are tried before Declared's.
 		void InvokeBinding(const std::string& content);
 
 		#pragma endregion
@@ -290,5 +313,55 @@ namespace Loom
 		};
 
 		std::unordered_map<std::string, Binding> _bindings{ };
+
+		#pragma region Default Bindings
+
+		DialogueBinding<"Proceed"> _proceed = [this]() { Proceed(); };
+		DialogueBinding<"Clear"> _clear = [this]() { ClearText(); };
+		DialogueBinding<"Pause"> _pause = [this]() { WaitForInput(); };
+		DialogueBinding<"TextSpeed", float> _textSpeedBy = [this](float speed) { _textSpeed = speed; };
+		DialogueBinding<"TextSpeed", std::string> _textSpeedNamed = [this](const std::string& speed) { SetTextSpeed(speed); };
+
+		// Named as RichText::ColorTag and SizeTag are.
+		DialogueBinding<"Color", std::string> _color = [this](const std::string& color) { AppendTag(RichText::ColorTag, color); };
+		DialogueBinding<"/Color"> _colorEnd = [this]() { AppendTag(std::string(1, RichText::Close) + std::string(RichText::ColorTag)); };
+		DialogueBinding<"Size", float> _size = [this](float size) { AppendTag(RichText::SizeTag, std::format("{}", size)); };
+		DialogueBinding<"/Size"> _sizeEnd = [this]() { AppendTag(std::string(1, RichText::Close) + std::string(RichText::SizeTag)); };
+
+		void WaitForInput();
+		void SetTextSpeed(const std::string& speed);
+
+		#pragma endregion
+	};
+
+	/// A component streaming a .dialogue file, whose commands are its DialogueBinding
+	/// members and those of the components around it. Self-typed as a StateMachine is:
+	///
+	///		struct Narrator : Loom::DialogueManager&lt;Narrator&gt;
+	///		{
+	///			Loom::DialogueBinding&lt;"Shake", float&gt; shake = [this](float strength) { };
+	///		};
+	///
+	/// A project's are filed under Custom/Dialogues in Add Component.
+	template <typename _Self, Str _Category = "Custom/Dialogues">
+	struct DialogueManager : StateMachine<_Self, _Category, DialogueManagerBase>
+	{
+		/// The file streamed when no script has been set.
+		Serial<Asset<DialogueManagerBase::extension>> dialogue;
+
+		std::string DialogueFile() const override { return *dialogue; };
+
+		void OnGui() override { this->DrawNewBinding(); };
+	};
+
+	namespace Basic
+	{
+		/// A manager with no bindings of its own, which the Cutscene menu's Dialogue Box
+		/// puts on. Registered as DialogueManager, as Basic::StateMachine is as
+		/// StateMachine, and has no header of its own to add a binding to.
+		struct DialogueManager final : Loom::DialogueManager<DialogueManager, "Logic">
+		{
+			void OnGui() override { };
+		};
 	};
 };

@@ -1,9 +1,12 @@
 #include "DialogueManager.h"
 
+#include "ComponentRegistry.h"
 #include "DialogueStates.h"
 #include "GameObject.h"
 #include "RichText.h"
 #include "Ui.h"
+
+#include "imgui.h"
 
 #include <algorithm>
 #include <cctype>
@@ -24,38 +27,38 @@ namespace Loom
 		return regex;
 	};
 
-	DialogueManager::DialogueManager()
+	std::function<void(const std::string& type)> DialogueManagerBase::onNewBinding{ };
+
+	DialogueManagerBase::DialogueManagerBase()
 	{
 		_textSpeed = startingTextSpeed;
-
-		#pragma region Default Bindings
-
-		// A script's [Pause] maps to Pause(); [TextSpeed, 0.1] passes the argument.
-
-		Bind("Proceed", [this]() { Proceed(); });
-
-		Bind("Clear", [this]() { ClearText(); });
-
-		Bind("Pause", [this]() { PushFirst<St_Dg_WaitForInput>(); });
-
-		Bind("TextSpeed", [this](float speed) { _textSpeed = speed; });
-
-		Bind("TextSpeed",
-			[this](std::string speed)
-			{
-				if (speed == "Slow") _textSpeed = startingTextSpeed * 2.0f;
-				else if (speed == "Normal") _textSpeed = startingTextSpeed;
-				else if (speed == "Fast") _textSpeed = startingTextSpeed / 2.0f;
-				else if (speed == "Default") _textSpeed = startingTextSpeed;
-				else std::cerr << "[Dialogue] Unrecognized text speed '" << speed << "'." << std::endl;
-			});
-
-		#pragma endregion
 	};
+
+	#pragma region Default Bindings
+
+	void DialogueManagerBase::WaitForInput()
+	{
+		PushFirst<St_Dg_WaitForInput>();
+	};
+
+	void DialogueManagerBase::SetTextSpeed(const std::string& speed)
+	{
+		// Each named speed against the one a line starts at.
+		constexpr float SLOWER = 2.0f;
+		constexpr float FASTER = 0.5f;
+
+		if (speed == "Slow") _textSpeed = startingTextSpeed * SLOWER;
+		else if (speed == "Normal") _textSpeed = startingTextSpeed;
+		else if (speed == "Fast") _textSpeed = startingTextSpeed * FASTER;
+		else if (speed == "Default") _textSpeed = startingTextSpeed;
+		else std::cerr << "[Dialogue] Unrecognized text speed '" << speed << "'." << std::endl;
+	};
+
+	#pragma endregion
 
 	#pragma region Running
 
-	void DialogueManager::SetScript(std::string script)
+	void DialogueManagerBase::SetScript(std::string script)
 	{
 		_script = std::move(script);
 
@@ -63,7 +66,7 @@ namespace Loom
 		_ready = false;
 	};
 
-	void DialogueManager::OnStart()
+	void DialogueManagerBase::OnStart()
 	{
 		Build();
 
@@ -78,17 +81,17 @@ namespace Loom
 		Proceed();
 	};
 
-	void DialogueManager::Build()
+	void DialogueManagerBase::Build()
 	{
 		if (_ready)
 			return;
 
-		if (_script.empty() && !dialogue->empty())
+		if (const std::string path = DialogueFile(); _script.empty() && !path.empty())
 		{
-			std::ifstream file(*dialogue, std::ios::binary);
+			std::ifstream file(path, std::ios::binary);
 
 			if (!file)
-				std::cerr << "[Dialogue] Could not open '" << *dialogue << "'." << std::endl;
+				std::cerr << "[Dialogue] Could not open '" << path << "'." << std::endl;
 
 			_script.assign(std::istreambuf_iterator<char>(file), { });
 		};
@@ -111,7 +114,7 @@ namespace Loom
 		_ready = true;
 	};
 
-	void DialogueManager::Begin()
+	void DialogueManagerBase::Begin()
 	{
 		Build();
 
@@ -125,7 +128,7 @@ namespace Loom
 		Proceed();
 	};
 
-	void DialogueManager::Begin(const std::string& text)
+	void DialogueManagerBase::Begin(const std::string& text)
 	{
 		Build();
 
@@ -139,12 +142,12 @@ namespace Loom
 		Proceed();
 	};
 
-	void DialogueManager::QueueScript()
+	void DialogueManagerBase::QueueScript()
 	{
 		Queue(_script);
 	};
 
-	void DialogueManager::Queue(const std::string& text)
+	void DialogueManagerBase::Queue(const std::string& text)
 	{
 		_textSpeed = startingTextSpeed;
 
@@ -157,9 +160,7 @@ namespace Loom
 
 		for (const std::string& split : Tokens(text))
 		{
-			if (IsRichText(split))
-				Push<St_Dg_StreamRichText>()->text = split;
-			else if (IsBinding(split))
+			if (IsBinding(split))
 			{
 				const std::string content = split.substr(1, split.size() - 2);
 
@@ -176,12 +177,12 @@ namespace Loom
 
 	#pragma region Text
 
-	void DialogueManager::SetContinueText(std::string text)
+	void DialogueManagerBase::SetContinueText(std::string text)
 	{
 		_continueText = std::move(text);
 	};
 
-	void DialogueManager::Append(const std::string& text)
+	void DialogueManagerBase::Append(const std::string& text)
 	{
 		if (text.empty())
 			return;
@@ -191,14 +192,14 @@ namespace Loom
 		Show();
 	};
 
-	void DialogueManager::Append(char c)
+	void DialogueManagerBase::Append(char c)
 	{
 		_text += c;
 
 		Show();
 	};
 
-	void DialogueManager::ClearText()
+	void DialogueManagerBase::ClearText()
 	{
 		if (_text.empty())
 			return;
@@ -208,7 +209,7 @@ namespace Loom
 		Show();
 	};
 
-	void DialogueManager::Show()
+	void DialogueManagerBase::Show()
 	{
 		if (onTextChanged)
 			onTextChanged(_text);
@@ -216,23 +217,30 @@ namespace Loom
 			box->text = _text;
 	};
 
-	UiText* DialogueManager::Box() const
+	UiText* DialogueManagerBase::Box() const
 	{
-		return m_gameObject ? m_gameObject->FindComponent<UiText>() : nullptr;
+		GameObject* object = Object();
+
+		return object ? object->FindComponent<UiText>() : nullptr;
+	};
+
+	void DialogueManagerBase::AppendTag(std::string_view name, const std::string& arg)
+	{
+		Append('[' + std::string(name) + (arg.empty() ? "" : ", " + arg) + ']');
 	};
 
 	#pragma endregion
 
 	#pragma region Voice
 
-	float DialogueManager::VoiceOut() const
+	float DialogueManagerBase::VoiceOut() const
 	{
 		const float level = VoiceLevel ? std::clamp(VoiceLevel(), 0.0f, 1.0f) : 1.0f;
 
 		return voiceVolume * level;
 	};
 
-	void DialogueManager::Speak(char c)
+	void DialogueManagerBase::Speak(char c)
 	{
 		if (!onSpeak || std::isspace(static_cast<unsigned char>(c)))
 			return;
@@ -254,7 +262,7 @@ namespace Loom
 
 	#pragma region Bindings
 
-	std::string DialogueManager::Lowered(const std::string& s)
+	std::string DialogueManagerBase::Lowered(const std::string& s)
 	{
 		std::string lowered;
 		lowered.reserve(s.size());
@@ -265,24 +273,53 @@ namespace Loom
 		return lowered;
 	};
 
-	void DialogueManager::Unbind(const std::string& name)
+	void DialogueManagerBase::Unbind(const std::string& name)
 	{
 		_bindings.erase(Lowered(name));
 	};
 
-	std::vector<std::string> DialogueManager::Commands() const
+	std::vector<std::string> DialogueManagerBase::Commands() const
 	{
 		std::vector<std::string> names;
 
 		for (const auto& [lowered, binding] : _bindings)
 			names.push_back(binding.name);
 
+		for (const DialogueBindings::Form& form : Declared())
+			if (std::none_of(names.begin(), names.end(), [&form](const std::string& name) { return Lowered(name) == Lowered(form.name); }))
+				names.push_back(form.name);
+
 		std::sort(names.begin(), names.end());
 
 		return names;
 	};
 
-	void DialogueManager::InvokeBinding(const std::string& content)
+	GameObject* DialogueManagerBase::Object() const
+	{
+		// GetGameObject is not const only because a machine hands out its object to
+		// change.
+		return const_cast<DialogueManagerBase*>(this)->GetGameObject();
+	};
+
+	std::vector<DialogueBindings::Form> DialogueManagerBase::Declared() const
+	{
+		const LoomObject* self = dynamic_cast<const LoomObject*>(this);
+		std::vector<DialogueBindings::Form> forms = DialogueBindings::Of(self);
+
+		for (const GameObject* at = Object(); at != nullptr; at = at->GetParent())
+			for (const ComponentBase* component : at->GetComponents())
+			{
+				if (component == self)
+					continue;
+
+				const std::vector<DialogueBindings::Form> declared = DialogueBindings::Of(component);
+				forms.insert(forms.end(), declared.begin(), declared.end());
+			};
+
+		return forms;
+	};
+
+	void DialogueManagerBase::InvokeBinding(const std::string& content)
 	{
 		const size_t comma = content.find(',');
 
@@ -291,20 +328,33 @@ namespace Loom
 
 		const std::string argList = comma == std::string::npos ? "" : content.substr(comma + 1);
 
-		const auto found = _bindings.find(Lowered(name));
+		const std::string lowered = Lowered(name);
+		const std::vector<std::string> args = DialogueArgs::Split(argList);
+		const auto found = _bindings.find(lowered);
+		bool named = found != _bindings.end();
 
-		if (found == _bindings.end())
+		if (named)
+			for (const auto& form : found->second.forms)
+				if (form(args))
+					return;
+
+		for (const DialogueBindings::Form& form : Declared())
+		{
+			if (Lowered(form.name) != lowered)
+				continue;
+
+			named = true;
+
+			if ((*form.invoke)(args))
+				return;
+		};
+
+		if (!named)
 		{
 			std::cerr << "[Dialogue] No binding named '" << name << "'." << std::endl;
 
 			return;
 		};
-
-		const std::vector<std::string> args = DialogueArgs::Split(argList);
-
-		for (const auto& form : found->second.forms)
-			if (form(args))
-				return;
 
 		std::cerr
 			<< "[Dialogue] No form of '" << name << "' takes the arguments '"
@@ -313,19 +363,38 @@ namespace Loom
 
 	#pragma endregion
 
+	#pragma region Gui
+
+	void DialogueManagerBase::DrawNewBinding()
+	{
+		const ComponentBase* component = dynamic_cast<const ComponentBase*>(this);
+
+		ImGui::BeginDisabled(!onNewBinding || component == nullptr);
+
+		if (ImGui::Button("New Binding", ImVec2(-FLT_MIN, 0.0f)))
+			onNewBinding(ComponentRegistry::NameOf(*component));
+
+		ImGui::EndDisabled();
+
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+			ImGui::SetTooltip("Adds a DialogueBinding to this script and opens it in Visual Studio");
+	};
+
+	#pragma endregion
+
 	#pragma region Parsing
 
-	bool DialogueManager::IsBinding(const std::string& token)
+	bool DialogueManagerBase::IsBinding(const std::string& token)
 	{
 		return token.size() >= 2 && token.front() == '[' && token.back() == ']';
 	};
 
-	bool DialogueManager::IsRichText(const std::string& token)
+	bool DialogueManagerBase::IsRichText(const std::string& token)
 	{
 		return RichText::IsTag(token);
 	};
 
-	bool DialogueManager::IsClearBinding(const std::string& token)
+	bool DialogueManagerBase::IsClearBinding(const std::string& token)
 	{
 		const std::string content = token.substr(1, token.size() - 2);
 		const size_t comma = content.find(',');
@@ -354,7 +423,7 @@ namespace Loom
 		return s.substr(begin);
 	};
 
-	std::vector<std::string> DialogueManager::Tokens(const std::string& text)
+	std::vector<std::string> DialogueManagerBase::Tokens(const std::string& text)
 	{
 		// Every piece the regex carves the script into, the matches and the text between
 		// them alike, in order.

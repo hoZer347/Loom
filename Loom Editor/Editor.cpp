@@ -26,6 +26,7 @@
 #include "Ui.h"
 
 #include "Utilities/AxisGui.h"
+#include "Utilities/DialogueManager.h"
 #include "Utilities/StateMachine.h"
 #include "Utilities/StateMachineMonitor.h"
 
@@ -755,6 +756,8 @@ namespace Loom
 
 		Engine::SetGuiFunction([this]() { DrawGui(); });
 
+		DialogueManagerBase::onNewBinding = [this](const std::string& type) { AddDialogueBinding(type); };
+
 		// Set before the first frame, which is when ImGui reads it.
 		static const std::string layout = BesideExecutable("LoomEditor.layout.ini").string();
 		ImGui::GetIO().IniFilename = layout.c_str();
@@ -797,6 +800,8 @@ namespace Loom
 		drop_receiver = nullptr;
 
 		Engine::SetGuiFunction(Task{ });
+
+		DialogueManagerBase::onNewBinding = nullptr;
 
 		Engine::renderScenes = true;
 		Engine::updateScenes = true;
@@ -3568,10 +3573,27 @@ namespace Loom
 		if (!node.children.empty() && !node.components.empty())
 			ImGui::Separator();
 
+		// Each is a base to derive from, so picking one makes a script of that kind
+		// for the object, which needs a project to put it in.
+		constexpr std::pair<std::string_view, AssetKind> derived[] =
+		{
+			{ "StateMachine", AssetKind::StateMachine },
+			{ "DialogueManager", AssetKind::DialogueManager },
+		};
+
 		for (const std::string& component : node.components)
 		{
 			if (ImGui::MenuItem(component.c_str()))
-				ChangeComponents(*gameObject, [&]() { ComponentRegistry::Create(component, *gameObject); });
+			{
+				const auto base = std::find_if(std::begin(derived), std::end(derived), [&component](const auto& kind) { return kind.first == component; });
+
+				if (base != std::end(derived) && !m_projectPath.empty())
+				{
+					AskForAsset(base->second, m_projectPath);
+					m_newScriptFor = gameObject->GetGuid();
+				}
+				else ChangeComponents(*gameObject, [&]() { ComponentRegistry::Create(component, *gameObject); });
+			};
 
 			if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
 				ImGui::SetTooltip("Right-click to change its category");
@@ -3651,6 +3673,28 @@ namespace Loom
 				return SourceLine{ file, line };
 
 		return { };
+	};
+
+	void Editor::AddDialogueBinding(const std::string& type)
+	{
+		const SourceLine source = FindSource(type);
+		const std::string scripts = std::filesystem::path(ScriptsProject()).parent_path().string();
+
+		if (source.path.empty() || !ProjectAssets::IsUnder(source.path, scripts))
+		{
+			std::cerr << "No script under " << scripts << " defines " << type << '.' << std::endl;
+			return;
+		};
+
+		int line = 0;
+		std::string error;
+		const std::string text = ProjectAssets::WithDialogueBinding(ProjectAssets::ReadText(source.path), source.line, &line);
+
+		if (text.empty())
+			std::cerr << type << " in " << source.path << " never closes its braces." << std::endl;
+		else if (!ProjectAssets::WriteText(source.path, text, &error))
+			std::cerr << "Could not add a binding to " << type << ": " << error << std::endl;
+		else OpenInVisualStudio(source.path, line);
 	};
 
 	void Editor::DrawSourcePopup(const std::string& component)
@@ -3857,7 +3901,10 @@ namespace Loom
 		if (const MissingComponent* missing = dynamic_cast<const MissingComponent*>(component))
 			DrawKept(*missing);
 
-		if (StateMachineBase* machine = dynamic_cast<StateMachineBase*>(component))
+		// A dialogue's states are its own, and its OnGui has New Binding instead.
+		StateMachineBase* machine = dynamic_cast<StateMachineBase*>(component);
+
+		if (machine != nullptr && dynamic_cast<DialogueManagerBase*>(component) == nullptr)
 		{
 			const float spacing = ImGui::GetStyle().ItemSpacing.x;
 			const float half = (ImGui::GetContentRegionAvail().x - spacing) / 2.0f;

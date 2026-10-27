@@ -211,6 +211,11 @@ namespace Loom
 		owner->m_buttons.push_back({ owner->TakeName(name), press, owner->m_fields.size() });
 	};
 
+	LoomObject* ObjectUnderConstruction()
+	{
+		return constructing;
+	};
+
 	std::string LoomObject::TakeName(const char* given) const
 	{
 		std::string name = given;

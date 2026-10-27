@@ -192,6 +192,7 @@ namespace
 			{ "script", AssetKind::Script },
 			{ "state", AssetKind::State },
 			{ "state-machine", AssetKind::StateMachine },
+			{ "dialogue-manager", AssetKind::DialogueManager },
 		};
 
 		for (const auto& [name, found] : kinds)

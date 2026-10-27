@@ -40,11 +40,4 @@ namespace Loom
 		if (amountStreamed >= text.size())
 			Proceed();
 	};
-
-	void St_Dg_StreamRichText::OnUpdate()
-	{
-		Focus()->Append(text);
-
-		Proceed();
-	};
 };

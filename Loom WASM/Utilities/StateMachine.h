@@ -219,11 +219,17 @@ namespace Loom
 	///
 	///		struct Camp : Loom::StateMachine&lt;Camp&gt; { };
 	///		gameObject->Attach&lt;Camp&gt;();
-	template <typename _Self, Str _Category = "">
+	///
+	/// A project's machines are filed under Custom/StateMachines in Add Component. _Machine
+	/// is the StateMachineBase whose behaviour it has, for a kind of machine the engine
+	/// writes once, such as DialogueManagerBase.
+	template <typename _Self, Str _Category = "Custom/StateMachines", typename _Machine = StateMachineBase>
 	struct StateMachine :
 		public Component<_Self, _Category>,
-		public StateMachineBase
+		public _Machine
 	{
+		static_assert(std::is_base_of_v<StateMachineBase, _Machine>, "A state machine's behaviour must be a StateMachineBase");
+
 		/// What the machine enters when play starts, unless Current names a state.
 		Serial<StateReference> m_start;
 
@@ -235,20 +241,20 @@ namespace Loom
 
 		std::string MachineName() const override { return typeid(_Self).name(); };
 
-		void ExtraGui() override { DrawMachineGui(); };
+		void ExtraGui() override { this->DrawMachineGui(); };
 
 		void OnFieldChanged(const SerializedField& field) override
 		{
-			if (field.data != &*m_current || !IsStarted())
+			if (field.data != &*m_current || !this->IsStarted())
 				return;
 
 			if (std::shared_ptr<StateBase> state = m_current->Create())
 			{
-				ExitDisabled();
-				Enter(std::move(state));
+				this->ExitDisabled();
+				this->Enter(std::move(state));
 			}
-			else if (!IsDisabled())
-				Disable();
+			else if (!this->IsDisabled())
+				this->Disable();
 		};
 
 	protected:
@@ -263,10 +269,10 @@ namespace Loom
 		{
 			// Before the machine runs, Current is what the inspector set, which a
 			// Disable in edit mode is not to wipe.
-			if (!IsStarted())
+			if (!this->IsStarted())
 				return;
 
-			const StateBase* state = Current();
+			const StateBase* state = this->Current();
 
 			m_current = state
 				? StateReference::Named(PrettyTypeName(typeid(*state).name()))

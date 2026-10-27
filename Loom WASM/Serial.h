@@ -47,6 +47,10 @@ namespace Loom
 	// Hands a button to the same object, with its name and what pressing it runs.
 	LOOM_API void RegisterButton(const char* name, const std::function<void()>* press);
 
+	// The object the next field, button or other member that registers itself
+	// belongs to, or none when no LoomObject has been built on this thread.
+	LOOM_API LoomObject* ObjectUnderConstruction();
+
 	#pragma endregion
 
 	/**

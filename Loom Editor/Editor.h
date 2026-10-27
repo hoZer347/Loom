@@ -87,6 +87,7 @@ namespace Loom
 		Script,
 		State,
 		StateMachine,
+		DialogueManager,
 		Shader,
 		Dialogue,
 		Texture,
@@ -620,6 +621,10 @@ namespace Loom
 
 		// Right-click on a component's header in the Inspector.
 		void DrawSourcePopup(const std::string& component);
+
+		// A DialogueManager's New Binding: a DialogueBinding member written into the
+		// header defining type, opened there in Visual Studio.
+		void AddDialogueBinding(const std::string& type);
 		void DrawFields(LoomObject& object, const std::vector<std::string>& labels, float column);
 
 		// A reference field of object: what it holds, which a click swaps for
@@ -768,6 +773,9 @@ namespace Loom
 		// The scenes and prefab, and what was selected in them, as a rebuild
 		// found them or as they were opened while it ran.
 		void RestoreAfterBuild();
+
+		// The script Add Component made for an object, put on it.
+		void AttachAfterBuild();
 
 		// Switches updating on, keeping the state the scenes are in now so Stop
 		// has something to go back to.
@@ -1432,6 +1440,13 @@ namespace Loom
 		std::string m_newAssetFolder{ };
 		char m_newAssetName[128]{ };
 		std::string m_newAssetProblem{ };
+
+		// Add Component's StateMachine and DialogueManager make a script of that kind
+		// for the object rather than attaching one, and the script attaches to it
+		// once the compile that follows has loaded it.
+		Guid m_newScriptFor{ };
+		Guid m_attachAfterBuildTo{ };
+		std::string m_attachAfterBuild{ };
 
 		#pragma endregion
 

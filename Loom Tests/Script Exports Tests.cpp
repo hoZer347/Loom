@@ -14,7 +14,7 @@ TEST_SUITE("Script Exports")
 		// import library asks the executable for.
 		const char* const names[] =
 		{
-			"??0DialogueManager@Loom@@QEAA@XZ",
+			"??0DialogueManagerBase@Loom@@QEAA@XZ",
 			"??0SpriteManager@Loom@@QEAA@XZ",
 			"?Split@DialogueArgs@Loom@@SA?AV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@AEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@4@@Z",
 			"?Continued@DialogueInput@Loom@@SA_NXZ",
