@@ -107,11 +107,9 @@ namespace Loom
 	* Loom::Editor
 	* - A Unity-style shell around the Loom runtime
 	* - Owns one dock space holding the scene hierarchy, an inspector, a console
-	*   and, in the centre, three views rendered into off-screen targets so they
-	*   sit inside the layout like any other panel: the active scene on its own
-	*   in a window named after it, where editing it edits every copy of it
-	*   that is open, the way a prefab works; the game as its own cameras see
-	*   it; and everything loaded, from a camera the editor flies
+	*   and, in the centre, two views rendered into off-screen targets so they
+	*   sit inside the layout like any other panel: the game as its own cameras
+	*   see it, and everything loaded, from a camera the editor flies
 	* - Works out of a project folder, which the Project panel lists in tabs:
 	*   its scenes and prefabs in the Scenes tab, which also creates them, its
 	*   scripts and shaders in the Scripts tab, which creates those, and its

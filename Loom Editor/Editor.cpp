@@ -325,7 +325,7 @@ namespace Loom
 
 		// A window docked on the frame it first appears only takes its tab on
 		// the one after.
-		constexpr int scene_focus_frames = 2;
+		constexpr int prefab_focus_frames = 2;
 
 		// How often the editor checks whether a shader file was edited outside it.
 		constexpr double shader_poll_seconds = 0.5;
@@ -1444,7 +1444,7 @@ namespace Loom
 		m_historyDirty = true;
 
 		m_showPrefab = true;
-		m_prefabFocusFrames = scene_focus_frames;
+		m_prefabFocusFrames = prefab_focus_frames;
 
 		Select(root);
 	};

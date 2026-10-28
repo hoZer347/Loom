@@ -19,7 +19,7 @@ popup's Close hears a click: the cursor is on the rect drawn last under it,
 whatever is beneath. Close shuts the popup again.
 
 The UI is drawn in the Game view, over every scene in it, and not in the
-Scene view.
+Debug view.
 
 The keyboard and the wheel reach the script through Loom::Input once the Game
 view has focus. The keys come by way of the project's actions, which the Key

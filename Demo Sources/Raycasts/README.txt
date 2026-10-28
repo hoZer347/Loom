@@ -15,4 +15,4 @@ its hole. The laser turns, stops its beam at the first collider in its way,
 tints what it hit and draws the surface's normal from the hit point.
 
 Select a box or sphere in the Hierarchy to see its collider outlined in green
-in the Scene view.
+in the Debug view.
