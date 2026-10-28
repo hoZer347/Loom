@@ -146,14 +146,14 @@ TEST_SUITE("Performance" * doctest::skip())
 
 	TEST_CASE("ten thousand test cases register, draw and run without holding up a frame")
 	{
-		constexpr double MOST_REGISTERING = 20.0;
-		constexpr double MOST_FRAME = 1.0;
+		constexpr double most_registering = 20.0;
+		constexpr double most_frame = 1.0;
 
 		// The longest any one RunQueued may take, as the editor calls it once a frame.
-		constexpr double MOST_RUN_STEP = 20.0;
+		constexpr double most_run_step = 20.0;
 
-		// The one frame that lays the tree out again once results come in.
-		constexpr double MOST_REBUILDING = 10.0;
+		// The one frame that lays the tree out again once results come in or the filter changes.
+		constexpr double most_rebuilding = 10.0;
 
 		const Suite suite;
 		Frames frames;
@@ -185,24 +185,31 @@ TEST_SUITE("Performance" * doctest::skip())
 		const double run = frames.Quickest(panel);
 
 		panel.SetFilter("case 99");
+
+		const Clock::time_point refilter_start = Clock::now();
+
+		frames.Frame(panel);
+
+		const double refiltering = MillisecondsSince(refilter_start);
 		const double filtered = frames.Quickest(panel);
 
 		std::ostringstream report;
 		report << CASES << " cases in " << FILES << " files: registered in " << suite.registering << " ms, a frame takes "
 			<< not_run << " ms before they run, " << run << " ms after and " << filtered << " ms filtered; they ran in "
 			<< running << " ms over " << steps << " steps, the longest " << longest_step << " ms, and the frame that took in their results "
-			<< rebuilding << " ms";
+			<< rebuilding << " ms, and the one that took in the filter " << refiltering << " ms";
 		MESSAGE(report.str());
 
 		REQUIRE(panel.ResultOf("Performance case 0"));
 		CHECK(panel.ResultOf("Performance case 0")->outcome == Loom::ScriptTests::Outcome::Failed);
 		REQUIRE(panel.ResultOf("Performance case " + std::to_string(CASES - 1)));
-		CHECK(suite.registering <= MOST_REGISTERING);
-		CHECK(not_run <= MOST_FRAME);
-		CHECK(run <= MOST_FRAME);
-		CHECK(filtered <= MOST_FRAME);
-		CHECK(longest_step <= MOST_RUN_STEP);
-		CHECK(rebuilding <= MOST_REBUILDING);
+		CHECK(suite.registering <= most_registering);
+		CHECK(not_run <= most_frame);
+		CHECK(run <= most_frame);
+		CHECK(filtered <= most_frame);
+		CHECK(longest_step <= most_run_step);
+		CHECK(rebuilding <= most_rebuilding);
+		CHECK(refiltering <= most_rebuilding);
 	};
 
 	#pragma endregion

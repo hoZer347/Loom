@@ -73,7 +73,7 @@ namespace Loom
 
 			ImGui::SetItemTooltip("Adds a tests script");
 			ImGui::SameLine();
-			ImGui::BeginDisabled(chosen.empty());
+			ImGui::BeginDisabled(chosen.empty() || HasQueued());
 
 			if (ImGui::Button(("Run " + std::to_string(chosen.size()) + "###run").c_str()))
 			{
@@ -82,7 +82,7 @@ namespace Loom
 				for (const ScriptTests::Case* test : chosen)
 					names.push_back(test->name);
 
-				m_queued = Queued{ { }, std::move(names) };
+				Queue({ { }, std::move(names) });
 			};
 
 			ImGui::EndDisabled();
@@ -443,7 +443,13 @@ namespace Loom
 
 	void TestsPanel::QueueShown()
 	{
-		m_queued = Queued{ m_filter };
+		Queue({ m_filter });
+	};
+
+	void TestsPanel::Queue(Queued queued)
+	{
+		if (!m_queued)
+			m_queued = std::move(queued);
 	};
 
 	const ScriptTests::Result* TestsPanel::ResultOf(const std::string& name) const

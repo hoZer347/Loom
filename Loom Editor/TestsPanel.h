@@ -24,9 +24,6 @@ namespace Loom
 	*   every case shown when none is. It runs between frames, through
 	*   RunQueued, so the editor can compile stale scripts first
 	* - A double click on a case or a failure follows its line
-	* - The tree is built once for each change to the cases, the filter, the
-	*   results or what is folded, and only the rows in view are drawn, so
-	*   thousands of cases cost a frame little
 	*/
 	struct TestsPanel final
 	{
@@ -51,6 +48,7 @@ namespace Loom
 		const std::vector<const ScriptTests::Case*>& Chosen();
 
 		void SetFilter(const std::string& filter);
+		// Does nothing while a run is going on.
 		void QueueShown();
 
 		// The last run's result for the case of this name, or null.
@@ -117,6 +115,7 @@ namespace Loom
 		void LayOut();
 		void DrawRow(size_t index, const Callbacks& callbacks);
 		void Select(ImGuiMultiSelectIO* requests);
+		void Queue(Queued queued);
 
 		char m_filter[filter_size]{ };
 		std::optional<Queued> m_queued{ };

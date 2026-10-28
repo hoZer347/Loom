@@ -344,6 +344,14 @@ TEST_SUITE("TestsPanel")
 		panel.SetFilter("TestsPanel slow");
 		panel.QueueShown();
 
+		panel.RunQueued();
+		++calls;
+		REQUIRE(panel.HasQueued());
+
+		// A run asked for while one goes on is turned away, rather than cutting the first short.
+		panel.SetFilter("TestsPanel slow case 0");
+		panel.QueueShown();
+
 		while (panel.HasQueued())
 		{
 			panel.RunQueued();
