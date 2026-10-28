@@ -38,9 +38,10 @@ namespace Loom
 
 		// Opens file at line, or where Visual Studio puts the caret for a line
 		// of zero. Without Visual Studio a file other than a header opens as
-		// Explorer would; a header would only come back here. A Visual Studio started on solution only takes the file once
-		// it has loaded, which the returned thread waits for; empty when there
-		// is nothing to wait for.
+		// Explorer would; a header would only come back here. A Visual Studio
+		// started on solution only takes the file once it has loaded, which
+		// the returned thread waits for; empty when there is nothing to wait
+		// for.
 		static std::thread Open(const std::string& solution, const std::string& file, int line = 0, int column = 0);
 	};
 };
