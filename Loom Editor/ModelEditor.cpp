@@ -2416,8 +2416,7 @@ void main()
 
 		Add(Shapes::Shape::Cube);
 
-		// Undo takes the cube back but not the components it went on, so the
-		// prefab as saved is never reached again.
+		// Undo leaves the components the cube went on, so the save is out of reach.
 		document->savedAt.reset();
 	};
 
