@@ -211,4 +211,39 @@ TEST_SUITE("Browser")
 		Request("wheel:10");
 		CHECK(Turned() == doctest::Approx(-tenth_of_a_notch));
 	};
+
+	TEST_CASE("the window takes the canvas's device pixels, as a zoomed page backs it")
+	{
+		constexpr int zoom = 2;
+
+		OpenPage();
+
+		EM_ASM(
+			{
+				const canvas = Module.canvas;
+				canvas.width = canvas.clientWidth * $0;
+				canvas.height = canvas.clientHeight * $0;
+				window.dispatchEvent(new Event("resize"));
+			},
+			zoom);
+
+		const int width = EM_ASM_INT({ return Module.canvas.clientWidth; }) * zoom;
+		const int height = EM_ASM_INT({ return Module.canvas.clientHeight; }) * zoom;
+
+		CHECK(Until(
+			[&]()
+			{
+				int framebufferWidth, framebufferHeight;
+				glfwGetFramebufferSize(Loom::Engine::window, &framebufferWidth, &framebufferHeight);
+				return framebufferWidth == width && framebufferHeight == height;
+			}));
+
+		CHECK(EM_ASM_INT({ return Module.canvas.width; }) == width);
+		CHECK(EM_ASM_INT({ return Module.canvas.height; }) == height);
+
+		GLint viewport[4];
+		glGetIntegerv(GL_VIEWPORT, viewport);
+		CHECK(viewport[2] == width);
+		CHECK(viewport[3] == height);
+	};
 };

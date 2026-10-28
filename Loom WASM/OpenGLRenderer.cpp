@@ -135,6 +135,19 @@ namespace Loom
 
 			glViewport(0, 0, width, height);
 		};
+
+		void WatchCanvas()
+		{
+			emscripten_set_resize_callback(
+				EMSCRIPTEN_EVENT_TARGET_WINDOW,
+				nullptr,
+				EM_TRUE,
+				[](int, const EmscriptenUiEvent*, void*) -> EM_BOOL
+				{
+					ResizeCanvas();
+					return EM_TRUE;
+				});
+		};
 #endif
 	};
 
@@ -220,15 +233,7 @@ namespace Loom
 					glViewport(0, 0, width, height);
 				});
 #else
-			emscripten_set_resize_callback(
-				EMSCRIPTEN_EVENT_TARGET_WINDOW,
-				nullptr,
-				EM_TRUE,
-				[](int, const EmscriptenUiEvent*, void*) -> EM_BOOL
-				{
-					ResizeCanvas();
-					return EM_TRUE;
-				});
+			WatchCanvas();
 #endif
 
 			glEnable(GL_DEPTH_TEST);
@@ -297,6 +302,12 @@ namespace Loom
 			// Emscripten: avoid double-callback wiring
 			ImGui_ImplGlfw_InitForOpenGL(window, false);
 			ImGui_ImplGlfw_InstallEmscriptenCallbacks(window, "#canvas");
+
+			// ImGui's handlers size the window in CSS pixels, off the canvas's device pixels.
+			emscripten_set_resize_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, nullptr, EM_TRUE, nullptr);
+			emscripten_set_fullscreenchange_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, nullptr, EM_TRUE, nullptr);
+			WatchCanvas();
+			ResizeCanvas();
 
 			// Make canvas focusable + stop browser stealing input
 			emscripten_run_script(R"JS(
