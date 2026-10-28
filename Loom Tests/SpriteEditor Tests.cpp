@@ -1308,12 +1308,17 @@ TEST_SUITE("SpriteEditor")
 		std::filesystem::remove_all(folder);
 	};
 
-	TEST_CASE("clear comes first in every palette, paints as the eraser does, and is never added or taken out")
+	TEST_CASE("clear comes first in every palette, paints as the eraser does, is never added, and on the left has - ask about the last colour instead")
 	{
+		const std::filesystem::path folder = std::filesystem::temp_directory_path() / "loom sprite clear swatch";
+		std::filesystem::remove_all(folder);
+		std::filesystem::create_directories(folder);
+
 		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
 		sprite.layers[0].cels[0].Fill(0, 0, RED);
 
-		Driven driven("loom sprite clear swatch.tga", &sprite);
+		Driven driven("loom sprite clear swatch/Clear.tga", &sprite);
+		driven.projectFolder = folder.string();
 
 		const std::string palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension).string();
 
@@ -1327,12 +1332,16 @@ TEST_SUITE("SpriteEditor")
 		CHECK(Count(driven.Saved(), CLEAR) == 1);
 
 		driven.Run("click " + clear_swatch + "\nwait 2\nclick \"Palette\" \"+\"\nwait 2\nclick \"Palette\" \"-\"\nwait 2\n");
+		REQUIRE(driven.editor.ColourUsers() != nullptr);
+		CHECK(*driven.editor.ColourUsers() == std::vector<std::pair<std::string, size_t>>{ { std::filesystem::path(SpriteAsset::For(driven.path)).lexically_normal().string(), Driven::side * Driven::side - 1 } });
+
+		driven.Run("click \"Delete Colour?\" \"Cancel\"\nwait 2\nkey ctrl+s\nwait 2\n");
 
 		Loom::Palette saved;
 		REQUIRE(Loom::Palette::Load(palette, saved));
 		CHECK(saved.colours == std::vector<SpriteAsset::Colour>{ RED });
 
-		std::filesystem::remove(palette);
+		std::filesystem::remove_all(folder);
 	};
 
 	TEST_CASE("import puts every colour of the sprite in a category named after it, those the palette has already included, written on Ctrl+S and stepped by Ctrl+Z and Ctrl+Y")

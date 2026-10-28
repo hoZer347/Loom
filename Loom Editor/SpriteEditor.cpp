@@ -1559,8 +1559,6 @@ namespace Loom
 		};
 
 		const Colour& left = m_colours[ImGuiMouseButton_Left];
-		const auto found = std::find(colours.begin(), colours.end(), left);
-		const bool listed = found != colours.end() && !SeeThrough(left);
 
 		ImGui::BeginDisabled(SeeThrough(left));
 
@@ -1573,13 +1571,16 @@ namespace Loom
 		ImGui::EndDisabled();
 		ImGui::SetItemTooltip("Add left colour");
 		ImGui::SameLine();
-		ImGui::BeginDisabled(colours.empty());
+
+		const auto found = std::find(colours.begin(), colours.end(), left);
+		const bool listed = found != colours.end() && !SeeThrough(left);
+		const auto shown_last = std::find_if(colours.rbegin(), colours.rend(), [](const Colour& colour) { return !SeeThrough(colour); });
+		const auto taken = listed ? found : shown_last == colours.rend() ? colours.end() : std::prev(shown_last.base());
+
+		ImGui::BeginDisabled(taken == colours.end());
 
 		if (ImGui::Button("-", ImVec2(side, side)))
-		{
-			const size_t index = listed ? (size_t)(found - colours.begin()) : colours.size() - 1;
-			m_deleting = ColourDeletion{ path, category, index, colours[index] };
-		};
+			m_deleting = ColourDeletion{ path, category, (size_t)(taken - colours.begin()), *taken };
 
 		ImGui::EndDisabled();
 		ImGui::SetItemTooltip("Remove left colour, or the last");
