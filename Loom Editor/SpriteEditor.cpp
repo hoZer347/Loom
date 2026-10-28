@@ -316,11 +316,18 @@ namespace Loom
 				? SpriteAsset::For(image)
 				: path;
 
-			for (SpriteAsset::Links* links : { &document->links, &document->savedLinks })
+			const auto relocate = [&](SpriteAsset::Links& links)
 			{
-				links->image = ProjectAssets::Relocate(links->image, from, to);
-				links->palette = ProjectAssets::Relocate(links->palette, from, to);
+				links.image = ProjectAssets::Relocate(links.image, from, to);
+				links.palette = ProjectAssets::Relocate(links.palette, from, to);
 			};
+
+			relocate(document->links);
+			relocate(document->savedLinks);
+
+			for (std::vector<Snapshot>* history : { &document->undo, &document->redo })
+				for (Snapshot& snapshot : *history)
+					relocate(snapshot.links);
 		};
 
 		m_loosePalette = ProjectAssets::Relocate(m_loosePalette, from, to);

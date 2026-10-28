@@ -342,6 +342,37 @@ TEST_SUITE("SpriteEditor")
 		std::filesystem::remove(SpriteAsset::For(moved.string()));
 	};
 
+	TEST_CASE("a stroke made before its image moved is taken back by Ctrl+Z without taking the move back")
+	{
+		Driven driven("loom sprite first.tga");
+
+		const std::string opened = LoomTests::WriteTga("loom sprite unmoved.tga", Driven::side, Driven::side, SpriteAsset::Image::Blank(Driven::side, Driven::side).pixels);
+		const std::filesystem::path moved = std::filesystem::path(opened).parent_path() / "loom sprite moved back.tga";
+
+		driven.editor.Open(opened);
+		driven.Frame();
+
+		driven.Stroke(middle, middle);
+		driven.Stroke(ImVec2(middle.x - reach, middle.y), ImVec2(middle.x + reach, middle.y));
+
+		std::filesystem::rename(opened, moved);
+		driven.editor.Relocate(std::filesystem::path(opened).lexically_normal().string(), moved.string());
+		driven.Frame();
+
+		driven.Press(ImGuiKey_Z);
+		driven.Press(ImGuiKey_S);
+
+		SpriteAsset::Image saved;
+		REQUIRE(SpriteAsset::LoadImage(moved.string(), saved));
+
+		CHECK(Count(saved, CLEAR) == Driven::side * Driven::side - 1);
+		CHECK_FALSE(std::filesystem::exists(opened));
+		CHECK_FALSE(std::filesystem::exists(SpriteAsset::For(opened)));
+
+		std::filesystem::remove(moved);
+		std::filesystem::remove(SpriteAsset::For(moved.string()));
+	};
+
 	TEST_CASE("Ctrl+Z takes a stroke back and Ctrl+Y puts it back")
 	{
 		Driven driven("loom sprite undo.tga");
