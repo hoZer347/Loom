@@ -710,20 +710,42 @@ TEST_SUITE("ModelEditor")
 			Driven driven("model_add_mesh", nullptr, prefab.string());
 			CHECK(driven.editor.Editing() == nullptr);
 
+			const auto component = [&](const std::string& type)
+			{
+				const std::string text = ReadFile(prefab.string());
+				const size_t at = text.find("Component " + type + "(");
+
+				return at == std::string::npos ? std::string{ } : text.substr(at, text.find(')', at) - at);
+			};
+
 			driven.editor.AddMesh();
 			CHECK(driven.Mesh().faces.size() == 6);
+			REQUIRE(driven.editor.Save());
+
+			const std::string mesh = component("Mesh");
+			const std::string material = component("Material");
+			REQUIRE_FALSE(mesh.empty());
+			REQUIRE_FALSE(material.empty());
 
 			driven.editor.Undo();
 			CHECK(driven.editor.Editing() == nullptr);
-			CHECK_FALSE(driven.editor.Unsaved());
+			CHECK(driven.editor.Unsaved());
 			REQUIRE(driven.editor.Save());
-			CHECK(ReadFile(prefab.string()).find("Mesh") == std::string::npos);
-			CHECK(ReadFile(prefab.string()).find("Material") == std::string::npos);
+			CHECK(component("Mesh").empty());
+			CHECK(component("Material").empty());
 
 			driven.editor.Redo();
 			CHECK(driven.Mesh().faces.size() == 6);
 			CHECK(driven.editor.Unsaved());
+
+			driven.editor.Undo();
+			CHECK_FALSE(driven.editor.Unsaved());
+
+			// Redo puts back the same components, so what refers to them still finds them.
+			driven.editor.Redo();
 			REQUIRE(driven.editor.Save());
+			CHECK(component("Mesh") == mesh);
+			CHECK(component("Material") == material);
 
 			ModelEditor reopened;
 			reopened.Open(prefab.string());

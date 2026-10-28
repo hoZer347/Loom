@@ -93,7 +93,7 @@ TEST_SUITE("UndoHistory")
 		CHECK(history.Unsaved());
 	};
 
-	TEST_CASE("Pop takes back the last push, as if it was never made")
+	TEST_CASE("Pop drops the newest step to undo")
 	{
 		Loom::UndoHistory<std::string> history;
 

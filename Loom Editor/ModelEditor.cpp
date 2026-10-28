@@ -614,6 +614,14 @@ void main()
 
 		MergeFields(shown, file, edited);
 
+		// The merge only adds, so what an undone Add a Mesh took off goes here.
+		if (document.parts.empty())
+			std::erase_if(file.components, [&](const Prefabs::ComponentNode& component)
+			{
+				return (document.addedMesh && component.guid == document.addedMesh->ToString())
+					|| (document.addedMaterial && component.guid == document.addedMaterial->ToString());
+			});
+
 		const std::string text = Prefabs::Write(file);
 
 		{
