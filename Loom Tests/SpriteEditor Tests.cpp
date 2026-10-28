@@ -1195,37 +1195,52 @@ TEST_SUITE("SpriteEditor")
 		std::filesystem::remove(palette);
 	};
 
-	TEST_CASE("import asks first for a sprite of more than 128 colours, and Cancel leaves the palette as it was")
+	TEST_CASE("import takes 128 colours straight in, asks first for more, and Cancel leaves the palette as it was")
 	{
 		constexpr int many_side = 16;
-		constexpr int many = 129;
+		constexpr int most_unasked = 128;
 		constexpr const char* import_question = "Import Colours?";
 
+		// The top half holds the colours, leaving the middle clear for the pencil to add one more.
 		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(many_side, many_side));
 
-		for (int i = 0; i < many; i++)
-			sprite.layers[0].cels[0].Set(i % many_side, i / many_side, SpriteAsset::Colour{ (uint8_t)i, 0, 0, FULL });
+		for (int i = 0; i < most_unasked; i++)
+			sprite.layers[0].cels[0].Set(i % many_side, i / many_side, SpriteAsset::Colour{ (uint8_t)(i + 1), 0, 0, FULL });
 
 		Driven driven("loom sprite many colours.tga", &sprite);
 
 		const std::string palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension).string();
 
+		const auto saved_categories = [&driven, &palette](const std::string& steps)
+		{
+			driven.Run(steps + "key ctrl+s\nwait 2\n");
+
+			Loom::Palette saved;
+			REQUIRE(Loom::Palette::Load(palette, saved));
+
+			return saved.categories;
+		};
+
 		driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\nclick \"Palette\" \"📥\"\nwait 2\n");
+		CHECK_FALSE(Driven::Asking(import_question));
+
+		std::vector<Loom::Palette::Category> categories = saved_categories("");
+		REQUIRE(categories.size() == 1);
+		CHECK(categories[0].colours.size() == most_unasked);
+
+		driven.Stroke(middle, middle);
+		driven.Run("click \"Palette\" \"📥\"\nwait 2\n");
 		CHECK(Driven::Asking(import_question));
 
 		driven.Run(std::string("click \"") + import_question + "\" \"Cancel\"\nwait 2\n");
 		CHECK_FALSE(Driven::Asking(import_question));
+		CHECK(saved_categories("").size() == 1);
 
-		driven.Run(std::string("click \"Palette\" \"📥\"\nwait 2\nclick \"") + import_question + "\" \"Import\"\nwait 2\nkey ctrl+s\nwait 2\n");
+		categories = saved_categories(std::string("click \"Palette\" \"📥\"\nwait 2\nclick \"") + import_question + "\" \"Import\"\nwait 2\n");
+		REQUIRE(categories.size() == 2);
+		CHECK(categories[1].colours.size() == most_unasked + 1);
 
-		Loom::Palette saved;
-		REQUIRE(Loom::Palette::Load(palette, saved));
-		REQUIRE(saved.categories.size() == 1);
-		CHECK(saved.categories[0].colours.size() == many);
-
-		driven.Run("key ctrl+z\nwait 2\nkey ctrl+s\nwait 2\n");
-		REQUIRE(Loom::Palette::Load(palette, saved));
-		CHECK(saved.categories.empty());
+		CHECK(saved_categories("key ctrl+z\nwait 2\n").size() == 1);
 
 		std::filesystem::remove(palette);
 	};

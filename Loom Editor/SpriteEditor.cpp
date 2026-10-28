@@ -1294,7 +1294,8 @@ namespace Loom
 
 		if (IconButton(import_icon, "Import", side))
 		{
-			Palette::Category category = { std::filesystem::path(m_active->path).stem().string(), m_active->sprite.Colours(std::numeric_limits<size_t>::max()) };
+			const std::string name = std::filesystem::path(m_active->path).stem().string();
+			Palette::Category category = { name, m_active->sprite.Colours(std::numeric_limits<size_t>::max()) };
 
 			if (category.colours.size() > import_warning)
 			{
