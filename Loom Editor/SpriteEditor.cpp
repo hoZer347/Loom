@@ -28,6 +28,9 @@ namespace Loom
 		// the one after.
 		constexpr int focus_frames = 2;
 
+		// How much of the Sprites panel's height a Palette panel docked under it takes.
+		constexpr float palette_share = 0.25f;
+
 		// Screen pixels to an image pixel. From one up, zoom goes in whole
 		// steps, so every image pixel is the same size on screen.
 		constexpr float min_zoom = 1.0f / 16.0f;
@@ -334,10 +337,15 @@ namespace Loom
 		// As the Palette panel was last drawn, which is after this one.
 		const bool palette_shown = std::exchange(m_paletteShown, false);
 
+		DockPalette();
+
 		// The wheel zooms the canvas rather than scrolling the panel.
 		if (ImGui::Begin(EditorPanels::Sprites, open, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
 		{
 			m_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+
+			if (ImGui::IsWindowAppearing() && !*palette_open)
+				m_askPalette = true;
 
 			if (m_documents.empty())
 				ImGui::TextDisabled("Click an image or a sprite in the 2D tab to edit it here.");
@@ -392,9 +400,64 @@ namespace Loom
 			};
 
 			DrawCloseQuestion();
+			DrawPaletteQuestion(palette_open, ImGui::GetWindowDockID());
 		};
 
 		ImGui::End();
+	};
+
+	void SpriteEditor::DrawPaletteQuestion(bool* palette_open, ImGuiID dock)
+	{
+		constexpr const char* popup = "Open Palette?";
+
+		if (m_askPalette && !ImGui::IsPopupOpen(popup))
+			ImGui::OpenPopup(popup);
+
+		if (!ImGui::BeginPopupModal(popup, nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+			return;
+
+		if (!m_askPalette || *palette_open)
+		{
+			m_askPalette = false;
+			ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+			return;
+		};
+
+		ImGui::Text("%s Open the Palette panel under the sprites?", EditorIcons::Palette);
+
+		const bool open = ImGui::Button("Open Palette");
+		ImGui::SameLine();
+		const bool skip = ImGui::Button("Not Now");
+
+		if (open)
+		{
+			*palette_open = true;
+			m_paletteFocusFrames = focus_frames;
+			m_paletteDock = dock;
+		};
+
+		if (open || skip)
+		{
+			m_askPalette = false;
+			ImGui::CloseCurrentPopup();
+		};
+
+		ImGui::EndPopup();
+	};
+
+	void SpriteEditor::DockPalette()
+	{
+		const ImGuiID node = std::exchange(m_paletteDock, 0);
+
+		if (node == 0 || ImGui::DockBuilderGetNode(node) == nullptr)
+			return;
+
+		ImGuiID above = 0;
+		const ImGuiID below = ImGui::DockBuilderSplitNode(node, ImGuiDir_Down, palette_share, nullptr, &above);
+
+		ImGui::DockBuilderDockWindow(EditorPanels::Palette, below);
+		ImGui::DockBuilderFinish(node);
 	};
 
 	void SpriteEditor::DrawDocument(Document& document, bool* palette_open, bool palette_shown)

@@ -24,7 +24,8 @@ namespace Loom
 	*   swatches of the palette the sprite in front paints from, clear always
 	*   first, a click on one picking it for the button that clicked. A
 	*   sprite whose Palette panel is out of sight says so, with a button to
-	*   bring it
+	*   bring it, and the Sprites panel opening with it closed asks whether
+	*   to open it, docked in the bottom quarter of the Sprites panel
 	* - The left and right mouse paint the layer and frame picked in the
 	*   timeline, each with its own colour, and the picker picks for the
 	*   button that clicked; the middle mouse pans and the wheel zooms about
@@ -192,6 +193,17 @@ namespace Loom
 
 		#pragma endregion
 
+		#pragma region Palette Question
+
+		// Asked as the Sprites panel opens with the Palette panel closed. dock is
+		// the Sprites panel's node, which the Palette panel is docked under.
+		void DrawPaletteQuestion(bool* palette_open, ImGuiID dock);
+
+		// Docks the Palette panel under the Sprites panel's node, once asked to.
+		void DockPalette();
+
+		#pragma endregion
+
 		#pragma region Palette Window
 
 		void DrawTools();
@@ -314,6 +326,11 @@ namespace Loom
 		// Frames left to ask for focus on.
 		int m_focusFrames = 0;
 		int m_paletteFocusFrames = 0;
+
+		bool m_askPalette = false;
+
+		// The Sprites panel's dock node, to split for the Palette panel on the next frame.
+		ImGuiID m_paletteDock = 0;
 
 		#pragma endregion
 	};
