@@ -735,8 +735,10 @@ namespace Loom
 		// Floating windows stay inside the editor, or dialogs fall behind it.
 		ImGui::GetIO().ConfigViewportsNoAutoMerge = false;
 
-		// A panel dragged out is a Windows window, with a title bar that snaps it.
+		// A panel dragged out is a Windows window, with a title bar that snaps
+		// it over a tab bar that docks it back.
 		ImGui::GetIO().ConfigViewportsNoDecoration = false;
+		ImGui::GetIO().ConfigDockingAlwaysTabBar = true;
 
 		// Clicking a number field types into it, Unity-style; dragging still scrubs.
 		ImGui::GetIO().ConfigDragClickToInputText = true;
