@@ -170,23 +170,40 @@ namespace Loom
 
 		#pragma region Registry
 
-		// One file per editor, named by its own port and holding its process id.
+		// When a process started, which tells it from a later one given its id.
+		uint64_t StartOf(HANDLE process)
+		{
+			FILETIME created{ }, exited{ }, kernel{ }, user{ };
+
+			if (!GetProcessTimes(process, &created, &exited, &kernel, &user))
+				return 0;
+
+			return ((uint64_t)created.dwHighDateTime << 32) | created.dwLowDateTime;
+		};
+
+		// One file per editor, named by its own port and holding its process's id and start.
 		bool Note(const std::filesystem::path& file)
 		{
 			std::ofstream out(file);
-			out << GetCurrentProcessId();
+			out << GetCurrentProcessId() << ' ' << StartOf(GetCurrentProcess());
 
 			return (bool)out;
 		};
 
-		bool Running(DWORD process_id)
+		bool Running(const std::filesystem::path& file)
 		{
-			const HANDLE process = OpenProcess(SYNCHRONIZE, FALSE, process_id);
+			DWORD process_id = 0;
+			uint64_t start = 0;
+
+			if (!(std::ifstream(file) >> process_id >> start))
+				return false;
+
+			const HANDLE process = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
 
 			if (!process)
 				return false;
 
-			const bool running = WaitForSingleObject(process, 0) == WAIT_TIMEOUT;
+			const bool running = WaitForSingleObject(process, 0) == WAIT_TIMEOUT && StartOf(process) == start;
 			CloseHandle(process);
 
 			return running;
@@ -576,9 +593,7 @@ namespace Loom
 			if (name.empty() || *end != '\0' || port == 0 || port > HIGHEST_PORT)
 				continue;
 
-			DWORD process_id = 0;
-
-			if (std::ifstream(entry.path()) >> process_id && Running(process_id))
+			if (Running(entry.path()))
 				open.push_back((unsigned short)port);
 			else
 				std::filesystem::remove(entry.path(), error);

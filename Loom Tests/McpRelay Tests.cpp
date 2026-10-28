@@ -8,6 +8,7 @@
 #include <fstream>
 #include <future>
 #include <memory>
+#include <process.h>
 #include <string>
 #include <thread>
 
@@ -24,6 +25,9 @@ namespace
 
 	// A port in the registry with no process noted for it, as a crashed editor can leave.
 	constexpr unsigned short closed_port = 1;
+
+	// A start no running process has, as when an editor's id has gone to another.
+	constexpr unsigned long long reused_start = 1;
 
 	// Far longer than a call that holds up nothing else takes.
 	constexpr std::chrono::seconds held_limit{ 3 };
@@ -173,6 +177,17 @@ TEST_SUITE("McpRelay")
 		const auto editor = Editor("A");
 
 		std::ofstream(Registry() / std::to_string(closed_port));
+
+		CHECK(Call("whoami") == "A");
+		CHECK_FALSE(std::filesystem::exists(Registry() / std::to_string(closed_port)));
+	};
+
+	TEST_CASE("an editor whose process id another process now has is forgotten")
+	{
+		const auto editor = Editor("A");
+
+		// This process's id, with a start it did not have.
+		std::ofstream(Registry() / std::to_string(closed_port)) << _getpid() << ' ' << reused_start;
 
 		CHECK(Call("whoami") == "A");
 		CHECK_FALSE(std::filesystem::exists(Registry() / std::to_string(closed_port)));
