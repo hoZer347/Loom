@@ -5,6 +5,7 @@
 #include "DialogueEditor.h"
 #include "EditorCamera.h"
 #include "EditorConsole.h"
+#include "EditHistory.h"
 #include "KeyBindings.h"
 #include "EditorLayouts.h"
 #include "EditorRefresh.h"
@@ -180,9 +181,15 @@ namespace Loom
 		GameObject* Instantiate(const std::string& path, GameObject& parent);
 
 		// Shows the prefab in the Prefab panel, in a scene of its own that
-		// only the panel draws, with a light the Hierarchy leaves out.
+		// only the panel draws, with a light the Hierarchy leaves out. With
+		// edits held in the panel, another prefab waits for the question
+		// about them, and the same one keeps them.
 		void OpenPrefab(const std::string& path);
 		void ClosePrefab();
+
+		// Writes the Prefab panel's held edits to the file, and from there to
+		// every instance. Whether nothing is left unsaved.
+		bool SavePrefab();
 		GameObject* GetPrefabRoot() const;
 
 		#pragma endregion
@@ -1040,8 +1047,8 @@ namespace Loom
 		// or in the Prefab panel. Empty when it is in none.
 		std::filesystem::path PrefabFileOf(const GameObject& gameObject) const;
 
-		// Run with the history: carries an edit made in the Prefab panel or to
-		// an instance to the file and every instance, and brings instances
+		// Run with the history: carries an edit saved in the Prefab panel or
+		// made to an instance to the file and every instance, and brings instances
 		// that do not know their prefab yet into line with it. Only the
 		// prefabs of instances changed, of files written and of the panel
 		// edited are looked at.
@@ -1058,6 +1065,26 @@ namespace Loom
 		// The Prefab panel's copy made the file's again, in place: the same
 		// guids, so the selection and the panel's focus stay where they are.
 		void ReshowPrefab();
+
+		// The Prefab panel's copy made subtree, a text of its prefab, in
+		// place. False, with the panel closed, when it does not show.
+		bool ShowPrefab(const std::string& subtree);
+
+		// The Prefab panel's unsaved edits, kept as text while a build has its
+		// scene down, and OpenPrefab after it with them.
+		void HoldPrefabEdits();
+		void ReopenPrefab(const std::string& path, const std::string& held, const std::string& shape);
+
+		// Undo or Redo in the Prefab panel's copy.
+		void StepPrefab(bool undo);
+
+		// Whether Ctrl+Z, Ctrl+Y and Ctrl+S are the Prefab panel's: it has
+		// the keyboard, or what is selected is in it.
+		bool PrefabHasKeyboard() const;
+
+		// Asks whether to save the Prefab panel's edits before it closes or
+		// shows another prefab.
+		void DrawPrefabQuestion();
 
 		// Whether gameObject is in the prefab at path: its scene's copy in the
 		// Prefab panel, or an instance of it. A prefab dropped there would
@@ -1101,8 +1128,22 @@ namespace Loom
 		// Set when the file under the Prefab panel changed outside the editor.
 		bool m_reshowPrefab = false;
 
+		// Undo over the Prefab panel's copy, as its text. Its edits are held
+		// there until saved, the file and instances staying as they were.
+		EditHistory<std::string> m_prefabHistory{ };
+		bool m_prefabOpened = false;
+		bool m_savePrefab = false;
+		bool m_prefabUnsaved = false;
+		bool m_prefabFocused = false;
+
+		// What the Prefab panel shows once the question about its unsaved
+		// edits is answered: another prefab's path, or empty to close.
+		std::optional<std::string> m_prefabNext{ };
+
 		// The open prefab, while a build has its scene down.
 		std::string m_prefabBeforeBuild{ };
+		std::string m_prefabHeldBeforeBuild{ };
+		std::string m_prefabShapeBeforeBuild{ };
 
 		// Each prefab file read so far, by its path from the project folder,
 		// with when it was written as it was read.

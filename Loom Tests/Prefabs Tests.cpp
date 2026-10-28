@@ -328,6 +328,24 @@ TEST_SUITE("Prefabs")
 		CHECK(from_instance.reshow);
 	};
 
+	TEST_CASE("an instance's edit reaches the prefab past a Prefab panel holding its own, which is not shown again")
+	{
+		const Tree prefab;
+		const Tree instance;
+
+		// A panel holding an unsaved edit takes no part in the sync.
+		const Loom::Prefabs::Outcome outcome = Loom::Prefabs::Sync(
+			prefab.Node(),
+			nullptr,
+			Whole(prefab.Node()),
+			{ { instance.Node("Goblin", "(1, 2, 3)", "7"), true } },
+			transform_keys);
+
+		REQUIRE(outcome.prefab);
+		CHECK(Shared(*outcome.prefab) == Shared(prefab.Node("Goblin", "(1, 2, 3)", "7")));
+		CHECK_FALSE(outcome.reshow);
+	};
+
 	TEST_CASE("nothing changes when the prefab, the panel and every instance agree")
 	{
 		const Tree prefab;

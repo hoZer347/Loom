@@ -73,6 +73,9 @@ namespace Loom
 
 		bool Unsaved(const T& value) const { return !(value == m_saved); };
 
+		bool CanUndo() const { return !m_undo.empty(); };
+		bool CanRedo() const { return !m_redo.empty(); };
+
 	private:
 		T m_saved{ };
 		T m_kept{ };

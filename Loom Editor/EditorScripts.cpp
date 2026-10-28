@@ -184,6 +184,7 @@ namespace Loom
 		m_snapshots = TakeSnapshots();
 		m_selectedBeforeBuild = m_selected ? m_selected->GetGuid() : Guid();
 		m_prefabBeforeBuild = m_prefabPath;
+		HoldPrefabEdits();
 
 		// Ahead of the scenes, whose closing runs the queue that deletes it.
 		ClosePrefab();
@@ -219,7 +220,10 @@ namespace Loom
 		};
 
 		if (!m_prefabPath.empty())
+		{
 			m_prefabBeforeBuild = m_prefabPath;
+			HoldPrefabEdits();
+		};
 
 		ClosePrefab();
 		CloseAllScenes();
@@ -273,7 +277,10 @@ namespace Loom
 		m_snapshots.clear();
 
 		if (!m_prefabBeforeBuild.empty())
-			OpenPrefab(std::exchange(m_prefabBeforeBuild, { }));
+			ReopenPrefab(
+				std::exchange(m_prefabBeforeBuild, { }),
+				std::exchange(m_prefabHeldBeforeBuild, { }),
+				std::exchange(m_prefabShapeBeforeBuild, { }));
 
 		if (GameObject* selected = LoomObject::GetByGuid<GameObject>(m_selectedBeforeBuild))
 			Select(selected);

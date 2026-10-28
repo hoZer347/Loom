@@ -1138,6 +1138,9 @@ namespace Loom
 		if (m_buildSettings.Unsaved())
 			saved = SaveBuildSettings() && saved;
 
+		if (m_prefabUnsaved)
+			saved = SavePrefab() && saved;
+
 		SetActiveScene(m_activeScene);
 
 		return saved;
@@ -1366,6 +1369,18 @@ namespace Loom
 		// Closing the one open clears the path this may have been handed.
 		const std::string opening = path;
 
+		if (m_prefabUnsaved)
+		{
+			if (opening == m_prefabPath)
+			{
+				m_showPrefab = true;
+				m_prefabFocusFrames = prefab_focus_frames;
+			}
+			else m_prefabNext = opening;
+
+			return;
+		};
+
 		const Prefabs::ObjectNode* prefab = LoadPrefab(opening);
 
 		if (prefab == nullptr)
@@ -1398,6 +1413,7 @@ namespace Loom
 
 		// Agreed with the file next pass, once the copy has its children.
 		m_prefabShape.clear();
+		m_prefabOpened = true;
 		m_historyDirty = true;
 
 		m_showPrefab = true;
@@ -1422,6 +1438,20 @@ namespace Loom
 		m_prefabPath.clear();
 		m_prefabShape.clear();
 		m_reshowPrefab = false;
+		m_prefabUnsaved = false;
+		m_prefabFocused = false;
+	};
+
+	bool Editor::SavePrefab()
+	{
+		if (GetPrefabRoot() == nullptr || !CanStepHistory())
+			return false;
+
+		m_savePrefab = true;
+		RecordHistory();
+		m_savePrefab = false;
+
+		return !m_prefabUnsaved;
 	};
 
 	GameObject* Editor::GetPrefabRoot() const
@@ -1598,7 +1628,9 @@ namespace Loom
 			return;
 		};
 
-		StepHistory(&SceneHistory::Undo);
+		if (PrefabHasKeyboard())
+			StepPrefab(true);
+		else StepHistory(&SceneHistory::Undo);
 	};
 
 	void Editor::Redo()
@@ -1613,7 +1645,9 @@ namespace Loom
 			return;
 		};
 
-		StepHistory(&SceneHistory::Redo);
+		if (PrefabHasKeyboard())
+			StepPrefab(false);
+		else StepHistory(&SceneHistory::Redo);
 	};
 
 	void Editor::StepHistory(bool (SceneHistory::* step)(const std::vector<Scene*>&))
@@ -1649,14 +1683,14 @@ namespace Loom
 	{
 		return m_playing
 			? m_playHistory.CanUndo()
-			: CanStepHistory() && m_history.CanUndo();
+			: CanStepHistory() && (PrefabHasKeyboard() ? m_prefabHistory.CanUndo() : m_history.CanUndo());
 	};
 
 	bool Editor::CanRedo() const
 	{
 		return m_playing
 			? m_playHistory.CanRedo()
-			: CanStepHistory() && m_history.CanRedo();
+			: CanStepHistory() && (PrefabHasKeyboard() ? m_prefabHistory.CanRedo() : m_history.CanRedo());
 	};
 
 	void Editor::TrackPlayEdit(LoomObject& object, size_t index, const std::string& before)
@@ -1769,7 +1803,12 @@ namespace Loom
 		case EditCommand::Paste:	Paste();			break;
 		case EditCommand::Delete:	DeleteSelected();	break;
 		case EditCommand::None:							break;
-		case EditCommand::Save:		SaveActiveScene();	break;
+		case EditCommand::Save:
+			if (PrefabHasKeyboard())
+				SavePrefab();
+			else SaveActiveScene();
+
+			break;
 		};
 	};
 
@@ -4228,6 +4267,15 @@ namespace Loom
 
 	void Editor::DrawPrefab()
 	{
+		DrawPrefabQuestion();
+
+		// Closed with edits held: asked first, and closed once answered.
+		if (!m_showPrefab && m_prefabUnsaved)
+		{
+			m_showPrefab = true;
+			m_prefabNext = std::string();
+		};
+
 		if (!m_showPrefab || (m_prefabPath.empty() && m_prefabBeforeBuild.empty()))
 		{
 			m_showPrefab = false;
@@ -4245,8 +4293,12 @@ namespace Loom
 			ImGui::SetNextWindowFocus();
 		};
 
-		if (ImGui::Begin(title.c_str(), &m_showPrefab, view_flags))
+		m_prefabFocused = false;
+
+		if (ImGui::Begin(title.c_str(), &m_showPrefab, view_flags | (m_prefabUnsaved ? ImGuiWindowFlags_UnsavedDocument : ImGuiWindowFlags_None)))
 		{
+			m_prefabFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+
 			Watch(View::Prefab);
 
 			DrawPrefabView();

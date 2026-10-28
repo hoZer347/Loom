@@ -8,6 +8,8 @@
 #include "SceneHistory.h"
 #include "SceneSerializer.h"
 
+#include "imgui.h"
+
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
@@ -232,10 +234,21 @@ namespace Loom
 		if (prefab == nullptr || !Prefabs::Parse(SceneSerializer::Serialize(*root), shown))
 			return;
 
-		const std::string text = Prefabs::Splice(
-			SceneSerializer::Serialize(*m_prefabScene),
-			root->GetGuid().ToString(),
-			Prefabs::Write(Prefabs::Retarget(*prefab, shown, Prefabs::TransformKeys(*root), Prefabs::Part::Whole)));
+		if (!ShowPrefab(Prefabs::Write(Prefabs::Retarget(*prefab, shown, Prefabs::TransformKeys(*root), Prefabs::Part::Whole))))
+			return;
+
+		// Agreed again on the next pass, from the copy as it now serializes.
+		m_prefabShape.clear();
+	};
+
+	bool Editor::ShowPrefab(const std::string& subtree)
+	{
+		GameObject* root = GetPrefabRoot();
+
+		if (root == nullptr)
+			return false;
+
+		const std::string text = Prefabs::Splice(SceneSerializer::Serialize(*m_prefabScene), root->GetGuid().ToString(), subtree);
 
 		const Guid selected = IsSelectedIn(m_prefabScene->GetRoot()) ? m_selected->GetGuid() : Guid();
 
@@ -250,23 +263,128 @@ namespace Loom
 			std::cerr << "Could not show prefab " << m_prefabPath << " again: " << error << std::endl;
 			m_prefabRoot = Guid();
 			m_prefabPath.clear();
-			return;
+			m_prefabUnsaved = false;
+			return false;
 		};
 
 		Scene::Unlist(m_prefabScene);
 		Engine::DoTasks();
 
-		// Agreed again on the next pass, from the copy as it now serializes.
-		m_prefabShape.clear();
 		m_historyDirty = true;
 
 		if (GameObject* again = LoomObject::GetByGuid<GameObject>(selected))
 			Select(again);
+
+		return true;
+	};
+
+	void Editor::ReopenPrefab(const std::string& path, const std::string& held, const std::string& shape)
+	{
+		OpenPrefab(path);
+
+		// The same prefab as before the build, whose steps still apply.
+		m_prefabOpened = false;
+
+		if (held.empty() || GetPrefabRoot() == nullptr)
+			return;
+
+		Engine::DoTasks();
+
+		if (ShowPrefab(held))
+			m_prefabShape = shape;
+	};
+
+	void Editor::HoldPrefabEdits()
+	{
+		m_prefabHeldBeforeBuild.clear();
+		m_prefabShapeBeforeBuild = m_prefabShape;
+
+		GameObject* root = GetPrefabRoot();
+		Prefabs::ObjectNode shown;
+
+		if (root == nullptr || m_prefabShape.empty() || !Prefabs::Parse(SceneSerializer::Serialize(*root), shown))
+			return;
+
+		if (Prefabs::Shape(shown, Prefabs::TransformKeys(*root), Prefabs::Part::Whole) != m_prefabShape)
+			m_prefabHeldBeforeBuild = Prefabs::Write(shown);
+	};
+
+	void Editor::StepPrefab(bool undo)
+	{
+		if (!CanStepHistory())
+			return;
+
+		// So an edit not kept yet is the one taken back.
+		RecordHistory();
+
+		std::string text;
+
+		if (!m_prefabHistory.Step(text, undo) || !ShowPrefab(text))
+			return;
+
+		if (GameObject* root = GetPrefabRoot())
+			m_prefabHistory.Amend(SceneSerializer::Serialize(*root));
+	};
+
+	bool Editor::PrefabHasKeyboard() const
+	{
+		return GetPrefabRoot() != nullptr && (m_prefabFocused || IsSelectedIn(m_prefabScene->GetRoot()));
+	};
+
+	void Editor::DrawPrefabQuestion()
+	{
+		constexpr const char* popup = "Unsaved Prefab";
+
+		if (m_prefabNext && !ImGui::IsPopupOpen(popup))
+			ImGui::OpenPopup(popup);
+
+		if (!ImGui::BeginPopupModal(popup, nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+			return;
+
+		if (!m_prefabNext)
+		{
+			ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+			return;
+		};
+
+		ImGui::Text("Save the changes to %s?", std::filesystem::path(m_prefabPath).filename().string().c_str());
+
+		const bool save = ImGui::Button("Save");
+		ImGui::SameLine();
+		const bool discard = ImGui::Button("Don't Save");
+		ImGui::SameLine();
+		const bool cancel = ImGui::Button("Cancel");
+
+		// A save that fails leaves the question up, with the edits still held.
+		const bool saved = save && SavePrefab();
+
+		if (saved || discard)
+		{
+			const std::string next = *m_prefabNext;
+
+			m_prefabUnsaved = false;
+
+			if (next.empty())
+			{
+				m_showPrefab = false;
+				ClosePrefab();
+			}
+			else OpenPrefab(next);
+		};
+
+		if (saved || discard || cancel)
+		{
+			m_prefabNext.reset();
+			ImGui::CloseCurrentPopup();
+		};
+
+		ImGui::EndPopup();
 	};
 
 	bool Editor::PrefabsNeedSync() const
 	{
-		if (m_reshowPrefab || !ChangedPrefabFiles().empty())
+		if (m_savePrefab || m_reshowPrefab || !ChangedPrefabFiles().empty())
 			return true;
 
 		GameObject* root = GetPrefabRoot();
@@ -315,12 +433,17 @@ namespace Loom
 			paths.insert(path);
 		};
 
+		bool reshown = false;
+
 		if (GetPrefabRoot())
 		{
 			LoadPrefab(m_prefabPath);
 
 			if (std::exchange(m_reshowPrefab, false))
+			{
 				ReshowPrefab();
+				reshown = true;
+			};
 		};
 
 		GameObject* root = GetPrefabRoot();
@@ -332,7 +455,10 @@ namespace Loom
 		if (showing && m_prefabShape.empty())
 			m_prefabShape = Prefabs::Shape(shown, Prefabs::TransformKeys(*root), Prefabs::Part::Whole);
 
-		if (showing && panel_text != m_panelText)
+		// An edit in the panel stays there until saved, for the instances to sync without it.
+		const bool held = showing && !m_savePrefab && Prefabs::Shape(shown, Prefabs::TransformKeys(*root), Prefabs::Part::Whole) != m_prefabShape;
+
+		if (showing && (m_savePrefab || panel_text != m_panelText))
 			paths.insert(m_prefabPath);
 
 		bool reshow = false;
@@ -344,7 +470,7 @@ namespace Loom
 			if (prefab == nullptr)
 				continue;
 
-			const bool panel = showing && path == m_prefabPath;
+			const bool panel = showing && !held && path == m_prefabPath;
 
 			std::vector<GameObject*> mine{ };
 			std::vector<Prefabs::Instance> instances{ };
@@ -410,11 +536,22 @@ namespace Loom
 			};
 		};
 
+		m_prefabUnsaved = showing && !reshow && Prefabs::Shape(shown, Prefabs::TransformKeys(*root), Prefabs::Part::Whole) != m_prefabShape;
+
 		if (reshow)
 			ReshowPrefab();
 
 		root = GetPrefabRoot();
 		m_panelText = root ? SceneSerializer::Serialize(*root) : std::string();
+
+		if (root == nullptr)
+			return;
+
+		if (std::exchange(m_prefabOpened, false))
+			m_prefabHistory.Reset(m_panelText);
+		else if (reshow || reshown)
+			m_prefabHistory.Amend(m_panelText);
+		else m_prefabHistory.Keep(m_panelText);
 	};
 
 	#pragma endregion

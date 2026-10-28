@@ -223,6 +223,9 @@
     <ClCompile Include="BuildSettings Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="EditHistory Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="StageTiming Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
