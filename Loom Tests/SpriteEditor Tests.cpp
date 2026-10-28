@@ -123,7 +123,7 @@ namespace
 			{
 				ImGui::SetNextWindowPos(ImVec2(width, 0.0f));
 				ImGui::SetNextWindowSize(ImVec2(paletteWidth, height));
-				editor.DrawPalette(&paletteOpen, "");
+				editor.DrawPalette(&paletteOpen, projectFolder);
 			};
 			ImGui::EndFrame();
 		};
@@ -278,6 +278,9 @@ namespace
 		SpriteEditor editor;
 		bool open = true;
 		bool paletteOpen;
+
+		// Empty for the folder the palette is in.
+		std::string projectFolder;
 	};
 
 	// A point in the canvas well inside the image, which sits in the middle of
@@ -1155,40 +1158,77 @@ TEST_SUITE("SpriteEditor")
 		std::filesystem::remove(palette);
 	};
 
-	TEST_CASE("a swatch's x deletes its colour, asking first while the sprite still has pixels of it, and Ctrl+Z puts it back")
+	TEST_CASE("a swatch's x deletes its colour, asking first while any sprite on the palette still has pixels of it, and Ctrl+Z and Ctrl+Y step it")
 	{
+		using Users = std::vector<std::pair<std::string, size_t>>;
+
+		const std::filesystem::path folder = std::filesystem::temp_directory_path() / "loom sprite delete swatch";
+		std::filesystem::remove_all(folder);
+		std::filesystem::create_directories(folder / "Units");
+
 		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
 		sprite.layers[0].cels[0].Set(0, 0, RED);
 
-		Driven driven("loom sprite delete swatch.tga", &sprite);
-
-		const std::string palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension).string();
-
-		// The last swatch, just left of +.
-		const std::string last = "move \"Palette\" \"+\" left -15 0\nwait 2\nclick \"Palette\" \"##delete\"\nwait 2\n";
-
-		const auto saved_after = [&driven, &palette](const std::string& script)
 		{
-			driven.Run(script + "key ctrl+s\nwait 2\n");
+			Driven driven("loom sprite delete swatch/Ghost.tga", &sprite);
+			driven.projectFolder = folder.string();
 
-			Loom::Palette saved;
-			REQUIRE(Loom::Palette::Load(palette, saved));
+			const std::string palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension).string();
 
-			return saved.colours;
+			// The last swatch, just left of +.
+			const std::string last = "move \"Palette\" \"+\" left -15 0\nwait 2\nclick \"Palette\" \"##delete\"\nwait 2\n";
+
+			const auto saved = [&palette]()
+			{
+				Loom::Palette file;
+				REQUIRE(Loom::Palette::Load(palette, file));
+
+				return file.colours;
+			};
+
+			const auto saved_after = [&driven, &saved](const std::string& script)
+			{
+				driven.Run(script + "key ctrl+s\nwait 2\n");
+
+				return saved();
+			};
+
+			driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\n");
+
+			// Closed, one on the palette with red in a hidden layer, and one on another.
+			SpriteAsset tank = sprite;
+			tank.AddLayer(1, "Hidden");
+			tank.layers[1].visible = false;
+			tank.layers[1].cels[0].Set(1, 1, RED);
+			REQUIRE(SpriteAsset::Save((folder / "Units" / "Tank.loomsprite").string(), tank, { (folder / "Units" / "Tank.png").string(), palette }));
+			REQUIRE(SpriteAsset::Save((folder / "Units" / "Other.loomsprite").string(), tank, { (folder / "Units" / "Other.png").string(), (folder / "Other.loompalette").string() }));
+
+			driven.Run(last);
+			REQUIRE(driven.editor.ColourUsers() != nullptr);
+			CHECK(*driven.editor.ColourUsers() == Users{ { "Ghost.loomsprite", 1 }, { "Tank.loomsprite", 2 } });
+
+			CHECK(saved_after("click \"Delete Colour?\" \"Cancel\"\nwait 2\n") == std::vector<SpriteAsset::Colour>{ RED });
+			CHECK(driven.editor.ColourUsers() == nullptr);
+
+			driven.Run(last + "click \"Delete Colour?\" \"Delete\"\nwait 2\n");
+			CHECK(saved() == std::vector<SpriteAsset::Colour>{ RED });
+			CHECK(saved_after("").empty());
+			CHECK(saved_after("key ctrl+z\nwait 2\n") == std::vector<SpriteAsset::Colour>{ RED });
+			CHECK(saved_after("key ctrl+y\nwait 2\n").empty());
+			CHECK(saved_after("key ctrl+z\nwait 2\n") == std::vector<SpriteAsset::Colour>{ RED });
+
+			// Black, the left colour, is in no pixel, and a second red leaves one.
+			driven.Run("click \"Palette\" \"+\"\nwait 2\n" + last);
+			CHECK(driven.editor.ColourUsers() == nullptr);
+			CHECK(saved_after("") == std::vector<SpriteAsset::Colour>{ RED });
+
+			driven.Run("click \"Palette\" \"+\" left -15 0\nwait 2\nclick \"Palette\" \"+\"\nwait 2\n" + last);
+			CHECK(driven.editor.ColourUsers() == nullptr);
+			CHECK(saved_after("") == std::vector<SpriteAsset::Colour>{ RED });
+			CHECK(Count(driven.Saved(), RED) == 1);
 		};
 
-		driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\n");
-
-		CHECK(saved_after(last + "click \"Delete Colour?\" \"Cancel\"\nwait 2\n") == std::vector<SpriteAsset::Colour>{ RED });
-		CHECK(saved_after(last + "click \"Delete Colour?\" \"Delete\"\nwait 2\n").empty());
-		CHECK(saved_after("key ctrl+z\nwait 2\n") == std::vector<SpriteAsset::Colour>{ RED });
-
-		// Black, the left colour, is in no pixel, and a second red leaves one.
-		CHECK(saved_after("click \"Palette\" \"+\"\nwait 2\n" + last) == std::vector<SpriteAsset::Colour>{ RED });
-		CHECK(saved_after("click \"Palette\" \"+\" left -15 0\nwait 2\nclick \"Palette\" \"+\"\nwait 2\n" + last) == std::vector<SpriteAsset::Colour>{ RED });
-		CHECK(Count(driven.Saved(), RED) == 1);
-
-		std::filesystem::remove(palette);
+		std::filesystem::remove_all(folder);
 	};
 
 	TEST_CASE("clear comes first in every palette, paints as the eraser does, and is never added or taken out")

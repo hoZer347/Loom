@@ -92,6 +92,10 @@ namespace Loom
 		bool IsFocused() const { return m_focused; };
 		bool IsPaletteFocused() const { return m_paletteFocused; };
 
+		// While a swatch's x asks, the sprites with pixels of its colour and
+		// how many each has. Null otherwise.
+		const std::vector<std::pair<std::string, size_t>>* ColourUsers() const { return m_deleting && m_deleting->users ? &*m_deleting->users : nullptr; };
+
 		#pragma endregion
 
 		#pragma region Palette Window

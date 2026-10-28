@@ -1540,6 +1540,8 @@ namespace Loom
 
 			ImGui::PopID();
 
+			// The left colour's in the top left corner, the right's in the
+			// bottom right.
 			if (Matches(colour, m_colours[ImGuiMouseButton_Left]))
 			{
 				draw->AddTriangleFilled(min, ImVec2(min.x + corner, min.y), ImVec2(min.x, min.y + corner), marker);
@@ -1654,7 +1656,10 @@ namespace Loom
 			? &palette.colours
 			: *deleting.category < palette.categories.size() ? &palette.categories[*deleting.category].colours : nullptr;
 
-		if (deleting.path != PalettePath() || colours == nullptr || deleting.index >= colours->size() || (*colours)[deleting.index] != deleting.colour)
+		if (deleting.path != PalettePath() ||
+			colours == nullptr ||
+			deleting.index >= colours->size() ||
+			(*colours)[deleting.index] != deleting.colour)
 		{
 			m_deleting.reset();
 			return;
@@ -1707,7 +1712,10 @@ namespace Loom
 				SpriteAsset sprite;
 				SpriteAsset::Links links;
 
-				if (entry->path().extension() != SpriteAsset::extension || counted.contains(sprite_path) || !SpriteAsset::Load(sprite_path, sprite, links) || links.palette != deleting.path)
+				if (entry->path().extension() != SpriteAsset::extension ||
+					counted.contains(sprite_path) ||
+					!SpriteAsset::Load(sprite_path, sprite, links) ||
+					links.palette != deleting.path)
 					continue;
 
 				if (const size_t pixels = sprite.Count(deleting.colour); pixels > 0)
