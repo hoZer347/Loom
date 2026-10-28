@@ -117,6 +117,9 @@ namespace Loom
 		const EditableMesh* Editing() const;
 		const Selection* Selected() const;
 
+		// Whether the tab in front differs from its prefab as last read or saved.
+		bool Unsaved() const;
+
 		// Where a point of the mesh being edited was drawn in the panel when
 		// it last drew, in screen pixels. None behind the camera.
 		std::optional<ImVec2> ScreenOf(const glm::vec3& point) const;
@@ -193,6 +196,9 @@ namespace Loom
 			size_t part = 0;
 			EditableMesh mesh;
 			Selection selection;
+
+			// Each material's, in the order MaterialsOf finds them.
+			std::vector<std::string> shaders;
 		};
 
 		// One of the handles round what is picked, along an axis or, with
@@ -247,6 +253,12 @@ namespace Loom
 			std::vector<Snapshot> undo;
 			std::vector<Snapshot> redo;
 			bool unsaved = false;
+
+			// How many steps have been made since the prefab was read, less those
+			// taken back, and how many it was saved at. None once a new step
+			// leaves what was saved where redo cannot reach it.
+			size_t steps = 0;
+			std::optional<size_t> savedAt = 0;
 
 			// When the file was last read or written, and what it held then, so
 			// a change made to it elsewhere is read in again.

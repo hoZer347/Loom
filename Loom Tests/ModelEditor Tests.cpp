@@ -584,6 +584,36 @@ TEST_SUITE("ModelEditor")
 		CHECK(driven.Mesh().faces.size() == faces);
 	};
 
+	TEST_CASE("The Model panel's undo back to what was saved leaves nothing unsaved, until a new step leaves it behind")
+	{
+		Driven driven("model_saved_steps");
+
+		CHECK_FALSE(driven.editor.Unsaved());
+
+		driven.editor.Add(Shapes::Shape::Cylinder);
+		CHECK(driven.editor.Unsaved());
+
+		driven.editor.Undo();
+		CHECK_FALSE(driven.editor.Unsaved());
+
+		driven.editor.Redo();
+		CHECK(driven.editor.Unsaved());
+
+		REQUIRE(driven.editor.Save());
+		CHECK_FALSE(driven.editor.Unsaved());
+
+		driven.editor.Undo();
+		CHECK(driven.editor.Unsaved());
+
+		driven.editor.Redo();
+		CHECK_FALSE(driven.editor.Unsaved());
+
+		driven.editor.Undo();
+		driven.editor.Add(Shapes::Shape::Cube);
+		driven.editor.Undo();
+		CHECK(driven.editor.Unsaved());
+	};
+
 	TEST_CASE("The Model panel reads a prefab changed elsewhere again, unless it has edits of its own")
 	{
 		Driven driven("model_reload");
@@ -721,6 +751,21 @@ TEST_SUITE("ModelEditor")
 				CHECK(after.components[i].guid == before.components[i].guid);
 
 			CHECK(captured.Says("Material: Assets/Model.shader: "));
+
+			driven.editor.SetShader("Assets/Lit.shader");
+			CHECK(driven.editor.Unsaved());
+
+			driven.editor.Undo();
+			CHECK_FALSE(driven.editor.Unsaved());
+
+			driven.editor.Redo();
+			REQUIRE(driven.editor.Save());
+			CHECK(ReadFile(prefab.string()).find("\"Assets/Lit.shader\"") != std::string::npos);
+
+			driven.editor.Undo();
+			CHECK(driven.editor.Unsaved());
+			REQUIRE(driven.editor.Save());
+			CHECK(ReadFile(prefab.string()).find("\"Assets/Lit.shader\"") == std::string::npos);
 		};
 
 		std::error_code code;

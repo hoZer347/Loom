@@ -530,6 +530,8 @@ void main()
 		document.selection = { };
 		document.undo.clear();
 		document.redo.clear();
+		document.steps = 0;
+		document.savedAt = 0;
 		document.drag = Drag::None;
 		document.hoveredHandle.reset();
 		document.hoveredVertex.reset();
@@ -619,6 +621,7 @@ void main()
 		document.text = text;
 		document.unwritten.clear();
 		document.unsaved = false;
+		document.savedAt = document.steps;
 		document.message = "Saved.";
 		document.messageTime = ImGui::GetTime();
 
@@ -658,6 +661,13 @@ void main()
 		const Document* document = Front();
 
 		return document ? &document->selection : nullptr;
+	};
+
+	bool ModelEditor::Unsaved() const
+	{
+		const Document* document = Front();
+
+		return document && document->unsaved;
 	};
 
 	std::optional<ImVec2> ModelEditor::ScreenOf(const glm::vec3& point) const
@@ -2052,7 +2062,18 @@ void main()
 
 	ModelEditor::Snapshot ModelEditor::Take(const Document& document)
 	{
-		return Snapshot{ document.part, document.parts[document.part].editing, document.selection };
+		Snapshot snapshot{ document.part, document.parts.empty() ? EditableMesh{ } : document.parts[document.part].editing, document.selection };
+
+		if (document.root)
+		{
+			std::vector<Material*> materials{ };
+			MaterialsOf(*document.root, materials);
+
+			for (const Material* material : materials)
+				snapshot.shaders.push_back(material->GetShaderPath());
+		};
+
+		return snapshot;
 	};
 
 	void ModelEditor::Commit(Document& document, Snapshot snapshot)
@@ -2062,7 +2083,12 @@ void main()
 		if (document.undo.size() > max_steps)
 			document.undo.erase(document.undo.begin());
 
+		if (document.savedAt > document.steps)
+			document.savedAt.reset();
+
 		document.redo.clear();
+		document.steps++;
+		document.unsaved = true;
 	};
 
 	void ModelEditor::Remember(Document& document)
@@ -2081,24 +2107,40 @@ void main()
 		Snapshot step = std::move(from.back());
 		from.pop_back();
 
-		to.push_back(Snapshot{ step.part, document.parts[step.part].editing, document.selection });
-
 		document.part = step.part;
-		document.parts[step.part].editing = std::move(step.mesh);
+		to.push_back(Take(document));
+
 		document.selection = std::move(step.selection);
 
-		Changed(document);
+		if (document.root)
+		{
+			std::vector<Material*> materials{ };
+			MaterialsOf(*document.root, materials);
+
+			for (size_t i = 0; i < std::min(materials.size(), step.shaders.size()); i++)
+				if (materials[i]->GetShaderPath() != step.shaders[i])
+					materials[i]->ChangeShader(step.shaders[i]);
+		};
+
+		if (!document.parts.empty())
+		{
+			document.parts[step.part].editing = std::move(step.mesh);
+			Changed(document);
+		};
+
+		document.steps = undo ? document.steps - 1 : document.steps + 1;
+		document.unsaved = document.savedAt != document.steps;
 	};
 
 	void ModelEditor::Undo()
 	{
-		if (Document* document = Front(); document && !document->parts.empty())
+		if (Document* document = Front())
 			Step(*document, true);
 	};
 
 	void ModelEditor::Redo()
 	{
-		if (Document* document = Front(); document && !document->parts.empty())
+		if (Document* document = Front())
 			Step(*document, false);
 	};
 
@@ -2396,12 +2438,14 @@ void main()
 		std::vector<Material*> materials{ };
 		MaterialsOf(*document.root, materials);
 
+		if (std::none_of(materials.begin(), materials.end(), [&](const Material* material) { return material->GetShaderPath() != path; }))
+			return;
+
+		Remember(document);
+
 		for (Material* material : materials)
 			if (material->GetShaderPath() != path)
-			{
 				material->ChangeShader(path);
-				document.unsaved = true;
-			};
 	};
 
 	#pragma endregion
