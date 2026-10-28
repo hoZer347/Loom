@@ -1924,6 +1924,7 @@ protected:
 	void scrollToLine(size_t line, Scroll alignment, float fraction=0.0f);
 	void handlePossibleScrolling();
 	void makeCursorVisible();
+	void keepCursorInShrunkView();
 	void resetScrolling();
 
 	// find/replace support
@@ -2038,6 +2039,7 @@ protected:
 	float miniMapOffset;
 
 	ImVec2 textSize;
+	float previousTextHeight = 0.0f;
 	ImVec2 totalSize;
 	size_t firstVisibleRow = 0;
 	size_t lastVisibleRow = 0;

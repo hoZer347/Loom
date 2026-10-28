@@ -142,6 +142,7 @@ bool TextEditor::render(const char* title, const ImVec2& size, ImGuiChildFlags c
 
 		// handle possible state changes caused by API calls before first frame or between frames
 		updateState();
+		keepCursorInShrunkView();
 		handlePossibleScrolling();
 
 		// handle keyboard inputs
@@ -2140,6 +2141,25 @@ void TextEditor::makeCursorVisible() {
 	}
 
 	resetCursorAnimationTimer();
+}
+
+
+//
+//	TextEditor::keepCursorInShrunkView
+//
+
+void TextEditor::keepCursorInShrunkView() {
+	// a cursor that was in view before the text area got shorter stays in view
+	if (textSize.y < previousTextHeight) {
+		const auto row = docPos2VisPos(cursors.getCurrent().getInteractiveEnd()).row;
+		const auto bottom = (row + 1.0f) * glyphSize.y;
+
+		if (row >= firstVisibleRow && row <= lastVisibleRow && bottom > ImGui::GetScrollY() + textSize.y) {
+			ImGui::SetScrollY(bottom - textSize.y);
+		}
+	}
+
+	previousTextHeight = textSize.y;
 }
 
 

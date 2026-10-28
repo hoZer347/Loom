@@ -9,6 +9,7 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstring>
 #include <filesystem>
@@ -404,6 +405,36 @@ TEST_SUITE("ShaderEditor")
 		CHECK(ShaderEditor::MessageSpan("col", "'col' : undeclared identifier") == std::pair<size_t, size_t>{ 0, 3 });
 		CHECK(ShaderEditor::MessageSpan("\tcolor = 1.0;", "'col' : undeclared identifier") == std::pair<size_t, size_t>{ 1, 13 });
 		CHECK(ShaderEditor::MessageSpan("  x = y;", "'' : syntax error") == std::pair<size_t, size_t>{ 2, 8 });
+	};
+
+	TEST_CASE("the list of messages pushes up a caret on the bottom row rather than covering it")
+	{
+		// More than the panel shows, so the last line sits on its bottom row.
+		constexpr int filler_lines = 60;
+
+		std::string text = shader;
+
+		for (int i = 0; i < filler_lines; i++)
+			text += "// filler\n";
+
+		Driven driven(text.c_str());
+		driven.Press(ImGuiKey_End, true);
+		driven.Type("x");
+		driven.Settle();
+		// The text scrolls on the frame after it is drawn shorter.
+		driven.Frame();
+
+		REQUIRE(Driven::Listed());
+
+		const ImGuiWindow* view = Driven::Window("##text");
+
+		REQUIRE(view != nullptr);
+
+		// The caret is on the empty line after the last newline.
+		const auto rows = std::count(text.begin(), text.end(), '\n') + 1;
+		const float caret_bottom = view->InnerRect.Min.y - view->Scroll.y + rows * ImGui::GetFontSize();
+
+		CHECK(caret_bottom <= view->InnerRect.Max.y);
 	};
 
 	TEST_CASE("resting the mouse on an engine name explains it")
