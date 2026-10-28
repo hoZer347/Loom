@@ -416,6 +416,16 @@ TEST_SUITE("SpriteAsset")
 		CHECK(TwoByTwo().Colours(1).size() == 1);
 	};
 
+	TEST_CASE("a sprite counts the pixels of a colour in every cel, hidden layers too")
+	{
+		SpriteAsset sprite = TwoByTwo();
+		sprite.layers[1].cels[0].Set(0, 1, RED);
+
+		CHECK(sprite.Count(RED) == 2);
+		CHECK(sprite.Count(BLUE) == 1);
+		CHECK(sprite.Count({ 1, 2, 3, HALF }) == 0);
+	};
+
 	#pragma endregion
 
 	#pragma region Linked Images

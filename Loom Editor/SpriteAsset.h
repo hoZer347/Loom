@@ -194,6 +194,9 @@ namespace Loom
 		// Pixels of every cel, so undo can keep fewer of a large sprite.
 		size_t Bytes() const;
 
+		// Pixels of the colour in every cel, hidden layers too.
+		size_t Count(const Colour& colour) const;
+
 		#pragma endregion
 
 		int width = 0;

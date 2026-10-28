@@ -770,6 +770,20 @@ namespace Loom
 		return bytes;
 	};
 
+	size_t SpriteAsset::Count(const Colour& colour) const
+	{
+		size_t count = 0;
+
+		for (const Layer& layer : layers)
+			for (const Image& cel : layer.cels)
+				for (int y = 0; y < cel.height; y++)
+					for (int x = 0; x < cel.width; x++)
+						if (cel.Get(x, y) == colour)
+							count++;
+
+		return count;
+	};
+
 	#pragma endregion
 
 	#pragma region Palette

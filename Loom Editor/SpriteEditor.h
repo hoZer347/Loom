@@ -231,9 +231,14 @@ namespace Loom
 		void DrawImportQuestion();
 		void Import(const std::string& path, Palette::Category category);
 		void DrawSwatches(const std::string& path);
-		// Clear is first among the palette's own colours, and in no category.
-		void DrawSection(const std::string& path, std::vector<Colour>& colours, bool with_clear, const std::string& add_label);
+		// The palette's own colours when category is empty, clear first among
+		// them and in no category.
+		void DrawSection(const std::string& path, std::vector<Colour>& colours, std::optional<size_t> category, const std::string& add_label);
 		void DrawCategories(const std::string& path);
+
+		// Asks before a swatch's x takes out the last of a colour any sprite
+		// painted from the palette still has pixels of.
+		void DrawColourDeletion(const std::string& project_folder);
 		void DrawPaletteChoice(const std::string& project_folder);
 		void DrawPaletteMenu(const std::string& project_folder);
 		void DrawPaletteRename(const std::string& project_folder);
@@ -390,6 +395,19 @@ namespace Loom
 
 		// Palettes renamed since TakeRenamed last ran, from where to where.
 		std::vector<std::pair<std::string, std::string>> m_renamed;
+
+		// A swatch whose x was clicked, by where it sits in the palette, and
+		// once counted, the sprites with pixels of it and how many each has.
+		struct ColourDeletion
+		{
+			std::string path;
+			std::optional<size_t> category;
+			size_t index = 0;
+			Colour colour{ };
+			std::optional<std::vector<std::pair<std::string, size_t>>> users;
+		};
+
+		std::optional<ColourDeletion> m_deleting;
 
 		#pragma endregion
 

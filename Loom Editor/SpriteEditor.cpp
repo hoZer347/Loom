@@ -10,9 +10,9 @@
 #include <cstdint>
 #include <filesystem>
 #include <iostream>
-#include <iterator>
 #include <limits>
 #include <optional>
+#include <set>
 #include <utility>
 
 
@@ -94,6 +94,14 @@ namespace Loom
 		// Swatch size in lines, and its mouse button corners as a share of its side.
 		constexpr float swatch_lines = 1.75f;
 		constexpr float marker_share = 0.4f;
+
+		// The x that deletes a hovered swatch, in its top right corner, as a
+		// share of the swatch's side, and how far its lines keep from the
+		// corner's edges.
+		constexpr float delete_share = 0.4f;
+		constexpr float delete_inset = 0.25f;
+
+		constexpr const char* delete_popup = "Delete Colour?";
 
 		// What a new category is called, numbered from the second on.
 		constexpr const char* new_category = "Category";
@@ -1223,6 +1231,7 @@ namespace Loom
 				ImGui::TextDisabled("No sprite open");
 
 			DrawPaletteMenu(project_folder);
+			DrawColourDeletion(project_folder);
 		};
 
 		ImGui::End();
@@ -1455,11 +1464,11 @@ namespace Loom
 
 	void SpriteEditor::DrawSwatches(const std::string& path)
 	{
-		DrawSection(path, PaletteAt(path).palette.colours, true, "+");
+		DrawSection(path, PaletteAt(path).palette.colours, std::nullopt, "+");
 		DrawCategories(path);
 	};
 
-	void SpriteEditor::DrawSection(const std::string& path, std::vector<Colour>& colours, bool with_clear, const std::string& add_label)
+	void SpriteEditor::DrawSection(const std::string& path, std::vector<Colour>& colours, std::optional<size_t> category, const std::string& add_label)
 	{
 		PaletteFile& file = PaletteAt(path);
 
@@ -1471,29 +1480,34 @@ namespace Loom
 		const ImU32 marker = ImGui::GetColorU32(ImGuiCol_Text);
 		const ImU32 marker_edge = ImGui::GetColorU32(ImGuiCol_WindowBg);
 		const float corner = side * marker_share;
+		const float cross = side * delete_share;
 
-		std::vector<Colour> shown;
+		// Where each swatch's colour sits in colours, or nothing for clear.
+		std::vector<std::optional<size_t>> shown;
 
-		if (with_clear)
-			shown.push_back(clear);
+		if (!category)
+			shown.push_back(std::nullopt);
 
-		std::copy_if(colours.begin(), colours.end(), std::back_inserter(shown), [](const Colour& colour) { return !SeeThrough(colour); });
+		for (size_t i = 0; i < colours.size(); i++)
+			if (!SeeThrough(colours[i]))
+				shown.push_back(i);
 
 		for (size_t i = 0; i < shown.size(); i++)
 		{
-			const Colour& colour = shown[i];
+			const Colour colour = shown[i] ? colours[*shown[i]] : clear;
 
 			ImGui::PushID((int)i);
 
-			if (colour == clear)
+			if (!shown[i])
 			{
 				ImGui::ColorButton("##swatch", ToFloats(colour), ImGuiColorEditFlags_NoTooltip, ImVec2(side, side));
 				ImGui::SetItemTooltip("Clear, which paints as the eraser does");
 			}
 			else
+			{
+				ImGui::SetNextItemAllowOverlap();
 				ImGui::ColorButton("##swatch", ToFloats(colour), ImGuiColorEditFlags_AlphaPreviewHalf, ImVec2(side, side));
-
-			ImGui::PopID();
+			};
 
 			for (const ImGuiMouseButton button : paint_buttons)
 				if (ImGui::IsItemClicked(button))
@@ -1501,6 +1515,30 @@ namespace Loom
 
 			const ImVec2 min = ImGui::GetItemRectMin();
 			const ImVec2 max = ImGui::GetItemRectMax();
+
+			if (shown[i] && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) && ImGui::IsMouseHoveringRect(min, max))
+			{
+				const ImRect box(ImVec2(max.x - cross, min.y), ImVec2(max.x, min.y + cross));
+				const ImGuiID id = ImGui::GetID("##delete");
+				[[maybe_unused]] ImGuiContext& g = *GImGui;
+				bool hovered = false;
+				bool held = false;
+
+				ImGui::ItemAdd(box, id);
+				IMGUI_TEST_ENGINE_ITEM_INFO(id, "##delete", ImGuiItemStatusFlags_None);
+
+				if (ImGui::ButtonBehavior(box, id, &hovered, &held))
+					m_deleting = ColourDeletion{ path, category, *shown[i], colour };
+
+				const float inset = cross * delete_inset;
+
+				draw->AddRectFilled(box.Min, box.Max, ImGui::GetColorU32(hovered ? ImGuiCol_ButtonHovered : ImGuiCol_WindowBg));
+				draw->AddLine(ImVec2(box.Min.x + inset, box.Min.y + inset), ImVec2(box.Max.x - inset, box.Max.y - inset), marker);
+				draw->AddLine(ImVec2(box.Max.x - inset, box.Min.y + inset), ImVec2(box.Min.x + inset, box.Max.y - inset), marker);
+				ImGui::SetItemTooltip("Delete from the palette");
+			};
+
+			ImGui::PopID();
 
 			if (Matches(colour, m_colours[ImGuiMouseButton_Left]))
 			{
@@ -1514,7 +1552,7 @@ namespace Loom
 				draw->AddTriangle(max, ImVec2(max.x - corner, max.y), ImVec2(max.x, max.y - corner), marker_edge);
 			};
 
-			if (ImGui::GetItemRectMax().x + style.ItemSpacing.x + side <= right)
+			if (max.x + style.ItemSpacing.x + side <= right)
 				ImGui::SameLine();
 		};
 
@@ -1591,7 +1629,7 @@ namespace Loom
 			};
 
 			if (open)
-				DrawSection(path, category.colours, false, "+##" + category.name);
+				DrawSection(path, category.colours, i, "+##" + category.name);
 
 			ImGui::PopID();
 		};
@@ -1601,6 +1639,113 @@ namespace Loom
 			RememberPalette(file);
 			palette.categories.erase(palette.categories.begin() + *deleted);
 		};
+	};
+
+	void SpriteEditor::DrawColourDeletion(const std::string& project_folder)
+	{
+		if (!m_deleting)
+			return;
+
+		ColourDeletion& deleting = *m_deleting;
+		PaletteFile& file = PaletteAt(deleting.path);
+		Palette& palette = file.palette;
+
+		std::vector<Colour>* colours = !deleting.category
+			? &palette.colours
+			: *deleting.category < palette.categories.size() ? &palette.categories[*deleting.category].colours : nullptr;
+
+		if (deleting.path != PalettePath() || colours == nullptr || deleting.index >= colours->size() || (*colours)[deleting.index] != deleting.colour)
+		{
+			m_deleting.reset();
+			return;
+		};
+
+		const size_t index = deleting.index;
+
+		const auto erase = [this, &file, colours, index]()
+		{
+			RememberPalette(file);
+			colours->erase(colours->begin() + index);
+			m_deleting.reset();
+		};
+
+		size_t copies = std::count(palette.colours.begin(), palette.colours.end(), deleting.colour);
+
+		for (const Palette::Category& category : palette.categories)
+			copies += std::count(category.colours.begin(), category.colours.end(), deleting.colour);
+
+		if (copies > 1)
+			return erase();
+
+		if (!deleting.users)
+		{
+			std::vector<std::pair<std::string, size_t>> users;
+			std::set<std::string> counted;
+
+			for (const std::unique_ptr<Document>& document : m_documents)
+			{
+				if (document->links.palette != deleting.path)
+					continue;
+
+				counted.insert(document->path);
+
+				if (const size_t pixels = document->sprite.Count(deleting.colour); pixels > 0)
+					users.emplace_back(FileName(document->path), pixels);
+			};
+
+			const std::string root = !project_folder.empty()
+				? project_folder
+				: std::filesystem::path(deleting.path).parent_path().string();
+
+			std::error_code code;
+
+			for (auto entry = std::filesystem::recursive_directory_iterator(root, std::filesystem::directory_options::skip_permission_denied, code);
+				entry != std::filesystem::recursive_directory_iterator();
+				entry.increment(code))
+			{
+				const std::string sprite_path = entry->path().lexically_normal().string();
+				SpriteAsset sprite;
+				SpriteAsset::Links links;
+
+				if (entry->path().extension() != SpriteAsset::extension || counted.contains(sprite_path) || !SpriteAsset::Load(sprite_path, sprite, links) || links.palette != deleting.path)
+					continue;
+
+				if (const size_t pixels = sprite.Count(deleting.colour); pixels > 0)
+					users.emplace_back(FileName(sprite_path), pixels);
+			};
+
+			deleting.users = std::move(users);
+		};
+
+		if (deleting.users->empty())
+			return erase();
+
+		if (!ImGui::IsPopupOpen(delete_popup))
+			ImGui::OpenPopup(delete_popup);
+
+		if (!ImGui::BeginPopupModal(delete_popup, nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+			return;
+
+		ImGui::ColorButton("##colour", ToFloats(deleting.colour), ImGuiColorEditFlags_AlphaPreviewHalf | ImGuiColorEditFlags_NoTooltip);
+		ImGui::SameLine();
+		ImGui::TextUnformatted("Pixels left of this colour");
+
+		for (const auto& [name, pixels] : *deleting.users)
+			ImGui::BulletText("%s: %zu", name.c_str(), pixels);
+
+		const bool confirmed = ImGui::Button("Delete");
+		ImGui::SameLine();
+		const bool cancelled = ImGui::Button("Cancel");
+
+		if (confirmed)
+			erase();
+		else if (cancelled)
+			m_deleting.reset();
+
+		if (confirmed || cancelled)
+			ImGui::CloseCurrentPopup();
+
+		ImGui::EndPopup();
 	};
 
 	void SpriteEditor::DrawPaletteMenu(const std::string& project_folder)

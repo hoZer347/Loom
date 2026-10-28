@@ -1155,6 +1155,42 @@ TEST_SUITE("SpriteEditor")
 		std::filesystem::remove(palette);
 	};
 
+	TEST_CASE("a swatch's x deletes its colour, asking first while the sprite still has pixels of it, and Ctrl+Z puts it back")
+	{
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.layers[0].cels[0].Set(0, 0, RED);
+
+		Driven driven("loom sprite delete swatch.tga", &sprite);
+
+		const std::string palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension).string();
+
+		// The last swatch, just left of +.
+		const std::string last = "move \"Palette\" \"+\" left -15 0\nwait 2\nclick \"Palette\" \"##delete\"\nwait 2\n";
+
+		const auto saved_after = [&driven, &palette](const std::string& script)
+		{
+			driven.Run(script + "key ctrl+s\nwait 2\n");
+
+			Loom::Palette saved;
+			REQUIRE(Loom::Palette::Load(palette, saved));
+
+			return saved.colours;
+		};
+
+		driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\n");
+
+		CHECK(saved_after(last + "click \"Delete Colour?\" \"Cancel\"\nwait 2\n") == std::vector<SpriteAsset::Colour>{ RED });
+		CHECK(saved_after(last + "click \"Delete Colour?\" \"Delete\"\nwait 2\n").empty());
+		CHECK(saved_after("key ctrl+z\nwait 2\n") == std::vector<SpriteAsset::Colour>{ RED });
+
+		// Black, the left colour, is in no pixel, and a second red leaves one.
+		CHECK(saved_after("click \"Palette\" \"+\"\nwait 2\n" + last) == std::vector<SpriteAsset::Colour>{ RED });
+		CHECK(saved_after("click \"Palette\" \"+\" left -15 0\nwait 2\nclick \"Palette\" \"+\"\nwait 2\n" + last) == std::vector<SpriteAsset::Colour>{ RED });
+		CHECK(Count(driven.Saved(), RED) == 1);
+
+		std::filesystem::remove(palette);
+	};
+
 	TEST_CASE("clear comes first in every palette, paints as the eraser does, and is never added or taken out")
 	{
 		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
