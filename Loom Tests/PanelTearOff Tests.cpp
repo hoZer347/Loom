@@ -208,7 +208,7 @@ namespace
 
 TEST_SUITE("PanelTearOff")
 {
-	TEST_CASE("a panel dragged off the editor stays in it while held, and is torn into a window with a menu bar where it is let go")
+	TEST_CASE("a panel dragged off the editor shows whole in a bare window while held, and is torn into a window with a menu bar where it is let go")
 	{
 		Driven driven;
 		driven.Frame(false);
@@ -218,8 +218,10 @@ TEST_SUITE("PanelTearOff")
 		const ImVec2 offset = grab - Driven::Find(PANEL)->RootWindowDockTree->Pos;
 		driven.Drag(grab, OFF_EDITOR, false);
 
-		CHECK(Driven::InEditor(Driven::Find(PANEL)));
-		CHECK(Driven::Viewports() == 1);
+		CHECK_FALSE(Driven::InEditor(Driven::Find(PANEL)));
+		CHECK_FALSE(driven.HasBar(Driven::Find(PANEL)));
+		CHECK(driven.torn.Windows().empty());
+		CHECK(Driven::Viewports() == 2);
 
 		driven.Release(false);
 
@@ -257,8 +259,9 @@ TEST_SUITE("PanelTearOff")
 
 		driven.Drag(Driven::Tab(Driven::Find(PANEL)), OFF_EDITOR, true);
 
-		CHECK(Driven::InEditor(Driven::Find(PANEL)));
-		CHECK(Driven::Viewports() == 1);
+		CHECK_FALSE(Driven::InEditor(Driven::Find(PANEL)));
+		CHECK(driven.torn.Windows().empty());
+		CHECK(Driven::Viewports() == 2);
 
 		driven.Release(true);
 
@@ -280,7 +283,7 @@ TEST_SUITE("PanelTearOff")
 		CHECK(driven.torn.Windows().empty());
 	};
 
-	TEST_CASE("a tab dragged out of a torn-off window waits for release before it gets a window of its own")
+	TEST_CASE("a tab dragged out of a torn-off window shows in a bare window while held, and is torn into its own on release")
 	{
 		Driven driven;
 		driven.DockBoth();
@@ -297,8 +300,10 @@ TEST_SUITE("PanelTearOff")
 
 		driven.Drag(Driven::Tab(Driven::Find(OTHER)), BELOW_EDITOR, true);
 
-		CHECK(Driven::InEditor(Driven::Find(OTHER)));
-		CHECK(Driven::Viewports() == 2);
+		CHECK(Driven::Find(OTHER)->Viewport != Driven::Find(PANEL)->Viewport);
+		CHECK_FALSE(driven.HasBar(Driven::Find(OTHER)));
+		CHECK(driven.torn.Windows().size() == 1);
+		CHECK(Driven::Viewports() == 3);
 
 		driven.Release(true);
 
