@@ -108,6 +108,8 @@ TEST_SUITE("TestsPanel")
 
 		panel.RunQueued();
 		CHECK(panel.ResultOf("TestsPanel door opens") == nullptr);
+		REQUIRE(panel.LastRun());
+		CHECK(panel.LastRun()->cases == 0);
 	};
 
 	TEST_CASE("a case the filter shows that loaded after Run is run too")
@@ -344,9 +346,16 @@ TEST_SUITE("TestsPanel")
 		panel.SetFilter("TestsPanel slow");
 		panel.QueueShown();
 
+		REQUIRE(panel.RunProgress());
+		CHECK(panel.RunProgress()->total == 0);
+		CHECK_FALSE(panel.LastRun());
+
 		panel.RunQueued();
 		++calls;
 		REQUIRE(panel.HasQueued());
+		REQUIRE(panel.RunProgress());
+		CHECK(panel.RunProgress()->done == (size_t)runs);
+		CHECK(panel.RunProgress()->total == cases);
 
 		// A run asked for while one goes on is turned away, rather than cutting the first short.
 		panel.SetFilter("TestsPanel slow case 0");
@@ -362,6 +371,11 @@ TEST_SUITE("TestsPanel")
 		CHECK(calls > 1);
 		CHECK(runs == cases);
 		CHECK(panel.ResultOf("TestsPanel slow case " + std::to_string(cases - 1)));
+		CHECK_FALSE(panel.RunProgress());
+		REQUIRE(panel.LastRun());
+		CHECK(panel.LastRun()->cases == cases);
+		CHECK(panel.LastRun()->milliseconds >= std::chrono::duration<double, std::milli>(case_time * cases).count());
+		CHECK(panel.LastRun()->at.size() == std::string("00:00:00").size());
 
 		Loom::ScriptTests::Truncate(before);
 	};

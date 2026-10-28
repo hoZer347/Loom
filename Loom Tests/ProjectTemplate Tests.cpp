@@ -400,6 +400,20 @@ TEST_SUITE("ProjectTemplate")
 		CHECK(Loom::ProjectTemplate::BuildLine("   ").empty());
 	};
 
+	TEST_CASE("a scripts build names its project and configuration, and keeps quiet about building in the temporary folder")
+	{
+		const std::string msbuild = "C:\\MSBuild.exe";
+		const std::string project = "C:\\Games\\Raycasts\\Scripts\\RaycastsScripts.vcxproj";
+		const std::string build = Loom::ProjectTemplate::BuildCommand(msbuild, project, "Release", false);
+		const std::string rebuild = Loom::ProjectTemplate::BuildCommand(msbuild, project, "Release", true);
+
+		CHECK(build.starts_with("\"" + msbuild + "\" \"" + project + "\""));
+		CHECK(build.find("-p:Configuration=Release") != std::string::npos);
+		CHECK(build.find("-p:IgnoreWarnIntDirInTempDetected=true") != std::string::npos);
+		CHECK(build.find("-t:Rebuild") == std::string::npos);
+		CHECK(rebuild.find("-t:Rebuild") != std::string::npos);
+	};
+
 	#pragma endregion
 };
 

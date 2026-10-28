@@ -84,6 +84,11 @@ namespace Loom
 		// indent and the .vcxproj MSBuild ends it with.
 		static std::string BuildLine(const std::string& line);
 
+		// The command that builds a scripts project, showing only its errors
+		// and warnings. A project under the temporary folder builds quietly
+		// there too.
+		static std::string BuildCommand(const std::string& msbuild, const std::string& project, const std::string& configuration, bool rebuild);
+
 		#pragma endregion
 
 		#pragma region Engine

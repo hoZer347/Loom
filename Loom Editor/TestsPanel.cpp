@@ -9,6 +9,7 @@
 #include <cfloat>
 #include <chrono>
 #include <cstdint>
+#include <ctime>
 #include <string>
 #include <utility>
 
@@ -55,6 +56,22 @@ namespace Loom
 		{
 			return ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
 		};
+
+		std::string TimeOfDay()
+		{
+			const std::time_t now = std::time(nullptr);
+			std::tm local{ };
+			char text[sizeof("00:00:00")]{ };
+
+#ifndef __EMSCRIPTEN__
+			localtime_s(&local, &now);
+#else
+			localtime_r(&now, &local);
+#endif
+			std::strftime(text, sizeof(text), "%H:%M:%S", &local);
+
+			return text;
+		};
 	};
 
 	#pragma region Drawing
@@ -94,6 +111,20 @@ namespace Loom
 			ImGui::TextColored(view.failed ? EditorTheme::ErrorText : ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled), "%zu failed", view.failed);
 			ImGui::SameLine();
 			ImGui::TextDisabled("%zu not run", view.shown.size() - view.passed - view.failed);
+
+			if (const std::optional<Progress> progress = RunProgress())
+			{
+				constexpr float progress_ems = 12.0f;
+				const std::string overlay = progress->total ? std::to_string(progress->done) + " / " + std::to_string(progress->total) : "Waiting";
+
+				ImGui::SameLine();
+				ImGui::ProgressBar(progress->total ? (float)progress->done / progress->total : 0.0f, ImVec2(ImGui::GetFontSize() * progress_ems, 0.0f), overlay.c_str());
+			}
+			else if (m_lastRun)
+			{
+				ImGui::SameLine();
+				ImGui::TextDisabled("Ran %zu in %.0f ms at %s", m_lastRun->cases, m_lastRun->milliseconds, m_lastRun->at.c_str());
+			};
 
 			ImGui::SameLine();
 			ImGui::SetNextItemWidth(-FLT_MIN);
@@ -423,14 +454,29 @@ namespace Loom
 			{
 				m_results[name] = ScriptTests::Run(*test);
 				m_stale = true;
+				++queued.ran.cases;
 			};
 
 			if (std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() >= step_milliseconds)
 				break;
 		};
 
+		queued.ran.milliseconds += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+
 		if (queued.next == names.size())
+		{
+			queued.ran.at = TimeOfDay();
+			m_lastRun = std::move(queued.ran);
 			m_queued.reset();
+		};
+	};
+
+	std::optional<TestsPanel::Progress> TestsPanel::RunProgress() const
+	{
+		if (!m_queued)
+			return std::nullopt;
+
+		return Progress{ m_queued->next, m_queued->names ? m_queued->names->size() : 0 };
 	};
 
 	void TestsPanel::SetFilter(const std::string& filter)

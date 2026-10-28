@@ -198,11 +198,7 @@ namespace Loom
 		std::error_code code;
 		m_libraryBefore = std::filesystem::last_write_time(m_library, code);
 
-		const std::string command =
-			'"' + msbuild + "\" \"" + m_project + "\"" +
-			(rebuild ? " -t:Rebuild" : "") +
-			" -p:Configuration=" + configuration +
-			" -p:Platform=x64 -nologo -v:m -m \"-clp:ErrorsOnly;WarningsOnly\"";
+		const std::string command = ProjectTemplate::BuildCommand(msbuild, m_project, configuration, rebuild);
 
 		m_worker = std::thread(
 			[command, build = m_current]()

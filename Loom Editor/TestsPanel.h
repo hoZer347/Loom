@@ -41,6 +41,26 @@ namespace Loom
 		void RunQueued();
 		bool HasQueued() const { return m_queued.has_value(); };
 
+		// How far the run going on has got. Its total is 0 until it starts.
+		struct Progress
+		{
+			size_t done = 0;
+			size_t total = 0;
+		};
+
+		std::optional<Progress> RunProgress() const;
+
+		// The last run to finish: the cases it ran, how long they took, and
+		// the time of day it ended.
+		struct Ran
+		{
+			size_t cases = 0;
+			double milliseconds = 0.0;
+			std::string at;
+		};
+
+		const std::optional<Ran>& LastRun() const { return m_lastRun; };
+
 		// The cases the filter shows, in the order they registered.
 		const std::vector<const ScriptTests::Case*>& Shown();
 
@@ -64,6 +84,7 @@ namespace Loom
 			std::string filter;
 			std::optional<std::vector<std::string>> names;
 			size_t next = 0;
+			Ran ran;
 		};
 
 		struct File
@@ -119,6 +140,7 @@ namespace Loom
 
 		char m_filter[filter_size]{ };
 		std::optional<Queued> m_queued{ };
+		std::optional<Ran> m_lastRun{ };
 		std::unordered_map<std::string, ScriptTests::Result> m_results{ };
 
 		std::optional<View> m_view{ };

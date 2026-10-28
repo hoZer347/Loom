@@ -728,6 +728,15 @@ SpinningTriangle is there as a worked example.
 		return shown;
 	};
 
+	std::string ProjectTemplate::BuildCommand(const std::string& msbuild, const std::string& project, const std::string& configuration, bool rebuild)
+	{
+		return
+			'"' + msbuild + "\" \"" + project + "\"" +
+			(rebuild ? " -t:Rebuild" : "") +
+			" -p:Configuration=" + configuration +
+			" -p:Platform=x64 -p:IgnoreWarnIntDirInTempDetected=true -nologo -v:m -m \"-clp:ErrorsOnly;WarningsOnly\"";
+	};
+
 	#pragma endregion
 
 	#pragma region Engine
