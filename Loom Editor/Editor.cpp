@@ -42,6 +42,7 @@
 #include "ModelImporter.h"
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
+#include "RenderingObjects.h"
 #include "Shapes.h"
 #include "SpriteAsset.h"
 #include "TextFit.h"
@@ -2342,6 +2343,7 @@ namespace Loom
 
 			DrawShapeMenu(m_activeScene ? &m_activeScene->GetRoot() : nullptr);
 			DrawCutsceneMenu(m_activeScene ? &m_activeScene->GetRoot() : nullptr);
+			DrawRenderingMenu(m_activeScene ? &m_activeScene->GetRoot() : nullptr);
 
 			ImGui::Separator();
 
@@ -2989,6 +2991,7 @@ namespace Loom
 
 				DrawShapeMenu(last_rows);
 				DrawCutsceneMenu(last_rows);
+				DrawRenderingMenu(last_rows);
 
 				ImGui::EndPopup();
 			};
@@ -3057,6 +3060,7 @@ namespace Loom
 
 			DrawShapeMenu(&root);
 			DrawCutsceneMenu(&root);
+			DrawRenderingMenu(&root);
 
 			ImGui::Separator();
 
@@ -3165,6 +3169,7 @@ namespace Loom
 
 			DrawShapeMenu(gameObject);
 			DrawCutsceneMenu(gameObject);
+			DrawRenderingMenu(gameObject);
 
 			const std::filesystem::path prefab = PrefabFileOf(*gameObject);
 			std::error_code code;
@@ -3222,6 +3227,17 @@ namespace Loom
 		ImGui::EndMenu();
 	};
 
+	void Editor::DrawRenderingMenu(GameObject* parent)
+	{
+		if (!ImGui::BeginMenu("Rendering", parent != nullptr))
+			return;
+
+		if (ImGui::MenuItem(RenderingObjects::PreVertexLabel))
+			Select(RenderingObjects::AddPreVertex(*parent, FirstPreVertex()));
+
+		ImGui::EndMenu();
+	};
+
 	std::string Editor::FirstFont() const
 	{
 		for (const FileTab& tab : m_fileTabs)
@@ -3229,6 +3245,14 @@ namespace Loom
 				return *std::min_element(tab.files.begin(), tab.files.end());
 
 		return "";
+	};
+
+	std::string Editor::FirstPreVertex() const
+	{
+		if (m_projectPreVertices.empty())
+			return "";
+
+		return ProjectAssets::RelativeTo(*std::min_element(m_projectPreVertices.begin(), m_projectPreVertices.end()), m_projectPath);
 	};
 
 	std::string Editor::ShapeShader() const

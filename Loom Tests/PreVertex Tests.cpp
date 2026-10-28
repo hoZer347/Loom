@@ -11,6 +11,7 @@
 #ifndef __EMSCRIPTEN__
 #include "GlslCompiler.h"
 #include "ProjectAssets.h"
+#include "RenderingObjects.h"
 #endif
 
 #include <algorithm>
@@ -18,6 +19,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -106,6 +108,16 @@ TEST_SUITE("PreVertex")
 
 		// The stage declares u_time already, so the code's own is left out.
 		CHECK(stages.vertex.find("uniform float u_time;") == stages.vertex.rfind("uniform float u_time;"));
+	};
+
+	TEST_CASE("a model flattened to no scale on an axis keeps its vertices rather than an inverse it has none of")
+	{
+		const Loom::Shader::Stages stages = Loom::Shader::Assemble(VERTEX + FRAGMENT, WAVE);
+		const size_t guard = stages.vertex.find("if (determinant(u_model) != 0.0)");
+
+		REQUIRE(guard != std::string::npos);
+		CHECK(guard < stages.vertex.find("inverse(u_model)"));
+		CHECK(stages.vertex.find("loom_PreVertexPos = aPos;") < guard);
 	};
 
 	TEST_CASE("assembling without pre-vertex code leaves the vertex stage as it was")
@@ -215,6 +227,25 @@ TEST_SUITE("PreVertex")
 		CHECK(Loom::PreVertex::CodeFor("Assets/Lit.shader").empty());
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader the engine carries rather than reads off disk runs no code, even with everything on")
+	{
+		LoomTests::RecordingRenderer renderer;
+
+		const TempFile file("loom pre vertex carried.loomprevertex", WAVE);
+
+		Loom::Scene scene("pre vertex carried");
+		scene.Attach<Loom::PreVertex>()->file = file.Path();
+		Pump();
+
+		REQUIRE(Loom::PreVertex::CodeFor("loom pre vertex carried") == WAVE);
+
+		std::istringstream source(VERTEX + FRAGMENT);
+		const Loom::Shader shader("loom pre vertex carried", source);
+
+		REQUIRE(renderer.vertices.contains("loom pre vertex carried"));
+		CHECK(renderer.vertices.at("loom pre vertex carried").find("loom_pre_vertex_main") == std::string::npos);
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "with everything off, only the shaders listed run the code, however their paths are spelt")
 	{
 		const TempFile file("loom pre vertex listed.loomprevertex", WAVE);
@@ -276,6 +307,32 @@ TEST_SUITE("PreVertex")
 
 		CHECK(Loom::PreVertex::CodeFor("Assets/Lit.shader").empty());
 		Loom::Material::ReloadChangedShaders();
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the Rendering menu's Pre-Vertex is a child running the file, in effect once attached")
+	{
+		const TempFile file("loom pre vertex menu.loomprevertex", WAVE);
+
+		Loom::Scene scene("pre vertex menu");
+		Pump();
+
+		Loom::GameObject* made = Loom::RenderingObjects::AddPreVertex(scene.GetRoot(), file.Path());
+		Pump();
+
+		REQUIRE(made != nullptr);
+		CHECK(made->GetName() == Loom::RenderingObjects::PreVertexLabel);
+		CHECK(made->GetParent() == &scene.GetRoot());
+
+		const Loom::PreVertex* preVertex = made->GetComponent<Loom::PreVertex>();
+
+		REQUIRE(preVertex != nullptr);
+		CHECK((const std::string&)*preVertex->file == file.Path());
+		CHECK(Loom::PreVertex::CodeFor("Assets/Lit.shader") == WAVE);
+
+		scene.GetRoot().RemoveChild(made);
+		Pump();
+
+		CHECK(Loom::PreVertex::CodeFor("Assets/Lit.shader").empty());
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the list of shaders is shown only while everything is off")

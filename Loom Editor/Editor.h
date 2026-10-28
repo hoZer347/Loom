@@ -578,8 +578,16 @@ namespace Loom
 		// selected. Disabled with no parent.
 		void DrawCutsceneMenu(GameObject* parent);
 
+		// The Rendering submenu, each object made a child of parent and
+		// selected. Disabled with no parent.
+		void DrawRenderingMenu(GameObject* parent);
+
 		// What a new UiText is drawn in: the project's first font by path.
 		std::string FirstFont() const;
+
+		// What a new PreVertex runs: the project's first pre-vertex file by
+		// path, relative to the project.
+		std::string FirstPreVertex() const;
 
 		// The shader most meshes open already draw with, or else the
 		// project's.

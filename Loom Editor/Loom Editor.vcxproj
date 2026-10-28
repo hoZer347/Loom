@@ -175,6 +175,7 @@
     <ClCompile Include="ShaderEditor.cpp" />
     <ClCompile Include="DialogueEditor.cpp" />
     <ClCompile Include="Cutscenes.cpp" />
+    <ClCompile Include="RenderingObjects.cpp" />
     <ClCompile Include="SpriteAsset.cpp" />
     <ClCompile Include="SpriteEditor.cpp" />
     <ClCompile Include="ModelEditor.cpp" />
@@ -241,6 +242,7 @@
     <ClInclude Include="ShaderEditor.h" />
     <ClInclude Include="DialogueEditor.h" />
     <ClInclude Include="Cutscenes.h" />
+    <ClInclude Include="RenderingObjects.h" />
     <ClInclude Include="SpriteAsset.h" />
     <ClInclude Include="SpriteEditor.h" />
     <ClInclude Include="ModelEditor.h" />

@@ -121,6 +121,9 @@
     <ClCompile Include="DialogueEditor.cpp">
       <Filter>Panels</Filter>
     </ClCompile>
+    <ClCompile Include="RenderingObjects.cpp">
+      <Filter>Panels</Filter>
+    </ClCompile>
     <ClCompile Include="Cutscenes.cpp">
       <Filter>Panels</Filter>
     </ClCompile>
@@ -301,6 +304,9 @@
       <Filter>Panels</Filter>
     </ClInclude>
     <ClInclude Include="DialogueEditor.h">
+      <Filter>Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderingObjects.h">
       <Filter>Panels</Filter>
     </ClInclude>
     <ClInclude Include="Cutscenes.h">

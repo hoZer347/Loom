@@ -285,6 +285,7 @@
     <ClCompile Include="..\Loom Editor\ShaderEditor.cpp" />
     <ClCompile Include="..\Loom Editor\DialogueEditor.cpp" />
     <ClCompile Include="..\Loom Editor\Cutscenes.cpp" />
+    <ClCompile Include="..\Loom Editor\RenderingObjects.cpp" />
     <ClCompile Include="..\Loom Editor\SpriteAsset.cpp" />
     <ClCompile Include="..\Loom Editor\SpriteEditor.cpp" />
     <ClCompile Include="..\Loom Editor\EditableMesh.cpp" />
