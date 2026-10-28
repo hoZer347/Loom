@@ -548,11 +548,11 @@ TEST_SUITE("SpriteEditor")
 		SpriteAsset saved;
 		SpriteAsset::Links links;
 
-		driven.Run("click \"Sprites\" \"Fit\"\nwait 2\n");
 		driven.Press(ImGuiKey_Z);
 		REQUIRE(driven.editor.SaveAll());
 		REQUIRE(SpriteAsset::Load(SpriteAsset::For(driven.path), saved, links));
 		CHECK(links.palette.empty());
+		CHECK_FALSE(std::filesystem::exists(palette));
 
 		driven.Press(ImGuiKey_Y);
 		REQUIRE(driven.editor.SaveAll());
@@ -598,6 +598,30 @@ TEST_SUITE("SpriteEditor")
 
 		CHECK_FALSE(Driven::Asking());
 		CHECK(driven.paletteOpen);
+	};
+
+	TEST_CASE("a palette made by New and moved before it is saved is written where it went")
+	{
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.layers[0].cels[0].Set(0, 0, RED);
+
+		Driven driven("loom sprite moved palette.tga", &sprite);
+
+		driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\n");
+
+		const std::filesystem::path palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension);
+		const std::filesystem::path moved = palette.parent_path() / ("loom sprite moved" + std::string(Loom::Palette::extension));
+
+		driven.editor.Relocate(palette.lexically_normal().string(), moved.lexically_normal().string());
+		driven.Frame();
+		REQUIRE(driven.editor.SaveAll());
+
+		Loom::Palette made;
+		REQUIRE(Loom::Palette::Load(moved.string(), made));
+		CHECK(made.colours == std::vector<SpriteAsset::Colour>{ RED });
+		CHECK_FALSE(std::filesystem::exists(palette));
+
+		std::filesystem::remove(moved);
 	};
 
 	TEST_CASE("Resize scales the sprite, is written only on Ctrl+S, and Ctrl+Z and Ctrl+Y step it")

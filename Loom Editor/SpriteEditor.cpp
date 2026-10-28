@@ -318,8 +318,12 @@ namespace Loom
 
 		m_loosePalette = ProjectAssets::Relocate(m_loosePalette, from, to);
 
-		// Loaded again from where they are now.
-		m_palettes.clear();
+		std::map<std::string, PaletteFile> palettes;
+
+		for (auto& [path, file] : m_palettes)
+			palettes[ProjectAssets::Relocate(path, from, to)] = std::move(file);
+
+		m_palettes = std::move(palettes);
 	};
 
 	std::vector<std::string> SpriteEditor::TakeSaved()
@@ -1169,10 +1173,12 @@ namespace Loom
 			const bool redo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y) || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z);
 			const std::string path = PalettePath();
 
-			if (!path.empty())
+			if (path.empty() && m_active != nullptr && (undo || redo))
+				Step(*m_active, undo);
+			else if (!path.empty())
 			{
-				if (undo || redo)
-					StepPalette(PaletteAt(path), undo);
+				if ((undo || redo) && !StepPalette(PaletteAt(path), undo) && m_active != nullptr)
+					Step(*m_active, undo);
 
 				if (save)
 					SavePalette(path);
@@ -1433,17 +1439,18 @@ namespace Loom
 		file.redo.clear();
 	};
 
-	void SpriteEditor::StepPalette(PaletteFile& file, bool undo)
+	bool SpriteEditor::StepPalette(PaletteFile& file, bool undo)
 	{
 		std::vector<Palette>& from = undo ? file.undo : file.redo;
 		std::vector<Palette>& to = undo ? file.redo : file.undo;
 
 		if (from.empty())
-			return;
+			return false;
 
 		to.push_back(std::move(file.palette));
 		file.palette = std::move(from.back());
 		from.pop_back();
+		return true;
 	};
 
 	bool SpriteEditor::SavePalette(const std::string& path)
@@ -1676,8 +1683,16 @@ namespace Loom
 			if (document->unsaved)
 				saved = SaveDocument(*document) && saved;
 
+		// One made by New and since let go of is not written.
+		const auto linked = [this](const std::string& path)
+		{
+			return path == m_loosePalette || std::any_of(m_documents.begin(), m_documents.end(),
+				[&path](const std::unique_ptr<Document>& document) { return document->links.palette == path; });
+		};
+
 		for (const auto& [path, file] : m_palettes)
-			saved = SavePalette(path) && saved;
+			if (file.saved || linked(path))
+				saved = SavePalette(path) && saved;
 
 		return saved;
 	};

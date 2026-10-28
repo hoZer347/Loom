@@ -130,7 +130,7 @@ namespace Loom
 			// sprite was saved, until the user takes it in or keeps the sprite.
 			std::optional<Image> outside;
 
-			// The sprite as it was before each edit.
+			// The sprite and its links as they were before each edit.
 			std::vector<Snapshot> undo;
 			std::vector<Snapshot> redo;
 
@@ -252,7 +252,8 @@ namespace Loom
 		PaletteFile& PaletteAt(const std::string& path);
 
 		static void RememberPalette(PaletteFile& file);
-		static void StepPalette(PaletteFile& file, bool undo);
+		// False when there is nothing that way.
+		static bool StepPalette(PaletteFile& file, bool undo);
 		bool SavePalette(const std::string& path);
 
 		#pragma endregion
