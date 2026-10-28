@@ -19,6 +19,9 @@
     <ClCompile Include="ProjectTemplate.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
+    <ClCompile Include="FileTypes.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
     <ClCompile Include="ProjectAssets.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
@@ -217,6 +220,9 @@
       <Filter>Scripts</Filter>
     </ClInclude>
     <ClInclude Include="ProjectTemplate.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="FileTypes.h">
       <Filter>Scripts</Filter>
     </ClInclude>
     <ClInclude Include="ProjectAssets.h">

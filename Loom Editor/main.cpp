@@ -9,9 +9,8 @@
 #include "CrashReports.h"
 #include "Editor.h"
 #include "EditorMcp.h"
+#include "FileTypes.h"
 #include "ProjectAssets.h"
-#include "ProjectTemplate.h"
-#include "SceneSerializer.h"
 #include "UiScript.h"
 
 #include "Audio.h"
@@ -109,73 +108,18 @@ namespace
 
 	#pragma region File Types
 
-	struct FileType
-	{
-		const char* extension;
-		const wchar_t* progId;
-		const wchar_t* description;
-	};
-
-	constexpr FileType FILE_TYPES[] =
-	{
-		{ ProjectTemplate::extension, L"Loom.Project", L"Loom Project" },
-		{ SceneSerializer::extension, L"Loom.Scene", L"Loom Scene" },
-		{ ScriptFolders::extension, L"Loom.ScriptFolders", L"Loom Script Folders" },
-		{ FileTabs::TwoD.extension, L"Loom.TwoDFolders", L"Loom 2D Folders" },
-		{ FileTabs::ThreeD.extension, L"Loom.ThreeDFolders", L"Loom 3D Folders" },
-		{ FileTabs::Sounds.extension, L"Loom.SoundFolders", L"Loom Sound Folders" },
-		{ FileTabs::Fonts.extension, L"Loom.FontFolders", L"Loom Font Folders" },
-		{ InputActions::extension, L"Loom.InputActions", L"Loom Key Bindings" },
-	};
-
-	// Makes this executable what opens the editor's files for the current
-	// user, so double-clicking one in Explorer opens it here. Per-user, so it
-	// needs no elevation; Explorer is only told when something actually changed.
-	void ClaimFileTypes()
+	// Makes this editor what opens the editor's files in Explorer, and false
+	// when it is not the main checkout's.
+	bool ClaimFileTypes()
 	{
 		wchar_t executable[MAX_PATH]{ };
 
 		const DWORD length = GetModuleFileNameW(nullptr, executable, MAX_PATH);
 
 		if (length == 0 || length == MAX_PATH)
-			return;
+			return false;
 
-		const std::wstring classes = L"Software\\Classes\\";
-		const std::wstring command = L"\"" + std::wstring(executable) + L"\" \"%1\"";
-
-		const auto set = [](const std::wstring& key, const wchar_t* name, const std::wstring& value)
-		{
-			return RegSetKeyValueW(HKEY_CURRENT_USER, key.c_str(), name, REG_SZ,
-				value.c_str(), (DWORD)((value.size() + 1) * sizeof(wchar_t))) == ERROR_SUCCESS;
-		};
-
-		bool changed = false;
-
-		for (const FileType& type : FILE_TYPES)
-		{
-			const std::string narrow = type.extension;
-			const std::wstring extension_key = classes + std::wstring(narrow.begin(), narrow.end());
-			const std::wstring prog_id_key = classes + type.progId;
-			const std::wstring command_key = prog_id_key + L"\\shell\\open\\command";
-
-			std::wstring current(command.size() + 1, L'\0');
-			DWORD size = (DWORD)(current.size() * sizeof(wchar_t));
-
-			if (RegGetValueW(HKEY_CURRENT_USER, command_key.c_str(), nullptr, RRF_RT_REG_SZ, nullptr, current.data(), &size) == ERROR_SUCCESS &&
-				command == current.c_str())
-				continue;
-
-			if (set(extension_key, nullptr, type.progId) &&
-				set(extension_key + L"\\OpenWithProgids", type.progId, L"") &&
-				set(prog_id_key, nullptr, type.description) &&
-				set(command_key, nullptr, command))
-				changed = true;
-			else
-				std::cerr << "Could not register " << narrow << " files with Explorer" << std::endl;
-		};
-
-		if (changed)
-			SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
+		return FileTypes::Claim(executable);
 	};
 
 	#pragma endregion
@@ -205,7 +149,7 @@ namespace
 	void Usage()
 	{
 		std::cout
-			<< "Loom Editor [project folder, .loomproject or .loomscene]\n"
+			<< "Loom Editor [project folder or one of its .loom files]\n"
 			<< "  --new-project <folder> <name>  create a project and open it\n"
 			<< "  --new-script <scripts project> <folder> <name>\n"
 			<< "                                 write a script into that folder and exit,\n"
@@ -220,6 +164,9 @@ namespace
 			<< "                                 script, state, state-machine or dialogue-manager\n"
 			<< "  --compile                      build the project's scripts on startup\n"
 			<< "  --log-scripts-project          print each scripts project opened\n"
+			<< "  --claim-file-types             make this editor what opens .loom files in\n"
+			<< "                                 Explorer, as showing its window does, and\n"
+			<< "                                 exit; fails for a worktree's editor\n"
 			<< "  --play                         start with the scene running\n"
 			<< "  --play-web                     build the scene for the web and open it\n"
 			<< "  --import <file> [x y]          import a model, as if dropped on the window;\n"
@@ -331,6 +278,9 @@ int main(int argc, char** argv)
 	{
 		const std::string argument = argv[i];
 
+		if (argument == "--claim-file-types")
+			return ClaimFileTypes() ? 0 : 1;
+
 		if (argument == "--vulkan")
 			Engine::backend = Backend::Vulkan;
 
@@ -366,9 +316,8 @@ int main(int argc, char** argv)
 		Engine engine;
 
 		// An automated run is often a scratch build that is deleted afterwards,
-		// and a worktree's editor is an agent's, so neither takes the file
-		// association from the main checkout's.
-		if (Engine::showWindow && !ProjectTemplate::IsWorktree(ProjectTemplate::EngineRoot()))
+		// so it leaves the file types to the editor the user opens.
+		if (Engine::showWindow)
 			ClaimFileTypes();
 
 		glfwSetWindowTitle(Engine::window, "Loom Editor");

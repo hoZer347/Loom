@@ -285,16 +285,16 @@ namespace Loom
 			return false;
 		};
 
-		// The nearest folder above a scene file with a project file in it, or
-		// the scene's own folder when there is none.
-		std::filesystem::path ProjectFolderOf(const std::filesystem::path& scene)
+		// The nearest folder above a file with a project file in it, or the
+		// file's own folder when there is none.
+		std::filesystem::path ProjectFolderOf(const std::filesystem::path& file)
 		{
-			std::filesystem::path folder = scene.parent_path();
+			std::filesystem::path folder = file.parent_path();
 
 			while (!HasProjectFile(folder))
 			{
 				if (folder == folder.parent_path())
-					return scene.parent_path();
+					return file.parent_path();
 
 				folder = folder.parent_path();
 			};
@@ -758,10 +758,12 @@ namespace Loom
 
 		DialogueManagerBase::onNewBinding = [this](const std::string& type) { AddDialogueBinding(type); };
 
-		// Set before the first frame, which is when ImGui reads it.
+		// Read now rather than on the first frame, so the panels a file opened
+		// from the command line shows are not closed again by the saved layout.
 		static const std::string layout = BesideExecutable("LoomEditor.layout.ini").string();
 		ImGui::GetIO().IniFilename = layout.c_str();
 		AddPanelSettings();
+		ImGui::LoadIniSettingsFromDisk(layout.c_str());
 
 		// The engine keeps every floating window in an OS window of its own,
 		// which for an editor means dialogs that sit behind the main window and
@@ -974,6 +976,31 @@ namespace Loom
 
 				return OpenProject(std::filesystem::absolute(path, code).parent_path().string(), open_scene);
 			};
+
+		// A prefab, sprite, palette or build settings file opens its panel in the
+		// project it belongs to.
+		if (const std::filesystem::path file = path;
+			(file.extension() == Prefab::extension ||
+			file.extension() == SpriteAsset::extension ||
+			file.extension() == Palette::extension ||
+			file.extension() == BuildSettings::extension) &&
+			std::filesystem::is_regular_file(file, code))
+		{
+			const std::filesystem::path absolute = std::filesystem::absolute(file, code).lexically_normal();
+
+			if (!OpenProject(ProjectFolderOf(absolute).string(), open_scene))
+				return false;
+
+			if (file.extension() == Prefab::extension)
+				OpenModel(absolute.string());
+			else if (file.extension() == SpriteAsset::extension)
+				OpenSprite(absolute.string());
+			else if (file.extension() == Palette::extension)
+				OpenPalette(absolute.string());
+			else m_showBuildSettings = true;
+
+			return true;
+		};
 
 		// So does a scene file, for the project it belongs to, which then starts
 		// on that scene.

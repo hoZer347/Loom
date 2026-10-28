@@ -157,6 +157,7 @@
     <ClCompile Include="BuildSettings.cpp" />
     <ClCompile Include="ScriptRun.cpp" />
     <ClCompile Include="ProjectTemplate.cpp" />
+    <ClCompile Include="FileTypes.cpp" />
     <ClCompile Include="EditorScripts.cpp" />
     <ClCompile Include="EditorProject.cpp" />
     <ClCompile Include="EditorRefresh.cpp" />
@@ -220,6 +221,7 @@
     <ClInclude Include="BuildSettings.h" />
     <ClInclude Include="ScriptRun.h" />
     <ClInclude Include="ProjectTemplate.h" />
+    <ClInclude Include="FileTypes.h" />
     <ClInclude Include="ProjectAssets.h" />
     <ClInclude Include="EditorFileDialogs.h" />
     <ClInclude Include="EditorLog.h" />
