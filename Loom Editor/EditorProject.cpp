@@ -1894,39 +1894,9 @@ namespace Loom
 		m_dialogues.Relocate(path, moved);
 		m_sprites.Relocate(path, moved);
 		m_models.Relocate(path, moved);
+		SpriteAsset::RelinkPalettes(m_projectPath, path, moved);
 
-		// The FileTabs file theirs by their paths, so they stay filed where
-		// they were.
-		const auto refile = [this](const std::string& from, const std::string& to)
-		{
-			for (FileTab& tab : m_fileTabs)
-			{
-				bool refiled = false;
-
-				for (const std::string& file : tab.files)
-				{
-					const std::filesystem::path relocated = ProjectAssets::Relocate((std::filesystem::path(m_projectPath) / file).lexically_normal().string(), from, to);
-					const std::string now = relocated.lexically_relative(m_projectPath).generic_string();
-
-					if (now == file)
-						continue;
-
-					const std::string filed = tab.folders.FolderOf(file);
-
-					tab.folders.Move(file, "");
-					tab.folders.Move(now, filed);
-					refiled = true;
-
-					if (tab.selected == file)
-						tab.selected = now;
-				};
-
-				if (refiled)
-					SaveFileFolders(tab);
-			};
-		};
-
-		refile(path, moved);
+		Refile(path, moved);
 
 		if (!companion.empty())
 		{
@@ -1937,7 +1907,7 @@ namespace Loom
 			else
 			{
 				m_sprites.Relocate(companion, companion_moved);
-				refile(companion, companion_moved);
+				Refile(companion, companion_moved);
 			};
 		};
 
@@ -1948,6 +1918,35 @@ namespace Loom
 
 		m_selectedAsset = std::filesystem::path(moved).lexically_normal().string();
 		m_revealSelectedAsset = true;
+	};
+
+	void Editor::Refile(const std::string& from, const std::string& to)
+	{
+		for (FileTab& tab : m_fileTabs)
+		{
+			bool refiled = false;
+
+			for (const std::string& file : tab.files)
+			{
+				const std::filesystem::path relocated = ProjectAssets::Relocate((std::filesystem::path(m_projectPath) / file).lexically_normal().string(), from, to);
+				const std::string now = relocated.lexically_relative(m_projectPath).generic_string();
+
+				if (now == file)
+					continue;
+
+				const std::string filed = tab.folders.FolderOf(file);
+
+				tab.folders.Move(file, "");
+				tab.folders.Move(now, filed);
+				refiled = true;
+
+				if (tab.selected == file)
+					tab.selected = now;
+			};
+
+			if (refiled)
+				SaveFileFolders(tab);
+		};
 	};
 
 	#pragma endregion

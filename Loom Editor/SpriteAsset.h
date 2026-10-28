@@ -129,6 +129,12 @@ namespace Loom
 		static bool Load(const std::string& path, SpriteAsset& sprite, Links& links);
 		static bool Save(const std::string& path, const SpriteAsset& sprite, const Links& links);
 
+		// Once from, a palette or a folder of them, has moved to to, points
+		// every sprite file in folder, and the folders inside it, that was
+		// painted from one at where it is now, changing nothing else in them.
+		// How many it rewrote.
+		static int RelinkPalettes(const std::string& folder, const std::string& from, const std::string& to);
+
 		#pragma endregion
 
 		#pragma region Editing

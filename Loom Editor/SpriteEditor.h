@@ -77,6 +77,9 @@ namespace Loom
 		// The images saved since the last call.
 		std::vector<std::string> TakeSaved();
 
+		// The palettes renamed since the last call, from where to where.
+		std::vector<std::pair<std::string, std::string>> TakeRenamed();
+
 		#pragma endregion
 
 		#pragma region Windows
@@ -93,8 +96,9 @@ namespace Loom
 
 		#pragma region Palette Window
 
-		// project_folder is where it looks for palettes to pick from, or beside
-		// the sprite when it is empty.
+		// project_folder is where it looks for palettes to pick from, and for
+		// sprites to point at one renamed, or beside the sprite when it is
+		// empty.
 		void DrawPalette(bool* open, const std::string& project_folder);
 
 		#pragma endregion
@@ -231,6 +235,7 @@ namespace Loom
 
 		// Into m_paletteFiles, from the project, or beside the sprite, and those made and not yet saved.
 		void FindPalettes(const std::string& project_folder);
+		void DrawPaletteRename(const std::string& project_folder);
 
 		#pragma endregion
 
@@ -370,6 +375,12 @@ namespace Loom
 		// The category just added, whose rename box opens on the next frame,
 		// or -1.
 		int m_renameCategory = -1;
+
+		// What the palette's rename box holds while it is open.
+		static constexpr size_t paletteNameSize = 64;
+		char m_paletteName[paletteNameSize] = { };
+
+		std::vector<std::pair<std::string, std::string>> m_renamed;
 
 		#pragma endregion
 

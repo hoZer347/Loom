@@ -439,6 +439,45 @@ TEST_SUITE("ProjectAssets")
 		std::filesystem::remove_all(root);
 	};
 
+	TEST_CASE("a file renamed keeps its folder, never replaces anything, and may change only its case")
+	{
+		const std::filesystem::path root = std::filesystem::temp_directory_path() / "loom project assets rename";
+
+		std::filesystem::remove_all(root);
+		std::filesystem::create_directories(root);
+
+		const std::string warm = (root / "Warm.loompalette").string();
+		std::ofstream(warm) << "#FF0000FF\n";
+		std::ofstream(root / "Cold.loompalette") << "#0000FFFF\n";
+
+		const std::string renamed = Loom::ProjectAssets::Rename(warm, "Hot.loompalette");
+
+		CHECK(renamed == (root / "Hot.loompalette").string());
+		CHECK(ReadAll(renamed) == "#FF0000FF\n");
+		CHECK_FALSE(std::filesystem::exists(warm));
+
+		std::string error;
+		CHECK(Loom::ProjectAssets::Rename(renamed, "Cold.loompalette", &error).empty());
+		CHECK_FALSE(error.empty());
+		CHECK(ReadAll((root / "Cold.loompalette").string()) == "#0000FFFF\n");
+
+		error.clear();
+		CHECK(Loom::ProjectAssets::Rename(renamed, "Bad/Name.loompalette", &error).empty());
+		CHECK_FALSE(error.empty());
+		CHECK(std::filesystem::exists(renamed));
+
+		const std::string recased = Loom::ProjectAssets::Rename(renamed, "HOT.loompalette");
+		std::vector<std::string> names;
+
+		for (const auto& entry : std::filesystem::directory_iterator(root))
+			names.push_back(entry.path().filename().string());
+
+		CHECK(recased == (root / "HOT.loompalette").string());
+		CHECK(std::find(names.begin(), names.end(), "HOT.loompalette") != names.end());
+
+		std::filesystem::remove_all(root);
+	};
+
 	TEST_CASE("a file is named from the project by its own path there, so two of one name stay apart")
 	{
 		const std::filesystem::path root = std::filesystem::temp_directory_path() / "loom project assets relative";

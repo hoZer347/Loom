@@ -570,6 +570,50 @@ namespace Loom
 		return WriteFile(path, out.str(), "Sprites");
 	};
 
+	int SpriteAsset::RelinkPalettes(const std::string& folder, const std::string& from, const std::string& to)
+	{
+		int rewritten = 0;
+		std::error_code code;
+
+		for (auto entry = std::filesystem::recursive_directory_iterator(folder, std::filesystem::directory_options::skip_permission_denied, code);
+			entry != std::filesystem::recursive_directory_iterator();
+			entry.increment(code))
+		{
+			if (entry->path().extension() != extension)
+				continue;
+
+			std::ifstream file(entry->path(), std::ios::binary);
+			const std::filesystem::path sprite_folder = entry->path().parent_path();
+			std::string text;
+			std::string line;
+			bool relinked = false;
+
+			while (std::getline(file, line))
+			{
+				const bool carriage = !line.empty() && line.back() == '\r';
+
+				if (carriage)
+					line.pop_back();
+
+				if (const auto [key, value] = Split(line); key == palette_key && !value.empty())
+					if (const std::string palette = Resolve(value, sprite_folder), moved = ProjectAssets::Relocate(palette, from, to); moved != palette)
+					{
+						line = std::string(palette_key) + separator + Relative(moved, sprite_folder);
+						relinked = true;
+					};
+
+				text += line + (carriage ? "\r\n" : "\n");
+			};
+
+			file.close();
+
+			if (relinked && WriteFile(entry->path().string(), text, "Sprites"))
+				rewritten++;
+		};
+
+		return rewritten;
+	};
+
 	#pragma endregion
 
 	#pragma region Editing

@@ -111,6 +111,10 @@ namespace Loom
 		// is replaced, and a folder never goes inside itself.
 		static std::string MoveInto(const std::string& path, const std::string& folder, std::string* error = nullptr);
 
+		// Renames a file in its folder to name, its extension included. Nothing
+		// there is replaced.
+		static std::string Rename(const std::string& path, const std::string& name, std::string* error = nullptr);
+
 		// Where path is once from has moved to to: path itself when it is
 		// neither from nor inside it.
 		static std::string Relocate(const std::string& path, const std::string& from, const std::string& to);

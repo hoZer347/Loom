@@ -642,6 +642,36 @@ namespace {NAMESPACE}
 		return target.string();
 	};
 
+	std::string ProjectAssets::Rename(const std::string& path, const std::string& name, std::string* error)
+	{
+		const std::filesystem::path source(path);
+		const std::filesystem::path target = source.parent_path() / name;
+		std::error_code code;
+
+		if (!IsValidName(std::filesystem::path(name).stem().string()))
+		{
+			Fail(error, "Could not rename " + path + ": " + name + " is not a usable name");
+			return "";
+		};
+
+		// One differing only in case is the file itself.
+		if (std::filesystem::exists(target, code) && !std::filesystem::equivalent(source, target, code))
+		{
+			Fail(error, "Could not rename " + path + ": " + target.string() + " already exists");
+			return "";
+		};
+
+		std::filesystem::rename(source, target, code);
+
+		if (code)
+		{
+			Fail(error, "Could not rename " + path + " to " + target.string() + ": " + code.message());
+			return "";
+		};
+
+		return target.string();
+	};
+
 	std::string ProjectAssets::Relocate(const std::string& path, const std::string& from, const std::string& to)
 	{
 		std::error_code code;

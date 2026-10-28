@@ -359,6 +359,11 @@ namespace Loom
 		return std::exchange(m_saved, { });
 	};
 
+	std::vector<std::pair<std::string, std::string>> SpriteEditor::TakeRenamed()
+	{
+		return std::exchange(m_renamed, { });
+	};
+
 	#pragma endregion
 
 	#pragma region Windows
@@ -1301,7 +1306,10 @@ namespace Loom
 		const std::string& current = PalettePath();
 		const std::string shown = current.empty() ? "None" : FileName(current) + (PaletteAt(current).Unsaved() ? " *" : "");
 
-		ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("New").x - ImGui::GetStyle().FramePadding.x * 2.0f - ImGui::GetStyle().ItemSpacing.x);
+		const ImGuiStyle& style = ImGui::GetStyle();
+		const float buttons_width = ImGui::CalcTextSize("New").x + ImGui::CalcTextSize("Clone").x + (style.FramePadding.x * 2.0f + style.ItemSpacing.x) * 2.0f;
+
+		ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - buttons_width);
 
 		if (ImGui::BeginCombo("##palette", (std::string(EditorIcons::Palette) + " " + shown).c_str()))
 		{
@@ -1322,6 +1330,11 @@ namespace Loom
 			ImGui::EndCombo();
 		};
 
+		if (!current.empty())
+			ImGui::SetItemTooltip("Right-click to rename");
+
+		DrawPaletteRename(project_folder);
+
 		ImGui::SameLine();
 		ImGui::BeginDisabled(m_active == nullptr);
 
@@ -1335,6 +1348,81 @@ namespace Loom
 
 		ImGui::EndDisabled();
 		ImGui::SetItemTooltip("A palette beside the sprite, of the colours it already has");
+
+		ImGui::SameLine();
+		ImGui::BeginDisabled(current.empty());
+
+		if (ImGui::Button("Clone"))
+		{
+			const std::string path = NewPalettePath(current);
+			const Palette palette = PaletteAt(current);
+
+			if (Palette::Save(path, palette))
+			{
+				m_palettes[path] = palette;
+				SetPalette(path);
+			};
+		};
+
+		ImGui::EndDisabled();
+		ImGui::SetItemTooltip("A copy of this palette beside it, painted from in its place");
+	};
+
+	void SpriteEditor::DrawPaletteRename(const std::string& project_folder)
+	{
+		const std::string current = PalettePath();
+
+		if (current.empty() || !ImGui::BeginPopupContextItem("##rename_palette"))
+			return;
+
+		if (ImGui::IsWindowAppearing())
+		{
+			snprintf(m_paletteName, sizeof(m_paletteName), "%s", std::filesystem::path(current).stem().string().c_str());
+			ImGui::SetKeyboardFocusHere();
+		};
+
+		const bool entered = ImGui::InputText("##name", m_paletteName, sizeof(m_paletteName), ImGuiInputTextFlags_EnterReturnsTrue);
+		const std::string name = std::string(m_paletteName) + Palette::extension;
+		const std::filesystem::path target = std::filesystem::path(current).parent_path() / name;
+
+		std::error_code code;
+		const bool same = target == std::filesystem::path(current);
+		const bool taken = !same && std::filesystem::exists(target, code) && !std::filesystem::equivalent(current, target, code);
+		const bool usable = ProjectAssets::IsValidName(m_paletteName) && !taken;
+
+		if (!usable)
+			ImGui::TextDisabled(taken ? "%s is already there" : "Not a usable name", name.c_str());
+
+		if (entered && (same || !usable))
+		{
+			if (same)
+				ImGui::CloseCurrentPopup();
+
+			ImGui::EndPopup();
+			return;
+		};
+
+		if (entered)
+		{
+			std::string error;
+
+			if (const std::string renamed = ProjectAssets::Rename(current, name, &error); renamed.empty())
+				std::cerr << "Palette: " << error << std::endl;
+			else
+			{
+				const std::string root = !project_folder.empty()
+					? project_folder
+					: std::filesystem::path(current).parent_path().string();
+
+				SpriteAsset::RelinkPalettes(root, current, renamed);
+				Relocate(current, renamed);
+				m_renamed.emplace_back(current, renamed);
+			};
+
+			ImGui::CloseCurrentPopup();
+		};
+
+		ImGui::EndPopup();
 	};
 
 	void SpriteEditor::DrawSwatches(const std::string& path)

@@ -861,6 +861,10 @@ namespace Loom
 		void AcceptMove(const std::string& folder);
 		void MoveAsset(const std::string& path, const std::string& folder);
 
+		// The FileTabs file theirs by their paths, so one moved from from to to
+		// stays filed where it was.
+		void Refile(const std::string& from, const std::string& to);
+
 		// The texture at path, to show in place of its icon. Null for anything
 		// else, or a texture that will not load.
 		const Texture* Thumbnail(const std::string& path);
@@ -903,7 +907,8 @@ namespace Loom
 		void PollShaders();
 
 		// Has the Sprites that show a file the Sprites panel saved draw it as
-		// it now is.
+		// it now is, and the 2D tab keep a palette renamed in the Palette
+		// panel filed where it was.
 		void ReloadSavedSprites();
 
 		// Has the instances of a prefab the Model panel saved take it as it

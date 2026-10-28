@@ -3464,6 +3464,14 @@ namespace Loom
 	{
 		for (const std::string& path : m_sprites.TakeSaved())
 			Texture::ReloadShared(path);
+
+		const std::vector<std::pair<std::string, std::string>> renamed = m_sprites.TakeRenamed();
+
+		for (const auto& [from, to] : renamed)
+			Refile(from, to);
+
+		if (!renamed.empty())
+			RefreshProjectAssets();
 	};
 
 	void Editor::TakeSavedModels()

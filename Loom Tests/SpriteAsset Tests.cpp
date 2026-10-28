@@ -494,4 +494,50 @@ TEST_SUITE("SpriteAsset")
 
 		std::filesystem::remove(path);
 	};
+
+	TEST_CASE("a palette or a folder of them moved is followed by the sprites painted from it, and no other line or sprite changes")
+	{
+		const std::filesystem::path folder = Temp("loom sprite relink");
+		std::filesystem::remove_all(folder);
+		std::filesystem::create_directories(folder / "Units" / "Tanks");
+		std::filesystem::create_directories(folder / "Palettes");
+
+		const std::string warm = (folder / "Palettes" / "Warm.loompalette").string();
+		const std::string cold = (folder / "Palettes" / "Cold.loompalette").string();
+		const std::string hero = (folder / "Hero.loomsprite").string();
+		const std::string tank = (folder / "Units" / "Tanks" / "Tank.loomsprite").string();
+		const std::string ice = (folder / "Ice.loomsprite").string();
+		const SpriteAsset sprite = TwoByTwo();
+
+		REQUIRE(SpriteAsset::Save(hero, sprite, { (folder / "Hero.png").string(), warm }));
+		REQUIRE(SpriteAsset::Save(tank, sprite, { (folder / "Units" / "Tanks" / "Tank.png").string(), warm }));
+		REQUIRE(SpriteAsset::Save(ice, sprite, { (folder / "Ice.png").string(), cold }));
+
+		const auto links = [](const std::string& path)
+		{
+			SpriteAsset loaded;
+			SpriteAsset::Links loaded_links;
+			SpriteAsset::Load(path, loaded, loaded_links);
+			return loaded_links;
+		};
+
+		const std::string hot = (folder / "Palettes" / "Hot.loompalette").string();
+
+		CHECK(SpriteAsset::RelinkPalettes(folder.string(), warm, hot) == 2);
+		CHECK(links(hero).palette == hot);
+		CHECK(links(hero).image == (folder / "Hero.png").string());
+		CHECK(links(tank).palette == hot);
+		CHECK(links(ice).palette == cold);
+
+		const std::filesystem::path moved = folder / "Units" / "Palettes";
+
+		CHECK(SpriteAsset::RelinkPalettes(folder.string(), (folder / "Palettes").string(), moved.string()) == 3);
+		CHECK(links(hero).palette == (moved / "Hot.loompalette").string());
+		CHECK(links(tank).palette == (moved / "Hot.loompalette").string());
+		CHECK(links(ice).palette == (moved / "Cold.loompalette").string());
+
+		CHECK(SpriteAsset::RelinkPalettes(folder.string(), warm, hot) == 0);
+
+		std::filesystem::remove_all(folder);
+	};
 };

@@ -244,6 +244,20 @@ namespace
 			return "";
 		};
 
+		// Whether any tab has changes not yet saved.
+		static bool Unsaved()
+		{
+			ImGuiContext& g = *ImGui::GetCurrentContext();
+
+			for (int i = 0; i < g.TabBars.GetMapSize(); i++)
+				if (ImGuiTabBar* bar = g.TabBars.TryGetMapData(i))
+					for (const ImGuiTabItem& tab : bar->Tabs)
+						if (tab.Flags & ImGuiTabItemFlags_UnsavedDocument)
+							return true;
+
+			return false;
+		};
+
 		// The middle of the tab whose name holds name, which a script cannot
 		// aim at by its label, or nowhere when there is none.
 		static ImVec2 TabMiddle(const std::string& name)
@@ -595,6 +609,75 @@ TEST_SUITE("SpriteEditor")
 		CHECK(made.colours == std::vector<SpriteAsset::Colour>{ RED });
 
 		std::filesystem::remove(palette);
+	};
+
+	TEST_CASE("Clone makes a copy of the palette beside it and paints from that")
+	{
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.layers[0].cels[0].Set(0, 0, RED);
+
+		Driven driven("loom sprite palette clone.tga", &sprite);
+
+		driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\nclick \"Palette\" \"Clone\"\nwait 2\n");
+
+		const std::filesystem::path palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension);
+		const std::filesystem::path clone = palette.parent_path() / (palette.stem().string() + "1" + Loom::Palette::extension);
+
+		Loom::Palette original;
+		Loom::Palette cloned;
+		REQUIRE(Loom::Palette::Load(palette.string(), original));
+		REQUIRE(Loom::Palette::Load(clone.string(), cloned));
+		CHECK(cloned == original);
+
+		REQUIRE(driven.editor.SaveAll());
+
+		SpriteAsset saved;
+		SpriteAsset::Links links;
+		REQUIRE(SpriteAsset::Load(SpriteAsset::For(driven.path), saved, links));
+		CHECK(links.palette == clone.string());
+
+		std::filesystem::remove(palette);
+		std::filesystem::remove(clone);
+	};
+
+	TEST_CASE("a palette renamed from its right-click menu takes the sprites painted from it along, open or saved, without marking them unsaved")
+	{
+		const std::filesystem::path folder = std::filesystem::temp_directory_path() / "loom sprite palette rename";
+		std::filesystem::remove_all(folder);
+		std::filesystem::create_directories(folder / "Units");
+
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.layers[0].cels[0].Set(0, 0, RED);
+
+		Driven driven("loom sprite palette rename/Hero.tga", &sprite);
+
+		driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\n");
+		REQUIRE(driven.editor.SaveAll());
+
+		const std::string palette = (folder / "Hero.loompalette").string();
+		const std::string hot = (folder / "Hot.loompalette").string();
+		const std::string other = (folder / "Units" / "Tank.loomsprite").string();
+		REQUIRE(SpriteAsset::Save(other, sprite, { (folder / "Units" / "Tank.png").string(), palette }));
+
+		driven.Run("rightclick \"Palette\" \"New\" left -40 0\nwait 2\nkey ctrl+a\ntype Hot\nkey enter\nwait 2\n");
+
+		CHECK(std::filesystem::exists(hot));
+		CHECK_FALSE(std::filesystem::exists(palette));
+		CHECK_FALSE(Driven::Unsaved());
+		CHECK(driven.editor.TakeRenamed() == std::vector<std::pair<std::string, std::string>>{ { palette, hot } });
+
+		SpriteAsset saved;
+		SpriteAsset::Links links;
+		REQUIRE(SpriteAsset::Load(SpriteAsset::For(driven.path), saved, links));
+		CHECK(links.palette == hot);
+		REQUIRE(SpriteAsset::Load(other, saved, links));
+		CHECK(links.palette == hot);
+
+		REQUIRE(driven.editor.SaveAll());
+		REQUIRE(SpriteAsset::Load(SpriteAsset::For(driven.path), saved, links));
+		CHECK(links.palette == hot);
+
+		std::filesystem::remove_all(folder);
 	};
 
 	TEST_CASE("the panel opening with the Palette panel shut asks to open it, and Open Palette does")
