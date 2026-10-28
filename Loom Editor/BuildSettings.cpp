@@ -90,12 +90,13 @@ namespace Loom
 		const bool undo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z);
 		const bool redo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y) || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z);
 
-		if (Settings settings = Current(); (undo || redo) && m_history.Step(settings, undo))
-		{
-			configuration = settings.configuration;
-			scene = settings.scene;
-			folder = settings.folder;
-		};
+		if (undo || redo)
+			if (Settings settings = Current(); m_history.Step(settings, undo))
+			{
+				configuration = settings.configuration;
+				scene = settings.scene;
+				folder = settings.folder;
+			};
 
 		return ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_S);
 	};

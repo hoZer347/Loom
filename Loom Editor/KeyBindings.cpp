@@ -104,11 +104,12 @@ namespace Loom
 		const bool undo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z);
 		const bool redo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y) || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z);
 
-		if (InputActions::File file = Current(); (undo || redo) && m_history.Step(file, undo))
-		{
-			InputActions::Set(std::move(file.actions), std::move(file.folders));
-			m_renaming.reset();
-		};
+		if (undo || redo)
+			if (InputActions::File file = Current(); m_history.Step(file, undo))
+			{
+				InputActions::Set(std::move(file.actions), std::move(file.folders));
+				m_renaming.reset();
+			};
 
 		return ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_S);
 	};

@@ -10,6 +10,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <memory>
 #include <string>
 #include <vector>
@@ -38,6 +39,8 @@ namespace
 
 			script = std::make_unique<Loom::UiScript>(std::filesystem::path());
 			script->LoadText(text);
+
+			settings.Save(file);
 		};
 
 		// A script of its own to carry on with, since one that has ended stays ended.
@@ -51,9 +54,11 @@ namespace
 		{
 			script.reset();
 			ImGui::DestroyContext(context);
+			std::filesystem::remove(file);
 		};
 
-		// Frames until the script ends; how many of them asked to save.
+		// Frames until the script ends; how many of them asked to save, each
+		// writing to file as the editor does.
 		int Run()
 		{
 			constexpr int most_frames = 600;
@@ -70,7 +75,10 @@ namespace
 				ImGui::SetNextWindowSize(ImVec2(width, height));
 
 				if (settings.Draw(&open, "C:/Games/MyGame", "Space", []() { return std::vector<std::string>{ }; }, "", false) == Loom::BuildSettings::Action::Save)
+				{
 					saves++;
+					REQUIRE(settings.Save(file));
+				};
 
 				ImGui::Render();
 			};
@@ -84,6 +92,14 @@ namespace
 		ImGuiContext* context = nullptr;
 		std::unique_ptr<Loom::UiScript> script;
 		Loom::BuildSettings settings;
+
+		const std::string file = (std::filesystem::temp_directory_path() / "Loom BuildSettings Driven.loombuild").string();
+
+		std::string OnDisk() const
+		{
+			std::ifstream in(file, std::ios::binary);
+			return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+		};
 	};
 
 	// The tab is drawn before anything in it can be aimed at.
@@ -210,10 +226,12 @@ TEST_SUITE("BuildSettings")
 	TEST_CASE("a folder typed is held until Ctrl+S, and Ctrl+Z and Ctrl+Y step it")
 	{
 		Driven driven(std::string(drawn) + typed_folder + drawn);
+		const std::string loaded = driven.OnDisk();
 
 		CHECK(driven.Run() == 0);
 		CHECK(driven.settings.folder == "D:/Out");
 		CHECK(driven.settings.Unsaved());
+		CHECK(driven.OnDisk() == loaded);
 
 		driven.Next("key ctrl+z\n" + std::string(drawn));
 		driven.Run();
@@ -230,6 +248,8 @@ TEST_SUITE("BuildSettings")
 
 		CHECK(driven.Run() == 1);
 		CHECK_FALSE(driven.script->Failed());
+		CHECK_FALSE(driven.settings.Unsaved());
+		CHECK(driven.OnDisk().find("folder=D:/Out") != std::string::npos);
 	};
 
 	TEST_CASE("only the player's own configurations are ones to build")

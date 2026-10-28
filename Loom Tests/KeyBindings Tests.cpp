@@ -10,6 +10,8 @@
 #include "imgui.h"
 
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -41,6 +43,7 @@ namespace
 			io.Fonts->GetTexDataAsRGBA32(&pixels, &atlas_width, &atlas_height);
 
 			Loom::InputActions::Set(std::move(actions), std::move(folders));
+			Loom::InputActions::Save(file);
 			panel.Loaded();
 
 			script = std::make_unique<Loom::UiScript>(std::filesystem::path());
@@ -59,11 +62,12 @@ namespace
 			script.reset();
 			ImGui::DestroyContext(context);
 			Loom::InputActions::Set({ });
+			std::filesystem::remove(file);
 		};
 
 		// Frames until the script ends; how many of them changed the actions.
-		// Ctrl+S is counted in saves, and has the panel told they were saved,
-		// as the editor does once it has written them.
+		// Ctrl+S is counted in saves, and writes them to file and has the
+		// panel told, as the editor does.
 		int Run(bool project_open = true)
 		{
 			constexpr int most_frames = 600;
@@ -84,6 +88,7 @@ namespace
 				if (panel.Draw(&open, project_open))
 				{
 					saves++;
+					REQUIRE(Loom::InputActions::Save(file));
 					panel.Saved();
 				};
 
@@ -101,6 +106,12 @@ namespace
 			return { Loom::InputActions::All(), Loom::InputActions::Folders() };
 		};
 
+		std::string OnDisk() const
+		{
+			std::ifstream in(file, std::ios::binary);
+			return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+		};
+
 		static constexpr float width = 800.0f;
 		static constexpr float height = 600.0f;
 
@@ -108,6 +119,9 @@ namespace
 		std::unique_ptr<Loom::UiScript> script;
 		Loom::KeyBindings panel;
 		int saves = 0;
+
+		// Where the actions were loaded from, and Ctrl+S writes them.
+		const std::string file = (std::filesystem::temp_directory_path() / "Loom KeyBindings Tests.loominput").string();
 	};
 
 	const std::vector<Action> slowdown = { { "Slowdown", { Loom::Key::Space } } };
@@ -256,10 +270,12 @@ TEST_SUITE("KeyBindings")
 	TEST_CASE("a change is held until Ctrl+S saves it")
 	{
 		Driven driven(std::string(drawn) + "click \"Key Bindings\" \"Remove\"\n" + drawn, slowdown);
+		const std::string loaded = driven.OnDisk();
 
 		CHECK(driven.Run() == 1);
 		CHECK(driven.saves == 0);
 		CHECK(driven.panel.Unsaved());
+		CHECK(driven.OnDisk() == loaded);
 
 		driven.Next("key ctrl+s\n" + std::string(drawn));
 		driven.Run();
@@ -267,15 +283,20 @@ TEST_SUITE("KeyBindings")
 		CHECK_FALSE(driven.script->Failed());
 		CHECK(driven.saves == 1);
 		CHECK_FALSE(driven.panel.Unsaved());
+		CHECK(driven.OnDisk() != loaded);
+		CHECK(driven.OnDisk().find("Slowdown") == std::string::npos);
 	};
 
 	TEST_CASE("Ctrl+Z takes a change back, saved again, and Ctrl+Y puts it back")
 	{
 		Driven driven(std::string(drawn) + "click \"Key Bindings\" \"Remove\"\n" + drawn + "key ctrl+z\n" + drawn, slowdown);
 
+		const std::string loaded = driven.OnDisk();
+
 		CHECK(driven.Run() == 2);
 		CHECK(Loom::InputActions::All() == slowdown);
 		CHECK_FALSE(driven.panel.Unsaved());
+		CHECK(driven.OnDisk() == loaded);
 
 		driven.Next("key ctrl+y\n" + std::string(drawn));
 

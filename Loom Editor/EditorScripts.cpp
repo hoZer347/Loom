@@ -48,6 +48,8 @@ namespace Loom
 
 	void Editor::LoadProjectFile()
 	{
+		const std::string previous = m_projectFile;
+
 		m_scripts.Clear();
 		m_projectFile.clear();
 		m_componentMenu.Clear();
@@ -55,10 +57,6 @@ namespace Loom
 
 		for (FileTab& tab : m_fileTabs)
 			tab.folders.Clear();
-
-		InputActions::Set({ });
-		m_keyBindings.Loaded();
-		m_buildSettings = BuildSettings{ };
 
 		// Unless the project file names it otherwise.
 		m_projectName = std::filesystem::path(m_projectPath).filename().string();
@@ -76,6 +74,17 @@ namespace Loom
 			};
 		};
 
+		// The project open already, read again for its scripts project, keeps
+		// the key bindings and build settings it has not saved yet.
+		const bool reread = !m_projectFile.empty() && m_projectFile == previous;
+
+		if (!reread)
+		{
+			InputActions::Set({ });
+			m_keyBindings.Loaded();
+			m_buildSettings = BuildSettings{ };
+		};
+
 		if (m_projectFile.empty())
 			return;
 
@@ -84,9 +93,12 @@ namespace Loom
 		for (FileTab& tab : m_fileTabs)
 			tab.Load(FileFoldersFile(tab));
 
-		InputActions::Load(InputActionsFile());
-		m_keyBindings.Loaded();
-		m_buildSettings.Load(BuildSettingsFile());
+		if (!reread)
+		{
+			InputActions::Load(InputActionsFile());
+			m_keyBindings.Loaded();
+			m_buildSettings.Load(BuildSettingsFile());
+		};
 
 		std::ifstream in(m_projectFile);
 		std::string line, project, library;
