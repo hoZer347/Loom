@@ -46,8 +46,6 @@ namespace Loom
 		constexpr const char* Hierarchy = "🌳 Hierarchy###Hierarchy";
 		constexpr const char* Project = "📁 Project###Project";
 		constexpr const char* Inspector = "🔍 Inspector###Inspector";
-		constexpr const char* Scene = "🎬 Scene###Scene";
-		constexpr const char* SceneId = "###Scene";
 		constexpr const char* Game = "🎮 Game###Game";
 		constexpr const char* Debug = "🐞 Debug###Debug";
 		constexpr const char* PrefabId = "###Prefab";

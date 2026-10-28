@@ -157,9 +157,6 @@ namespace Loom
 
 		void SetActiveScene(Scene* scene);
 
-		// Makes the scene active and brings the Scene view, opened if closed,
-		// to the front.
-		void ShowInSceneView(Scene* scene);
 		bool IsOwned(Scene* scene) const;
 
 		// The file an owned scene was opened from or saved to, empty for one
@@ -647,7 +644,6 @@ namespace Loom
 
 		#pragma region Views
 
-		void DrawScene();
 		void DrawPrefab();
 		void DrawGame();
 		void DrawDebug();
@@ -656,7 +652,6 @@ namespace Loom
 		// their panel away.
 		enum class View
 		{
-			Scene,
 			Prefab,
 			Game,
 			Debug,
@@ -664,7 +659,6 @@ namespace Loom
 
 		// What each view's panel holds, in whatever window is open: its
 		// panel, or the one over the whole monitor.
-		void DrawSceneView();
 		void DrawPrefabView();
 		void DrawGameView();
 		void DrawDebugView();
@@ -1065,21 +1059,15 @@ namespace Loom
 
 		#pragma region Views
 
-		EditorViewport m_sceneView;
 		EditorViewport m_gameView;
 		EditorViewport m_debugView;
 
-		EditorCamera m_sceneCamera;
 		EditorCamera m_debugCamera;
 
-		SelectionOutline m_sceneOutline;
 		SelectionOutline m_debugOutline;
 
 		// Shared: unlike an outline, it keeps nothing the size of a view.
 		ColliderGizmos m_colliderGizmos;
-
-		// Frames left in which the Scene view asks for focus.
-		int m_sceneFocusFrames = 0;
 
 		#pragma endregion
 
@@ -1345,7 +1333,6 @@ namespace Loom
 		bool m_showHierarchy = true;
 		bool m_hierarchyFocused = false;
 		bool m_showInspector = true;
-		bool m_showScene = true;
 		bool m_showGame = true;
 		bool m_showDebug = true;
 		bool m_gamePanelFocused = false;

@@ -217,7 +217,7 @@ TEST_SUITE("Ui")
 				CHECK(vertices[corner + Z] == renderer.drawnVertices[0][Z]);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene rendered outside an overlay leaves its UI out, as the editor's Scene view renders")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene rendered outside an overlay leaves its UI out, as the editor's Debug view renders")
 	{
 		LoomTests::RecordingRenderer renderer;
 		PointAt(glm::vec2(0.0f));

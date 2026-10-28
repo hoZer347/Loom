@@ -48,7 +48,7 @@ TEST_SUITE("EditorIcons")
 
 		CHECK(EditorPanels::IdOf(EditorPanels::Hierarchy) == "Hierarchy");
 		CHECK(EditorPanels::IdOf(EditorPanels::SceneData) == "Scene Data");
-		CHECK(EditorPanels::IdOf(EditorPanels::SceneId) == "Scene");
+		CHECK(EditorPanels::IdOf(EditorPanels::PrefabId) == "Prefab");
 	};
 
 	TEST_CASE("a texture is whatever stb_image decodes, whatever the extension's case")

@@ -448,7 +448,7 @@ namespace Loom
 
 		// What is docked in the middle: the views, and the shader, dialogue,
 		// sprite and model editors.
-		constexpr const char* centre_windows[] = { EditorPanels::SceneId, EditorPanels::Game, EditorPanels::Debug, EditorPanels::PrefabId, EditorPanels::Shaders, EditorPanels::Dialogues, EditorPanels::Sprites, EditorPanels::Model };
+		constexpr const char* centre_windows[] = { EditorPanels::Game, EditorPanels::Debug, EditorPanels::PrefabId, EditorPanels::Shaders, EditorPanels::Dialogues, EditorPanels::Sprites, EditorPanels::Model };
 
 		// What lights the Prefab panel, which the Hierarchy leaves out.
 		constexpr const char* prefab_light = "Prefab Light";
@@ -1351,14 +1351,6 @@ namespace Loom
 		SaveSettings();
 	};
 
-	void Editor::ShowInSceneView(Scene* scene)
-	{
-		SetActiveScene(scene);
-
-		m_showScene = true;
-		m_sceneFocusFrames = scene_focus_frames;
-	};
-
 	#pragma endregion
 
 	#pragma region Saving
@@ -2033,7 +2025,6 @@ namespace Loom
 		if (m_showProject)		DrawProject();
 		if (m_showHierarchy)	DrawHierarchy();
 		if (m_showInspector)	DrawInspector();
-		if (m_showScene)		DrawScene();
 		DrawPrefab();
 		if (m_showGame)			DrawGame();
 		if (m_showDebug)		DrawDebug();
@@ -2099,7 +2090,6 @@ namespace Loom
 		{
 			switch (*m_fullscreen)
 			{
-			case View::Scene:	DrawSceneView();	break;
 			case View::Prefab:	DrawPrefabView();	break;
 			case View::Game:	DrawGameView();		break;
 			case View::Debug:	DrawDebugView();	break;
@@ -2481,7 +2471,6 @@ namespace Loom
 			{ EditorPanels::Hierarchy, &m_showHierarchy, true },
 			{ EditorPanels::Project, &m_showProject, true },
 			{ EditorPanels::Inspector, &m_showInspector, true },
-			{ EditorPanels::Scene, &m_showScene, true },
 			{ EditorPanels::Game, &m_showGame, true },
 			{ EditorPanels::Debug, &m_showDebug, true },
 			{ EditorPanels::SceneData, &m_showSceneData, true },
@@ -2867,9 +2856,6 @@ namespace Loom
 
 		if (ImGui::BeginPopupContextItem())
 		{
-			if (ImGui::MenuItem("Open In Scene View"))
-				ShowInSceneView(scene);
-
 			if (ImGui::MenuItem("Add GameObject"))
 				Select(scene->AddChild());
 
@@ -3260,13 +3246,6 @@ namespace Loom
 		if (payload->IsDelivery())
 		{
 			const Hierarchy::Placement placement = Hierarchy::Place(row, open, zone, moving);
-
-			// Each scene is seen through its own camera, so an object moved into
-			// another scene is followed there rather than vanishing from view.
-			Scene* destination = EditCommands::SceneOf(row);
-
-			if (destination != EditCommands::SceneOf(*moving))
-				ShowInSceneView(destination);
 
 			moving->SetParent(placement.parent, placement.before);
 			Select(moving);
@@ -4262,41 +4241,6 @@ namespace Loom
 	#pragma endregion
 
 	#pragma region Views
-
-	void Editor::DrawScene()
-	{
-		const std::string title =
-			std::string(EditorIcons::Scene) + " " +
-			(m_activeScene ? m_activeScene->GetName() : std::string("Scene")) + EditorPanels::SceneId;
-
-		if (m_sceneFocusFrames > 0)
-		{
-			m_sceneFocusFrames--;
-			ImGui::SetNextWindowFocus();
-		};
-
-		if (ImGui::Begin(title.c_str(), &m_showScene, view_flags))
-		{
-			Watch(View::Scene);
-
-			DrawSceneView();
-		};
-
-		ImGui::End();
-	};
-
-	void Editor::DrawSceneView()
-	{
-		LOOM_STAGE("Editor::DrawSceneView");
-
-		if (m_activeScene == nullptr)
-			DrawNoScene();
-		else
-		{
-			DrawView(m_sceneView, { m_activeScene }, &m_sceneCamera, &m_sceneOutline);
-			TakeImportTarget(&m_activeScene->GetRoot());
-		};
-	};
 
 	void Editor::DrawPrefab()
 	{
