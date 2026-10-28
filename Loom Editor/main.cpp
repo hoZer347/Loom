@@ -25,6 +25,7 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -261,10 +262,22 @@ int main(int argc, char** argv)
 	// Explorer sends a double-clicked header here, to open in its project's Visual Studio.
 	if (argc == 2 && VisualStudio::IsHeader(argv[1]))
 	{
+		// Explorer gives no console, so what went wrong shows in a box.
+		std::ostringstream errors;
+		std::streambuf* const console = std::cerr.rdbuf(errors.rdbuf());
+
 		if (std::thread opening = VisualStudio::Open(VisualStudio::SolutionFor(argv[1]), argv[1]); opening.joinable())
 			opening.join();
 
-		return 0;
+		std::cerr.rdbuf(console);
+
+		if (errors.str().empty())
+			return 0;
+
+		std::cerr << errors.str();
+		MessageBoxA(nullptr, errors.str().c_str(), "Loom", MB_OK | MB_ICONERROR);
+
+		return 1;
 	};
 
 	// Automated runs and runs on another desktop start hidden; read before the Engine opens the window.
