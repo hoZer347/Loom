@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <chrono>
 #include <cstdint>
 #include <string>
 #include <utility>
@@ -50,26 +51,6 @@ namespace Loom
 			return file.substr(file.find_last_of("/\\") + 1);
 		};
 
-		using FileCases = std::pair<std::string, std::vector<const ScriptTests::Case*>>;
-
-		// The cases under the files that hold them, each file where its first case is.
-		std::vector<FileCases> ByFile(const std::vector<const ScriptTests::Case*>& cases)
-		{
-			std::vector<FileCases> files;
-
-			for (const ScriptTests::Case* test : cases)
-			{
-				auto found = std::ranges::find(files, test->file, &FileCases::first);
-
-				if (found == files.end())
-					found = files.insert(files.end(), { test->file, { } });
-
-				found->second.push_back(test);
-			};
-
-			return files;
-		};
-
 		bool DoubleClicked()
 		{
 			return ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
@@ -82,8 +63,8 @@ namespace Loom
 	{
 		if (ImGui::Begin(EditorPanels::Tests, open))
 		{
-			const std::vector<const ScriptTests::Case*> shown = Shown();
-			const std::vector<const ScriptTests::Case*> chosen = Chosen();
+			const std::vector<const ScriptTests::Case*>& chosen = Chosen();
+			const View& view = *m_view;
 
 			#pragma region Toolbar
 
@@ -96,30 +77,23 @@ namespace Loom
 
 			if (ImGui::Button(("Run " + std::to_string(chosen.size()) + "###run").c_str()))
 			{
-				Queued queued;
+				std::vector<std::string> names;
 
 				for (const ScriptTests::Case* test : chosen)
-					queued.names.insert(test->name);
+					names.push_back(test->name);
 
-				m_queued = std::move(queued);
+				m_queued = Queued{ { }, std::move(names) };
 			};
 
 			ImGui::EndDisabled();
 			ImGui::SetItemTooltip("Runs the selected tests, or every test shown");
 
-			size_t passed = 0;
-			size_t failed = 0;
-
-			for (const ScriptTests::Case* test : shown)
-				if (const ScriptTests::Result* result = ResultOf(test->name))
-					++(result->outcome == ScriptTests::Outcome::Passed ? passed : failed);
-
 			ImGui::SameLine();
-			ImGui::TextColored(EditorTheme::SuccessText, "%zu passed", passed);
+			ImGui::TextColored(EditorTheme::SuccessText, "%zu passed", view.passed);
 			ImGui::SameLine();
-			ImGui::TextColored(failed ? EditorTheme::ErrorText : ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled), "%zu failed", failed);
+			ImGui::TextColored(view.failed ? EditorTheme::ErrorText : ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled), "%zu failed", view.failed);
 			ImGui::SameLine();
-			ImGui::TextDisabled("%zu not run", shown.size() - passed - failed);
+			ImGui::TextDisabled("%zu not run", view.shown.size() - view.passed - view.failed);
 
 			ImGui::SameLine();
 			ImGui::SetNextItemWidth(-FLT_MIN);
@@ -131,8 +105,6 @@ namespace Loom
 
 			constexpr int column_count = 3;
 			constexpr ImGuiTableFlags table_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersInnerV;
-			constexpr ImGuiTreeNodeFlags row_flags = ImGuiTreeNodeFlags_SpanAllColumns | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_DefaultOpen;
-			constexpr ImGuiTreeNodeFlags leaf_flags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 			constexpr ImGuiMultiSelectFlags select_flags = ImGuiMultiSelectFlags_ClearOnEscape | ImGuiMultiSelectFlags_ClearOnClickVoid;
 
 			if (ImGui::BeginTable("##cases", column_count, table_flags))
@@ -143,111 +115,18 @@ namespace Loom
 				ImGui::TableSetupColumn("Time", ImGuiTableColumnFlags_WidthFixed);
 				ImGui::TableHeadersRow();
 
-				Select(ImGui::BeginMultiSelect(select_flags, (int)m_selected.size(), (int)m_rows.size()));
-				m_rows.clear();
+				ImGuiMultiSelectIO* const requests = ImGui::BeginMultiSelect(select_flags, (int)m_selected.size(), (int)view.rows.size());
+				ImGuiListClipper clipper;
 
-				// A row the selection knows, under the key it keeps.
-				const auto selectable =
-					[this](const std::string& key, ImGuiTreeNodeFlags flags)
-					{
-						ImGui::TableNextRow();
-						ImGui::TableNextColumn();
-						ImGui::SetNextItemSelectionUserData((ImGuiSelectionUserData)m_rows.size());
-						m_rows.push_back(key);
+				Select(requests);
+				clipper.Begin((int)view.rows.size());
 
-						return m_selected.contains(key) ? flags | ImGuiTreeNodeFlags_Selected : flags;
-					};
+				if (requests->RangeSrcItem != -1)
+					clipper.IncludeItemByIndex((int)requests->RangeSrcItem);
 
-				for (const auto& [file, cases] : ByFile(shown))
-				{
-					ImGui::PushID(file.c_str());
-
-					const bool file_open = ImGui::TreeNodeEx("##file", selectable(FileKey(file), row_flags), "%s", FileName(file).c_str());
-
-					ImGui::SetItemTooltip("%s", file.c_str());
-
-					if (DoubleClicked())
-						callbacks.follow(file, cases.front()->line);
-
-					size_t file_failed = 0;
-					size_t file_run = 0;
-					double file_milliseconds = 0.0;
-
-					for (const ScriptTests::Case* test : cases)
-						if (const ScriptTests::Result* result = ResultOf(test->name))
-						{
-							++file_run;
-							file_failed += result->outcome != ScriptTests::Outcome::Passed;
-							file_milliseconds += result->milliseconds;
-						};
-
-					ImGui::TableNextColumn();
-
-					if (file_failed)
-						ImGui::TextColored(EditorTheme::ErrorText, "Failed");
-					else if (file_run == cases.size())
-						ImGui::TextColored(EditorTheme::SuccessText, "Passed");
-
-					ImGui::TableNextColumn();
-
-					if (file_run)
-						ImGui::TextDisabled("%.1f ms", file_milliseconds);
-
-					if (file_open)
-					{
-						for (const ScriptTests::Case* test : cases)
-						{
-							const ScriptTests::Result* result = ResultOf(test->name);
-							const bool has_failures = result && !result->failures.empty();
-
-							ImGui::PushID(test->name.c_str());
-
-							const bool case_open = ImGui::TreeNodeEx("##case", selectable(CaseKey(test->name), has_failures ? row_flags : row_flags | leaf_flags), "%s", test->name.c_str());
-
-							ImGui::SetItemTooltip("%s:%d", test->file.c_str(), test->line);
-
-							if (DoubleClicked())
-								callbacks.follow(test->file, test->line);
-
-							ImGui::TableNextColumn();
-
-							if (result)
-							{
-								const auto [label, colour] = StatusOf(result->outcome);
-
-								ImGui::TextColored(colour, "%s", label);
-								ImGui::TableNextColumn();
-								ImGui::TextDisabled("%.1f ms", result->milliseconds);
-							};
-
-							if (has_failures && case_open)
-							{
-								for (size_t i = 0; i < result->failures.size(); ++i)
-								{
-									const ScriptTests::Failure& failure = result->failures[i];
-
-									ImGui::TableNextRow();
-									ImGui::TableNextColumn();
-									ImGui::PushStyleColor(ImGuiCol_Text, EditorTheme::ErrorText);
-									ImGui::TreeNodeEx((void*)(intptr_t)i, ImGuiTreeNodeFlags_SpanAllColumns | leaf_flags, "%s", failure.text.c_str());
-									ImGui::PopStyleColor();
-									ImGui::SetItemTooltip("%s:%d", failure.file.c_str(), failure.line);
-
-									if (DoubleClicked())
-										callbacks.follow(failure.file, failure.line);
-								};
-
-								ImGui::TreePop();
-							};
-
-							ImGui::PopID();
-						};
-
-						ImGui::TreePop();
-					};
-
-					ImGui::PopID();
-				};
+				while (clipper.Step())
+					for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row)
+						DrawRow((size_t)row, callbacks);
 
 				Select(ImGui::EndMultiSelect());
 				ImGui::EndTable();
@@ -259,14 +138,110 @@ namespace Loom
 		ImGui::End();
 	};
 
+	void TestsPanel::DrawRow(size_t index, const Callbacks& callbacks)
+	{
+		constexpr ImGuiTreeNodeFlags row_flags = ImGuiTreeNodeFlags_SpanAllColumns | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+		constexpr ImGuiTreeNodeFlags leaf_flags = row_flags | ImGuiTreeNodeFlags_Leaf;
+
+		const Row& row = m_view->rows[index];
+		const float indent = row.depth * ImGui::GetStyle().IndentSpacing;
+
+		ImGui::TableNextRow();
+		ImGui::TableNextColumn();
+		ImGui::PushID(row.key->c_str());
+
+		if (indent > 0.0f)
+			ImGui::Indent(indent);
+
+		if (row.kind == Row::Kind::Failure)
+		{
+			const ScriptTests::Failure& failure = row.result->failures[row.failure];
+
+			ImGui::PushStyleColor(ImGuiCol_Text, EditorTheme::ErrorText);
+			ImGui::TreeNodeEx((void*)(intptr_t)row.failure, leaf_flags, "%s", failure.text.c_str());
+			ImGui::PopStyleColor();
+			ImGui::SetItemTooltip("%s:%d", failure.file.c_str(), failure.line);
+
+			if (DoubleClicked())
+				callbacks.follow(failure.file, failure.line);
+		}
+		else
+		{
+			const bool is_file = row.kind == Row::Kind::File;
+			const bool has_children = is_file || (row.result && !row.result->failures.empty());
+			const bool folded = m_folded.contains(*row.key);
+			const ImGuiTreeNodeFlags flags = (has_children ? row_flags | ImGuiTreeNodeFlags_OpenOnArrow : leaf_flags) | (m_selected.contains(*row.key) ? ImGuiTreeNodeFlags_Selected : 0);
+			const File& file = m_view->files[row.file];
+
+			ImGui::SetNextItemSelectionUserData((ImGuiSelectionUserData)index);
+
+			if (has_children)
+				ImGui::SetNextItemOpen(!folded);
+
+			const bool open = ImGui::TreeNodeEx("##row", flags, "%s", is_file ? file.name.c_str() : row.test->name.c_str());
+
+			if (has_children && open == folded)
+			{
+				if (open)
+					m_folded.erase(*row.key);
+				else
+					m_folded.insert(*row.key);
+
+				m_stale = true;
+			};
+
+			if (is_file)
+				ImGui::SetItemTooltip("%s", file.path.c_str());
+			else
+				ImGui::SetItemTooltip("%s:%d", row.test->file.c_str(), row.test->line);
+
+			if (DoubleClicked())
+				callbacks.follow(is_file ? file.path : row.test->file, is_file ? file.line : row.test->line);
+
+			ImGui::TableNextColumn();
+
+			if (is_file)
+			{
+				if (file.failed)
+					ImGui::TextColored(EditorTheme::ErrorText, "Failed");
+				else if (file.run == file.cases)
+					ImGui::TextColored(EditorTheme::SuccessText, "Passed");
+
+				ImGui::TableNextColumn();
+
+				if (file.run)
+					ImGui::TextDisabled("%.1f ms", file.milliseconds);
+			}
+			else if (row.result)
+			{
+				const auto [label, colour] = StatusOf(row.result->outcome);
+
+				ImGui::TextColored(colour, "%s", label);
+				ImGui::TableNextColumn();
+				ImGui::TextDisabled("%.1f ms", row.result->milliseconds);
+			};
+		};
+
+		if (indent > 0.0f)
+			ImGui::Unindent(indent);
+
+		ImGui::PopID();
+	};
+
 	void TestsPanel::Select(ImGuiMultiSelectIO* requests)
 	{
+		const std::vector<Row>& rows = m_view->rows;
+
 		for (const ImGuiSelectionRequest& request : requests->Requests)
 		{
 			if (request.Type == ImGuiSelectionRequestType_SetAll)
 			{
 				if (request.Selected)
-					m_selected.insert(m_rows.begin(), m_rows.end());
+				{
+					for (const Row& row : rows)
+						if (row.kind != Row::Kind::Failure)
+							m_selected.insert(*row.key);
+				}
 				else
 					m_selected.clear();
 			}
@@ -275,13 +250,143 @@ namespace Loom
 				const size_t first = (size_t)std::min(request.RangeFirstItem, request.RangeLastItem);
 				const size_t last = (size_t)std::max(request.RangeFirstItem, request.RangeLastItem);
 
-				for (size_t row = first; row <= last && row < m_rows.size(); ++row)
-					if (request.Selected)
-						m_selected.insert(m_rows[row]);
+				for (size_t row = first; row <= last && row < rows.size(); ++row)
+					if (rows[row].kind == Row::Kind::Failure)
+						continue;
+					else if (request.Selected)
+						m_selected.insert(*rows[row].key);
 					else
-						m_selected.erase(m_rows[row]);
+						m_selected.erase(*rows[row].key);
+			};
+
+			m_chosen.reset();
+		};
+	};
+
+	#pragma endregion
+
+	#pragma region View
+
+	void TestsPanel::Refresh()
+	{
+		if (!m_view || m_view->generation != ScriptTests::Generation() || m_view->filter != m_filter)
+			Rebuild();
+		else if (m_stale)
+			LayOut();
+	};
+
+	void TestsPanel::Rebuild()
+	{
+		View& view = m_view.emplace(View{ m_filter, ScriptTests::Generation() });
+		std::unordered_map<std::string, size_t> places;
+
+		for (const ScriptTests::Case& test : ScriptTests::All())
+		{
+			if (!ScriptTests::Matches(test.name, view.filter))
+				continue;
+
+			const auto [place, added] = places.try_emplace(test.file, view.files.size());
+
+			if (added)
+			{
+				view.files.push_back({ test.file, FileName(test.file), FileKey(test.file), test.line });
+				view.cases_of.emplace_back();
+			};
+
+			view.cases_of[place->second].push_back(view.shown.size());
+			view.files_of.push_back(place->second);
+			view.shown.push_back(&test);
+			view.keys.push_back(CaseKey(test.name));
+			++view.files[place->second].cases;
+		};
+
+		LayOut();
+	};
+
+	void TestsPanel::LayOut()
+	{
+		View& view = *m_view;
+
+		m_stale = false;
+		m_chosen.reset();
+		view.results.clear();
+		view.rows.clear();
+		view.passed = 0;
+		view.failed = 0;
+
+		for (File& file : view.files)
+		{
+			file.run = 0;
+			file.failed = 0;
+			file.milliseconds = 0.0;
+		};
+
+		for (size_t i = 0; i < view.shown.size(); ++i)
+		{
+			const ScriptTests::Result* result = m_results.empty() ? nullptr : ResultOf(view.shown[i]->name);
+
+			view.results.push_back(result);
+
+			if (result)
+			{
+				const bool failed = result->outcome != ScriptTests::Outcome::Passed;
+				File& file = view.files[view.files_of[i]];
+
+				++file.run;
+				file.failed += failed;
+				file.milliseconds += result->milliseconds;
+				++(failed ? view.failed : view.passed);
 			};
 		};
+
+		const auto folded = [this](const std::string& key) { return !m_folded.empty() && m_folded.contains(key); };
+
+		for (size_t f = 0; f < view.files.size(); ++f)
+		{
+			view.rows.push_back({ Row::Kind::File, 0, f, nullptr, nullptr, 0, &view.files[f].key });
+
+			if (folded(view.files[f].key))
+				continue;
+
+			for (const size_t shown : view.cases_of[f])
+			{
+				const ScriptTests::Result* result = view.results[shown];
+				const std::string* key = &view.keys[shown];
+
+				view.rows.push_back({ Row::Kind::Case, 1, f, view.shown[shown], result, 0, key });
+
+				if (result && !folded(*key))
+					for (size_t i = 0; i < result->failures.size(); ++i)
+						view.rows.push_back({ Row::Kind::Failure, 2, f, view.shown[shown], result, i, key });
+			};
+		};
+	};
+
+	const std::vector<const ScriptTests::Case*>& TestsPanel::Shown()
+	{
+		Refresh();
+
+		return m_view->shown;
+	};
+
+	const std::vector<const ScriptTests::Case*>& TestsPanel::Chosen()
+	{
+		Refresh();
+
+		if (!m_chosen)
+		{
+			const View& view = *m_view;
+			std::vector<const ScriptTests::Case*> chosen;
+
+			if (!m_selected.empty())
+				for (size_t i = 0; i < view.shown.size(); ++i)
+					if (m_selected.contains(view.keys[i]) || m_selected.contains(view.files[view.files_of[i]].key))
+						chosen.push_back(view.shown[i]);
+
+			m_chosen = chosen.empty() ? view.shown : std::move(chosen);
+		};
+
+		return *m_chosen;
 	};
 
 	#pragma endregion
@@ -290,37 +395,42 @@ namespace Loom
 
 	void TestsPanel::RunQueued()
 	{
+		// About half a frame at 60 a second, so the editor keeps drawing while a long run goes on.
+		constexpr double step_milliseconds = 8.0;
+
 		if (!m_queued)
 			return;
 
-		const Queued queued = *std::exchange(m_queued, std::nullopt);
+		Queued& queued = *m_queued;
 
-		for (const ScriptTests::Case& test : ScriptTests::All())
-			if (queued.names.empty() ? ScriptTests::Matches(test.name, queued.filter) : queued.names.contains(test.name))
-				m_results[test.name] = ScriptTests::Run(test);
-	};
+		if (!queued.names)
+		{
+			queued.names.emplace();
 
-	std::vector<const ScriptTests::Case*> TestsPanel::Shown() const
-	{
-		std::vector<const ScriptTests::Case*> shown;
+			for (const ScriptTests::Case& test : ScriptTests::All())
+				if (ScriptTests::Matches(test.name, queued.filter))
+					queued.names->push_back(test.name);
+		};
 
-		for (const ScriptTests::Case& test : ScriptTests::All())
-			if (ScriptTests::Matches(test.name, m_filter))
-				shown.push_back(&test);
+		const std::vector<std::string>& names = *queued.names;
+		const auto start = std::chrono::steady_clock::now();
 
-		return shown;
-	};
+		while (queued.next < names.size())
+		{
+			const std::string& name = names[queued.next++];
 
-	std::vector<const ScriptTests::Case*> TestsPanel::Chosen() const
-	{
-		const std::vector<const ScriptTests::Case*> shown = Shown();
-		std::vector<const ScriptTests::Case*> chosen;
+			if (const ScriptTests::Case* test = ScriptTests::Find(name))
+			{
+				m_results[name] = ScriptTests::Run(*test);
+				m_stale = true;
+			};
 
-		for (const ScriptTests::Case* test : shown)
-			if (m_selected.contains(CaseKey(test->name)) || m_selected.contains(FileKey(test->file)))
-				chosen.push_back(test);
+			if (std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() >= step_milliseconds)
+				break;
+		};
 
-		return chosen.empty() ? shown : chosen;
+		if (queued.next == names.size())
+			m_queued.reset();
 	};
 
 	void TestsPanel::SetFilter(const std::string& filter)

@@ -40,6 +40,12 @@ namespace Loom
 		// In the order they registered.
 		static const std::vector<Case>& All();
 
+		// The case of this name, or null. Good until the next Register or Truncate.
+		static const Case* Find(const std::string& name);
+
+		// Counts each change to the cases, so a list made from them knows when it is out of date.
+		static size_t Generation();
+
 		// Takes back every case after the first count, as a script library
 		// that registered them unloads.
 		static void Truncate(size_t count);

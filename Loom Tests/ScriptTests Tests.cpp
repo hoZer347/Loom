@@ -109,6 +109,29 @@ TEST_SUITE("ScriptTests")
 		CHECK_FALSE(second_ran);
 	};
 
+	TEST_CASE("Find knows a case by its name until Truncate takes it back, and the name is free again after")
+	{
+		const size_t generation = Loom::ScriptTests::Generation();
+
+		{
+			const Registered registered;
+
+			registered.Add("found", [] { });
+
+			REQUIRE(Loom::ScriptTests::Find("found"));
+			CHECK(Loom::ScriptTests::Find("found")->file == "Scripts/Laser.hpp");
+			CHECK(Loom::ScriptTests::Find("never registered") == nullptr);
+			CHECK(Loom::ScriptTests::Generation() != generation);
+		};
+
+		CHECK(Loom::ScriptTests::Find("found") == nullptr);
+
+		const Registered registered;
+
+		registered.Add("found", [] { });
+		CHECK(Loom::ScriptTests::Find("found") == &Loom::ScriptTests::All().back());
+	};
+
 	TEST_CASE("a filter matches any part of a name, whatever its case")
 	{
 		CHECK(Loom::ScriptTests::Matches("Laser stops at a wall", ""));

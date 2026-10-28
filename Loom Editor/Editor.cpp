@@ -4994,7 +4994,7 @@ namespace Loom
 		m_testsCompiled = false;
 		m_tests.RunQueued();
 		m_showTests = true;
-		m_focusTests = true;
+		m_focusTests = !m_tests.HasQueued();
 	};
 
 	void Editor::ClickQueued()

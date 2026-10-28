@@ -7,6 +7,7 @@
 #include <chrono>
 #include <exception>
 #include <iostream>
+#include <unordered_map>
 
 #ifdef _MSC_VER
 #include <eh.h>
@@ -19,11 +20,21 @@ namespace Loom
 {
 	namespace
 	{
-		std::vector<ScriptTests::Case>& Cases()
+		struct Registry
 		{
-			static std::vector<ScriptTests::Case> cases;
+			std::vector<ScriptTests::Case> cases;
 
-			return cases;
+			// Each case's place in cases, by its name.
+			std::unordered_map<std::string, size_t> places;
+
+			size_t generation = 0;
+		};
+
+		Registry& Cases()
+		{
+			static Registry registry;
+
+			return registry;
 		};
 
 		// Where LOOM_CHECK writes while a case runs, and null otherwise.
@@ -97,23 +108,49 @@ namespace Loom
 
 	bool ScriptTests::Register(const std::string& name, const char* file, int line, const Body& body)
 	{
-		if (std::ranges::find(Cases(), name, &Case::name) != Cases().end())
+		Registry& registry = Cases();
+
+		if (!registry.places.try_emplace(name, registry.cases.size()).second)
 			std::cerr << "A second test named '" << name << "' at " << file << ":" << line << " is left out" << std::endl;
 		else
-			Cases().push_back({ name, file, line, body });
+		{
+			registry.cases.push_back({ name, file, line, body });
+			++registry.generation;
+		};
 
 		return true;
 	};
 
 	const std::vector<ScriptTests::Case>& ScriptTests::All()
 	{
-		return Cases();
+		return Cases().cases;
+	};
+
+	const ScriptTests::Case* ScriptTests::Find(const std::string& name)
+	{
+		const Registry& registry = Cases();
+		const auto found = registry.places.find(name);
+
+		return found == registry.places.end() ? nullptr : &registry.cases[found->second];
+	};
+
+	size_t ScriptTests::Generation()
+	{
+		return Cases().generation;
 	};
 
 	void ScriptTests::Truncate(size_t count)
 	{
-		if (count < Cases().size())
-			Cases().resize(count);
+		Registry& registry = Cases();
+
+		if (count >= registry.cases.size())
+			return;
+
+		for (size_t i = count; i < registry.cases.size(); ++i)
+			registry.places.erase(registry.cases[i].name);
+
+		registry.cases.resize(count);
+		++registry.generation;
 	};
 
 	bool ScriptTests::Matches(const std::string& name, const std::string& filter)

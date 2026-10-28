@@ -4,6 +4,7 @@
 
 #include "imgui.h"
 
+#include <chrono>
 #include <string>
 #include <utility>
 #include <vector>
@@ -296,6 +297,64 @@ TEST_SUITE("TestsPanel")
 		CHECK(open);
 		CHECK(created == 0);
 
+		// Laser.hpp's arrow, found by clicking along its row until the row under it is Door.hpp's.
+		float arrow = 0.0f;
+
+		for (float x = scan_step; x < width && arrow == 0.0f; x += scan_step)
+		{
+			click(rows[0].first, ImGuiKey_None, x);
+			click(rows[1].first);
+
+			if (chosen() == "TestsPanel door opens|")
+				arrow = x;
+		};
+
+		REQUIRE(arrow > 0.0f);
+		click(rows[0].first);
+		CHECK(chosen() == "TestsPanel laser stops at a wall|TestsPanel laser misses|");
+
+		click(rows[0].first, ImGuiKey_None, arrow);
+		click(rows[1].first);
+		CHECK(chosen() == "TestsPanel laser stops at a wall|");
+
 		ImGui::DestroyContext(context);
+	};
+
+	TEST_CASE("a long run takes several calls of RunQueued, each a part of it")
+	{
+		constexpr int cases = 20;
+		constexpr std::chrono::milliseconds case_time{ 2 };
+
+		const size_t before = Loom::ScriptTests::All().size();
+		Loom::TestsPanel panel;
+		int runs = 0;
+		int calls = 0;
+
+		for (int i = 0; i < cases; ++i)
+			Loom::ScriptTests::Register("TestsPanel slow case " + std::to_string(i), "Scripts/Slow.hpp", i + 1,
+				[&runs, case_time]
+				{
+					const auto end = std::chrono::steady_clock::now() + case_time;
+
+					while (std::chrono::steady_clock::now() < end);
+
+					++runs;
+				});
+
+		panel.SetFilter("TestsPanel slow");
+		panel.QueueShown();
+
+		while (panel.HasQueued())
+		{
+			panel.RunQueued();
+			++calls;
+			CHECK((runs < cases) == panel.HasQueued());
+		};
+
+		CHECK(calls > 1);
+		CHECK(runs == cases);
+		CHECK(panel.ResultOf("TestsPanel slow case " + std::to_string(cases - 1)));
+
+		Loom::ScriptTests::Truncate(before);
 	};
 };

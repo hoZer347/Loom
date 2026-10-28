@@ -3,10 +3,10 @@
 #include "ScriptTests.h"
 
 #include <functional>
-#include <map>
 #include <optional>
-#include <set>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 
@@ -24,6 +24,9 @@ namespace Loom
 	*   every case shown when none is. It runs between frames, through
 	*   RunQueued, so the editor can compile stale scripts first
 	* - A double click on a case or a failure follows its line
+	* - The tree is built once for each change to the cases, the filter, the
+	*   results or what is folded, and only the rows in view are drawn, so
+	*   thousands of cases cost a frame little
 	*/
 	struct TestsPanel final
 	{
@@ -35,16 +38,17 @@ namespace Loom
 
 		void Draw(bool* open, const Callbacks& callbacks);
 
-		// Runs the cases a click queued. Outside ImGui's frame, as a case may
-		// load scenes and step the engine.
+		// Runs the cases a click queued, as many as fit in a frame each call,
+		// until none are left. Outside ImGui's frame, as a case may load
+		// scenes and step the engine.
 		void RunQueued();
 		bool HasQueued() const { return m_queued.has_value(); };
 
 		// The cases the filter shows, in the order they registered.
-		std::vector<const ScriptTests::Case*> Shown() const;
+		const std::vector<const ScriptTests::Case*>& Shown();
 
 		// The cases Run takes.
-		std::vector<const ScriptTests::Case*> Chosen() const;
+		const std::vector<const ScriptTests::Case*>& Chosen();
 
 		void SetFilter(const std::string& filter);
 		void QueueShown();
@@ -55,22 +59,78 @@ namespace Loom
 	private:
 		static constexpr size_t filter_size = 128;
 
-		// The cases named, or every case whose name holds filter when none are.
+		// The cases named, or every case whose name holds filter, found when
+		// the run starts so a case that loads before then is run too.
 		struct Queued
 		{
 			std::string filter;
-			std::set<std::string> names;
+			std::optional<std::vector<std::string>> names;
+			size_t next = 0;
 		};
 
+		struct File
+		{
+			std::string path;
+			std::string name;
+			std::string key;
+			int line = 0;
+			size_t cases = 0;
+			size_t run = 0;
+			size_t failed = 0;
+			double milliseconds = 0.0;
+		};
+
+		struct Row
+		{
+			enum class Kind { File, Case, Failure };
+
+			Kind kind = Kind::File;
+			int depth = 0;
+			size_t file = 0;
+			const ScriptTests::Case* test = nullptr;
+			const ScriptTests::Result* result = nullptr;
+			size_t failure = 0;
+
+			// What the selection and the folding know it by, in the view. A
+			// failure row's is its case's.
+			const std::string* key = nullptr;
+		};
+
+		// What the filter shows, laid out as the tree's rows.
+		struct View
+		{
+			std::string filter;
+			size_t generation = 0;
+			std::vector<const ScriptTests::Case*> shown;
+			std::vector<std::string> keys;
+			std::vector<size_t> files_of;
+			std::vector<const ScriptTests::Result*> results;
+			std::vector<File> files;
+			std::vector<std::vector<size_t>> cases_of;
+			std::vector<Row> rows;
+			size_t passed = 0;
+			size_t failed = 0;
+		};
+
+		void Refresh();
+		void Rebuild();
+		void LayOut();
+		void DrawRow(size_t index, const Callbacks& callbacks);
 		void Select(ImGuiMultiSelectIO* requests);
 
 		char m_filter[filter_size]{ };
 		std::optional<Queued> m_queued{ };
-		std::map<std::string, ScriptTests::Result> m_results{ };
+		std::unordered_map<std::string, ScriptTests::Result> m_results{ };
 
-		// Rows by the key Select knows them by: a file's path or a case's name,
-		// each after a prefix that keeps the two apart.
-		std::set<std::string> m_selected{ };
-		std::vector<std::string> m_rows{ };
+		std::optional<View> m_view{ };
+		std::optional<std::vector<const ScriptTests::Case*>> m_chosen{ };
+
+		// Rows by key: a file's path or a case's name, each after a prefix
+		// that keeps the two apart.
+		std::unordered_set<std::string> m_selected{ };
+		std::unordered_set<std::string> m_folded{ };
+
+		// The results or the folding changed since the view was built.
+		bool m_stale = false;
 	};
 };
