@@ -111,8 +111,8 @@ namespace Loom
 		constexpr int anchor_columns = 3;
 		constexpr int middle_anchor = anchor_columns * anchor_columns / 2;
 
-		// Wide enough for the longest side a sprite can have.
-		constexpr float resize_field_ems = 3.5f;
+		// Wide enough, in lines of text, for the longest side a sprite can have.
+		constexpr float resize_field_lines = 3.5f;
 
 		#pragma endregion
 
@@ -1090,7 +1090,7 @@ namespace Loom
 		if (!ImGui::BeginPopup(resize_popup))
 			return;
 
-		const float width = ImGui::GetFontSize() * resize_field_ems;
+		const float width = ImGui::GetFontSize() * resize_field_lines;
 
 		ImGui::BeginGroup();
 		ImGui::SetNextItemWidth(width);
