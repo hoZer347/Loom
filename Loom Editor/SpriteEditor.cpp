@@ -1575,7 +1575,11 @@ namespace Loom
 		const auto found = std::find(colours.begin(), colours.end(), left);
 		const bool listed = found != colours.end() && !SeeThrough(left);
 		const auto shown_last = std::find_if(colours.rbegin(), colours.rend(), [](const Colour& colour) { return !SeeThrough(colour); });
-		const auto taken = listed ? found : shown_last == colours.rend() ? colours.end() : std::prev(shown_last.base());
+		const auto taken = listed
+			? found
+			: shown_last == colours.rend()
+			? colours.end()
+			: std::prev(shown_last.base());
 
 		ImGui::BeginDisabled(taken == colours.end());
 
