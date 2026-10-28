@@ -483,7 +483,7 @@ namespace Loom
 
 		constexpr float drag_speed = 0.01f;
 
-		// A Text field's box shows its lines and one more to type on, within these.
+		// A MultilineText field's box shows its lines and one more to type on, within these.
 		constexpr int min_text_lines = 3;
 		constexpr int max_text_lines = 12;
 

@@ -49,7 +49,13 @@ namespace
 		Loom::Serial<Loom::Asset<".shader">> shader;
 		Loom::Serial<std::string> path;
 		Loom::Serial<Loom::Folder> folder;
-		Loom::Serial<Loom::MultilineText> message;
+	};
+
+	// Text of several lines, and a plain string saved before it was.
+	struct Message final : Loom::Component<Message>
+	{
+		Loom::Serial<Loom::MultilineText> text;
+		Loom::Serial<std::string> line;
 	};
 
 	struct Pointer final : Loom::Component<Pointer>
@@ -678,22 +684,30 @@ TEST_SUITE("SerializedField")
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "text is written as a string, its new lines kept, and reads what a string field saved")
 	{
-		Files object;
+		Message object;
 		Pump();
 
-		const Loom::SerializedField& message = Field(object, 3);
+		const Loom::SerializedField& message = Field(object, 0);
 
 		CHECK(message.type == Loom::FieldType::MultilineText);
 
-		object.message = "first\nsecond";
+		object.text = "first\nsecond";
 
 		CHECK(message.Write() == "\"first\\nsecond\"");
 
-		object.path = "one\ntwo";
+		object.line = "one\ntwo";
 
 		REQUIRE(message.Read(Field(object, 1).Write()));
 
-		CHECK(*object.message == "one\ntwo");
+		CHECK(*object.text == "one\ntwo");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a UiText's text is multiline text")
+	{
+		Loom::UiText text;
+		Pump();
+
+		CHECK(Field(text, 0).type == Loom::FieldType::MultilineText);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an empty float list is still a float list")
