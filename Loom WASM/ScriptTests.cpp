@@ -6,9 +6,12 @@
 #include <cctype>
 #include <chrono>
 #include <exception>
+#include <iostream>
 
 #ifdef _MSC_VER
+#include <eh.h>
 #include <excpt.h>
+#include <malloc.h>
 #endif
 
 
@@ -26,6 +29,9 @@ namespace Loom
 		// Where LOOM_CHECK writes while a case runs, and null otherwise.
 		std::vector<ScriptTests::Failure>* running = nullptr;
 
+		// What a crash is thrown as, so the case's locals unwind.
+		struct Crash { };
+
 		// Runs the body, giving what it threw as a failure.
 		ScriptTests::Outcome Catching(const ScriptTests::Body& body, std::vector<ScriptTests::Failure>& failures)
 		{
@@ -33,6 +39,10 @@ namespace Loom
 			{
 				body();
 				return ScriptTests::Outcome::Passed;
+			}
+			catch (const Crash&)
+			{
+				return ScriptTests::Outcome::Crashed;
 			}
 			catch (const std::exception& exception)
 			{
@@ -46,18 +56,37 @@ namespace Loom
 			return ScriptTests::Outcome::Threw;
 		};
 
+#ifdef _MSC_VER
+		constexpr unsigned long STACK_OVERFLOW = 0xC00000FD;
+
+		// A stack overflow is left to Guarded, as there is no stack left to unwind with.
+		void Translate(unsigned int code, _EXCEPTION_POINTERS*)
+		{
+			if (code != STACK_OVERFLOW)
+				throw Crash{ };
+		};
+#endif
+
 		// Catching, with a crash ending the case rather than the editor.
 		ScriptTests::Outcome Guarded(const ScriptTests::Body& body, std::vector<ScriptTests::Failure>& failures)
 		{
 #ifdef _MSC_VER
+			const _se_translator_function previous = _set_se_translator(Translate);
+			ScriptTests::Outcome outcome = ScriptTests::Outcome::Crashed;
+
 			__try
 			{
-				return Catching(body, failures);
+				outcome = Catching(body, failures);
 			}
 			__except (EXCEPTION_EXECUTE_HANDLER)
 			{
-				return ScriptTests::Outcome::Crashed;
+				if (GetExceptionCode() == STACK_OVERFLOW)
+					_resetstkoflw();
 			};
+
+			_set_se_translator(previous);
+
+			return outcome;
 #else
 			return Catching(body, failures);
 #endif
@@ -68,7 +97,10 @@ namespace Loom
 
 	bool ScriptTests::Register(const std::string& name, const char* file, int line, const Body& body)
 	{
-		Cases().push_back({ name, file, line, body });
+		if (std::ranges::find(Cases(), name, &Case::name) != Cases().end())
+			std::cerr << "A second test named '" << name << "' at " << file << ":" << line << " is left out" << std::endl;
+		else
+			Cases().push_back({ name, file, line, body });
 
 		return true;
 	};

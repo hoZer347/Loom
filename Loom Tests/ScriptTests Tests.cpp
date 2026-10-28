@@ -2,9 +2,14 @@
 
 #include "Test Support.h"
 
+#include "Engine.h"
+#include "Scene.h"
 #include "ScriptTests.h"
 
 #include <algorithm>
+#include <functional>
+#include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 
@@ -81,6 +86,27 @@ TEST_SUITE("ScriptTests")
 
 		Loom::ScriptTests::Truncate(before + 1);
 		CHECK(Loom::ScriptTests::All().size() == before);
+	};
+
+	TEST_CASE("a second case with a name already taken is left out")
+	{
+		const Registered registered;
+		const size_t before = Loom::ScriptTests::All().size();
+		bool second_ran = false;
+
+		registered.Add("taken", [] { });
+
+		std::ostringstream captured;
+		std::streambuf* const previous = std::cerr.rdbuf(captured.rdbuf());
+
+		Loom::ScriptTests::Register("taken", "Scripts/Door.hpp", 1, [&second_ran] { second_ran = true; });
+
+		std::cerr.rdbuf(previous);
+
+		CHECK(Loom::ScriptTests::All().size() == before + 1);
+		CHECK(Loom::ScriptTests::All().back().file == "Scripts/Laser.hpp");
+		CHECK(captured.str().find("Scripts/Door.hpp:1") != std::string::npos);
+		CHECK_FALSE(second_ran);
 	};
 
 	TEST_CASE("a filter matches any part of a name, whatever its case")
@@ -162,6 +188,41 @@ TEST_SUITE("ScriptTests")
 		CHECK(result.outcome == Loom::ScriptTests::Outcome::Crashed);
 		REQUIRE(result.failures.size() == 1);
 		CHECK(result.failures[0].text == "Crashed");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a crash takes back the scene the case held")
+	{
+		const Registered registered;
+		const size_t scenes = Loom::Scene::GetScenes().size();
+
+		const Loom::ScriptTests::Result result = Loom::ScriptTests::Run(registered.Add("crashes in a scene", []
+			{
+				Loom::Scene scene("Crashing");
+				Loom::Engine::DoTasks();
+
+				volatile int* nowhere = nullptr;
+				*nowhere = 1;
+			}));
+
+		CHECK(result.outcome == Loom::ScriptTests::Outcome::Crashed);
+		CHECK(Loom::Scene::GetScenes().size() == scenes);
+	};
+
+	TEST_CASE("a stack overflow ends the case, and the next case still has its stack")
+	{
+		const Registered registered;
+
+		constexpr size_t frame_bytes = 1024;
+
+		const std::function<int(int)> deeper = [&deeper](int depth) { volatile char frame[frame_bytes]{ }; return deeper(depth + 1) + frame[0]; };
+
+		const Loom::ScriptTests::Result overflowed = Loom::ScriptTests::Run(registered.Add("overflows", [&deeper] { deeper(0); }));
+
+		CHECK(overflowed.outcome == Loom::ScriptTests::Outcome::Crashed);
+
+		const Loom::ScriptTests::Result again = Loom::ScriptTests::Run(registered.Add("overflows again", [&deeper] { deeper(0); }));
+
+		CHECK(again.outcome == Loom::ScriptTests::Outcome::Crashed);
 	};
 #endif
 

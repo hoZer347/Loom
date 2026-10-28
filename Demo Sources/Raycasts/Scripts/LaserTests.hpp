@@ -37,32 +37,32 @@ namespace RaycastsScripts
 
 		LOOM_TEST("A ray stops at the first box in its way")
 		{
-			constexpr float near_distance = 5.0f;
-			constexpr float far_distance = 9.0f;
-			constexpr float half_box = 0.5f;
+			constexpr float NEAR_DISTANCE = 5.0f;
+			constexpr float FAR_DISTANCE = 9.0f;
+			constexpr float HALF_BOX = 0.5f;
 
 			Loom::Scene scene("Laser Tests");
 			Loom::Engine::DoTasks();
 
-			Loom::BoxCollider* nearer = PlaceBox(scene, ORIGIN + AHEAD * near_distance);
-			PlaceBox(scene, ORIGIN + AHEAD * far_distance);
+			Loom::BoxCollider* nearer = PlaceBox(scene, ORIGIN + AHEAD * NEAR_DISTANCE);
+			PlaceBox(scene, ORIGIN + AHEAD * FAR_DISTANCE);
 			scene.Physics();
 
 			Loom::RaycastHit hit;
 
 			LOOM_CHECK(Loom::Physics::Raycast(ORIGIN, AHEAD, hit));
 			LOOM_CHECK(hit.collider == nearer);
-			LOOM_CHECK(glm::abs(hit.distance - (near_distance - half_box)) < TOLERANCE);
+			LOOM_CHECK(glm::abs(hit.distance - (NEAR_DISTANCE - HALF_BOX)) < TOLERANCE);
 		};
 
 		LOOM_TEST("A ray misses a box behind it")
 		{
-			constexpr float behind = 5.0f;
+			constexpr float BEHIND = 5.0f;
 
 			Loom::Scene scene("Laser Tests");
 			Loom::Engine::DoTasks();
 
-			PlaceBox(scene, ORIGIN - AHEAD * behind);
+			PlaceBox(scene, ORIGIN - AHEAD * BEHIND);
 			scene.Physics();
 
 			Loom::RaycastHit hit;
@@ -72,8 +72,8 @@ namespace RaycastsScripts
 
 		LOOM_TEST("A laser with nothing ahead draws its beam to its full range")
 		{
-			constexpr float range = 12.0f;
-			constexpr size_t beam_floats = 6;
+			constexpr float RANGE = 12.0f;
+			constexpr size_t BEAM_FLOATS = 6;
 
 			Loom::Scene scene("Laser Tests");
 			Loom::Engine::DoTasks();
@@ -93,8 +93,8 @@ namespace RaycastsScripts
 			{
 				const std::vector<float>& beam = mesh->m_vertices;
 
-				LOOM_CHECK(beam.size() == beam_floats);
-				LOOM_CHECK(glm::abs(beam.back() + range) < TOLERANCE);
+				LOOM_CHECK(beam.size() == BEAM_FLOATS);
+				LOOM_CHECK(glm::abs(beam.back() + RANGE) < TOLERANCE);
 			};
 		};
 	};

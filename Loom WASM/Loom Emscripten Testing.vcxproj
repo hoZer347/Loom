@@ -173,7 +173,9 @@
     <ClCompile Include="OpenGLRenderer.cpp" />
     <ClCompile Include="Physics.cpp" />
     <ClCompile Include="Profiler.cpp" />
-    <ClCompile Include="ScriptTests.cpp" />
+    <ClCompile Include="ScriptTests.cpp">
+      <ExceptionHandling>Async</ExceptionHandling>
+    </ClCompile>
     <ClCompile Include="StageTiming.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="Scene.cpp" />

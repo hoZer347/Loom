@@ -273,6 +273,36 @@ TEST_SUITE("ProjectTemplate")
 		CHECK(Count(text, "\n") == Count(text, "\r\n"));
 	};
 
+	TEST_CASE("a scripts project from before Tests ran its cases is given async exceptions, once")
+	{
+		const Folder project("loom template catch crashes");
+		const std::filesystem::path scripts = project.path / "Game.vcxproj";
+
+		std::ofstream(scripts, std::ios::binary) << unprecompiled;
+
+		REQUIRE(Loom::ProjectTemplate::CatchCrashes(scripts.string()));
+		REQUIRE(Loom::ProjectTemplate::CatchCrashes(scripts.string()));
+
+		const std::string text = ReadBytes(scripts);
+
+		CHECK(Count(text, "      <ExceptionHandling>Async</ExceptionHandling>\r\n") == 1);
+		CHECK(text.find("<ExceptionHandling>") < text.find("<PreprocessorDefinitions>LOOM_SCRIPT_MODULE"));
+		CHECK(Count(text, "\n") == Count(text, "\r\n"));
+	};
+
+	TEST_CASE("a scripts project with exception handling of its own keeps it")
+	{
+		const Folder project("loom template own exceptions");
+		const std::filesystem::path scripts = project.path / "Game.vcxproj";
+		const std::string own = "<Project><ExceptionHandling>Sync</ExceptionHandling><PreprocessorDefinitions>LOOM_SCRIPT_MODULE</PreprocessorDefinitions></Project>";
+
+		std::ofstream(scripts, std::ios::binary) << own;
+
+		REQUIRE(Loom::ProjectTemplate::CatchCrashes(scripts.string()));
+
+		CHECK(ReadBytes(scripts) == own);
+	};
+
 	TEST_CASE("a scripts project changed past recognising is not precompiled")
 	{
 		const Folder project("loom template precompile unknown");
@@ -294,6 +324,7 @@ TEST_SUITE("ProjectTemplate")
 		CHECK(project.Ensure() == scripts.lexically_normal().string());
 
 		CHECK(std::filesystem::is_regular_file(scripts));
+		CHECK(ReadBytes(scripts).find("<ExceptionHandling>Async</ExceptionHandling>") != std::string::npos);
 		CHECK(std::filesystem::is_regular_file(project.root / "Scripts" / "GameScripts.sln"));
 		CHECK(std::filesystem::is_regular_file(project.root / "Scripts" / "SpinningTriangle.hpp"));
 

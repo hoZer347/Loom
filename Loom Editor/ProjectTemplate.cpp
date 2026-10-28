@@ -190,6 +190,7 @@ namespace {NAME}Scripts
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <ConformanceMode>true</ConformanceMode>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ExceptionHandling>Async</ExceptionHandling>
       <DisableSpecificWarnings>4251;4275</DisableSpecificWarnings>
 {PCH_SETTINGS}      <PreprocessorDefinitions>LOOM_SCRIPT_MODULE;_WIN32_WINNT=0x0601;WIN32;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>{ENGINE}\Loom WASM;{ENGINE}\Loom ImGui;{ENGINE}\External Libraries\glm;{ENGINE}\External Libraries\glew\include;{ENGINE}\External Libraries\glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -655,6 +656,24 @@ SpinningTriangle is there as a worked example.
 		// The later one first, so the earlier position still holds.
 		text.insert(LineStart(text, item), lines(ProjectAssets::Replace(pch_item, "{HEADERS}", headers)));
 		text.insert(LineStart(text, defines), lines(pch_settings));
+
+		return Write(scripts, text, error);
+	};
+
+	bool ProjectTemplate::CatchCrashes(const std::string& scripts, std::string* error)
+	{
+		constexpr std::string_view defines_tag = "<PreprocessorDefinitions>LOOM_SCRIPT_MODULE";
+		constexpr std::string_view async_line = "      <ExceptionHandling>Async</ExceptionHandling>\n";
+
+		std::string text = ProjectAssets::ReadText(scripts);
+		const size_t defines = text.find(defines_tag);
+
+		if (text.find("<ExceptionHandling>") != std::string::npos || defines == std::string::npos)
+			return true;
+
+		const std::string newline = text.find("\r\n") == std::string::npos ? "\n" : "\r\n";
+
+		text.insert(LineStart(text, defines), ProjectAssets::Replace(std::string(async_line), "\n", newline));
 
 		return Write(scripts, text, error);
 	};

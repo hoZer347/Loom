@@ -32,8 +32,9 @@ namespace Loom
 			Body body;
 		};
 
-		// What LOOM_TEST runs as the scripts load. Always true, for the
-		// static it initialises.
+		// What LOOM_TEST runs as the scripts load. A name already taken is
+		// left out, as the panel knows a case by its name. Always true, for
+		// the static it initialises.
 		static bool Register(const std::string& name, const char* file, int line, const Body& body);
 
 		// In the order they registered.

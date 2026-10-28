@@ -143,7 +143,9 @@
     <ClCompile Include="Platform Tests.cpp" />
     <ClCompile Include="Macro Helpers Tests.cpp" />
     <ClCompile Include="Engine Tests.cpp" />
-    <ClCompile Include="ScriptTests Tests.cpp" />
+    <ClCompile Include="ScriptTests Tests.cpp">
+      <ExceptionHandling>Async</ExceptionHandling>
+    </ClCompile>
     <ClCompile Include="TestsPanel Tests.cpp" />
     <ClCompile Include="LoomObject Tests.cpp" />
     <ClCompile Include="ComponentRegistry Tests.cpp" />

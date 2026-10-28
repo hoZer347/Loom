@@ -64,6 +64,11 @@ namespace Loom
 		// alone. False, with the reason in error, when it could not be written.
 		static bool Precompile(const std::string& scripts, std::string* error = nullptr);
 
+		// Gives a scripts project from before Tests ran its cases the
+		// exception handling that unwinds a crashed case's locals. One that
+		// sets its own is left alone.
+		static bool CatchCrashes(const std::string& scripts, std::string* error = nullptr);
+
 		// EnsureScripts for the project in folder, writing it a .loomproject
 		// named after name first if it has none. Returns the .vcxproj, or an
 		// empty string with the reason in error.

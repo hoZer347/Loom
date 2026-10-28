@@ -7,6 +7,8 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
+#include <algorithm>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -21,14 +23,17 @@ namespace
 		const size_t before = Loom::ScriptTests::All().size();
 		int laser_runs = 0;
 		int door_runs = 0;
+		int failure_line = 0;
 
 		Suite()
 		{
-			constexpr int line = 3;
+			constexpr int stops_line = 3;
+			constexpr int misses_line = 4;
+			constexpr int door_line = 5;
 
-			Loom::ScriptTests::Register("TestsPanel laser stops at a wall", "Scripts/Laser.hpp", line, [this] { ++laser_runs; });
-			Loom::ScriptTests::Register("TestsPanel laser misses", "Scripts/Laser.hpp", line, [this] { ++laser_runs; LOOM_CHECK(laser_runs < 0); });
-			Loom::ScriptTests::Register("TestsPanel door opens", "Scripts/Door.hpp", line, [this] { ++door_runs; });
+			Loom::ScriptTests::Register("TestsPanel laser stops at a wall", "Scripts/Laser.hpp", stops_line, [this] { ++laser_runs; });
+			Loom::ScriptTests::Register("TestsPanel laser misses", "Scripts/Laser.hpp", misses_line, [this] { ++laser_runs; failure_line = __LINE__; LOOM_CHECK(laser_runs < 0); });
+			Loom::ScriptTests::Register("TestsPanel door opens", "Scripts/Door.hpp", door_line, [this] { ++door_runs; });
 		};
 
 		~Suite()
@@ -125,16 +130,18 @@ TEST_SUITE("TestsPanel")
 		CHECK(suite.laser_runs == 0);
 	};
 
-	TEST_CASE("the panel draws its cases and their failures")
+	TEST_CASE("clicking down the test column follows each case and the failure under it")
 	{
 		constexpr float width = 800.0f;
 		constexpr float height = 400.0f;
 		constexpr float frame_time = 1.0f / 60.0f;
+		constexpr float click_step = 4.0f;
 
 		Suite suite;
 		Loom::TestsPanel panel;
 		bool open = true;
 		int created = 0;
+		std::vector<std::string> followed;
 
 		ImGuiContext* const context = ImGui::CreateContext();
 		ImGuiIO& io = ImGui::GetIO();
@@ -151,16 +158,39 @@ TEST_SUITE("TestsPanel")
 		panel.QueueShown();
 		panel.RunQueued();
 
-		const Loom::TestsPanel::Callbacks callbacks{ [&created] { ++created; }, [](const std::string&, int) { } };
+		const Loom::TestsPanel::Callbacks callbacks{
+			[&created] { ++created; },
+			[&followed](const std::string& file, int line) { followed.push_back(std::filesystem::path(file).filename().string() + ":" + std::to_string(line)); } };
 
-		for (int frame = 0; frame < 2; ++frame)
+		const auto frame =
+			[&]
+			{
+				ImGui::NewFrame();
+				ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+				ImGui::SetNextWindowSize(io.DisplaySize);
+				panel.Draw(&open, callbacks);
+				ImGui::EndFrame();
+			};
+
+		frame();
+
+		// Down the middle of the panel, which is the test column below its toolbar.
+		for (float y = 0.0f; y < height; y += click_step)
 		{
-			ImGui::NewFrame();
-			panel.Draw(&open, callbacks);
-			ImGui::EndFrame();
+			io.AddMousePosEvent(width / 2.0f, y);
+			frame();
+			io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+			frame();
+			io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+			frame();
 		};
 
-		CHECK(ImGui::FindWindowByName(Loom::EditorPanels::Tests) != nullptr);
+		followed.erase(std::unique(followed.begin(), followed.end()), followed.end());
+
+		const std::string failure = "TestsPanel Tests.cpp:" + std::to_string(suite.failure_line);
+
+		CHECK(followed == std::vector<std::string>{ "Laser.hpp:3", "Laser.hpp:4", failure, "Door.hpp:5" });
+		CHECK_FALSE(panel.HasQueued());
 		CHECK(open);
 		CHECK(created == 0);
 
