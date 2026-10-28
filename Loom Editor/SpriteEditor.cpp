@@ -96,6 +96,10 @@ namespace Loom
 		// A new palette starts with the sprite's own colours, as many as fit.
 		constexpr size_t seeded_colours = 64;
 
+		// An import of more colours than this asks first.
+		constexpr size_t import_warning = 128;
+		constexpr const char* import_popup = "Import Colours?";
+
 		// Swatches, in lines of text, and the corners marking those the left
 		// and right mouse paint with, as a share of a swatch's side.
 		constexpr float swatch_lines = 1.75f;
@@ -1290,15 +1294,62 @@ namespace Loom
 
 		if (IconButton(import_icon, "Import", side))
 		{
-			PaletteFile& file = PaletteAt(path);
-			const std::string name = std::filesystem::path(m_active->path).stem().string();
+			Palette::Category category = { std::filesystem::path(m_active->path).stem().string(), m_active->sprite.Colours(std::numeric_limits<size_t>::max()) };
 
-			RememberPalette(file);
-			file.palette.categories.push_back({ name, m_active->sprite.Colours(std::numeric_limits<size_t>::max()) });
+			if (category.colours.size() > import_warning)
+			{
+				m_importing = std::move(category);
+				m_importPath = path;
+			}
+			else
+				Import(path, std::move(category));
 		};
 
 		ImGui::EndDisabled();
 		ImGui::SetItemTooltip("Import the sprite's colours into a category of the palette");
+
+		DrawImportQuestion();
+	};
+
+	void SpriteEditor::DrawImportQuestion()
+	{
+		if (m_importing && !ImGui::IsPopupOpen(import_popup))
+			ImGui::OpenPopup(import_popup);
+
+		if (!ImGui::BeginPopupModal(import_popup, nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+			return;
+
+		if (!m_importing)
+		{
+			ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+			return;
+		};
+
+		ImGui::Text("%s %s has %zu colours, more than %zu. Import them all?", import_icon, m_importing->name.c_str(), m_importing->colours.size(), import_warning);
+
+		const bool import = ImGui::Button("Import");
+		ImGui::SameLine();
+		const bool cancel = ImGui::Button("Cancel");
+
+		if (import)
+			Import(m_importPath, std::move(*m_importing));
+
+		if (import || cancel)
+		{
+			m_importing.reset();
+			ImGui::CloseCurrentPopup();
+		};
+
+		ImGui::EndPopup();
+	};
+
+	void SpriteEditor::Import(const std::string& path, Palette::Category category)
+	{
+		PaletteFile& file = PaletteAt(path);
+
+		RememberPalette(file);
+		file.palette.categories.push_back(std::move(category));
 	};
 
 	void SpriteEditor::DrawPaletteChoice(const std::string& project_folder)

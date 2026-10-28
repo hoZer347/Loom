@@ -226,6 +226,10 @@ namespace Loom
 		#pragma region Palette Window
 
 		void DrawTools();
+
+		// Asked before an import of many colours, each a swatch of its own.
+		void DrawImportQuestion();
+		void Import(const std::string& path, Palette::Category category);
 		void DrawSwatches(const std::string& path);
 		// Clear is first among the palette's own colours, and in no category.
 		void DrawSection(const std::string& path, std::vector<Colour>& colours, bool with_clear, const std::string& add_label);
@@ -358,6 +362,10 @@ namespace Loom
 		int m_resizeHeight = 0;
 		bool m_resizeScale = true;
 		int m_resizeAnchor = 0;
+
+		// An import waiting on its question, and the palette it goes into.
+		std::optional<Palette::Category> m_importing;
+		std::string m_importPath;
 
 		#pragma endregion
 

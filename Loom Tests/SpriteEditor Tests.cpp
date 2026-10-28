@@ -201,9 +201,9 @@ namespace
 		};
 
 		// Whether the question about the Palette panel was up last frame.
-		static bool Asking()
+		static bool Asking(const char* question = paletteQuestion)
 		{
-			const ImGuiWindow* window = ImGui::FindWindowByName(paletteQuestion);
+			const ImGuiWindow* window = ImGui::FindWindowByName(question);
 
 			return window != nullptr && window->Active;
 		};
@@ -1191,6 +1191,41 @@ TEST_SUITE("SpriteEditor")
 
 		CHECK(saved_after("key ctrl+z\nwait 2\n").categories.empty());
 		CHECK(saved_after("key ctrl+y\nwait 2\n").categories == imported);
+
+		std::filesystem::remove(palette);
+	};
+
+	TEST_CASE("import asks first for a sprite of more than 128 colours, and Cancel leaves the palette as it was")
+	{
+		constexpr int many_side = 16;
+		constexpr int many = 129;
+		constexpr const char* import_question = "Import Colours?";
+
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(many_side, many_side));
+
+		for (int i = 0; i < many; i++)
+			sprite.layers[0].cels[0].Set(i % many_side, i / many_side, SpriteAsset::Colour{ (uint8_t)i, 0, 0, FULL });
+
+		Driven driven("loom sprite many colours.tga", &sprite);
+
+		const std::string palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension).string();
+
+		driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\nclick \"Palette\" \"📥\"\nwait 2\n");
+		CHECK(Driven::Asking(import_question));
+
+		driven.Run(std::string("click \"") + import_question + "\" \"Cancel\"\nwait 2\n");
+		CHECK_FALSE(Driven::Asking(import_question));
+
+		driven.Run(std::string("click \"Palette\" \"📥\"\nwait 2\nclick \"") + import_question + "\" \"Import\"\nwait 2\nkey ctrl+s\nwait 2\n");
+
+		Loom::Palette saved;
+		REQUIRE(Loom::Palette::Load(palette, saved));
+		REQUIRE(saved.categories.size() == 1);
+		CHECK(saved.categories[0].colours.size() == many);
+
+		driven.Run("key ctrl+z\nwait 2\nkey ctrl+s\nwait 2\n");
+		REQUIRE(Loom::Palette::Load(palette, saved));
+		CHECK(saved.categories.empty());
 
 		std::filesystem::remove(palette);
 	};
