@@ -2151,15 +2151,8 @@ namespace Loom
 			if (document->unsaved)
 				saved = SaveDocument(*document) && saved;
 
-		// One made by New and since let go of is not written.
-		const auto linked = [this](const std::string& path)
-		{
-			return path == m_loosePalette || std::any_of(m_documents.begin(), m_documents.end(),
-				[&path](const std::unique_ptr<Document>& document) { return document->links.palette == path; });
-		};
-
 		for (const auto& [path, file] : m_palettes)
-			if (file.saved || linked(path))
+			if (Kept(path))
 				saved = SavePalette(path) && saved;
 
 		return saved;
@@ -2173,17 +2166,22 @@ namespace Loom
 			if (document->unsaved)
 				unsaved.push_back(std::filesystem::path(document->path).filename().string());
 
-		// As SaveAll writes them: one made by New and since let go of is not.
 		for (const auto& [path, file] : m_palettes)
-		{
-			const bool linked = path == m_loosePalette || std::any_of(m_documents.begin(), m_documents.end(),
-				[&path](const std::unique_ptr<Document>& document) { return document->links.palette == path; });
-
-			if (file.Unsaved() && (file.saved || linked))
+			if (file.Unsaved() && Kept(path))
 				unsaved.push_back(std::filesystem::path(path).filename().string());
-		};
 
 		return unsaved;
+	};
+
+	bool SpriteEditor::Kept(const std::string& path) const
+	{
+		// One made by New and since let go of is not written.
+		const auto found = m_palettes.find(path);
+
+		return (found != m_palettes.end() && found->second.saved) ||
+			path == m_loosePalette ||
+			std::any_of(m_documents.begin(), m_documents.end(),
+				[&path](const std::unique_ptr<Document>& document) { return document->links.palette == path; });
 	};
 
 	bool SpriteEditor::SaveDocument(Document& document)

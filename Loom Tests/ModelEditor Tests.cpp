@@ -584,6 +584,20 @@ TEST_SUITE("ModelEditor")
 		CHECK(driven.Mesh().faces.size() == faces);
 	};
 
+	TEST_CASE("The Model panel lists an edited prefab as unsaved by name until it is saved")
+	{
+		Driven driven("model_unsaved_files");
+		const std::vector<std::string> name{ std::filesystem::path(driven.path).filename().string() };
+
+		CHECK(driven.editor.UnsavedFiles().empty());
+
+		driven.editor.Add(Shapes::Shape::Cylinder);
+		CHECK(driven.editor.UnsavedFiles() == name);
+
+		REQUIRE(driven.editor.SaveAll());
+		CHECK(driven.editor.UnsavedFiles().empty());
+	};
+
 	TEST_CASE("The Model panel's undo back to what was saved leaves nothing unsaved, until a new step leaves it behind")
 	{
 		Driven driven("model_saved_steps");

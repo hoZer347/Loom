@@ -631,8 +631,18 @@ namespace Loom
 			ImGui::BeginDisabled(!usable);
 
 			if (ImGui::Button("Create", ImVec2(button_width, 0.0f)))
-				if (CreateProject(m_newProjectFolder, m_newProjectName))
-					m_askForNewProject = false;
+			{
+				Stop();
+
+				AskToSave(
+					UnsavedWork(),
+					[this]() { return SaveProject(); },
+					[this, folder = std::string(m_newProjectFolder), name = std::string(m_newProjectName)]()
+					{
+						if (CreateProject(folder, name))
+							m_askForNewProject = false;
+					});
+			};
 
 			ImGui::EndDisabled();
 

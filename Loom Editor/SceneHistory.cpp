@@ -49,9 +49,15 @@ namespace Loom
 
 		if (m_undo.size() > max_steps)
 		{
-			// A scene saved at the step let go had no step of its own before it.
+			const Step& front = m_undo.front();
+
+			// A scene saved before the step let go can no longer be undone back to it.
+			for (const Guid& scene : front.scenes)
+				if (unsigned long long& saved = m_saved[scene]; saved < front.id)
+					saved = never_saved;
+
 			for (auto& [scene, saved] : m_saved)
-				if (saved == m_undo.front().id)
+				if (saved == front.id)
 					saved = 0;
 
 			m_undo.erase(m_undo.begin());

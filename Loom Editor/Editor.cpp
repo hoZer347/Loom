@@ -1359,12 +1359,12 @@ namespace Loom
 
 	bool Editor::SaveScene(Scene* scene, const std::string& path)
 	{
-		if (scene == nullptr)
+		// A run's state is not the scene's.
+		if (scene == nullptr || m_playing)
 			return false;
 
 		// What is saved is what the history marks, so it has to have seen it.
-		if (!m_playing)
-			RecordHistory();
+		RecordHistory();
 
 		std::string error;
 
@@ -2789,6 +2789,8 @@ namespace Loom
 
 	void Editor::LeaveFor(const std::string& project)
 	{
+		Stop();
+
 		AskToSave(
 			UnsavedWork(),
 			[this]() { return SaveProject(); },
@@ -2840,7 +2842,6 @@ namespace Loom
 		ImGui::SameLine();
 		const bool cancel = ImGui::Button("Cancel");
 
-		// A save that fails leaves the question up, with everything still open.
 		const bool saved = save && m_saveQuestion->save();
 
 		if (saved)
@@ -2879,9 +2880,8 @@ namespace Loom
 
 		if (m_dialogs->folder.HasSelected())
 		{
-			OpenProject(m_dialogs->folder.GetSelected().string());
+			LeaveFor(m_dialogs->folder.GetSelected().string());
 			m_dialogs->folder.ClearSelected();
-			m_askForFolder = false;
 		};
 
 		m_dialogs->openProject.Display();
@@ -3042,7 +3042,7 @@ namespace Loom
 
 			ImGui::Separator();
 
-			if (ImGui::MenuItem("Close Scene", nullptr, false, IsOwned(scene)))
+			if (ImGui::MenuItem("Close Scene", nullptr, false, IsOwned(scene) && !m_playing))
 				AskToSave(
 					SceneUnsaved(scene) ? std::vector<std::string>{ scene->GetName() } : std::vector<std::string>{ },
 					[this, scene]() { return !IsOwned(scene) || SaveToProject(scene); },

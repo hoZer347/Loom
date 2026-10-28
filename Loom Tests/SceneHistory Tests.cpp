@@ -450,6 +450,30 @@ TEST_SUITE("SceneHistory")
 		CHECK(history.Unsaved(*open[0]));
 	};
 
+	TEST_CASE_FIXTURE(Editing, "a scene whose edits since its save have all been let go is still unsaved")
+	{
+		Open("Aged");
+		Record();
+		history.Saved(*open[0]);
+
+		Root(0).AddChild("Edit");
+		Record();
+
+		Open("Crowd");
+		Record();
+
+		Root(1).AddChild("Edit 0");
+		Record();
+
+		for (size_t i = 1; i <= Loom::SceneHistory::max_steps; i++)
+		{
+			Rename(1, "Edit " + std::to_string(i));
+			Record();
+		};
+
+		CHECK(history.Unsaved(*open[0]));
+	};
+
 	#pragma endregion
 
 	#pragma region Restoring

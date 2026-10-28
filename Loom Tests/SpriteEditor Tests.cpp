@@ -322,6 +322,20 @@ TEST_SUITE("SpriteEditor")
 		CHECK(Count(saved, CLEAR) == Driven::side * Driven::side - 1);
 	};
 
+	TEST_CASE("a painted sprite is listed as unsaved by name until it is saved")
+	{
+		Driven driven("loom sprite unsaved.tga");
+		const std::vector<std::string> name{ std::filesystem::path(SpriteAsset::For(driven.path)).filename().string() };
+
+		CHECK(driven.editor.UnsavedFiles().empty());
+
+		driven.Stroke(middle, middle);
+		CHECK(driven.editor.UnsavedFiles() == name);
+
+		REQUIRE(driven.editor.SaveAll());
+		CHECK(driven.editor.UnsavedFiles().empty());
+	};
+
 	TEST_CASE("a stroke across the image paints the row it crosses, end to end")
 	{
 		Driven driven("loom sprite stroke.tga");
@@ -622,6 +636,36 @@ TEST_SUITE("SpriteEditor")
 		Loom::Palette made;
 		REQUIRE(Loom::Palette::Load(palette, made));
 		CHECK(made.colours == std::vector<SpriteAsset::Colour>{ RED });
+
+		std::filesystem::remove(palette);
+	};
+
+	TEST_CASE("a palette made by New is listed as unsaved while the sprite uses it, and not once Ctrl+Z lets it go")
+	{
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.layers[0].cels[0].Set(0, 0, RED);
+
+		Driven driven("loom sprite palette unsaved.tga", &sprite);
+
+		driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\n");
+
+		const std::filesystem::path palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension);
+		const auto listed = [&driven, &palette]()
+		{
+			const std::vector<std::string> unsaved = driven.editor.UnsavedFiles();
+			return std::find(unsaved.begin(), unsaved.end(), palette.filename().string()) != unsaved.end();
+		};
+
+		CHECK(listed());
+
+		driven.Press(ImGuiKey_Z);
+		CHECK_FALSE(listed());
+
+		driven.Press(ImGuiKey_Y);
+		CHECK(listed());
+
+		REQUIRE(driven.editor.SaveAll());
+		CHECK(driven.editor.UnsavedFiles().empty());
 
 		std::filesystem::remove(palette);
 	};

@@ -268,6 +268,21 @@ TEST_SUITE("ShaderEditor")
 		CHECK(driven.Saved().find('x') != std::string::npos);
 	};
 
+	TEST_CASE("an edited shader is listed as unsaved by name until it is saved")
+	{
+		Driven driven;
+		const std::vector<std::string> name{ std::filesystem::path(driven.path).filename().string() };
+
+		CHECK(driven.editor.UnsavedFiles().empty());
+
+		driven.Type("x");
+		driven.Settle();
+		CHECK(driven.editor.UnsavedFiles() == name);
+
+		REQUIRE(driven.editor.SaveAll());
+		CHECK(driven.editor.UnsavedFiles().empty());
+	};
+
 	TEST_CASE("saving everything leaves a shader with no edits alone")
 	{
 		constexpr const char* changed_outside = "// written by something else\n";

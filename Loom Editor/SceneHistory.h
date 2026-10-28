@@ -2,6 +2,7 @@
 
 #include "Guid.h"
 
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -208,6 +209,8 @@ namespace Loom
 		std::vector<Step> m_undo{ };
 		std::vector<Step> m_redo{ };
 		unsigned long long m_lastStep = 0;
+
+		static constexpr unsigned long long never_saved = std::numeric_limits<unsigned long long>::max();
 
 		// Each scene's NewestOf when it was saved.
 		std::unordered_map<Guid, unsigned long long> m_saved{ };
