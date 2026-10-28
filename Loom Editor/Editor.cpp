@@ -451,7 +451,7 @@ namespace Loom
 		constexpr const char* prefab_light = "Prefab Light";
 
 		// Panels docked as a tab beside another, each with the one it goes beside.
-		constexpr std::pair<const char*, const char*> side_windows[] = { { EditorPanels::KeyBindings, EditorPanels::Console }, { EditorPanels::BuildSettings, EditorPanels::Console }, { EditorPanels::Palette, EditorPanels::Inspector } };
+		constexpr std::pair<const char*, const char*> side_windows[] = { { EditorPanels::KeyBindings, EditorPanels::Console }, { EditorPanels::BuildSettings, EditorPanels::Console }, { EditorPanels::Tests, EditorPanels::Console }, { EditorPanels::Palette, EditorPanels::Inspector } };
 
 		// The name ImGui::ShowDemoWindow gives its window.
 		constexpr const char* imgui_demo = "Dear ImGui Demo";
@@ -1973,6 +1973,7 @@ namespace Loom
 		ImportQueued();
 		ClickQueued();
 		PollScripts();
+		RunQueuedTests();
 		StepOpening();
 		PollRefresh();
 
@@ -2111,6 +2112,14 @@ namespace Loom
 		if (m_showSprites)		m_sprites.Draw(&m_showSprites, &m_showPalette);
 		if (m_showPalette)		m_sprites.DrawPalette(&m_showPalette, m_projectPath);
 		if (m_showStats)		DrawStats();
+		// Not before the panel's first frame, whose dock would pick its saved tab over it.
+		if (m_focusTests && ImGui::FindWindowByName(EditorPanels::Tests))
+		{
+			ImGui::SetNextWindowFocus();
+			m_focusTests = false;
+		};
+
+		if (m_showTests)		m_tests.Draw(&m_showTests, { [this] { AskForAsset(AssetKind::Test, m_projectPath); }, [this](const std::string& file, int line) { OpenInVisualStudio(file, line); } });
 
 		if (m_showKeyBindings && m_keyBindings.Draw(&m_showKeyBindings, !m_projectFile.empty()))
 			SaveInputActions();
@@ -2582,6 +2591,7 @@ namespace Loom
 		ImGui::DockBuilderDockWindow(EditorPanels::Stats, bottom);
 		ImGui::DockBuilderDockWindow(EditorPanels::KeyBindings, bottom);
 		ImGui::DockBuilderDockWindow(EditorPanels::BuildSettings, bottom);
+		ImGui::DockBuilderDockWindow(EditorPanels::Tests, bottom);
 
 		for (const char* window : centre_windows)
 			ImGui::DockBuilderDockWindow(window, centre);
@@ -2606,7 +2616,8 @@ namespace Loom
 			{ EditorPanels::Palette, &m_showPalette, false },
 			{ EditorPanels::Stats, &m_showStats, true },
 			{ EditorPanels::KeyBindings, &m_showKeyBindings, true },
-			{ EditorPanels::BuildSettings, &m_showBuildSettings, true } };
+			{ EditorPanels::BuildSettings, &m_showBuildSettings, true },
+			{ EditorPanels::Tests, &m_showTests, true } };
 	};
 
 	void Editor::AddPanelSettings()
@@ -4876,6 +4887,29 @@ namespace Loom
 	void Editor::QueueClick(float x, float y, float to_x, float to_y)
 	{
 		m_clicks.push_back(QueuedClick{ x, y, to_x, to_y });
+	};
+
+	void Editor::QueueTestRun(const std::string& filter)
+	{
+		m_tests.SetFilter(filter);
+		m_tests.QueueShown();
+	};
+
+	void Editor::RunQueuedTests()
+	{
+		if (!m_tests.HasQueued() || !m_scripts.IsIdle())
+			return;
+
+		if (m_scripts.HasProject() && m_scripts.IsStale() && !std::exchange(m_testsCompiled, true))
+		{
+			CompileScripts();
+			return;
+		};
+
+		m_testsCompiled = false;
+		m_tests.RunQueued();
+		m_showTests = true;
+		m_focusTests = true;
 	};
 
 	void Editor::ClickQueued()

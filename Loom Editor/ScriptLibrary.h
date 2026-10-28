@@ -195,6 +195,9 @@ namespace Loom
 		// The state names this library registered.
 		std::vector<std::string> m_states{ };
 
+		// How many test cases were registered before this library's.
+		size_t m_testsBefore = 0;
+
 		// The whole registry as it stood before this library registered anything.
 		// Kept in full rather than just the entries it went on to displace, because
 		// std::functions cannot be compared: unloading puts all of it back, which

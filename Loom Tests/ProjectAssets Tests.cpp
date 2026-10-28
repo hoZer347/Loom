@@ -117,6 +117,18 @@ TEST_SUITE("ProjectAssets")
 		CHECK(text.find("{NAME}") == std::string::npos);
 	};
 
+	TEST_CASE("a tests script is one header holding a LOOM_TEST named after it")
+	{
+		const ScriptsProject scripts("loom project assets tests");
+
+		const std::string text = ReadAll(scripts.Create("LaserTests", nullptr, Loom::ProjectAssets::ScriptKind::Test));
+
+		CHECK(text.find("namespace GameScripts") != std::string::npos);
+		CHECK(text.find("LOOM_TEST(\"LaserTests makes a scene\")") != std::string::npos);
+		CHECK(text.find("LOOM_CHECK(") != std::string::npos);
+		CHECK(text.find("{NAME}") == std::string::npos);
+	};
+
 	#pragma endregion
 
 	#pragma region Bindings

@@ -143,6 +143,8 @@
     <ClCompile Include="Platform Tests.cpp" />
     <ClCompile Include="Macro Helpers Tests.cpp" />
     <ClCompile Include="Engine Tests.cpp" />
+    <ClCompile Include="ScriptTests Tests.cpp" />
+    <ClCompile Include="TestsPanel Tests.cpp" />
     <ClCompile Include="LoomObject Tests.cpp" />
     <ClCompile Include="ComponentRegistry Tests.cpp" />
     <ClCompile Include="Prefabs Tests.cpp" />
@@ -269,6 +271,7 @@
     <ClCompile Include="..\Loom Editor\VirtualFolders.cpp" />
     <ClCompile Include="..\Loom Editor\FolderTree.cpp" />
     <ClCompile Include="..\Loom Editor\SearchBar.cpp" />
+    <ClCompile Include="..\Loom Editor\TestsPanel.cpp" />
     <ClCompile Include="..\Loom Editor\TextFit.cpp" />
     <ClCompile Include="..\Loom Editor\KindFilter.cpp" />
     <ClCompile Include="..\Loom Editor\Hierarchy.cpp" />

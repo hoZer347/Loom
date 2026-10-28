@@ -327,6 +327,26 @@ namespace {NAMESPACE}
 };
 )";
 
+		const char* const test = R"(#pragma once
+
+#include "Loom.h"
+
+
+namespace {NAMESPACE}
+{
+	// Each LOOM_TEST is a case in the Tests panel, run between frames.
+	// LOOM_CHECK notes a failure and carries on. Engine::DoTasks makes what
+	// was created so far real, and a scene made here is gone after the case.
+	LOOM_TEST("{NAME} makes a scene")
+	{
+		Loom::Scene scene;
+		Loom::Engine::DoTasks();
+
+		LOOM_CHECK(scene.GetRoot().GetName() == "Root");
+	};
+};
+)";
+
 		#pragma endregion
 
 		#pragma region Dialogue Bindings
@@ -553,7 +573,7 @@ namespace {NAMESPACE}
 				return "";
 			};
 
-		const char* const templates[] = { script, state, state_machine, dialogue_manager };
+		const char* const templates[] = { script, state, state_machine, dialogue_manager, test };
 
 		const std::string text = Replace(
 			Replace(templates[(int)kind], "{NAME}", name),

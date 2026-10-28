@@ -129,6 +129,7 @@ namespace
 			{ "state", AssetKind::State },
 			{ "state-machine", AssetKind::StateMachine },
 			{ "dialogue-manager", AssetKind::DialogueManager },
+			{ "test", AssetKind::Test },
 		};
 
 		for (const auto& [name, found] : kinds)
@@ -152,8 +153,10 @@ namespace
 			<< "  --create-state-machine <name>  the same for Create > State Machine\n"
 			<< "  --create-dialogue-manager <name>\n"
 			<< "                                 and for Create > Dialogue Manager\n"
+			<< "  --create-test <name>           and for Create > Test\n"
 			<< "  --create-prompt <kind>         start with the Create prompt open for a\n"
-			<< "                                 script, state, state-machine or dialogue-manager\n"
+			<< "                                 script, state, state-machine, dialogue-manager\n"
+			<< "                                 or test\n"
 			<< "  --compile                      build the project's scripts on startup\n"
 			<< "  --log-scripts-project          print each scripts project opened\n"
 			<< "  --claim-file-types             make this editor what opens .loom files in\n"
@@ -186,6 +189,8 @@ namespace
 			<< "  --undo, --redo                 step the history once the imports have landed\n"
 			<< "  --click <x y> [x y]            left click there once the scripts are built,\n"
 			<< "                                 letting go at the second point if given\n"
+			<< "  --run-tests [filter]           run the tests whose names hold filter, or\n"
+			<< "                                 every test, compiling stale scripts first\n"
 			<< "  --vulkan, --opengl             run on that graphics API this time\n"
 			<< "  --screenshot <file> [frames]   write the editor to a bitmap and exit,\n"
 			<< "                                 without showing a window\n"
@@ -435,7 +440,7 @@ int main(int argc, char** argv)
 			{
 				if (i + 1 >= argc || !ScriptKindNamed(argv[i + 1]))
 				{
-					std::cerr << "--create-prompt needs script, state, state-machine or dialogue-manager" << std::endl;
+					std::cerr << "--create-prompt needs script, state, state-machine, dialogue-manager or test" << std::endl;
 					return 1;
 				};
 
@@ -581,6 +586,8 @@ int main(int argc, char** argv)
 				}
 				else editor.QueueClick(x, y, x, y);
 			}
+			else if (argument == "--run-tests")
+				editor.QueueTestRun(i + 1 < argc && std::string(argv[i + 1]).rfind("--", 0) != 0 ? argv[++i] : "");
 			else if (argument == "--undo" || argument == "--redo")
 				editor.QueueHistoryStep(argument == "--undo");
 			else if (argument.rfind("--", 0) == 0)

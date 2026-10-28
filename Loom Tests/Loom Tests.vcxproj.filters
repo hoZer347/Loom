@@ -19,6 +19,12 @@
     <ClCompile Include="Engine Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="ScriptTests Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="TestsPanel Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="LoomObject Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

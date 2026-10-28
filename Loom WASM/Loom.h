@@ -29,6 +29,7 @@
 #include "Rigidbody.h"
 #include "Scene.h"
 #include "SceneSerializer.h"
+#include "ScriptTests.h"
 #include "Serial.h"
 #include "SerializedField.h"
 #include "ShaderVariables.h"

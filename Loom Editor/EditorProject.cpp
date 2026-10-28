@@ -127,6 +127,7 @@ namespace Loom
 			{ AssetKind::State, EditorIcons::State, "State", "NewState", ProjectAssets::ScriptKind::State, "a state machine's Start and Current" },
 			{ AssetKind::StateMachine, EditorIcons::Script, "State Machine", "NewStateMachine", ProjectAssets::ScriptKind::StateMachine, "Add Component" },
 			{ AssetKind::DialogueManager, EditorIcons::Dialogue, "Dialogue Manager", "NewDialogueManager", ProjectAssets::ScriptKind::DialogueManager, "Add Component" },
+			{ AssetKind::Test, EditorIcons::Test, "Test", "NewTests", ProjectAssets::ScriptKind::Test, "the Tests panel" },
 			{ AssetKind::Shader, EditorIcons::Shader, "Shader", "NewShader" },
 			{ AssetKind::Dialogue, EditorIcons::Dialogue, "Dialogue", "NewDialogue" },
 			{ AssetKind::Texture, EditorIcons::Texture, "Texture", "NewTexture" },
@@ -1258,6 +1259,7 @@ namespace Loom
 		case AssetKind::State:
 		case AssetKind::StateMachine:
 		case AssetKind::DialogueManager:
+		case AssetKind::Test:
 		{
 			if (!m_scripts.HasProject())
 			{

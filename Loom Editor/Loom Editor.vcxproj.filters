@@ -85,6 +85,9 @@
     <ClCompile Include="SearchBar.cpp">
       <Filter>Panels</Filter>
     </ClCompile>
+    <ClCompile Include="TestsPanel.cpp">
+      <Filter>Panels</Filter>
+    </ClCompile>
     <ClCompile Include="TextFit.cpp">
       <Filter>Panels</Filter>
     </ClCompile>
@@ -268,6 +271,9 @@
       <Filter>Panels</Filter>
     </ClInclude>
     <ClInclude Include="SearchBar.h">
+      <Filter>Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="TestsPanel.h">
       <Filter>Panels</Filter>
     </ClInclude>
     <ClInclude Include="TextFit.h">

@@ -41,6 +41,7 @@ namespace Loom
 		extern const ImVec4 AccentText;
 		extern const ImVec4 ErrorText;
 		extern const ImVec4 WarningText;
+		extern const ImVec4 SuccessText;
 
 		#pragma endregion
 	};

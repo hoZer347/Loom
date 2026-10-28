@@ -56,6 +56,7 @@ namespace Loom
 		constexpr ImVec4 AccentLight = Rgb(0x9DC1FF);
 		constexpr ImVec4 Error = Rgb(0xF0625D);
 		constexpr ImVec4 Warning = Rgb(0xE5C07B);
+		constexpr ImVec4 Success = Rgb(0x8BCF8E);
 
 		constexpr float SelectionAlpha = 0.35f;
 		constexpr float SelectionActiveAlpha = 0.5f;
@@ -191,6 +192,7 @@ namespace Loom
 	const ImVec4 EditorTheme::AccentText = AccentLight;
 	const ImVec4 EditorTheme::ErrorText = Error;
 	const ImVec4 EditorTheme::WarningText = Warning;
+	const ImVec4 EditorTheme::SuccessText = Success;
 
 	void EditorTheme::ApplyStyle()
 	{

@@ -75,6 +75,7 @@ namespace Loom
 			State,
 			StateMachine,
 			DialogueManager,
+			Test,
 		};
 
 		// A name usable as a file name, and as a path in an MSBuild project.

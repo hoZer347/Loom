@@ -4,6 +4,7 @@
 #include "HiddenProcess.h"
 #include "LoadProgress.h"
 #include "ProjectTemplate.h"
+#include "ScriptTests.h"
 
 #include "Utilities/StateReference.h"
 
@@ -397,6 +398,7 @@ namespace Loom
 		for (const auto& [name, factory] : ComponentRegistry::All())
 			before.emplace(name, std::make_pair(factory, ComponentRegistry::CategoryOf(name)));
 		const std::vector<std::string> states_before = StateRegistry::Names();
+		m_testsBefore = ScriptTests::All().size();
 
 		HMODULE module = LoadLibraryA(copy.string().c_str());
 
@@ -431,8 +433,9 @@ namespace Loom
 		m_loadedCopy = copy.string();
 
 		m_status =
-			"Loaded " + std::to_string(m_types.size()) + " component type(s) and " +
-			std::to_string(m_states.size()) + " state(s).";
+			"Loaded " + std::to_string(m_types.size()) + " component type(s), " +
+			std::to_string(m_states.size()) + " state(s) and " +
+			std::to_string(ScriptTests::All().size() - m_testsBefore) + " test(s).";
 
 		return true;
 	};
@@ -494,6 +497,8 @@ namespace Loom
 			StateRegistry::Unregister(state);
 
 		m_states.clear();
+
+		ScriptTests::Truncate(m_testsBefore);
 
 		// Restores anything the library registered over.
 		for (const auto& [name, entry] : m_before)

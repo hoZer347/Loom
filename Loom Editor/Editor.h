@@ -18,6 +18,7 @@
 #include "Hierarchy.h"
 #include "EditorSettings.h"
 #include "ShaderEditor.h"
+#include "TestsPanel.h"
 #include "Shapes.h"
 #include "BuildSettings.h"
 #include "GameBuilder.h"
@@ -90,6 +91,7 @@ namespace Loom
 		State,
 		StateMachine,
 		DialogueManager,
+		Test,
 		Shader,
 		Dialogue,
 		Texture,
@@ -348,6 +350,9 @@ namespace Loom
 		// once the scripts are built, so an automated run can click through
 		// the panels without the real mouse.
 		void QueueClick(float x, float y, float to_x, float to_y);
+
+		// Runs the tests whose names hold filter, all of them for an empty one.
+		void QueueTestRun(const std::string& filter);
 
 		// False in a run that exits once its screenshot or UI script is done,
 		// which nobody is at to see Visual Studio come up.
@@ -863,6 +868,7 @@ namespace Loom
 		void CopyIntoProject(const std::string& file);
 		void ImportQueued();
 		void ClickQueued();
+		void RunQueuedTests();
 
 		#pragma endregion
 
@@ -1447,6 +1453,7 @@ namespace Loom
 		bool m_showImGuiDemo = false;
 		bool m_showSettings = false;
 		bool m_showBuildSettings = true;
+		bool m_showTests = true;
 		bool m_focusBuildSettings = false;
 
 #ifndef LOOM_FINAL
@@ -1545,6 +1552,7 @@ namespace Loom
 		DialogueEditor m_dialogues;
 		SpriteEditor m_sprites;
 		ModelEditor m_models;
+		TestsPanel m_tests;
 
 		#pragma endregion
 
@@ -1586,6 +1594,11 @@ namespace Loom
 		};
 
 		std::vector<QueuedClick> m_clicks{ };
+		bool m_focusTests = false;
+
+		// Whether the queued tests already compiled the scripts, so a failed
+		// build runs them on the library it left rather than building again.
+		bool m_testsCompiled = false;
 
 		#pragma endregion
 
