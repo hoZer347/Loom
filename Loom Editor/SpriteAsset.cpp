@@ -81,8 +81,7 @@ namespace Loom
 			return error == std::errc() && end == text.data() + text.size();
 		};
 
-		// Written relative to the folder its file is in, so the pair can move
-		// together.
+		// Relative to its file's folder, so the pair can move together.
 		std::string Relative(const std::string& path, const std::filesystem::path& folder)
 		{
 			const std::filesystem::path relative = std::filesystem::path(path).lexically_relative(folder);
@@ -461,8 +460,7 @@ namespace Loom
 			{
 				std::vector<Image>& cels = loaded.layers.back().cels;
 
-				// A cel is made before the sprite is checked, so one past its
-				// frames is refused before it is.
+				// A cel is made before the sprite is checked, so one past its frames is refused first.
 				if (cels.size() >= std::min<size_t>(loaded.durations.size(), maxFrames))
 				{
 					overfull = true;

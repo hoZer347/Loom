@@ -125,8 +125,7 @@ namespace Loom
 	{
 		const glm::vec3 half = glm::abs(*size) * 0.5f;
 
-		// Corner i is on the + side of each axis whose bit it has set, so each
-		// edge joins two corners a single bit apart.
+		// Corner i's bits pick its side of each axis, so an edge joins corners one bit apart.
 		const auto corner =
 			[&](int i)
 			{

@@ -17,11 +17,13 @@
 
 using LoomTests::Pump;
 using LoomTests::RecordingRenderer;
+using LoomTests::EPSILON;
 
+
+#pragma region Helpers
 
 namespace
 {
-	constexpr float CLOSE = 1e-4f;
 	constexpr size_t POSITION_FLOATS = 3;
 	constexpr float QUARTER_TURN = 90.0f;
 	constexpr float EIGHTH_TURN = 45.0f;
@@ -83,23 +85,27 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("Skin")
 {
+	#pragma region Joints
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a vertex follows the joint it is bound to")
 	{
 		Rig rig;
 		rig.mesh->m_vertices = { 0.0f, 1.0f, 0.0f };
 		rig.skin->m_influences = Bound({ 0.0f });
 
-		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(0.0f, 1.0f, 0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(0.0f, 1.0f, 0.0f), EPSILON)));
 
 		rig.bone->transform.position = glm::vec3(2.0f, 0.0f, 0.0f);
-		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(2.0f, 1.0f, 0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(2.0f, 1.0f, 0.0f), EPSILON)));
 
 		rig.bone->transform.position = glm::vec3(0.0f);
 		rig.bone->transform.rotation = glm::vec3(0.0f, 0.0f, QUARTER_TURN);
-		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(-1.0f, 0.0f, 0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(-1.0f, 0.0f, 0.0f), EPSILON)));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a normal turns with the joint it is bound to, but is not moved by it")
@@ -110,10 +116,10 @@ TEST_SUITE("Skin")
 		rig.skin->m_influences = Bound({ 0.0f });
 
 		rig.bone->transform.position = glm::vec3(2.0f, 0.0f, 0.0f);
-		CHECK(glm::all(glm::epsilonEqual(rig.Turned(0), glm::vec3(1.0f, 0.0f, 0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(rig.Turned(0), glm::vec3(1.0f, 0.0f, 0.0f), EPSILON)));
 
 		rig.bone->transform.rotation = glm::vec3(0.0f, 0.0f, QUARTER_TURN);
-		CHECK(glm::all(glm::epsilonEqual(rig.Turned(0), glm::vec3(0.0f, 1.0f, 0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(rig.Turned(0), glm::vec3(0.0f, 1.0f, 0.0f), EPSILON)));
 
 		// The mesh's own normals are left as they were.
 		CHECK(*rig.mesh->m_normals == std::vector<float>{ 1.0f, 0.0f, 0.0f });
@@ -144,7 +150,7 @@ TEST_SUITE("Skin")
 
 		rig.bone->transform.position = glm::vec3(2.0f, 0.0f, 0.0f);
 
-		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(1.0f, 0.0f, 0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(1.0f, 0.0f, 0.0f), EPSILON)));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the bind pose is undone first, so a joint bound away from the origin moves its vertices only by what it moved since")
@@ -157,10 +163,10 @@ TEST_SUITE("Skin")
 		rig.mesh->m_vertices = { 1.0f, 3.0f, 0.0f };
 		rig.skin->m_influences = Bound({ 0.0f });
 
-		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(1.0f, 3.0f, 0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(1.0f, 3.0f, 0.0f), EPSILON)));
 
 		rig.bone->transform.rotation = glm::vec3(0.0f, 0.0f, QUARTER_TURN);
-		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(0.0f, 4.0f, 0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(0.0f, 4.0f, 0.0f), EPSILON)));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a joint that is not there holds its vertices where they were bound")
@@ -171,8 +177,12 @@ TEST_SUITE("Skin")
 		rig.skin->m_influences = Bound({ 0.0f });
 		rig.bone->transform.position = glm::vec3(5.0f, 0.0f, 0.0f);
 
-		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(0.0f, 1.0f, 0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(0.0f, 1.0f, 0.0f), EPSILON)));
 	};
+
+	#pragma endregion
+
+	#pragma region Shape Keys
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shape key moves its vertices by its weight, and its name is all that reaches it")
 	{
@@ -183,15 +193,15 @@ TEST_SUITE("Skin")
 		rig.skin->m_shapeOffsets = { 1.0f, 1.0f, 0.0f, 2.0f, 0.0f };
 		rig.skin->m_shapeWeights = { 0.0f };
 
-		CHECK(glm::all(glm::epsilonEqual(rig.Bent(1), glm::vec3(1.0f, 0.0f, 0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(rig.Bent(1), glm::vec3(1.0f, 0.0f, 0.0f), EPSILON)));
 
 		rig.skin->SetShapeWeight("Smile", 0.5f);
 		rig.skin->SetShapeWeight("Frown", 1.0f);
 
 		CHECK(rig.skin->GetShapeWeight("Smile") == doctest::Approx(0.5f));
 		CHECK(rig.skin->GetShapeWeight("Frown") == 0.0f);
-		CHECK(glm::all(glm::epsilonEqual(rig.Bent(1), glm::vec3(1.0f, 1.0f, 0.0f), CLOSE)));
-		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(rig.Bent(1), glm::vec3(1.0f, 1.0f, 0.0f), EPSILON)));
+		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(0.0f), EPSILON)));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shape key counting more offsets than it has, or no number of them, moves nothing")
@@ -206,9 +216,13 @@ TEST_SUITE("Skin")
 		{
 			rig.skin->m_shapeOffsets = { count, 1.0f, 0.0f, 1.0f, 0.0f };
 
-			CHECK(glm::all(glm::epsilonEqual(rig.Bent(1), glm::vec3(1.0f, 0.0f, 0.0f), CLOSE)));
+			CHECK(glm::all(glm::epsilonEqual(rig.Bent(1), glm::vec3(1.0f, 0.0f, 0.0f), EPSILON)));
 		};
 	};
+
+	#pragma endregion
+
+	#pragma region Skin Lifetime
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh whose Skin is taken off draws its own vertices again")
 	{
@@ -236,19 +250,19 @@ TEST_SUITE("Skin")
 		rig.skin->m_influences = Bound({ 0.0f });
 		rig.bone->transform.position = glm::vec3(2.0f, 0.0f, 0.0f);
 
-		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(2.0f, 1.0f, 0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(2.0f, 1.0f, 0.0f), EPSILON)));
 
 		rig.bone->Destroy();
 		Pump();
 
 		// Drawn in between, as a running editor would.
-		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(0.0f, 1.0f, 0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(0.0f, 1.0f, 0.0f), EPSILON)));
 
 		Loom::GameObject* again = rig.scene.GetRoot().AddChild("Bone");
 		Pump();
 		again->transform.position = glm::vec3(-1.0f, 0.0f, 0.0f);
 
-		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(-1.0f, 1.0f, 0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(-1.0f, 1.0f, 0.0f), EPSILON)));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the mesh's own vertices are never changed by bending")
@@ -262,13 +276,17 @@ TEST_SUITE("Skin")
 		rig.Bent(0);
 
 		CHECK(*rig.mesh->m_vertices == std::vector<float>{ 0.0f, 1.0f, 0.0f });
-		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(2.0f, 1.0f, 0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(2.0f, 1.0f, 0.0f), EPSILON)));
 	};
+
+	#pragma endregion
 };
 
 
 TEST_SUITE("Animator")
 {
+	#pragma region Clips
+
 	// A one second clip that slides Bone from the origin to (2, 0, 0), turns it
 	// a quarter about Y and closes Smile, and a second clip that holds it still.
 	struct Animated
@@ -331,8 +349,8 @@ TEST_SUITE("Animator")
 		Animated animated;
 		animated.animator->Pose(0.5f);
 
-		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(1.0f, 0.0f, 0.0f), CLOSE)));
-		CHECK(glm::all(glm::epsilonEqual(*animated.rig.bone->transform.rotation, glm::vec3(0.0f, EIGHTH_TURN, 0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(1.0f, 0.0f, 0.0f), EPSILON)));
+		CHECK(glm::all(glm::epsilonEqual(*animated.rig.bone->transform.rotation, glm::vec3(0.0f, EIGHTH_TURN, 0.0f), EPSILON)));
 		CHECK(animated.rig.skin->GetShapeWeight("Smile") == doctest::Approx(0.5f));
 	};
 
@@ -356,11 +374,11 @@ TEST_SUITE("Animator")
 		Animated animated;
 
 		animated.animator->Pose(1.25f);
-		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(0.5f, 0.0f, 0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(0.5f, 0.0f, 0.0f), EPSILON)));
 
 		animated.animator->loop = false;
 		animated.animator->Pose(1.25f);
-		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(2.0f, 0.0f, 0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(2.0f, 0.0f, 0.0f), EPSILON)));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "playing another clip starts it from its beginning, and a name it has no clip by changes nothing")
@@ -376,9 +394,13 @@ TEST_SUITE("Animator")
 		CHECK(animated.animator->GetDuration() == doctest::Approx(0.5f));
 
 		animated.animator->Pose(0.25f);
-		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(0.0f), EPSILON)));
 		CHECK(animated.animator->GetClipNames() == std::vector<std::string>{ "Slide", "Hold" });
 	};
+
+	#pragma endregion
+
+	#pragma region Transitions
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "going from one clip to another plays the transition between them once on the way")
 	{
@@ -424,21 +446,21 @@ TEST_SUITE("Animator")
 		animated.animator->blendTime = 0.5f;
 		animated.animator->Play("Slide");
 		animated.animator->Advance(0.5f);
-		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(1.0f, 0.0f, 0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(1.0f, 0.0f, 0.0f), EPSILON)));
 
 		// Hold keeps Bone at the origin; half way through the blend, eased, it is half way there.
 		animated.animator->clip = 1;
 		animated.animator->Advance(0.25f);
-		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(0.5f, 0.0f, 0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(0.5f, 0.0f, 0.0f), EPSILON)));
 
 		animated.animator->Advance(0.25f);
-		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(0.0f), EPSILON)));
 
 		// With no blend it cuts straight to Slide's pose a tenth of a second in.
 		animated.animator->blendTime = 0.0f;
 		animated.animator->clip = 0;
 		animated.animator->Advance(0.1f);
-		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(0.2f, 0.0f, 0.0f), CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(animated.Position(), glm::vec3(0.2f, 0.0f, 0.0f), EPSILON)));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "asking for the same clip every frame lets the transition into it play out")
@@ -459,6 +481,10 @@ TEST_SUITE("Animator")
 		CHECK(animated.animator->GetClipName() == "Hold");
 		CHECK(animated.animator->GetTime() == doctest::Approx(0.05f));
 	};
+
+	#pragma endregion
+
+	#pragma region Rotations
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a name with \" to \" in it is a transition only when both halves name clips")
 	{
@@ -508,6 +534,10 @@ TEST_SUITE("Animator")
 		CHECK(animated.rig.skin->GetShapeWeight("Smile") == doctest::Approx(1.0f));
 	};
 
+	#pragma endregion
+
+	#pragma region Inspector
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "clip picks a clip by its place, the inspector offers the clips by name, and one past them plays nothing")
 	{
 		Animated animated;
@@ -528,13 +558,17 @@ TEST_SUITE("Animator")
 		animated.animator->Pose(0.5f);
 		CHECK(animated.animator->GetClipName().empty());
 		CHECK(animated.animator->GetDuration() == 0.0f);
-		CHECK(glm::all(glm::epsilonEqual(animated.Position(), held, CLOSE)));
+		CHECK(glm::all(glm::epsilonEqual(animated.Position(), held, EPSILON)));
 	};
+
+	#pragma endregion
 };
 
 
 TEST_SUITE("Textured meshes")
 {
+	#pragma region Vertex Layout
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh with a texture coordinate for every vertex draws them beside its positions")
 	{
 		RecordingRenderer renderer;
@@ -622,6 +656,10 @@ TEST_SUITE("Textured meshes")
 		CHECK(renderer.lastFormat == Loom::VertexFormat::PositionUVNormal);
 	};
 
+	#pragma endregion
+
+	#pragma region Sampling
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader with pixelated on has its program sample nearest")
 	{
 		RecordingRenderer renderer;
@@ -676,6 +714,10 @@ TEST_SUITE("Textured meshes")
 		CHECK(renderer.pixelatedPrograms.contains(blended.id));
 	};
 
+	#pragma endregion
+
+	#pragma region Euler Angles
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a rotation turned into Transform's Euler angles turns the same way")
 	{
 		const glm::quat rotation = glm::normalize(glm::quat(0.8f, 0.3f, -0.4f, 0.2f));
@@ -690,6 +732,8 @@ TEST_SUITE("Textured meshes")
 		const glm::mat4 turned = transform.Matrix();
 
 		for (int column = 0; column < 3; column++)
-			CHECK(glm::all(glm::epsilonEqual(glm::vec3(turned[column]), glm::vec3(expected[column]), CLOSE)));
+			CHECK(glm::all(glm::epsilonEqual(glm::vec3(turned[column]), glm::vec3(expected[column]), EPSILON)));
 	};
+
+	#pragma endregion
 };

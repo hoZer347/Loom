@@ -49,8 +49,7 @@ namespace Loom
 	{
 		m_stopping = true;
 
-		// The last handle to the job: closing it kills everything in it, and
-		// the reader runs out of pipe.
+		// Closing the last handle kills the job, and the reader runs out of pipe.
 		if (m_job != nullptr)
 		{
 			CloseHandle(m_job);

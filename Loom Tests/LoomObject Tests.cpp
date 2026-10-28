@@ -13,6 +13,8 @@
 
 using LoomTests::Pump;
 
+#pragma region Helpers
+
 namespace
 {
 	// LoomObject is abstract only in spirit -- it has no pure virtuals -- but
@@ -35,9 +37,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("LoomObject")
 {
+	#pragma region Names and IDs
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "every object gets its own ID")
 	{
 		std::set<Loom::uint64_t> ids;
@@ -204,6 +210,10 @@ TEST_SUITE("LoomObject")
 		Pump();
 	};
 
+	#pragma endregion
+
+	#pragma region Journal
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "while watched, a written name or field puts the object in the journal once")
 	{
 		LoomTests::Watching watching;
@@ -333,4 +343,6 @@ TEST_SUITE("LoomObject")
 
 		CHECK(holder.partner == nullptr);
 	};
+
+	#pragma endregion
 };

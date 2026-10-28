@@ -8,8 +8,7 @@
 
 namespace Loom
 {
-	// The keys "carry on" is spelled with. One list, so the stream and the wait cannot
-	// disagree about what advances a line.
+	// One list, so the stream and the wait agree on what advances a line.
 	static const int s_keys[] =
 	{
 		GLFW_KEY_SPACE,
@@ -34,8 +33,7 @@ namespace Loom
 	static bool s_pad_pressed = false;
 	static bool s_mouse_pressed = false;
 
-	// Asked when read rather than at Tick, which runs before an editor decides
-	// this frame's focus.
+	// Read at use, since Tick runs before the editor decides focus.
 	bool DialogueInput::Continued() { return Input::IsFocused() && s_pad_pressed; };
 
 	bool DialogueInput::ContinuedOnKeyboard() { return Input::IsFocused() && s_keyboard_pressed; };
@@ -70,9 +68,7 @@ namespace Loom
 		};
 
 #ifndef __EMSCRIPTEN__
-		// The four lettered face buttons, by position, on the first pad that is one.
-		// Guarded off under Emscripten, whose GLFW port has no gamepad mapping at all --
-		// the browser reads pads through its own API, which is a separate job.
+		// Face buttons on the first pad; not on the web, whose GLFW has no gamepad mapping.
 		for (int pad = GLFW_JOYSTICK_1; pad <= GLFW_JOYSTICK_LAST && !s_pad; pad++)
 		{
 			if (!glfwJoystickPresent(pad) || !glfwJoystickIsGamepad(pad))

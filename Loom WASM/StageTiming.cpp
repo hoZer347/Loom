@@ -22,9 +22,7 @@ namespace Loom
 		// The thinnest a stage's bar or graph is drawn.
 		constexpr float stage_narrowest_bar = 1.0f;
 
-		// Each stage keeps its colour on every thread, a soft one under dark
-		// text. Hues step round the wheel by the golden ratio as stages are
-		// first seen, so those seen together stay far apart.
+		// Golden-ratio hue steps keep stages seen together far apart.
 		ImU32 StageColour(const std::string& name)
 		{
 			constexpr float hue_step = 0.618034f;
@@ -75,8 +73,7 @@ namespace Loom
 		if (total <= 0.0)
 			return shares;
 
-		// For each depth, where its next row begins and where the stage it
-		// is part of ends.
+		// Per depth, where its next row begins and where its parent stage ends.
 		std::vector<double> next((size_t)deepest + 2, 0.0);
 		std::vector<double> end((size_t)deepest + 2, 1.0);
 
@@ -201,8 +198,7 @@ namespace Loom
 		const ImVec2 mouse = ImGui::GetIO().MousePos;
 		ImDrawList* const draw = ImGui::GetWindowDrawList();
 
-		// Each thread's stages stacked a point every Bucket frames, the oldest
-		// on the left.
+		// Each thread's stages stacked per Bucket frames, oldest on the left.
 		constexpr float graph_lines = 6.0f;
 		constexpr int graph_frames = Profiler::Trend * Profiler::Bucket;
 		constexpr double milliseconds_per_second = 1000.0;
@@ -251,8 +247,7 @@ namespace Loom
 
 			draw->AddRectFilled(corner, ImVec2(corner.x + size.x, corner.y + size.y), ImGui::GetColorU32(ImGuiCol_FrameBg));
 
-			// Antialiased edges would show the background through the seams
-			// between one point's quad and the next.
+			// Antialiasing would show the background through quad seams.
 			const ImDrawListFlags flags = draw->Flags;
 			draw->Flags &= ~ImDrawListFlags_AntiAliasedFill;
 
@@ -328,14 +323,12 @@ namespace Loom
 
 	void StageTiming::Overlay()
 	{
-		// How far in from the corner it sits, how much of the width it takes,
-		// and how much of the game shows through.
+		// Inset, width share and how much game shows through.
 		constexpr float inset = 8.0f;
 		constexpr float width_share = 0.4f;
 		constexpr float opacity = 0.85f;
 
-		// The longest a frame's length runs to in the header, so a slow frame
-		// widens nothing.
+		// The widest frame length shown, so a slow frame widens nothing.
 		constexpr double widest_frame = 999.99;
 
 		const ImGuiViewport* viewport = ImGui::GetMainViewport();

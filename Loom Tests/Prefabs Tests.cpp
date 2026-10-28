@@ -15,6 +15,8 @@
 using Loom::Prefabs::ObjectNode;
 using Loom::Prefabs::Part;
 
+#pragma region Helpers
+
 namespace
 {
 	std::string NewGuid()
@@ -81,9 +83,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("Prefabs")
 {
+	#pragma region Text
+
 	TEST_CASE("a GameObject's text parses and writes back the same")
 	{
 		const Tree tree;
@@ -135,6 +141,10 @@ TEST_SUITE("Prefabs")
 
 		CHECK(Shared(tree.Node()) != Shared(edited));
 	};
+
+	#pragma endregion
+
+	#pragma region Retargeting
 
 	TEST_CASE("the whole of a prefab takes in its transforms and name")
 	{
@@ -237,6 +247,10 @@ TEST_SUITE("Prefabs")
 		CHECK(isolated.components[0].fields[2].value == "null");
 	};
 
+	#pragma endregion
+
+	#pragma region Instances
+
 	TEST_CASE("a known instance's edit reaches the prefab and the other instances")
 	{
 		const Tree prefab;
@@ -333,6 +347,10 @@ TEST_SUITE("Prefabs")
 		CHECK_FALSE(outcome.instances[0]);
 	};
 
+	#pragma endregion
+
+	#pragma region Links
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a GameObject's transform is written under the keys the tests use")
 	{
 		Loom::Scene scene("Transforms");
@@ -361,4 +379,6 @@ TEST_SUITE("Prefabs")
 		CHECK(Loom::Prefabs::NearestLink(*inner_child) == inner_link);
 		CHECK(Loom::Prefabs::NearestLink(*loose) == nullptr);
 	};
+
+	#pragma endregion
 };

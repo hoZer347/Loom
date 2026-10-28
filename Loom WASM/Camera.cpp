@@ -12,8 +12,7 @@ namespace Loom
 {
 	namespace
 	{
-		// How short the cross of forward and up may get before the two count as
-		// parallel and another up stands in.
+		// Below this, forward and up count as parallel and another up stands in.
 		constexpr float PARALLEL = 1e-4f;
 
 		// How far ahead a target goes when the old one sat on the camera.
@@ -128,9 +127,7 @@ namespace Loom
 		if (!m_gameObject)
 			return;
 
-		// Rotation is relative to the parent, so the aim is taken back through
-		// the whole of it: a parent scaled unevenly bends directions, and
-		// undoing only its rotation would leave the bend in.
+		// Back through the whole parent transform, since uneven scale bends directions.
 		glm::vec3 forward = was.forward;
 		glm::vec3 up = was.up;
 

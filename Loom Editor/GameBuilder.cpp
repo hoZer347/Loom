@@ -39,8 +39,7 @@ namespace Loom
 
 	bool GameBuilder::Launch(const std::string& arguments, const std::filesystem::path& run)
 	{
-		// Before the start, which stops the last run and its reader, so only
-		// this one's reader writes it.
+		// Before the start, which stops the last run, so only this one's reader writes it.
 		m_status = Status::Building;
 
 		const bool started = m_run.Start("build-game.ps1", arguments,

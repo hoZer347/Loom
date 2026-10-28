@@ -16,6 +16,8 @@
 #include <sstream>
 #include <string>
 
+#pragma region Helpers
+
 namespace
 {
 	// An ImGui context of the test's own, with no window and no renderer,
@@ -88,9 +90,13 @@ namespace
 
 };
 
+#pragma endregion
+
 
 TEST_SUITE("UiScript")
 {
+	#pragma region Mouse
+
 	TEST_CASE("a click lands on the button with that label")
 	{
 		ScriptedUi ui("wait 2\nclick \"Panel\" \"Press me\"\n");
@@ -356,6 +362,10 @@ TEST_SUITE("UiScript")
 		CHECK(Loom::Input::screen_height == (int)window.y);
 	};
 
+	#pragma endregion
+
+	#pragma region Failures
+
 	TEST_CASE("a target that never shows up fails the script, saying which line")
 	{
 		const LoomTests::Captured errors(std::cerr);
@@ -382,6 +392,10 @@ TEST_SUITE("UiScript")
 
 		CHECK(errors.Says("UI script line"));
 	};
+
+	#pragma endregion
+
+	#pragma region Keys
 
 	TEST_CASE("hold keeps ctrl down through a click until release")
 	{
@@ -468,6 +482,10 @@ TEST_SUITE("UiScript")
 		CHECK_FALSE(shift_after);
 	};
 
+	#pragma endregion
+
+	#pragma region Scroll and Resize
+
 	TEST_CASE("scroll turns the wheel where the mouse is, for ImGui and the game")
 	{
 		constexpr float notches = -2.0f;
@@ -502,6 +520,10 @@ TEST_SUITE("UiScript")
 		CHECK(ui.script->Failed());
 		CHECK(errors.Says("no window"));
 	};
+
+	#pragma endregion
+
+	#pragma region Parsing
 
 	TEST_CASE("blank lines and comments are skipped, and quit ends early")
 	{
@@ -575,6 +597,10 @@ TEST_SUITE("UiScript")
 
 		CHECK(errors.Says("UI script line"));
 	};
+
+	#pragma endregion
+
+	#pragma region Windows
 
 	TEST_CASE("items can be listed from one window, and only while listening")
 	{
@@ -685,4 +711,6 @@ TEST_SUITE("UiScript")
 		CHECK(ui.script->Failed());
 		CHECK(errors.Says("Missing"));
 	};
+
+	#pragma endregion
 };

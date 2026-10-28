@@ -1,13 +1,4 @@
-// Entry point for the Loom test suite.
-//
-// The same sources are built twice: by MSVC into a desktop executable, and by
-// emcc into a WebAssembly module run under node. This is the only translation
-// unit that defines doctest's implementation and main(); every other file just
-// includes "doctest.h" and adds TEST_CASEs.
-//
-// Run the executable with no arguments to run everything, or pass
-// -ts=<suite> / -tc=<case> to narrow it down. --help lists the rest.
-// --progress-log=<file> writes each case's name and seconds there as it runs.
+// Defines doctest's main; --progress-log=<file> writes each case's name and seconds there.
 
 #define DOCTEST_CONFIG_IMPLEMENT
 #include "doctest.h"
@@ -56,6 +47,8 @@
 
 namespace
 {
+	#pragma region Build Banner
+
 	// Printed before doctest's own banner so a log makes it obvious which of the
 	// two builds produced it.
 	struct BuildBanner
@@ -70,11 +63,12 @@ namespace
 		};
 	} banner;
 
+	#pragma endregion
+
+	#pragma region Turns
+
 #ifndef __EMSCRIPTEN__
-	// Two runs at once collide even with temp folders of their own: one clears
-	// the Screenshots folder another is writing to, and runs from different
-	// slots share the rest of the machine. Every run, from any slot, takes this
-	// in turn.
+	// Runs from any slot share Screenshots and the machine, so each takes this in turn.
 	constexpr wchar_t SUITE_MUTEX[] = L"Global\\LoomTestSuite";
 
 	// Calls waiting first when another run holds the suite, so a run waiting its
@@ -121,6 +115,10 @@ namespace
 		};
 	} tempFolder;
 #endif
+
+	#pragma endregion
+
+	#pragma region Web Output
 
 #ifdef __EMSCRIPTEN__
 	// Emscripten's isatty answers yes for any stdout, so doctest's colours
@@ -174,6 +172,10 @@ namespace
 	// Held until main counts what it held back.
 	std::optional<HeldBack> startup LOOM_FIRST_INITIALISED { std::in_place };
 
+	#pragma endregion
+
+	#pragma region Progress Log
+
 	constexpr std::string_view PROGRESS_LOG_OPTION = "--progress-log=";
 
 	std::ofstream progressFile;
@@ -212,6 +214,8 @@ namespace
 	};
 
 	REGISTER_LISTENER("progress-log", 0, ProgressLog);
+
+	#pragma endregion
 };
 
 
@@ -282,6 +286,8 @@ int main(int argc, char** argv)
 // doctest.h's TEST_SUITE_END names the default suite, and a -ts= run would crash on it.
 TEST_SUITE("Loom Tests")
 {
+	#pragma region Filters and Progress
+
 	TEST_CASE("every case is in a suite a -ts= filter can pick")
 	{
 		for (const doctest::detail::TestCase& test : doctest::detail::getRegisteredTests())
@@ -308,6 +314,10 @@ TEST_SUITE("Loom Tests")
 		log.test_case_end(stats);
 		CHECK(out.str() == name + "  1.250 s\n");
 	};
+
+	#pragma endregion
+
+	#pragma region Runs
 
 #ifndef __EMSCRIPTEN__
 	TEST_CASE("the suite's temp files go in a folder of its own")
@@ -387,4 +397,6 @@ TEST_SUITE("Loom Tests")
 		CHECK(std::filesystem::exists(LoomTests::ScreenshotFolder().parent_path() / "Loom Tests.exe"));
 	};
 #endif
+
+	#pragma endregion
 };

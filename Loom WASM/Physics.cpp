@@ -21,8 +21,7 @@ namespace Loom
 			const float origin = ray.origin[axis];
 			const float direction = ray.direction[axis];
 
-			// Parallel to this pair of planes: dividing would make 0 * inf of a
-			// ray lying in one of them.
+			// Parallel to these planes, dividing would make 0 * inf.
 			if (direction == 0.0f)
 			{
 				if (origin < min[axis] || origin > max[axis])

@@ -129,8 +129,7 @@ namespace Loom::Hierarchy
 		if (open)
 			for (const auto& [index, child] : *open)
 			{
-				// Gathered at the top of the frame, so one moved since is left
-				// to the closed rows around it.
+				// Gathered at the top of the frame, so one moved since is left alone.
 				if (index < from || index >= children.size() || children[index] != child)
 					continue;
 

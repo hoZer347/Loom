@@ -11,8 +11,7 @@ namespace Loom
 {
 	namespace
 	{
-		// By what follows the last separator, as a FileTab shows its files by
-		// their names, and then whole.
+		// By file name, as a FileTab shows them, then whole.
 		bool ByName(std::string_view a, std::string_view b)
 		{
 			const std::string_view name_a = a.substr(a.rfind(VirtualFolders::separator) + 1);
@@ -231,8 +230,7 @@ namespace Loom
 
 		m_folders.erase(folder);
 
-		// What is under it moves up a level, landing in a folder of the same
-		// name when the level above already has one.
+		// Landing in a same-named folder when the level above has one.
 		const std::string prefix = folder + separator;
 
 		std::set<std::string> folders{ };

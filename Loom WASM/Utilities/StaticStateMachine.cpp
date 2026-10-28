@@ -32,9 +32,7 @@ namespace Loom
 
 	void StaticStateMachine::Pump()
 	{
-		// Never built just to be pumped. A game that does not use it pays nothing, and a
-		// machine created mid-frame starts on the next one rather than half-way through
-		// this one.
+		// Never built just to pump, so unused it costs nothing and a new one starts next frame.
 		if (s_instance == nullptr)
 			return;
 

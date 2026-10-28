@@ -95,8 +95,7 @@ namespace Loom
 			return top && component.type == Prefabs::PrefabType();
 		};
 
-		// The components that are content, which is all of them but the top
-		// object's links.
+		// All but the top object's links.
 		std::vector<const Prefabs::ComponentNode*> ContentOf(const Prefabs::ObjectNode& node, bool top)
 		{
 			std::vector<const Prefabs::ComponentNode*> content{ };
@@ -124,8 +123,7 @@ namespace Loom
 
 		#pragma region Syncing
 
-		// What a reference out of the tree compares as: an instance keeps its
-		// own, and a prefab has nothing outside it to point at.
+		// An instance keeps its own outside references, and a prefab has none.
 		constexpr const char* outside = "out";
 
 		struct Shaper

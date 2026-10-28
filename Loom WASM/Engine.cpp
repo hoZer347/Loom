@@ -39,8 +39,7 @@ namespace Loom
 
 		std::unique_ptr<Renderer> renderer;
 
-		// While a shader has a pixel pass, the scenes are drawn into this rather
-		// than the window, so the passes can read them back.
+		// Scenes draw here while a pixel pass needs to read them back.
 		PixelPass s_framePass;
 		uint32_t s_frame = 0;
 		glm::ivec2 s_frameSize{ 0 };
@@ -79,8 +78,7 @@ namespace Loom
 		enum Channel { RED, GREEN, BLUE, BYTES_PER_PIXEL };
 		enum BitmapChannel { BITMAP_BLUE, BITMAP_GREEN, BITMAP_RED };
 
-		// Writes a 24 bit bottom-up bitmap, which is the row order GL hands back
-		// and the one format worth writing without an image library.
+		// 24 bit bottom-up, GL's row order, and writable without an image library.
 		bool WriteBitmap(const std::string& path, int width, int height, const std::vector<uint8_t>& rgb)
 		{
 			constexpr uint32_t FILE_HEADER = 14;
@@ -145,8 +143,7 @@ namespace Loom
 
 		window = OpenWindow(backend);
 
-		// Vulkan needs a driver and features an OpenGL machine may not have, and
-		// a window made for one API cannot be handed to the other.
+		// A window made for one API cannot be handed to the other.
 		if (!window && backend == Backend::Vulkan)
 		{
 			std::cerr << "Engine: Vulkan could not start, so this runs on OpenGL" << std::endl;
@@ -195,8 +192,7 @@ namespace Loom
 	{
 		Stop();
 
-		// After whatever the application built on the Engine is gone, since
-		// that is what holds the textures and programs being released here.
+		// After the application is gone, since it holds what is released here.
 		if (renderer)
 		{
 			ReleaseFrame();
@@ -259,9 +255,7 @@ namespace Loom
 			Input::Tick();
 		};
 
-		// The frame clock, the edge-detected dialogue input and the StaticStateMachine.
-		// First thing in the frame, so everything ticked below reads the same delta and
-		// the same key presses.
+		// First in the frame, so everything below reads the same delta and key presses.
 		{
 			LOOM_STAGE("Utilities::Tick");
 			Utilities::Tick();
@@ -289,9 +283,7 @@ namespace Loom
 
 		if (updateScenes)
 		{
-			// As many fixed steps as the frame's time covers, carrying the
-			// rest over, and at most a few, so a slow frame does not leave
-			// the next one further behind.
+			// At most a few fixed steps, so a slow frame does not leave the next further behind.
 			constexpr int MOST_STEPS = 4;
 
 			s_physicsTime += Time::DeltaTime();
@@ -303,8 +295,7 @@ namespace Loom
 
 			s_physicsTime = std::min(s_physicsTime, Physics::FixedDeltaTime());
 
-			// All but the last whole, and the last solved on its own thread
-			// while the GUI is built.
+			// The last step solves on its own thread while the GUI is built.
 			for (int step = 1; step < steps; step++)
 				for (auto& scene : Scene::allScenes)
 					scene->Physics();
@@ -401,9 +392,7 @@ namespace Loom
 		io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
 
 #ifndef __EMSCRIPTEN__
-		// Multi-viewport (native only). Not while the window is hidden: a panel
-		// dragged out in an earlier session is remembered in the layout, and a
-		// viewport is a real window that ImGui shows whatever this one does.
+		// Not while hidden: a remembered dragged-out panel would show as a real window.
 		if (showWindow)
 		{
 			io->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;   // Enable Multi-Viewport / Platform Windows
@@ -525,9 +514,7 @@ namespace Loom
 			std::cerr << "Simulation::EndAll threw an unknown exception" << std::endl;
 		};
 
-		// Each task is popped under the lock but run outside it, so a task is
-		// free to queue more work (Attach doing so from OnAttach is normal) and
-		// the follow-up still runs in this same drain.
+		// Run outside the lock, so a task can queue more work that drains here too.
 		while (true)
 		{
 			Task task;
@@ -542,8 +529,7 @@ namespace Loom
 				taskQueue.pop();
 			};
 
-			// DoTasks is noexcept because it runs from the frame loop, where an
-			// escaping exception would take the whole application down.
+			// An escaping exception would take the whole application down.
 			try
 			{
 				task();

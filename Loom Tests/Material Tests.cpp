@@ -14,6 +14,8 @@
 
 using LoomTests::Pump;
 
+#pragma region Helpers
+
 namespace
 {
 	// Path, colour, shadows, variables, sampling.
@@ -22,9 +24,13 @@ namespace
 	enum { PATH, COLOR, SHADOWS, VARIABLES, SAMPLING };
 };
 
+#pragma endregion
+
 
 TEST_SUITE("Material")
 {
+	#pragma region Components
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a fresh material has no shader")
 	{
 		Loom::Material material;
@@ -39,9 +45,7 @@ TEST_SUITE("Material")
 		CHECK(std::is_base_of_v<Loom::ComponentBase, Loom::Material>);
 	};
 
-	// Material overrides OnRender but does nothing in it -- Mesh is what issues
-	// the draw call, reading the shader back off the material. Until that moves,
-	// rendering a material is safe with no GL context.
+	// Mesh issues the draw, so a material renders safely with no GL context.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "rendering a material on its own draws nothing")
 	{
 		Loom::Scene scene("material render");
@@ -66,9 +70,7 @@ TEST_SUITE("Material")
 		CHECK(scene.GetRoot().GetComponent<Loom::Material>() == material);
 	};
 
-	// A material names its shader rather than owning one: the engine compiles
-	// one per path and shares it, because ~Shader evicts an entry every user of
-	// that path is reading.
+	// The engine compiles one shader per path and shares it.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a material carries the name of the shader it wants")
 	{
 		Loom::Scene scene("shader path");
@@ -91,6 +93,10 @@ TEST_SUITE("Material")
 		CHECK(material->GetFields().front().type == Loom::FieldType::Asset);
 		CHECK(material->GetFields().front().extensions == std::vector<std::string>{ Loom::Shader::extension });
 	};
+
+	#pragma endregion
+
+	#pragma region Fields
 
 	// The path comes first: it was the only field before colour was added, and
 	// scene files already saved key it by position.
@@ -151,6 +157,10 @@ TEST_SUITE("Material")
 		CHECK(read.sampling == Loom::Material::Nearest);
 	};
 
+	#pragma endregion
+
+	#pragma region Compiling
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a material with no shader named compiles nothing")
 	{
 		Loom::Scene scene("no shader named");
@@ -163,13 +173,7 @@ TEST_SUITE("Material")
 	};
 
 #ifndef __EMSCRIPTEN__
-	// Attaching a material retries a shader that would not compile, whatever
-	// the poll remembers: reloading the scene has to be enough wherever the
-	// file cannot be watched, or live iteration means restarting the editor.
-	//
-	// Native only, for the reason the Shader suite gives: a missing path fails
-	// in the ifstream here, while the web build fetches over HTTP and needs a
-	// browser to fail in.
+	// Native only: a missing path fails in the ifstream here, but needs a browser on the web.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader that failed to compile is tried again")
 	{
 		const LoomTests::Captured captured(std::cerr);
@@ -230,4 +234,6 @@ TEST_SUITE("Material")
 		CHECK(changed == 2);
 	};
 #endif
+
+	#pragma endregion
 };

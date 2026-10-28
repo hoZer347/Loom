@@ -15,6 +15,8 @@
 #include <vector>
 
 
+#pragma region Helpers
+
 namespace
 {
 	using Loom::SpriteAsset;
@@ -38,9 +40,7 @@ namespace
 		return count;
 	};
 
-	// The Sprites panel in an ImGui context of the test's own, with no window
-	// and no renderer, filling the display but for the Palette panel's room
-	// on the right, with one small image open.
+	// The Sprites panel in an ImGui context of its own, with one small image open.
 	struct Driven
 	{
 		static constexpr float width = 900.0f;
@@ -289,9 +289,13 @@ namespace
 	constexpr float reach = 200.0f;
 };
 
+#pragma endregion
+
 
 TEST_SUITE("SpriteEditor")
 {
+	#pragma region Painting and Saving
+
 	TEST_CASE("a click with the pencil paints one pixel, and Ctrl+S writes it")
 	{
 		Driven driven("loom sprite click.tga");
@@ -454,6 +458,10 @@ TEST_SUITE("SpriteEditor")
 		CHECK(Count(driven.Saved(), CLEAR) == 0);
 	};
 
+	#pragma endregion
+
+	#pragma region Tabs
+
 	TEST_CASE("an image with a sprite opens as it: a stroke paints the first frame of the bottom layer, and saving writes both")
 	{
 		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
@@ -574,6 +582,10 @@ TEST_SUITE("SpriteEditor")
 			std::filesystem::remove(SpriteAsset::For(image));
 		};
 	};
+
+	#pragma endregion
+
+	#pragma region Palette Prompt
 
 	TEST_CASE("a sprite with the Palette panel shut offers to open it, New there makes a palette of the sprite's colours written on save, and Ctrl+Z takes the choice back")
 	{
@@ -780,6 +792,10 @@ TEST_SUITE("SpriteEditor")
 		std::filesystem::remove(moved);
 	};
 
+	#pragma endregion
+
+	#pragma region Layers and Frames
+
 	TEST_CASE("Resize scales the sprite, is written only on Ctrl+S, and Ctrl+Z and Ctrl+Y step it")
 	{
 		constexpr int wider = Driven::side * 2;
@@ -893,6 +909,10 @@ TEST_SUITE("SpriteEditor")
 		CHECK(Count(saved.layers[0].cels[1], CLEAR) == Driven::side * Driven::side - 1);
 	};
 
+	#pragma endregion
+
+	#pragma region Images and Sprites
+
 	TEST_CASE("an image written since its sprite is not saved over until it is taken in or the sprite kept")
 	{
 		const SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
@@ -993,6 +1013,10 @@ TEST_SUITE("SpriteEditor")
 		std::filesystem::remove(other);
 		std::filesystem::remove(SpriteAsset::For(other));
 	};
+
+	#pragma endregion
+
+	#pragma region Mouse Buttons and Swatches
 
 	TEST_CASE("the left mouse paints black and the right white, until X swaps them")
 	{
@@ -1275,6 +1299,10 @@ TEST_SUITE("SpriteEditor")
 		std::filesystem::remove(palette);
 	};
 
+	#pragma endregion
+
+	#pragma region Palette Panel
+
 	// Below the swatches, where no item is.
 	constexpr const char* palette_space = "1050 550";
 
@@ -1353,6 +1381,10 @@ TEST_SUITE("SpriteEditor")
 
 		std::filesystem::remove(other);
 	};
+
+	#pragma endregion
+
+	#pragma region Layer List
 
 	TEST_CASE("a layer's outline toggle is kept with the sprite, changes nothing in the image, and Ctrl+Z turns it back")
 	{
@@ -1519,4 +1551,6 @@ TEST_SUITE("SpriteEditor")
 		CHECK(saved.layers.back().name == "Layer 1");
 		CHECK(saved.layers.front().name == "Layer 2");
 	};
+
+	#pragma endregion
 };

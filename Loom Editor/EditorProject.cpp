@@ -58,9 +58,7 @@ namespace Loom
 		constexpr float NAME_PROMPT_WIDTH = 320.0f;
 		constexpr float PROMPT_BUTTON_WIDTH = 120.0f;
 
-		// How long a frame spends reading a scene being opened: long enough
-		// that the reading, not the frames between, takes the time, and short
-		// enough that its bar still moves.
+		// Long enough that reading takes the time, short enough that the bar still moves.
 		constexpr double OPENING_SLICE_SECONDS = 1.0 / 15.0;
 
 		// The widest the bar of a scene being opened gets, in lines of text.
@@ -73,8 +71,7 @@ namespace Loom
 		constexpr float PING_OUTLINE_THICKNESS = 2.0f;
 		constexpr float PING_ROUNDING = 3.0f;
 
-		// How far NewShader, NewShader1, ... counts before leaving the name to
-		// the user to sort out.
+		// How far NewShader1, NewShader2... counts before the user picks a name.
 		constexpr int MAX_DEFAULT_NAME_SUFFIX = 1000;
 
 		#pragma endregion
@@ -86,9 +83,7 @@ namespace Loom
 		constexpr float PICKER_ROWS = 12.0f;
 		constexpr const char* PICKER = "##picker";
 
-		// icon, then as much of the end of text as fits beside it in width,
-		// cut as FitPath cuts, so a path keeps its file's name. Whether text
-		// was cut, in cut.
+		// Cut as FitPath cuts, so a path keeps its file's name.
 		std::string FitPickerLabel(const char* icon, const std::string& text, float width, bool& cut)
 		{
 			const std::string lead = icon ? std::string(icon) + " " : std::string();
@@ -99,8 +94,6 @@ namespace Loom
 			return lead + fitted;
 		};
 
-		// What the item drawn last holds in full: tip if given, else text if
-		// it was cut.
 		void PickerTip(const std::string& tip, const std::string& text, bool cut)
 		{
 			if (!tip.empty())
@@ -120,8 +113,7 @@ namespace Loom
 			const char* label;
 			const char* defaultName;
 
-			// Scripts only: the header's template, and where its type turns up
-			// once it is compiled.
+			// Scripts only: the header's template, and where its compiled type turns up.
 			ProjectAssets::ScriptKind script = ProjectAssets::ScriptKind::Component;
 			const char* appearsIn = nullptr;
 		};
@@ -155,8 +147,7 @@ namespace Loom
 			return InfoOf(kind).appearsIn != nullptr;
 		};
 
-		// New Folder in parent, or the first of New Folder1, ... nothing there is
-		// using, its name then typed in place.
+		// New Folder, or the first free New Folder1..., renamed in place.
 		void AddNewFolder(VirtualFolders& folders, FolderTree& tree, const std::string& parent)
 		{
 			constexpr const char* newFolder = "New Folder";
@@ -169,15 +160,11 @@ namespace Loom
 			tree.Rename(path);
 		};
 
-		// What the Scripts tab's Create menu makes, as it lists the shaders and
-		// dialogues.
 		bool IsScriptsPanels(AssetKind kind)
 		{
 			return IsScript(kind) || kind == AssetKind::Shader || kind == AssetKind::Dialogue;
 		};
 
-		// The FileTab whose Create menu makes kind, rather than the Scenes
-		// tab's or the Scripts tab's.
 		const FileTabKind* TabMaking(AssetKind kind)
 		{
 			return kind == AssetKind::Texture || kind == AssetKind::Palette ? &FileTabs::TwoD : nullptr;
@@ -253,8 +240,7 @@ namespace Loom
 			return std::string(label.substr(0, label.find(' ')));
 		};
 
-		// As wide as the icon it stands in for, a line high and no wider,
-		// keeping the picture's shape.
+		// As wide as its icon and a line high, keeping the picture's shape.
 		ImVec2 ThumbnailSize(const Texture& texture)
 		{
 			const float side = (std::min)(ImGui::GetFontSize(), ImGui::CalcTextSize(EditorIcons::Texture).x);
@@ -290,12 +276,7 @@ namespace Loom
 
 		#pragma region Scanning
 
-		// The scenes and prefabs, and the folders they are in: folders first,
-		// then files, each alphabetically. Dot-prefixed folders (.vs) and the
-		// build output are left out, and so is a folder whose files are all
-		// something else, though an empty one stays, as a new folder is. Every
-		// file, those included, goes in files, and every folder in folders.
-		// Whether there were files under folder.
+		// Folders then files, alphabetically; dot folders, build output and folders of other kinds are left out.
 		bool Scan(
 			const std::filesystem::path& folder,
 			const std::filesystem::path& skip,
@@ -398,8 +379,7 @@ namespace Loom
 			return SUCCEEDED(AssocQueryStringA(ASSOCF_NONE, ASSOCSTR_EXECUTABLE, extension.c_str(), "open", executable, &length));
 		};
 
-		// With whatever opens text files, for a kind of file nothing claims (a
-		// .shader among them).
+		// For a kind of file nothing claims, a .shader among them.
 		void OpenAsText(const std::string& path)
 		{
 			SHELLEXECUTEINFOA info{ sizeof(info) };
@@ -427,8 +407,7 @@ namespace Loom
 
 		using Microsoft::WRL::ComPtr;
 
-		// Calls an automation member by name. IDispatch takes the arguments
-		// last first.
+		// IDispatch takes the arguments last first.
 		HRESULT Call(
 			IDispatch* object,
 			const wchar_t* member,
@@ -476,8 +455,7 @@ namespace Loom
 			return integer;
 		};
 
-		// Puts the caret in the document a Visual Studio window shows at the
-		// line and column, the first column when none is given.
+		// The first column when none is given.
 		HRESULT GoTo(IDispatch* window, int line, int column)
 		{
 			const ComPtr<IDispatch> document = Property(window, L"Document");
@@ -497,9 +475,7 @@ namespace Loom
 			return result == RPC_E_CALL_REJECTED || result == RPC_E_SERVERCALL_RETRYLATER;
 		};
 
-		// Each running Visual Studio registers its automation object as
-		// "!VisualStudio.DTE.<version>:<process id>". Sets busy when one would
-		// not say which solution it has.
+		// Each Visual Studio registers as "!VisualStudio.DTE.<version>:<pid>"; busy when one will not answer.
 		ComPtr<IDispatch> FindVisualStudioWith(const std::string& solution, DWORD& process, bool& busy)
 		{
 			ComPtr<IRunningObjectTable> table;
@@ -571,15 +547,12 @@ namespace Loom
 			Opened,
 			NotRunning,
 
-			// A Visual Studio would not answer, and may be the one with the
-			// solution.
 			Busy,
 
 			Failed,
 		};
 
-		// The line and column count from one, and a line of zero leaves the
-		// caret where Visual Studio puts it.
+		// A line of zero leaves the caret where Visual Studio puts it.
 		Handover OpenThroughAutomation(const std::string& solution, const std::string& file, int line, int column)
 		{
 			DWORD process = 0;
@@ -629,8 +602,7 @@ namespace Loom
 					<< "Visual Studio opened " << file << " but would not go to line " << line
 					<< " (error 0x" << std::hex << moved << std::dec << ')' << std::endl;
 
-			// The editor has the foreground, having just been clicked, and Windows
-			// only lets another process take it when the one holding it says so.
+			// Windows only lets another process take the foreground when the holder allows it.
 			AllowSetForegroundWindow(process);
 
 			if (window)
@@ -639,16 +611,14 @@ namespace Loom
 			return Handover::Opened;
 		};
 
-		// False when no Visual Studio has the solution open. The editor's thread
-		// does not keep COM up, so this brings it up for the length of the call.
+		// The editor's thread does not keep COM up, so the call brings it up.
 		bool OpenInRunningVisualStudio(const std::string& solution, const std::string& file, int line, int column)
 		{
 			const HRESULT com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
 			const Handover handover = OpenThroughAutomation(solution, file, line, column);
 
-			// A busy one may be the one with the solution, and starting another
-			// would open it twice.
+			// A busy one may have the solution, and starting another would open it twice.
 			if (handover == Handover::Busy)
 				std::cerr << "Visual Studio is busy; try again once it has finished." << std::endl;
 
@@ -662,10 +632,7 @@ namespace Loom
 		constexpr std::chrono::seconds visualStudioStartTimeout{ 180 };
 		constexpr std::chrono::milliseconds visualStudioPollInterval{ 500 };
 
-		// A Visual Studio just started answers nothing until it has loaded the
-		// solution, so the file is handed to it from a thread of its own once it
-		// says it has. Its command line could open the file too, but File.OpenFile
-		// through /Command fails with dialogs of its own.
+		// A fresh Visual Studio answers nothing until loaded, and /Command File.OpenFile fails with dialogs.
 		void OpenOnceLoaded(const std::string& solution, const std::string& file, int line, int column)
 		{
 			std::thread(
@@ -699,8 +666,7 @@ namespace Loom
 
 		#pragma region Models
 
-		// The model as a prefab of it holds it, empty when it cannot be read.
-		// Imported into a scene of its own, deleted as a closed scene is.
+		// Empty when unreadable; imported into a scene of its own, deleted as a closed scene is.
 		std::string ImportedPrefab(const std::string& path)
 		{
 			Scene* scene = new Scene(std::filesystem::path(path).stem().string());
@@ -830,10 +796,7 @@ namespace Loom
 				if (ImGui::Button(change))
 					m_dialogs->folder.Open();
 
-				// The tabs show their names while every one fits, and only their
-				// icons, named in a tooltip, once they don't. The panel goes no
-				// narrower than the icons; on a screen too narrow even for that,
-				// they scroll rather than cut short.
+				// Tabs drop to icons once their names do not fit, and scroll on a screen too narrow for those.
 				const ImGuiStyle& style = ImGui::GetStyle();
 				float names_width = -style.ItemInnerSpacing.x;
 				float icons_width = -style.ItemInnerSpacing.x;
@@ -921,8 +884,6 @@ namespace Loom
 
 	void Editor::DrawScenes()
 	{
-		// Something new is selected to be shown, which the search or the
-		// filter may hide.
 		if (m_revealSelectedAsset)
 		{
 			m_assetSearch.Clear();
@@ -947,8 +908,7 @@ namespace Loom
 		// Dropped anywhere else in the list, it goes in the project folder.
 		TakeImportFolder(m_projectPath, ImGui::IsWindowHovered());
 
-		// The empty space under the rows, so a row that turns a drop away
-		// does not pass it on to the project folder.
+		// So a row that turns a drop away does not pass it to the project folder.
 		const ImGuiWindow* list = ImGui::GetCurrentWindow();
 		const ImRect below(
 			list->InnerRect.Min.x,
@@ -1000,8 +960,7 @@ namespace Loom
 		{
 			flags |= ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
 
-			// The top level is only a handful of folders, and the scenes are in
-			// one of them.
+			// The top level is only a handful of folders, and the scenes are in one of them.
 			if (depth == 0)
 				flags |= ImGuiTreeNodeFlags_DefaultOpen;
 
@@ -1279,8 +1238,7 @@ namespace Loom
 
 		case AssetKind::Prefab:
 		{
-			// A GameObject of its own, so the file has every field one writes.
-			// Deleted once the queue has registered it, as a closed scene is.
+			// A GameObject of its own, so the file has every field; deleted once registered.
 			Scene* blank = new Scene(name);
 			Scene::Unlist(blank);
 			blank->GetRoot().SetName(name);
@@ -1307,9 +1265,7 @@ namespace Loom
 				if (ProjectTemplate::AddScripts(m_projectPath, m_projectName, &error).empty())
 					break;
 
-				// The project file names a scripts project now, which may be one
-				// already under the folder rather than a new one, so it is loaded
-				// before the script's place is worked out from it.
+				// The scripts project may already be under the folder, so it is loaded first.
 				LoadProjectFile();
 			};
 
@@ -1418,8 +1374,7 @@ namespace Loom
 				sizeof(m_newAssetName),
 				ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
 
-			// Checked on edit rather than every frame: for a script it walks the
-			// scripts project.
+			// Checked on edit, since for a script it walks the scripts project.
 			if (ImGui::IsItemEdited())
 				m_newAssetProblem = NewAssetProblem();
 
@@ -1429,8 +1384,7 @@ namespace Loom
 
 			ImGui::BeginDisabled(!usable);
 
-			// Opened from here rather than in CreateAsset, so --create-script
-			// leaves Visual Studio closed.
+			// Opened here rather than in CreateAsset, so --create-script leaves Visual Studio closed.
 			if (ImGui::Button("Create", ImVec2(PROMPT_BUTTON_WIDTH, 0.0f)) || (entered && usable))
 				if (const std::string path = CreateAsset(); !path.empty() && IsScript(m_newAssetKind))
 					OpenAsset(path);
@@ -1459,8 +1413,7 @@ namespace Loom
 		if (!opensVisualStudio)
 			return;
 
-		// A hand-written project need not have a solution beside it, even though
-		// every project the editor writes does.
+		// A hand-written project need not have a solution beside it.
 		const std::string solution = m_scripts.HasProject()
 			? std::filesystem::path(m_scripts.GetProject()).replace_extension(".sln").string()
 			: "";
@@ -1532,8 +1485,7 @@ namespace Loom
 		if (!m_opening && (m_scripts.IsIdle() || m_activeScene != nullptr))
 			return;
 
-		// A prompt or popup comes to the front only as it takes focus, so the
-		// bar, kept in front, would cover it.
+		// A prompt only comes to the front as it takes focus, so the bar would cover it.
 		if (m_askForLayoutName || m_askForFolder || m_askForNewProject || m_askForAsset ||
 			ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel))
 			return;
@@ -1551,8 +1503,7 @@ namespace Loom
 			? "Opening " + std::filesystem::path(m_openingPath).stem().string()
 			: std::string("Compiling scripts");
 
-		// A negative fraction is ImGui's for a bar that sweeps with no end
-		// in sight.
+		// A negative fraction is ImGui's endless sweeping bar.
 		float fraction = m_opening
 			? m_opening->Progress()
 			: m_scripts.BuildProgress().value_or(-(float)ImGui::GetTime());
@@ -1858,8 +1809,7 @@ namespace Loom
 
 		std::error_code code;
 
-		// Neither moves unless both can, so an image never leaves its sprite
-		// behind.
+		// Neither moves unless both can, so an image never leaves its sprite behind.
 		if (!companion.empty() && std::filesystem::path(path).parent_path().lexically_normal() != std::filesystem::path(folder).lexically_normal())
 			for (const std::string& file : { path, companion })
 				if (const std::filesystem::path target = std::filesystem::path(folder) / std::filesystem::path(file).filename();
@@ -2029,8 +1979,7 @@ namespace Loom
 		// What the watch has seen so far, this scan takes in.
 		m_scriptWatch.Changed();
 
-		// Every type the headers declare, for the compiled scripts that do not
-		// look like one to DeclaredScripts.
+		// For compiled scripts DeclaredScripts does not recognise.
 		std::map<std::string, std::string> headers{ };
 
 		std::error_code code;
@@ -2140,8 +2089,7 @@ namespace Loom
 	{
 		VirtualFolders::Node root = m_scriptFolders.Build(names);
 
-		// By what each shows, so a shader sits among the scripts by its name
-		// rather than its path.
+		// By label, so a shader sits among the scripts by name rather than path.
 		const auto by_label = [&](const auto& self, VirtualFolders::Node& node) -> void
 		{
 			std::stable_sort(
@@ -2575,9 +2523,7 @@ namespace Loom
 			else m_selectedModel.clear();
 		};
 
-		// A texture, sprite or palette opens on the release, so dragging one
-		// out to a field leaves its panel shut, a sprite as a preview the
-		// next one replaces. A double click opens anything, and keeps it.
+		// Single click opens on release so a drag to a field leaves the panel shut.
 		const ImGuiIO& io = ImGui::GetIO();
 		const float drag_threshold = io.MouseDragThreshold * io.MouseDragThreshold;
 

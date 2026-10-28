@@ -12,6 +12,8 @@
 
 TEST_SUITE("InputActions")
 {
+	#pragma region Reading and Writing
+
 	using Action = Loom::InputActions::Action;
 	using Loom::Key;
 
@@ -143,6 +145,10 @@ TEST_SUITE("InputActions")
 		CHECK(Loom::InputActions::Down("Pan Up"));
 	};
 
+	#pragma endregion
+
+	#pragma region Playing
+
 	TEST_CASE("any action by a name does it, and an unknown name never")
 	{
 		Fresh fresh({ { "Pan Up", { Key::W } }, { "Pan Up", { Key::Up } } });
@@ -193,6 +199,10 @@ TEST_SUITE("InputActions")
 		CHECK_FALSE(Loom::InputActions::Held("Unbound"));
 	};
 
+	#pragma endregion
+
+	#pragma region Saving
+
 	TEST_CASE("saved actions load back, and a missing file loads none")
 	{
 		Fresh fresh({ { "Slowdown", { Key::Space } } });
@@ -215,4 +225,6 @@ TEST_SUITE("InputActions")
 
 		CHECK(Loom::InputActions::All().empty());
 	};
+
+	#pragma endregion
 };

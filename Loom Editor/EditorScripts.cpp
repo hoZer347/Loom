@@ -25,8 +25,7 @@ namespace Loom
 {
 	namespace
 	{
-		// Under the project's build folder: the scene Play Web hands over, and
-		// the page and module built beside it.
+		// Under the build folder: the scene Play Web hands over, and its page and module.
 		const char* const web_folder = "Web";
 		const char* const web_scene = "Scene";
 
@@ -131,18 +130,12 @@ namespace Loom
 		if (logScriptsProject)
 			std::cout << "Project '" << m_projectName << "' scripts: " << project << std::endl;
 
-		// Loaded before any scene opens: a scene that mentions a script type
-		// needs that type to exist by the time it is read. A library that has
-		// fallen behind its sources, or behind the editor, is rebuilt first;
-		// PollScripts opens the scene once that finishes.
+		// A scene needs its script types before it is read; a stale library is rebuilt first.
 		if (m_scripts.IsStale())
 			CompileScripts();
 		else if (!m_scripts.Load())
 		{
-			// Never built, or a copy of it is in the way. Opening the scenes now
-			// would show every component that comes from the library as not
-			// loaded until a build finished, so this does what pressing Compile
-			// does and waits for the result.
+			// Never built or blocked: opening now would show every script component as not loaded.
 			CompileScripts();
 		};
 	};
@@ -176,24 +169,18 @@ namespace Loom
 			return;
 		};
 
-		// The build running began before the script waiting to be attached was
-		// written, so another follows it.
+		// The running build began before the script to attach was written.
 		if (m_scripts.IsBuilding())
 		{
 			m_compileAfterBuild = !m_attachAfterBuild.empty();
 			return;
 		};
 
-		// A scene halfway in goes out with the rest rather than finishing on
-		// a library that has gone.
 		FinishOpening();
 
-		// Asked for partway through loading a project, the build is its own
-		// rather than that load's.
 		m_projectLoad.reset();
 
-		// The components in the open scenes are about to have the code behind
-		// them unloaded, so the scenes go out as text and come back the same way.
+		// The code behind the scenes' components is about to unload, so they go out as text.
 		m_snapshots = TakeSnapshots();
 		m_selectedBeforeBuild = m_selected ? m_selected->GetGuid() : Guid();
 		m_prefabBeforeBuild = m_prefabPath;
@@ -220,9 +207,7 @@ namespace Loom
 		if (m_scripts.LastBuildSucceeded())
 			m_scripts.Load();
 
-		// What was opened while the scripts built holds their components as
-		// MissingComponents, so it goes out as text beside what the build took
-		// down and is read again on the library just loaded.
+		// What opened mid-build holds MissingComponents, so it is reread on the new library.
 		FinishOpening();
 
 		std::vector<SceneSnapshot> opened = TakeSnapshots();
@@ -246,8 +231,6 @@ namespace Loom
 
 		RefreshProjectAssets();
 
-		// Nothing open yet: the scene this project starts on was waiting for the
-		// scripts it mentions.
 		if (m_ownedScenes.empty())
 			if (const std::string scene = StartupScene(); !scene.empty())
 				BeginOpeningScene(scene);
@@ -298,9 +281,7 @@ namespace Loom
 
 	std::vector<Editor::SceneSnapshot> Editor::TakeSnapshots() const
 	{
-		// A scene is only finished being built once the queue has run: AddChild
-		// and Attach defer, so serializing before that writes out a hierarchy
-		// that is still missing its children.
+		// AddChild and Attach defer, so serializing before the queue runs loses children.
 		Engine::DoTasks();
 
 		std::vector<SceneSnapshot> snapshots;
@@ -321,8 +302,7 @@ namespace Loom
 
 	void Editor::RestoreSnapshots(const std::vector<SceneSnapshot>& snapshots)
 	{
-		// Resolved once every scene is back, since a reference can point into a
-		// scene restored after the one holding it.
+		// After every scene is back, since a reference can point into a later one.
 		SceneSerializer::PendingReferences pending;
 
 		for (const SceneSnapshot& snapshot : snapshots)
@@ -354,18 +334,14 @@ namespace Loom
 
 	void Editor::BeginPlay()
 	{
-		// Mid-build the scenes are down and there is nothing to snapshot or to
-		// update: the run waits for the ones PollScripts puts back, or for the
-		// one being opened.
+		// Mid-build the scenes are down; the run waits for PollScripts or the one opening.
 		if (m_scripts.IsBuilding() || m_opening)
 		{
 			m_playAfterCompile = true;
 			return;
 		};
 
-		// Only the first Play of a session takes the snapshot: a paused run
-		// carries on from where it stopped, and still goes back to the state it
-		// started in rather than the state it was paused in.
+		// A paused run still goes back to the state it started in.
 		if (!m_playing)
 		{
 			m_playSnapshots = TakeSnapshots();
@@ -390,8 +366,7 @@ namespace Loom
 		m_activeScene = nullptr;
 		Select(nullptr);
 
-		// Anything the hierarchy still had queued has to land before the
-		// objects it refers to are deleted.
+		// Queued hierarchy work lands before the objects it refers to are deleted.
 		Engine::DoTasks();
 
 		for (Scene* scene : closing)
@@ -408,16 +383,14 @@ namespace Loom
 	{
 		if (Engine::updateScenes)
 		{
-			// A play left queued by an earlier build goes with it: a pause
-			// should not be undone by the next compile finishing.
+			// A pause should not be undone by the next compile finishing.
 			Engine::updateScenes = false;
 			m_playAfterCompile = false;
 
 			return;
 		};
 
-		// A run starts from freshly compiled scripts. A paused one carries on
-		// with the library it started with.
+		// A paused run keeps the library it started with.
 		if (!m_playing && m_scripts.HasProject() && !m_scripts.IsBuilding())
 		{
 			m_playAfterCompile = true;
@@ -448,8 +421,7 @@ namespace Loom
 
 		snapshots.swap(m_playSnapshots);
 
-		// Mid-build the scenes are already down, waiting on a library that is
-		// not there yet. What PollScripts puts back becomes the base scene.
+		// Mid-build the scenes are down; what PollScripts puts back becomes the base.
 		if (m_scripts.IsBuilding())
 		{
 			m_snapshots = std::move(snapshots);
@@ -665,8 +637,7 @@ namespace Loom
 
 		ImGui::End();
 
-		// The browser is its own modal, so it is displayed from here rather than
-		// from inside the prompt window.
+		// The browser is its own modal, so it is displayed outside the prompt window.
 		m_dialogs->newProjectFolder.Display();
 
 		if (m_dialogs->newProjectFolder.HasSelected())

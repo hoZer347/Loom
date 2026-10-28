@@ -18,6 +18,8 @@
 using LoomTests::Pump;
 using Loom::EditCommand;
 
+#pragma region Helpers
+
 namespace
 {
 	// An ImGui context of the test's own, with no window and no renderer:
@@ -115,9 +117,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("EditCommands")
 {
+	#pragma region Shortcuts
+
 	TEST_CASE("each shortcut asks for its edit")
 	{
 		ImGuiInput input;
@@ -225,6 +231,10 @@ TEST_SUITE("EditCommands")
 		CHECK(input.Press({ ImGuiMod_Ctrl, ImGuiKey_Z }) == EditCommand::Undo);
 	};
 
+	#pragma endregion
+
+	#pragma region Copy and Paste
+
 	TEST_CASE_FIXTURE(Selection, "only an object under a root can be taken")
 	{
 		CHECK_FALSE(Loom::EditCommands::CanTake(nullptr));
@@ -328,6 +338,10 @@ TEST_SUITE("EditCommands")
 		CHECK(Loom::LoomObject::GetByGuid<Loom::GameObject>(original) == restored);
 	};
 
+	#pragma endregion
+
+	#pragma region Dragging
+
 	TEST_CASE_FIXTURE(Selection, "an object's scene is the one whose root it is under")
 	{
 		Loom::Scene other("Other");
@@ -374,4 +388,6 @@ TEST_SUITE("EditCommands")
 		delete copy;
 		Pump();
 	};
+
+	#pragma endregion
 };

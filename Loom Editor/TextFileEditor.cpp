@@ -35,8 +35,7 @@ namespace Loom
 		// The squiggle type the check's messages are drawn with.
 		constexpr size_t message_squiggles = 1;
 
-		// A window docked on the frame it first appears only takes its tab on
-		// the one after.
+		// A window docked on its first frame only takes its tab on the next.
 		constexpr int focus_frames = 2;
 
 		// How strongly a line with a message on it is tinted.
@@ -188,8 +187,7 @@ namespace Loom
 					if (std::exchange(document->select, false))
 						flags |= ImGuiTabItemFlags_SetSelected;
 
-					// Known by the document rather than its path, so a file moved
-					// in the Project panel keeps its tab.
+					// By document rather than path, so a moved file keeps its tab.
 					const std::string label = std::string(Icon()) + " " + std::filesystem::path(document->path).filename().string() + "###" + std::to_string((uintptr_t)document.get());
 					bool keep = true;
 					const bool shown = ImGui::BeginTabItem(label.c_str(), &keep, flags);
@@ -230,8 +228,7 @@ namespace Loom
 		const float messages_height = rows == 0 ? 0.0f : (float)rows * ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y;
 
 		ImGui::PushFont(EditorTheme::CodeFont(), 0.0f);
-		// Against the text rather than the undo history, which an edit made
-		// after an undo can bring back to where it was saved.
+		// Against the text, since an edit after an undo can return to the saved state.
 		if (document.editor.Render("##text", ImVec2(0.0f, -messages_height)))
 			document.unsaved = document.editor.GetText() != document.savedText;
 		ImGui::PopFont();

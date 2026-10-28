@@ -35,62 +35,45 @@ namespace Loom
 		// As many as Unity's default.
 		constexpr int ITERATIONS = 6;
 
-		// The share of an overlap pushed out each step, and how much is
-		// left alone so resting contacts do not jitter.
+		// Share of overlap pushed out per step; the rest keeps resting contacts from jittering.
 		constexpr float BAUMGARTE = 0.2f;
 		constexpr float SLOP = 0.005f;
 
-		// The fastest an overlap is pushed apart, so bodies started inside one
-		// another separate rather than burst apart.
+		// The fastest overlap push, so bodies started inside one another separate gently.
 		constexpr float MOST_PUSH = 3.0f;
 
 		// Slower approaches than this do not bounce, so resting bodies settle.
 		constexpr float BOUNCE_SPEED = 1.0f;
 
-		// How much further than a step's travel a pair is looked at, so a
-		// body coming to rest keeps its contacts from step to step.
+		// Looked at beyond a step's travel, so resting bodies keep their contacts.
 		constexpr float SPECULATIVE_SLACK = 0.02f;
 
-		// Closer than this counts as touching, as Unity's contactOffset has
-		// it, so a resting contact hovering about zero does not flicker
-		// between touching and apart, and wake its neighbours each time.
+		// Touching within this, as Unity's contactOffset, so resting contacts do not flicker.
 		constexpr float CONTACT_OFFSET = 0.01f;
 
-		// A body whose kinetic energy, over its mass, stays below this for
-		// SLEEP_AFTER seconds goes to sleep, as Unity's sleepThreshold has it.
-		// Spin counts by the body's inertia, so a small body spinning in
-		// place, which friction cannot stop, still comes to rest.
+		// Sleeps below this energy per mass for SLEEP_AFTER, as Unity's sleepThreshold; spin counts.
 		constexpr float SLEEP_ENERGY = 0.005f;
 		constexpr float SLEEP_AFTER = 0.5f;
 
-		// A sleeper is woken by a body striking it faster than this, well
-		// above sleeping speed, so jostling neighbours do not keep a pile awake.
+		// Well above sleeping speed, so jostling does not keep a pile awake.
 		constexpr float WAKE_SPEED = 0.5f;
 
-		// How many leaves one job's chunk queries, how many bodies it readies
-		// or moves, how many candidates it collides, how many pairs it
-		// reports and how many candidates it checks for parting: enough that a
-		// chunk outweighs handing it out.
+		// Per-job chunk sizes, big enough to outweigh handing a chunk out.
 		constexpr size_t QUERY_GRAIN = 16;
 		constexpr size_t BODY_GRAIN = 64;
 		constexpr size_t CONSIDER_GRAIN = 128;
 		constexpr size_t PAIR_GRAIN = 64;
 		constexpr size_t PRUNE_GRAIN = 512;
 
-		// The solver splits the bodies in pairs into a slab for each of the
-		// machine's cores, but no fewer bodies to a slab than this, so each is
-		// worth handing out; cut where a histogram of this many bins along the
-		// slabs' axis has them share the contacts evenly.
+		// The fewest bodies per solver slab, so each is worth handing out.
 		constexpr size_t SLAB_BODIES = 64;
 		constexpr size_t BINS = 256;
 
-		// A contact this close to one from the last step, facing nearly the
-		// same way, is taken to be the same one.
+		// Contacts this close and facing nearly alike carry over from the last step.
 		constexpr float SAME_DISTANCE = 0.05f;
 		constexpr float SAME_FACING = 0.95f;
 
-		// Of a uniform box about its centre, by its half extents; of a solid
-		// sphere, by its radius.
+		// Inertia of a uniform box by half extents, and of a solid sphere by radius.
 		constexpr float BOX_INERTIA = 1.0f / 3.0f;
 		constexpr float SPHERE_INERTIA = 2.0f / 5.0f;
 		constexpr float HALF = 0.5f;
@@ -176,8 +159,7 @@ namespace Loom
 		body.rigidbody = &rigidbody;
 		body.object = rigidbody.m_gameObject;
 
-		// Those on its GameObject, on either side of where it was added,
-		// all in the tree by now.
+		// Those on its GameObject, all in the tree by now.
 		size_t first = joining.noted;
 		size_t end = joining.noted;
 
@@ -198,8 +180,7 @@ namespace Loom
 		if (rigidbody.m_sleeping && (rigidbody.velocity != glm::vec3(0.0f) || rigidbody.angularVelocity != glm::vec3(0.0f)))
 			rigidbody.WakeUp();
 
-		// Asleep, it holds still against whatever touches it, and is only
-		// weighed if something wakes it.
+		// Asleep, it holds still until woken.
 		body.awake = !rigidbody.m_sleeping;
 
 		return !body.awake || Weigh(body);
@@ -234,8 +215,7 @@ namespace Loom
 		body.orientation = rigidbody.m_posedOrientation;
 		const glm::vec3 scale = rigidbody.m_posedScale;
 
-		// Spread as its first box or sphere is; a body with neither is a
-		// sphere of radius half a unit.
+		// Spread as its first box or sphere; with neither, a half-unit sphere.
 		glm::vec3 inertia(SPHERE_INERTIA * rigidbody.mass * HALF * HALF);
 
 		if (!body.colliders.empty())
@@ -291,8 +271,7 @@ namespace Loom
 		std::condition_variable handed{ };
 		std::condition_variable solved{ };
 
-		// Each taken off once solved, so one waiting knows its step is done
-		// when it is gone.
+		// Each removed once solved, so a waiter knows its step is done.
 		std::deque<Simulation*> queue{ };
 		bool stopping = false;
 
@@ -521,13 +500,10 @@ namespace Loom
 
 	void Simulation::ReadyBodies(float seconds)
 	{
-		// Once the tree is in step, so a collider attached since the body
-		// was is in it and moves with the body. The bodies are kept from step
-		// to step, so readying one only overwrites it.
+		// After the tree is in step, so newly attached colliders move with the body.
 		m_bodies.resize(m_joining.size());
 
-		// Each readied, then gravity and what AddForce gathered taken into
-		// its velocity, and how far that takes it found.
+		// Gravity and gathered forces into velocity, then its travel.
 		const glm::vec3 gravity = Physics::GetGravity();
 
 		Jobs::For(m_bodies.size(), BODY_GRAIN,
@@ -559,10 +535,7 @@ namespace Loom
 				for (Collider* collider : m_bodies[index].colliders)
 					collider->m_body = index;
 
-		// Each moving body's leaf reaches along the travel it is about to
-		// make, which a velocity set or changed since the last step may not:
-		// those found to have outgrown theirs are refitted. The last change to
-		// the tree, so the contacts are found and solved in a tree held still.
+		// Leaves outgrown by a changed velocity are refitted, the last tree change before solving.
 		for (Body& body : m_bodies)
 			if (body.refit)
 			{
@@ -577,8 +550,7 @@ namespace Loom
 
 	void Simulation::PrepareContacts(float seconds)
 	{
-		// Every pair's contacts made ready at once, from the velocities before
-		// any warm start.
+		// Every pair readied at once, from velocities before warm starting.
 		Jobs::For(m_groups.size(), 1,
 			[&](size_t, size_t begin, size_t end)
 			{
@@ -590,9 +562,7 @@ namespace Loom
 
 	void Simulation::MoveBodies(float seconds)
 	{
-		// A body with others hanging under it moves first, outermost first,
-		// so those under it are placed from where it ends up; the rest move at
-		// once, then their leaves are placed.
+		// Parents move first, outermost first, so children follow where they end up.
 		m_parents.clear();
 
 		for (Body& body : m_bodies)
@@ -635,8 +605,7 @@ namespace Loom
 						Integrate(m_bodies[i], seconds);
 			});
 
-		// The moved leaves placed in the tree as one piece of work, the first
-		// handed out, while the rest keep what each touching pair ended on.
+		// Moved leaves placed as one job while the rest keep each pair's result.
 		const size_t keeping = Jobs::Chunks(m_pairs.size(), PAIR_GRAIN);
 
 		Jobs::For(1 + keeping, 1,
@@ -694,8 +663,7 @@ namespace Loom
 
 	void Simulation::Forget(const Collider& collider)
 	{
-		// Only one destroyed comes while a step is solved, which the rules
-		// forbid; that step goes rather than move a collider half gone.
+		// Only a destroy during a solve lands here, so that step is dropped.
 		if (!m_landed)
 			Drop();
 
@@ -749,9 +717,7 @@ namespace Loom
 	{
 		Body& sleeper = m_bodies[body];
 
-		// Its Rigidbody is woken as it moves, back on the caller's thread;
-		// Weigh only refreshes the pose and inertia kept on it for the
-		// simulation.
+		// Weigh only refreshes pose and inertia; the Rigidbody wakes on the caller's thread.
 		if (Weigh(sleeper))
 			sleeper.awake = true;
 	};
@@ -764,10 +730,7 @@ namespace Loom
 	{
 		m_pairs.clear();
 
-		// New candidates: each leaf put in or refitted since the last step,
-		// against whatever it now overlaps, found in parallel and taken in
-		// chunk order. Leaves cover their bodies' travel, so two that can
-		// meet this step overlap.
+		// New candidates from leaves moved since the last step, found in parallel.
 		m_found.resize(std::max(m_found.size(), Jobs::Chunks(m_moved.size(), QUERY_GRAIN)));
 
 		Jobs::For(m_moved.size(), QUERY_GRAIN,
@@ -798,9 +761,7 @@ namespace Loom
 				if (m_candidateSet.Insert(key))
 					m_candidates.push_back({ key });
 
-		// Candidates whose leaves have parted are dropped, and the rest to be
-		// looked at gathered. Where neither side is awake, nothing has moved
-		// to part them.
+		// Parted candidates are dropped; where neither side is awake nothing moved.
 		m_fates.resize(m_candidates.size());
 
 		Jobs::For(m_candidates.size(), PRUNE_GRAIN,
@@ -825,16 +786,14 @@ namespace Loom
 						continue;
 					};
 
-					// Their own boxes, as far apart as Consider would find them
-					// without a trigger, which only brings them closer.
+					// As far apart as Consider would find them without a trigger.
 					const float margin = Travel(BodyOf(*key.first)) + Travel(BodyOf(*key.second)) + SPECULATIVE_SLACK;
 
 					m_fates[i] = key.first->m_bounds.Expanded(margin).Overlaps(key.second->m_bounds) ? Fate::Live : Fate::Still;
 				};
 			});
 
-		// From the back, each parted one swapped for the last, which has
-		// already been seen.
+		// From the back, each parted one swapped with the already-seen last.
 		for (size_t i = m_candidates.size(); i-- > 0; )
 		{
 			if (m_fates[i] != Fate::Parted)
@@ -862,8 +821,7 @@ namespace Loom
 			if (m_fates[i] == Fate::Live)
 				m_live.push_back(i);
 
-		// Collided in parallel, each chunk into its own slot, then put
-		// together in chunk order, with the sleepers they wake woken after.
+		// Collided in parallel by chunk, merged in order, then sleepers woken.
 		const size_t chunks = Jobs::Chunks(m_live.size(), CONSIDER_GRAIN);
 		m_considered.resize(std::max(m_considered.size(), chunks));
 
@@ -985,8 +943,7 @@ namespace Loom
 			pair.bounciness = only->bounciness;
 		};
 
-		// A sleeper wakes when struck hard enough, or touched by something
-		// that will not stop for it.
+		// A sleeper wakes when struck hard or touched by something that will not stop.
 		if (!pair.trigger)
 			for (const auto& [striker, sleeper] : { std::pair{ pair.bodyA, pair.bodyB }, std::pair{ pair.bodyB, pair.bodyA } })
 				if (Awake(striker) && sleeper != NONE && !m_bodies[sleeper].awake
@@ -1025,14 +982,12 @@ namespace Loom
 			const glm::vec3 tangent = Perpendicular(contact.normal);
 			const glm::vec3 directions[DIRECTIONS] = { contact.normal, tangent, glm::cross(contact.normal, tangent) };
 
-			// What a push along each direction does to each side, worked out
-			// once here so the iterations need only dot products.
+			// Each direction's effect on each side, so iterations need only dot products.
 			for (int d = 0; d < DIRECTIONS; d++)
 			{
 				Axis& axis = contact.axes[d];
 
-				// Nothing turns a side the solver cannot move, and one not
-				// spinning adds nothing to the speed.
+				// Unmovable or still sides add nothing.
 				const glm::vec3 angularA = spinsA ? glm::cross(fromA, directions[d]) : glm::vec3(0.0f);
 				const glm::vec3 angularB = spinsB ? glm::cross(fromB, directions[d]) : glm::vec3(0.0f);
 				const glm::vec3 turnA = movesA ? a.inverseInertia * angularA : glm::vec3(0.0f);
@@ -1061,8 +1016,7 @@ namespace Loom
 			}
 			else
 			{
-				// Still apart: free to close the gap and no faster, or to bounce
-				// off early if it would meet within the step.
+				// Still apart: may close the gap, or bounce early if meeting within the step.
 				const float gap = -contact.depth;
 				contact.bias = bouncing && closing * seconds > gap ? pair.bounciness * closing : -gap / seconds;
 			};
@@ -1091,8 +1045,7 @@ namespace Loom
 
 	void Simulation::Partition()
 	{
-		// How many contacts each body has, which is what the slabs share out,
-		// and how far apart those in any lie along each axis.
+		// Each body's contact count, which slabs share, and their spread along each axis.
 		Bounds spread{ glm::vec3(std::numeric_limits<float>::max()), glm::vec3(std::numeric_limits<float>::lowest()) };
 		size_t loaded = 0;
 		size_t load = 0;
@@ -1116,8 +1069,7 @@ namespace Loom
 
 		const size_t slabs = std::clamp<size_t>(loaded / SLAB_BODIES, 1, Jobs::Cores());
 
-		// Cut along the widest axis where an equal share of the load lies
-		// either side, from a histogram of it.
+		// Cut along the widest axis where a histogram splits the load evenly.
 		const glm::vec3 extent = spread.max - spread.min;
 		const int axis = extent.x >= extent.y && extent.x >= extent.z ? 0 : extent.y >= extent.z ? 1 : 2;
 		const float low = spread.min[axis];
@@ -1148,9 +1100,7 @@ namespace Loom
 		for (Body& body : m_bodies)
 			body.slab = (int)(std::upper_bound(m_cuts.begin(), m_cuts.end(), body.position[axis]) - m_cuts.begin());
 
-		// A pair inside one slab is that slab's to solve; one across two
-		// side by side, the border's; any other, solved alone; and one with
-		// nothing to move only made ready, for what it reports.
+		// In one slab, the slab's; across two side by side, the border's; else alone.
 		const size_t borders = slabs - 1;
 		const size_t across = slabs + borders;
 		const size_t idle = across + 1;
@@ -1196,8 +1146,7 @@ namespace Loom
 		const int slabs = (int)m_slabs;
 		const bool lonely = !m_groups[m_alone].empty();
 
-		// How many passes each slab, each border and those alone have been
-		// through.
+		// Passes done by each slab, border and the lone pairs.
 		const std::unique_ptr<std::atomic<int>[]> slabsDone(new std::atomic<int>[slabs]());
 		const std::unique_ptr<std::atomic<int>[]> bordersDone(new std::atomic<int>[slabs]());
 		std::atomic<int> aloneDone{ 0 };
@@ -1215,11 +1164,7 @@ namespace Loom
 
 		const int team = (int)std::min<size_t>(Jobs::Threads(), m_slabs);
 
-		// Each member keeps its slabs, and the border after each, through
-		// every pass, waiting only on those it shares bodies with. Every
-		// body meets its slab, its even border, its odd border, then those
-		// alone, pass after pass: as one thread doing them all in that order
-		// would, so the result is the same however many share them.
+		// Each member keeps its slabs in a fixed order, so results match any thread count.
 		Jobs::For(team, 1,
 			[&](size_t member, size_t, size_t)
 			{
@@ -1307,8 +1252,7 @@ namespace Loom
 
 	void Simulation::Push(Body& a, Body& b, const Axis& axis, float impulse)
 	{
-		// One that does not move is left untouched, as pairs in other slabs
-		// may be pushing on it at once.
+		// An unmoving body is untouched, since other slabs may push on it at once.
 		if (a.inverseMass > 0.0f)
 		{
 			Store(a.linear, Load(a.linear) - Load(axis.direction) * (impulse * a.inverseMass));
@@ -1367,8 +1311,7 @@ namespace Loom
 		if (!body.awake || *body.object->transform.position != body.placed || *body.object->transform.rotation != body.turned)
 			return;
 
-		// Only what moved is written back, so a body set still, a kinematic
-		// one moved by its script especially, keeps the pose it was given.
+		// Only movement is written back, so a body set still keeps its pose.
 		const bool moving = body.velocity != glm::vec3(0.0f);
 		const bool turning = body.angularVelocity != glm::vec3(0.0f);
 
@@ -1407,10 +1350,7 @@ namespace Loom
 				body.object->transform.rotation = glm::degrees(radians);
 			};
 
-			// Where its colliders are now: under a parent that changes
-			// nothing, its own pose and scale, without working the transform
-			// just written back out; the next walk finds that as it was left,
-			// so keeps this.
+			// Collider pose from the body's own pose and scale, without recomputing the transform.
 			glm::mat4 world = glm::mat4_cast(body.orientation);
 
 			if (flat)
@@ -1442,8 +1382,7 @@ namespace Loom
 		if (body.inverseMass == 0.0f)
 			return;
 
-		// The spin's energy about the body's own axes, its inertia being the
-		// inverse of what the solver turns it by.
+		// Spin energy about the body's own axes.
 		const glm::vec3 spinOwn = glm::transpose(glm::mat3_cast(body.orientation)) * body.angularVelocity;
 		float spinning = 0.0f;
 
@@ -1542,8 +1481,7 @@ namespace Loom
 		const auto rigidbodyOf =
 			[&](int body) { return body == NONE ? nullptr : m_bodies[body].rigidbody; };
 
-		// Every component on the collider's GameObject, from a copy: one may
-		// attach another.
+		// From a copy, since one component may attach another.
 		const auto tell =
 			[](Collider& collider, const auto& call)
 			{
@@ -1653,8 +1591,7 @@ namespace Loom
 				report(a, b, Listens(*a.m_gameObject), Listens(*b.m_gameObject), BodyOf(a), BodyOf(b), candidate.trigger, nullptr, 0, LEAVING);
 			};
 
-		// Taken out first, as a listener may remove a collider, and with it
-		// those that name it.
+		// Taken out first, since a listener may remove a collider.
 		std::vector<Candidate> parted = std::move(m_parted);
 		m_parted.clear();
 

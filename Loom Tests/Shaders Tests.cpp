@@ -9,6 +9,8 @@
 #include <vector>
 
 
+#pragma region Helpers
+
 namespace
 {
 	const std::string FRAGMENT =
@@ -33,23 +35,26 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("Shader")
 {
-	// Shader compiles on construction, so most of it needs a GL context. What
-	// does not is the source-loading step in front of the compiler, which is
-	// where a wrong path or a malformed shader file gets caught.
+	// Shader compiles on construction, so only source loading runs without a context.
+
+	#pragma region Registry
 
 	TEST_CASE("the shader registry starts out without a bogus path in it")
 	{
 		CHECK_FALSE(Loom::Shader::shaders.contains("no such shader.shader"));
 	};
 
+	#pragma endregion
+
+	#pragma region Check
+
 #ifndef __EMSCRIPTEN__
-	// The native build reads shader sources off disk with an ifstream, and
-	// fails before it ever reaches glCreateProgram -- so this is reachable with
-	// no window open. The web build fetches over HTTP instead, which needs a
-	// browser, so the same case is skipped there.
+	// The native build fails in the ifstream before GL; the web fetch needs a browser.
 	TEST_CASE("constructing a Shader from a missing file throws")
 	{
 		CHECK_THROWS_AS(
@@ -67,14 +72,7 @@ TEST_SUITE("Shader")
 		CHECK_FALSE(Loom::Shader::shaders.contains(missing));
 	};
 
-	// The one-argument constructor appends the extension for you, so callers can
-	// say Shader("Loom") instead of Shader("Loom.shader").
-	//
-	// It only half works today: file_path is normalised, but the id is compiled
-	// from the raw constructor argument rather than from the normalised member,
-	// so "Loom" and "Loom.shader" are looked up as two different shaders. Both
-	// paths fail the same way here, which is all this can check without a
-	// context.
+	// The id compiles from the raw argument, so "Loom" and "Loom.shader" are two shaders.
 	TEST_CASE("both spellings of a shader path fail the same way when the file is missing")
 	{
 		CHECK_THROWS_AS(Loom::Shader("missing"), std::runtime_error);
@@ -222,16 +220,17 @@ TEST_SUITE("Shader")
 	};
 #endif
 
+	#pragma endregion
+
+	#pragma region Shading
+
 	TEST_CASE("Shader is a plain resource handle, not a component")
 	{
 		// Materials hold a Shader*; a shader is not attached to a GameObject and
 		// has no lifecycle callbacks of its own.
 		CHECK(std::is_final_v<Loom::Shader>);
 
-		// Its const members make it non-assignable, but the compiler still
-		// generates a copy constructor -- and ~Shader calls glDeleteShader, so a
-		// copy would delete the same GL program twice. Shaders are meant to be
-		// held by pointer; this records that copying one is not defended against.
+		// ~Shader deletes its program, so a copy would delete it twice; nothing stops one.
 		CHECK(std::is_copy_constructible_v<Loom::Shader>);
 		CHECK_FALSE(std::is_copy_assignable_v<Loom::Shader>);
 	};
@@ -371,6 +370,10 @@ TEST_SUITE("Shader")
 		CHECK_NOTHROW(Loom::Shader::Assemble("bloom = on\n" + FRAGMENT));
 	};
 
+	#pragma endregion
+
+	#pragma region Pixel Passes
+
 	TEST_CASE("a file with no pixel pass section has no pixel pass")
 	{
 		const Loom::Shader::Stages stages = Loom::Shader::Assemble(VERTEX + FRAGMENT);
@@ -492,6 +495,10 @@ TEST_SUITE("Shader")
 	};
 #endif
 
+	#pragma endregion
+
+	#pragma region UV Layers
+
 	TEST_CASE("a vertex stage's UV layer reads its fields from raw words, past four of them in a second attribute")
 	{
 		const std::string source =
@@ -545,4 +552,6 @@ TEST_SUITE("Shader")
 
 		CHECK(stages.fragment.find("UV_1<double weight>;") != std::string::npos);
 	};
+
+	#pragma endregion
 };

@@ -73,8 +73,7 @@ namespace Loom
 			return (hash ^ value) * FNV_PRIME;
 		};
 
-		// The GameObject's guid mixed down to u_seed, from 0 up to 1, so a
-		// GameObject saved in a scene keeps its seed from run to run.
+		// u_seed from the guid, so a saved GameObject keeps its seed.
 		float Seed(const GameObject& gameObject)
 		{
 			const Guid& guid = gameObject.GetGuid();
@@ -104,15 +103,13 @@ namespace Loom
 
 		#pragma region UV Layers
 
-		// Each layer m_uvLayers holds starts with its id, its words a vertex
-		// and its vertices.
+		// Each layer starts with its id, its words a vertex, then its vertices.
 		constexpr size_t LAYER_ID = 0;
 		constexpr size_t LAYER_WORDS = 1;
 		constexpr size_t LAYER_VERTICES = 2;
 		constexpr size_t LAYER_HEADER = 3;
 
-		// Calls found with each whole layer in the words, in turn, with where
-		// its words start and end.
+		// Calls found with each whole layer and where its words start and end.
 		template <typename Found>
 		void EachLayer(const std::vector<unsigned int>& words, const Found& found)
 		{
@@ -138,8 +135,7 @@ namespace Loom
 			words.insert(words.end(), layer.values.begin(), layer.values.begin() + vertices * layer.words);
 		};
 
-		// Where the layer with the id starts and ends in the words, its id and
-		// all, or where it would go when there is none.
+		// The layer's span with its id, or where it would go.
 		std::pair<size_t, size_t> LayerAt(const std::vector<unsigned int>& words, uint32_t id)
 		{
 			std::optional<std::pair<size_t, size_t>> at;
@@ -182,9 +178,7 @@ namespace Loom
 		if (material == nullptr)
 			material = m_gameObject->GetComponent<Material>();
 
-		// A mesh attached without a material (or before one is set up, which is
-		// the normal state for a mesh just added in the editor) has nothing to
-		// draw with.
+		// No material yet, as with a mesh just added in the editor.
 		if (material == nullptr)
 			return false;
 
@@ -236,8 +230,7 @@ namespace Loom
 	{
 		if (m_indices.size())
 		{
-			// Indexed drawing is not wired up yet, and saying so once beats
-			// either drawing nonsense or throwing out of the frame loop.
+			// Indexed drawing is not wired up yet, so it warns once.
 			static bool warned = false;
 
 			if (!warned)
@@ -351,13 +344,11 @@ namespace Loom
 				{
 					out = std::copy_n(positions.data() + i * POSITION_COMPONENTS, POSITION_COMPONENTS, out);
 
-					// Without texture coordinates, aUV reads the position's x and y,
-					// as it does from vertices drawn without normals.
+					// Without texture coordinates, aUV reads the position's x and y.
 					if (layout.format != VertexFormat::Position)
 						out = std::copy_n(hasUVs ? textureCoordinates.data() + i * UV_COMPONENTS : positions.data() + i * POSITION_COMPONENTS, UV_COMPONENTS, out);
 
-					// With colours and no normals, aNormal reads zeros, as it does
-					// from vertices drawn without normals.
+					// With colours and no normals, aNormal reads zeros.
 					if (hasNormals)
 						out = std::copy_n(normals.data() + i * NORMAL_COMPONENTS, NORMAL_COMPONENTS, out);
 					else if (hasColors)
@@ -404,9 +395,7 @@ namespace Loom
 
 		std::stable_sort(byDepth.begin(), byDepth.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
 
-		// Each mesh lays down its depth before its colour, so only its nearest
-		// surface blends over what is behind it, and one with opaque colours
-		// draws just as it would with transparency off.
+		// Depth first, so only the nearest surface blends over what is behind.
 		renderer->SetDepthTestEqual(true);
 
 		for (const auto& [depth, mesh] : byDepth)

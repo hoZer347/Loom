@@ -25,8 +25,7 @@ namespace Loom
 		// Named after a GameObject whose name is no file name.
 		constexpr const char* unnamed_prefab = "Prefab";
 
-		// The instance gameObject is part of, but none inside another, which
-		// is that one's content. Null when it is in none.
+		// None inside another, which is that one's content. Null when in none.
 		GameObject* OutermostInstance(GameObject& gameObject)
 		{
 			GameObject* outermost = nullptr;
@@ -85,8 +84,7 @@ namespace Loom
 			return nullptr;
 		};
 
-		// Changed outside the editor: the file is what instances and the panel
-		// show from now on.
+		// Changed outside the editor, so the file is what shows from now on.
 		if (loaded != m_prefabs.end())
 		{
 			std::erase_if(m_linkedInstances, [&](const auto& link) { return link.second == path; });

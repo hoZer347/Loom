@@ -14,8 +14,9 @@
 #include <vector>
 
 using LoomTests::Pump;
+using LoomTests::EPSILON;
 
-static constexpr float EPSILON = 1e-4f;
+#pragma region Helpers
 
 static constexpr glm::vec3 FORWARD(0.0f, 0.0f, -1.0f);
 
@@ -58,9 +59,13 @@ static Loom::MeshCollider* PlaceMesh(
 	return collider;
 };
 
+#pragma endregion
+
 
 TEST_SUITE("MeshCollider")
 {
+	#pragma region Raycasts
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh collider is a collider the editor can add by name")
 	{
 		Loom::Scene scene("mesh collider by name");
@@ -172,6 +177,10 @@ TEST_SUITE("MeshCollider")
 		CHECK_FALSE(scene.Raycast({ glm::vec3(1.0f, 2.0f, 10.0f), FORWARD }, hit));
 	};
 
+	#pragma endregion
+
+	#pragma region Editing
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "editing the mesh's vertices moves what the scene's raycasts hit at the next step")
 	{
 		Loom::Scene scene("edited mesh");
@@ -240,6 +249,10 @@ TEST_SUITE("MeshCollider")
 		REQUIRE(collider->Raycast({ glm::vec3(AWAY, 0.0f, 0.0f), FORWARD }, hit));
 		CHECK(scene.Raycast({ glm::vec3(AWAY, 0.0f, 0.0f), FORWARD }, hit));
 	};
+
+	#pragma endregion
+
+	#pragma region Wireframes and Size
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "there is no wireframe for the editor to draw, however many triangles there are")
 	{
@@ -341,4 +354,6 @@ TEST_SUITE("MeshCollider")
 		CHECK(hits > 0);
 		CHECK(agreed == RAYS);
 	};
+
+	#pragma endregion
 };

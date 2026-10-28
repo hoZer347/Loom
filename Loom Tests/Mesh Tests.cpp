@@ -21,6 +21,8 @@ using LoomTests::RecordingRenderer;
 
 TEST_SUITE("Mesh")
 {
+	#pragma region Geometry
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh remembers the primitive it was built for")
 	{
 		Loom::Mesh mesh(Loom::Mesh::Triangles);
@@ -59,6 +61,10 @@ TEST_SUITE("Mesh")
 		CHECK(mesh.m_vertices->size() % 3 == 0);
 		CHECK(mesh.m_vertices->size() / 3 == 3);
 	};
+
+	#pragma endregion
+
+	#pragma region Generated
 
 	// A value no other field of a fresh mesh writes, to look for in the text.
 	constexpr float GENERATED_VALUE = 7.25f;
@@ -147,6 +153,10 @@ TEST_SUITE("Mesh")
 		CHECK(renderer.handed == 2);
 		CHECK(renderer.lastVertices == std::vector<float>(9, 2.0f));
 	};
+
+	#pragma endregion
+
+	#pragma region Instancing
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "meshes alike are drawn as instances of one, each with its own transform and colour")
 	{
@@ -339,6 +349,10 @@ TEST_SUITE("Mesh")
 		};
 	};
 
+	#pragma endregion
+
+	#pragma region Components and Rendering
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the draw type is settable to any GL usage hint")
 	{
 		Loom::Mesh mesh(Loom::Mesh::Triangles);
@@ -355,9 +369,6 @@ TEST_SUITE("Mesh")
 		CHECK(std::is_base_of_v<Loom::ComponentBase, Loom::Mesh>);
 	};
 
-	// A mesh added in the editor has no material until one is set up. OnRender
-	// has to notice that and bail out before it touches GL, or every such mesh
-	// dereferences null on the first frame.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "rendering a mesh with no material is a no-op")
 	{
 		Loom::Scene scene("mesh without material");
@@ -395,6 +406,10 @@ TEST_SUITE("Mesh")
 		// ...and then stops, because the material has no shader to bind.
 		CHECK(mesh->material->shader == nullptr);
 	};
+
+	#pragma endregion
+
+	#pragma region UV Layers
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh's UV layers hold each vertex's values as raw words, in order of id")
 	{
@@ -564,4 +579,6 @@ TEST_SUITE("Mesh")
 		CHECK(Loom::SourceOf(layout, { 12, 2 }).words == 0);
 		CHECK(Loom::SourceOf(layout, { 7, 0 }).words == 0);
 	};
+
+	#pragma endregion
 };

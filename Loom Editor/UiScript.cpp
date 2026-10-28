@@ -15,8 +15,7 @@
 #include <unordered_map>
 
 
-// How ImGui's GLFW backend turns GLFW's keys into its own, which it leaves
-// out of its header.
+// ImGui's GLFW backend leaves this out of its header.
 ImGuiKey ImGui_ImplGlfw_KeyToImGuiKey(int keycode, int scancode);
 
 
@@ -77,8 +76,6 @@ namespace Loom
 
 		#pragma region Keys
 
-		// What a chord names, what ImGui is told of it, and the key the game
-		// hears for it.
 		struct Modifier
 		{
 			const char* name;
@@ -94,9 +91,7 @@ namespace Loom
 			{ "super", ImGuiMod_Super, ImGuiKey_LeftSuper },
 		};
 
-		// The key the game hears for one ImGui is told of, as GLFW numbers
-		// it, or -1 for none. The backend's mapping goes the other way, so it
-		// is run over every GLFW key once.
+		// The backend only maps GLFW to ImGui, so it is inverted over every key once.
 		int GameKey(ImGuiKey key)
 		{
 			static const std::unordered_map<ImGuiKey, int> numbers = []()
@@ -138,8 +133,7 @@ namespace Loom
 		// How far inside an item's left or right edge "left" and "right" aim.
 		constexpr float edge_inset = 4.0f;
 
-		// How far the mouse moves with the button down before it heads for
-		// the drop: past ImGui's drag threshold, so the drag has started.
+		// Past ImGui's drag threshold, so the drag has started.
 		constexpr float drag_nudge = 10.0f;
 
 		// The part of a label ImGui shows: everything before its ##.
@@ -225,8 +219,7 @@ namespace Loom
 		if (m_finished)
 			return;
 
-		// After whatever the platform queued, so the position this frame reads
-		// is the script's.
+		// After the platform's queue, so this frame reads the script's position.
 		if (m_mouseSet)
 			MoveCursor();
 

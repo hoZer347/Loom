@@ -13,9 +13,9 @@
 
 using LoomTests::Pump;
 using LoomTests::Probe;
+using LoomTests::EPSILON;
 
-// How far a projected coordinate may drift from where the math puts it.
-static constexpr float EPSILON = 1e-4f;
+#pragma region Helpers
 
 static constexpr float SQUARE = 1.0f;
 static constexpr float WIDE = 2.0f;
@@ -27,9 +27,13 @@ static void CheckSame(const glm::mat4& actual, const glm::mat4& expected)
 			CHECK(actual[column][row] == doctest::Approx(expected[column][row]).epsilon(EPSILON));
 };
 
+#pragma endregion
+
 
 TEST_SUITE("Camera")
 {
+	#pragma region Rendering
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a camera is a built-in component the editor can add by name")
 	{
 		Loom::Scene scene("camera by name");
@@ -152,6 +156,10 @@ TEST_SUITE("Camera")
 		CHECK(ahead.w > 0.0f);
 	};
 
+	#pragma endregion
+
+	#pragma region Looking
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a camera looks down its transform's -Z, nearer things in front")
 	{
 		Loom::Scene scene("transform camera");
@@ -230,6 +238,10 @@ TEST_SUITE("Camera")
 		CHECK(std::abs(target.x / target.w) < EPSILON);
 		CHECK(std::abs(target.y / target.w) < EPSILON);
 	};
+
+	#pragma endregion
+
+	#pragma region Targets
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "turning the target on leaves the view where it was, the target as far away as it was")
 	{
@@ -335,4 +347,6 @@ TEST_SUITE("Camera")
 		CHECK(camera->lookAtTarget);
 		CheckSame(camera->ViewProjection(SQUARE), before);
 	};
+
+	#pragma endregion
 };

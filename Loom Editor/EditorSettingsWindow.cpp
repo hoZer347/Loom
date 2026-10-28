@@ -37,8 +37,7 @@ namespace Loom
 		default:				EditorTheme::ApplyStyle();		break;
 		};
 
-		// A panel dragged out of the window is a window of its own, and looks
-		// like the docked ones: square and opaque.
+		// A dragged-out panel is square and opaque like the docked ones.
 		if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 		{
 			style.WindowRounding = 0.0f;
@@ -173,8 +172,7 @@ namespace Loom
 		if (changed)
 			QueueLook();
 
-		// ImGui's own editor, for everything else. What it changes lasts until
-		// the theme or scale is applied again.
+		// What it changes lasts until the theme or scale is applied again.
 		if (ImGui::CollapsingHeader("Style editor (this session only)"))
 			ImGui::ShowStyleEditor();
 

@@ -68,8 +68,7 @@ namespace Loom
 		// Tags this subclass on the window, among any others it has.
 		constexpr UINT_PTR SUBCLASS_ID = 0x4C4F4F4D;
 
-		// What a title bar gives a window: snapping, the maximize animation
-		// and the shadow, all of which go with a bare popup.
+		// Snapping, the maximize animation and the shadow all go with a bare popup.
 		constexpr LONG FRAMED_STYLE = WS_CAPTION | WS_THICKFRAME | WS_MAXIMIZEBOX;
 
 		LRESULT HitCode(WindowFrame::Hit hit)
@@ -89,8 +88,7 @@ namespace Loom
 			};
 		};
 
-		// The window's monitor's metric, through Windows 10's per-monitor calls,
-		// which the engine's Windows 7 target leaves undeclared.
+		// Windows 10's per-monitor calls, which the Windows 7 target leaves undeclared.
 		int Metric(HWND window, int index)
 		{
 			using DpiForWindow = UINT(WINAPI*)(HWND);
@@ -168,8 +166,7 @@ namespace Loom
 
 		m_window = window;
 
-		// GLFW then sizes the window as though it had no frame, which with the
-		// whole of it client area is what it has.
+		// The whole window is client area, so GLFW sizes it as frameless.
 		glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_FALSE);
 		Fit();
 	};

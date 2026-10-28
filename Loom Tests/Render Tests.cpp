@@ -23,6 +23,8 @@ using LoomTests::Pump;
 using LoomTests::RenderFixture;
 
 
+#pragma region Helpers
+
 namespace
 {
 	constexpr float CLEAR[] = { 0.0f, 0.0f, 1.0f, 1.0f };
@@ -145,9 +147,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("Render")
 {
+	#pragma region Frames
+
 	TEST_CASE_FIXTURE(RenderFixture, "a frame reads back the size the window was opened, top row first, in the colour it was cleared to")
 	{
 		const ClearedTo cleared(CLEAR);
@@ -262,6 +268,10 @@ TEST_SUITE("Render")
 		CHECK(BigEndian(bytes, HEIGHT_AT) == (uint32_t)image.height);
 	};
 
+	#pragma endregion
+
+	#pragma region UV Layers
+
 	TEST_CASE_FIXTURE(RenderFixture, "a vertex stage reads a mesh's UV layers as the types it declares, on OpenGL")
 	{
 		const Image image = LayeredFrame(*this, "Render - UV layers on OpenGL");
@@ -281,6 +291,8 @@ TEST_SUITE("Render")
 		CHECK(image.At(image.width / 4, middle) == CLEARED);
 		CHECK(image.At(image.width * 3 / 4, middle) == WHITE);
 	};
+
+	#pragma endregion
 };
 
 #endif

@@ -13,6 +13,8 @@
 #include <vector>
 
 
+#pragma region Helpers
+
 namespace
 {
 	// A scripts project with nothing in it but the namespace it declares.
@@ -53,9 +55,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("ProjectAssets")
 {
+	#pragma region New Scripts
+
 	TEST_CASE("a script is one header, a component in the project's namespace")
 	{
 		const ScriptsProject scripts("loom project assets script");
@@ -110,6 +116,10 @@ TEST_SUITE("ProjectAssets")
 		CHECK(text.find("struct Herald : Loom::DialogueManager<Herald>") != std::string::npos);
 		CHECK(text.find("{NAME}") == std::string::npos);
 	};
+
+	#pragma endregion
+
+	#pragma region Bindings
 
 	TEST_CASE("a new binding goes at the end of its type, explained when it is the first")
 	{
@@ -172,6 +182,10 @@ TEST_SUITE("ProjectAssets")
 		CHECK(Loom::ProjectAssets::WithDialogueBinding("struct Narrator;\n", 1).empty());
 	};
 
+	#pragma endregion
+
+	#pragma region Names
+
 	TEST_CASE("a script cannot take a registered state's name")
 	{
 		const ScriptsProject scripts("loom project assets registered state");
@@ -224,6 +238,10 @@ TEST_SUITE("ProjectAssets")
 		CHECK_FALSE(Loom::ProjectAssets::ScriptNameProblem(scripts.project.string(), "Shimmer").empty());
 		CHECK(Loom::ProjectAssets::ScriptNameProblem(scripts.project.string(), "Glo").empty());
 	};
+
+	#pragma endregion
+
+	#pragma region Declared Types
 
 	TEST_CASE("a script's declared types are the ones it defines, in order, commented out or not")
 	{
@@ -302,6 +320,10 @@ TEST_SUITE("ProjectAssets")
 		CHECK_FALSE(scripts[3].state);
 	};
 
+	#pragma endregion
+
+	#pragma region Projects
+
 	TEST_CASE("scenes, shaders and dialogues open in the editor, the scripts project's sources in Visual Studio")
 	{
 		using Loom::ProjectAssets;
@@ -362,6 +384,10 @@ TEST_SUITE("ProjectAssets")
 		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("README.txt"));
 		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("Spinner"));
 	};
+
+	#pragma endregion
+
+	#pragma region Moving Files
 
 	TEST_CASE("a file copied into a folder keeps its name, or takes the first free number")
 	{
@@ -500,6 +526,10 @@ TEST_SUITE("ProjectAssets")
 		CHECK(Loom::ProjectAssets::Relocate((root / "Scenes" / "Main.loomscene").string(), from, to) == (root / "Scenes" / "Main.loomscene").string());
 	};
 
+	#pragma endregion
+
+	#pragma region Shaders
+
 	TEST_CASE("a project draws with a new project's shader while it has one, or else its first")
 	{
 		const std::filesystem::path root = std::filesystem::temp_directory_path() / "loom project assets shader";
@@ -521,4 +551,6 @@ TEST_SUITE("ProjectAssets")
 
 		std::filesystem::remove_all(root);
 	};
+
+	#pragma endregion
 };

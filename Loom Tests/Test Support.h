@@ -28,6 +28,11 @@
 
 namespace LoomTests
 {
+	// How far a computed float may drift from the value the math gives.
+	constexpr float EPSILON = 1e-4f;
+
+	#pragma region Pumping and Fixtures
+
 	// GameObject, Scene and LoomObject all defer their real work through
 	// Engine::QueueTask, which the engine normally drains once a frame. Tests
 	// have no frame loop, so they call this instead. Nothing an engine object
@@ -55,6 +60,10 @@ namespace LoomTests
 		~Watching() { Loom::LoomObject::Watch(false); };
 	};
 
+	#pragma endregion
+
+
+	#pragma region Probes
 
 	// A component that records every lifecycle callback the engine makes on it,
 	// so tests can assert on what ran and in what order.
@@ -109,6 +118,10 @@ namespace LoomTests
 		std::string text;
 	};
 
+	#pragma endregion
+
+
+	#pragma region Recording Renderer
 
 	// Stands in for the Engine's renderer while it lives, which a test has no
 	// window to open. It hands out handles, records what it is given, and
@@ -348,6 +361,10 @@ namespace LoomTests
 		const Loom::VertexLayout* m_drawing = nullptr;
 	};
 
+	#pragma endregion
+
+
+	#pragma region Captures
 
 	// Takes what is written to a stream for as long as it lives, so a test
 	// that makes the engine complain on purpose keeps it off the console and
@@ -390,6 +407,10 @@ namespace LoomTests
 		std::streambuf* m_previous;
 	};
 
+	#pragma endregion
+
+	#pragma region Startup Clashes
+
 	// What the ComponentRegistry suite's two Clash types say when they first
 	// register, before main. main.cpp holds that line back from std::cerr and
 	// counts it in StartupClashes; all else said then goes through.
@@ -401,6 +422,10 @@ namespace LoomTests
 		return count;
 	};
 
+	#pragma endregion
+
+
+	#pragma region Images
 
 	// Writes width x height RGBA pixels, top row first, as an uncompressed
 	// 32 bit TGA in the temp folder and answers its path. TGA because it is
@@ -441,4 +466,6 @@ namespace LoomTests
 
 		return path;
 	};
+
+	#pragma endregion
 };

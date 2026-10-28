@@ -21,6 +21,8 @@
 using LoomTests::Pump;
 
 
+#pragma region Helpers
+
 namespace
 {
 	// Objects sit in groups of this many under the scene's root, as a scene
@@ -205,6 +207,8 @@ namespace
 		},
 	};
 };
+
+#pragma endregion
 
 
 TEST_SUITE("Performance" * doctest::skip())

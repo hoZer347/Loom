@@ -17,8 +17,6 @@ namespace Loom
 {
 	namespace
 	{
-		// The byte offset in text whose boundary falls nearest x, measured from
-		// where the text starts.
 		size_t TextOffsetAt(const std::string& text, float x)
 		{
 			constexpr float half = 0.5f;
@@ -67,8 +65,7 @@ namespace Loom
 
 			ImGui::Separator();
 
-			// Taken here rather than in the child, so the chords still work
-			// once a click on the toolbar has focused the panel itself.
+			// Taken here, so the chords still work once a toolbar click has focused the panel.
 			const bool copy = std::exchange(m_copy, false) || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_C);
 			const bool select_all = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_A);
 
@@ -221,8 +218,7 @@ namespace Loom
 						under_mouse_length = text_end.offset;
 					};
 
-					// One item over all the text, so a drag selects rather than
-					// moving the window, and the selection has a context menu.
+					// One item over the text, so a drag selects rather than moving the window.
 					ImGui::SetCursorScreenPos(origin);
 					ImGui::InvisibleButton("##select", ImVec2(text_width, std::max(text_bottom - origin.y, visible.y)));
 

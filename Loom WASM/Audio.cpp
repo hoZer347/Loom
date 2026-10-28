@@ -30,8 +30,7 @@ namespace Loom
 		constexpr ma_uint32 SILENT_CHANNELS = 2;
 		constexpr ma_uint32 SILENT_SAMPLE_RATE = 48000;
 
-		// Decoded whole on the thread that loads them, so the resource manager
-		// needs no threads of its own.
+		// Decoded whole on the loading thread, so the resource manager needs no threads.
 		constexpr ma_uint32 LOAD_FLAGS = MA_SOUND_FLAG_DECODE;
 
 		struct Output final
@@ -39,24 +38,19 @@ namespace Loom
 			ma_resource_manager resources;
 			ma_engine engine;
 
-			// The sounds PlayAt and Play started. A list, so each stays where the
-			// mixer is reading it while others come and go.
+			// A list, so each sound stays put while the mixer reads it.
 			std::list<ma_sound> shots;
 
-			// The files PlayAt and Play have registered, which keeps them decoded
-			// between one shot and the next.
+			// Registered files stay decoded between shots.
 			std::unordered_set<std::string> registered;
 
-			// The files that would not load, so a sound played over and over is
-			// reported once rather than every time.
+			// Files that would not load, reported once each.
 			std::unordered_set<std::string> failed;
 
 			bool running = true;
 		};
 
-		// Opened by Audio::Get and never closed: the mixer thread is reading it
-		// until the process ends, and a scene destroyed by a static destructor
-		// still lets go of its sources against it.
+		// Never closed, since the mixer reads it until the process ends.
 		Output* output = nullptr;
 		bool opening_failed = false;
 

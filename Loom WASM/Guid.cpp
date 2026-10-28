@@ -13,8 +13,7 @@ namespace Loom
 {
 	Guid Guid::New()
 	{
-		// One generator for the process, seeded once. Guids are handed out from
-		// whatever thread creates an object, so the draw is locked.
+		// One generator for the process, locked since any thread may draw a guid.
 		static std::mutex mutex;
 		static std::mt19937_64 generator(std::random_device{ }());
 
@@ -24,8 +23,7 @@ namespace Loom
 
 		Guid guid(distribution(generator), distribution(generator));
 
-		// Version 4 (random) and the RFC 4122 variant, so these are recognisable
-		// as guids to anything else that reads the file.
+		// Version 4 and the RFC 4122 variant, so other readers recognise them as guids.
 		guid.high = (guid.high & 0xFFFFFFFFFFFF0FFFull) | 0x0000000000004000ull;
 		guid.low = (guid.low & 0x3FFFFFFFFFFFFFFFull) | 0x8000000000000000ull;
 

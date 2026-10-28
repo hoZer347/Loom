@@ -20,13 +20,14 @@
 using LoomTests::Pump;
 using LoomTests::Probe;
 
+#pragma region Helpers
+
 namespace
 {
-	// GameObject's constructor is private to Scene and Engine, so every test
-	// here reaches a GameObject the way an application does: through a Scene.
-	//
-	// DetachComponent deletes the component it removes, so a component cannot
-	// report its own detach afterwards; this counter outlives it.
+	// Composed transforms hold to a tenth of LoomTests::EPSILON.
+	constexpr float TRANSFORM_EPSILON = 1e-5f;
+
+	// DetachComponent deletes what it removes, so this counter reports the detach.
 	int detachCount = 0;
 
 	struct DetachReporter final : Loom::Component<DetachReporter>
@@ -158,9 +159,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("GameObject")
 {
+	#pragma region Components
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene root starts with no children and no components")
 	{
 		Loom::Scene scene("root shape");
@@ -193,10 +198,7 @@ TEST_SUITE("GameObject")
 		CHECK(scene.GetRoot().GetComponents().size() == 1);
 	};
 
-	// Two components created in one pass - a scene load, or one component's
-	// OnAttach reaching for another - have to be able to see each other. When
-	// ownership waited for the queue they could not, and a script asking for a
-	// sibling got nothing and attached a second one.
+	// A script asking for a sibling made in the same pass must find it, not attach a second.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "components attached in the same frame are siblings")
 	{
 		Loom::Scene scene("siblings");
@@ -262,9 +264,6 @@ TEST_SUITE("GameObject")
 		CHECK(scene.GetRoot().GetComponent<Probe<>>() == nullptr);
 	};
 
-	// Attach inspects each callback at compile time and only registers the
-	// component on the lists it actually implements, so a component that
-	// overrides OnUpdate is ticked but never drawn.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a component is only ticked on the callbacks it overrides")
 	{
 		Loom::Scene scene("selective registration");
@@ -300,6 +299,10 @@ TEST_SUITE("GameObject")
 
 		CHECK(true); // Ticking a component with no overrides must not reach into GL.
 	};
+
+	#pragma endregion
+
+	#pragma region Hierarchy
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "AddChild builds a hierarchy")
 	{
@@ -421,6 +424,10 @@ TEST_SUITE("GameObject")
 
 		CHECK(probe->Count("physics") == 1);
 	};
+
+	#pragma endregion
+
+	#pragma region Removal
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "RemoveChild detaches and deletes the child")
 	{
@@ -594,6 +601,10 @@ TEST_SUITE("GameObject")
 		};
 	};
 
+	#pragma endregion
+
+	#pragma region Reparenting
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "SetParent reorders siblings and moves between parents")
 	{
 		Loom::Scene scene("set parent");
@@ -666,6 +677,10 @@ TEST_SUITE("GameObject")
 		CHECK(scene.GetRoot().GetChildren().size() == 1);
 		CHECK(scene.GetRoot().GetChildren()[0] == child);
 	};
+
+	#pragma endregion
+
+	#pragma region Detaching Components
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "DetachComponent removes one instance and calls OnDetach")
 	{
@@ -741,6 +756,10 @@ TEST_SUITE("GameObject")
 		CHECK(detachCount == 0);
 	};
 
+	#pragma endregion
+
+	#pragma region Threads
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "SetThreadID carries down to the children that inherit it")
 	{
 		constexpr int ROOT_THREAD = 2;
@@ -781,6 +800,10 @@ TEST_SUITE("GameObject")
 		CHECK(child->InheritsThreadID());
 		CHECK(child->GetThreadID() == ROOT_THREAD);
 	};
+
+	#pragma endregion
+
+	#pragma region Serialization and Transforms
 
 	// Scenes saved before the transform existed number the thread fields 0 and
 	// 1, so the transform has to come after them, and disabling after that.
@@ -833,8 +856,6 @@ TEST_SUITE("GameObject")
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a transform scales, then rotates, then translates")
 	{
-		constexpr float EPSILON = 1e-5f;
-
 		Loom::Scene scene("local");
 		Loom::GameObject* object = scene.AddChild("Object");
 		Pump();
@@ -846,15 +867,13 @@ TEST_SUITE("GameObject")
 		// +X, doubled, turned a quarter about Y to -Z, then moved.
 		const glm::vec4 moved = object->WorldMatrix() * glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
 
-		CHECK(moved.x == doctest::Approx(1.0f).epsilon(EPSILON));
-		CHECK(moved.y == doctest::Approx(2.0f).epsilon(EPSILON));
-		CHECK(moved.z == doctest::Approx(1.0f).epsilon(EPSILON));
+		CHECK(moved.x == doctest::Approx(1.0f).epsilon(TRANSFORM_EPSILON));
+		CHECK(moved.y == doctest::Approx(2.0f).epsilon(TRANSFORM_EPSILON));
+		CHECK(moved.z == doctest::Approx(1.0f).epsilon(TRANSFORM_EPSILON));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "rotation applies X before Y")
 	{
-		constexpr float EPSILON = 1e-5f;
-
 		Loom::Scene scene("rotation order");
 		Loom::GameObject* object = scene.AddChild("Object");
 		Pump();
@@ -864,9 +883,9 @@ TEST_SUITE("GameObject")
 		// X turns +Z to -Y, which Y leaves alone. Y first would give +X.
 		const glm::vec4 turned = object->WorldMatrix() * glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
 
-		CHECK(turned.x == doctest::Approx(0.0f).epsilon(EPSILON));
-		CHECK(turned.y == doctest::Approx(-1.0f).epsilon(EPSILON));
-		CHECK(turned.z == doctest::Approx(0.0f).epsilon(EPSILON));
+		CHECK(turned.x == doctest::Approx(0.0f).epsilon(TRANSFORM_EPSILON));
+		CHECK(turned.y == doctest::Approx(-1.0f).epsilon(TRANSFORM_EPSILON));
+		CHECK(turned.z == doctest::Approx(0.0f).epsilon(TRANSFORM_EPSILON));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a child's transform is relative to its parent")
@@ -883,6 +902,10 @@ TEST_SUITE("GameObject")
 
 		CHECK(origin == glm::vec4(5.0f, 1.0f, 0.0f, 1.0f));
 	};
+
+	#pragma endregion
+
+	#pragma region Lanes
 
 #if !defined(__EMSCRIPTEN__) || defined(__EMSCRIPTEN_PTHREADS__)
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "each object updates on the thread its thread ID names, 0 on the caller's")
@@ -1029,4 +1052,6 @@ TEST_SUITE("GameObject")
 		CHECK(kept->Count("update") == 1);
 		CHECK(kept->Count("render") == 1);
 	};
+
+	#pragma endregion
 };

@@ -78,8 +78,7 @@ namespace Loom
 
 	bool FileTypes::MayClaim(const std::filesystem::path& executable)
 	{
-		// <engine>/x64/Release/Loom Editor.exe, the configuration games' scripts
-		// are built for.
+		// <engine>/x64/Release/Loom Editor.exe, the configuration games' scripts build for.
 		const std::filesystem::path root = executable.parent_path().parent_path().parent_path();
 
 		std::error_code code;

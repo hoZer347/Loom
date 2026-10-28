@@ -138,10 +138,7 @@ void main()
 			return model_shader_path;
 		};
 
-		// The material's texture as a file in folder, copied out of the model or
-		// from beside it: its base colour, or failing that its diffuse or
-		// emission. Empty when it has none. nearest says whether the file asks
-		// for the texture to be sampled nearest.
+		// Empty when it has none.
 		std::string TextureOf(
 			const aiScene& scene,
 			const aiMaterial& material,
@@ -163,8 +160,7 @@ void main()
 
 				if (const aiTexture* embedded = scene.GetEmbeddedTexture(file.C_Str()))
 				{
-					// Texels rather than an image file's bytes, which only some
-					// formats embed and stb has nothing to read them with.
+					// Texels rather than file bytes, which stb cannot read.
 					if (embedded->mHeight != 0)
 						continue;
 
@@ -189,8 +185,6 @@ void main()
 			return { };
 		};
 
-		// The file's material as Model.shader draws it: its base colour, its
-		// texture copied into folder, how that is sampled, and where it is cut out.
 		void Dress(
 			Material& drawn,
 			const aiScene& scene,
@@ -202,8 +196,7 @@ void main()
 
 			aiColor4D base(1.0f, 1.0f, 1.0f, 1.0f);
 
-			// Drawn by its glow's texture alone, as an unlit export is, it takes
-			// the glow's colour, its base colour being black.
+			// An unlit export draws by its glow, its base colour being black.
 			const bool glows = material.GetTextureCount(aiTextureType_BASE_COLOR) + material.GetTextureCount(aiTextureType_DIFFUSE) == 0 &&
 				material.GetTextureCount(aiTextureType_EMISSIVE) > 0;
 
@@ -238,8 +231,6 @@ void main()
 
 		#pragma region Parts
 
-		// A layer for each of the mesh's sets of texture coordinates past the
-		// first, numbered by its channel, each vertex's coordinates its words.
 		std::vector<UVLayer> UVLayersOf(const aiMesh& mesh)
 		{
 			std::vector<UVLayer> layers;
@@ -273,8 +264,7 @@ void main()
 			{
 				const aiMesh& mesh = *scene.mMeshes[node.mMeshes[n]];
 
-				// Points and lines are sorted into meshes of their own, which a
-				// triangle list has nothing to draw with.
+				// Points and lines come as meshes of their own, with nothing to draw here.
 				if (!(mesh.mPrimitiveTypes & aiPrimitiveType_TRIANGLE))
 					continue;
 
@@ -341,9 +331,7 @@ void main()
 				Collect(scene, *node.mChildren[c], transform, parts);
 		};
 
-		// The scene's triangles, each mesh with its node's transform applied,
-		// centred and scaled to span model_fit_extent. Empty, with why logged,
-		// when there are none.
+		// Centred and scaled to model_fit_extent; empty, with why logged, when there are none.
 		std::vector<ModelPart> PartsOf(const aiScene& scene, const std::string& path)
 		{
 			std::vector<ModelPart> parts;
@@ -447,13 +435,10 @@ void main()
 
 		#pragma region Skinning
 
-		// Closer than this to nothing, an offset is none: a shape key's vertex
-		// that does not move, or a channel that never leaves its rest value.
+		// Closer than this to nothing, an offset is none.
 		constexpr float NEGLIGIBLE = 1e-5f;
 
-		// A mesh unindexed, which is how Mesh draws, with what a Skin needs to
-		// bend it: each vertex's joints and weights and each shape key's
-		// offsets, by the unindexed vertex they move.
+		// Unindexed, as Mesh draws, with each vertex's joints, weights and shape key offsets.
 		struct SkinnedPart
 		{
 			std::vector<float> vertices;
@@ -472,8 +457,7 @@ void main()
 		{
 			SkinnedPart part;
 
-			// Each vertex's joints, then their weights; LimitBoneWeights has left
-			// no vertex with more than a Skin takes.
+			// LimitBoneWeights has left no vertex with more than a Skin takes.
 			std::vector<std::array<float, Skin::FLOATS_PER_INFLUENCE>> influences(mesh.mNumVertices);
 			std::vector<size_t> taken(mesh.mNumVertices);
 
@@ -559,8 +543,6 @@ void main()
 
 		#pragma region Animation
 
-		// A channel of one clip: its property, what it moves, and its keys, each
-		// a time and then the value.
 		struct Track
 		{
 			size_t clip;
@@ -613,8 +595,7 @@ void main()
 			return true;
 		};
 
-		// The shape key names of a morph channel's mesh: the meshes on the node
-		// it names, or failing that the mesh by that name.
+		// The meshes on the named node, or failing that the mesh by that name.
 		std::vector<std::string> ShapeNames(const aiScene& scene, const aiString& name)
 		{
 			const aiMesh* found = nullptr;
@@ -634,10 +615,7 @@ void main()
 			return names;
 		};
 
-		// Every clip's channels into an Animator. A channel that holds its rest
-		// value in every clip is left out; one that moves in any clip is in all
-		// of them, a clip without it holding it at rest, so switching clips
-		// never leaves it where the last one moved it.
+		// A channel that moves in any clip is in all, so switching clips never strands it.
 		void AttachAnimator(const aiScene& scene, GameObject& model)
 		{
 			std::vector<Track> tracks;

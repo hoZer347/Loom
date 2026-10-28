@@ -17,8 +17,7 @@ namespace Loom
 		constexpr const char* solution = "Loom.sln";
 		constexpr const char* target = "Loom Editor";
 
-		// <file>.<process id>.old, so two editors run from one build each move
-		// their own.
+		// <file>.<pid>.old, so two editors run from one build each move their own.
 		constexpr const char* moved_aside_extension = ".old";
 
 		constexpr const char* symbols_extension = ".pdb";
@@ -34,8 +33,7 @@ namespace Loom
 				: std::filesystem::path(buffer);
 		};
 
-		// What earlier refreshes moved aside. What an editor still has open is
-		// locked, and left.
+		// What an editor still has open is locked, and left.
 		void SweepMovedAside(const std::filesystem::path& file)
 		{
 			const std::string prefix = file.filename().string() + '.';
@@ -125,8 +123,7 @@ namespace Loom
 
 			m_movedAside.emplace_back(file, aside);
 
-			// Kept as it was, timestamps included, so a build with nothing to do
-			// finds it up to date.
+			// Timestamps kept, so a build with nothing to do finds it up to date.
 			if (!CopyFileW(aside.c_str(), file.c_str(), FALSE))
 			{
 				std::cerr << "Full refresh: could not put a copy of " << file.string() << " back to build over." << std::endl;

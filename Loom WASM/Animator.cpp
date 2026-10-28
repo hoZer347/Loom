@@ -85,8 +85,7 @@ namespace Loom
 
 		if (m_after >= 0 && m_time >= GetDuration())
 		{
-			// A transition ends where its clip begins, so it carries on into it
-			// with no easing of its own.
+			// A transition carries on into its clip with no easing of its own.
 			m_time -= GetDuration();
 			m_playing = m_after;
 			m_after = -1;
@@ -245,8 +244,7 @@ namespace Loom
 			fields >> parsed.duration;
 		};
 
-		// A transition's name is two other clips' names joined; any other name
-		// with the join in it is just a name.
+		// Only two clip names joined make a transition's name.
 		const auto named = [&](const std::string& name)
 		{
 			for (size_t i = 0; i < m_parsedClips.size(); i++)

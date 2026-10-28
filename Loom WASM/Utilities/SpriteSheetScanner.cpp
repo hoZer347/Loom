@@ -63,9 +63,7 @@ namespace Loom
 
 	#pragma region Content
 
-	// The union of every inked pixel across a range of rows, as a box in normalised cell
-	// space. Shared by the sheet-wide measure and the per-clip one, which differ only in
-	// how many rows they fold together.
+	// The union of inked pixels across rows, in normalised cell space.
 	static Rect MeasureRows(
 		const PixelSheet& sheet,
 		const Int2& cell,

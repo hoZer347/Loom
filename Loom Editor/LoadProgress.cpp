@@ -14,8 +14,7 @@ namespace Loom
 		constexpr const char* BUILD_KEY = "build";
 		constexpr const char* REBUILD_KEY = "rebuild";
 
-		// Where a build that outlasts the last of its kind holds, rather than
-		// looking done before it is.
+		// Where an overrunning build holds rather than looking done.
 		constexpr float PROGRESS_HOLD = 0.95f;
 	};
 
@@ -81,8 +80,7 @@ namespace Loom
 
 	float ProjectLoad::Fraction(bool opening, float step) const
 	{
-		// A scene being opened is a step of its own even where the load did
-		// not expect one.
+		// An opening scene is a step even where the load did not expect one.
 		const int steps = (compiles ? 1 : 0) + (opens || opening ? 1 : 0);
 		const int done = compiles && opening ? 1 : 0;
 

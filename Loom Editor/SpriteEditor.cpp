@@ -25,15 +25,13 @@ namespace Loom
 		constexpr int channels = 4;
 		constexpr int alpha = 3;
 
-		// A window docked on the frame it first appears only takes its tab on
-		// the one after.
+		// A window docked on its first frame only takes its tab on the next.
 		constexpr int focus_frames = 2;
 
 		// How much of the Sprites panel's height a Palette panel docked under it takes.
 		constexpr float palette_share = 0.25f;
 
-		// Screen pixels to an image pixel. From one up, zoom goes in whole
-		// steps, so every image pixel is the same size on screen.
+		// From one up zoom goes in whole steps, so every image pixel is the same size.
 		constexpr float min_zoom = 1.0f / 16.0f;
 		constexpr float max_zoom = 64.0f;
 		constexpr float wheel_zoom = 1.25f;
@@ -44,8 +42,7 @@ namespace Loom
 		// The pixel grid shows from this zoom up.
 		constexpr float grid_zoom = 8.0f;
 
-		// The most pixels drawn across or down. A larger image zoomed out is
-		// drawn a block of pixels to a cell, coloured by its top left one.
+		// The most pixels drawn across; a larger image zoomed out draws blocks by their top left pixel.
 		constexpr int max_cells = 256;
 
 		// In screen pixels, behind the image where it is see-through.
@@ -64,16 +61,12 @@ namespace Loom
 		// Shared by a document's edits, so a large sprite keeps fewer of them.
 		constexpr size_t max_undo_bytes = 256 * 1024 * 1024;
 
-		// The timeline's rows of layers, beyond which it scrolls, and in lines
-		// of text the widths of a frame's milliseconds, of its layers column
-		// and of a frame's column.
+		// Timeline rows before it scrolls, and column widths in lines of text.
 		constexpr int timeline_rows = 4;
 		constexpr float name_lines = 8.0f;
 		constexpr float layers_lines = 12.0f;
 		constexpr float frame_lines = 1.5f;
 
-		// The timeline is a table, with a column for the layers' names and
-		// one for each frame.
 		static_assert(SpriteAsset::maxFrames < IMGUI_TABLE_MAX_COLUMNS);
 
 		// Above the layers: the timeline's buttons, and the frames' numbers.
@@ -81,12 +74,10 @@ namespace Loom
 
 		constexpr float milliseconds = 1000.0f;
 
-		// How fast the timeline scrolls while a layer is held past its top or
-		// bottom row.
+		// Timeline scroll speed while a layer is held past its edge.
 		constexpr float held_scroll_rows = 8.0f;
 
-		// The dots on the square a layer is dragged by, as braille's six, and
-		// their radius as a share of the line.
+		// The braille dots on a layer's grip, and their radius as a share of the line.
 		constexpr int grip_columns = 2;
 		constexpr int grip_rows = 3;
 		constexpr float grip_dot = 0.1f;
@@ -100,8 +91,7 @@ namespace Loom
 		constexpr size_t import_warning = 128;
 		constexpr const char* import_popup = "Import Colours?";
 
-		// Swatches, in lines of text, and the corners marking those the left
-		// and right mouse paint with, as a share of a swatch's side.
+		// Swatch size in lines, and its mouse button corners as a share of its side.
 		constexpr float swatch_lines = 1.75f;
 		constexpr float marker_share = 0.4f;
 
@@ -114,8 +104,6 @@ namespace Loom
 		// How far a preview's tab name leans, across per line down.
 		constexpr float italic_slant = 0.2f;
 
-		// The Resize popup's anchors, a grid of them with the middle first
-		// picked.
 		constexpr const char* resize_popup = "Resize";
 		constexpr int anchor_columns = 3;
 		constexpr int middle_anchor = anchor_columns * anchor_columns / 2;
@@ -127,12 +115,10 @@ namespace Loom
 
 		#pragma region Colours
 
-		// First in every palette, whether its file has it or not, and painting
-		// as the eraser does.
+		// First in every palette, and painting as the eraser does.
 		constexpr SpriteAsset::Colour clear{ };
 
-		// Any colour with no alpha paints as clear does, and is the clear
-		// swatch, whatever its red, green and blue.
+		// Any colour with no alpha is the clear swatch.
 		bool SeeThrough(const SpriteAsset::Colour& colour)
 		{
 			return colour[alpha] == 0;
@@ -220,8 +206,7 @@ namespace Loom
 			return std::filesystem::path(path).filename().string();
 		};
 
-		// Beside the sprite, under its stem, or with the first number after it
-		// that nothing there, nor any palette made and not yet saved, is using.
+		// The first free number after the stem, counting palettes not yet saved.
 		template <typename Taken>
 		std::string NewPalettePath(const std::string& sprite, const Taken& taken)
 		{
@@ -411,8 +396,7 @@ namespace Loom
 					if (std::exchange(document->select, false))
 						flags |= ImGuiTabItemFlags_SetSelected;
 
-					// Known by the document rather than its path, so a file moved
-					// in the Project panel keeps its tab.
+					// By document rather than path, so a moved file keeps its tab.
 					const std::string label = std::string(EditorIcons::Sprite) + " " + FileName(document->path) + "###" + std::to_string((uintptr_t)document.get());
 					bool keep = true;
 					const int first_vertex = ImGui::GetWindowDrawList()->VtxBuffer.Size;
@@ -513,8 +497,7 @@ namespace Loom
 		if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_S))
 			SaveDocument(document);
 
-		// Asked every frame, mid-stroke too: ImGui only routes a shortcut to a
-		// window that asked for it the frame before.
+		// Asked every frame: ImGui routes a shortcut only to a window that asked last frame.
 		const bool undo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z);
 		const bool redo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y) || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z);
 
@@ -644,8 +627,7 @@ namespace Loom
 				draw->AddLine(ImVec2(shown_min.x, origin.y + y * zoom), ImVec2(shown_max.x, origin.y + y * zoom), grid_colour);
 		};
 
-		// Where an outlined layer's pixel meets one it does not cover, or the
-		// image's edge. Not while a cell is a block of pixels.
+		// Not while a cell is a block of pixels.
 		if (step == 1)
 			for (const SpriteAsset::Layer& layer : document.sprite.layers)
 			{
@@ -833,9 +815,7 @@ namespace Loom
 			ImGui::PopID();
 		};
 
-		// The row the mouse is over, for a held layer to move to once the rows
-		// are drawn, since they hold the layers. Only rows in sight count, the
-		// top and bottom of which are kept for a layer held past them.
+		// Rows hold the layers, so a held layer moves once they are drawn; only rows in sight count.
 		struct ShownRow
 		{
 			int layer;
@@ -855,8 +835,7 @@ namespace Loom
 			ImGui::TableSetColumnIndex(0);
 			ImGui::PushID(layer);
 
-			// The grip, for dragging the layer up or down past the others,
-			// labelled by the layer for a UiScript to aim at.
+			// Labelled by the layer for a UiScript to aim at.
 			const float box = ImGui::GetFrameHeight();
 
 			ImGui::InvisibleButton(("##grip " + row.name).c_str(), ImVec2(box, box));
@@ -992,8 +971,7 @@ namespace Loom
 			ImGui::PopID();
 		};
 
-		// Held past the rows in sight, the layer goes to the one at that edge
-		// and the rows scroll on to bring more into sight.
+		// Held past the rows in sight, the layer moves to the edge row and the rows scroll.
 		if (document.grabbed >= 0 && !under && top_shown)
 		{
 			const float mouse_y = ImGui::GetIO().MousePos.y;
@@ -1065,8 +1043,7 @@ namespace Loom
 			ImGui::SameLine();
 		};
 
-		// Asked of the panel only while the palette is out of sight, since
-		// painting needs what it holds.
+		// Painting needs the palette, so the panel is asked only while it is out of sight.
 		if (!palette_shown)
 		{
 			ImGui::TextDisabled("%s No palette open", EditorIcons::Palette);
@@ -1522,8 +1499,6 @@ namespace Loom
 				if (ImGui::IsItemClicked(button))
 					m_colours[button] = colour;
 
-			// The left colour's in the top left corner, the right's in the
-			// bottom right.
 			const ImVec2 min = ImGui::GetItemRectMin();
 			const ImVec2 max = ImGui::GetItemRectMax();
 
@@ -1787,8 +1762,6 @@ namespace Loom
 
 	const SpriteAsset::Image& SpriteEditor::Shown(Document& document)
 	{
-		// A layer on its own is drawn as it is, with nothing to flatten while
-		// it is painted.
 		const Image* only = nullptr;
 		int visible = 0;
 
@@ -1813,8 +1786,6 @@ namespace Loom
 		Image& cel = document.sprite.layers[document.layer].cels[document.frame];
 
 		// Before the tool is looked at, since it may have changed mid-stroke.
-		// A stroke that changed nothing, such as one wholly off the image,
-		// leaves nothing to undo.
 		if (document.stroking && !ImGui::IsMouseDown(document.strokeButton))
 		{
 			document.stroking = false;
@@ -1969,8 +1940,7 @@ namespace Loom
 
 		float zoom = was * std::pow(wheel_zoom, wheel);
 
-		// At least one whole step, or a slow wheel would round back to where
-		// it was.
+		// At least one whole step, or a slow wheel rounds back to where it was.
 		if (zoom >= 1.0f)
 			zoom = wheel > 0.0f
 				? (std::max)(std::round(zoom), std::floor(was) + 1.0f)
@@ -2018,8 +1988,7 @@ namespace Loom
 			return false;
 		};
 
-		// The palette before the sprite that names it, and the image before
-		// the sprite, since it is what the game draws.
+		// The palette and image before the sprite that names them.
 		if ((!document.links.palette.empty() && !SavePalette(document.links.palette)) ||
 			!SpriteAsset::SaveImage(document.links.image, document.sprite.Sheet()) ||
 			!SpriteAsset::Save(document.path, document.sprite, document.links))

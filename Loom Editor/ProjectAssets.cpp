@@ -31,8 +31,7 @@ namespace Loom
 
 		constexpr size_t maxNameLength = 64;
 
-		// Windows forbids the first lot in a file name; the rest mean something
-		// to MSBuild, or to the XML a project is written in.
+		// Forbidden by Windows, or meaningful to MSBuild or XML.
 		constexpr const char* const forbiddenNameCharacters = "<>:\"/\\|?*&;%'$@()";
 
 		constexpr const char* const keywords[] =
@@ -114,8 +113,7 @@ namespace Loom
 			return true;
 		};
 
-		// A PNG with its pixel data stored rather than deflated, which is a
-		// valid zlib stream and needs no compressor.
+		// Stored rather than deflated, which is a valid zlib stream with no compressor.
 		namespace Png
 		{
 			constexpr uint32_t crcPolynomial = 0xEDB88320u;
@@ -230,8 +228,7 @@ namespace Loom
 
 		#pragma region Script Templates
 
-		// The namespace the scripts project puts its code in, or the project's
-		// own name when it does not say.
+		// The project's own name when it names no namespace.
 		std::string RootNamespace(const std::filesystem::path& project)
 		{
 			const std::string name = ProjectAssets::Element(ProjectAssets::ReadText(project.string()), "RootNamespace");
@@ -241,8 +238,7 @@ namespace Loom
 				: name;
 		};
 
-		// A whole script in one header, which the scripts project picks up by
-		// its **\*.hpp glob and which registers itself as a component.
+		// Picked up by the scripts project's **\*.hpp glob.
 		const char* const script = R"(#pragma once
 
 #include "Loom.h"
@@ -346,8 +342,7 @@ namespace {NAMESPACE}
 			"// To give a name several forms, declare each as a Loom::DialogueBinding.",
 		};
 
-		// Where a { or } that is code, not text in a literal or a comment, closes
-		// the block opened at open.
+		// Skips braces in literals and comments.
 		size_t ClosingBrace(const std::string& text, size_t open)
 		{
 			int depth = 0;
@@ -550,8 +545,7 @@ namespace {NAMESPACE}
 			return "";
 		};
 
-		// A folder made outside the editor never went through IsValidName, and
-		// the project's glob hands its name to MSBuild as written.
+		// A folder made outside the editor never went through IsValidName.
 		for (const std::filesystem::path& part : relative)
 			if (part != "." && !IsValidName(part.string()))
 			{
@@ -726,8 +720,7 @@ namespace {NAMESPACE}
 			if (name == keyword)
 				return "'" + name + "' is a C++ keyword.";
 
-		// Components register by type name without their namespace, and the
-		// registry turns away a second one by a name it already has.
+		// The registry turns away a second component of a name, namespaces dropped.
 		if (ComponentRegistry::All().contains(name))
 			return "A component called " + name + " already exists.";
 
@@ -737,8 +730,7 @@ namespace {NAMESPACE}
 		const std::filesystem::path root = std::filesystem::path(scripts_project).parent_path();
 		const std::string header = name + ".hpp";
 
-		// A header can hold several components, and the registry only knows the
-		// ones in a library that is built and loaded, so the headers are read too.
+		// The registry only knows built libraries, so the headers are read too.
 		std::error_code code;
 
 		for (const auto& entry : std::filesystem::recursive_directory_iterator(root, code))
@@ -796,8 +788,7 @@ namespace {NAMESPACE}
 			if (opened != std::string::npos && (closed == std::string::npos || closed < opened))
 				continue;
 
-			// A component is never a primary template, only what one is derived
-			// from, so a template head on this line or the one above rules it out.
+			// A component is never a primary template, so a template head rules it out.
 			const size_t previous = newline == std::string::npos || newline == 0
 				? line_start
 				: text.rfind('\n', newline - 1) + 1;
@@ -858,8 +849,7 @@ namespace {NAMESPACE}
 			member + '{' + eol +
 			member + "};" + eol;
 
-		// A closing brace on a line of its own keeps it; one that shares a line
-		// moves down under the member, and { } on one line opens onto its own.
+		// A brace sharing a line moves under the member; { } opens onto its own lines.
 		const size_t newline = text.rfind('\n', close);
 		const size_t close_line = newline == std::string::npos ? 0 : newline + 1;
 		const bool own_line = text.find_first_not_of(" \t", close_line) == close;
@@ -971,8 +961,7 @@ void main()
 
 	std::string ProjectAssets::Replace(std::string text, const std::string& token, const std::string& value)
 	{
-		// Resuming past the replacement, not at it: a value that contains its
-		// own token would otherwise be substituted forever.
+		// Past the replacement, or a value holding its own token substitutes forever.
 		for (size_t at = text.find(token); at != std::string::npos; at = text.find(token, at + value.size()))
 			text.replace(at, token.size(), value);
 

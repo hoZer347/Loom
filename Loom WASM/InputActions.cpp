@@ -19,8 +19,7 @@ namespace Loom
 			return key != Key::None;
 		};
 
-		// Whether the keys chosen are all held, and some of them made this
-		// frame's edge: went down for Down, came up for Up.
+		// All keys held, and some made this frame's edge.
 		bool Together(const std::vector<Key>& keys, bool (*edge)(Key))
 		{
 			bool any = false;
@@ -212,8 +211,7 @@ namespace Loom
 
 	void InputActions::Write(std::ostream& out, const File& file)
 	{
-		// The file's folders in its order, then any an action is filed in that
-		// it left out.
+		// The file's folders in order, then any it left out.
 		std::vector<std::string> written = file.folders;
 
 		for (const Action& action : file.actions)

@@ -126,9 +126,7 @@ namespace Loom
 		if (child->m_removed.exchange(true))
 			return;
 
-		// From wherever it has been moved to since, unless that is under
-		// something on its way out, which takes it along. Found again by ID,
-		// since it may have been moved under one deleted ahead of it.
+		// Found again by ID, since it may have moved under one deleted ahead of it.
 		Engine::QueueTask(
 			[child, id = child->m_ID]()
 			{
@@ -400,8 +398,7 @@ namespace Loom
 				ImGui::TreePop();
 			};
 
-			// Removing components, by instance rather than by type: a GameObject
-			// is free to carry two of the same kind.
+			// By instance, since a GameObject may carry two of a kind.
 			if (ImGui::TreeNode("Remove Component: "))
 			{
 				for (ComponentBase* component : m_components)
@@ -417,8 +414,7 @@ namespace Loom
 				ImGui::TreePop();
 			};
 
-			// A copy: a component's GUI can attach another one, and Attach now puts
-			// it straight into m_components rather than on the queue.
+			// A copy, since a component's GUI can attach another.
 			const std::vector<ComponentBase*> components = m_components;
 
 			for (ComponentBase* component : components)

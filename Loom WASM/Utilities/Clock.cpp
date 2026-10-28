@@ -52,9 +52,7 @@ namespace Loom
 		float raw = float(now - s_last);
 		s_last = now;
 
-		// A frame that took a second really happened, but nothing integrating against it
-		// wants to be told so -- a paused debugger would move a walking character a metre.
-		// GLFW's timer starts again from zero when GLFW does, and that frame took no time.
+		// Clamped so a debugger pause does not move a character a metre.
 		raw = std::clamp(raw, 0.0f, s_maxDelta);
 
 		s_unscaledDeltaTime = raw;

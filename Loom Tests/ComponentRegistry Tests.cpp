@@ -14,6 +14,8 @@
 
 using LoomTests::Pump;
 
+#pragma region Helpers
+
 namespace
 {
 	struct Registered final : Loom::Component<Registered>
@@ -50,9 +52,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("ComponentRegistry")
 {
+	#pragma region Creating by Name
+
 	// The registry is what turns "Component Mesh(...)" in a scene file back into
 	// a Mesh, and what fills the editor's Add Component menu.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a registered type can be created by name")
@@ -100,9 +106,7 @@ TEST_SUITE("ComponentRegistry")
 		CHECK(scene.GetRoot().GetComponents().empty());
 	};
 
-	// A script library is unloaded before it is rebuilt, and a factory left
-	// pointing into code that is no longer mapped is a crash waiting for someone
-	// to open the Add Component menu.
+	// A factory left pointing into an unloaded script library crashes Add Component.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "unregistering takes the type back out")
 	{
 		Loom::ComponentRegistry::Register<Registered>("Temporary");
@@ -118,6 +122,10 @@ TEST_SUITE("ComponentRegistry")
 
 		CHECK(Loom::ComponentRegistry::Create("Temporary", scene.GetRoot()) == nullptr);
 	};
+
+	#pragma endregion
+
+	#pragma region Names
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a component reports the name it was registered under")
 	{
@@ -140,9 +148,7 @@ TEST_SUITE("ComponentRegistry")
 		CHECK(Loom::ComponentRegistry::NameOf(*component) == "Registered");
 	};
 
-	// The fallback name ends up in scene files and in the built-in GUI, and the
-	// two compilers this builds with do not spell typeid().name() the same way:
-	// MSVC writes it out, clang hands back the mangled form.
+	// MSVC writes typeid().name() out, clang mangles it.
 	TEST_CASE("a type name is tidied up whichever compiler spelled it")
 	{
 		CHECK(Loom::PrettyTypeName("struct Loom::Mesh") == "Mesh");
@@ -179,9 +185,7 @@ TEST_SUITE("ComponentRegistry")
 		CHECK(Loom::ComponentRegistry::All().count("NeedsArguments") == 0);
 	};
 
-	// Which of the two got there first is up to static initialisation; what
-	// matters is that neither a second module registering the same type nor a
-	// different type with the same name changes what the name builds.
+	// Which registers first is up to static initialisation.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a name stays with the type that took it first")
 	{
 		Loom::Scene scene("clash");
@@ -207,6 +211,10 @@ TEST_SUITE("ComponentRegistry")
 
 		CHECK(strcmp(before->GetTypeName(), after->GetTypeName()) == 0);
 	};
+
+	#pragma endregion
+
+	#pragma region Built-ins
 
 	TEST_CASE("the engine's own components are registered")
 	{
@@ -253,4 +261,6 @@ TEST_SUITE("ComponentRegistry")
 		CHECK(scene.GetRoot().GetComponent<Loom::Mesh>() == mesh);
 		CHECK(Loom::ComponentRegistry::NameOf(*mesh) == "Mesh");
 	};
+
+	#pragma endregion
 };

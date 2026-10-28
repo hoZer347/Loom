@@ -16,8 +16,6 @@ namespace Loom
 	{
 		#pragma region Scene Text
 
-		// A GameObject's own line, or one of its components', with the field
-		// lines under it.
 		struct Block
 		{
 			std::string line{ };
@@ -144,8 +142,7 @@ namespace Loom
 			};
 		};
 
-		// Hold for everything from at down but gameObject, whose own text
-		// carries its own references.
+		// gameObject's own text carries its own references.
 		void HoldUnder(const GameObject& at, const GameObject& gameObject, std::vector<PlayHistory::Field>& held)
 		{
 			if (&at != &gameObject)

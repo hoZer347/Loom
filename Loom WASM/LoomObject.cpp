@@ -11,10 +11,7 @@ namespace Loom
 {
 	namespace
 	{
-		// The last object whose constructor started on this thread, which is the
-		// one a Serial member being built right now belongs to. There is nowhere
-		// to clear it when a constructor finishes, so it goes on naming that
-		// object until the next one is built or that one is destroyed.
+		// The object whose constructor last started on this thread, owner of any Serial being built.
 		thread_local LoomObject* constructing = nullptr;
 	};
 
@@ -50,8 +47,7 @@ namespace Loom
 		if (ours != by_guid.end() && ours->second == this)
 			by_guid.erase(ours);
 
-		// A scene file is the authority on identity, so an object already
-		// answering to the incoming guid gives it up rather than sharing it.
+		// The scene file is the authority, so an object holding the guid gives it up.
 		const auto incumbent = by_guid.find(guid);
 
 		if (incumbent != by_guid.end() && incumbent->second != this)
@@ -67,16 +63,13 @@ namespace Loom
 
 	uint64_t LoomObject::Initialize()
 	{
-		// Runs before any member of a derived class is built, which is what puts
-		// the Serial members those declare on this object.
+		// Before any derived member is built, so their Serial members land on this object.
 		constructing = this;
 
 		const uint64_t ID = Engine::GetUniqueID();
 
 		{
-			// Registered straight away rather than on the task queue: loading a
-			// scene resolves references between objects as it builds them, and
-			// cannot wait a frame for them to become findable.
+			// Registered now, since loading resolves references as it builds.
 			std::lock_guard lock{ mutex };
 
 			by_id.emplace(ID, this);
@@ -151,8 +144,7 @@ namespace Loom
 		unsigned long long* version,
 		std::span<const char* const> extensions)
 	{
-		// Each field's count starts this far past the last one's, further than
-		// any field is ever changed.
+		// Each field's count starts this far past the last, beyond any field's changes.
 		constexpr int VERSIONS_EACH = 32;
 		static std::atomic<unsigned long long> fields{ 0 };
 
@@ -169,9 +161,7 @@ namespace Loom
 			return nullptr;
 		};
 
-		// Under the lock like the lookup tables: a destructor elsewhere reads
-		// the fields of whoever points at it, and objects are made wherever
-		// their owner happens to run.
+		// Under the lock, since destructors elsewhere read their holders' fields.
 		std::lock_guard lock{ LoomObject::mutex };
 
 		SerializedField field;
@@ -245,8 +235,7 @@ namespace Loom
 
 		const unsigned char kinds = placed ? touched_placed : touched_self;
 
-		// Already in for this: whoever takes the journal reads the object
-		// after taking it, so sees this change too.
+		// Already in: the journal's reader sees this change too.
 		if ((m_touched & kinds) == kinds)
 			return;
 
@@ -321,8 +310,7 @@ namespace Loom
 
 	void LoomObject::ReferencesWritten()
 	{
-		// Still waiting: Reindex clears this before it reads the fields, so it
-		// reads this write too.
+		// Still pending: Reindex clears this before reading, so it sees this write.
 		if (m_referencesDirty)
 			return;
 
@@ -377,16 +365,14 @@ namespace Loom
 	{
 		std::lock_guard lock{ mutex };
 
-		// So a field declared after this point is refused rather than handed an
-		// object that is already gone.
+		// So a field declared after this is refused rather than handed a dead object.
 		if (constructing == this)
 			constructing = nullptr;
 
 		by_id.erase(m_ID);
 		Unname();
 
-		// Only while it is still ours: SetGuid hands a guid over to whoever
-		// loads a scene that claims it, and that object outlives this one.
+		// Only while ours, since SetGuid can hand it to a loaded object.
 		const auto entry = by_guid.find(m_guid);
 
 		if (entry != by_guid.end() && entry->second == this)
@@ -417,8 +403,7 @@ namespace Loom
 			dirty_holders.pop_back();
 		};
 
-		// What this pointed at is taken out as it was indexed, since the
-		// fields that said so may be gone by now.
+		// Taken out as indexed, since the fields may be gone.
 		for (const LoomObject* target : m_referenced)
 		{
 			const auto entry = referrers.find(target);
@@ -436,10 +421,7 @@ namespace Loom
 		if (holders == referrers.end())
 			return;
 
-		// Nobody may be left pointing here. A Reference field still holding this
-		// object would be read again next frame - by the serializer writing its
-		// guid, by the inspector drawing its name, or by whatever component owns
-		// the field - and by then the memory is gone.
+		// No Reference field may still point here once the memory is gone.
 		for (LoomObject* holder : std::unordered_set<LoomObject*>(std::move(holders->second)))
 		{
 			for (const SerializedField& field : holder->m_fields)

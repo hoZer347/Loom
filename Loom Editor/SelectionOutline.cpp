@@ -110,12 +110,7 @@ void main()
 }
 )";
 
-		// The mask is the size of the target, so a fragment's own pixel is the
-		// mask's. The distance to the silhouette's edge, negative inside it,
-		// places the ring: WIDTH pixels wide, fading in over the edge itself and
-		// out beyond, each over SOFTNESS, so neither side follows the pixels.
-		// Where the silhouette runs off the target, the ring runs along the
-		// target's edge inside it, as wide, so the cut side is ringed too.
+		// Ring WIDTH wide, fading over SOFTNESS each side; where the silhouette runs off the target, the ring runs along its edge.
 		const char* const edge_fragment = R"(
 uniform sampler2D u_mask;
 uniform vec4 u_color;
@@ -263,8 +258,7 @@ void main()
 	{
 		bool drew = false;
 
-		// By type name, the way GetComponent matches: a script library's Mesh
-		// carries its own copy of the type info.
+		// By type name, as GetComponent matches, since a script library has its own type info.
 		for (ComponentBase* component : gameObject.GetComponents())
 			if (strcmp(component->GetTypeName(), typeid(Mesh).name()) == 0)
 			{
@@ -305,9 +299,7 @@ void main()
 			uncovered,
 			[&]()
 			{
-				// The mesh program last, so that when nothing draws it is the one
-				// left bound: GL calls the sprite program's sampler undefined
-				// behaviour while it would read the shadow map left on its unit.
+				// Mesh program last, so the sprite program is never left bound with the shadow map on its unit.
 				camera.Apply(m_spriteMask);
 				camera.Apply(m_meshMask);
 
@@ -317,8 +309,7 @@ void main()
 		if (!drew)
 			return;
 
-		// Otherwise the scene's depth would hide the ring wherever it overlaps
-		// something nearer than the screen quad.
+		// Or the scene's depth would hide the ring behind anything nearer than the quad.
 		renderer->Clear(nullptr, true);
 
 		renderer->SetTexture(m_edge, "u_mask", m_mask.GetTexture());

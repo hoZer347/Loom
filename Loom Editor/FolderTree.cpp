@@ -157,8 +157,7 @@ namespace Loom
 
 		ImGui::InputText("##rename_folder", m_name, sizeof(m_name), ImGuiInputTextFlags_AutoSelectAll);
 
-		// Enter and clicking away both keep the new name; Escape has already put
-		// the old one back by the time the field lets go.
+		// Escape has already restored the old name by the time the field lets go.
 		if (!ImGui::IsItemDeactivated())
 			return;
 

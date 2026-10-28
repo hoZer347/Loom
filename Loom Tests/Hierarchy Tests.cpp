@@ -16,6 +16,8 @@ using Loom::Hierarchy::View;
 using Loom::Hierarchy::Zone;
 
 
+#pragma region Helpers
+
 namespace
 {
 	constexpr float ROW = 10.0f;
@@ -46,9 +48,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("Hierarchy")
 {
+	#pragma region Visible Rows
+
 	TEST_CASE("Visible is the rows the view shows, at the top, the middle and the bottom of the list")
 	{
 		constexpr size_t count = 100;
@@ -117,6 +123,10 @@ TEST_SUITE("Hierarchy")
 		CHECK(openUnder.at(group).front().second == inGroup[0]);
 	};
 
+	#pragma endregion
+
+	#pragma region Plans
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Plan draws the closed rows in view and steps over the rest")
 	{
 		Loom::Scene scene("Plan");
@@ -179,6 +189,10 @@ TEST_SUITE("Hierarchy")
 		CHECK(DrawnBy(steps) == Drawn{ { 0, children[0] }, { 0, children[1] }, { 0, children[2] }, { 0, children[3] }, { 0, nullptr } });
 	};
 
+	#pragma endregion
+
+	#pragma region Placing
+
 	TEST_CASE("ZoneOf takes a quarter of the row at each end beside it, and all of a root's row into it")
 	{
 		CHECK(Loom::Hierarchy::ZoneOf(0.0f, ROW, 1.0f, false) == Zone::Above);
@@ -218,4 +232,6 @@ TEST_SUITE("Hierarchy")
 		CHECK(Loom::Hierarchy::Place(*children[0], false, Zone::Below, children[1]) == Placement{ &scene.GetRoot(), children[2] });
 		CHECK(Loom::Hierarchy::Place(*children[1], false, Zone::Below, children[2]) == Placement{ &scene.GetRoot(), nullptr });
 	};
+
+	#pragma endregion
 };

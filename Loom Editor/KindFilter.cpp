@@ -16,9 +16,7 @@ namespace Loom
 				ImGui::GetFrameHeight());
 		};
 
-		// Moves x, how far along its line the row has come, past an icon
-		// width wide. Whether the icon starts a line, as it does when the line
-		// has no room left for it.
+		// Whether the icon starts a line, as it does when the line has no room left.
 		bool StartsLine(float& x, float width, float available)
 		{
 			const float spacing = ImGui::GetStyle().ItemSpacing.x;
@@ -77,8 +75,7 @@ namespace Loom
 			if (!shown)
 				ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 
-			// Unpadded, so the spacing between them shows, and toggled as the
-			// mouse goes down rather than up.
+			// Unpadded, and toggled on press rather than release.
 			if (ImGui::Selectable(
 				(std::string(kind.icon) + "##" + kind.name).c_str(),
 				shown,

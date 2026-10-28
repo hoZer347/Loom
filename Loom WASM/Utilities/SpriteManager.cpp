@@ -20,9 +20,7 @@
 
 namespace Loom
 {
-	// One quad, shared by every sprite: two triangles of a unit square, which the vertex
-	// shader stretches into whatever the sprite's own rect says. Loom's Mesh only feeds
-	// attribute 0, so the cell coordinates are derived from the corner rather than sent.
+	// One unit quad for every sprite; Mesh feeds only attribute 0, so cells derive from corners.
 	static const float s_quad[] =
 	{
 		-0.5f, -0.5f, 0.0f,
@@ -155,9 +153,7 @@ namespace Loom
 	{
 		if (m_program == 0)
 		{
-			// Compiled on the first draw rather than in the constructor: a component can
-			// be attached before there is a GL context to compile against, and Loom's
-			// Shader caches by path, so every sprite shares the one program.
+			// Compiled on first draw, since a component may attach before there is a GL context.
 			try
 			{
 				static Shader shader(shaderPath);
@@ -168,8 +164,7 @@ namespace Loom
 			{
 				std::cerr << "[SpriteManager] " << error.what() << std::endl;
 
-				// Left at zero so the failure is reported once per sprite rather than
-				// once per frame for the life of the program.
+				// Marked failed, so it is reported once rather than every frame.
 				m_program = ~0u;
 
 				return;

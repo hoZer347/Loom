@@ -16,6 +16,8 @@
 
 using LoomTests::Pump;
 
+#pragma region Helpers
+
 namespace
 {
 	struct StateTestIdle final : Loom::State<StateTestIdle>
@@ -82,9 +84,13 @@ namespace
 	constexpr size_t currentField = 1;
 };
 
+#pragma endregion
+
 
 TEST_SUITE("StateMachine")
 {
+	#pragma region Registration
+
 	TEST_CASE("a state machine is offered under Add Component by its own name")
 	{
 		CHECK(Loom::ComponentRegistry::All().contains("StateTestMachine"));
@@ -125,6 +131,10 @@ TEST_SUITE("StateMachine")
 		CHECK_FALSE(reference.IsSet());
 		CHECK(reference.Create() == nullptr);
 	};
+
+	#pragma endregion
+
+	#pragma region Fields
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Start and Current are the machine's first fields, written by name")
 	{
@@ -171,6 +181,10 @@ TEST_SUITE("StateMachine")
 		REQUIRE(machine != nullptr);
 		CHECK(machine->m_start->StateType() == "StateTestIdle");
 	};
+
+	#pragma endregion
+
+	#pragma region Running
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the machine starts on its first step, not when it is attached")
 	{
@@ -279,4 +293,6 @@ TEST_SUITE("StateMachine")
 
 		CHECK(patrol.machine->m_current->StateType() == "StateTestWalk");
 	};
+
+	#pragma endregion
 };

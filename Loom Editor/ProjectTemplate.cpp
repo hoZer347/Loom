@@ -31,8 +31,7 @@ namespace Loom
 library=Build/{NAME}Scripts.dll
 )";
 
-		// Every scripts project the template writes defines this, wherever it
-		// has been moved to since.
+		// Every scripts project the template writes defines this.
 		constexpr const char* script_module_define = "LOOM_SCRIPT_MODULE";
 
 		const char* const script = R"(#pragma once
@@ -114,15 +113,13 @@ namespace {NAME}Scripts
 };
 )";
 
-		// What precompiles the engine's header and forces it into every script,
-		// for the template and for a scripts project from before it did.
+		// For the template and for scripts projects from before it precompiled.
 		const char* const pch_settings = R"(      <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>Loom.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>Loom.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
 )";
 
-		// {HEADERS} is the engine's header folder as the project names it. The
-		// object is named apart from the one a script called Loom.hpp would get.
+		// Named apart from the object a script called Loom.hpp would get.
 		const char* const pch_item = R"(    <ClCompile Include="{HEADERS}\Loom.h">
       <CompileAs>CompileAsCpp</CompileAs>
       <PrecompiledHeader>Create</PrecompiledHeader>
@@ -267,8 +264,7 @@ Global
 EndGlobal
 )";
 
-		// The tabs and newlines are the scene format's syntax, so they are spelled
-		// out rather than left to whatever a raw string would preserve.
+		// Tabs and newlines are the scene format's syntax, so they are spelled out.
 		const char* const starter_scene =
 			"Main({SCENE_GUID}):\n"
 			"\tGameObject Root({ROOT_GUID})\n"
@@ -394,8 +390,6 @@ SpinningTriangle is there as a worked example.
 			return '{' + text + '}';
 		};
 
-		// The scripts project, its solution and the example script, under
-		// root's scripts folder.
 		bool WriteScripts(const std::filesystem::path& root, const std::string& name, std::string* error)
 		{
 			const std::string project = root.lexically_normal().string();
@@ -415,8 +409,7 @@ SpinningTriangle is there as a worked example.
 				Write(folder / (name + "Scripts.sln"), fill(solution), error);
 		};
 
-		// Relative to root when it can be, which keeps a project file working
-		// wherever the project is moved, and whole when it cannot.
+		// Relative when it can be, so a project file survives a move.
 		std::string PathIn(const std::filesystem::path& root, const std::filesystem::path& path)
 		{
 			const std::filesystem::path relative = path.lexically_normal().lexically_relative(root);
@@ -426,9 +419,7 @@ SpinningTriangle is there as a worked example.
 				: relative.generic_string();
 		};
 
-		// Where the build of a scripts project puts its library: its OutDir,
-		// which MSBuild reads against the project's own folder, unless that is
-		// made of macros there is no working out here.
+		// Its OutDir against the project's folder, unless that is made of macros.
 		std::filesystem::path LibraryOf(const std::filesystem::path& root, const std::filesystem::path& scripts)
 		{
 			const std::string text = ProjectAssets::ReadText(scripts.string());

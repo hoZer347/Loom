@@ -19,6 +19,8 @@
 
 using LoomTests::Pump;
 
+#pragma region Helpers
+
 namespace
 {
 	// A component with something worth writing down, registered under a name the
@@ -100,9 +102,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("SceneSerializer")
 {
+	#pragma region Writing and Reading
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an empty scene is a header and a root")
 	{
 		Loom::Scene scene("Empty");
@@ -292,6 +298,10 @@ TEST_SUITE("SceneSerializer")
 		Pump();
 	};
 
+	#pragma endregion
+
+	#pragma region Parsing
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "four spaces count as a tab")
 	{
 		const std::string text =
@@ -321,9 +331,11 @@ TEST_SUITE("SceneSerializer")
 		CHECK(loaded.scene->GetName() == "Commented");
 	};
 
-	// A scene read while a script's library has not built, then saved, as the
-	// editor does after a failed build: the script's components have to survive
-	// it, and be themselves again once the library loads.
+	#pragma endregion
+
+	#pragma region Unknown Types
+
+	// As the editor saves after a failed script build.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a component of a type not registered is written back as it was read, and is itself once the type is back")
 	{
 		std::string text;
@@ -438,6 +450,10 @@ TEST_SUITE("SceneSerializer")
 		CHECK(*marker->label == "kept");
 	};
 
+	#pragma endregion
+
+	#pragma region Transforms
+
 	// Scenes written before GameObject had a transform stop at the thread
 	// fields; they load with the default transform and nothing to complain about.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene without transform fields loads the identity transform")
@@ -533,12 +549,14 @@ TEST_SUITE("SceneSerializer")
 
 		REQUIRE(marker != nullptr);
 
-		// Neither the named line nor the one whose key is 2^64 - which wraps onto
-		// field zero, this member, if the digits are not counted first - went
-		// anywhere, so it kept its default.
+		// A key of 2^64 wraps onto field zero unless its digits are counted first.
 		CHECK(marker->weight == doctest::Approx(1.0f));
 		CHECK(*marker->label == "still read");
 	};
+
+	#pragma endregion
+
+	#pragma region Files
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a file that is not a scene is refused")
 	{
@@ -660,9 +678,7 @@ TEST_SUITE("SceneSerializer")
 		CHECK(Counted::live == 0);
 	};
 
-	// A hand-written scene file is going to have a typo in it eventually, and a
-	// typo has to be a message rather than a crash: everything built before the
-	// bad line still has deferred work pointing at it.
+	// Work deferred before the bad line still points at what it built.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a line the parser cannot read fails without taking the process with it")
 	{
 		const std::string text =
@@ -707,6 +723,10 @@ TEST_SUITE("SceneSerializer")
 		CHECK(loaded.scene == nullptr);
 	};
 
+	#pragma endregion
+
+	#pragma region Meshes
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh keeps its geometry")
 	{
 		Loom::Scene scene("Geometry");
@@ -729,6 +749,10 @@ TEST_SUITE("SceneSerializer")
 		CHECK(*read->m_vertices == *mesh->m_vertices);
 		CHECK(read->primitive_id == Loom::Mesh::Triangles);
 	};
+
+	#pragma endregion
+
+	#pragma region Pasting
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a pasted subtree is a copy with guids of its own")
 	{
@@ -833,4 +857,6 @@ TEST_SUITE("SceneSerializer")
 
 		CHECK(scene.GetRoot().GetChildren().empty());
 	};
+
+	#pragma endregion
 };

@@ -65,8 +65,7 @@ namespace Loom
 			return slots;
 		};
 
-		// Clamps the shadow sampler's reads to the map, and compares rather than
-		// returns depth: linear filtering on a compared texture is a free 2x2 PCF.
+		// Clamped and compared: linear filtering on a compared texture is a free 2x2 PCF.
 		void SetShadowSampling()
 		{
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -241,10 +240,7 @@ namespace Loom
 			glDebugMessageCallback(
 				[](GLenum, GLenum type, GLuint, GLenum severity, GLsizei, const GLchar* message, const void*)
 				{
-					// Notifications are per-buffer-upload chatter from the driver,
-					// and performance warnings are its guesses about state changes
-					// and read-backs the engine makes on purpose. Neither ever says
-					// anything actionable, and both drown out what is.
+					// Notifications and performance warnings are noise that drowns out real messages.
 					if (severity == GL_DEBUG_SEVERITY_NOTIFICATION || type == GL_DEBUG_TYPE_PERFORMANCE)
 						return;
 
@@ -404,9 +400,7 @@ namespace Loom
 		uint32_t CreateProgram(const std::string& name, const std::string& vertex, const std::string& fragment) override
 		{
 #ifdef __EMSCRIPTEN__
-			// GLSL ES gives a fragment shader no default float precision. Desktop
-			// GLSL does, so a shader written in the editor would otherwise only
-			// compile there.
+			// GLSL ES gives fragment shaders no default float precision.
 			const std::string version = "#version 300 es\nprecision highp float;\n";
 #else
 			const std::string version = "#version 460 core\n";
@@ -451,9 +445,7 @@ namespace Loom
 
 		void DeleteProgram(uint32_t program) override
 		{
-			// A program still bound outlives glDeleteProgram until it is
-			// unbound, and anything that puts the binding back afterwards (Clear
-			// does) names a program that is gone.
+			// A bound program outlives glDeleteProgram, and a restored binding would name it.
 			GLint current = 0;
 			glGetIntegerv(GL_CURRENT_PROGRAM, &current);
 
@@ -535,8 +527,7 @@ namespace Loom
 
 		void SetTexture(uint32_t program, const char* name, uint32_t texture) override
 		{
-			// Each sampler a program names gets a unit of its own, in the order
-			// they are first set.
+			// Each sampler gets its own unit, in the order first set.
 			Program& state = m_programs[program];
 			auto found = state.units.find(std::string_view(name));
 
@@ -564,8 +555,7 @@ namespace Loom
 			return found->second;
 		};
 
-		// Binds the program's textures to their units, which every program
-		// shares, as Vulkan hands each draw its program's own.
+		// Units are shared by every program, where Vulkan hands each draw its own.
 		void BindTextures(uint32_t program)
 		{
 			const auto found = m_programs.find(program);
@@ -581,8 +571,7 @@ namespace Loom
 				glActiveTexture(GL_TEXTURE0 + unit);
 				glBindTexture(GL_TEXTURE_2D, textures[unit]);
 
-				// A sampler object overrides all of a texture's sampling, a shadow
-				// map's comparison included, so shadow maps keep their own.
+				// A sampler object overrides a shadow map's comparison, so shadow maps keep their own.
 				const auto target = m_targets.find(textures[unit]);
 				const bool shadow = target != m_targets.end() && target->second.compare;
 				glBindSampler(unit, pixelated && !shadow ? m_nearest : 0);
@@ -649,8 +638,7 @@ namespace Loom
 				glDeleteBuffers(1, &vertices);
 		};
 
-		// Draws count vertices laid out as layout says from buffer, which holds
-		// them already: once, or once for each of instanceCount instances.
+		// From buffer, once or once per instance.
 		void DrawBuffer(uint32_t program, uint32_t primitive, GLuint buffer, size_t count, const VertexLayout& layout, const float* instances = nullptr, size_t instanceCount = 0)
 		{
 			constexpr GLint POSITION_COMPONENTS = 3;
@@ -662,8 +650,7 @@ namespace Loom
 			constexpr GLuint NORMAL_LOCATION = 2;
 			constexpr GLuint COLOR_LOCATION = 3;
 
-			// A divisor no instance count reaches reads the first value for
-			// every vertex of every instance.
+			// A divisor no instance count reaches reads the first value throughout.
 			constexpr GLuint PER_VERTEX = 0;
 			constexpr GLuint PER_DRAW = std::numeric_limits<GLuint>::max();
 
@@ -675,11 +662,7 @@ namespace Loom
 
 			glBindBuffer(GL_ARRAY_BUFFER, buffer);
 
-			// All left enabled after the draw: toggling them per draw has the
-			// driver recompile the vertex shader for each state. Without texture
-			// coordinates, aUV reads the position's x and y, without normals,
-			// aNormal reads m_noNormal's zeros for every vertex, and without
-			// colours, aColor reads m_noColor's white.
+			// Left enabled, since toggling per draw recompiles the vertex shader; missing ones read defaults.
 			const GLsizeiptr uvOffset = format != VertexFormat::Position ? POSITION_COMPONENTS * sizeof(float) : 0;
 			const GLsizeiptr normalOffset = (POSITION_COMPONENTS + UV_COMPONENTS) * sizeof(float);
 			const GLsizeiptr colorOffset = normalOffset + NORMAL_COMPONENTS * sizeof(float);
@@ -748,8 +731,7 @@ namespace Loom
 			else
 				DrawInstanced(primitive, count, instances, instanceCount);
 
-			// Off again, as the instances are, since the next program may read
-			// these locations as attributes of another type.
+			// Off again, since the next program may read these as another type.
 			for (const UVBinding& binding : slots)
 				glDisableVertexAttribArray(binding.location);
 
@@ -782,8 +764,7 @@ namespace Loom
 
 			glDrawArraysInstanced(primitive, 0, (GLsizei)count, (GLsizei)instanceCount);
 
-			// Off again, as WebGL refuses a draw whose enabled arrays run short of
-			// it, and these are only as long as the last batch.
+			// Off again, since WebGL refuses a draw whose enabled arrays run short.
 			for (GLuint column = 0; column < COLUMNS; column++)
 				glDisableVertexAttribArray(InstanceModelLocation + column);
 
@@ -849,8 +830,7 @@ namespace Loom
 			glBindFramebuffer(GL_FRAMEBUFFER, target.framebuffer);
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, target.texture, 0);
 
-			// Depth only: without these a framebuffer with no colour attachment is
-			// incomplete.
+			// Without these a colourless framebuffer is incomplete.
 			const GLenum none = GL_NONE;
 			glDrawBuffers(1, &none);
 			glReadBuffer(GL_NONE);
@@ -951,9 +931,7 @@ namespace Loom
 			if (depth)
 				mask |= GL_DEPTH_BUFFER_BIT;
 
-			// Not with a program bound: drivers validate it on a clear as they
-			// would on a draw, so clearing a target mid-scene, before that
-			// program's textures are set, is reported as undefined behaviour.
+			// Unbound first: drivers validate a clear like a draw, against unset textures.
 			GLint program = 0;
 			glGetIntegerv(GL_CURRENT_PROGRAM, &program);
 			glUseProgram(0);
@@ -1027,8 +1005,7 @@ namespace Loom
 				std::replace(state.textures.begin(), state.textures.end(), texture, 0u);
 		};
 
-		// Creating a texture binds it, and whatever program is in use may be
-		// sampling the one it replaces on that unit.
+		// Creating a texture binds it over what the program may be sampling.
 		static GLuint BoundTexture()
 		{
 			GLint texture = 0;
@@ -1045,8 +1022,7 @@ namespace Loom
 			return (GLuint)framebuffer;
 		};
 
-		// Creating a target binds its framebuffer, so whatever was being drawn
-		// into is bound again after.
+		// Creating a target binds its framebuffer, so the previous one is rebound after.
 		uint32_t Complete(Target& target, int width, int height, GLuint previous)
 		{
 			const bool complete = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
@@ -1089,8 +1065,7 @@ namespace Loom
 		// What DrawInstances hands its instances over in.
 		GLuint m_instances = 0;
 
-		// What CreateVertices handed out, by GL name: how many vertices each
-		// holds and how they are laid out.
+		// CreateVertices' handles by GL name: vertex count and layout.
 		struct Kept
 		{
 			size_t count = 0;
@@ -1125,9 +1100,7 @@ namespace Loom
 
 		typedef std::unordered_map<std::string, GLint, NameHash, std::equal_to<>> Locations;
 
-		// What each program has been given: where its uniforms are, the unit
-		// each sampler has and the texture set for each unit, and where it
-		// reads UV layers.
+		// Per program: uniform locations, sampler units, bound textures and UV layer reads.
 		struct Program
 		{
 			Locations locations;

@@ -26,10 +26,7 @@ namespace
 	{ };
 };
 
-// Every component is a LoomObject, and a LoomObject queues its own registration
-// on construction. So each case here pumps immediately after building one: that
-// consumes the queued work while the object is still alive, instead of leaving
-// it to fire against freed memory in a later test.
+// Each case pumps while its component lives, so queued registration never meets freed memory.
 
 
 TEST_SUITE("Component")
@@ -87,12 +84,7 @@ TEST_SUITE("Component")
 		CHECK(true);
 	};
 
-	// ComponentBase::m_gameObject has no initialiser, so an unattached component
-	// does not hold null -- it holds whatever was on the stack or in the heap
-	// block. Reading it before Attach has run is undefined, which is why this
-	// case checks the attached side of the contract instead of the unattached
-	// one. Giving m_gameObject a "= nullptr" would make "no parent yet" a
-	// question a component could actually answer.
+	// An unattached m_gameObject is uninitialised, so only the attached side is checked.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a component's parent is the GameObject that attached it")
 	{
 		Loom::Scene scene("component parent");

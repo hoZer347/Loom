@@ -34,8 +34,7 @@ namespace Loom
 	{
 		#pragma region Engine Code
 
-		// The file is source string 0 to the compiler and the engine's GLSL is
-		// 1, so nothing said about the engine's is taken for the file's.
+		// The file is source 0 and the engine's GLSL 1, so messages land on the right one.
 		constexpr int FILE_SOURCE = 0;
 		constexpr int LIBRARY_SOURCE = 1;
 
@@ -51,8 +50,7 @@ namespace Loom
 			return code.empty() ? code : LineDirective(1, LIBRARY_SOURCE) + code;
 		};
 
-		// The vertex stage of a file without one: the mesh's positions, through
-		// its transform and the camera.
+		// A file without a vertex stage gets the mesh's positions through its transform and camera.
 		constexpr const char* DEFAULT_VERTEX = R"(
 layout(location = 0) in vec3 aPos;
 
@@ -72,9 +70,7 @@ void main()
 }
 )";
 
-		// A transparent shader's shadow pass keeps its alpha's share of each
-		// 4x4 block of texels. The shadow map's filtering spans a block, so it
-		// averages them back into a shadow as dark as the alpha.
+		// A transparent shadow pass dithers alpha over 4x4 blocks, which filtering averages back.
 		constexpr const char* DITHER_LIBRARY = R"(
 const int LOOM_DITHER_SIZE = 4;
 const float LOOM_DITHER_LEVELS = 16.0;
@@ -97,8 +93,7 @@ bool LoomDitheredOut(float alpha)
 
 		#pragma region Shading
 
-		// What the shading section's vertex half reads, and the declaration it
-		// adds when the stage has not made its own.
+		// What the shading section's vertex half reads, and its declaration if missing.
 		struct ShadingInput
 		{
 			const char* name;
@@ -114,8 +109,7 @@ bool LoomDitheredOut(float alpha)
 
 		const std::regex& MainPattern()
 		{
-			// The whitespace is kept, so a main split over lines keeps the
-			// lines after it where #line numbered them.
+			// Whitespace kept, so lines after a split main keep their #line numbers.
 			static const std::regex pattern(R"(\b(void\s+)main(\s*\(\s*(?:void\s*)?\)))");
 
 			return pattern;
@@ -136,8 +130,7 @@ bool LoomDitheredOut(float alpha)
 			return std::regex_search(stage, declaration);
 		};
 
-		// The stage's own main, renamed for the engine's to call before adding
-		// its sections.
+		// The stage's main, renamed for the engine's main to call.
 		std::string WithMainRenamed(const std::string& stage, const std::string& which)
 		{
 			if (!std::regex_search(stage, MainPattern()))
@@ -159,9 +152,7 @@ bool LoomDitheredOut(float alpha)
 			if (shadows)
 				shaded += "out vec4 loom_LightSpace;\n";
 
-			// The model's inverse transpose keeps a normal square to its face
-			// however the model is stretched. A mesh without normals gives
-			// zeros, which stay zeros.
+			// The inverse transpose keeps normals square under stretching; zeros stay zeros.
 			shaded +=
 				"\nvoid main()\n{\n"
 				"\tloom_main();\n\n"
@@ -187,11 +178,7 @@ bool LoomDitheredOut(float alpha)
 			if (shadows)
 				shaded += "in vec4 loom_LightSpace;\n";
 
-			// The face's own normal comes from the surface's slope across the
-			// screen, and always faces the camera. A mesh with normals is lit by
-			// them instead, smoothly across its faces, turned to the camera's
-			// side so a sheet seen from behind is lit as its back. One without
-			// them gives zeros, and is lit flat face by face.
+			// Screen-space slope gives a flat normal facing the camera; mesh normals light smoothly instead.
 			return shaded +
 				"\nvoid main()\n{\n"
 				"\tloom_main();\n\n"
@@ -209,8 +196,7 @@ bool LoomDitheredOut(float alpha)
 			if (!std::regex_search(stage, color, ColorPattern()))
 				throw std::runtime_error("Transparency with shadows needs the fragment stage to write an out vec4 colour");
 
-			// The pass has no colour attachment, so the colour becomes a plain
-			// variable, losing any layout qualifier with its out.
+			// No colour attachment, so the output becomes a plain variable.
 			static const std::regex output(R"((?:\blayout\s*\([^)]*\)\s*)?\bout\s+(?:(?:lowp|mediump|highp)\s+)?vec4\s+(\w+)\s*;)");
 
 			const std::string withoutOutput = std::regex_replace(WithMainRenamed(stage, "fragment"), output, "vec4 $1;");
@@ -234,10 +220,7 @@ bool LoomDitheredOut(float alpha)
 			std::string fragment;
 		};
 
-		// The stages, reading the model matrix, colour and seed each draw would
-		// set from each instance, or none when the vertex stage declares no
-		// model matrix, any is declared some other way, or the fragment stage
-		// reads the model matrix.
+		// Stages reading per-draw values from instances, or none when that cannot work.
 		std::optional<InstancedStages> Instanced(const std::string& vertex, const std::string& fragment)
 		{
 			static const std::regex model(R"(\buniform\s+(?:(?:lowp|mediump|highp)\s+)?mat4\s+u_model\s*;)");
@@ -261,8 +244,7 @@ bool LoomDitheredOut(float alpha)
 				std::regex_search(fragment, readsModel))
 				return std::nullopt;
 
-			// The colour and seed are the instance's, handed on to the fragment
-			// stage unblended.
+			// Instance colour and seed pass to the fragment stage unblended.
 			stages.vertex =
 				"layout(location = " + std::to_string(Renderer::InstanceModelLocation) + ") in mat4 loom_InstanceModel;\n"
 				"layout(location = " + std::to_string(Renderer::InstanceColorLocation) + ") in vec4 loom_InstanceColorSeed;\n"
@@ -305,9 +287,7 @@ bool LoomDitheredOut(float alpha)
 
 		#pragma region Library
 
-		// A pixel pass is drawn as one quad over the view, which it reads from
-		// texel by texel. The inverse of the camera's view is worked out here
-		// rather than for each pixel.
+		// One quad over the view; the inverse view is worked out here, not per pixel.
 		constexpr const char* PIXEL_PASS_VERTEX = R"(
 layout(location = 0) in vec3 aPos;
 
@@ -326,8 +306,7 @@ void main()
 }
 )";
 
-		// What every pixel pass reads the view through. Depth is 0 at the near
-		// plane and 1 at the far, which is also where nothing was drawn.
+		// Depth is 0 at near and 1 at far, which is also where nothing was drawn.
 		constexpr const char* PIXEL_PASS_LIBRARY = R"(
 precision highp int;
 
@@ -409,8 +388,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 		#pragma region Kernels
 
-		// What each kind of kernel holds of each pixel it covers, and what
-		// reads it.
+		// What each kernel kind holds per pixel, and what reads it.
 		struct KernelKind
 		{
 			std::string_view name;
@@ -426,8 +404,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 			{ "Normal", "vec3", "normals", "LoomSceneNormal" },
 		};
 
-		// Past this a kernel reads more of the view for each pixel than a pass
-		// should.
+		// Past this a kernel reads too much of the view per pixel.
 		constexpr int MAX_KERNEL_SIZE = 15;
 
 		// Enough digits to keep a weight a float apart from the next.
@@ -495,8 +472,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 			return text;
 		};
 
-		// A row of Pascal's triangle over its sum: the binomial weights, the
-		// discrete Gaussian of that width.
+		// Binomial weights: the discrete Gaussian of that width.
 		std::vector<double> BinomialWeights(int size)
 		{
 			std::vector<double> weights(size, 1.0);
@@ -603,9 +579,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 			return library;
 		};
 
-		// The pass's fragment stage: the library ahead of its own code, and a
-		// main that fills its global kernels in for the pixel being drawn
-		// before running its own.
+		// Library, then its code, then a main that fills its kernels before running its own.
 		std::string PixelPassFragment(const std::string& stage)
 		{
 			std::smatch color;
@@ -621,15 +595,13 @@ vec3 LoomSceneNormal(ivec2 pixel)
 			for (std::sregex_iterator next(outside.begin(), outside.end(), GlobalKernelPattern()); next != std::sregex_iterator(); ++next)
 				filled += "\t" + (*next)[GLOBAL_NAME_MATCH].str() + " = Loom" + (*next)[GLOBAL_TYPE_MATCH].str() + "(loom_pixel);\n";
 
-			// The library's functions read these ahead of where the stage
-			// declares them.
+			// The library reads these before the stage declares them.
 			std::string own = WithMainRenamed(stage, "pixel pass");
 
 			for (const char* uniform : PIXEL_PASS_UNIFORMS)
 				own = std::regex_replace(own, std::regex(R"(\buniform\s+(?:(?:lowp|mediump|highp)\s+)?\w+\s+)" + std::string(uniform) + R"(\s*;)"), "");
 
-			// What the pass draws is the view's final colour, which nothing is
-			// seen through.
+			// The pass draws the view's final colour, so nothing is seen through.
 			return EngineCode(PixelPassLibrary(code)) + own + '\n' + LineDirective(1, LIBRARY_SOURCE) +
 				"\nvoid main()\n{\n"
 				"\tivec2 loom_pixel = LoomScreenPixel();\n" +
@@ -689,8 +661,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 				if (std::regex_match(message.text, place, PlacePattern()))
 				{
-					// A warning about the engine's GLSL is nothing the file can do
-					// anything about.
+					// Warnings about the engine's GLSL are nothing the file can fix.
 					if (std::stoi(place[1]) != FILE_SOURCE && !message.error)
 						continue;
 
@@ -847,8 +818,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 	{
 		#pragma region UV Layers
 
-		// A scalar type a UV layer's field can be, the vectors of it, and how
-		// one of the layer's words reads as it.
+		// A UV layer field's scalar type, its vectors, and how a word reads as it.
 		struct UVScalar
 		{
 			std::string_view name;
@@ -870,26 +840,20 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 		static_assert(SWIZZLE.size() == Renderer::WordsPerUVLocation);
 
-		// A vertex stage's UV_<id> declarations, each turned into the
-		// attributes loom_UV_<id>_<slot> at the locations from
-		// Renderer::UVLayerLocation on, and a UV_<id> that reads them as the
-		// declared types, in a struct loom_UVLayer<id> when they are named.
+		// A vertex stage's UV_<id> declarations, expanded to loom_UV_<id>_<slot> attributes.
 		struct UVDeclarations
 		{
 			uint32_t nextLocation = Renderer::UVLayerLocation;
 			std::unordered_set<uint32_t> declared;
 
-			// UV_<id><type name, ...>; with a name for every type, read as a
-			// struct, or UV_<id><type>; read as the type itself.
+			// UV_<id><type name, ...>; as a struct, or UV_<id><type>; as the type.
 			static const std::regex& Pattern()
 			{
 				static const std::regex pattern(R"(^\s*UV_(\d+)\s*<([^>]*)>\s*;\s*(?://.*)?$)");
 				return pattern;
 			};
 
-			// The GLSL for the declaration on the line, or nullopt when the
-			// line is not one. Throws std::runtime_error for one that is
-			// wrong.
+			// The declaration's GLSL, nullopt if none; throws std::runtime_error when malformed.
 			std::optional<std::string> Expand(const std::string& line, size_t number)
 			{
 				std::smatch match;
@@ -1009,8 +973,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 				if (!named)
 					return code + "#define UV_" + std::to_string(id) + ' ' + reads.front() + '\n';
 
-				// Chrome's ANGLE on Direct3D fails to draw with a struct named
-				// as the start of an attribute's name, so the struct has its own.
+				// Chrome's ANGLE cannot draw with a struct name prefixing an attribute's.
 				const std::string type = "loom_UVLayer" + std::to_string(id);
 
 				code += "struct " + type + " {";
@@ -1043,8 +1006,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 		size_t number = 0;
 
-		// Each section starts on the file's own line number, so what the
-		// compiler says about a line of a stage is about that line of the file.
+		// Sections start on the file's line numbers, so errors point at the file.
 		for (std::string line; std::getline(lines, line);)
 		{
 			number++;
@@ -1102,8 +1064,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 			stages.shadowFragment = settings.transparency ? TransparentShadowFragment(fragment) : common + EngineCode(SHADOW_FRAGMENT);
 		};
 
-		// The engine's GLSL goes first, so a shader's own COMMON block (its
-		// precision statements included) has the last word.
+		// Engine GLSL first, so the shader's own COMMON has the last word.
 		for (std::string* stage : { &stages.vertex, &stages.shadowVertex })
 			if (!stage->empty())
 				*stage = EngineCode(Light::VertexLibrary(*stage)) + *stage;
@@ -1168,8 +1129,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		if (stages.settings.shadows)
 			programs.shadowInstanced = CreateIfCompiles(*renderer, name + SHADOW_PROGRAM_SUFFIX + INSTANCED_PROGRAM_SUFFIX, Instanced(stages.shadowVertex, stages.shadowFragment));
 
-		// After the programs, so a reload that fails leaves these describing
-		// the ones still in use.
+		// After the programs, so a failed reload leaves these matching the ones in use.
 		variables = ParseShaderVariables(text);
 		shaders[name] = programs;
 
@@ -1263,8 +1223,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		while (!fetchComplete)
 			emscripten_sleep(pollMilliseconds);
 
-		// Thrown like a file that will not open, so a Material or a reload
-		// reports it once, with the path.
+		// Thrown like an unopenable file, so it is reported once with the path.
 		if (shader_source.empty())
 			throw std::runtime_error("fetched nothing");
 	};

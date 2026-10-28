@@ -110,9 +110,7 @@ TEST_SUITE("TextFit")
 	{
 		Measuring measuring;
 
-		// What the font has no glyph for, the stray bytes of a cut character
-		// among them, narrower than é, so a tail starting inside é would fit
-		// where é itself does not.
+		// Narrower than the fallback glyph, so a tail cut inside a character still fits.
 		constexpr float narrow_fallback = 1.0f;
 		ImGui::GetFontBaked()->FallbackAdvanceX = narrow_fallback;
 

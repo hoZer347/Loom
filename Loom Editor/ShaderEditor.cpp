@@ -2,8 +2,7 @@
 
 #include "EditorIcons.h"
 
-// The editor only runs on Windows, but the web test build compiles this too,
-// and glslang is desktop only.
+// The web test build compiles this too, and glslang is desktop only.
 #ifndef __EMSCRIPTEN__
 
 #include "EditorTheme.h"

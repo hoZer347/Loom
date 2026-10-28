@@ -24,6 +24,8 @@
 using LoomTests::Pump;
 
 
+#pragma region Helpers
+
 namespace
 {
 	// Steps a second takes, and how close a resting body has to settle.
@@ -120,9 +122,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("Rigidbody")
 {
+	#pragma region Settings
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "drag below none is taken as none")
 	{
 		Loom::Scene scene("dragging");
@@ -165,6 +171,10 @@ TEST_SUITE("Rigidbody")
 
 		CHECK(dynamic_cast<Loom::Rigidbody*>(created) != nullptr);
 	};
+
+	#pragma endregion
+
+	#pragma region Falling and Resting
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a body falls under gravity, and a kinematic one does not")
 	{
@@ -234,6 +244,10 @@ TEST_SUITE("Rigidbody")
 		CHECK(std::abs(top.x) < DRIFT);
 		CHECK(std::abs(top.z) < DRIFT);
 	};
+
+	#pragma endregion
+
+	#pragma region Bouncing and Friction
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a bouncy ball bounces back nearly as high")
 	{
@@ -323,6 +337,10 @@ TEST_SUITE("Rigidbody")
 		CHECK(smooth->velocity.x == doctest::Approx(SPEED).epsilon(CLOSE));
 	};
 
+	#pragma endregion
+
+	#pragma region Fast Bodies
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a fast small ball cannot pass through a thin box or a mesh between steps")
 	{
 		// Several times its own size, and the floor's thickness, every step.
@@ -405,6 +423,10 @@ TEST_SUITE("Rigidbody")
 			CHECK(Position(*ball).y == doctest::Approx(SMALL).epsilon(REST));
 		};
 	};
+
+	#pragma endregion
+
+	#pragma region Contacts
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a kinematic body pushes others aside and is not pushed back")
 	{
@@ -509,6 +531,10 @@ TEST_SUITE("Rigidbody")
 		CHECK(zoneToucher->Count("enter") == 0);
 	};
 
+	#pragma endregion
+
+	#pragma region Sleep
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a body at rest falls asleep and wakes when something lands on it")
 	{
 		Loom::Scene scene("sleeping");
@@ -588,6 +614,10 @@ TEST_SUITE("Rigidbody")
 		CHECK(Position(*sleeper).x == doctest::Approx(pushed).epsilon(STILL));
 		CHECK(Position(*sleeper).x > Position(*pusher).x + 1.0f - STILL);
 	};
+
+	#pragma endregion
+
+	#pragma region Forces
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a body turned by its script past ninety degrees keeps the turn it was given")
 	{
@@ -699,6 +729,10 @@ TEST_SUITE("Rigidbody")
 		CHECK(std::abs(body->angularVelocity.y) < CLOSE);
 	};
 
+	#pragma endregion
+
+	#pragma region Parents
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a collider attached after its Rigidbody moves with it from the first step")
 	{
 		Loom::Scene scene("rigidbody first");
@@ -759,6 +793,10 @@ TEST_SUITE("Rigidbody")
 
 		CHECK(*off->transform.position == glm::vec3(-5.0f, 3.0f, 0.0f));
 	};
+
+	#pragma endregion
+
+	#pragma region Threads
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a pile ends up the same however many threads share its steps")
 	{
@@ -995,4 +1033,6 @@ TEST_SUITE("Rigidbody")
 		const std::vector<Loom::Scene*>& scenes = Loom::Scene::GetScenes();
 		CHECK(std::find(scenes.begin(), scenes.end(), scene) == scenes.end());
 	};
+
+	#pragma endregion
 };

@@ -41,14 +41,10 @@ namespace Loom
 			return text.substr(first, text.find_last_not_of(" \t\r\n") - first + 1);
 		};
 
-		// The key on a field line: the position of the Serial member it belongs
-		// to, and nothing else, so a typo is a bad file rather than a value
-		// quietly landing on field zero.
+		// A field key is the member's position only, so a typo is a bad file.
 		bool Index(const std::string& text, size_t& index)
 		{
-			// No object has ten thousand fields, and a longer run of digits than
-			// that wraps size_t back into the range of one that does: 2^64 comes
-			// out as field zero.
+			// More than four digits could wrap size_t back to a real field.
 			if (text.empty() || text.size() > 4)
 				return false;
 
@@ -69,9 +65,7 @@ namespace Loom
 
 		#pragma region Writing
 
-		// What identifies a field is where its Serial member was declared, so
-		// that is what goes in the file. One the object does not save is left
-		// out, and the rest keep their numbers.
+		// Keyed by declaration order; unsaved fields are skipped and the rest keep their numbers.
 		void WriteFields(std::string& text, const LoomObject& object, int depth)
 		{
 			const std::vector<SerializedField>& fields = object.GetFields();
@@ -123,8 +117,7 @@ namespace Loom
 
 		#pragma region Reading
 
-		// The component registered under type, or until something registers
-		// it, one keeping its place.
+		// The registered component, or a placeholder keeping its place until one registers.
 		ComponentBase* Make(const std::string& type, GameObject& gameObject)
 		{
 			if (ComponentBase* component = ComponentRegistry::Create(type, gameObject))
@@ -138,8 +131,7 @@ namespace Loom
 			return { Trim(content.substr(0, equals)), Trim(content.substr(equals + 1)) };
 		};
 
-		// A field line read onto object in place: left alone when it already
-		// reads that way, and a reference by guid handed to pending.
+		// Left alone when unchanged; a guid reference goes to pending.
 		void ReadOwnField(LoomObject& object, const std::string& content, SceneSerializer::PendingReferences& pending)
 		{
 			const size_t equals = content.find('=');
@@ -162,8 +154,7 @@ namespace Loom
 				object.OnFieldChanged(field);
 		};
 
-		// A component has no name of its own, so the type is what identifies it
-		// in a message about one.
+		// A component has no name, so its type identifies it in messages.
 		std::string Describe(LoomObject& object)
 		{
 			ComponentBase* component = dynamic_cast<ComponentBase*>(&object);
@@ -173,16 +164,14 @@ namespace Loom
 				: object.GetName();
 		};
 
-		// One entry per indentation level: what that level introduced, so the
-		// next line down knows what it belongs to.
+		// What each indentation level introduced, for the lines under it.
 		struct Level
 		{
 			LoomObject* object = nullptr;
 			GameObject* gameObject = nullptr;
 		};
 
-		// Walks text a line at a time from wherever it last stopped, handing out
-		// each line that carries something to read with how deep it sits.
+		// Walks text a line at a time, with each line's depth.
 		struct LineCursor
 		{
 			const std::string* text = nullptr;
@@ -211,7 +200,6 @@ namespace Loom
 			};
 		};
 
-		// Hands each line that carries something to read, with how deep it sits.
 		// Stops at the first line read turns down.
 		bool ReadLines(
 			const std::string& text,
@@ -239,23 +227,19 @@ namespace Loom
 
 		#pragma region Reader
 
-		// Builds objects from the lines under a header. A scene and a pasted
-		// subtree differ only in what a GameObject one level down becomes.
+		// A scene and a pasted subtree differ only in what a nested GameObject becomes.
 		struct Reader
 		{
 			std::vector<Level> levels{ };
 
 			std::function<GameObject*(const std::string& name)> top_level;
 
-			// Pasted objects are handed new guids, so a second paste of the same
-			// text does not take the first one's identity. A reference into the
-			// pasted objects follows them to their new guid.
+			// Pasted objects take new guids, and references into them follow.
 			std::unordered_map<Guid, Guid> fresh{ };
 
 			std::string error{ };
 
-			// References are written as guids, and the object a guid names may
-			// not have been built yet when the line mentioning it is read.
+			// A referenced guid may not be built yet when it is read.
 			SceneSerializer::PendingReferences pending{ };
 
 			bool Read(int depth, const std::string& content)
@@ -330,8 +314,7 @@ namespace Loom
 				if (parent.object == nullptr)
 					return true;
 
-				// Kept as text, with a guid among the pasted objects following
-				// its object as a reference would.
+				// Kept as text, with pasted guids followed as references are.
 				if (MissingComponent* missing = dynamic_cast<MissingComponent*>(parent.object))
 				{
 					MissingComponent::Line& line = missing->lines.emplace_back(LineOf(content, equals));
@@ -348,9 +331,7 @@ namespace Loom
 
 				size_t index = 0;
 
-				// Not an index at all: a typo, or a file from when fields were keyed
-				// by member name. Skipped like a field the type no longer has, so
-				// the rest of the scene still loads.
+				// Not an index, such as a typo or an old name key: skipped so the rest still loads.
 				if (!Index(key, index))
 				{
 					std::cerr
@@ -362,8 +343,7 @@ namespace Loom
 
 				const std::vector<SerializedField>& fields = parent.object->GetFields();
 
-				// A type that has lost a field since this was written, or never had
-				// one this far along: the line has nowhere to go.
+				// A field the type no longer has.
 				if (index >= fields.size())
 				{
 					std::cerr
@@ -385,8 +365,7 @@ namespace Loom
 				if (field->Read(value))
 					return true;
 
-				// A reference that did not resolve is not a bad line; the object it
-				// names may still be further down the text.
+				// Unresolved is not bad, since the target may be further down.
 				if (names_guid)
 				{
 					pending.emplace_back(field, Identity(guid));
@@ -536,8 +515,7 @@ namespace Loom
 
 	#pragma region Loading
 
-	// Everything a scene being read needs to pick up where the last slice left
-	// off. The text is either its own or one the caller keeps alive.
+	// What a sliced read needs to resume; the text is owned or kept alive by the caller.
 	struct SceneSerializer::Loading::State
 	{
 		std::string owned{ };
@@ -638,16 +616,14 @@ namespace Loom
 				reason = "scene header is missing a valid guid";
 			else
 			{
-				// Kept out of the open scenes until it is whole, so nothing
-				// draws, saves or edits it halfway.
+				// Kept out of the open scenes until whole.
 				scene = new Scene(name);
 				scene->SetGuid(guid);
 				Scene::Unlist(scene);
 
 				reader.levels.assign(1, Level{ scene, nullptr });
 
-				// The first GameObject in the file is the scene's own root,
-				// which already exists; everything else hangs off one.
+				// The first GameObject is the scene's existing root.
 				reader.top_level =
 					[this](const std::string& child)
 					{
@@ -663,10 +639,7 @@ namespace Loom
 			return reason.empty();
 		};
 
-		// Everything built so far has work queued against it: a child waiting
-		// to be linked to its parent, a component waiting for OnAttach. That
-		// work has to land before the objects go, or it lands on freed memory,
-		// so the scene goes behind it in the queue.
+		// Queued work still points at what was built, so the scene is freed behind it.
 		void Discard()
 		{
 			if (scene == nullptr)
@@ -750,8 +723,7 @@ namespace Loom
 		std::vector<GameObject*> built{ };
 		Reader reader;
 
-		// The text's top level sits one under the parent, which is not the
-		// text's to put fields on.
+		// The top level sits under parent, which takes no fields from the text.
 		reader.levels.assign(1, Level{ });
 
 		reader.top_level =
@@ -763,8 +735,7 @@ namespace Loom
 
 		int line_number = 0;
 
-		// Every new guid is decided before the first line is read, since a
-		// reference can name an object further down.
+		// New guids are all decided first, since a reference can point further down.
 		ReadLines(
 			text,
 			line_number,
@@ -802,8 +773,7 @@ namespace Loom
 				? std::string("there is no GameObject in it")
 				: "line " + std::to_string(line_number) + ": " + reader.error;
 
-		// Queued behind the links AddChild queued, so each lands on a child
-		// that is in place.
+		// Queued behind AddChild's links, so each child is in place.
 		for (GameObject* gameObject : built)
 			gameObject->Destroy();
 

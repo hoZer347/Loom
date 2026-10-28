@@ -3,10 +3,7 @@
 
 namespace Loom
 {
-	// "&health, &attack" -> "health", "attack". The expressions HOZER_ATTRIBUTES is given
-	// are addresses of members, so the leading & and any surrounding space is decoration.
-	// A qualified expression (&this->health, &m_stats.health) keeps only its last hop,
-	// which is the part a readout wants to print.
+	// Strips the & and spacing, and keeps a qualified expression's last hop.
 	static std::string CleanName(const std::string& raw)
 	{
 		size_t begin = 0;
@@ -41,8 +38,7 @@ namespace Loom
 		std::vector<std::string> split;
 		std::string current;
 
-		// Split on top-level commas only, so a templated expression -- &get<int, float>()
-		// -- is one argument rather than two. Nothing else in the argument list nests.
+		// Top-level commas only, so a templated expression stays one argument.
 		int depth = 0;
 
 		for (const char c : list)

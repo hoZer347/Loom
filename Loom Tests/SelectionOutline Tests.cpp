@@ -20,6 +20,8 @@ using LoomTests::Pump;
 using LoomTests::RecordingRenderer;
 
 
+#pragma region Helpers
+
 namespace
 {
 	constexpr const char* MESH_MASK = "Loom Editor Mesh Mask: ";
@@ -44,9 +46,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("SelectionOutline")
 {
+	#pragma region Masks
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a selection is drawn into a mask the size of the view, children and all, then ringed once over the view")
 	{
 		RecordingRenderer renderer;
@@ -169,6 +175,10 @@ TEST_SUITE("SelectionOutline")
 		CHECK(renderer.drawnInto == std::vector<uint32_t>{ Mask(renderer), RecordingRenderer::WINDOW });
 	};
 
+	#pragma endregion
+
+	#pragma region Edges
+
 #ifndef __EMSCRIPTEN__
 	TEST_CASE_FIXTURE(LoomTests::RenderFixture, "a selection running off the view is ringed along the view's edge where it leaves, and nowhere else along it")
 	{
@@ -228,4 +238,6 @@ TEST_SUITE("SelectionOutline")
 		CHECK_FALSE(ringed(image.At(cut / 2, middle)));
 	};
 #endif
+
+	#pragma endregion
 };

@@ -67,8 +67,7 @@ namespace Loom
 		if (file_path.empty())
 			return 0;
 
-		// The disk is only asked about a path that has not loaded. What has
-		// is kept as its Texture, whose handle a reload replaces.
+		// Only unloaded paths hit the disk; a reload replaces the kept Texture's handle.
 		static std::unordered_map<std::string, const Texture*> loaded;
 		static std::unordered_map<std::string, std::filesystem::file_time_type> failed;
 

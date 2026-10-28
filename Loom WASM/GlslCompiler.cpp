@@ -18,10 +18,7 @@ namespace Loom::Glsl
 
 		const char* const VERSION_LINE = "#version 460 core\n";
 
-		// The window is drawn with a flipped viewport, so its rows come out top
-		// first while clip space keeps GL's y up. That reverses screen space y,
-		// which dFdy would show; this puts it back. #line keeps the compiler's
-		// line numbers where GL's would be.
+		// Undoes the flipped viewport's reversal of screen y; #line keeps GL's line numbers.
 		const char* const FRAGMENT_PRELUDE =
 			"layout(constant_id = 0) const float loom_FlipY = 1.0;\n"
 			"#define dFdy(p) (loom_FlipY * dFdy(p))\n"

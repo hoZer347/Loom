@@ -11,11 +11,10 @@
 #include <cmath>
 
 using LoomTests::Pump;
+using LoomTests::EPSILON;
 
 namespace
 {
-	constexpr float EPSILON = 1e-4f;
-
 	constexpr int fly_frames = 30;
 	constexpr float pan_pixels = 10.0f;
 

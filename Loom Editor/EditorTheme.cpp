@@ -97,8 +97,7 @@ namespace Loom
 
 		ImFont* codeFont = nullptr;
 
-		// ImGui's built-in ProggyClean, itself monospaced, stands in for a
-		// missing file.
+		// ImGui's monospaced ProggyClean stands in for a missing file.
 		ImFont* AddFont(const std::string& file, float size)
 		{
 			ImFontAtlas& atlas = *ImGui::GetIO().Fonts;
@@ -132,8 +131,7 @@ namespace Loom
 			return path;
 		};
 
-		// ImGui draws it in the text colour, having no colour glyphs without
-		// FreeType.
+		// Without FreeType ImGui has no colour glyphs.
 		void AddEmoji(float size)
 		{
 			const std::filesystem::path path = EmojiFont();
@@ -208,8 +206,7 @@ namespace Loom
 		style.GrabMinSize = GrabMinSize;
 		style.DockingSeparatorSize = DockingSeparatorSize;
 
-		// Square panels, since nearly all of them are docked edge to edge, and
-		// rounded controls inside them.
+		// Square panels, since nearly all are docked edge to edge.
 		style.WindowRounding = 0.0f;
 		style.ChildRounding = ControlRounding;
 		style.FrameRounding = ControlRounding;

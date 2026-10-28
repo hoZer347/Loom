@@ -66,8 +66,7 @@ namespace Loom
 
 		DeleteProcThreadAttributeList(startup.lpAttributeList);
 
-		// The child holds its own copy now; with this one gone, the read end
-		// sees the end of the pipe once the child and everything it started exit.
+		// With this handle gone, the pipe ends once the child and its children exit.
 		CloseHandle(write);
 
 		if (!ok)

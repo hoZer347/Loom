@@ -36,9 +36,7 @@ namespace
 
 TEST_SUITE("Threading")
 {
-	// Each thread waits to see every other one arrive. That only finishes if
-	// they are all running at once: threads run one after another on a single
-	// core, or queued behind a pool with no workers, time out instead.
+	// Only threads running at once all see each other arrive.
 	TEST_CASE("threads run at the same time")
 	{
 		std::atomic<int> arrived = 0;
@@ -109,9 +107,7 @@ TEST_SUITE("Threading")
 		};
 	};
 
-	// A Serial member finds its owner through whichever object's constructor
-	// last started on its own thread. Objects built side by side on different
-	// threads must each end up with their own fields, pointing into themselves.
+	// A Serial member finds its owner through the last constructor started on its thread.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "objects built on other threads keep their own fields")
 	{
 		constexpr int per_thread = 100;

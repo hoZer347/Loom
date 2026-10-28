@@ -148,9 +148,7 @@ namespace Loom
 			return name;
 		};
 
-		// Clang and gcc give the mangled form instead: "N4Loom4MeshE", or
-		// "7Example" for a type outside any namespace. Each piece is its own
-		// length followed by its characters, and the last piece is the type.
+		// Clang and gcc mangle it, as in "N4Loom4MeshE": length-prefixed pieces, the type last.
 		size_t at = name.rfind('N', 0) == 0 ? 1 : 0;
 
 		std::string last;

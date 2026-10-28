@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+#pragma region Helpers
+
 namespace
 {
 	constexpr const char* window = "Layout Test Window";
@@ -69,8 +71,12 @@ namespace
 	};
 };
 
+#pragma endregion
+
 TEST_SUITE("EditorLayouts")
 {
+	#pragma region Names
+
 	TEST_CASE("names are file names: letters, digits, spaces, _ and -, no space at either end")
 	{
 		CHECK(Loom::EditorLayouts::IsValidName("Wide Scene"));
@@ -103,6 +109,10 @@ TEST_SUITE("EditorLayouts")
 		CHECK(Loom::EditorLayouts::SameName("Alpha", "aLPHA"));
 		CHECK_FALSE(Loom::EditorLayouts::SameName("Alpha", "Alphas"));
 	};
+
+	#pragma endregion
+
+	#pragma region Loading and Saving
 
 	TEST_CASE("loading names the windows the layout has a place for")
 	{
@@ -254,4 +264,6 @@ TEST_SUITE("EditorLayouts")
 		CHECK(Loom::EditorLayouts::Names(driven.folder).empty());
 		CHECK_FALSE(Loom::EditorLayouts::Delete(driven.folder, "Gone"));
 	};
+
+	#pragma endregion
 };

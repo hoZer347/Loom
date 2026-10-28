@@ -17,9 +17,7 @@ namespace Loom
 		// At most this many triangles are tested one by one rather than split.
 		constexpr uint32_t LEAF_TRIANGLES = 4;
 
-		// Splitting at the median halves every branch, so the tree is never
-		// deeper than log2 of its triangles: far below this for any mesh that
-		// fits in memory.
+		// Median splits keep depth near log2 of the triangles, far below this.
 		constexpr size_t MOST_DEPTH = 64;
 
 		constexpr uint32_t BOX_CORNERS = 8;
@@ -130,8 +128,7 @@ namespace Loom
 			for (uint32_t corner = 0; corner < CORNERS; corner++)
 				m_posed[i].corners[corner] = glm::vec3(world * glm::vec4(m_triangles[i].corners[corner], 1.0f));
 
-		// A branch's children come after it, so from the back each node's
-		// are boxed before it is.
+		// Children follow their branch, so from the back each node's are boxed first.
 		m_posedBounds.resize(m_nodes.size());
 
 		for (size_t i = m_nodes.size(); i-- > 0; )
@@ -178,8 +175,7 @@ namespace Loom
 				continue;
 			};
 
-			// Only those whose own boxes reach near: a leaf's box covers
-			// several, and testing one against a shape costs far more.
+			// Only those whose own boxes reach near, since a shape test costs far more.
 			for (uint32_t i = node.first; i < node.first + node.count; i++)
 			{
 				const glm::vec3* posed = m_posed[i].corners;

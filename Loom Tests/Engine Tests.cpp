@@ -14,6 +14,8 @@ using LoomTests::Pump;
 
 TEST_SUITE("Engine")
 {
+	#pragma region Unique IDs
+
 	// Engine's constructor opens a window and a renderer, so these cover the
 	// static half of Engine that a host can reach without one.
 	TEST_CASE("an unstarted engine reports itself as not running")
@@ -62,6 +64,10 @@ TEST_SUITE("Engine")
 	};
 #endif
 
+	#pragma endregion
+
+	#pragma region Tasks
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "QueueTask defers work until DoTasks runs it")
 	{
 		bool ran = false;
@@ -87,9 +93,7 @@ TEST_SUITE("Engine")
 		CHECK(order == std::vector<int>{ 0, 1, 2, 3, 4 });
 	};
 
-	// Attaching a component from inside OnAttach is normal, so work queued
-	// during a drain has to be picked up by that same drain rather than being
-	// left for the next frame.
+	// Attaching from OnAttach queues work the same drain has to run.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a task may queue more work and still see it run")
 	{
 		std::vector<int> order;
@@ -130,6 +134,10 @@ TEST_SUITE("Engine")
 		CHECK(captured.Says("Queued task threw: task blew up"));
 	};
 
+	#pragma endregion
+
+	#pragma region Frame Loop
+
 	TEST_CASE("the frame loop defaults have the engine driving its own scenes")
 	{
 		CHECK(Loom::Engine::doGUI);
@@ -169,11 +177,7 @@ TEST_SUITE("Engine")
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "SetUpdateFunction registers a per-frame callback")
 	{
-		// onUpdate is only invoked from renderFrame, which needs a context, so
-		// this covers the registration path rather than the call. Note that
-		// renderFrame calls onUpdate unconditionally: handing it an empty Task
-		// would throw std::bad_function_call on the next frame, so a host that
-		// wants to stop updating has to install a no-op, not an empty one.
+		// onUpdate runs only from renderFrame, which needs a context, so this checks registration.
 		bool called = false;
 
 		Loom::Engine::SetUpdateFunction([&called]() { called = true; });
@@ -224,4 +228,6 @@ TEST_SUITE("Engine")
 		CHECK(Loom::Engine::Crop({ width, 0, 1, 1 }, cutWidth, cutHeight, rgb).empty());
 		CHECK(cutWidth == 0);
 	};
+
+	#pragma endregion
 };

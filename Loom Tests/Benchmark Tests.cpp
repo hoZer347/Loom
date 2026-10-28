@@ -24,12 +24,11 @@
 using LoomTests::Pump;
 
 
+#pragma region Helpers
+
 namespace
 {
-	// The Profiling demo's Crowd scene, as Benchmarks/Unity Crowd builds it in
-	// Unity, so the two can be timed against each other; every number here
-	// matches one there, and so does every body, drawn from the same
-	// generator in the same order. run-physics-benchmark.ps1 runs both.
+	// Matches Benchmarks/Unity Crowd number for number, so the two time alike.
 	constexpr int COUNT = 1500;
 	constexpr int STEPS = 1200;
 	constexpr uint32_t SEED = 1;
@@ -256,6 +255,8 @@ namespace
 		return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
 	};
 };
+
+#pragma endregion
 
 
 TEST_SUITE("Benchmark" * doctest::skip())

@@ -11,6 +11,8 @@
 
 // A final build records no stages, so there is nothing to look at.
 #ifndef LOOM_FINAL
+#pragma region Helpers
+
 namespace
 {
 	constexpr std::chrono::milliseconds BUSY_FOR{ 2 };
@@ -68,8 +70,12 @@ namespace
 	};
 };
 
+#pragma endregion
+
 TEST_SUITE("Profiler")
 {
+	#pragma region Stages
+
 	TEST_CASE_FIXTURE(NewFrame, "a stage's parts follow it one deeper, in the order they began")
 	{
 		{
@@ -227,6 +233,10 @@ TEST_SUITE("Profiler")
 		Loom::Profiler::EndFrame();
 	};
 
+	#pragma endregion
+
+	#pragma region Recording
+
 	TEST_CASE_FIXTURE(NewFrame, "nothing is recorded while recording is off, and what was is forgotten")
 	{
 		{
@@ -381,6 +391,10 @@ TEST_SUITE("Profiler")
 		CHECK(share < half + tolerance);
 	};
 
+	#pragma endregion
+
+	#pragma region Workers
+
 	TEST_CASE_FIXTURE(NewFrame, "a worker's share of a For counts towards the stage it was started in")
 	{
 		if (Loom::Jobs::Threads() < 2)
@@ -406,5 +420,7 @@ TEST_SUITE("Profiler")
 		CHECK(worker.thread->rows[worker.row].depth == 0);
 		CHECK(worker.thread->rows[worker.row].peak > 0.0);
 	};
+
+	#pragma endregion
 };
 #endif

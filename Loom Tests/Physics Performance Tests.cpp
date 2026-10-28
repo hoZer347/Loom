@@ -23,6 +23,8 @@
 using LoomTests::Pump;
 
 
+#pragma region Helpers
+
 namespace
 {
 	// Room each collider gets on average, so a scene of any size is as
@@ -201,8 +203,13 @@ namespace
 
 // Timed against the clock and long under node, so they run once a day from daily-performance.ps1
 // rather than with every change.
+
+#pragma endregion
+
 TEST_SUITE("Performance" * doctest::skip())
 {
+	#pragma region Raycasts
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene of twenty thousand colliders answers a raycast far faster than testing every one")
 	{
 		constexpr int COUNT = 20000;
@@ -276,10 +283,7 @@ TEST_SUITE("Performance" * doctest::skip())
 		constexpr int RAYS = 1000;
 		constexpr unsigned SEED = 5;
 
-		// Sixteen times the colliders adds four levels to a balanced tree, so
-		// a ray's cost should grow by a small amount. Testing every collider
-		// would make it sixteen times; this allows plenty of noise between the
-		// two.
+		// Sixteen times the colliders adds four tree levels, so the cost grows far less than sixteen times.
 		constexpr double MOST_GROWTH = 6.0;
 
 		double few = 0.0;
@@ -304,6 +308,8 @@ TEST_SUITE("Performance" * doctest::skip())
 
 		CHECK(many / few <= MOST_GROWTH);
 	};
+
+	#pragma endregion
 };
 
 
@@ -329,9 +335,7 @@ TEST_SUITE("PhysicsPiles")
 		// Small enough that, turned any way, it still fits its cell.
 		constexpr float LARGEST = 0.9f;
 
-		// How many may still be stirring by the end: balls still rolling to a
-		// stop, and what they wake as they leave it. A pile that never
-		// settles keeps them all awake.
+		// Balls still rolling may stay awake; a pile that never settles keeps them all.
 		constexpr int MOST_AWAKE = COUNT / 2;
 
 		// Nothing slows a ball rolling on a floor, here as in Unity, so a

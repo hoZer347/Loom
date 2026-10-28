@@ -23,6 +23,8 @@
 
 using LoomTests::Pump;
 
+#pragma region Helpers
+
 namespace
 {
 	constexpr int SCREEN_WIDTH = 800;
@@ -110,9 +112,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("Ui")
 {
+	#pragma region Layout
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the UI components are built in, and the editor can add them by name")
 	{
 		Loom::Scene scene("ui by name");
@@ -180,6 +186,10 @@ TEST_SUITE("Ui")
 		CHECK(Middle(itemRect).x == doctest::Approx(Middle(panelRect).x));
 		CHECK(Middle(itemRect).y == doctest::Approx(Middle(panelRect).y));
 	};
+
+	#pragma endregion
+
+	#pragma region Drawing
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the UI of every scene in a view is drawn once they all are, over cleared depth, all at one depth")
 	{
@@ -261,6 +271,10 @@ TEST_SUITE("Ui")
 
 		CHECK(Loom::Ui::IsPointerOver());
 	};
+
+	#pragma endregion
+
+	#pragma region Buttons
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a button is hovered and clicked only while the cursor is on its rect")
 	{
@@ -435,6 +449,10 @@ TEST_SUITE("Ui")
 		Settle();
 	};
 
+	#pragma endregion
+
+	#pragma region Images
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a rect with an image is filled through it, the right way up")
 	{
 		const std::vector<uint8_t> pixels(IMAGE_SIDE * IMAGE_SIDE * RGBA, FULL);
@@ -539,6 +557,10 @@ TEST_SUITE("Ui")
 		CHECK(renderer.textures["u_texture"] == image->handle);
 	};
 
+	#pragma endregion
+
+	#pragma region Pointer
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the cursor on a button's label is on the button, which the click goes to")
 	{
 		Settle();
@@ -631,6 +653,10 @@ TEST_SUITE("Ui")
 
 		CHECK_FALSE(Loom::Ui::IsPointerOver());
 	};
+
+	#pragma endregion
+
+	#pragma region Text
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a file that is not a font, or too short to be one, is no font")
 	{
@@ -1003,4 +1029,6 @@ TEST_SUITE("Ui")
 		CHECK_FALSE(destroyed(usedAtlas));
 	};
 #endif
+
+	#pragma endregion
 };

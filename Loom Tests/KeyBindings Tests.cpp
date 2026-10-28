@@ -17,6 +17,8 @@
 #include <string>
 #include <vector>
 
+#pragma region Helpers
+
 namespace
 {
 	using Action = Loom::InputActions::Action;
@@ -168,9 +170,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("KeyBindings")
 {
+	#pragma region Actions
+
 	TEST_CASE("Add Action adds one by a name no other has")
 	{
 		Driven driven(std::string(drawn) + "click \"Key Bindings\" \"Add Action\"\n" + drawn + "click \"Key Bindings\" \"Add Action\"\n", { { "Action", { } } });
@@ -328,6 +334,10 @@ TEST_SUITE("KeyBindings")
 		CHECK(Loom::InputActions::All() == slowdown);
 	};
 
+	#pragma endregion
+
+	#pragma region Folders
+
 	TEST_CASE("Add Folder makes one and has it named")
 	{
 		Driven driven(std::string(drawn) + "click \"Key Bindings\" \"Add Folder\"\n" + drawn + "key ctrl+a\ntype Camera\nkey enter\n", slowdown);
@@ -358,6 +368,10 @@ TEST_SUITE("KeyBindings")
 		CHECK(Loom::InputActions::Folders().empty());
 		CHECK(Loom::InputActions::All()[0].folder.empty());
 	};
+
+	#pragma endregion
+
+	#pragma region Search
 
 	TEST_CASE("the search narrows the actions to those with its text in their names, whatever its case")
 	{
@@ -442,4 +456,6 @@ TEST_SUITE("KeyBindings")
 		CHECK_FALSE(folder.script->Failed());
 		CHECK(Loom::InputActions::Folders() == std::vector<std::string>{ "Camera" });
 	};
+
+	#pragma endregion
 };

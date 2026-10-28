@@ -15,6 +15,8 @@ using LoomTests::Pump;
 using LoomTests::RecordingRenderer;
 
 
+#pragma region Helpers
+
 namespace
 {
 	const glm::ivec2 VIEW(64, 32);
@@ -48,9 +50,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("PixelPass")
 {
+	#pragma region Passes
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader with a pixel pass section builds a program for it, and one without does not")
 	{
 		RecordingRenderer renderer;
@@ -193,6 +199,10 @@ TEST_SUITE("PixelPass")
 		CHECK(outer.End());
 	};
 
+	#pragma endregion
+
+	#pragma region Viewports
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a viewport drawn with a pixel pass shows the pass, with what goes over it drawn after it")
 	{
 		RecordingRenderer renderer;
@@ -253,4 +263,6 @@ TEST_SUITE("PixelPass")
 		REQUIRE(renderer.drawn.size() == 1);
 		CHECK(renderer.drawnInto[0] == viewport.GetTexture());
 	};
+
+	#pragma endregion
 };

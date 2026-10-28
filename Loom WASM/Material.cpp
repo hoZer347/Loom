@@ -19,10 +19,7 @@ namespace Loom
 	{
 		#pragma region Shader Cache
 
-		// One Shader per path, shared by every Material that names it. Materials
-		// deliberately do not own theirs: ~Shader erases the entry in Shader's own
-		// program cache, so the first Material destroyed would pull the compiled
-		// program out from under the rest. These live until the process ends.
+		// Shared and never freed, since ~Shader would pull the program from the other Materials.
 		std::unordered_map<std::string, Shader*>& SharedShaders()
 		{
 			static std::unordered_map<std::string, Shader*> shaders{ };
@@ -30,8 +27,7 @@ namespace Loom
 			return shaders;
 		};
 
-		// When each path that failed to compile was last written, so the
-		// editor's poll compiles it again once the file changes.
+		// When each failed path was written, so the editor recompiles it on change.
 		std::unordered_map<std::string, std::filesystem::file_time_type>& FailedShaders()
 		{
 			static std::unordered_map<std::string, std::filesystem::file_time_type> failed{ };
@@ -61,8 +57,7 @@ namespace Loom
 			};
 		};
 
-		// A path that failed is compiled again here too, so reloading the
-		// scene retries it wherever the file cannot be watched (the web).
+		// A failed path recompiles here too, for the web where files cannot be watched.
 		Shader* Shared(const std::string& path)
 		{
 			const auto found = SharedShaders().find(path);
@@ -216,8 +211,7 @@ namespace Loom
 		if (field.data != &*m_shader_path)
 			return;
 
-		// Until it names a shader file, as one typed in over the MCP may not,
-		// the material keeps drawing with the one it has.
+		// Until it names a shader file, the material keeps its current one.
 		std::error_code code;
 
 		if (m_shader_path->empty() ||
@@ -269,8 +263,7 @@ namespace Loom
 			ImGui::TableSetupColumn("Scope", ImGuiTableColumnFlags_WidthFixed, combo_width(SCOPE_NAMES[(int)UniformScope::Material]));
 			ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
 
-			// A copy: rewriting the file recompiles the shader, which replaces
-			// the list being drawn.
+			// A copy, since rewriting the file replaces this list.
 			const std::vector<ShaderVariable> declared = shader->variables;
 
 			for (const ShaderVariable& variable : declared)

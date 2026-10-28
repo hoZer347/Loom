@@ -19,12 +19,10 @@ namespace Loom
 		constexpr size_t floats_per_color = 4;
 		constexpr size_t corners_per_triangle = 3;
 
-		// Below this a ray runs along a triangle's plane, or a hit is the
-		// triangle the ray starts on.
+		// Below this a ray runs along the plane, or hits the triangle it starts on.
 		constexpr float ray_epsilon = 1e-7f;
 
-		// Two faces whose normals are this close lie flat together, and faces
-		// whose normals add up to less than this have no way they face.
+		// Normals this close lie flat together; summing below this, faces have no direction.
 		constexpr float flat_epsilon = 1e-4f;
 
 		// A UV square's corners, in the order a quad's corners go round.
@@ -354,8 +352,7 @@ namespace Loom
 
 		mesh.vertices = { { 0.0f, half, 0.0f }, { 0.0f, -half, 0.0f } };
 
-		// The rings from the north down, the waist twice: once ending the top
-		// half sphere and once starting the bottom one.
+		// The waist ring comes twice: once ending each half sphere.
 		for (int row = 0; row < rows; row++)
 		{
 			const bool top = row < cap_rings;
@@ -669,8 +666,7 @@ namespace Loom
 
 	std::set<uint32_t> EditableMesh::Append(const EditableMesh& other)
 	{
-		// An empty mesh says nothing about what a mesh has, so takes the other's.
-		// Colours are white where there were none, so either having them keeps them.
+		// An empty mesh takes the other's layers, and colours default to white so either keeps them.
 		if (faces.empty())
 		{
 			hasUVs = other.hasUVs;
@@ -681,8 +677,7 @@ namespace Loom
 		else
 			hasColors = hasColors || other.hasColors;
 
-		// Where each of this mesh's layers' words come from in the other's
-		// corners, if it has that layer.
+		// Where each layer's words come from in the other's corners, if it has that layer.
 		std::vector<std::optional<size_t>> from{ };
 		size_t words = 0;
 
@@ -804,8 +799,7 @@ namespace Loom
 		std::vector<bool> taken(faces.size(), false);
 		std::vector<Face> joined{ };
 
-		// The quad two triangles make across the edge from first's corner i,
-		// if they lie flat, it is convex and the edge's corners agree.
+		// The quad across first's edge i, if flat, convex and the edge's corners agree.
 		const auto join = [&](uint32_t first, size_t i, uint32_t second) -> std::optional<Face>
 		{
 			const std::vector<Corner>& a = faces[first].corners;

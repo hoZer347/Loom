@@ -8,6 +8,8 @@
 #include <vector>
 
 
+#pragma region Helpers
+
 namespace
 {
 	using Loom::EditableMesh;
@@ -60,8 +62,12 @@ namespace
 	};
 };
 
+#pragma endregion
+
 TEST_SUITE("EditableMesh")
 {
+	#pragma region Building
+
 	TEST_CASE("EditableMesh welds the corners of triangles that meet")
 	{
 		const EditableMesh mesh = EditableMesh::FromTriangles(SQUARE, { }, { }, { });
@@ -175,6 +181,10 @@ TEST_SUITE("EditableMesh")
 		CHECK(apart.faces.size() == 2);
 	};
 
+	#pragma endregion
+
+	#pragma region Primitives
+
 	TEST_CASE("EditableMesh's primitives are closed and face outwards")
 	{
 		constexpr float SIZE = 2.0f;
@@ -206,6 +216,10 @@ TEST_SUITE("EditableMesh")
 		const auto [capsule_low, capsule_high] = EditableMesh::Capsule(SIZE, CAPSULE_HEIGHT, SEGMENTS, RINGS).Bounds();
 		CHECK(Near(capsule_high - capsule_low, glm::vec3(2.0f * SIZE, CAPSULE_HEIGHT, 2.0f * SIZE)));
 	};
+
+	#pragma endregion
+
+	#pragma region Editing
 
 	TEST_CASE("EditableMesh moves a vertex in every face it is part of and flattens them")
 	{
@@ -341,6 +355,10 @@ TEST_SUITE("EditableMesh")
 		CHECK(mesh.vertices.empty());
 	};
 
+	#pragma endregion
+
+	#pragma region Appending
+
 	TEST_CASE("EditableMesh duplicates and appends onto vertices of their own")
 	{
 		EditableMesh mesh = EditableMesh::Cube(2.0f);
@@ -408,6 +426,10 @@ TEST_SUITE("EditableMesh")
 		CHECK(cube.layers.empty());
 		CHECK(cube.faces.back().corners.front().layers.empty());
 	};
+
+	#pragma endregion
+
+	#pragma region Faces
 
 	TEST_CASE("EditableMesh flips faces round")
 	{
@@ -480,4 +502,6 @@ TEST_SUITE("EditableMesh")
 		CHECK(mesh.EdgesWithin(front).size() == 4);
 		CHECK(mesh.VerticesOfEdges(mesh.EdgesWithin(front)) == front);
 	};
+
+	#pragma endregion
 };

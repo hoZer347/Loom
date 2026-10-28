@@ -38,8 +38,7 @@ namespace Loom
 			return nullptr;
 		};
 
-		// The scene's own light, or with none at all, the first among scenes.
-		// One whose own lights are all off stays unlit.
+		// The scene's own light, else the first among scenes; one with all lights off stays unlit.
 		Light* LightFor(Scene& scene, const std::vector<Scene*>& scenes)
 		{
 			if (Light* own = scene.GetRoot().FindComponent<Light>())
@@ -54,17 +53,13 @@ namespace Loom
 
 		#pragma region Updates
 
-		// What each lane updates, 0 being the caller, kept from one update to
-		// the next so gathering it does not allocate.
+		// Each lane's updates, 0 the caller, kept so gathering does not allocate.
 		std::vector<std::vector<ComponentBase*>> s_updates(1);
 
-		// Each lane at one below its number, made the first time an object
-		// asks for it.
+		// Lane n at index n - 1, made on first use.
 		std::vector<std::unique_ptr<Lane>> s_lanes{ };
 
-		// Components whose OnUpdate has thrown, each reported the first time
-		// rather than every frame. Lanes report under the lock, so their lines
-		// do not interleave.
+		// Components that threw, reported once, under a lock so lines do not interleave.
 		std::mutex s_threwMutex;
 		std::unordered_set<uint64_t> s_threw;
 
@@ -80,8 +75,7 @@ namespace Loom
 		{
 			LOOM_STAGE("Scene::Update");
 
-			// A script's throw is its own: the rest still update, and the lane
-			// it ran on is still waited for.
+			// A throw stays with its script; the rest still update.
 			for (ComponentBase* updateable : updates)
 				try { updateable->OnUpdate(); }
 				catch (const std::exception& e)
@@ -184,17 +178,13 @@ namespace Loom
 		if (seen == nullptr && root.FindComponent<Camera>(true) != nullptr)
 			return;
 
-		// Scenes open together are one world: one with no camera or light of
-		// its own is seen through and lit by the first among them, and drawn in
-		// world space when no scene has a camera.
+		// Open scenes are one world, sharing the first camera and light among them.
 		if (seen == nullptr)
 			seen = FirstAmong<Camera>(allScenes);
 
 		Light* light = LightFor(*this, allScenes);
 
-		// The shadow map has to be finished before the first mesh samples it,
-		// and holds every scene drawn alongside this one that the light falls
-		// on, so shadows cross between them but not from scenes out of view.
+		// The shadow map is finished first, holding every visible scene the light falls on.
 		if (light)
 		{
 			LOOM_STAGE("Light::RenderShadowMap");
@@ -323,8 +313,7 @@ namespace Loom
 
 	namespace
 	{
-		// Normalised, so the tree measures distance along it in world units.
-		// Null for a ray going nowhere.
+		// Normalised so distances are in world units; null for a zero ray.
 		std::optional<Ray> Normalised(const Ray& ray)
 		{
 			if (glm::length(ray.direction) == 0.0f)

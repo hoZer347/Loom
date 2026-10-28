@@ -15,8 +15,7 @@ namespace Loom
 
 	static std::map<std::string, std::function<std::shared_ptr<StateBase>()>>& Registry()
 	{
-		// Function-local, so a state registering itself from a static initialiser in
-		// another translation unit cannot beat the map into existence.
+		// Function-local, so a static initialiser elsewhere cannot run before it.
 		static std::map<std::string, std::function<std::shared_ptr<StateBase>()>> registry;
 
 		return registry;
@@ -78,9 +77,7 @@ namespace Loom
 
 	namespace
 	{
-		// Here rather than static members of an exported class, which a script
-		// module importing it could not define. Function-local, like the
-		// registry, so a machine built by a static initialiser finds them.
+		// Function-local, since exported static members cannot be defined by a script module.
 		std::vector<StateMachineBase*>& Machines()
 		{
 			static std::vector<StateMachineBase*> machines{ };
@@ -119,9 +116,7 @@ namespace Loom
 
 	#pragma region Primitives
 
-	/// Handler for many sub-states running at the same time: does not proceed until every
-	/// sub-state inside it has triggered Proceed. (Sub-states still run their own OnExit
-	/// as they proceed, rather than all at once at the end.)
+	/// Waits for every sub-state to Proceed; each runs its own OnExit as it does.
 	struct StateMachineBase::St_Parallel final : StateBase
 	{
 		/// Sub-states that all run at once.
@@ -153,9 +148,7 @@ namespace Loom
 			return !SubStates.empty();
 		};
 
-		/// Runs one step over every sub-state, keeping track of which one is running so a
-		/// Proceed from inside it can be attributed. Copied first, because a sub-state is
-		/// allowed to proceed from inside the very step being walked.
+		/// Steps each sub-state on a copy, tracking which runs so its Proceed is attributed.
 		void Each(auto&& step)
 		{
 			for (const auto& state : std::vector<std::shared_ptr<StateBase>>(SubStates))
@@ -175,8 +168,7 @@ namespace Loom
 		void OnLateUpdate() override { Each([](StateBase& s) { s.OnLateUpdate(); }); };
 		void OnGui() override { Each([](StateBase& s) { s.OnGui(); }); };
 
-		// The one step that is not attributed to a sub-state: nothing is going to proceed
-		// out of a parallel that is already on its way out.
+		// Nothing proceeds out of a parallel already leaving.
 		void OnExit(StateBase* nextState) override
 		{
 			for (const auto& state : SubStates)
@@ -277,16 +269,14 @@ namespace Loom
 
 	StateBase* StateMachineBase::Proceed()
 	{
-		// St_Parallel overrides normal Proceed: one sub-state finishing is not the whole
-		// parallel state finishing.
+		// One sub-state finishing does not finish the parallel.
 		if (St_Parallel* parallel = dynamic_cast<St_Parallel*>(current.get()))
 			if (parallel->OnChildProceed())
 				return _stateQueue.empty() ? nullptr : _stateQueue.front().get();
 
 		StateBase* nextState = _stateQueue.empty() ? nullptr : _stateQueue.front().get();
 
-		// Held, so the outgoing state survives its own OnExit and the incoming state's
-		// OnEnter -- which is handed a pointer to it.
+		// Held, so the outgoing state survives its OnExit and the next OnEnter.
 		const std::shared_ptr<StateBase> previousState = current;
 
 		if (current)
@@ -304,9 +294,7 @@ namespace Loom
 
 			current = _stateQueue.front();
 
-			// Taken off the queue before OnEnter, not after: a state that pushes to the
-			// front of the queue from inside its own OnEnter must not have that new
-			// state erased in place of itself.
+			// Erased before OnEnter, so a state queued at the front from it survives.
 			_stateQueue.erase(_stateQueue.begin());
 
 			Adopt(current);
@@ -384,8 +372,7 @@ namespace Loom
 
 	void StateMachineBase::StepAttached()
 	{
-		// One snapshot holds for the whole frame: a GameObject or component is only
-		// ever destroyed by a queued task, at the start of the next one.
+		// One snapshot per frame, since destruction only happens in queued tasks.
 		for (StateMachineBase* machine : All())
 			if (machine->GetGameObject())
 				machine->Step();

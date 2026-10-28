@@ -45,9 +45,7 @@ namespace Loom
 
 		const std::string last = Trim(current);
 
-		// An empty tail still counts once something has been split off -- "a," is two
-		// arguments, the second of them blank, and a binding that takes two should see
-		// them both rather than be told it was handed one.
+		// Once something split off, an empty tail is an argument: "a," is two.
 		if (!last.empty() || !args.empty())
 			args.push_back(last);
 
@@ -108,9 +106,7 @@ namespace Loom
 		errno = 0;
 		const long long value = std::strtoll(token.c_str(), &end, 10);
 
-		// The whole token has to be the number. "3 apples" is not a 3 -- it is a script
-		// with a typo in it, and reading it as 3 hides the typo. Nor is a number too
-		// big to hold, which would read as the most there is.
+		// The whole token must be the number, so a typo or overflow is not read as one.
 		if (end == nullptr || *end != '\0' || errno == ERANGE)
 			return false;
 

@@ -30,9 +30,7 @@ namespace Loom
 				CoUninitialize();
 		};
 
-		// Opens the page when the server comes up, and prints what the script
-		// said if it ended first. Returns when everything holding the pipe has
-		// exited.
+		// Returns when everything holding the pipe has exited.
 		void Read(HiddenProcess hidden, const std::string& page, const std::atomic<bool>& stopping)
 		{
 			WebPlayer::Output output(page);

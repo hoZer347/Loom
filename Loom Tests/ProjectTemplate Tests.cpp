@@ -13,6 +13,8 @@
 #include <string>
 
 
+#pragma region Helpers
+
 namespace
 {
 	// An empty folder under the temp directory, gone again afterwards.
@@ -117,9 +119,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("ProjectTemplate")
 {
+	#pragma region Project Files
+
 	TEST_CASE("a project without a project file gets one pointing at new scripts")
 	{
 		const Folder project("loom template My Game");
@@ -190,6 +196,10 @@ TEST_SUITE("ProjectTemplate")
 		CHECK(project.Ensure() == (project.root / "Code" / "Game.vcxproj").lexically_normal().string());
 		CHECK(project.Text() == before);
 	};
+
+	#pragma endregion
+
+	#pragma region Scripts Projects
 
 	TEST_CASE("a scripts project anywhere under the folder is found and written in")
 	{
@@ -313,6 +323,10 @@ TEST_SUITE("ProjectTemplate")
 		CHECK(captured.str().empty());
 	};
 
+	#pragma endregion
+
+	#pragma region Names and Engines
+
 	TEST_CASE("a project file with no name names its scripts after itself")
 	{
 		const ProjectFolder project("loom template unnamed", "");
@@ -354,6 +368,8 @@ TEST_SUITE("ProjectTemplate")
 		CHECK(Loom::ProjectTemplate::BuildLine("\t" + error) == error);
 		CHECK(Loom::ProjectTemplate::BuildLine("   ").empty());
 	};
+
+	#pragma endregion
 };
 
 #endif

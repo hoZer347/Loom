@@ -35,8 +35,7 @@ namespace Loom
 	{
 		#pragma region Constants
 
-		// A window docked on the frame it first appears only takes its tab on
-		// the one after.
+		// A window docked on its first frame only takes its tab on the next.
 		constexpr int focus_frames = 2;
 
 		constexpr const char* model_light = "Model Light";
@@ -76,16 +75,13 @@ namespace Loom
 		constexpr float view_ring_share = 1.25f;
 		constexpr int ring_points = 64;
 
-		// Toward the eye, as a share of the way there, so the wire and dots
-		// draw over the faces they lie on.
+		// Toward the eye, so the wire and dots draw over their faces.
 		constexpr float overlay_pull = 0.002f;
 
-		// A point counts as seen when nothing is in front of it by more than
-		// this share of the way from the eye.
+		// Seen when nothing is in front by more than this share of the distance.
 		constexpr float seen_share = 1e-3f;
 
-		// An extrusion lifts faces this share of their edges' average length,
-		// and a shape added is this share of the mesh's size.
+		// Extrusion depth and added shape size, as shares of the mesh.
 		constexpr float extrude_share = 0.5f;
 		constexpr float add_share = 0.5f;
 		constexpr float empty_size = 1.0f;
@@ -258,8 +254,7 @@ void main()
 			return std::filesystem::absolute(path, code).lexically_normal().string();
 		};
 
-		// The prefab's file, or until there is one, the text its tab was opened
-		// with, which is dropped once the file is found.
+		// The text the tab opened with stands in until the file is found.
 		std::string PrefabText(const std::string& path, std::string& unwritten)
 		{
 			std::error_code code;
@@ -272,12 +267,7 @@ void main()
 			return ProjectAssets::ReadText(path);
 		};
 
-		// Writes the fields edited here, the meshes' geometry and the materials'
-		// shaders, into the file's own tree rather than this copy over it, so
-		// the file keeps its guids, and any component this build could not read
-		// stays as it was. Components pair up as the nth of their type on each
-		// side, and one the file's object lacks, such as a mesh added here, is
-		// added.
+		// Into the file's own tree, so it keeps its guids and unread components; nth of a type pairs with nth.
 		void MergeFields(const Prefabs::ObjectNode& shown, Prefabs::ObjectNode& file, const std::map<std::string, std::vector<std::string>>& edited)
 		{
 			std::map<std::string, size_t> seen{ };
@@ -324,8 +314,7 @@ void main()
 
 		#pragma region Parts
 
-		// A Skin keeps a weight for each of the mesh's corners as it is, which
-		// a change to them would scramble, so an animated mesh is skipped.
+		// A Skin's weights follow the corners as they are, so animated meshes are skipped.
 		void FindParts(GameObject& object, std::vector<GameObject*>& found, size_t& skipped)
 		{
 			if (const Mesh* mesh = object.GetComponent<Mesh>())
@@ -377,8 +366,6 @@ void main()
 			return ProjectAssets::ShadersIn(ProjectFolder(prefab).string());
 		};
 
-		// The shader another mesh of the prefab draws with, so a mesh added to
-		// it looks like the rest.
 		std::string ShaderOf(GameObject& object)
 		{
 			if (Material* material = object.GetComponent<Material>())
@@ -497,8 +484,7 @@ void main()
 
 		scene->AddChild(model_light)->Attach<Light>();
 
-		// Children join their parents through the queue, so the meshes under
-		// the top object are only found once it has run.
+		// Children join through the queue, so the meshes are found once it has run.
 		Engine::DoTasks();
 
 		document.scene = scene;
@@ -589,9 +575,7 @@ void main()
 			return false;
 		};
 
-		// Each mesh's geometry, under the keys of its fields that are not
-		// references, which point at this copy's objects rather than the file's,
-		// and each material's shader.
+		// References point at this copy's objects, so only plain fields are kept.
 		std::map<std::string, std::vector<std::string>> edited{ };
 
 		for (const Part& part : document.parts)
@@ -737,8 +721,7 @@ void main()
 					if (std::exchange(document->select, false))
 						flags |= ImGuiTabItemFlags_SetSelected;
 
-					// Known by the document rather than its path, so a prefab
-					// moved in the Project panel keeps its tab.
+					// By document rather than path, so a moved prefab keeps its tab.
 					const std::string label = std::string(EditorIcons::Model) + " " + std::filesystem::path(document->path).stem().string() + "###" + std::to_string((uintptr_t)document.get());
 					bool keep = true;
 					const bool shown = ImGui::BeginTabItem(label.c_str(), &keep, flags);
@@ -776,8 +759,7 @@ void main()
 		if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_S))
 			SaveDocument(document);
 
-		// Asked every frame, mid-drag too: ImGui only routes a shortcut to a
-		// window that asked for it the frame before.
+		// Asked every frame: ImGui routes a shortcut only to a window that asked last frame.
 		const bool undo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z);
 		const bool redo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y) || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z);
 
@@ -820,9 +802,7 @@ void main()
 
 	void ModelEditor::HandleKeys(Document& document)
 	{
-		// Asked every frame for the routing, as undo is, but left alone while
-		// the Centre field's text box has the keyboard or the mouse is in a
-		// drag, which holds on to what is under it.
+		// Asked every frame for routing, but idle while typing or dragging.
 		const bool idle = !ImGui::GetIO().WantTextInput && !document.parts.empty() && document.drag == Drag::None;
 
 		for (const PickInfo& info : picks)
@@ -1160,8 +1140,7 @@ void main()
 
 		const bool hovered = ImGui::IsItemHovered();
 
-		// The camera is steered before anything is measured from it, so the
-		// image and the picking keep up with the mouse.
+		// Steered first, so the image and picking keep up with the mouse.
 		Steer(document, hovered);
 		Pose(document);
 		Measure(document, corner, size);
@@ -1401,8 +1380,7 @@ void main()
 		if (m_seeThrough)
 			return true;
 
-		// Against every part, each in its own space along the same ray from
-		// the eye, so another part in front hides it too.
+		// Each part in its own space along one ray, so one in front hides it.
 		const glm::vec3 point(document.view.world * glm::vec4(local, 1.0f));
 
 		for (const Part& part : document.parts)
@@ -1549,9 +1527,7 @@ void main()
 			glm::vec3 direction;
 			Ray(view, mouse, origin, direction);
 
-			// Every part, nearest first, so a click on another goes on to edit
-			// it. Each is hit in its own space along the same ray, so how far
-			// along it compares across them.
+			// Each part in its own space along one ray, so distances compare.
 			std::optional<EditableMesh::Hit> nearest{ };
 
 			for (size_t i = 0; i < document.parts.size(); i++)
@@ -1763,8 +1739,7 @@ void main()
 			const float start = std::atan2(document.pressed.y - middle->y, document.pressed.x - middle->x);
 			const float now = std::atan2(mouse.y - middle->y, mouse.x - middle->x);
 
-			// Screen angles grow clockwise, as y grows down. Seen from the
-			// side the axis points to, a positive turn is anticlockwise.
+			// Screen angles grow clockwise; a positive turn about the axis is anticlockwise.
 			float degrees = glm::degrees(start - now);
 
 			if (glm::dot(direction, view.eye - centre) < 0.0f)
@@ -1804,8 +1779,7 @@ void main()
 			}
 			else
 			{
-				// Grabbed at the middle, so by how far right and up it has gone
-				// rather than out from there: a handle's length doubles it.
+				// Grabbed at the middle, so a handle's length doubles it.
 				factor = 1.0f + ((mouse.x - document.pressed.x) - (mouse.y - document.pressed.y)) / handle_length;
 
 				if (snapping)
@@ -1860,8 +1834,7 @@ void main()
 		for (const glm::vec3& vertex : mesh.vertices)
 			points.push_back(glm::vec3(view.world * glm::vec4(vertex, 1.0f)));
 
-		// Of any part, so the face under the mouse lights up on a part not
-		// being edited too.
+		// Of any part, so the hovered face lights up on parts not being edited.
 		const auto fill = [&](const Part& part, const std::set<uint32_t>& faces)
 		{
 			const glm::mat4 world = part.object->WorldMatrix();
@@ -1879,8 +1852,7 @@ void main()
 			return triangles;
 		};
 
-		// Edges as strips facing the eye, so they keep their width on screen
-		// whichever renderer draws them.
+		// Strips facing the eye keep their width on screen under any renderer.
 		const auto strip = [&](const glm::vec3& a, const glm::vec3& b, float half_width, std::vector<glm::vec3>& triangles)
 		{
 			const glm::vec3 side = glm::cross(b - a, view.eye - (a + b) / 2.0f);
@@ -1937,8 +1909,7 @@ void main()
 		document.camera.Apply(m_program);
 		renderer->SetUniform(m_program, "u_pull", overlay_pull);
 
-		// The ground, its lines a step apart that grows tenfold as the view
-		// backs off tenfold, about where the view is looking.
+		// Grid spacing grows tenfold as the view backs off tenfold.
 		const float spacing = std::pow(10.0f, std::floor(std::log10(document.distance))) * grid_share;
 		const float reach = grid_half_lines * spacing;
 		const glm::vec3 middle(Snap(document.target.x, spacing), 0.0f, Snap(document.target.z, spacing));
@@ -2386,8 +2357,7 @@ void main()
 	{
 		Document* document = Front();
 
-		// A mesh the top object has already, which cannot be shaped here, is
-		// left alone rather than joined by a second.
+		// An existing mesh that cannot be shaped is left alone rather than joined by a second.
 		if (document == nullptr || document->root == nullptr || !document->parts.empty() || document->root->GetComponent<Mesh>())
 			return;
 

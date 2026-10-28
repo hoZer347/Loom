@@ -22,13 +22,10 @@ namespace Contacts
 		// Below this a direction or a length is taken as none at all.
 		constexpr float EPSILON = 1e-6f;
 
-		// An edge pair only takes over from a face when it overlaps this much
-		// less, so a box resting on a face keeps the same contacts from step
-		// to step rather than flickering to an edge.
+		// An edge only beats a face by this much, so a resting box keeps its contacts.
 		constexpr float FACE_SLACK = 0.01f;
 
-		// Two of a mesh's contacts this close, facing this nearly the same
-		// way, are one.
+		// Contacts this close and facing nearly alike are one.
 		constexpr float SAME_POINT = 0.001f;
 		constexpr float SAME_FACING = 0.999f;
 
@@ -158,9 +155,7 @@ namespace Contacts
 			return face;
 		};
 
-		// Clips incident to the sides of box's face pointing along outward,
-		// keeping what sits behind that face or within margin of it, each
-		// point's depth how far behind.
+		// Clips incident to the sides of box's face, keeping points behind it or within margin.
 		void ClipToFace(const Box& box, int axis, const glm::vec3& outward, Polygon incident, float margin, Polygon& points)
 		{
 			const glm::vec3 middle = box.center + outward * box.half[axis];
@@ -199,8 +194,7 @@ namespace Contacts
 			};
 		};
 
-		// Keeps the deepest point and those spread farthest from the ones
-		// kept, which hold a resting face as well as all of them would.
+		// The deepest point and those spread farthest, which hold a resting face as all would.
 		void AddReduced(Manifold& manifold, const Polygon& candidates)
 		{
 			if (candidates.count == 0)
@@ -259,8 +253,7 @@ namespace Contacts
 
 		#pragma region Closest Points
 
-		// The closest points between the segments from p1 to q1 and p2 to q2,
-		// after Ericson's Real-Time Collision Detection.
+		// After Ericson's Real-Time Collision Detection.
 		void ClosestBetween(const glm::vec3& p1, const glm::vec3& q1, const glm::vec3& p2, const glm::vec3& q2, glm::vec3& c1, glm::vec3& c2)
 		{
 			const glm::vec3 d1 = q1 - p1;
@@ -446,8 +439,7 @@ namespace Contacts
 		{
 			const glm::vec3 between = b.center - a.center;
 
-			// b's axes and the gap between the centres, in a's frame, which
-			// every axis below is tested with, as Gottschalk's OBB test does.
+			// b's axes and the centres' gap in a's frame, as Gottschalk's OBB test has it.
 			float turned[AXES][AXES];
 			float across[AXES][AXES];
 			float gap[AXES];
@@ -463,8 +455,7 @@ namespace Contacts
 				};
 			};
 
-			// A box mirrored by its scale has its axes the other way round, which
-			// turns every cross product taken in its frame.
+			// A mirrored box's axes turn every cross product taken in its frame.
 			const float handed = glm::dot(glm::cross(a.axes[0], a.axes[1]), a.axes[2]) < 0.0f ? -1.0f : 1.0f;
 
 			float bestOverlap = INFINITE_DISTANCE;
@@ -474,9 +465,7 @@ namespace Contacts
 			constexpr int FACES = 2 * AXES;
 			int best = -1;
 
-			// How far each box reaches along an axis of the given length, and
-			// how far along it b's centre is from a's; axis gives it, only
-			// once it is the best so far.
+			// How far each box reaches along an axis, and b's centre from a's.
 			const auto test =
 				[&](float reachA, float reachB, float distance, float length, int index, const auto& axis)
 				{
@@ -512,8 +501,7 @@ namespace Contacts
 			for (int i = 0; i < AXES; i++)
 				for (int j = 0; j < AXES; j++)
 				{
-					// Both axes being unit length, their cross product's is the
-					// sine between them.
+					// For unit axes, the cross product's length is the sine between them.
 					const float length = std::sqrt(std::max(1.0f - turned[i][j] * turned[i][j], 0.0f));
 
 					if (length < EPSILON)
@@ -632,14 +620,12 @@ namespace Contacts
 			float bestOverlap = INFINITE_DISTANCE;
 			glm::vec3 bestAxis(0.0f);
 
-			// 0 to 2 the box's faces, 3 the triangle's, then box axis i
-			// crossed with triangle edge j.
+			// 0 to 2 the box's faces, 3 the triangle's, then box axis i crossed with edge j.
 			constexpr int TRIANGLE_FACE = AXES;
 			constexpr int FACES = AXES + 1;
 			int best = -1;
 
-			// The triangle in the box's own frame, where the box reaches half
-			// its size along each axis and every axis below is a few products.
+			// In the box's frame, each axis test is a few products.
 			glm::vec3 local[CORNERS];
 
 			for (int corner = 0; corner < CORNERS; corner++)
@@ -648,8 +634,7 @@ namespace Contacts
 				local[corner] = glm::vec3(glm::dot(offset, box.axes[0]), glm::dot(offset, box.axes[1]), glm::dot(offset, box.axes[2]));
 			};
 
-			// axis in the box's frame, of the given length; world gives it in
-			// the world, only once it is the best so far.
+			// axis is in the box's frame; world is only set for the best so far.
 			const auto test =
 				[&](const glm::vec3& axis, float length, int index, const auto& world)
 				{
@@ -684,8 +669,7 @@ namespace Contacts
 					return true;
 				};
 
-			// The triangle's own face first: one near the box but not touching
-			// it is most often apart along that.
+			// The triangle's face first, the likeliest separating axis.
 			const glm::vec3 faceLocal(glm::dot(faceNormal, box.axes[0]), glm::dot(faceNormal, box.axes[1]), glm::dot(faceNormal, box.axes[2]));
 
 			if (!test(faceLocal, 1.0f, TRIANGLE_FACE, [&]() { return faceNormal; }))
@@ -740,8 +724,7 @@ namespace Contacts
 			}
 			else if (best == TRIANGLE_FACE)
 			{
-				// The box's face toward the triangle, clipped to the triangle's
-				// sides, kept where it has gone through the triangle's plane.
+				// The box's face toward the triangle, clipped to its sides, kept past its plane.
 				Polygon incident = Face(box, bestAxis);
 				const glm::vec3 inward = -bestAxis;
 
@@ -812,8 +795,7 @@ namespace Contacts
 					SphereTriangle(solid.sphere, triangle, margin, manifolds);
 			};
 
-			// Triangles sharing an edge or a corner find the same point there,
-			// facing the same way; each is kept once.
+			// Triangles sharing an edge find the same point there, so each is kept once.
 			size_t kept = first;
 
 			for (size_t m = first; m < manifolds.size(); m++)
@@ -970,8 +952,7 @@ namespace Contacts
 	{
 		const size_t before = manifolds.size();
 
-		// Each pair is written with the simpler shape first; the ones run the
-		// other way round have their normals turned after.
+		// Simpler shape first; swapped pairs have their normals turned after.
 		bool swapped = false;
 
 		switch (first.kind)

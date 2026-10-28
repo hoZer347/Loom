@@ -32,8 +32,7 @@ namespace Loom
 	{
 		#pragma region Drawing
 
-		// Every item is drawn at one depth, nearer than the depth buffer is
-		// cleared to, so each lands over the ones before it.
+		// One depth nearer than the clear, so each item lands over the last.
 		constexpr float DEPTH = 0.0f;
 
 		constexpr int RGBA = 4;
@@ -74,8 +73,7 @@ void main()
 }
 )";
 
-		// Shared by everything the UI draws and kept until the process ends,
-		// like the sprites'. 0 when it will not compile, which is reported once.
+		// Shared and kept for the process; 0 on a compile failure, reported once.
 		uint32_t UiProgram()
 		{
 			static const uint32_t program = []() -> uint32_t
@@ -107,8 +105,7 @@ void main()
 			return texture;
 		};
 
-		// The image a rect is filled through: its own, or plain white while
-		// it has none to draw with.
+		// The rect's image, or plain white when it has none.
 		uint32_t ImageOf(const UiRect& rect)
 		{
 			const uint32_t handle = Texture::HandleOf(rect.imagePath);
@@ -216,8 +213,7 @@ void main()
 			font->ascent = ascent * scale;
 			font->lineHeight = (ascent - descent) * scale;
 
-			// White, with the coverage as alpha, and bottom row first as the
-			// renderer takes it, where the baker writes the top row first.
+			// White with coverage as alpha, flipped to the renderer's bottom-first rows.
 			const int side = font->atlasSize;
 			std::vector<uint8_t> rgba((size_t)side * side * RGBA, OPAQUE);
 
@@ -318,10 +314,7 @@ void main()
 			Grow(line, font);
 		};
 
-		// The text cut into lines at its breaks and, with wrap, at the spaces
-		// that keep each inside width; the spaces a line is cut at are left
-		// out. None when its font will not load, and a span whose size will
-		// not load is drawn at the text's own.
+		// Lines cut at breaks and, wrapping, at spaces; none when the font will not load.
 		std::vector<Line> LayOut(const UiText& text, float width)
 		{
 			const Font* const base = FontFor(text.fontPath, text.fontSize);
@@ -333,8 +326,7 @@ void main()
 
 			std::vector<Line> lines(1);
 
-			// Spaces after the last word, added only once the next word is
-			// on the same line.
+			// Trailing spaces, added once the next word joins the line.
 			Piece spaces{ };
 			float spacesWidth = 0.0f;
 
@@ -447,9 +439,7 @@ void main()
 
 		constexpr int LEFT_BUTTON = 0;
 
-		// The rects that block the pointer the last overlay drew, in the order
-		// drawn, and the buttons they press, by their IDs, which are never
-		// handed out again.
+		// Pointer-blocking rects from the last overlay, and the button IDs they press.
 		struct Hit
 		{
 			uint64_t rect;
@@ -523,8 +513,7 @@ void main()
 	{
 		overlay = false;
 
-		// Laid aside until everything is drawn, as buttons are tinted from the
-		// last overlay's.
+		// Kept until all is drawn, since buttons tint from the last overlay.
 		std::vector<Hit> drawn;
 
 		const Rect screen = Screen();

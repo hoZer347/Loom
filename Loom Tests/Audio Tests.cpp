@@ -17,6 +17,8 @@
 using LoomTests::Pump;
 
 
+#pragma region Helpers
+
 namespace
 {
 	constexpr uint32_t SAMPLE_RATE = 48000;
@@ -30,9 +32,7 @@ namespace
 			Loom::Audio::useDevice = false;
 		};
 
-		// The scenes left running and nothing left playing, as the next case
-		// expects. Pumped first, which unregisters the case's scenes, so Tick
-		// does not look for a listener in them.
+		// Pumped first so Tick does not look for a listener in the case's scenes.
 		~AudioFixture()
 		{
 			Pump();
@@ -85,9 +85,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("Audio")
 {
+	#pragma region Playing
+
 	TEST_CASE_FIXTURE(AudioFixture, "PlayAt and Play start a sound each, and StopAll stops them")
 	{
 		const std::string clip = WriteWav("loom-audio-shot.wav");
@@ -151,6 +155,10 @@ TEST_SUITE("Audio")
 		CHECK(Loom::Audio::PlayingCount() == 0);
 		CHECK(captured.Says("could not load no such sound.wav"));
 	};
+
+	#pragma endregion
+
+	#pragma region Sources and Listeners
 
 	TEST_CASE_FIXTURE(AudioFixture, "an AudioSource plays on its first update, and only then")
 	{
@@ -262,4 +270,6 @@ TEST_SUITE("Audio")
 		holder->SetDisabled(true);
 		CHECK(Loom::AudioListener::Current() == far);
 	};
+
+	#pragma endregion
 };

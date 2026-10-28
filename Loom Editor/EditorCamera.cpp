@@ -14,8 +14,6 @@ namespace Loom
 {
 	namespace
 	{
-		// Up and back from the origin, where a scene is built around, looking
-		// down at it.
 		constexpr glm::vec3 start_position(0.0f, 4.0f, 10.0f);
 
 		// Far enough to take in a level, where a game's camera only needs its own.

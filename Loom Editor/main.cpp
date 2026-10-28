@@ -1,5 +1,4 @@
-// Before anything that brings in GLFW, which defines APIENTRY itself
-// when windows.h has not been seen.
+// Before GLFW, which defines APIENTRY itself when windows.h has not been seen.
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <dwmapi.h>
@@ -41,8 +40,7 @@ namespace
 {
 	#pragma region Desktop
 
-	// IVirtualDesktopManager from shobjidl.h, which only declares it for a
-	// Windows 10 target; the engine targets Windows 7.
+	// shobjidl.h only declares it for a Windows 10 target; the engine targets Windows 7.
 	MIDL_INTERFACE("a5cd92ff-29be-454c-8d04-d82879fb3f1b")
 	DesktopManager : public IUnknown
 	{
@@ -53,10 +51,7 @@ namespace
 
 	constexpr CLSID CLSID_DesktopManager = { 0xaa509086, 0x5ca9, 0x4c25, { 0x8f, 0x95, 0x58, 0x9d, 0x3c, 0x07, 0xb4, 0x8a } };
 
-	// Puts the (still hidden) window on another virtual desktop and shows it
-	// there without activating it, so it never takes the focus. The shell only
-	// tracks a window on a desktop once it has been shown, so it is shown
-	// cloaked first and uncloaked after the move.
+	// The shell only tracks a shown window, so it is shown cloaked, moved, then uncloaked.
 	bool ShowOnDesktop(GLFWwindow* window, const std::string& id)
 	{
 		const std::wstring braced = L"{" + std::wstring(id.begin(), id.end()) + L"}";
@@ -106,8 +101,7 @@ namespace
 
 	#pragma region File Types
 
-	// Makes this editor what opens the editor's files in Explorer, and false
-	// when it is not the main checkout's.
+	// False when this is not the main checkout's editor.
 	bool ClaimFileTypes()
 	{
 		wchar_t executable[MAX_PATH]{ };
@@ -212,14 +206,9 @@ namespace
 
 };
 
-// With a project folder given, the editor starts on it. Without one it uses
-// whichever folder it was pointed at last, and asks for one when there is no
-// answer to that either.
 int main(int argc, char** argv)
 {
-	// The editor is a Windows program, so it opens no console of its own and
-	// its Console panel is where it talks. Started from a terminal, what it
-	// says goes there too, unless that was redirected already.
+	// A Windows program has no console; started from a terminal it writes there too.
 	if ((_fileno(stdout) < 0 || _fileno(stderr) < 0) && AttachConsole(ATTACH_PARENT_PROCESS))
 	{
 		FILE* reopened = nullptr;
@@ -231,8 +220,7 @@ int main(int argc, char** argv)
 			freopen_s(&reopened, "CONOUT$", "w", stderr);
 	};
 
-	// Visual Studio's Add > Loom Script runs this, so it is over before there is
-	// an engine or a window.
+	// Visual Studio's Add > Loom Script runs this before there is an engine or window.
 	for (int i = 1; i < argc; i++)
 		if (std::string(argv[i]) == "--new-script")
 		{
@@ -260,13 +248,7 @@ int main(int argc, char** argv)
 			return 0;
 		};
 
-	// A screenshot or UI script run is automated by definition: it renders,
-	// writes its bitmaps and exits, so it does that without putting a window
-	// on screen.
-	// Read before the Engine, which is what opens the window.
-	//
-	// A run on another virtual desktop starts hidden too, and is shown once it
-	// is over there.
+	// Automated runs and runs on another desktop start hidden; read before the Engine opens the window.
 	std::string desktop;
 
 	Engine::backend = Editor::SavedBackend();
@@ -298,23 +280,19 @@ int main(int argc, char** argv)
 	if (!Engine::showWindow)
 		ReportCrashesToStderr();
 
-	// Nobody is listening to an automated run either, and its sounds would
-	// play over whatever whoever is at the machine is doing.
+	// Nobody hears an automated run, and its sounds would play over the user.
 	Audio::useDevice = Engine::showWindow;
 
-	// A refresh starts the new editor once this one is gone, its MCP port
-	// freed and what it writes as it closes written.
+	// The new editor starts once this one has freed its MCP port and saved.
 	std::filesystem::path relaunch;
 	std::string relaunch_arguments;
 	bool failed = false;
 
 	{
-		// The Engine comes first: it owns the window, the renderer and the ImGui
-		// context the editor draws itself into.
+		// The Engine owns the window, renderer and ImGui context the editor draws into.
 		Engine engine;
 
-		// An automated run is often a scratch build that is deleted afterwards,
-		// so it leaves the file types to the editor the user opens.
+		// An automated run is often a scratch build, so it leaves the file types alone.
 		if (Engine::showWindow)
 			ClaimFileTypes();
 
@@ -324,9 +302,7 @@ int main(int argc, char** argv)
 		if (!desktop.empty() && !ShowOnDesktop(Engine::window, desktop))
 			return 1;
 
-		// Opening a project moves the working directory into it, and the editor
-		// opens the last one as it starts, so relative paths on the command line
-		// are taken from where it was started.
+		// Opening a project moves the working directory, so command-line paths resolve first.
 		const std::filesystem::path launch_folder = std::filesystem::current_path();
 
 		Editor editor;
@@ -383,8 +359,7 @@ int main(int argc, char** argv)
 
 				screenshot = argv[++i];
 
-				// An optional frame count: enough of them for a build to finish and
-				// for the scene to have been ticked.
+				// Enough frames for a build to finish and the scene to tick.
 				if (i + 1 < argc && isdigit((unsigned char)argv[i + 1][0]))
 					frames = atoi(argv[++i]);
 			}
@@ -438,8 +413,7 @@ int main(int argc, char** argv)
 
 				const std::string path = argv[++i];
 
-				// An optional drop position, which picks the parent the way the
-				// mouse does when a file is dragged in.
+				// Picks the parent the way a dragged-in file does.
 				if (i + 2 < argc && isdigit((unsigned char)argv[i + 1][0]) && isdigit((unsigned char)argv[i + 2][0]))
 				{
 					editor.Drop(path, (float)atof(argv[i + 1]), (float)atof(argv[i + 2]));
@@ -627,8 +601,7 @@ int main(int argc, char** argv)
 		if (compile)
 			editor.CompileScripts();
 
-		// The same path the Play button takes, so the scripts are compiled first
-		// here too.
+		// The Play button's path, so the scripts compile first.
 		if (play)
 			editor.TogglePlay();
 
@@ -656,8 +629,7 @@ int main(int argc, char** argv)
 
 		editor.opensVisualStudio = screenshot.empty() && !exit_after_script;
 
-		// The server's ui tool runs its commands through the same UiScript as a
-		// --ui-script run, since only one can listen to ImGui's items.
+		// Only one UiScript can listen to ImGui's items.
 		std::unique_ptr<EditorMcp> mcp;
 
 		if (mcp_port != 0)

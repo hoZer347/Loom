@@ -22,8 +22,6 @@ namespace Loom
 
 		constexpr uint32_t STATIC_DRAW = 0x88E4;	// GL_STATIC_DRAW
 
-		// Two triangles over the unit square. The vertex shader takes its
-		// texture coordinates straight off the positions.
 		constexpr float QUAD[] =
 		{
 			0.0f, 0.0f, 0.0f,
@@ -36,8 +34,7 @@ namespace Loom
 		constexpr size_t FLOATS_PER_VERTEX = 3;
 		constexpr size_t QUAD_VERTICES = std::size(QUAD) / FLOATS_PER_VERTEX;
 
-		// Keeps a zero or negative pixelsPerUnit from making the quad infinite or
-		// turning it inside out.
+		// Keeps a bad pixelsPerUnit from making the quad infinite or inverted.
 		constexpr float MIN_PIXELS_PER_UNIT = 1e-3f;
 
 		#pragma endregion
@@ -173,8 +170,7 @@ void main()
 }
 )";
 
-		// Shared by every sprite and kept until the process ends, like the
-		// materials' shaders. 0 when it will not compile, which is reported once.
+		// Shared and kept for the process; 0 on a compile failure, reported once.
 		uint32_t Compile(const char* name, const char* source)
 		{
 			try

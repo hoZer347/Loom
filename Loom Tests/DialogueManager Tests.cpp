@@ -25,6 +25,8 @@
 
 using LoomTests::Pump;
 
+#pragma region Helpers
+
 namespace
 {
 	// More frames than any line here takes to stream at no delay per character,
@@ -122,9 +124,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("DialogueManager")
 {
+	#pragma region Streaming
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a manager streams its script into the UiText under it, passing RichText tags through whole")
 	{
 		Box box;
@@ -184,6 +190,10 @@ TEST_SUITE("DialogueManager")
 		CHECK(std::find(commands.begin(), commands.end(), "Shout") != commands.end());
 		CHECK(std::is_sorted(commands.begin(), commands.end()));
 	};
+
+	#pragma endregion
+
+	#pragma region Bindings
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a DialogueBinding on the manager's GameObject runs with the script's arguments")
 	{
@@ -339,6 +349,8 @@ TEST_SUITE("DialogueManager")
 
 		CHECK(Loom::DialogueBindings::Of(gone).empty());
 	};
+
+	#pragma endregion
 };
 
 #endif

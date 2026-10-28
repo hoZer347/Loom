@@ -13,9 +13,7 @@
 
 using LoomTests::Pump;
 using LoomTests::RecordingRenderer;
-
-// How far a projected coordinate may drift from where the math puts it.
-static constexpr float EPSILON = 1e-4f;
+using LoomTests::EPSILON;
 
 
 namespace

@@ -24,8 +24,7 @@ namespace Loom
 	{
 		#pragma region Shadow Map
 
-		// Pushes the casters' depth back by their slope, which is what keeps a
-		// lit surface from shadowing itself in stripes (shadow acne).
+		// Slope-scaled depth bias, against shadow acne.
 		constexpr float SLOPE_OFFSET = 3.0f;
 		constexpr float CONSTANT_OFFSET = 4.0f;
 
@@ -37,11 +36,7 @@ namespace Loom
 
 		constexpr int MIN_RESOLUTION = 1;
 
-		// A one-texel map at the far plane: nothing is in shadow. Bound in place
-		// of a light's own map when there is none, so a shadow sampler always
-		// has a depth texture behind it, and during the shadow pass, so a caster
-		// never samples the map it is drawing into. Shared, and lives until the
-		// process ends.
+		// A one-texel far-plane map bound wherever no shadow map applies, so a sampler always has one.
 		uint32_t NothingInShadow(Renderer& renderer)
 		{
 			static const uint32_t texture = [&renderer]() -> uint32_t
@@ -68,8 +63,7 @@ namespace Loom
 		// With no light to shade by, a material shows its colour as it is.
 		constexpr float UNLIT_AMBIENT = 1.0f;
 
-		// A zero vector has no direction to normalise; straight down is the
-		// least surprising stand-in.
+		// A zero vector falls back to straight down.
 		glm::vec3 Normalised(const glm::vec3& direction)
 		{
 			return glm::length(direction) > 0.0f
@@ -180,8 +174,7 @@ vec3 LoomLight(vec3 normal)
 			return isalnum((unsigned char)c) || c == '_';
 		};
 
-		// A stage uses a library when it calls one of its functions: the whole
-		// name, then the parenthesis, with any whitespace between.
+		// Called is the whole name then the parenthesis, whitespace allowed between.
 		bool Calls(const std::string& source, std::initializer_list<const char*> functions)
 		{
 			for (const char* function : functions)
@@ -285,8 +278,7 @@ vec3 LoomLight(vec3 normal)
 	{
 		Renderer& renderer = *Renderer::Get();
 
-		// The pass is the shader's own vertex stage seen from the light,
-		// so it is handed the light's view-projection in the camera's place.
+		// The light's view-projection stands in for the camera's.
 		mesh.material->Apply(program, &*std::as_const(mesh.variables));
 		renderer.SetUniform(program, "u_viewProjection", m_view_projection);
 		// A transparent shader's pass runs its fragment stage, which may call LoomShadow.
@@ -300,8 +292,7 @@ vec3 LoomLight(vec3 normal)
 		if (gameObject.IsDisabled())
 			return;
 
-		// By type name, the way GetComponent matches: a script library's Mesh
-		// carries its own copy of the type info.
+		// By type name, as GetComponent matches, since a script library's Mesh has its own type info.
 		for (ComponentBase* component : gameObject.GetComponents())
 			if (strcmp(component->GetTypeName(), typeid(Mesh).name()) == 0)
 			{

@@ -20,6 +20,8 @@
 
 using json = nlohmann::json;
 
+#pragma region Helpers
+
 namespace
 {
 	constexpr int GLTF_FLOAT = 5126;
@@ -134,10 +136,7 @@ namespace
 		return nullptr;
 	};
 
-	// Each part drawn as the file's material says: Model.shader, the base
-	// colour, the texture copied out, the vertex colours, the second texture
-	// coordinates as UV_1 and the cutout, or for the glowing part its
-	// emission's colour and texture.
+	// Each part drawn as the file's material says, glow and cutout included.
 	void CheckDressed(Loom::GameObject& model)
 	{
 		Loom::GameObject* painted = Named(model, "Painted");
@@ -230,6 +229,8 @@ namespace
 		return parts;
 	};
 };
+
+#pragma endregion
 
 TEST_SUITE("ModelImporter")
 {

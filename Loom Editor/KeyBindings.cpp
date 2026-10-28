@@ -29,8 +29,7 @@ namespace Loom
 		constexpr const char* action_payload = "LoomAction";
 		constexpr const char* folder_payload = "LoomActionFolder";
 
-		// Between an action's name and where it is in the list, in what the
-		// folders file it by, since actions may share a name.
+		// Between an action's name and its index, since actions may share a name.
 		constexpr char index_mark = '\x1f';
 
 		#pragma endregion
@@ -374,8 +373,7 @@ namespace Loom
 
 			if (const std::optional<Key> picked = DrawKey("##Key", shown[i]))
 			{
-				// None takes a key out of a combination, though not its last,
-				// even one not chosen yet.
+				// None takes a key out of a combination, though not its last.
 				if (*picked == Key::None && shown.size() > 1)
 				{
 					unset = i;

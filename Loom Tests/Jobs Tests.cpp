@@ -11,6 +11,8 @@
 #include <vector>
 
 
+#pragma region Helpers
+
 namespace
 {
 	constexpr size_t GRAIN = 16;
@@ -57,8 +59,12 @@ namespace
 	};
 };
 
+#pragma endregion
+
 TEST_SUITE("Jobs")
 {
+	#pragma region For
+
 	TEST_CASE("For gives out every chunk once, with its own range, whatever the count")
 	{
 		constexpr size_t COUNTS[] = { 0, 1, GRAIN - 1, GRAIN, GRAIN + 1, GRAIN * 64, GRAIN * 64 + 3 };
@@ -151,6 +157,10 @@ TEST_SUITE("Jobs")
 		CHECK(cores >= Loom::Jobs::Threads());
 	};
 
+	#pragma endregion
+
+	#pragma region Waiting
+
 	TEST_CASE("WaitFor returns at once for a counter already there")
 	{
 		std::atomic<int> counter{ 3 };
@@ -211,4 +221,6 @@ TEST_SUITE("Jobs")
 		CHECK(good == 2 * ROUNDS);
 	};
 #endif
+
+	#pragma endregion
 };

@@ -153,9 +153,7 @@ namespace Loom
 
 		ClearText();
 
-		// Qualified deliberately: this must empty the machine's queue, not the text box,
-		// which ClearText() above already did. Without it a second Begin() would append
-		// its states behind whatever was left of the first.
+		// Qualified: empties the machine's queue, not the text box.
 		StateMachineBase::Clear();
 
 		for (const std::string& split : Tokens(text))
@@ -296,8 +294,7 @@ namespace Loom
 
 	GameObject* DialogueManagerBase::Object() const
 	{
-		// GetGameObject is not const only because a machine hands out its object to
-		// change.
+		// GetGameObject is only non-const so a machine can hand its object out to change.
 		return const_cast<DialogueManagerBase*>(this)->GetGameObject();
 	};
 
@@ -425,8 +422,7 @@ namespace Loom
 
 	std::vector<std::string> DialogueManagerBase::Tokens(const std::string& text)
 	{
-		// Every piece the regex carves the script into, the matches and the text between
-		// them alike, in order.
+		// The regex's matches and the text between, in order.
 		std::vector<std::string> pieces;
 
 		auto begin = std::sregex_iterator(text.begin(), text.end(), TokenRegex());
@@ -450,16 +446,14 @@ namespace Loom
 
 		std::vector<std::string> tokens;
 
-		// An emptied box takes no leading whitespace, or the file's line breaks stream as
-		// text.
+		// An emptied box skips leading whitespace, or the file's line breaks stream.
 		bool pageStart = true;
 
 		for (size_t at = 0; at < pieces.size(); at++)
 		{
 			const std::string& split = pieces[at];
 
-			// Line breaks between commands are the file's layout; spaces beside a RichText
-			// tag are the line's own.
+			// Breaks between commands are layout; spaces beside a tag are text.
 			const bool besideTag = (at > 0 && IsRichText(pieces[at - 1])) || (at + 1 < pieces.size() && IsRichText(pieces[at + 1]));
 
 			if (IsAllWhitespace(split) && (!besideTag || split.find('\n') != std::string::npos))

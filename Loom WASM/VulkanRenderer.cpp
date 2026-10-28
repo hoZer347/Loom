@@ -43,20 +43,14 @@ namespace Loom
 
 		#pragma region Pipeline Keys
 
-		// Where each part of a pipeline's key sits: the topology in the low
-		// byte, then the colour format, then whether there is depth, then
-		// whether the viewport is flipped, then whether colour is written, then
-		// the vertex format.
+		// Key layout: topology low byte, then colour format, depth, flip, colour write, vertex format.
 		constexpr int FORMAT_SHIFT = 8;
 		constexpr int DEPTH_SHIFT = 40;
 		constexpr int FLIP_SHIFT = 41;
 		constexpr int COLOR_WRITE_SHIFT = 42;
 		constexpr int VERTEX_FORMAT_SHIFT = 43;
 
-		// A pipeline's key: the state packed as above, then the vertices'
-		// stride, and for each UV layer slot the program reads, in turn, where
-		// in each vertex it reads from and how many words, packed by
-		// SLOT_WORDS_BITS, or 0 when it reads the zeros of NO_UV_BINDING.
+		// The state as above, the stride, then each UV slot's offset and word count, or 0.
 		struct PipelineKey
 		{
 			uint64_t state = 0;
@@ -86,8 +80,7 @@ namespace Loom
 		constexpr VkFormat COLOR_TARGET_FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
 		constexpr VkFormat DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
 
-		// Vertices and uniform blocks are written into host-visible chunks of
-		// this size, reused once their frame has finished on the GPU.
+		// Host-visible chunks, reused once their frame finishes on the GPU.
 		constexpr VkDeviceSize CHUNK_SIZE = 4 * 1024 * 1024;
 
 		constexpr uint32_t IMGUI_DESCRIPTORS = 1024;
@@ -111,10 +104,7 @@ namespace Loom
 		constexpr uint32_t COLOR_SIZE = COLOR_COMPONENTS * sizeof(float);
 		constexpr float NO_COLOR[COLOR_COMPONENTS] = { 1.0f, 1.0f, 1.0f, 1.0f };
 
-		// The vertices' binding, the one aNormal reads its zeros from when
-		// they have no normals, the one DrawInstances hands its instances in,
-		// the one aColor reads its white from when they have no colours, and
-		// the one a UV layer slot reads its zeros from when they lack its layer.
+		// Vertex, zero normal, instance, white colour and zero UV bindings.
 		constexpr uint32_t VERTEX_BINDING = 0;
 		constexpr uint32_t NO_NORMAL_BINDING = 1;
 		constexpr uint32_t INSTANCE_BINDING = 2;
@@ -243,8 +233,7 @@ namespace Loom
 		{
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 			VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
-			// Core in 1.3, but ImGui's backend looks it up by its KHR names to
-			// draw the windows dragged out of the main one.
+			// Core in 1.3, but ImGui's backend looks it up by its KHR name.
 			VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
 			// GL's -1 to 1 clip space depth, so shaders and projections carry over.
 			VK_EXT_DEPTH_CLIP_CONTROL_EXTENSION_NAME,
@@ -316,8 +305,7 @@ namespace Loom
 		{
 			m_window = window;
 
-			// Asked before any Vulkan call, so a machine without a Vulkan driver
-			// never needs the loader the engine is linked against.
+			// Asked first, so a machine without a Vulkan driver never needs the loader.
 			if (!glfwVulkanSupported())
 				return false;
 
@@ -377,8 +365,7 @@ namespace Loom
 			info.ImageCount = (uint32_t)m_swapImages.size();
 			info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
-			// ImGui draws in a pass of its own over the window's colour, with no
-			// depth. The backend sets up the windows dragged out of this one.
+			// ImGui draws in its own depthless pass over the window's colour.
 			info.UseDynamicRendering = true;
 			info.PipelineInfoMain.PipelineRenderingCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR };
 			info.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
@@ -747,8 +734,7 @@ namespace Loom
 			DrawKept(program, primitive, vertices, instances, count);
 		};
 
-		// Draws kept vertices once, or once for each of instanceCount instances
-		// when there are instances.
+		// Once, or once per instance.
 		void DrawKept(uint32_t program, uint32_t primitive, uint32_t handle, const float* instances, size_t instanceCount)
 		{
 			const auto found = m_kept.find(handle);
@@ -758,9 +744,7 @@ namespace Loom
 
 			Kept& kept = found->second;
 
-			// Moving them costs a wait on the GPU, so only vertices set to stay
-			// that have also stayed a whole frame are moved, and any still
-			// changing are handed over afresh with each draw, as Draw's are.
+			// Moving costs a GPU wait, so only vertices stable for a whole frame move.
 			if (!kept.buffer && kept.settles && kept.setOn != m_framesBegun)
 				Settle(kept);
 
@@ -795,10 +779,7 @@ namespace Loom
 			m_kept.erase(found);
 		};
 
-		// Draws count vertices laid out as layout says, once for each of
-		// instances, which bind puts in VERTEX_BINDING, and the instances in
-		// INSTANCE_BINDING, given the command, how many are drawn (one more
-		// than count for a loop, closed on its first) and their stride.
+		// Vertices bound by bind, instances in INSTANCE_BINDING; a loop draws one more.
 		template<typename Bind>
 		void DrawWith(uint32_t handle, uint32_t primitive, size_t count, const VertexLayout& layout, size_t instances, const Bind& bind)
 		{
@@ -868,8 +849,7 @@ namespace Loom
 				vkCmdBindVertexBuffers(command, NO_UV_BINDING, 1, &noUV.buffer, &noUV.offset);
 			};
 
-			// Members, so a draw allocates nothing; reserved, so the writes'
-			// pointers into images stay put.
+			// Members so a draw allocates nothing; reserved so image pointers stay put.
 			std::vector<VkWriteDescriptorSet>& writes = m_writes;
 			std::vector<VkDescriptorImageInfo>& images = m_images;
 			writes.clear();
@@ -972,8 +952,7 @@ namespace Loom
 
 			texture.sampler = CreateSampler(true);
 
-			// Starts at the far plane, so a map nothing has been drawn into yet
-			// puts nothing in shadow.
+			// Cleared to the far plane, so an empty map shadows nothing.
 			Immediately([&](VkCommandBuffer command)
 			{
 				Transition(command, texture.depth.image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -1192,8 +1171,7 @@ namespace Loom
 			float rgba[RGBA]{ };
 		};
 
-		// A plain texture has only colour, a depth target only depth, and a
-		// colour target both. Whichever is there first is what a shader samples.
+		// A texture has colour, a depth target depth, a colour target both; the first is sampled.
 		struct Texture
 		{
 			Attachment color;
@@ -1204,8 +1182,7 @@ namespace Loom
 			Pending pending;
 			VkDescriptorSet imgui = VK_NULL_HANDLE;
 
-			// A colour target's depth as TargetDepth hands it out, and the target
-			// it is the depth of, which owns the image.
+			// A colour target's depth view, and the target that owns its image.
 			uint32_t depthView = 0;
 			bool borrowed = false;
 
@@ -1269,9 +1246,7 @@ namespace Loom
 			VkDeviceSize used = 0;
 		};
 
-		// What CreateVertices handed out: vertices in a buffer of their own on
-		// the GPU, or as they were handed over until then. settles says they
-		// were set to stay, and setOn is the frame they were set in.
+		// Vertices on the GPU, or as handed over until then; settles and setOn track staying.
 		struct Kept
 		{
 			VkBuffer buffer = VK_NULL_HANDLE;
@@ -1378,8 +1353,7 @@ namespace Loom
 				destroy(m_instance, m_messenger, nullptr);
 		};
 
-		// The first device that can do everything this needs, a discrete one
-		// over any other.
+		// The first capable device, discrete first.
 		bool PickDevice()
 		{
 			uint32_t count = 0;
@@ -1438,8 +1412,7 @@ namespace Loom
 
 			std::vector<const char*> extensions(DEVICE_EXTENSIONS.begin(), DEVICE_EXTENSIONS.end());
 
-			// Lets a shader that draws points leave gl_PointSize alone, as GL
-			// does. Without it such points are a size the driver picks.
+			// Lets points leave gl_PointSize alone, as GL does.
 			VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_FEATURES_KHR };
 			maintenance5.maintenance5 = VK_TRUE;
 
@@ -1465,8 +1438,7 @@ namespace Loom
 
 			vkGetDeviceQueue(m_device, m_queueFamily, 0, &m_queue);
 
-			// Through the device rather than the loader's exports, which an older
-			// loader than these headers may not have.
+			// Through the device, since an older loader may not export it.
 			m_pushDescriptorSet = (PFN_vkCmdPushDescriptorSetKHR)vkGetDeviceProcAddr(m_device, "vkCmdPushDescriptorSetKHR");
 			m_beginRendering = (PFN_vkCmdBeginRendering)vkGetDeviceProcAddr(m_device, "vkCmdBeginRendering");
 			m_endRendering = (PFN_vkCmdEndRendering)vkGetDeviceProcAddr(m_device, "vkCmdEndRendering");
@@ -1607,8 +1579,7 @@ namespace Loom
 			return formats.empty() ? VK_FORMAT_B8G8R8A8_UNORM : formats.front().format;
 		};
 
-		// FIFO waits for the display, which every surface has. Without vsync, a
-		// mode that does not wait, tearing-free first.
+		// FIFO always exists; without vsync, a non-waiting mode, tearing-free first.
 		VkPresentModeKHR PresentMode() const
 		{
 			if (Engine::vsync)
@@ -1702,8 +1673,7 @@ namespace Loom
 			BeginRendering(target, true);
 		};
 
-		// Starts drawing into a target, loading what is in it or clearing it to
-		// what Clear asked for.
+		// Loads the target's contents or clears to what Clear asked.
 		void BeginRendering(uint32_t target, bool withDepth)
 		{
 			const VkCommandBuffer command = Command();
@@ -1789,9 +1759,7 @@ namespace Loom
 			m_renderingFormat = colorImage ? (target == WINDOW ? m_swapFormat : COLOR_TARGET_FORMAT) : VK_FORMAT_UNDEFINED;
 			m_boundPipeline = VK_NULL_HANDLE;
 
-			// The window is drawn upside down, which puts GL's bottom-up rows
-			// the right way up on screen. A texture is drawn the right way up,
-			// so it reads back bottom row first the way a GL one does.
+			// The window draws flipped to right GL's rows; textures read back bottom row first.
 			const bool flipped = target == WINDOW;
 			const VkViewport viewport =
 			{
@@ -1822,8 +1790,7 @@ namespace Loom
 			if (m_renderingTarget == WINDOW)
 				return;
 
-			// Back to being sampled, which is how every texture waits between
-			// passes. A colour target's depth can be sampled as well.
+			// Back to sampled, how every texture waits between passes.
 			Texture& texture = m_textures.at(m_renderingTarget);
 
 			if (texture.color.image)
@@ -1873,8 +1840,7 @@ namespace Loom
 			vkCmdClearAttachments(Command(), (uint32_t)clears.size(), clears.data(), 1, &rect);
 		};
 
-		// Everything before against everything after. Coarse, and every pass
-		// boundary in a frame here is one of these.
+		// A full barrier, as every pass boundary here is.
 		static void Transition(VkCommandBuffer command, VkImage image, VkImageAspectFlags aspect, VkImageLayout from, VkImageLayout to)
 		{
 			VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
@@ -1948,10 +1914,7 @@ namespace Loom
 			stages[1].pName = "main";
 			stages[1].pSpecializationInfo = &specialization;
 
-			// Without texture coordinates, aUV reads the position's x and y,
-			// without normals, aNormal reads one normal of zeros for the whole
-			// draw, and without colours, aColor reads one white, as they do
-			// under GL.
+			// Missing attributes read GL's defaults: position for UV, zero normal, white colour.
 			const uint32_t uvOffset = format != VertexFormat::Position ? UV_OFFSET : 0;
 
 			std::vector<VkVertexInputBindingDescription> bindings = { { VERTEX_BINDING, stride, VK_VERTEX_INPUT_RATE_VERTEX } };
@@ -2025,8 +1988,7 @@ namespace Loom
 			viewport.viewportCount = 1;
 			viewport.scissorCount = 1;
 
-			// Flipping the viewport turns GL's counter-clockwise front faces
-			// clockwise.
+			// The flipped viewport turns GL's counter-clockwise front faces clockwise.
 			VkPipelineRasterizationStateCreateInfo raster{ VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
 			raster.polygonMode = VK_POLYGON_MODE_FILL;
 			raster.cullMode = VK_CULL_MODE_NONE;
@@ -2085,8 +2047,7 @@ namespace Loom
 
 			VkPipeline pipeline = VK_NULL_HANDLE;
 
-			// Remembered either way, so a pipeline the driver refuses is reported
-			// once rather than every frame.
+			// Remembered either way, so a refused pipeline is reported once.
 			if (!Succeeded(vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &info, nullptr, &pipeline), ("creating a pipeline for " + program.name).c_str()))
 				pipeline = VK_NULL_HANDLE;
 
@@ -2115,8 +2076,7 @@ namespace Loom
 
 			for (const SpvReflectDescriptorBinding* binding : bindings)
 			{
-				// One the stage never reads is left without a binding of its own, so
-				// it can share one with what it does read.
+				// Unread bindings share one with what the stage reads.
 				if (!binding->accessed)
 					continue;
 
@@ -2185,8 +2145,7 @@ namespace Loom
 		{
 			const auto found = m_textures.find(sampler.texture);
 
-			// Whatever is behind it has to match the sampler's kind: a shadow
-			// sampler reads a depth texture.
+			// A shadow sampler needs a depth texture behind it.
 			if (found != m_textures.end() && found->second.Shadow() == sampler.shadow)
 				return found->second;
 
@@ -2253,8 +2212,7 @@ namespace Loom
 			return UINT32_MAX;
 		};
 
-		// Host visible and mapped into mapped, unless properties says otherwise
-		// and mapped is null.
+		// Host visible and mapped unless properties says otherwise.
 		bool CreateBuffer(
 			VkDeviceSize size,
 			VkBufferUsageFlags usage,
@@ -2365,8 +2323,7 @@ namespace Loom
 			attachment = Attachment{ };
 		};
 
-		// A shadow sampler compares rather than reads, and linear filtering on
-		// a compared texture is a free 2x2 PCF.
+		// Compare filtering on a shadow sampler is a free 2x2 PCF.
 		VkSampler CreateSampler(bool compare, VkFilter filter = VK_FILTER_LINEAR)
 		{
 			VkSamplerCreateInfo info{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
@@ -2422,9 +2379,7 @@ namespace Loom
 
 		#pragma region Kept Vertices
 
-		// Moves kept's vertices into a buffer of their own on the GPU, with the
-		// first vertex once more after the last, which a loop closes on. Left
-		// streamed if there is no room for them there.
+		// Moves vertices onto the GPU, first repeated for loops; left streamed if out of room.
 		void Settle(Kept& kept)
 		{
 			kept.settles = false;
@@ -2501,8 +2456,7 @@ namespace Loom
 
 		#pragma region Immediate Commands
 
-		// Records and runs commands outside the frame, waiting for them: for
-		// setting a resource up, which can happen in the middle of a pass.
+		// Runs setup commands outside the frame and waits for them.
 		template<typename Record>
 		void Immediately(const Record& record)
 		{
@@ -2562,8 +2516,7 @@ namespace Loom
 			return readback;
 		};
 
-		// Hands the window's pixels over the way GL reads them: red first and
-		// bottom row first.
+		// In GL's order: red first, bottom row first.
 		void DeliverReadback(Readback& readback)
 		{
 			constexpr int BYTES_PER_PIXEL = 3;

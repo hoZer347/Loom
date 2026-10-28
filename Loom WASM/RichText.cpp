@@ -86,8 +86,7 @@ namespace Loom
 			return color;
 		};
 
-		// The tag token names, brackets and all, or nothing when it is not one
-		// or its argument will not read.
+		// The tag a token names, or nothing for a non-tag or unreadable argument.
 		std::optional<Tag> Parse(const std::string& token)
 		{
 			if (token.size() < 2 || token.front() != OPEN_BRACKET || token.back() != CLOSE_BRACKET)

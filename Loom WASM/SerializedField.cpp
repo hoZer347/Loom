@@ -32,10 +32,7 @@ namespace Loom
 		// Shorter arrays write quickly enough not to keep.
 		constexpr size_t KEPT_ARRAY_LENGTH = 1024;
 
-		// %g with enough digits to round-trip, so a value written and read back
-		// is the same value rather than nearly the same one. to_chars writes
-		// what snprintf would, many times faster, which a scene holding meshes
-		// of a million floats needs.
+		// Round-trip %g through to_chars, many times faster than snprintf on large meshes.
 		template <typename T>
 		void AppendNumber(std::string& text, T value)
 		{
@@ -138,8 +135,7 @@ namespace Loom
 			return true;
 		};
 
-		// As ReadInteger, by strtof and strtod: the web's libc++ has no
-		// floating point from_chars.
+		// strtof and strtod, since the web's libc++ has no floating point from_chars.
 		template <typename T>
 		bool ReadReal(const std::string& text, void* data)
 		{
@@ -259,8 +255,7 @@ namespace Loom
 				continue;
 			};
 
-			// camelCase breaks before an upper case letter, but an acronym like ID
-			// stays one word.
+			// Breaks before an upper case letter, keeping acronyms like ID whole.
 			if (isupper((unsigned char)c) && islower((unsigned char)previous))
 				word_start = true;
 
@@ -467,11 +462,7 @@ namespace Loom
 
 			SetReference(LoomObject::GetByGuid(guid));
 
-			// What actually landed, not what was found: an object of a type this
-			// field cannot hold leaves it null, and saying otherwise would turn
-			// that into a silently dropped value. A target that does not exist
-			// yet reads the same way, which is the loader's cue to come back to
-			// it once the rest of the file has been built.
+			// What landed, not what was found, so the loader knows to come back to it.
 			return GetReference() != nullptr;
 		};
 		};

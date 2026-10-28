@@ -23,8 +23,7 @@ namespace Loom
 			ImGui::TextUnformatted("(disabled)");
 		};
 
-		// A parallel state is several states at once, and a monitor that names only the
-		// wrapper says nothing about what is actually running.
+		// Names the parallel's sub-states, not just the wrapper.
 		if (const auto* subStates = StateMachineBase::SubStatesOf(current))
 			for (const auto& state : *subStates)
 				ImGui::BulletText("%s", state ? state->Name().c_str() : "<null>");
@@ -77,8 +76,7 @@ namespace Loom
 
 		const std::string& name = reference.StateType();
 
-		// A name nothing is registered under is kept rather than dropped, since
-		// the scripts that register it may just not be built yet.
+		// Unregistered names are kept, as their scripts may not be built yet.
 		const std::string shown =
 			name.empty() ? none :
 			reference.IsSet() ? name :

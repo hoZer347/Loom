@@ -27,14 +27,16 @@
 #include <string>
 #include <vector>
 
+using LoomTests::EPSILON;
+
+
+#pragma region Helpers
 
 namespace
 {
 	using Loom::EditableMesh;
 	using Loom::ModelEditor;
 	namespace Shapes = Loom::Shapes;
-
-	constexpr float TOLERANCE = 1e-4f;
 
 	std::string ReadFile(const std::string& path)
 	{
@@ -247,8 +249,12 @@ namespace
 	};
 };
 
+#pragma endregion
+
 TEST_SUITE("ModelEditor")
 {
+	#pragma region Opening
+
 	TEST_CASE("The Model panel opens a prefab's mesh with its triangles welded back into quads")
 	{
 		Driven driven("model_opens");
@@ -312,6 +318,10 @@ TEST_SUITE("ModelEditor")
 		CHECK(captured.Says(path));
 	};
 
+	#pragma endregion
+
+	#pragma region Picking
+
 	TEST_CASE("The Model panel goes on to edit the part whose face is clicked")
 	{
 		// A lid floating a cube's height above it.
@@ -361,7 +371,7 @@ TEST_SUITE("ModelEditor")
 		REQUIRE(driven.editor.Selected()->faces.size() == 1);
 
 		const uint32_t face = *driven.editor.Selected()->faces.begin();
-		CHECK(driven.Mesh().FaceNormal(face).y > 1.0f - TOLERANCE);
+		CHECK(driven.Mesh().FaceNormal(face).y > 1.0f - EPSILON);
 
 		driven.Click(ImVec2(Driven::width - 10.0f, Driven::height - 40.0f));
 		CHECK(driven.editor.Selected()->faces.empty());
@@ -378,6 +388,10 @@ TEST_SUITE("ModelEditor")
 		// hidden behind the cube.
 		CHECK(driven.editor.Selected()->vertices.size() == 7);
 	};
+
+	#pragma endregion
+
+	#pragma region Shaping
 
 	TEST_CASE("The Model panel's move arrow lifts the picked face, and undo puts it back")
 	{
@@ -402,15 +416,15 @@ TEST_SUITE("ModelEditor")
 		driven.Drag(ImVec2(middle.x + up.x * grab, middle.y + up.y * grab), ImVec2(middle.x + up.x * (grab + pull), middle.y + up.y * (grab + pull)));
 
 		const glm::vec3 moved = driven.Mesh().FaceCentre(face);
-		CHECK(moved.y > centre.y + TOLERANCE);
-		CHECK(std::abs(moved.x - centre.x) < TOLERANCE);
-		CHECK(std::abs(moved.z - centre.z) < TOLERANCE);
+		CHECK(moved.y > centre.y + EPSILON);
+		CHECK(std::abs(moved.x - centre.x) < EPSILON);
+		CHECK(std::abs(moved.z - centre.z) < EPSILON);
 
 		driven.editor.Undo();
-		CHECK(std::abs(driven.Mesh().FaceCentre(face).y - centre.y) < TOLERANCE);
+		CHECK(std::abs(driven.Mesh().FaceCentre(face).y - centre.y) < EPSILON);
 
 		driven.editor.Redo();
-		CHECK(std::abs(driven.Mesh().FaceCentre(face).y - moved.y) < TOLERANCE);
+		CHECK(std::abs(driven.Mesh().FaceCentre(face).y - moved.y) < EPSILON);
 	};
 
 	TEST_CASE("The Model panel's middle handles size and turn the picked face about its middle")
@@ -441,17 +455,21 @@ TEST_SUITE("ModelEditor")
 
 		const float sized = side();
 		CHECK(sized > 1.5f);
-		CHECK(glm::distance(driven.Mesh().FaceCentre(face), centre) < TOLERANCE);
+		CHECK(glm::distance(driven.Mesh().FaceCentre(face), centre) < EPSILON);
 
 		const glm::vec3 corner = driven.Mesh().vertices[driven.Mesh().faces[face].corners[0].vertex];
 
 		driven.editor.SetTool(ModelEditor::Tool::Rotate);
 		driven.Drag(ImVec2(middle.x + ring, middle.y), ImVec2(middle.x, middle.y - ring));
 
-		CHECK(std::abs(side() - sized) < TOLERANCE);
-		CHECK(glm::distance(driven.Mesh().FaceCentre(face), centre) < TOLERANCE);
+		CHECK(std::abs(side() - sized) < EPSILON);
+		CHECK(glm::distance(driven.Mesh().FaceCentre(face), centre) < EPSILON);
 		CHECK(glm::distance(driven.Mesh().vertices[driven.Mesh().faces[face].corners[0].vertex], corner) > 0.1f);
 	};
+
+	#pragma endregion
+
+	#pragma region Saving
 
 	TEST_CASE("The Model panel saves an extrusion into the prefab, keeping its guids")
 	{
@@ -482,7 +500,7 @@ TEST_SUITE("ModelEditor")
 
 		const EditableMesh* mesh = reopened.Editing();
 		REQUIRE(mesh != nullptr);
-		CHECK(mesh->Bounds().second.y > 0.5f + TOLERANCE);
+		CHECK(mesh->Bounds().second.y > 0.5f + EPSILON);
 	};
 
 	TEST_CASE("The Model panel saves an extrusion's walls with the UV layer words of the corners they rise from")
@@ -539,6 +557,10 @@ TEST_SUITE("ModelEditor")
 		const auto tops = [top](const std::vector<uint32_t>& words) { return std::ranges::count(words, top); };
 		CHECK(tops(layers[0].values) == tops(heights.values) + WALLS * CORNERS_PER_WALL);
 	};
+
+	#pragma endregion
+
+	#pragma region Shapes and Reloading
 
 	TEST_CASE("The Model panel adds a shape, deletes what is picked, and steps back through both")
 	{
@@ -619,6 +641,10 @@ TEST_SUITE("ModelEditor")
 		std::error_code code;
 		std::filesystem::remove(path, code);
 	};
+
+	#pragma endregion
+
+	#pragma region Shaders
 
 	// The mesh's new material reads the project's shader, which the web build
 	// fetches, and node cannot.
@@ -703,6 +729,10 @@ TEST_SUITE("ModelEditor")
 	};
 #endif
 
+	#pragma endregion
+
+	#pragma region Controls
+
 	TEST_CASE("The Model panel's Esc puts a dragged face back and keeps what redo would do")
 	{
 		Driven driven("model_escape");
@@ -733,16 +763,16 @@ TEST_SUITE("ModelEditor")
 		io.AddMousePosEvent(middle.x + up.x * (grab + pull), middle.y + up.y * (grab + pull));
 		driven.Frame();
 
-		REQUIRE(driven.Mesh().FaceCentre(face).y > centre.y + TOLERANCE);
+		REQUIRE(driven.Mesh().FaceCentre(face).y > centre.y + EPSILON);
 
 		driven.Key(ImGuiKey_Escape);
 		io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
 		driven.Frame();
 
-		CHECK(std::abs(driven.Mesh().FaceCentre(face).y - centre.y) < TOLERANCE);
+		CHECK(std::abs(driven.Mesh().FaceCentre(face).y - centre.y) < EPSILON);
 
 		driven.editor.Redo();
-		CHECK(driven.Mesh().FaceNormal(face).y < -1.0f + TOLERANCE);
+		CHECK(driven.Mesh().FaceNormal(face).y < -1.0f + EPSILON);
 	};
 
 	TEST_CASE("The Model panel's extrude of faces facing every way does nothing, and is no step")
@@ -791,4 +821,6 @@ TEST_SUITE("ModelEditor")
 
 		CHECK(ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId));
 	};
+
+	#pragma endregion
 };

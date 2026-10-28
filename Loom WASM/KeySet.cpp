@@ -7,9 +7,7 @@ namespace Loom
 {
 	namespace
 	{
-		// Grown to keep at least this many slots for each key, from this
-		// many; a key's two addresses mixed by two large odd numbers, keeping
-		// the high bits, which they stir the most.
+		// Grown to keep this many slots a key; addresses mixed by large odd numbers, high bits kept.
 		constexpr size_t MOST_FULL = 2;
 		constexpr size_t LEAST_SLOTS = 1024;
 		constexpr uint64_t FIRST_MIX = 0x9E3779B97F4A7C15ull;
@@ -53,8 +51,7 @@ namespace Loom
 
 		m_count--;
 
-		// Those after it that would rather sit in the hole move back into it,
-		// so none is left past a gap from where it belongs.
+		// Those after it move back into the hole, so none sits past a gap.
 		for (size_t next = (hole + 1) & mask; m_slots[next].first != nullptr; next = (next + 1) & mask)
 		{
 			const size_t home = Home(m_slots[next]);

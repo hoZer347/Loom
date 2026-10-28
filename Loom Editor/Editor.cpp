@@ -81,16 +81,14 @@ namespace Loom
 		constexpr ImGuiTreeNodeFlags header_flags =
 			ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap;
 
-		// A category of a component's fields, inside that component's own
-		// header, folded until it is opened.
+		// A category of fields, folded until opened.
 		constexpr ImGuiTreeNodeFlags field_group_flags = ImGuiTreeNodeFlags_SpanAvailWidth;
 
 		#pragma endregion
 
 		#pragma region Window Buttons
 
-		// How much deeper the menu bar is than a frame, for room to take the
-		// window by now that it stands in for the title bar.
+		// How much deeper the menu bar is than a frame, for room to drag the window by.
 		constexpr float menu_bar_padding = 1.375f;
 
 		constexpr int window_button_count = 3;
@@ -105,9 +103,7 @@ namespace Loom
 
 		#pragma region Field Groups
 
-		// One thing an object's inspector draws: a field or a Button, by where
-		// it is in their list, or a group of them, by where it is in its
-		// parent's.
+		// A field or Button by index, or a group of them by index in its parent.
 		struct FieldItem
 		{
 			enum Kind { Field, Button, Group };
@@ -116,9 +112,7 @@ namespace Loom
 			size_t index = 0;
 		};
 
-		// Fields and Buttons by the category they were named under, nested at
-		// each '/'. Everything a group holds, its own fields and Buttons and
-		// the groups in it, keeps the order the first of each was declared in.
+		// Fields and Buttons by category, nested at each '/', in declaration order.
 		struct FieldGroup
 		{
 			std::string label;
@@ -173,8 +167,6 @@ namespace Loom
 			return top;
 		};
 
-		// What a group holds in order, each group in it under a heading that
-		// folds it open and shut.
 		template <typename DrawItem>
 		void DrawFieldGroup(const FieldGroup& group, const DrawItem& draw_item)
 		{
@@ -234,9 +226,7 @@ namespace Loom
 
 		#pragma region Paths
 
-		// Sits beside the executable and holds what the editor remembers between
-		// runs. Beside the executable rather than in the working directory,
-		// because opening a project moves the working directory to it.
+		// Beside the executable, since opening a project moves the working directory.
 		std::filesystem::path BesideExecutable(const char* file)
 		{
 			char buffer[MAX_PATH]{ };
@@ -285,8 +275,7 @@ namespace Loom
 			return false;
 		};
 
-		// The nearest folder above a file with a project file in it, or the
-		// file's own folder when there is none.
+		// The nearest folder above file with a project file, or the file's own folder.
 		std::filesystem::path ProjectFolderOf(const std::filesystem::path& file)
 		{
 			std::filesystem::path folder = file.parent_path();
@@ -302,8 +291,6 @@ namespace Loom
 			return folder;
 		};
 
-		// The projects under <engine>/Demos: each folder there with a project
-		// file in it.
 		std::vector<std::filesystem::path> DemoProjects()
 		{
 			std::vector<std::filesystem::path> demos{ };
@@ -323,8 +310,7 @@ namespace Loom
 
 		#pragma region Timing
 
-		// A window docked on the frame it first appears only takes its tab on
-		// the one after.
+		// A window docked on its first frame only takes its tab on the next.
 		constexpr int prefab_focus_frames = 2;
 
 		// How often the editor checks whether a shader file was edited outside it.
@@ -334,8 +320,7 @@ namespace Loom
 
 		#pragma region Hierarchy Eye
 
-		// The Hierarchy's eye, against the font size: its half-width, how far
-		// its lids bow from the middle, its pupil, and its lashes when closed.
+		// The Hierarchy eye against the font size: half-width, lid bow, pupil and lashes.
 		constexpr float eye_half_width = 0.42f;
 		constexpr float eye_lid_bow = 0.5f;
 		constexpr float eye_pupil = 0.16f;
@@ -346,8 +331,6 @@ namespace Loom
 		// Where each lash leaves the lower lid, as a fraction of its width.
 		constexpr float eye_lash_positions[] = { -0.5f, 0.0f, 0.5f };
 
-		// Where the eye goes on the Hierarchy row about to be drawn: square, at
-		// its right end.
 		ImRect EyeRect()
 		{
 			const float size = ImGui::GetFontSize();
@@ -412,9 +395,7 @@ namespace Loom
 
 		void OnDrop(GLFWwindow* window, int count, const char** paths)
 		{
-			// The OS swallows mouse moves while it drags, so ImGui still thinks
-			// the cursor is wherever it left the window. With viewports on,
-			// ImGui works in screen coordinates rather than the window's.
+			// The OS swallows mouse moves while dragging; with viewports, ImGui works in screen space.
 			double x = 0.0;
 			double y = 0.0;
 			glfwGetCursorPos(window, &x, &y);
@@ -433,8 +414,7 @@ namespace Loom
 				drop_receiver->Drop(paths[i], (float)x, (float)y);
 		};
 
-		// On every OS window ImGui has, since a panel dragged out of the main
-		// window takes drops in a window of its own.
+		// On every OS window, since a panel dragged out takes drops in its own.
 		void SetDropCallback(GLFWdropfun callback)
 		{
 			for (ImGuiViewport* viewport : ImGui::GetPlatformIO().Viewports)
@@ -446,8 +426,6 @@ namespace Loom
 
 		#pragma region Panels
 
-		// What is docked in the middle: the views, and the shader, dialogue,
-		// sprite and model editors.
 		constexpr const char* centre_windows[] = { EditorPanels::Game, EditorPanels::Debug, EditorPanels::PrefabId, EditorPanels::Shaders, EditorPanels::Dialogues, EditorPanels::Sprites, EditorPanels::Model };
 
 		// What lights the Prefab panel, which the Hierarchy leaves out.
@@ -473,8 +451,7 @@ namespace Loom
 		// Inspector field names longer than this are cut, however wide the panel.
 		constexpr size_t max_label_chars = 20;
 
-		// The most of the Inspector's width the label column may take before
-		// the labels start shrinking with it.
+		// The most of the Inspector's width the label column takes before labels shrink.
 		constexpr float max_label_share = 0.4f;
 
 		// Significant digits with no trailing zeros, so 1 draws as 1 rather than 1.000.
@@ -504,9 +481,7 @@ namespace Loom
 			return shown + ellipsis;
 		};
 
-		// Labels sit left of their widgets, Unity-style, in a column as wide as
-		// the longest one and no wider. longest seeds it with any label drawn
-		// beside the fields.
+		// Labels sit left in a column as wide as the longest; longest seeds it.
 		float LabelColumn(const std::vector<std::string>& labels, float longest)
 		{
 			for (const std::string& label : labels)
@@ -515,8 +490,7 @@ namespace Loom
 			return (std::min)(longest, ImGui::GetContentRegionAvail().x * max_label_share);
 		};
 
-		// The label column for an object's fields: wide enough for each label as
-		// far in as its categories nest it.
+		// Wide enough for each label as deep as its categories nest it.
 		float FieldLabelColumn(const LoomObject& object, const std::vector<std::string>& labels)
 		{
 			const std::vector<SerializedField>& fields = object.GetFields();
@@ -577,9 +551,7 @@ namespace Loom
 			return std::filesystem::path(path).extension() == SpriteAsset::extension || ProjectAssets::IsTextureFile(path);
 		};
 
-		// What a Sprite made from a texture or sprite file in the Project panel
-		// draws: the texture, or the image the sprite is flattened into, with
-		// forward slashes as every saved path has.
+		// The texture, or the sprite flattened to an image, with forward slashes.
 		std::string SpriteImage(const std::string& path)
 		{
 			if (std::filesystem::path(path).extension() == SpriteAsset::extension)
@@ -592,9 +564,7 @@ namespace Loom
 
 		#pragma region Dragging
 
-		// Components carry no name of their own, so one is shown as its type on
-		// the GameObject that holds it. A scene's root is shown as the scene,
-		// as the hierarchy draws it.
+		// Components carry no name, so one shows as its type; a scene root as the scene.
 		std::string Describe(const LoomObject& object)
 		{
 			if (const ComponentBase* component = dynamic_cast<const ComponentBase*>(&object))
@@ -629,17 +599,13 @@ namespace Loom
 			return ComponentDrag::Dragged(gameObject, *(const Guid*)payload->Data);
 		};
 
-		// A header on gameObject's Inspector, which shows folded while one of
-		// its components is dragged to reorder them, and opens again after
-		// as it was.
+		// Folded while one of its components is dragged, then restored.
 		bool ComponentHeader(const char* label, const GameObject& gameObject)
 		{
 			return ComponentDrag::Header(label, header_flags, DraggedComponent(gameObject) != nullptr);
 		};
 
-		// The object being dragged, as the field would hold it. Null when nothing
-		// is being dragged or the field has no place for it, which also keeps the
-		// field from lighting up under a drag it would refuse.
+		// Null when nothing fits, which also keeps the field from lighting up under a refused drag.
 		LoomObject* DraggedInto(const SerializedField& field)
 		{
 			const ImGuiPayload* payload = ImGui::GetDragDropPayload();
@@ -686,8 +652,7 @@ namespace Loom
 			};
 		};
 
-		// Whether another of the object's choices was picked, a value indexing
-		// choices. A value that is none of them shows as its number.
+		// A value that is none of the choices shows as its number.
 		bool DrawChoiceField(const char* label, const SerializedField& field, const std::vector<std::string>& choices)
 		{
 			const long long value = IntegerOf(field);
@@ -711,8 +676,7 @@ namespace Loom
 			return changed;
 		};
 
-		// Whether another enumerator was picked. A value that is none of them
-		// shows as its number.
+		// A value that is none of the enumerators shows as its number.
 		bool DrawEnumField(const char* label, const SerializedField& field, const std::vector<FieldNames::Enumerator>& enumerators)
 		{
 			const long long value = IntegerOf(field);
@@ -752,9 +716,7 @@ namespace Loom
 		EditorLog::Get().Install();
 
 
-		// The editor draws the scene into its own viewport, so the engine has to
-		// stop drawing it over the whole window, and updating becomes something
-		// the play controls own rather than something that always happens.
+		// The editor draws into its own viewport, and the play controls own updating.
 		Engine::renderScenes = false;
 		Engine::updateScenes = false;
 
@@ -762,17 +724,13 @@ namespace Loom
 
 		DialogueManagerBase::onNewBinding = [this](const std::string& type) { AddDialogueBinding(type); };
 
-		// Read now rather than on the first frame, so the panels a file opened
-		// from the command line shows are not closed again by the saved layout.
+		// Read now, so the saved layout does not close panels a file opened from the command line shows.
 		static const std::string layout = BesideExecutable("LoomEditor.layout.ini").string();
 		ImGui::GetIO().IniFilename = layout.c_str();
 		AddPanelSettings();
 		ImGui::LoadIniSettingsFromDisk(layout.c_str());
 
-		// The engine keeps every floating window in an OS window of its own,
-		// which for an editor means dialogs that sit behind the main window and
-		// take clicks with them. Floating windows belong inside the editor
-		// until the user drags one out.
+		// Floating windows stay inside the editor, or dialogs fall behind it.
 		ImGui::GetIO().ConfigViewportsNoAutoMerge = false;
 
 		// Clicking a number field types into it, Unity-style; dragging still scrubs.
@@ -791,9 +749,7 @@ namespace Loom
 
 	Editor::~Editor()
 	{
-		// The handler reads this editor's panels, and ImGui would otherwise
-		// call it when the engine destroys the context, after this is gone.
-		// Saving before ImGui has read the file would leave only the panels in it.
+		// ImGui would call the handler after this is gone, and saving before reading would lose the rest.
 		ImGuiIO& io = ImGui::GetIO();
 
 		if (ImGui::GetCurrentContext()->SettingsLoaded)
@@ -812,10 +768,7 @@ namespace Loom
 		Engine::renderScenes = true;
 		Engine::updateScenes = true;
 
-		// What loading queued lands before the objects it refers to go, and
-		// what deleting them queues lands while the script library its code is
-		// in is still loaded. A run that never reached its first frame, such as
-		// one stopped by a bad argument, still has all of it queued.
+		// Queued work lands before its objects go, and while their script library is still loaded.
 		ClosePrefab();
 		m_opening.reset();
 		Engine::DoTasks();
@@ -866,8 +819,7 @@ namespace Loom
 			while (!line.empty() && (line.back() == '\r' || line.back() == '\n'))
 				line.pop_back();
 
-			// A settings file saved by hand through a text editor can start with
-			// a byte order mark, and nothing here would match the key behind it.
+			// A file saved by hand can start with a byte order mark.
 			if (first && line.rfind("\xEF\xBB\xBF", 0) == 0)
 				line.erase(0, 3);
 
@@ -876,8 +828,7 @@ namespace Loom
 			if (line.rfind("project=", 0) == 0)
 				project = line.substr(strlen("project="));
 
-			// Read before the project opens, because opening it is what picks a
-			// scene to start on.
+			// Read before the project opens, since opening it picks the starting scene.
 			if (line.rfind("scene=", 0) == 0)
 				m_startupScene = line.substr(strlen("scene="));
 
@@ -903,11 +854,7 @@ namespace Loom
 		out << "project=" << m_projectPath << '\n';
 		m_settings.Write(out);
 
-		// So the editor comes back up on the scene that was open, rather than on
-		// the views' list of the project's scenes. Written from what the
-		// session last made active rather than from what is open right now: a
-		// rebuild saves with every scene closed, and that is not the user
-		// leaving the scene behind.
+		// From what the session last made active, since a rebuild saves with every scene closed.
 		if (!m_startupScene.empty())
 			out << "scene=" << m_startupScene << '\n';
 
@@ -919,9 +866,7 @@ namespace Loom
 	{
 		std::error_code code;
 
-		// The one the last session left open, as long as it is still there and
-		// still belongs to this project; otherwise its only one, or none when
-		// there is a choice.
+		// The last session's scene if it still belongs here; else the only one, or none.
 		if (!m_startupScene.empty() &&
 			m_startupScene.rfind(m_projectPath, 0) == 0 &&
 			std::filesystem::exists(m_startupScene, code))
@@ -940,8 +885,6 @@ namespace Loom
 	{
 		std::error_code code;
 
-		// A project file stands for the folder it is in, and is given scripts to
-		// go with it if it has none.
 		if (std::filesystem::path(path).extension() == ProjectTemplate::extension &&
 			std::filesystem::is_regular_file(path, code))
 		{
@@ -981,8 +924,6 @@ namespace Loom
 				return OpenProject(std::filesystem::absolute(path, code).parent_path().string(), open_scene);
 			};
 
-		// A prefab, sprite, palette or build settings file opens as it does from
-		// the Project panel, in the project it belongs to.
 		if (const std::filesystem::path file = path;
 			(file.extension() == Prefab::extension ||
 			file.extension() == SpriteAsset::extension ||
@@ -1005,8 +946,6 @@ namespace Loom
 			return true;
 		};
 
-		// So does a scene file, for the project it belongs to, which then starts
-		// on that scene.
 		if (std::filesystem::path(path).extension() == SceneSerializer::extension &&
 			std::filesystem::is_regular_file(path, code))
 		{
@@ -1017,8 +956,6 @@ namespace Loom
 			if (!OpenProject(ProjectFolderOf(scene).string(), open_scene))
 				return false;
 
-			// A project that was already open kept its scenes rather than
-			// starting on this one.
 			if (open_scene && !m_scripts.IsBuilding())
 			{
 				const auto open = std::find_if(m_scenePaths.begin(), m_scenePaths.end(),
@@ -1042,15 +979,10 @@ namespace Loom
 		const std::string resolved =
 			std::filesystem::absolute(path, code).lexically_normal().string();
 
-		// Already open: pick up new files, but leave the scenes and the script
-		// library they are made of alone.
 		if (resolved == m_projectPath)
 		{
 			RefreshProjectAssets();
 
-			// A project file that was not there when this folder was opened -
-			// New Project writes one into the folder the editor is already
-			// sitting in - is picked up rather than left unregistered.
 			if (!m_scripts.HasProject())
 				LoadProjectFile();
 
@@ -1061,8 +993,6 @@ namespace Loom
 			return true;
 		};
 
-		// Whatever was running, or was waiting on a build to run, belonged to the
-		// project being left behind; there is nothing here to go back to.
 		Engine::updateScenes = false;
 		m_playing = false;
 		m_playAfterCompile = false;
@@ -1075,8 +1005,7 @@ namespace Loom
 		m_openingPath.clear();
 		m_projectLoad.reset();
 
-		// Ahead of the scenes, whose closing runs the queue that deletes it
-		// while the scripts its components come from are still loaded.
+		// Ahead of the scenes, whose closing deletes it while its scripts are still loaded.
 		ClosePrefab();
 		CloseAllScenes();
 		m_prefabs.clear();
@@ -1087,8 +1016,7 @@ namespace Loom
 		m_projectPath = resolved;
 		EditorLog::Get().SetProject(m_projectPath);
 
-		// Asset paths in scenes and scripts are relative to the project, so the
-		// project is where the process works from.
+		// Asset paths are relative to the project.
 		std::filesystem::current_path(m_projectPath, code);
 
 		LoadProjectFile();
@@ -1096,9 +1024,7 @@ namespace Loom
 		RefreshProjectAssets();
 		SaveSettings();
 
-		// Nothing open yet and something to open: start on the scene the last
-		// session was on. Not while a build is running, though: PollScripts
-		// opens it once the component types the scene names actually exist.
+		// Not while building: PollScripts opens it once its component types exist.
 		const std::string scene = open_scene && m_ownedScenes.empty()
 			? StartupScene()
 			: "";
@@ -1106,8 +1032,6 @@ namespace Loom
 		if (!scene.empty() && !m_scripts.IsBuilding())
 			BeginOpeningScene(scene);
 
-		// A build opens the scene the project starts on once it is done, asked
-		// to or not.
 		if (!m_scripts.IsIdle())
 			m_projectLoad = ProjectLoad{ true, m_ownedScenes.empty() && !StartupScene().empty() };
 		else if (m_opening)
@@ -1164,8 +1088,7 @@ namespace Loom
 
 	bool Editor::SaveProject()
 	{
-		// Scenes Stop or a build just put back are only whole once the queue
-		// has run, since AddChild defers.
+		// AddChild defers, so the scenes are only whole once the queue has run.
 		Engine::DoTasks();
 
 		bool saved = true;
@@ -1184,8 +1107,6 @@ namespace Loom
 		if (m_buildSettings.Unsaved())
 			saved = SaveBuildSettings() && saved;
 
-		// An active scene saved for the first time just now is the one the
-		// next session starts on.
 		SetActiveScene(m_activeScene);
 
 		return saved;
@@ -1193,8 +1114,7 @@ namespace Loom
 
 	void Editor::PollRefresh()
 	{
-		// Mid-build the scenes are down, held as text until the scripts are
-		// back, and there is nothing to save until they are.
+		// Mid-build the scenes are down, held as text until the scripts are back.
 		if (!m_scripts.IsIdle() || m_refresh.Poll() != EditorRefresh::Progress::Finished)
 			return;
 
@@ -1338,9 +1258,7 @@ namespace Loom
 
 		m_scenePaths.erase(scene);
 
-		// Deleting a scene mid-GUI would leave the rest of the frame walking a
-		// dangling pointer; deferring puts the delete (and the unregistering it
-		// queues in turn) at the top of the next frame instead.
+		// Deleting mid-GUI would leave the rest of the frame on a dangling pointer.
 		Engine::QueueTask([scene]() { delete scene; });
 	};
 
@@ -1348,8 +1266,7 @@ namespace Loom
 	{
 		m_activeScene = scene;
 
-		// Closing scenes for a rebuild is not the user leaving a scene, so only
-		// arriving at one is worth remembering.
+		// Closing scenes for a rebuild is not the user leaving one.
 		if (scene == nullptr || m_projectPath.empty())
 			return;
 
@@ -1448,8 +1365,7 @@ namespace Loom
 		m_prefabRoot = root->GetGuid();
 		m_prefabPath = opening;
 
-		// Agreed with the file on the next pass, once the copy has its children
-		// and serializes the way it will from then on.
+		// Agreed with the file next pass, once the copy has its children.
 		m_prefabShape.clear();
 		m_historyDirty = true;
 
@@ -1544,9 +1460,7 @@ namespace Loom
 	{
 		const std::vector<Scene*>& scenes = Scene::GetScenes();
 
-		// The scenes load once the scripts have built, and add their children
-		// through the task queue, so the name is looked for over a few frames
-		// after the build before it is given up on.
+		// Scenes add their children through the queue, so the name is looked for over a few frames.
 		if (!m_pendingSelection.empty() && !m_scripts.IsBuilding())
 		{
 			GameObject* named = nullptr;
@@ -1696,8 +1610,7 @@ namespace Loom
 
 	bool Editor::CanStepHistory() const
 	{
-		// Mid-build the scenes are down, and every step would look like it
-		// belonged to a closed scene.
+		// Mid-build every step would belong to a closed scene.
 		return !m_playing && m_scripts.IsIdle();
 	};
 
@@ -1744,16 +1657,14 @@ namespace Loom
 			return;
 		};
 
-		// A field edit still held goes in first, since the change may take its
-		// object off.
+		// The held edit goes first, since the change may take its object off.
 		RecordPlayEdit();
 
 		PlayHistory::Components before = PlayHistory::ReadComponents(gameObject);
 
 		change();
 
-		// Taking a component off waits for the queue, so what the change made
-		// is read once the queue gets this far.
+		// Removing a component waits for the queue, so the change is read once it gets here.
 		Engine::QueueTask(
 			[this, before = std::move(before)]()
 			{
@@ -1806,8 +1717,6 @@ namespace Loom
 		if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_R))
 			FullRefresh();
 
-		// The Sprites or Palette panel has the keyboard, and none of the
-		// scene's shortcuts mean anything there.
 		if ((m_showSprites && m_sprites.IsFocused()) || (m_showPalette && m_sprites.IsPaletteFocused()))
 			return;
 
@@ -1866,8 +1775,7 @@ namespace Loom
 		ReloadSavedSprites();
 		TakeSavedModels();
 
-		// Panels come and go as OS windows, so the callback is put on whichever
-		// exist this frame.
+		// Panels come and go as OS windows, so the callback goes on whichever exist.
 		SetDropCallback(OnDrop);
 
 		if (!m_pendingLayout.empty())
@@ -1883,8 +1791,6 @@ namespace Loom
 			m_pendingLayout.clear();
 		};
 
-		// Nowhere the cursor can be, and nothing heard, unless the Game view
-		// draws the game below and has focus.
 		Input::SetView(0, 0, 0, 0);
 		m_gamePanelFocused = false;
 		m_gamePanelHovered = false;
@@ -1914,8 +1820,7 @@ namespace Loom
 		StepOpening();
 		PollRefresh();
 
-		// The renderer reads the window back once this frame has finished
-		// drawing, so the bitmap is the whole editor.
+		// The renderer reads the window back after drawing, so the bitmap is the whole editor.
 		if (!m_screenshotPath.empty() && ++m_frame >= m_screenshotFrame)
 			CaptureFrame();
 
@@ -1952,8 +1857,7 @@ namespace Loom
 	{
 		DrawMainMenuBar();
 
-		// Docked panels keep no size constraints of their own, so while the
-		// Project panel is open none goes narrower than its tabs' icons need.
+		// Docked panels keep no size limits, so the Project panel's icons set one.
 		const ImVec2 min_size = ImGui::GetStyle().WindowMinSize;
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2((std::max)(min_size.x, m_showProject ? m_projectMinWidth : 0.0f), min_size.y));
 
@@ -1965,8 +1869,7 @@ namespace Loom
 		if (m_firstFrame)
 			m_checkLayout = true;
 
-		// Only lay the panels out when there is nothing to restore: from the
-		// second run on, imgui.ini holds wherever the user dragged them.
+		// From the second run on, imgui.ini holds the user's layout.
 		if (m_checkLayout)
 		{
 			const ImGuiDockNode* node = ImGui::DockBuilderGetNode(dockspace_id);
@@ -1974,8 +1877,7 @@ namespace Loom
 			if (node == nullptr || node->IsEmpty())
 				m_rebuildLayout = true;
 
-			// A layout saved before a window existed has nowhere for it, so it
-			// joins the others in the middle, or the panel it goes beside.
+			// A layout saved before a window existed sends it to the middle or beside its panel.
 			else
 			{
 				const auto placed = [this](const char* window)
@@ -2064,8 +1966,6 @@ namespace Loom
 
 	void Editor::DrawFullscreen()
 	{
-		// How long the way back out shows for once the view fills the monitor,
-		// and how it shows: large, over a dark plate, both a little see-through.
 		constexpr double hint_seconds = 3.0;
 		constexpr double hint_fade_seconds = 0.5;
 		constexpr float hint_scale = 2.5f;
@@ -2644,8 +2544,7 @@ namespace Loom
 
 		ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
-		// Deliberately not a modal: the file browser it opens is one, and two
-		// stacked modals is more trouble than the prompt is worth.
+		// Not a modal, since the file browser it opens is one.
 		if (ImGui::Begin(
 			"Welcome to Loom Editor",
 			nullptr,
@@ -2682,8 +2581,6 @@ namespace Loom
 
 	void Editor::ShowOpenProjectDialog()
 	{
-		// Projects tend to sit side by side, so the one open is a sibling of
-		// whatever is opened next.
 		const std::filesystem::path start = m_projectPath.empty()
 			? std::filesystem::path(DesktopPath())
 			: std::filesystem::path(m_projectPath).parent_path();
@@ -2749,14 +2646,12 @@ namespace Loom
 
 			ImGui::Separator();
 
-			// Iterating a copy: closing a scene from a context menu edits the
-			// list the engine hands out.
+			// A copy, since closing a scene from a context menu edits the engine's list.
 			const std::vector<Scene*> scenes = Scene::GetScenes();
 
 			GatherOpenNodes();
 
-			// The tree ids are GUIDs, which a scene opened twice shares with
-			// its copy.
+			// Tree ids are GUIDs, which a scene opened twice shares with its copy.
 			std::unordered_map<Guid, int> copies{ };
 
 			for (Scene* scene : scenes)
@@ -2768,8 +2663,6 @@ namespace Loom
 
 			DrawPrefabNode();
 
-			// The empty space under the rows takes a drop as the last of the
-			// rows just above it: the open prefab's, or else the active scene's.
 			GameObject* last_rows = GetPrefabRoot();
 
 			if (last_rows == nullptr && m_activeScene)
@@ -2938,8 +2831,7 @@ namespace Loom
 
 		DragSource(*gameObject);
 
-		// Not again when already selected: the release that ends a double-click
-		// would cancel the rename its press just started.
+		// Not when already selected, or the double-click's release cancels the rename.
 		if (NodeReleased() && m_selected != gameObject)
 			Select(gameObject);
 
@@ -3067,8 +2959,7 @@ namespace Loom
 			clip.Max.y
 		};
 
-		// The row being renamed is drawn wherever it is, or its field would let
-		// go of the keyboard.
+		// Drawn wherever it is, or its field lets go of the keyboard.
 		const std::vector<Hierarchy::Step> steps = Hierarchy::Plan(
 			parent,
 			open == m_openUnder.end() ? nullptr : &open->second,
@@ -3281,8 +3172,7 @@ namespace Loom
 			sizeof(m_nameBuffer),
 			ImGuiInputTextFlags_AutoSelectAll);
 
-		// Enter and clicking away both keep the new name; Escape has already put
-		// the old one back in the buffer by the time the field lets go.
+		// Escape has already restored the old name by the time the field lets go.
 		if (!ImGui::IsItemDeactivated())
 			return;
 
@@ -3407,8 +3297,6 @@ namespace Loom
 
 		const auto entry = m_scriptEntries.find(name);
 
-		// A state goes in a state machine's Start or Current, and a dialogue in a
-		// DialogueManager, not on an object.
 		if (entry != m_scriptEntries.end() && (entry->second.kind == ScriptEntryKind::State || entry->second.kind == ScriptEntryKind::Dialogue))
 			return true;
 
@@ -3495,9 +3383,7 @@ namespace Loom
 			{
 				GameObject* gameObject = m_selected;
 
-				// The name box is only refilled when the selection changes or a
-				// rename ends, so typing into it is not fighting the object's
-				// current name.
+				// Only refilled on a new selection or rename, so typing does not fight the name.
 				if (m_nameBufferOwner != gameObject)
 				{
 					snprintf(
@@ -3554,9 +3440,7 @@ namespace Loom
 				if (ImGui::Button("Add Component", ImVec2(-FLT_MIN, 0.0f)))
 					ImGui::OpenPopup("##add_component");
 
-				// Not while the Inspector is appearing: docking it closes a popup
-				// opened then. With no click to open it at, it opens under the
-				// button.
+				// Not while appearing, since docking closes a popup opened then.
 				if (m_openAddComponent && !ImGui::IsWindowAppearing())
 				{
 					ImGui::SetNextWindowPos(ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y));
@@ -3595,8 +3479,7 @@ namespace Loom
 		if (!node.children.empty() && !node.components.empty())
 			ImGui::Separator();
 
-		// Each is a base to derive from, so picking one makes a script of that kind
-		// for the object, which needs a project to put it in.
+		// Each is a base, so picking one makes a script of that kind, which needs a project.
 		constexpr std::pair<std::string_view, AssetKind> derived[] =
 		{
 			{ "StateMachine", AssetKind::StateMachine },
@@ -3849,8 +3732,6 @@ namespace Loom
 		if (ImGui::Checkbox("##inherit", &inherit))
 			gameObject->SetInheritThreadID(inherit);
 
-		// An inheriting object follows its parent, so its own ID is not the
-		// inspector's to set.
 		ImGui::BeginDisabled(inherit);
 
 		int thread = gameObject->GetThreadID();
@@ -3883,9 +3764,7 @@ namespace Loom
 		const bool open = ComponentHeader(name.c_str(), *gameObject);
 		const ImRect header(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
 
-		// From halfway into the gap above the header to halfway into the one
-		// below the component, so neighbours' areas meet where a line marks
-		// the place between them.
+		// Halfway into the gaps on each side, so neighbours' drop areas meet at the line.
 		constexpr float half = 0.5f;
 		const float gap = ImGui::GetStyle().ItemSpacing.y * half;
 		const auto drop = [&]()
@@ -3895,8 +3774,7 @@ namespace Loom
 			DropComponent(*gameObject, *component, area);
 		};
 
-		// Headers passed over neither light up nor fold, so only the line
-		// between components marks where it goes.
+		// Headers passed over neither light up nor fold.
 		DragSource(*component, ImGuiDragDropFlags_SourceNoHoldToOpenOthers);
 		DrawSourcePopup(name);
 
@@ -3912,8 +3790,6 @@ namespace Loom
 			return;
 		};
 
-		// The Serial members the component declared, then whatever
-		// else it wants to draw for itself.
 		const std::vector<std::string> labels = FieldNames::Of(*component);
 
 		DrawFields(*component, labels, FieldLabelColumn(*component, labels));
@@ -4019,8 +3895,7 @@ namespace Loom
 
 		const std::vector<const std::vector<FieldNames::Enumerator>*> enumerators = FieldNames::EnumeratorsOf(object);
 
-		// Where the fields outside any category start, so those nested deeper
-		// give their labels the indent and keep their values in one column.
+		// Deeper nested fields indent their labels but keep their values in one column.
 		const float left = ImGui::GetCursorPosX();
 
 		const auto draw_field = [&](size_t i)
@@ -4081,8 +3956,6 @@ namespace Loom
 			{
 				std::string& text = *(std::string*)field.data;
 
-				// One name a line, such as a skin's joints: worth seeing the
-				// length of, not worth one box that cannot show its lines.
 				if (text.find('\n') != std::string::npos)
 				{
 					ImGui::Text("%d lines", (int)std::count(text.begin(), text.end(), '\n'));
@@ -4328,8 +4201,7 @@ namespace Loom
 			DrawNoScene();
 		else
 		{
-			// GLFW reports the cursor from the main window's corner, which
-			// ImGui's screen space only starts at without multi-viewports.
+			// GLFW reports from the main window's corner, which only matches ImGui without viewports.
 			const ImVec2 origin = ImGui::GetMainViewport()->Pos;
 			const ImVec2 corner = ImGui::GetCursorScreenPos();
 			const ImVec2 available = ImGui::GetContentRegionAvail();
@@ -4382,9 +4254,7 @@ namespace Loom
 		if (!window->DockIsActive)
 			return hovered == window && window->TitleBarRect().Contains(mouse);
 
-		// The tab is drawn in the window that hosts its dock node, so that is
-		// the one the cursor is on, and a hidden tab bar keeps the rect it
-		// last had.
+		// A tab is drawn in its dock node's host window, and a hidden tab bar keeps its last rect.
 		const ImGuiDockNode* node = window->DockNode;
 
 		return node != nullptr && !node->IsHiddenTabBar() && !node->IsNoTabBar() &&
@@ -4438,8 +4308,6 @@ namespace Loom
 		ImGui::EndDisabled();
 		ImGui::SameLine();
 
-		// A build has the scenes down, so there is nothing to step, and a
-		// running scene has no single frame to step to.
 		ImGui::BeginDisabled(m_scripts.IsBuilding() || Engine::updateScenes);
 
 		if (ImGui::Button(step_label, play_button_size))
@@ -4472,8 +4340,7 @@ namespace Loom
 		if (available.x < 1.0f || available.y < 1.0f)
 			return;
 
-		// The camera is steered before the scenes are drawn, so the image keeps
-		// up with the mouse rather than trailing it by a frame.
+		// Steered before drawing, so the image keeps up with the mouse.
 		if (camera)
 		{
 			const ImVec2 corner = ImGui::GetCursorScreenPos();
@@ -4498,16 +4365,13 @@ namespace Loom
 			scenes.end(),
 			[this](const Scene* scene) { return IsSelectedIn(scene->GetRoot()); });
 
-		// Rendering here is fine mid-frame: ImGui only records the texture id
-		// now and draws with it once the frame is submitted.
+		// ImGui only records the texture id now and draws it at submit.
 		view.Render(
 			(int)available.x,
 			(int)available.y,
 			Engine::clearColor,
 			[&]()
 			{
-				// Without an editor camera this is the Game view, which shows
-				// the UI over every scene in it.
 				if (!camera)
 					Ui::BeginOverlay();
 
@@ -4542,8 +4406,7 @@ namespace Loom
 				ImGui::TextDisabled("No scene open.");
 			else
 			{
-				// Rebuilt every frame on purpose: this is the scene as it would
-				// be written right now, edits included.
+				// Rebuilt every frame, so it is the scene as it would be written now.
 				const std::string text = SceneSerializer::Serialize(*m_activeScene);
 
 				if (ImGui::Button("Copy"))
@@ -4645,8 +4508,6 @@ namespace Loom
 		if (m_importQueue.empty())
 			return;
 
-		// A build has the scenes down; the files wait for them to come back and
-		// be drawn, so there is something under the mouse to import into.
 		if (!m_scripts.IsIdle())
 		{
 			m_importTarget = nullptr;
@@ -4657,8 +4518,7 @@ namespace Loom
 
 		const QueuedImport& front = m_importQueue.front();
 
-		// The mouse event lands at the start of the next frame, and the panels
-		// drawn in it pick the target.
+		// The mouse event lands next frame, and the panels drawn then pick the target.
 		if (front.positioned && !m_importPlaced)
 		{
 			ImGui::GetIO().AddMousePosEvent(front.x, front.y);
@@ -4668,8 +4528,7 @@ namespace Loom
 			return;
 		};
 
-		// Files dropped together go in together; a drop somewhere else waits
-		// for the mouse to be put there.
+		// Files dropped together go in together; others wait for the mouse.
 		const auto together =
 			[&front](const QueuedImport& queued)
 			{

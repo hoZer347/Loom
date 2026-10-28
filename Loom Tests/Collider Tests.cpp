@@ -16,8 +16,9 @@
 #include <type_traits>
 
 using LoomTests::Pump;
+using LoomTests::EPSILON;
 
-static constexpr float EPSILON = 1e-4f;
+#pragma region Helpers
 
 static constexpr glm::vec3 FORWARD(0.0f, 0.0f, -1.0f);
 static constexpr glm::vec3 DOWN(0.0f, -1.0f, 0.0f);
@@ -43,9 +44,13 @@ static T* Place(Loom::Scene& scene, const glm::vec3& position, const std::string
 	return collider;
 };
 
+#pragma endregion
+
 
 TEST_SUITE("Collider")
 {
+	#pragma region Components
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "box and sphere colliders are components the editor can add by name, the base is not")
 	{
 		CHECK(std::is_base_of_v<Loom::Collider, Loom::BoxCollider>);
@@ -79,6 +84,10 @@ TEST_SUITE("Collider")
 		CHECK(scene.GetRoot().GetChildren()[0]->GetComponent<Loom::Collider>() == sphere);
 		CHECK(scene.GetRoot().FindComponent<Loom::Collider>() == sphere);
 	};
+
+	#pragma endregion
+
+	#pragma region Boxes
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a ray meets a box at its face, facing back at the ray")
 	{
@@ -131,9 +140,7 @@ TEST_SUITE("Collider")
 		Loom::BoxCollider* box = child->Attach<Loom::BoxCollider>();
 		Pump();
 
-		// The child's local Z lies along the parent's X, which is stretched
-		// twice over, so the box reaches 1 either side along world X and its
-		// face toward a ray from the side is at x = 1.
+		// The child's Z lies along the parent's doubled X, so the face is at x = 1.
 		Loom::RaycastHit hit;
 		REQUIRE(box->Raycast({ glm::vec3(5.0f, 0.0f, -10.0f), glm::vec3(-1.0f, 0.0f, 0.0f) }, hit));
 
@@ -193,6 +200,10 @@ TEST_SUITE("Collider")
 		CHECK_FALSE(box->Raycast({ glm::vec3(0.0f), FORWARD }, hit));
 	};
 
+	#pragma endregion
+
+	#pragma region Spheres
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a sphere is hit on its surface and stays round under uneven scale")
 	{
 		Loom::Scene scene("sphere");
@@ -216,11 +227,15 @@ TEST_SUITE("Collider")
 		CHECK_FALSE(sphere->Raycast({ glm::vec3(0.0f, -9.0f, 0.0f), DOWN }, hit));
 		CHECK_FALSE(sphere->Raycast({ glm::vec3(3.0f, 0.0f, 0.0f), DOWN }, hit));
 	};
+
+	#pragma endregion
 };
 
 
 TEST_SUITE("ColliderTree")
 {
+	#pragma region Syncing
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene finds its colliders once a physics step has synced them")
 	{
 		Loom::Scene scene("synced");
@@ -236,6 +251,10 @@ TEST_SUITE("ColliderTree")
 		CHECK(scene.GetColliders().Size() == 1);
 		CHECK(scene.Raycast({ glm::vec3(0.0f), FORWARD }, hit));
 	};
+
+	#pragma endregion
+
+	#pragma region Raycasts
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Raycast answers the nearest hit and RaycastAll every hit, nearest first")
 	{
@@ -263,6 +282,10 @@ TEST_SUITE("ColliderTree")
 		CHECK(scene.RaycastAll(ray, 5.0f).size() == 1);
 		CHECK_FALSE(scene.Raycast(ray, hit, 2.0f));
 	};
+
+	#pragma endregion
+
+	#pragma region Tree Updates
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a collider is found where the last physics step left it")
 	{
@@ -385,6 +408,10 @@ TEST_SUITE("ColliderTree")
 		CHECK(second.GetColliders().Size() == 1);
 	};
 
+	#pragma endregion
+
+	#pragma region Scenes and Unprocessed Objects
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Physics::Raycast looks through every open scene")
 	{
 		Loom::Scene first("first");
@@ -418,6 +445,10 @@ TEST_SUITE("ColliderTree")
 		CHECK(scene.Raycast({ glm::vec3(0.0f), FORWARD }, hit));
 	};
 
+	#pragma endregion
+
+	#pragma region Shape of the Tree
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the tree stays shallow and answers what testing every collider would, through moves and removals")
 	{
 		constexpr int COUNT = 300;
@@ -429,9 +460,7 @@ TEST_SUITE("ColliderTree")
 		// Far enough past the padding that most moves reinsert their leaf.
 		constexpr float JUMP = 3.0f;
 
-		// A balanced tree of COUNT leaves is about log2(COUNT) deep; this
-		// allows the rotations some slack and still fails a tree that degrades
-		// into a list.
+		// About log2(COUNT) with slack for rotations, yet short of a list.
 		constexpr int MOST_HEIGHT = 20;
 
 		Loom::Scene scene("many");
@@ -535,6 +564,10 @@ TEST_SUITE("ColliderTree")
 		};
 	};
 
+	#pragma endregion
+
+	#pragma region Threads
+
 	// Without -pthread, emscripten's std::thread throws rather than running
 	// anything. Both web builds link with it.
 #if !defined(__EMSCRIPTEN__) || defined(__EMSCRIPTEN_PTHREADS__)
@@ -601,4 +634,6 @@ TEST_SUITE("ColliderTree")
 			CHECK(struck(box));
 	};
 #endif
+
+	#pragma endregion
 };

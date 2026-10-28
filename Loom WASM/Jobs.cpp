@@ -27,20 +27,14 @@ namespace Loom
 	{
 		#pragma region Waiting
 
-		// How long a worker waits awake for the next job before sleeping: a
-		// physics step runs several back to back, and waking a sleeping thread
-		// takes longer than any of them. It looks at the clock only every so
-		// many spins.
+		// Waking a sleeping worker takes longer than a physics job, so it stays awake this long.
 		constexpr std::chrono::microseconds STAY_AWAKE(200);
 		constexpr unsigned CLOCK_EVERY = 64;
 
-		// How long, in spins, a thread waiting on others keeps its core before
-		// it sleeps until woken: about as long as a short piece of work, and
-		// no longer, so one it waits on that has lost its core gets this one.
+		// Spins a waiter keeps its core before sleeping, about one short piece of work.
 		constexpr unsigned MOST_SPINS = 1024;
 
-		// Waits a moment on a spinning thread, without handing its core to
-		// another thread for a whole time slice as a yield may.
+		// Waits without handing the core away for a whole time slice.
 		void Relax()
 		{
 #if defined(_M_X64) || defined(__x86_64__)
@@ -48,8 +42,7 @@ namespace Loom
 #endif
 		};
 
-		// Until ready says so, spinning a while and then sleeping on value,
-		// which whatever makes it ready changes and notifies.
+		// Spins a while, then sleeps on value until ready.
 		template <typename T, typename Ready>
 		void Await(const std::atomic<T>& value, const Ready& ready)
 		{
@@ -101,10 +94,7 @@ namespace Loom
 
 		#pragma region Pool
 
-		// The machine's cores, rather than the threads they run at once: two
-		// threads on one core share its units, so a second that only waits
-		// slows the first, and one that works gains little. A browser tells
-		// only the threads, as many as the page starts with.
+		// Cores rather than hardware threads, since a second thread on a core gains little.
 		unsigned MachineCores()
 		{
 #if defined(_WIN32)
@@ -176,9 +166,7 @@ namespace Loom
 
 					seen = generation;
 
-					// Counted in before it looks, so the caller, having taken
-					// its job down, waits for any that found it. One past the
-					// limit stays out.
+					// Counted in before looking, so the caller waits for any that found its job.
 					helping++;
 
 					if (Job* job = current; job && number < Jobs::Threads())
@@ -194,8 +182,7 @@ namespace Loom
 
 			std::vector<std::thread> workers{ };
 
-			// Workers running, and how many threads may share a For; none for
-			// no limit.
+			// Running workers, and how many may share a For; none for no limit.
 			std::atomic<unsigned> started{ 0 };
 			std::atomic<unsigned> most{ 0 };
 
@@ -204,8 +191,7 @@ namespace Loom
 			std::atomic<unsigned> helping{ 0 };
 			std::atomic<bool> stopping{ false };
 
-			// Held by the For the workers are on, so one from another thread
-			// waits its turn.
+			// Held by the running For, so another thread's waits its turn.
 			std::mutex taking{ };
 		};
 

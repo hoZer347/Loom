@@ -14,6 +14,8 @@
 
 using LoomTests::Pump;
 
+#pragma region Helpers
+
 namespace
 {
 	// A component holding a reference, so undo can be checked for putting
@@ -106,9 +108,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("SceneHistory")
 {
+	#pragma region Recording
+
 	TEST_CASE_FIXTURE(Editing, "a scene seen for the first time is remembered, not recorded")
 	{
 		Open("First");
@@ -240,6 +246,10 @@ TEST_SUITE("SceneHistory")
 		CHECK(Text(0) == after);
 	};
 
+	#pragma endregion
+
+	#pragma region Steps
+
 	TEST_CASE_FIXTURE(Editing, "undo works back through several scenes, newest edit first")
 	{
 		Open("A");
@@ -341,6 +351,10 @@ TEST_SUITE("SceneHistory")
 		CHECK(Root(0).GetChildren().front()->GetName() == "Before");
 		CHECK_FALSE(history.CanUndo());
 	};
+
+	#pragma endregion
+
+	#pragma region Restoring
 
 	TEST_CASE_FIXTURE(Editing, "undo brings objects back under their own guids, references and all")
 	{
@@ -522,6 +536,10 @@ TEST_SUITE("SceneHistory")
 		CHECK(Text(0) == before);
 	};
 
+	#pragma endregion
+
+	#pragma region Open Scenes
+
 	TEST_CASE_FIXTURE(Editing, "a scene open twice is one scene: an edit to either copy is made to both, and undone in both")
 	{
 		Open("Twice");
@@ -595,4 +613,6 @@ TEST_SUITE("SceneHistory")
 		CHECK(Text(0) == edited);
 		CHECK_FALSE(history.CanUndo());
 	};
+
+	#pragma endregion
 };

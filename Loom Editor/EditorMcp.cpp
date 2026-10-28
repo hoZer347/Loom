@@ -1,5 +1,4 @@
-// Before anything that brings in windows.h, which would otherwise pull in
-// the old winsock.h and clash with this one.
+// Before windows.h, which would otherwise pull in the old winsock.h.
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <winsock2.h>
@@ -58,12 +57,10 @@ namespace Loom
 		constexpr DWORD receive_timeout_ms = 5000;
 		constexpr int listen_backlog = 8;
 
-		// Both how long a request waits for the main thread and how long the
-		// main thread gives a tool to finish before failing it.
+		// How long a request waits for the main thread, and a tool to finish.
 		constexpr std::chrono::minutes call_timeout{ 5 };
 
-		// A capture comes back once the frame it was asked for in is drawn;
-		// one that has not by then is not coming, as when the window has no size.
+		// A capture not back by then is not coming, as when the window has no size.
 		constexpr int capture_frames = 60;
 
 		constexpr size_t default_console_lines = 100;
@@ -174,8 +171,7 @@ namespace Loom
 			return ComponentRegistry::NameOf(component) + " (" + component.GetGuid().ToString() + ")";
 		};
 
-		// The component set_field writes into, by type or guid. Null for the
-		// GameObject itself, whose fields hold its Transform.
+		// Null for the GameObject itself, whose fields hold its Transform.
 		ComponentBase* FindComponent(GameObject& gameObject, const std::string& component)
 		{
 			if (component.empty() || SameText(component, "GameObject"))
@@ -213,8 +209,7 @@ namespace Loom
 				WriteTree(out, *child, depth + 1);
 		};
 
-		// A field's label with the categories its Serial was named under in
-		// front, which tells apart two of a name in different categories.
+		// Categories in front tell apart two fields of one name.
 		std::string CategorisedLabel(const SerializedField& field, const std::string& label)
 		{
 			return field.Category().empty() ? label : std::string(field.Category()) + '/' + label;
@@ -448,8 +443,6 @@ namespace Loom
 			const auto enumerators = FieldNames::EnumeratorsOf(object);
 			const std::vector<SerializedField>& fields = object.GetFields();
 
-			// The field inspect writes as that label, or the one field with that
-			// label after its categories.
 			std::vector<size_t> matches;
 
 			for (size_t i = 0; i < labels.size() && matches.empty(); i++)
@@ -505,8 +498,6 @@ namespace Loom
 			const std::string label = Argument(arguments, "button");
 			const std::vector<LoomObject::FieldButton>& buttons = object.GetButtons();
 
-			// The Button inspect writes as that name, or the one Button with
-			// that label after its categories.
 			std::vector<const LoomObject::FieldButton*> matches;
 
 			for (const LoomObject::FieldButton& button : buttons)
@@ -1196,8 +1187,7 @@ namespace Loom
 		if (call->done)
 			return call->result;
 
-		// One still queued is dropped. One already running finishes, or is
-		// failed by Step, for nobody.
+		// One still queued is dropped; one running finishes for nobody.
 		std::erase(m_calls, call);
 
 		return Failure(m_stopping ? "the editor is closing" : "the editor did not answer in time");

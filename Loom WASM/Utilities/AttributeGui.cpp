@@ -26,8 +26,7 @@ namespace Loom
 
 			ImGui::SameLine();
 
-			// The delta is the whole point of a modifier stack: a number on its own says
-			// nothing about whether anything is acting on it.
+			// The delta shows whether a modifier is acting.
 			if (delta > 0.0)
 				ImGui::TextColored(ImVec4(0.2f, 0.7f, 0.2f, 1.0f), "= %.3f (+%.3f)", value, delta);
 			else if (delta < 0.0)

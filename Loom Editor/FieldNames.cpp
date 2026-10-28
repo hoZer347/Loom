@@ -30,9 +30,7 @@ namespace Loom
 	{
 		#pragma region Symbols
 
-		// Not a process handle: DbgHelp takes any unique value for a session that
-		// loads its modules by hand, which keeps this one apart from anything
-		// else in the process using DbgHelp.
+		// DbgHelp takes any unique value as a session, keeping this apart from other users of it.
 		HANDLE Session()
 		{
 			static const char session = 0;
@@ -88,8 +86,7 @@ namespace Loom
 			return std::vector<ULONG>(children.ChildId, children.ChildId + count);
 		};
 
-		// An enumerator's value comes as whichever integer type the compiler
-		// found smallest for it.
+		// An enumerator's value comes as the smallest integer type that fits.
 		bool Integer(const VARIANT& variant, long long& value)
 		{
 			switch (variant.vt)
@@ -115,8 +112,7 @@ namespace Loom
 		// How a Serial member's type is spelled in the symbols, up to its argument.
 		constexpr std::wstring_view serial_type = L"Loom::Serial<";
 
-		// cvconst.h's DataIsMember, which dbghelp.h leaves out of its copy of
-		// the symbol enums.
+		// cvconst.h's DataIsMember, which dbghelp.h leaves out.
 		constexpr DWORD data_is_member = 7;
 
 		struct Member final
@@ -128,8 +124,6 @@ namespace Loom
 		// A member by its offset in the complete object.
 		typedef std::map<ptrdiff_t, Member> Members;
 
-		// The enumerators of the enum a Serial holds, or none when it holds
-		// something else.
 		std::vector<FieldNames::Enumerator> Enumerators(DWORD64 base, ULONG serial)
 		{
 			std::vector<FieldNames::Enumerator> enumerators;
@@ -160,8 +154,7 @@ namespace Loom
 			return enumerators;
 		};
 
-		// The Serial members of a type and of its non-virtual bases, by where
-		// they sit in a complete object whose copy of the type is at offset.
+		// Of the type and its non-virtual bases, offset as in a complete object.
 		void Collect(DWORD64 base, ULONG type, ptrdiff_t offset, Members& members)
 		{
 			for (const ULONG child : Children(base, type))
@@ -194,8 +187,7 @@ namespace Loom
 						type_tag != SymTagUDT)
 						continue;
 
-					// A struct member can hold Serials of its own, which belong to
-					// this object all the same.
+					// A struct member's own Serials belong to this object too.
 					if (SymbolName(base, child_type).starts_with(serial_type))
 						members[offset + child_offset] =
 						{
@@ -211,9 +203,7 @@ namespace Loom
 
 		#pragma region Lookup
 
-		// typeid spells a type "struct Game::Name<class Game::Other>" and puts an
-		// anonymous namespace in words; the symbols say "Game::Name<Game::Other>"
-		// and hyphenate it.
+		// typeid writes "struct Game::Name<class Game::Other>"; the symbols drop the keywords.
 		std::string SymbolTypeName(std::string name)
 		{
 			const std::pair<std::string_view, std::string_view> spellings[] =
@@ -241,8 +231,7 @@ namespace Loom
 			return name;
 		};
 
-		// What the symbols of the module that made this object say about its
-		// Serial members. Empty when they cannot say.
+		// Empty when the symbols cannot say.
 		Members Read(const std::type_info& type, HMODULE module, const IMAGE_NT_HEADERS& headers)
 		{
 			if (Session() == nullptr)
@@ -277,17 +266,14 @@ namespace Loom
 			if (SymGetTypeFromNameW(Session(), base, wide.c_str(), &symbol))
 				Collect(base, symbol.TypeIndex, 0, members);
 
-			// A script library's is unloaded straight away: DbgHelp holds the .pdb
-			// open while it is loaded, and every build of the scripts rewrites it.
-			// The editor's own is kept for the next type, it being most of them.
+			// DbgHelp holds a script library's .pdb open, and every build rewrites it.
 			if (module != GetModuleHandleW(nullptr))
 				SymUnloadModule64(Session(), base);
 
 			return members;
 		};
 
-		// What the symbols say about each of the object's fields, in order: null
-		// where they say nothing.
+		// Null where the symbols say nothing.
 		std::vector<const Member*> Lookup(const LoomObject& object)
 		{
 			static std::mutex mutex;
@@ -295,8 +281,7 @@ namespace Loom
 
 			const std::type_info& type = typeid(object);
 
-			// The type's RTTI lives in the module that built its vtable, whose
-			// symbols describe it.
+			// The type's RTTI lives in the module that built its vtable.
 			HMODULE module = nullptr;
 
 			GetModuleHandleExW(
@@ -308,8 +293,7 @@ namespace Loom
 
 			std::lock_guard lock{ mutex };
 
-			// The build's timestamp is in the key: a reloaded library can put a type
-			// with a new layout where the old one's RTTI was.
+			// A reloaded library can put a new layout where the old RTTI was.
 			const auto key = std::make_pair(&type, headers ? headers->FileHeader.TimeDateStamp : 0);
 
 			auto found = types.find(key);

@@ -13,8 +13,7 @@
 #include <vector>
 
 using LoomTests::Pump;
-
-static constexpr float EPSILON = 1e-4f;
+using LoomTests::EPSILON;
 
 namespace
 {

@@ -26,8 +26,7 @@ namespace Loom
 			return IsSeparator(c) ? '/' : (char)std::tolower((unsigned char)c);
 		};
 
-		// Where a path inside the project ends: at a character no file name
-		// holds, so a name with spaces in it is kept whole.
+		// At a character no file name holds, so a name with spaces is kept whole.
 		bool EndsPath(char c)
 		{
 			return std::string_view("<>:\"|?*").find(c) != std::string_view::npos;
@@ -46,15 +45,12 @@ namespace Loom
 			return (size_t)(found - text.begin());
 		};
 
-		// Where a file's name may end inside a run EndsPath has not cut short.
-		// A name may hold any of these, so the longest that is a file wins.
+		// Where a name may end inside a run; the longest that is a file wins.
 		bool MayEndName(char c)
 		{
 			return std::string_view(" (),;'.").find(c) != std::string_view::npos;
 		};
 
-		// The longest name from start to the end of the text, or to where a
-		// name may end before that, that is a file in the project.
 		std::optional<EditorLog::Link> FileLink(const std::string& project, const std::string& text, size_t start)
 		{
 			std::error_code code;
@@ -285,14 +281,12 @@ namespace Loom
 		if (c == EOF)
 			return !EOF;
 
-		// A build runs on a worker thread and writes to the same stream the
-		// editor does, so the half-built line is held under the lock too.
+		// The build's worker thread writes to the same stream.
 		std::scoped_lock lock(log->mutex);
 
 		Put((char)c);
 
-		// Whatever the passthrough says: a pipe whose reader went away would
-		// otherwise put the stream in error, and the log would stop hearing it.
+		// A pipe whose reader went away would otherwise stop the log hearing it.
 		if (passthrough)
 			passthrough->sputc((char)c);
 
@@ -303,8 +297,7 @@ namespace Loom
 	{
 		std::scoped_lock lock(log->mutex);
 
-		// std::endl flushes the stream, and the stream is this sink; without
-		// passing that on, output to a redirected stdout never reaches the file.
+		// Without passing the flush on, redirected stdout never reaches the file.
 		if (passthrough)
 			passthrough->pubsync();
 

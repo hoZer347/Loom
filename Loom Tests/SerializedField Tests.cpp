@@ -23,6 +23,8 @@
 
 using LoomTests::Pump;
 
+#pragma region Helpers
+
 namespace
 {
 	// One member of every type the format knows about, so a single object can
@@ -134,9 +136,7 @@ namespace
 		Loom::Serial<glm::vec3, "Size/Colour/Tint"> tint;
 	};
 
-	// Names that take the category of the field before them: with none
-	// before, after a nested category, after one more of those, and after a
-	// field with no name.
+	// Names after none, a nested category, another of those and a field with no name.
 	struct Continued final : Loom::LoomObject
 	{
 		Loom::Serial<int, ".../First"> first;
@@ -178,9 +178,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("SerializedField")
 {
+	#pragma region Labels
+
 	TEST_CASE("an identifier reads as words")
 	{
 		CHECK(Loom::NameFromIdentifier("position") == "Position");
@@ -287,6 +291,10 @@ TEST_SUITE("SerializedField")
 		CHECK(labels[8] == "UV Layers");
 	};
 #endif
+
+	#pragma endregion
+
+	#pragma region Declaration and Names
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an enum is written as its underlying integer")
 	{
@@ -465,9 +473,7 @@ TEST_SUITE("SerializedField")
 		CHECK(host.owned.GetFields().size() == 2);
 	};
 
-	// Documented rather than fixed: there is no hook for the end of a
-	// constructor, so a field declared past a nested object cannot tell that the
-	// object it is landing on has finished being built.
+	// Documented rather than fixed: nothing marks the end of a constructor.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a field declared after a LoomObject member lands on that member")
 	{
 		LateHost host;
@@ -488,6 +494,10 @@ TEST_SUITE("SerializedField")
 		REQUIRE(Field(object, Count).Read("12"));
 		CHECK(object.count == 12);
 	};
+
+	#pragma endregion
+
+	#pragma region Round Trips
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "every type survives being written and read back")
 	{
@@ -610,6 +620,10 @@ TEST_SUITE("SerializedField")
 		CHECK(*object.label == "tab\there \"quoted\" and\nnewline");
 	};
 
+	#pragma endregion
+
+	#pragma region Assets
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an asset is a file of its extension, written as the string of its path")
 	{
 		Files object;
@@ -682,6 +696,10 @@ TEST_SUITE("SerializedField")
 		CHECK(*object.folder == "Assets/Prefabs/Mechs");
 	};
 
+	#pragma endregion
+
+	#pragma region Text and Lists
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "text is written as a string, its new lines kept, and reads what a string field saved")
 	{
 		Message object;
@@ -752,6 +770,10 @@ TEST_SUITE("SerializedField")
 		CHECK(Field(object, Numbers).Write().ends_with(", 0, 3]"));
 	};
 
+	#pragma endregion
+
+	#pragma region References
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a reference is written as the guid of what it points at")
 	{
 		Loom::Scene scene("references");
@@ -789,10 +811,7 @@ TEST_SUITE("SerializedField")
 		CHECK(pointer->target == nullptr);
 	};
 
-	// Detaching a component, or destroying a GameObject, has to take every
-	// reference to it with it. One left behind is read again the next frame -
-	// by the serializer writing its guid, by the inspector drawing its name -
-	// and by then the object is gone.
+	// A reference left behind is read the next frame by the serializer and the inspector.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "detaching a component clears references to it")
 	{
 		Loom::Scene scene("detached target");
@@ -829,9 +848,7 @@ TEST_SUITE("SerializedField")
 
 		CHECK(mesh->material == nullptr);
 
-		// And the scene it writes out says so, rather than the guid of something
-		// that is no longer there. The mesh declares its material first, so the
-		// field is number zero.
+		// The mesh declares its material first, so the field is number zero.
 		CHECK(Loom::SceneSerializer::Serialize(scene).find("0 = null") != std::string::npos);
 	};
 
@@ -920,6 +937,10 @@ TEST_SUITE("SerializedField")
 		CHECK(Field(values, Count).ReferencesUnder(scene).empty());
 	};
 
+	#pragma endregion
+
+	#pragma region Counts and Raw Words
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a field counts its changes, and looking at it through const is not one")
 	{
 		Counted counted;
@@ -984,4 +1005,6 @@ TEST_SUITE("SerializedField")
 		CHECK_FALSE(Field(object, 0).Read("[1, 2.5]"));
 		CHECK_FALSE(Field(object, 0).Read("[-1]"));
 	};
+
+	#pragma endregion
 };

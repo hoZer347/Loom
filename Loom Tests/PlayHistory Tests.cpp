@@ -17,6 +17,8 @@
 
 using LoomTests::Pump;
 
+#pragma region Helpers
+
 namespace
 {
 	// A component with a field to edit and a reference to put back.
@@ -101,9 +103,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("PlayHistory")
 {
+	#pragma region Field Steps
+
 	TEST_CASE_FIXTURE(Running, "an edit is one step, and undo and redo put its value back and forward")
 	{
 		const glm::vec3 moved(1.0f, 2.0f, 3.0f);
@@ -225,6 +231,10 @@ TEST_SUITE("PlayHistory")
 		CHECK_FALSE(history.CanUndo());
 		CHECK_FALSE(history.CanRedo());
 	};
+
+	#pragma endregion
+
+	#pragma region Component Steps
 
 	TEST_CASE_FIXTURE(Running, "undo puts a removed component back in its place, and redo takes it off again")
 	{
@@ -375,6 +385,10 @@ TEST_SUITE("PlayHistory")
 		CHECK(Labels() == std::vector<std::string>{ "edited" });
 	};
 
+	#pragma endregion
+
+	#pragma region References
+
 	TEST_CASE_FIXTURE(Running, "undoing a removal puts back the references to it from other GameObjects")
 	{
 		Loom::GameObject* other = scene->GetRoot().AddChild("Other");
@@ -423,4 +437,6 @@ TEST_SUITE("PlayHistory")
 
 		CHECK(holder->partner == elsewhere);
 	};
+
+	#pragma endregion
 };

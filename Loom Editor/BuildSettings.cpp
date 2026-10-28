@@ -198,8 +198,7 @@ namespace Loom
 			ImGui::EndCombo();
 		};
 
-		// Left alone while it is typed in, and otherwise following a folder
-		// the browser chose.
+		// Left alone while typed in, else following the folder the browser chose.
 		const ImGuiID folder_id = ImGui::GetID("##Folder");
 
 		if (ImGui::GetActiveID() != folder_id)

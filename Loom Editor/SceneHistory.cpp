@@ -63,8 +63,7 @@ namespace Loom
 
 		const std::unordered_set<Scene*> open(scenes.begin(), scenes.end());
 
-		// A scene no longer listed may be gone, so only a listed one is asked
-		// whether it is still the scene it was.
+		// A scene no longer listed may be gone, so only listed ones are asked.
 		for (size_t i = m_trackers.size(); i-- > 0;)
 			if (!open.contains(m_trackers[i]->scene) || m_trackers[i]->scene->m_ID != m_trackers[i]->id)
 				Drop(*m_trackers[i]);
@@ -113,8 +112,7 @@ namespace Loom
 			was_placed = was_placed || placed;
 		};
 
-		// What says where its children and the sibling before it sit names it
-		// by guid.
+		// Placements name it by guid.
 		std::vector<GameObject*> renamed{ };
 
 		for (const auto& [gameObject, what] : changed)
@@ -273,8 +271,7 @@ namespace Loom
 	{
 		Engine::DoTasks();
 
-		// What this made or brought in, by guid, ahead of what each tracker
-		// last saw.
+		// By guid, ahead of what each tracker last saw.
 		std::unordered_map<Tracker*, std::unordered_map<Guid, LoomObject*>> made{ };
 
 		const auto find =
@@ -294,8 +291,7 @@ namespace Loom
 				return LoomObject::GetByGuid(guid);
 			};
 
-		// Taken from one scene and wanted in another is moved there, so it
-		// keeps its components and whatever points at it.
+		// Moved rather than recreated, so it keeps its components and whatever points at it.
 		std::vector<GameObject*> removed{ };
 		std::unordered_map<Guid, GameObject*> movable{ };
 
@@ -391,8 +387,7 @@ namespace Loom
 
 		Engine::DoTasks();
 
-		// Each in front of the sibling it goes before, so that one is placed
-		// first.
+		// Each before the sibling it precedes, so that one is placed first.
 		for (GameObject* first : order)
 		{
 			std::vector<std::tuple<GameObject*, GameObject*, GameObject*>> chain{ };
@@ -479,8 +474,7 @@ namespace Loom
 
 			bool applied = false;
 
-			// One copy of every scene at a time, so an object moved between
-			// scenes is moved within one copy of each.
+			// One copy of every scene at a time, so a move between scenes stays within one copy each.
 			for (size_t copy = 0; copy < most; copy++)
 			{
 				std::unordered_map<Tracker*, Wanted> wanted{ };
@@ -567,8 +561,6 @@ namespace Loom
 		if (tracker == nullptr || entry == m_entries.end())
 			return;
 
-		// An object open in the text: its depth, where it is in states, and
-		// where its last child so far is.
 		struct Open
 		{
 			int depth;
@@ -798,8 +790,7 @@ namespace Loom
 
 	void SceneHistory::Add(GameObject& gameObject, Tracker& tracker, bool record)
 	{
-		// Guids are what a step finds objects by, so a scene may not have two
-		// objects under one.
+		// Steps find objects by guid, so a scene may not hold two under one.
 		const auto taken = tracker.objects.find(gameObject.GetGuid());
 
 		if (taken != tracker.objects.end() && taken->second != &gameObject)

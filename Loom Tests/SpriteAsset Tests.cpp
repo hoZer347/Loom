@@ -10,6 +10,8 @@
 #include <vector>
 
 
+#pragma region Helpers
+
 namespace
 {
 	using Loom::Palette;
@@ -59,9 +61,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("SpriteAsset")
 {
+	#pragma region Drawing
+
 	TEST_CASE("a line reaches both ends with no gaps")
 	{
 		constexpr int length = 8;
@@ -113,6 +119,10 @@ TEST_SUITE("SpriteAsset")
 		CHECK(Count(image, RED) == 4);
 	};
 
+	#pragma endregion
+
+	#pragma region Image Files
+
 	TEST_CASE("each format saves and loads back the same pixels, top row first")
 	{
 		SpriteAsset::Image image = SpriteAsset::Image::Blank(3, 2);
@@ -147,6 +157,10 @@ TEST_SUITE("SpriteAsset")
 		CHECK(captured.Says("no such sprite.png"));
 	};
 
+	#pragma endregion
+
+	#pragma region Blending
+
 	TEST_CASE("an opaque pixel covers what is under it, and a see-through one blends with it")
 	{
 		SpriteAsset::Image bottom = SpriteAsset::Image::Blank(3, 1);
@@ -164,6 +178,10 @@ TEST_SUITE("SpriteAsset")
 		CHECK(bottom.Get(1, 0) == SpriteAsset::Colour{ FULL - HALF, 0, HALF, FULL });
 		CHECK(bottom.Get(2, 0) == GREEN);
 	};
+
+	#pragma endregion
+
+	#pragma region Sprite Files
 
 	TEST_CASE("a sprite saves and loads back its frames, layers and links")
 	{
@@ -284,6 +302,10 @@ TEST_SUITE("SpriteAsset")
 		std::filesystem::remove(path);
 	};
 
+	#pragma endregion
+
+	#pragma region Sheets and Frames
+
 	TEST_CASE("an image the size of the sheet is taken in as a layer cut into the frames, and any other starts the sprite over")
 	{
 		SpriteAsset sprite = TwoByTwo();
@@ -394,6 +416,10 @@ TEST_SUITE("SpriteAsset")
 		CHECK(TwoByTwo().Colours(1).size() == 1);
 	};
 
+	#pragma endregion
+
+	#pragma region Linked Images
+
 	TEST_CASE("an image and its sprite find each other, and a sprite naming another image is not its")
 	{
 		const std::filesystem::path folder = Temp("loom sprite companions");
@@ -458,6 +484,10 @@ TEST_SUITE("SpriteAsset")
 
 		std::filesystem::remove(path);
 	};
+
+	#pragma endregion
+
+	#pragma region Palettes
 
 	TEST_CASE("a palette saves and loads back its colours, reading #RRGGBB as opaque and skipping the rest")
 	{
@@ -540,4 +570,6 @@ TEST_SUITE("SpriteAsset")
 
 		std::filesystem::remove_all(folder);
 	};
+
+	#pragma endregion
 };

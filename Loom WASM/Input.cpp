@@ -176,8 +176,7 @@ namespace Loom
 
 		bool has_focus = true;
 
-		// The mouse's buttons or the keyboard's keys, numbered from 0: what
-		// the callbacks said of each, and what this frame answers for it.
+		// Mouse buttons or keys from 0: what the callbacks said, and this frame's answer.
 		template <int count>
 		struct Switches
 		{
@@ -255,8 +254,7 @@ namespace Loom
 			Flags down_this_frame{ };
 			Flags up_this_frame{ };
 
-			// Held when focus went, which the frame it went in hears come up. A
-			// press in that frame took focus away, so the game never had it.
+			// A press in the frame focus went took it away, so the game never had it.
 			Flags lost_this_frame{ };
 		};
 
@@ -291,8 +289,7 @@ namespace Loom
 			int height = 0;
 		};
 
-		// In the window's pixels, as the callbacks last said, and whether the
-		// cursor is over the window at all.
+		// In window pixels, and whether the cursor is over the window.
 		int cursor_x = 0;
 		int cursor_y = 0;
 		bool cursor_over = false;
@@ -493,15 +490,13 @@ namespace Loom
 	{
 		if (eventType == EMSCRIPTEN_EVENT_MOUSEMOVE)
 		{
-			// In the canvas's own pixels, as the renderer and a resize measure
-			// it, which on a dense screen are more than the page's.
+			// In the canvas's own pixels, more than the page's on a dense screen.
 			int width = 0;
 			int height = 0;
 			double cssWidth = 0.0;
 			double cssHeight = 0.0;
 
-			// Asked on every move, so a failure is left to the next one rather
-			// than reported once a move.
+			// Asked on every move, so a failure is left to the next.
 			if (emscripten_get_canvas_element_size("#canvas", &width, &height) != EMSCRIPTEN_RESULT_SUCCESS ||
 				emscripten_get_element_css_size("#canvas", &cssWidth, &cssHeight) != EMSCRIPTEN_RESULT_SUCCESS ||
 				cssWidth <= 0.0 || cssHeight <= 0.0)
@@ -520,12 +515,10 @@ namespace Loom
 		return EM_TRUE;
 	};
 
-	// The DOM's own wheel event: GLFW's port rounds every one up to a whole
-	// notch, which turns a touchpad's run of small ones into a spin.
+	// The DOM's own wheel event, since GLFW's port rounds each up to a whole notch.
 	EM_BOOL wheel_callback(int, const EmscriptenWheelEvent* e, void*)
 	{
-		// How far a notch goes in each of the DOM's units, as SDL and ImGui's
-		// GLFW backend count it.
+		// As SDL and ImGui's GLFW backend count it.
 		constexpr double pixels_per_notch = 100.0;
 		constexpr double lines_per_notch = 3.0;
 		constexpr double notches_per_page = 80.0;
@@ -608,8 +601,7 @@ namespace Loom
 			scroll_callback);
 #endif
 
-		// The engine's own GLFW port on the web: ImGui is told to leave GLFW's
-		// callbacks alone there, and on the desktop it chains to these.
+		// The engine's own GLFW callbacks on the web; on the desktop ImGui chains to these.
 		glfwSetMouseButtonCallback(
 			Engine::window,
 			mouse_button_callback);

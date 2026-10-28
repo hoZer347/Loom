@@ -8,11 +8,7 @@
 #include <thread>
 #include <type_traits>
 
-// The whole suite is compiled twice -- once by MSVC into a desktop executable,
-// once by emcc into a WebAssembly module run under node. These cases are the
-// ones that are allowed to know which, and they exist so that a difference
-// between the two builds shows up as a named failure rather than as some other
-// suite behaving oddly on one platform only.
+// The cases that may know whether they run as MSVC's executable or emcc's module.
 
 #ifdef __EMSCRIPTEN__
 #define LOOM_TEST_BUILD "web"
@@ -30,9 +26,7 @@ TEST_SUITE("Platform")
 		CHECK(std::string(LOOM_TEST_BUILD) != "");
 	};
 
-	// Loom::uint64_t is its own typedef rather than std::uint64_t, and the
-	// engine hands IDs out as size_t. On the web build size_t is 32 bits, so
-	// these are not the same width there -- worth having stated.
+	// size_t is 32 bits on the web, so IDs are wider than it there.
 	TEST_CASE("object IDs are 64 bits wide on both builds")
 	{
 		CHECK(sizeof(Loom::uint64_t) == 8);
@@ -70,9 +64,7 @@ TEST_SUITE("Platform")
 		CHECK(bytes[3] == 0x01);
 	};
 
-	// State, LoomObject and Engine all lock a mutex on every call. A default
-	// emscripten build is single threaded, where those locks are uncontended
-	// but still have to compile and behave.
+	// A single-threaded web build still compiles and runs every lock.
 	TEST_CASE("threading support matches what the build can offer")
 	{
 #ifdef __EMSCRIPTEN__
@@ -88,9 +80,7 @@ TEST_SUITE("Platform")
 #endif
 	};
 
-	// Shader source loading is the one place the two builds genuinely diverge:
-	// the desktop reads an ifstream, the web issues an emscripten_fetch. The
-	// Shader suite skips its file cases on the web for exactly this reason.
+	// The desktop reads shaders with an ifstream, the web with emscripten_fetch.
 	TEST_CASE("the build knows how it loads shader sources")
 	{
 #ifdef __EMSCRIPTEN__

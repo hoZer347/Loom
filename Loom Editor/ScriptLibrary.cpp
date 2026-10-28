@@ -30,11 +30,7 @@ namespace Loom
 		const char* const configuration = "Release";
 #endif
 
-		// When the editor itself was built. A script library older than that was
-		// compiled against different engine headers, and the class layouts it
-		// baked in may have moved since: the failure mode is not a missing
-		// symbol, it is the two modules disagreeing about where a member lives
-		// and quietly corrupting the heap.
+		// An older library baked in class layouts that may have moved, which corrupts the heap silently.
 		std::filesystem::file_time_type EditorBuildTime()
 		{
 			char buffer[MAX_PATH]{ };
@@ -46,10 +42,7 @@ namespace Loom
 			return std::filesystem::last_write_time(buffer, code);
 		};
 
-		// Asks vswhere for a file inside an installation. It ships with every
-		// installation since 2017 and knows about the ones that are not where
-		// you expect, prereleases included. -find prints one line per match, so
-		// the first one that is really there wins.
+		// vswhere ships with every Visual Studio since 2017; the first match that exists wins.
 		std::string VsWhere(const std::string& arguments)
 		{
 			char program_files[MAX_PATH]{ };
@@ -87,8 +80,7 @@ namespace Loom
 		if (m_worker.joinable())
 			m_worker.join();
 
-		// Including the ones nobody wanted: their results go nowhere, but they
-		// are still writing MSBuild's output to a log that is about to go.
+		// Abandoned workers still write MSBuild output to a log about to go.
 		for (std::thread& abandoned : m_abandoned)
 			if (abandoned.joinable())
 				abandoned.join();
@@ -108,9 +100,7 @@ namespace Loom
 		m_project = project;
 		m_library = library;
 
-		// The cached answer belonged to the project being left behind, and the
-		// panel asks often enough that it would still be warm when the new one
-		// asks whether it needs building.
+		// The cached answer belonged to the project being left.
 		m_staleCheckedAt = { };
 
 		std::error_code code;
@@ -156,10 +146,7 @@ namespace Loom
 
 		const std::filesystem::path scripts = std::filesystem::path(m_project).parent_path();
 
-		// The project compiles whatever headers are there, so adding, removing or
-		// renaming one is a change even when no file in it is newer: a copied or
-		// renamed file keeps its time, and a deleted one leaves nothing behind.
-		// Each of those does touch the folder it was in.
+		// Adding, removing or renaming a header touches its folder but not the file times.
 		if (std::filesystem::last_write_time(scripts, code) > built)
 			return true;
 
@@ -169,8 +156,7 @@ namespace Loom
 		{
 			if (entry->is_directory(code))
 			{
-				// Visual Studio's own state, written to all the time the solution
-				// is open.
+				// Visual Studio's own state, written all the time the solution is open.
 				if (entry->path().filename().string().front() == '.')
 					entry.disable_recursion_pending();
 				else if (entry->last_write_time(code) > built)
@@ -270,9 +256,7 @@ namespace Loom
 		if (!m_current->done)
 			return Progress::Building;
 
-		// Its worker has run to the end, so this join is immediate. An abandoned
-		// one is not here to be joined: it went into m_abandoned with its result,
-		// and only the destructor waits for it.
+		// Its worker has finished, so this join is immediate.
 		if (m_worker.joinable())
 			m_worker.join();
 
@@ -280,9 +264,7 @@ namespace Loom
 
 		m_current.reset();
 
-		// Only a build that wrote the library says how long the next will take:
-		// one that failed may have stopped anywhere, and one with nothing to
-		// compile, as every Play starts, took next to no time.
+		// Only a build that wrote the library predicts the next one's time.
 		std::error_code code;
 
 		if (m_succeeded && !m_library.empty() &&
@@ -301,8 +283,7 @@ namespace Loom
 			timings.Write(out);
 		};
 
-		// The library has just moved; whatever the cache last decided about it
-		// is out of date.
+		// The library has just moved, so the cache is out of date.
 		m_staleCheckedAt = { };
 
 		m_status = m_succeeded
@@ -327,9 +308,7 @@ namespace Loom
 		if (!m_worker.joinable())
 			return;
 
-		// Dropped, not waited for: it is blocked in MSBuild and the editor has a
-		// frame to draw. The worker holds the only other reference to its result
-		// and finishes into that, where nothing reads it.
+		// Dropped, not waited for, since it is blocked in MSBuild and a frame needs drawing.
 		m_current.reset();
 
 		m_abandoned.push_back(std::move(m_worker));
@@ -376,10 +355,7 @@ namespace Loom
 			return false;
 		};
 
-		// Loading a copy leaves the real library free to be overwritten, so a
-		// build from Visual Studio does not fail because the editor is running.
-		// One per process: a mapped copy is locked, and a shared name would mean
-		// the second editor open on a project silently getting no scripts.
+		// A loaded copy frees the real library for Visual Studio to rebuild; one per process, since a mapped copy is locked.
 		SweepLoadedCopies(m_library);
 
 		std::filesystem::path copy(m_library);
@@ -415,12 +391,7 @@ namespace Loom
 				code);
 		};
 
-		// Whatever turns up in the registry while the library loads belongs to
-		// it and goes again when it is unloaded: each component type registers
-		// itself as the library's statics are initialised. The registry as it
-		// stands now is kept alongside: a script may register over a name that
-		// already exists, and that factory has to come back rather than stay
-		// behind pointing into a library that is no longer mapped.
+		// Types register as the library loads; the previous registry is kept to restore names it overwrites.
 		std::map<std::string, std::pair<ComponentRegistry::Factory, std::string>> before{ };
 
 		for (const auto& [name, factory] : ComponentRegistry::All())
@@ -444,8 +415,7 @@ namespace Loom
 			else m_before.emplace(name, previous->second);
 		};
 
-		// A library whose initialisation threw is unmapped again, possibly after
-		// some of its types got as far as registering.
+		// A library whose initialisation threw may have registered some types already.
 		if (module == nullptr)
 		{
 			const DWORD error = GetLastError();
@@ -490,9 +460,7 @@ namespace Loom
 		m_status = "Unloaded.";
 	};
 
-	// The copies left behind by editors that are no longer running. One still
-	// mapped by a live editor refuses to be removed, and its symbols are left
-	// alone with it: that editor is still debugging scripts through them.
+	// A copy still mapped by a live editor is left, symbols and all.
 	void ScriptLibrary::SweepLoadedCopies(const std::string& library)
 	{
 		const std::filesystem::path path(library);
@@ -527,8 +495,7 @@ namespace Loom
 
 		m_states.clear();
 
-		// And put back what was there before, which restores anything the
-		// library registered over the top of.
+		// Restores anything the library registered over.
 		for (const auto& [name, entry] : m_before)
 			ComponentRegistry::Register(name, nullptr, entry.first, entry.second);
 
@@ -542,8 +509,7 @@ namespace Loom
 
 	const std::string& ScriptLibrary::FindVisualStudio()
 	{
-		// vswhere is a process, so the answer is kept: an installation does not
-		// come and go while the editor is up.
+		// vswhere is a process, and installations do not change while the editor is up.
 		static const std::string devenv = VsWhere("-find Common7\\IDE\\devenv.exe");
 
 		return devenv;

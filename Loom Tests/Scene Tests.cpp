@@ -17,6 +17,8 @@ using LoomTests::Pump;
 using LoomTests::Probe;
 using LoomTests::RecordingRenderer;
 
+#pragma region Helpers
+
 namespace
 {
 	bool Registered(const Loom::Scene* scene)
@@ -27,9 +29,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("Scene")
 {
+	#pragma region Names and Threads
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene names itself and its root")
 	{
 		Loom::Scene scene("Level One");
@@ -55,6 +61,10 @@ TEST_SUITE("Scene")
 
 		CHECK(scene.GetThreadID() == 3);
 	};
+
+	#pragma endregion
+
+	#pragma region Registry
 
 	// Engine iterates GetScenes() every frame, so registration is what makes a
 	// scene actually run. Like everything else, it happens on the task queue.
@@ -131,6 +141,10 @@ TEST_SUITE("Scene")
 		CHECK(scenes.back() == &second);
 	};
 
+	#pragma endregion
+
+	#pragma region Root
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "GetRoot hands out the same object every time")
 	{
 		Loom::Scene scene("Root identity");
@@ -164,6 +178,10 @@ TEST_SUITE("Scene")
 		REQUIRE(scene.GetRoot().GetChildren().size() == 1);
 		CHECK(scene.GetRoot().GetChildren()[0] == child);
 	};
+
+	#pragma endregion
+
+	#pragma region Ticking
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Update and Render each drive only their own callback")
 	{
@@ -273,6 +291,10 @@ TEST_SUITE("Scene")
 		CHECK(scene.GetRoot().GetChildren().empty());
 	};
 
+	#pragma endregion
+
+	#pragma region Identity
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a scene is a LoomObject with its own ID")
 	{
 		Loom::Scene first("A");
@@ -289,4 +311,6 @@ TEST_SUITE("Scene")
 	{
 		CHECK_FALSE(Loom::Scene::is_engine_running.load());
 	};
+
+	#pragma endregion
 };

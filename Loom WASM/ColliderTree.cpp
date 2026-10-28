@@ -23,18 +23,13 @@ namespace Loom
 	{
 		#pragma region Fitting
 
-		// How far a leaf's bounds reach past its collider's, so a collider
-		// moving a little each frame stays in its leaf.
+		// Slack so a collider moving a little stays in its leaf.
 		constexpr float PADDING = 0.05f;
 
-		// Past this much slack a leaf is refitted anyway, so one that shrinks
-		// or stops does not go on catching rays it is nowhere near.
+		// Past this slack a leaf is refitted, so it stops catching far rays.
 		constexpr float MOST_PADDING = PADDING * 4.0f;
 
-		// How many steps' travel a moving leaf is stretched ahead by when it
-		// is refitted. It is refitted once it no longer covers the next one.
-		// Measured against three and six on the Crowd benchmark, as the
-		// padding was against a tenth.
+		// Steps of travel a moving leaf is stretched ahead by, tuned on the Crowd benchmark.
 		constexpr float PREDICTION = 10.0f;
 
 		// bounds stretched along ahead, to cover where it is going.
@@ -57,20 +52,17 @@ namespace Loom
 		// A branch whose children's heights differ by more than this is rotated.
 		constexpr int MOST_IMBALANCE = 1;
 
-		// Box2D's insertion cost: a new branch costs twice the area it covers,
-		// once for itself and once for the leaf beside it.
+		// Box2D's insertion cost: a new branch costs twice its area.
 		constexpr float BRANCH_COST = 2.0f;
 
 		#pragma endregion
 
 		#pragma region Queries
 
-		// The inverse of a ray's direction along an axis it runs parallel to:
-		// large enough that it crosses that axis's slab nowhere near.
+		// The inverse direction along a parallel axis, so its slab is never crossed.
 		constexpr float PARALLEL = 1e30f;
 
-		// The shuffles that bring a vector's y and z to its first lane, and
-		// the mask of the first three lanes' signs.
+		// Shuffles bringing y and z to the first lane, and the first three lanes' sign mask.
 		constexpr int Y_LANE = 1;
 		constexpr int Z_LANE = 2;
 		constexpr int AXIS_LANES = 0b0111;
@@ -78,8 +70,7 @@ namespace Loom
 		// What a ray's entry into a node it misses is taken as.
 		constexpr float MISSED = std::numeric_limits<float>::infinity();
 
-		// Deep enough for any tree the rotations leave balanced, so a raycast
-		// never touches the heap; a deeper one spills over rather than fails.
+		// Deep enough for a balanced tree, so a raycast never touches the heap.
 		constexpr size_t INLINE_PENDING = 64;
 
 		// A stack held on the caller's own stack until it outgrows it.
@@ -117,8 +108,7 @@ namespace Loom
 			size_t m_count = 0;
 		};
 
-		// A node waiting to be visited, with the distance the ray enters it at,
-		// which a nearer hit found meanwhile can rule it out by.
+		// A node to visit, with its entry distance so a nearer hit can rule it out.
 		struct Pending
 		{
 			int node;
@@ -178,8 +168,7 @@ namespace Loom
 	{
 		const bool reshaped = collider.Refresh();
 
-		// Most colliders have not moved since the last step, and those leaves
-		// already fit.
+		// Most colliders have not moved, and their leaves already fit.
 		if (collider.m_tree == this && !reshaped && world == collider.m_synced)
 			return false;
 
@@ -277,8 +266,7 @@ namespace Loom
 
 		const Bounds& padded = m_nodes[collider.m_node].bounds;
 
-		// As much slack behind as ahead, so a leaf a steadily moving
-		// collider has moved along is not taken for one too big.
+		// Slack behind as well as ahead, so a steadily moving leaf is not taken as oversized.
 		const Bounds most = Stretched(Padded(collider.m_bounds, travel), -travel * PREDICTION).Expanded(MOST_PADDING);
 
 		return padded.Contains(Stretched(collider.m_bounds, travel)) && most.Contains(padded);
@@ -349,9 +337,7 @@ namespace Loom
 	{
 		SmallStack<Pending, INLINE_PENDING> pending;
 
-		// Each axis's slab is crossed at (plane - origin) / direction; the
-		// division is done once here. Parallel to an axis, the ray crosses
-		// that slab nowhere, which a huge inverse with the same sign gives.
+		// Slabs are crossed at (plane - origin) / direction, so the division is done once.
 		glm::vec3 inverse;
 
 		for (int axis = 0; axis < glm::vec3::length(); axis++)
@@ -363,8 +349,7 @@ namespace Loom
 		const glm::vec3 origin = ray.origin;
 
 #if defined(_M_X64) || defined(__SSE2__)
-		// All three axes at once. Each load's fourth lane is whatever follows
-		// in the node, and only the first three are ever read back.
+		// All three axes at once; the fourth lane is never read.
 		const __m128 from = _mm_setr_ps(origin.x, origin.y, origin.z, 0.0f);
 		const __m128 across = _mm_setr_ps(inverse.x, inverse.y, inverse.z, 0.0f);
 
@@ -476,8 +461,7 @@ namespace Loom
 			const Node& node = m_nodes[pending.Pop()];
 
 #if defined(_M_X64) || defined(__SSE2__)
-			// All three axes at once, as Raycast does: apart along any of
-			// the first three lanes is apart.
+			// All three axes at once, as Raycast does.
 			const __m128 above = _mm_cmpgt_ps(_mm_loadu_ps(&node.bounds.min.x), highest);
 			const __m128 below = _mm_cmplt_ps(_mm_loadu_ps(&node.bounds.max.x), lowest);
 
@@ -551,8 +535,7 @@ namespace Loom
 
 		const Bounds bounds = m_nodes[leaf].bounds;
 
-		// Down to the sibling that costs the least surface area to pair with,
-		// counting what every branch above it grows by.
+		// Down to the cheapest sibling by surface area, counting every branch above.
 		int sibling = m_root;
 
 		while (!m_nodes[sibling].IsLeaf())
@@ -639,8 +622,7 @@ namespace Loom
 		if (std::abs(imbalance) <= MOST_IMBALANCE)
 			return a;
 
-		// The taller child c takes a's place and a goes under it, keeping the
-		// shorter of c's children; c keeps the taller.
+		// The taller child c takes a's place, and a keeps c's shorter child.
 		const int side = imbalance > 0 ? 1 : 0;
 		const int b = m_nodes[a].children[1 - side];
 		const int c = m_nodes[a].children[side];

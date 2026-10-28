@@ -17,6 +17,8 @@
 #include <thread>
 #include <utility>
 
+#pragma region Helpers
+
 namespace
 {
 	constexpr float width = 900.0f;
@@ -213,8 +215,12 @@ namespace
 	};
 };
 
+#pragma endregion
+
 TEST_SUITE("ShaderEditor")
 {
+	#pragma region Typing and Saving
+
 	TEST_CASE("typing an engine name offers it, and Tab and Ctrl+S put it in the file")
 	{
 		Driven driven;
@@ -312,6 +318,10 @@ TEST_SUITE("ShaderEditor")
 		CHECK_FALSE(driven.Unsaved());
 	};
 
+	#pragma endregion
+
+	#pragma region Messages and Explanations
+
 	TEST_CASE("a message underlines the name it quotes, not the same letters inside another")
 	{
 		using Loom::ShaderEditor;
@@ -350,6 +360,10 @@ TEST_SUITE("ShaderEditor")
 		CHECK_FALSE(unsized.TooltipAlong(1));
 	};
 
+	#pragma endregion
+
+	#pragma region Moving
+
 	TEST_CASE("a shader moved while its tab is in front stays in front, and Ctrl+S writes where it went")
 	{
 		Driven driven;
@@ -382,6 +396,8 @@ TEST_SUITE("ShaderEditor")
 
 		std::filesystem::remove(moved);
 	};
+
+	#pragma endregion
 };
 
 #endif

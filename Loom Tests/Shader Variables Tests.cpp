@@ -30,6 +30,8 @@ using LoomTests::Pump;
 using LoomTests::RecordingRenderer;
 
 
+#pragma region Helpers
+
 namespace
 {
 	// A shader file in the temp folder, gone again when the test is.
@@ -69,9 +71,13 @@ namespace
 		"void main() { }\n";
 };
 
+#pragma endregion
+
 
 TEST_SUITE("Shader variables")
 {
+	#pragma region Variables
+
 	TEST_CASE("every uniform a shader declares is a variable, bar the engine's")
 	{
 		const std::vector<Loom::ShaderVariable> variables = Loom::ParseShaderVariables(
@@ -171,6 +177,10 @@ TEST_SUITE("Shader variables")
 		CHECK(values.Find({ "u_tint", Loom::UniformType::Vec4 }) == nullptr);
 		CHECK(values.Find({ "u_other", Loom::UniformType::Vec3 }) == nullptr);
 	};
+
+	#pragma endregion
+
+	#pragma region Declaring in Files
 
 	TEST_CASE("declaring into a file without a COMMON section adds one in front of the stages")
 	{
@@ -320,6 +330,10 @@ TEST_SUITE("Shader variables")
 		CHECK(Loom::ParseShaderVariables(file.Text()).empty());
 	};
 
+	#pragma endregion
+
+	#pragma region Reloading
+
 #ifndef __EMSCRIPTEN__
 	// Native only, for the reason the Shader suite gives: the web build fetches
 	// shader files over HTTP, which needs a browser.
@@ -419,6 +433,10 @@ TEST_SUITE("Shader variables")
 		CHECK(material->shader == named);
 	};
 #endif
+
+	#pragma endregion
+
+	#pragma region Programs
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "each variable gets its own scope's value, or the default")
 	{
@@ -566,6 +584,10 @@ TEST_SUITE("Shader variables")
 		CHECK(second.settings.shadows);
 	};
 
+	#pragma endregion
+
+	#pragma region Shadows and Drawing
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a material with shadows off is left out of the shadow map and drawn fully lit")
 	{
 		RecordingRenderer renderer;
@@ -623,9 +645,7 @@ TEST_SUITE("Shader variables")
 		Loom::Material* material = scene.AddChild("Timed")->Attach<Loom::Material>();
 		Pump();
 
-		// The clock reads GLFW's time, so it only runs once GLFW is up, and
-		// GLFW's time starts again with it. Two frames from there, so the time
-		// since the start is neither still nor the last frame's alone.
+		// GLFW's time restarts with it, so two frames on it is neither still nor one frame's.
 		constexpr std::chrono::milliseconds frame_length{ 20 };
 		constexpr int frames = 2;
 		glfwInit();
@@ -763,4 +783,6 @@ TEST_SUITE("Shader variables")
 		CHECK(renderer.colorWrites == std::vector<bool>{ false, true, false, true });
 		CHECK(renderer.depthTestsEqual == std::vector<bool>{ true, false });
 	};
+
+	#pragma endregion
 };

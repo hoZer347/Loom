@@ -31,8 +31,7 @@ namespace Loom
 
 		const std::regex& DeclarationPattern()
 		{
-			// The indentation, the type, the name and the word in a trailing
-			// comment.
+			// Indentation, type, name and the word in a trailing comment.
 			static const std::regex pattern(
 				R"(^(\s*)uniform\s+(?:(?:lowp|mediump|highp)\s+)?(\w+)\s+(\w+)\s*;\s*(?://\s*(\w+))?.*$)");
 
@@ -145,9 +144,7 @@ namespace Loom
 				return found;
 			};
 
-			// After the declarations and precision statements already at the top
-			// of COMMON, adding the section in front of the first section when
-			// there is none.
+			// After COMMON's leading declarations, or ahead of the first section if there is none.
 			size_t InsertionPoint()
 			{
 				const auto common = std::find_if(
@@ -220,8 +217,7 @@ namespace Loom
 		constexpr const char* FLOAT_FORMAT = "%.3f";
 		constexpr const char* INTEGER_FORMAT = "%.0f";
 
-		// Enough digits for a float, the precision every float variable has in
-		// the end, to come back the same.
+		// Enough digits for a float to round-trip.
 		constexpr const char* WRITTEN_FLOAT_FORMAT = "%.9g";
 		constexpr const char* WRITTEN_INTEGER_FORMAT = "%.0f";
 
@@ -276,8 +272,7 @@ namespace Loom
 
 			bool changed = false;
 
-			// A matrix reads the way it is written down, a row at a time, which
-			// is across its columns.
+			// A matrix is laid out a row at a time, across its columns.
 			const float x = ImGui::GetCursorPosX();
 
 			for (int row = 0; row < (IsMatrix(info) ? info.rows : 1); row++)

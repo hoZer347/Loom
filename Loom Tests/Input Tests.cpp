@@ -14,6 +14,8 @@ TEST_SUITE("Input")
 	constexpr int w_key = (int)Loom::Key::W;
 	constexpr int left_shift = (int)Loom::Key::LeftShift;
 
+	#pragma region Buttons
+
 	// Input is a namespace-with-state, not something a scene owns: Engine wires
 	// the platform callbacks up once and everything reads the statics.
 	TEST_CASE("Input cannot be instantiated")
@@ -210,6 +212,10 @@ TEST_SUITE("Input")
 		ReleaseAll();
 	};
 
+	#pragma endregion
+
+	#pragma region Keys
+
 	TEST_CASE("a key is down for the frame it lands in, then held, then up for one frame")
 	{
 		ReleaseAll();
@@ -293,6 +299,10 @@ TEST_SUITE("Input")
 		ReleaseAll();
 	};
 
+	#pragma endregion
+
+	#pragma region Wheel
+
 	TEST_CASE("the wheel's notches add up over a frame and are heard for that frame alone")
 	{
 		constexpr float first = 1.0f;
@@ -357,6 +367,10 @@ TEST_SUITE("Input")
 		ReleaseAll();
 	};
 
+	#pragma endregion
+
+	#pragma region Key Names
+
 	TEST_CASE("a key asked by name is the key asked by number")
 	{
 		ReleaseAll();
@@ -375,6 +389,10 @@ TEST_SUITE("Input")
 
 		ReleaseAll();
 	};
+
+	#pragma endregion
+
+	#pragma region Cursor
 
 	// The cursor callback writes these; Engine and any scene reads them. They
 	// have to be plain settable ints for the callback to be able to.
@@ -488,4 +506,6 @@ TEST_SUITE("Input")
 		CHECK(Loom::Input::mouse_x >= 0);
 		CHECK(Loom::Input::mouse_y >= 0);
 	};
+
+	#pragma endregion
 };

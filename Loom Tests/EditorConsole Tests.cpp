@@ -18,6 +18,8 @@
 #include <utility>
 #include <vector>
 
+#pragma region Helpers
+
 namespace
 {
 	std::string clipboard;
@@ -282,9 +284,13 @@ namespace
 	};
 };
 
+#pragma endregion
+
 
 TEST_SUITE("EditorConsole")
 {
+	#pragma region Selection and Copying
+
 	TEST_CASE_FIXTURE(Driven, "dragging across lines copies from the press to the release")
 	{
 		Drag(At(0, 6), At(2, 5));
@@ -429,6 +435,10 @@ TEST_SUITE("EditorConsole")
 		CHECK(clipboard == "first");
 	};
 
+	#pragma endregion
+
+	#pragma region Links
+
 	TEST_CASE_FIXTURE(Driven, "a click on a link follows it to its file, line and column")
 	{
 		const Project project;
@@ -466,7 +476,11 @@ TEST_SUITE("EditorConsole")
 		CHECK(followed.empty());
 		CHECK(clipboard == "erfull.loomsp");
 	};
+
+	#pragma endregion
 };
+
+#pragma region Log Helpers
 
 namespace
 {
@@ -481,8 +495,12 @@ namespace
 	};
 };
 
+#pragma endregion
+
 TEST_SUITE("EditorLog")
 {
+	#pragma region Stream
+
 	TEST_CASE("the log keeps every line when the stream it passes on to fails")
 	{
 		Failing failing;
@@ -507,6 +525,10 @@ TEST_SUITE("EditorLog")
 		CHECK(still_good);
 		CHECK(lines == std::vector<std::string>{ "first", "second", "third" });
 	};
+
+	#pragma endregion
+
+	#pragma region Log Links
 
 	TEST_CASE("a line naming a file in the project names it from the project's folder, and others are left as written")
 	{
@@ -631,4 +653,6 @@ TEST_SUITE("EditorLog")
 		REQUIRE(lines.size() == 1);
 		CHECK(lines[0].links.empty());
 	};
+
+	#pragma endregion
 };

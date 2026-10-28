@@ -19,17 +19,13 @@ namespace Loom
 	{
 		#pragma region Constants
 
-		// Past this many stages in a frame a thread's are dropped, so one
-		// recording with no frames ending, such as a test's, stays bounded.
+		// Caps a thread's stages per frame, so a recording with no frame ends stays bounded.
 		constexpr size_t MOST_SPANS = 4096;
 
 		// In milliseconds from one poll to the next.
 		constexpr double POLL = 1000.0 / (double)Profiler::Rate;
 
-		// Each poll falls a varying share of POLL after the last, from the
-		// shortest to one more, stepping by the golden ratio so the shares
-		// stay spread and average one. Work on a fixed cadence, such as
-		// physics' steps, is then not always caught or always missed.
+		// Polls step by the golden ratio, so fixed-cadence work is not always caught or missed.
 		constexpr double SHORTEST_POLL = 0.5;
 		constexpr double POLL_STEP = 0.618034;
 
@@ -52,8 +48,7 @@ namespace Loom
 		// A stage and its parts as they have run on one thread.
 		struct Node
 		{
-			// Moves the parts to the order they begin in this frame, ahead of
-			// those that have not run in it.
+			// Reorders parts to their start order this frame.
 			Node& Part(const std::string& name, unsigned long long frame)
 			{
 				const auto found = std::find_if(parts.begin(), parts.end(), [&name](const Node& part) { return part.name == name; });
@@ -79,13 +74,11 @@ namespace Loom
 
 			std::string name{ };
 
-			// Each frame's sum, the slot a frame's number picks overwritten
-			// as the window moves on.
+			// Each frame's sum, in a ring the frame number indexes.
 			std::array<double, Profiler::Window> history{ };
 			double sum = 0.0;
 
-			// Each whole Bucket's average, the slot a bucket's number picks
-			// overwritten as the trend moves on, and the sum of this one so far.
+			// Each bucket's average in a ring, and the current bucket's running sum.
 			std::array<double, Profiler::Trend> trend{ };
 			double gathered = 0.0;
 
@@ -120,8 +113,7 @@ namespace Loom
 			double frameLength = 0.0;
 			unsigned long long frame = 0;
 
-			// Each recorded frame's start, when the next poll is, and how many
-			// have fallen due.
+			// Frame starts, the next poll and how many are due.
 			std::array<double, Profiler::Window> frameStarts{ };
 			double spacing = 0.0;
 			double due = 0.0;
@@ -130,8 +122,7 @@ namespace Loom
 			std::vector<Profiler::Thread> threads{ };
 		};
 
-		// Never destroyed, since a worker may still be recording as the
-		// program ends.
+		// Never destroyed, since a worker may record as the program ends.
 		Registry& Shared()
 		{
 			static Registry& registry = *new Registry;
@@ -170,9 +161,7 @@ namespace Loom
 
 		#pragma region Frames
 
-		// Decides whether the frame starting now is recorded. Polls keep to
-		// their schedule rather than to the frame that took each, unless a
-		// frame ran past a whole poll.
+		// Polls keep their schedule unless a frame ran past a whole poll.
 		void Poll(Registry& shared, double now)
 		{
 			const bool due = now >= shared.due;
@@ -191,8 +180,7 @@ namespace Loom
 			s_polled.store(next, std::memory_order_relaxed);
 		};
 
-		// Takes this frame's sums into the window and the trend, and forgets
-		// the parts that have not run within the trend.
+		// Folds this frame into the window and trend, dropping parts idle for the trend.
 		void Close(Node& node, unsigned long long frame)
 		{
 			const unsigned long long buckets = (frame + 1) / Profiler::Bucket;
@@ -302,8 +290,7 @@ namespace Loom
 		Registry& shared = Shared();
 		std::lock_guard<std::mutex> lock(shared.mutex);
 
-		// A stage that saw recording on as it went off may close into its
-		// log after, so each is emptied as recording starts again.
+		// A stage may close into its log after recording stopped, so each is emptied.
 		for (const std::unique_ptr<Log>& log : shared.logs)
 		{
 			std::lock_guard<std::mutex> named(log->mutex);
@@ -407,8 +394,7 @@ namespace Loom
 				order = log->order;
 			};
 
-			// A part begins no sooner than its stage, and on the same tick
-			// only after it.
+			// A part begins no sooner than its stage, and after it on the same tick.
 			std::sort(recorded.begin(), recorded.end(),
 				[](const Recorded& a, const Recorded& b) { return a.start != b.start ? a.start < b.start : a.depth < b.depth; });
 

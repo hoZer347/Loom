@@ -16,6 +16,8 @@ using LoomTests::Pump;
 namespace ComponentDrag = Loom::ComponentDrag;
 
 
+#pragma region Helpers
+
 namespace
 {
 	constexpr ImGuiTreeNodeFlags header_flags = ImGuiTreeNodeFlags_DefaultOpen;
@@ -129,9 +131,13 @@ namespace
 	constexpr float carried = 0.25f;
 };
 
+#pragma endregion
+
 
 TEST_SUITE("ComponentDrag")
 {
+	#pragma region Folding
+
 	TEST_CASE("every header shows folded while a component is dragged, and each opens again after as it was, one the user had folded included")
 	{
 		Inspector inspector;
@@ -156,6 +162,10 @@ TEST_SUITE("ComponentDrag")
 		CHECK(ComponentDrag::Dragged(*shown, shown->GetGuid()) == nullptr);
 		CHECK(ComponentDrag::Dragged(*shown, Loom::Guid{ }) == nullptr);
 	};
+
+	#pragma endregion
+
+	#pragma region Scrolling
 
 	TEST_CASE("held within the edge rows or past them it scrolls up or down, a row's worth by the time and the rate")
 	{
@@ -216,4 +226,6 @@ TEST_SUITE("ComponentDrag")
 			CHECK(std::abs(scrolled) >= std::floor(step * frames) - 1.0f);
 		};
 	};
+
+	#pragma endregion
 };
