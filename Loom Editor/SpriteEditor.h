@@ -232,10 +232,10 @@ namespace Loom
 		void DrawCategories(const std::string& path);
 		void DrawPaletteChoice(const std::string& project_folder);
 		void DrawPaletteMenu(const std::string& project_folder);
+		void DrawPaletteRename(const std::string& project_folder);
 
 		// Into m_paletteFiles, from the project, or beside the sprite, and those made and not yet saved.
 		void FindPalettes(const std::string& project_folder);
-		void DrawPaletteRename(const std::string& project_folder);
 
 		#pragma endregion
 

@@ -645,13 +645,20 @@ TEST_SUITE("SpriteEditor")
 
 		Driven driven("loom sprite palette rename unsaved.tga", &sprite);
 
-		driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\nrightclick \"Palette\" \"New\" left -40 0\nwait 2\nkey ctrl+a\ntype Unsaved Hot\nkey enter\nwait 2\n");
+		driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\n");
+		driven.Stroke(middle, middle);
+		driven.Run("rightclick \"Palette\" \"New\" left -40 0\nwait 2\nkey ctrl+a\ntype Unsaved Hot\nkey enter\nwait 2\n");
 
 		const std::filesystem::path folder = std::filesystem::path(driven.path).parent_path();
 		const std::string hot = (folder / ("Unsaved Hot" + std::string(Loom::Palette::extension))).string();
 
 		CHECK_FALSE(std::filesystem::exists(hot));
 		CHECK(driven.editor.TakeRenamed().empty());
+
+		// The stroke's undo step holds the link from before the rename.
+		const ImVec2 tab = Driven::TabMiddle("rename unsaved");
+		driven.Stroke(tab, tab);
+		driven.Press(ImGuiKey_Z);
 
 		REQUIRE(driven.editor.SaveAll());
 
@@ -680,6 +687,7 @@ TEST_SUITE("SpriteEditor")
 		Driven driven("loom sprite palette rename/Hero.tga", &sprite);
 
 		driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\n");
+		driven.Stroke(middle, middle);
 		REQUIRE(driven.editor.SaveAll());
 
 		const std::string palette = (folder / "Hero.loompalette").string();
@@ -701,9 +709,15 @@ TEST_SUITE("SpriteEditor")
 		REQUIRE(SpriteAsset::Load(other, saved, links));
 		CHECK(links.palette == hot);
 
+		// The stroke's undo step holds the link from before the rename.
+		const ImVec2 tab = Driven::TabMiddle("Hero");
+		driven.Stroke(tab, tab);
+		driven.Press(ImGuiKey_Z);
+
 		REQUIRE(driven.editor.SaveAll());
 		REQUIRE(SpriteAsset::Load(SpriteAsset::For(driven.path), saved, links));
 		CHECK(links.palette == hot);
+		CHECK_FALSE(std::filesystem::exists(palette));
 
 		std::filesystem::remove_all(folder);
 	};
