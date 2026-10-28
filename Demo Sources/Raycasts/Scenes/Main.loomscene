@@ -29,7 +29,7 @@ Main(e23c8c69-58fb-4586-9300-bc06ad29d801):
 			1 = false
 			2 = (0, -0.25, 0)
 			4 = (14, 0.5, 14)
-			Component Shape(a3d471ec-171e-40c3-b725-0cabee1b1bb9)
+			Component Target(a3d471ec-171e-40c3-b725-0cabee1b1bb9)
 				0 = 0
 				1 = (0.82, 0.8, 0.76)
 				2 = "Assets/Lit.shader"
@@ -42,7 +42,7 @@ Main(e23c8c69-58fb-4586-9300-bc06ad29d801):
 			2 = (4, 1, 0)
 			3 = (0, 30, 0)
 			4 = (1.2, 2, 1.2)
-			Component Shape(f63bd7c5-7e43-440d-b7c8-ec58616f993d)
+			Component Target(f63bd7c5-7e43-440d-b7c8-ec58616f993d)
 				0 = 0
 				1 = (0.85, 0.35, 0.25)
 				2 = "Assets/Lit.shader"
@@ -54,7 +54,7 @@ Main(e23c8c69-58fb-4586-9300-bc06ad29d801):
 			1 = false
 			2 = (2, 1, 0.3)
 			4 = (0.4, 2, 0.4)
-			Component Shape(2a40cca1-2240-476d-b2b1-9b89a8322dbd)
+			Component Target(2a40cca1-2240-476d-b2b1-9b89a8322dbd)
 				0 = 0
 				1 = (0.3, 0.5, 0.85)
 				2 = "Assets/Lit.shader"
@@ -66,7 +66,7 @@ Main(e23c8c69-58fb-4586-9300-bc06ad29d801):
 			1 = false
 			2 = (0, 1, -4.5)
 			4 = (1.6, 1.6, 1.6)
-			Component Shape(338237c8-2779-4669-a923-8e416687bef7)
+			Component Target(338237c8-2779-4669-a923-8e416687bef7)
 				0 = 1
 				1 = (0.35, 0.75, 0.45)
 				2 = "Assets/Lit.shader"
@@ -79,7 +79,7 @@ Main(e23c8c69-58fb-4586-9300-bc06ad29d801):
 			2 = (-4, 1, 2)
 			3 = (0, -20, 15)
 			4 = (0.6, 2, 3)
-			Component Shape(07ed70ba-20e6-4e1f-ae57-bc32d397eed3)
+			Component Target(07ed70ba-20e6-4e1f-ae57-bc32d397eed3)
 				0 = 0
 				1 = (0.75, 0.6, 0.85)
 				2 = "Assets/Lit.shader"
@@ -91,7 +91,7 @@ Main(e23c8c69-58fb-4586-9300-bc06ad29d801):
 			1 = false
 			2 = (2.5, 1, 3.5)
 			4 = (1.2, 1.2, 1.2)
-			Component Shape(f5735541-6944-40e8-b57c-199fdd75da4b)
+			Component Target(f5735541-6944-40e8-b57c-199fdd75da4b)
 				0 = 1
 				1 = (0.3, 0.7, 0.75)
 				2 = "Assets/Lit.shader"
@@ -103,7 +103,7 @@ Main(e23c8c69-58fb-4586-9300-bc06ad29d801):
 			1 = false
 			2 = (-2, 1, -3)
 			4 = (1, 2, 1)
-			Component Shape(311da63a-65cb-42e6-819f-836dcca9195e)
+			Component Target(311da63a-65cb-42e6-819f-836dcca9195e)
 				0 = 0
 				1 = (0.6, 0.6, 0.6)
 				2 = "Assets/Lit.shader"
@@ -120,7 +120,7 @@ Main(e23c8c69-58fb-4586-9300-bc06ad29d801):
 			1 = false
 			2 = (0, 1.3, 4.5)
 			4 = (2.4, 2.4, 2.4)
-			Component Shape(09991404-7ef0-4398-a7cb-4169f01b5b29)
+			Component Target(09991404-7ef0-4398-a7cb-4169f01b5b29)
 				0 = 2
 				1 = (0.85, 0.5, 0.75)
 				2 = "Assets/Lit.shader"

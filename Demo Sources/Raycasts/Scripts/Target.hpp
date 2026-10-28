@@ -19,7 +19,7 @@ namespace RaycastsScripts
 	// BoxCollider and a SphereCollider have before they are resized, or a
 	// ring half a unit across around Z for a MeshCollider to follow. Scaling
 	// the GameObject sizes the shape and its collider together.
-	struct Shape : Loom::Component<Shape>
+	struct Target : Loom::Component<Target>
 	{
 		enum Kind { Cube, Sphere, Torus };
 
@@ -42,7 +42,7 @@ namespace RaycastsScripts
 			mesh->m_vertices = Build(m_kind);
 		};
 
-		// For a Shape made by a script, before it is first drawn.
+		// For a Target made by a script, before it is first drawn.
 		void Configure(Kind kind, const glm::vec3& colour)
 		{
 			m_kind = kind;

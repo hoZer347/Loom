@@ -5,7 +5,7 @@ A Loom project showing colliders and raycasts. Press Play.
 
     Scenes/Main.loomscene     a laser among boxes and spheres
     Scripts/Laser.hpp         casts a ray every frame with Loom::Physics::Raycast
-    Scripts/Shape.hpp         draws a cube, sphere or ring for its collider
+    Scripts/Target.hpp        draws a cube, sphere or ring for its collider
     Scripts/Slider.hpp        keeps one block moving
     Scripts/LaserTests.hpp    cases the Tests panel runs
     Assets/                   the shaders they draw with

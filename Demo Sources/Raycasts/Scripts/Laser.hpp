@@ -5,7 +5,7 @@
 #include "Material.h"
 #include "Mesh.h"
 #include "Physics.h"
-#include "Shape.hpp"
+#include "Target.hpp"
 
 #include "glm/glm.hpp"
 
@@ -18,7 +18,7 @@ namespace RaycastsScripts
 	// Turns about its Y axis, casting a ray ahead of it every frame with
 	// Loom::Physics::Raycast. It draws the ray as far as the first collider it
 	// meets, with that surface's normal sticking out of the hit, and tints the
-	// Shape it is hitting.
+	// Target it is hitting.
 	struct Laser : Loom::Component<Laser>
 	{
 		void OnAttach() override
@@ -59,8 +59,8 @@ namespace RaycastsScripts
 				return;
 			};
 
-			if (Shape* shape = hit.gameObject->GetComponent<Shape>())
-				shape->Tint(m_hitColor);
+			if (Target* target = hit.gameObject->GetComponent<Target>())
+				target->Tint(m_hitColor);
 
 			const glm::mat4 toLocal = glm::inverse(world);
 			const glm::vec3 normalEnd(toLocal * glm::vec4(hit.point + hit.normal * *m_normalLength, 1.0f));
