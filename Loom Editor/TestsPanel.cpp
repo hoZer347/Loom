@@ -443,6 +443,9 @@ namespace Loom
 					queued.names->push_back(test.name);
 		};
 
+		if (!queued.started)
+			queued.started = std::chrono::steady_clock::now();
+
 		const std::vector<std::string>& names = *queued.names;
 		const auto start = std::chrono::steady_clock::now();
 
@@ -461,10 +464,9 @@ namespace Loom
 				break;
 		};
 
-		queued.ran.milliseconds += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
-
 		if (queued.next == names.size())
 		{
+			queued.ran.milliseconds = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - *queued.started).count();
 			queued.ran.at = TimeOfDay();
 			m_lastRun = std::move(queued.ran);
 			m_queued.reset();

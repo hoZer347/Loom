@@ -2,6 +2,7 @@
 
 #include "ScriptTests.h"
 
+#include <chrono>
 #include <functional>
 #include <optional>
 #include <string>
@@ -84,6 +85,7 @@ namespace Loom
 			std::string filter;
 			std::optional<std::vector<std::string>> names;
 			size_t next = 0;
+			std::optional<std::chrono::steady_clock::time_point> started{ };
 			Ran ran;
 		};
 

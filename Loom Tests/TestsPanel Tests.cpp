@@ -6,6 +6,7 @@
 
 #include <chrono>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -136,6 +137,7 @@ TEST_SUITE("TestsPanel")
 		constexpr float frame_time = 1.0f / 60.0f;
 		constexpr float scan_step = 2.0f;
 		constexpr float double_click_time = 0.3f;
+		constexpr double most_clicked_run_milliseconds = 1000.0;
 
 		Suite suite;
 		Loom::TestsPanel panel;
@@ -222,6 +224,10 @@ TEST_SUITE("TestsPanel")
 		CHECK(created > 0);
 		created = 0;
 		panel.RunQueued();
+
+		// A clicked run names its cases, and is timed from its first case all the same.
+		REQUIRE(panel.LastRun());
+		CHECK(panel.LastRun()->milliseconds < most_clicked_run_milliseconds);
 
 		// Each row's y, found by clicking down the panel and reading what a click chose.
 		std::vector<std::pair<float, std::string>> rows;
@@ -326,6 +332,7 @@ TEST_SUITE("TestsPanel")
 	{
 		constexpr int cases = 20;
 		constexpr std::chrono::milliseconds case_time{ 2 };
+		constexpr std::chrono::milliseconds between_calls{ 5 };
 
 		const size_t before = Loom::ScriptTests::All().size();
 		Loom::TestsPanel panel;
@@ -363,6 +370,7 @@ TEST_SUITE("TestsPanel")
 
 		while (panel.HasQueued())
 		{
+			std::this_thread::sleep_for(between_calls);
 			panel.RunQueued();
 			++calls;
 			CHECK((runs < cases) == panel.HasQueued());
@@ -374,7 +382,7 @@ TEST_SUITE("TestsPanel")
 		CHECK_FALSE(panel.RunProgress());
 		REQUIRE(panel.LastRun());
 		CHECK(panel.LastRun()->cases == cases);
-		CHECK(panel.LastRun()->milliseconds >= std::chrono::duration<double, std::milli>(case_time * cases).count());
+		CHECK(panel.LastRun()->milliseconds >= std::chrono::duration<double, std::milli>(case_time * cases + between_calls * (calls - 1)).count());
 		CHECK(panel.LastRun()->at.size() == std::string("00:00:00").size());
 
 		Loom::ScriptTests::Truncate(before);
