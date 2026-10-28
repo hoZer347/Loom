@@ -2,6 +2,7 @@
 
 #include "GlslCompiler.h"
 #include "Light.h"
+#include "PreVertex.h"
 #include "Renderer.h"
 #include "Skin.h"
 
@@ -35,9 +36,10 @@ namespace Loom
 	{
 		#pragma region Engine Code
 
-		// The file is source 0 and the engine's GLSL 1, so messages land on the right one.
+		// The file is source 0, the engine's GLSL 1 and a PreVertex's file 2, so messages land on the right one.
 		constexpr int FILE_SOURCE = 0;
 		constexpr int LIBRARY_SOURCE = 1;
+		constexpr int PRE_VERTEX_SOURCE = 2;
 
 		// From GLSL 3.30 and ES 3.00 on, #line numbers the line after it.
 		std::string LineDirective(size_t line, int source)
@@ -337,6 +339,75 @@ bool LoomDitheredOut(float alpha)
 			{
 				return 0;
 			};
+		};
+
+		#pragma endregion
+
+		#pragma region Pre-Vertex
+
+		// Runs after the pre-vertex code, which defines PreVertex.
+		constexpr const char* PRE_VERTEX_MAIN = R"(
+void main()
+{
+	loom_PreVertexPos = aPos;
+
+	// A model flattened to no scale on an axis has no inverse to bring the moved vertex back with.
+	if (determinant(u_model) != 0.0)
+	{
+		vec4 loom_PreVertexWorld = u_model * vec4(aPos, 1.0);
+		loom_PreVertexPos = (inverse(u_model) * vec4(PreVertex(loom_PreVertexWorld.xyz), 1.0)).xyz;
+	}
+
+	loom_pre_vertex_main();
+}
+)";
+
+		// A shader with only a fragment stage, for the pre-vertex code to run in front of the engine's own vertex stage.
+		constexpr const char* PRE_VERTEX_CHECK = R"(// ===FRAGMENT===
+out vec4 FragColor;
+
+void main()
+{
+	FragColor = vec4(1.0);
+}
+)";
+
+		// The stage with aPos moved through PreVertex in world space before its main reads it, or as it was without aPos, u_model or main.
+		std::string WithPreVertex(const std::string& stage, const std::string& code)
+		{
+			static const std::regex position(R"(\bin\s+(?:(?:lowp|mediump|highp)\s+)?vec3\s+aPos\s*;)");
+			static const std::regex model(R"(\buniform\s+(?:(?:lowp|mediump|highp)\s+)?mat4\s+u_model\s*;)");
+			static const std::regex reads(R"(\baPos\b)");
+			static const std::regex renamed(R"((\bin\s+(?:(?:lowp|mediump|highp)\s+)?vec3\s+)loom_PreVertexPos(\s*;))");
+			static const std::regex uniform(R"(\buniform\s+(?:(?:lowp|mediump|highp)\s+)?\w+\s+(\w+)\s*;)");
+
+			if (code.empty() ||
+				stage.empty() ||
+				!std::regex_search(stage, position) ||
+				!std::regex_search(stage, model) ||
+				!std::regex_search(stage, MainPattern()))
+				return stage;
+
+			// The stage's own declarations stand, so the code may declare the uniforms it shares with it.
+			std::string own;
+			auto copied = code.cbegin();
+
+			for (std::sregex_iterator found(code.begin(), code.end(), uniform), end; found != end; ++found)
+				if (Declares(stage, (*found)[1].str()))
+				{
+					own.append(copied, (*found)[0].first);
+					copied = (*found)[0].second;
+				};
+
+			own.append(copied, code.cend());
+
+			const std::string moved = std::regex_replace(std::regex_replace(stage, reads, "loom_PreVertexPos"), renamed, "$1aPos$2");
+
+			return
+				"vec3 loom_PreVertexPos;\n" +
+				std::regex_replace(moved, MainPattern(), "$1loom_pre_vertex_main$2") +
+				LineDirective(1, PRE_VERTEX_SOURCE) + own + "\n" +
+				EngineCode(PRE_VERTEX_MAIN);
 		};
 
 		#pragma endregion
@@ -696,7 +767,8 @@ vec3 LoomSceneNormal(ivec2 pixel)
 			return pattern;
 		};
 
-		std::vector<ShaderMessage> ParseMessages(const std::string& log)
+		// The messages about source file, on its lines, and the errors in the rest on none.
+		std::vector<ShaderMessage> ParseMessages(const std::string& log, int file = FILE_SOURCE)
 		{
 			std::vector<ShaderMessage> messages;
 			std::istringstream lines(log);
@@ -720,10 +792,10 @@ vec3 LoomSceneNormal(ivec2 pixel)
 				if (std::regex_match(message.text, place, PlacePattern()))
 				{
 					// Warnings about the engine's GLSL are nothing the file can fix.
-					if (std::stoi(place[1]) != FILE_SOURCE && !message.error)
+					if (std::stoi(place[1]) != file && !message.error)
 						continue;
 
-					if (std::stoi(place[1]) == FILE_SOURCE)
+					if (std::stoi(place[1]) == file)
 						message.line = std::stoul(place[2]);
 
 					message.text = place[3];
@@ -793,7 +865,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 		std::istringstream file(ReadSource(file_path));
 
-		return Build(file_path, file);
+		return Build(file_path, file, PreVertex::CodeFor(file_path));
 	};
 
 	std::string Shader::ReadSource(const std::string& file_path)
@@ -823,7 +895,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		try
 		{
 			std::istringstream source(ReadSource(file_path));
-			id = Build(file_path, source);
+			id = Build(file_path, source, PreVertex::CodeFor(file_path));
 		}
 		catch (const std::exception& e)
 		{
@@ -869,7 +941,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		if (shaders.contains(name))
 			return Cached(shaders[name]);
 
-		return Build(name, source);
+		return Build(name, source, { });
 	};
 
 	#pragma endregion
@@ -1058,7 +1130,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 	#pragma region Assembly
 
-	Shader::Stages Shader::Assemble(const std::string& source)
+	Shader::Stages Shader::Assemble(const std::string& source, const std::string& preVertex)
 	{
 		std::istringstream lines(source);
 
@@ -1127,6 +1199,9 @@ vec3 LoomSceneNormal(ivec2 pixel)
 			stages.shadowFragment = settings.transparency ? TransparentShadowFragment(fragment) : common + EngineCode(SHADOW_FRAGMENT);
 		};
 
+		stages.vertex = WithPreVertex(stages.vertex, preVertex);
+		stages.shadowVertex = WithPreVertex(stages.shadowVertex, preVertex);
+
 		// Engine GLSL first, so the shader's own COMMON has the last word.
 		for (std::string* stage : { &stages.vertex, &stages.shadowVertex })
 			if (!stage->empty())
@@ -1144,7 +1219,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		return { EngineCode(PIXEL_PASS_VERTEX), PixelPassFragment(LineDirective(1, FILE_SOURCE) + source) };
 	};
 
-	uint32_t Shader::Build(const std::string& name, std::istream& source)
+	uint32_t Shader::Build(const std::string& name, std::istream& source, const std::string& preVertex)
 	{
 		const std::string text(std::istreambuf_iterator<char>(source), { });
 
@@ -1164,7 +1239,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 			return Cached(programs);
 		};
 
-		const Stages stages = Assemble(text);
+		const Stages stages = Assemble(text, preVertex);
 
 		Programs programs;
 		programs.settings = stages.settings;
@@ -1244,6 +1319,13 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		};
 
 		return ParseMessages(Glsl::Compile(stages.vertex, stages.fragment).log);
+	};
+
+	std::vector<ShaderMessage> Shader::CheckPreVertex(const std::string& text)
+	{
+		const Stages stages = Assemble(PRE_VERTEX_CHECK, text);
+
+		return ParseMessages(Glsl::Compile(stages.vertex, stages.fragment).log, PRE_VERTEX_SOURCE);
 	};
 
 	#pragma endregion

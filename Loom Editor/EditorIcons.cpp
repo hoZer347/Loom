@@ -42,6 +42,9 @@ namespace Loom
 		if (extension == ProjectAssets::dialogueExtension)
 			return Dialogue;
 
+		if (extension == ProjectAssets::preVertexExtension)
+			return PreVertex;
+
 		if (extension == ProjectTemplate::extension)
 			return Project;
 

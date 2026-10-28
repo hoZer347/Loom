@@ -354,6 +354,7 @@ TEST_SUITE("ProjectAssets")
 		CHECK(opener("Assets/Lit.shader", "") == ProjectAssets::Opener::Shaders);
 		CHECK(opener("Assets/Inked.loompixel", scripts) == ProjectAssets::Opener::Shaders);
 		CHECK(opener("Assets/Intro.dialogue", scripts) == ProjectAssets::Opener::Dialogues);
+		CHECK(opener("Assets/Wave.loomprevertex", scripts) == ProjectAssets::Opener::Shaders);
 		CHECK(opener("Scripts/Spinner.hpp", scripts) == ProjectAssets::Opener::VisualStudio);
 		CHECK(opener("Scripts/Spinner.hpp", "") == ProjectAssets::Opener::Shell);
 		CHECK(opener("Tools/Bake.cpp", scripts) == ProjectAssets::Opener::Shell);
@@ -390,6 +391,9 @@ TEST_SUITE("ProjectAssets")
 		CHECK(Loom::ProjectAssets::IsGameFile("Intro.dialogue"));
 		CHECK(Loom::ProjectAssets::IsDialogueFile("Intro.Dialogue"));
 		CHECK_FALSE(Loom::ProjectAssets::IsDialogueFile("Flat.shader"));
+		CHECK(Loom::ProjectAssets::IsGameFile("Wave.loomprevertex"));
+		CHECK(Loom::ProjectAssets::IsPreVertexFile("Wave.LoomPreVertex"));
+		CHECK_FALSE(Loom::ProjectAssets::IsPreVertexFile("Flat.shader"));
 
 		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("Spinner.hpp"));
 		CHECK_FALSE(Loom::ProjectAssets::IsGameFile("Spinner.CPP"));

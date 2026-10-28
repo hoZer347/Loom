@@ -53,6 +53,11 @@ namespace
 		Loom::Serial<Loom::Folder> folder;
 	};
 
+	struct FileList final : Loom::Component<FileList>
+	{
+		Loom::Serial<Loom::AssetList<".shader">> shaders;
+	};
+
 	// Text of several lines, and a plain string saved before it was.
 	struct Message final : Loom::Component<Message>
 	{
@@ -623,6 +628,32 @@ TEST_SUITE("SerializedField")
 	#pragma endregion
 
 	#pragma region Assets
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an asset list is files of its extension, written as their quoted paths in brackets")
+	{
+		FileList object;
+		Pump();
+
+		const Loom::SerializedField& field = Field(object, 0);
+
+		CHECK(field.type == Loom::FieldType::AssetList);
+		CHECK(field.extensions == std::vector<std::string>{ ".shader" });
+		CHECK(field.Write() == "[]");
+
+		object.shaders = { "Assets/Lit.shader", "Assets/Odd \"quoted\".shader" };
+
+		const std::string written = field.Write();
+
+		object.shaders->clear();
+
+		REQUIRE(field.Read(written));
+
+		CHECK(*object.shaders == std::vector<std::string>{ "Assets/Lit.shader", "Assets/Odd \"quoted\".shader" });
+
+		REQUIRE(field.Read("[]"));
+
+		CHECK(object.shaders->empty());
+	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an asset is a file of its extension, written as the string of its path")
 	{

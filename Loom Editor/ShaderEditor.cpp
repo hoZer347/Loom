@@ -6,6 +6,7 @@
 #ifndef __EMSCRIPTEN__
 
 #include "EditorTheme.h"
+#include "PreVertex.h"
 #include "ShaderVariables.h"
 
 #include "imgui.h"
@@ -83,7 +84,7 @@ namespace Loom
 	{
 		const std::string text = document.editor.GetText();
 
-		return Shader::IsPixel(document.path) ? Shader::CheckPixel(text) : Shader::Check(text);
+		return Shader::IsPixel(document.path) ? Shader::CheckPixel(text) : document.path.ends_with(PreVertex::extension) ? Shader::CheckPreVertex(text) : Shader::Check(text);
 	};
 
 	void ShaderEditor::Explain(const Document& document) const

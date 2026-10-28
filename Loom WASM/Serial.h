@@ -109,6 +109,7 @@ namespace Loom
 		else if constexpr (std::is_same_v<T, std::string>)			return FieldType::String;
 		else if constexpr (std::is_same_v<T, MultilineText>)		return FieldType::MultilineText;
 		else if constexpr (requires { T::fileExtensions; })			return FieldType::Asset;
+		else if constexpr (requires { T::listExtensions; })			return FieldType::AssetList;
 		else if constexpr (std::is_same_v<T, glm::vec2>)			return FieldType::Vec2;
 		else if constexpr (std::is_same_v<T, glm::vec3>)			return FieldType::Vec3;
 		else if constexpr (std::is_same_v<T, glm::vec4>)			return FieldType::Vec4;
@@ -295,12 +296,15 @@ namespace Loom
 			}
 			else if constexpr (FieldTypeOf<T>() == FieldType::Asset)
 				m_owner = RegisterSerialField(FieldType::Asset, Data(), nullptr, nullptr, nullptr, name.value, &m_version, T::fileExtensions);
+			else if constexpr (FieldTypeOf<T>() == FieldType::AssetList)
+				m_owner = RegisterSerialField(FieldType::AssetList, Data(), nullptr, nullptr, nullptr, name.value, &m_version, T::listExtensions);
 			else m_owner = RegisterSerialField(FieldTypeOf<T>(), Data(), nullptr, nullptr, nullptr, name.value, &m_version);
 		};
 
 		// The vector types are written out of their components, so the field
-		// points at those rather than at the struct around them, and an Asset
-		// or MultilineText out of the string it is.
+		// points at those rather than at the struct around them, an Asset or
+		// MultilineText out of the string it is, and an AssetList out of its
+		// vector of them.
 		void* Data()
 		{
 			constexpr FieldType type = FieldTypeOf<T>();
@@ -312,6 +316,8 @@ namespace Loom
 				return glm::value_ptr(m_value);
 			else if constexpr (type == FieldType::Asset || type == FieldType::MultilineText)
 				return static_cast<std::string*>(&m_value);
+			else if constexpr (type == FieldType::AssetList)
+				return static_cast<std::vector<std::string>*>(&m_value);
 			else return &m_value;
 		};
 

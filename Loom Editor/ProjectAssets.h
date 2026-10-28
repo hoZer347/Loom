@@ -1,5 +1,6 @@
 #pragma once
 
+#include "PreVertex.h"
 #include "Shaders.h"
 #include "Textures.h"
 #include "Utilities/DialogueManager.h"
@@ -26,6 +27,7 @@ namespace Loom
 		static constexpr const char* shaderExtension = Shader::extension;
 		static constexpr const char* pixelShaderExtension = Shader::pixel_extension;
 		static constexpr const char* dialogueExtension = DialogueManagerBase::extension;
+		static constexpr const char* preVertexExtension = PreVertex::extension;
 		static constexpr const char* textureExtension = TextureAsset::fileExtensions.front();
 		static constexpr std::string_view scriptExtensions[] = { ".hpp", ".h", ".cpp" };
 
@@ -58,6 +60,7 @@ namespace Loom
 		static bool IsScriptFile(const std::string& name);
 		static bool IsShaderFile(const std::string& name);
 		static bool IsDialogueFile(const std::string& name);
+		static bool IsPreVertexFile(const std::string& name);
 		static bool IsTextureFile(const std::string& name);
 
 		// A texture, sprite or palette, which the 2D tab lists.
@@ -88,6 +91,7 @@ namespace Loom
 		static std::string CreateShader(const std::string& folder, const std::string& name, std::string* error = nullptr);
 		static std::string CreatePixelShader(const std::string& folder, const std::string& name, std::string* error = nullptr);
 		static std::string CreateDialogue(const std::string& folder, const std::string& name, std::string* error = nullptr);
+		static std::string CreatePreVertex(const std::string& folder, const std::string& name, std::string* error = nullptr);
 		static std::string CreateTexture(const std::string& folder, const std::string& name, std::string* error = nullptr);
 		static std::string CreatePalette(const std::string& folder, const std::string& name, std::string* error = nullptr);
 
@@ -175,6 +179,9 @@ namespace Loom
 		// The pixel shader every new one starts from: the view as it was drawn.
 		static const char* const defaultPixelShader;
 		static const char* const defaultDialogue;
+
+		// What a new .loomprevertex file holds: a wave along world X.
+		static const char* const defaultPreVertex;
 
 		// Every shader under the project folder, relative to it with / between
 		// folders, in order.

@@ -5,6 +5,7 @@
 
 #include "InputActions.h"
 #include "Prefab.h"
+#include "PreVertex.h"
 #include "SceneSerializer.h"
 #include "Shaders.h"
 
@@ -84,6 +85,7 @@ TEST_SUITE("FileTypes")
 			Loom::FileTabs::Fonts.extension,
 			Loom::InputActions::extension,
 			Loom::Shader::pixel_extension,
+			Loom::PreVertex::extension,
 		};
 
 		const auto types = Loom::FileTypes::All();

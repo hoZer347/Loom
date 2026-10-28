@@ -7,6 +7,7 @@
 #include "Shaders.h"
 #include "ShaderVariables.h"
 
+#include <functional>
 #include <string>
 
 
@@ -49,6 +50,11 @@ namespace Loom
 
 		// The same, without compiling, so cheap enough for every draw.
 		static Shader* CompiledShader(const std::string& path);
+
+		// Recompiles every material's shader whose path covers, and compiles
+		// again any of those that failed to, for after what goes into them
+		// changes, as a PreVertex's code does.
+		static void ReloadShaders(const std::function<bool(const std::string&)>& covers);
 
 		Shader* shader = nullptr;
 

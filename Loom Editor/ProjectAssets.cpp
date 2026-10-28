@@ -62,6 +62,7 @@ namespace Loom
 
 		constexpr std::string_view shaderExtensions[] = { ProjectAssets::shaderExtension, ProjectAssets::pixelShaderExtension };
 		constexpr std::string_view dialogueExtensions[] = { ProjectAssets::dialogueExtension };
+		constexpr std::string_view preVertexExtensions[] = { ProjectAssets::preVertexExtension };
 
 		// 2D art besides textures.
 		constexpr std::string_view twoDExtensions[] = { SpriteAsset::extension, Palette::extension };
@@ -405,7 +406,7 @@ namespace {NAMESPACE}
 		if (extension == Prefab::extension)
 			return Opener::Prefab;
 
-		if (IsShaderFile(path))
+		if (IsShaderFile(path) || extension == preVertexExtension)
 			return Opener::Shaders;
 
 		if (extension == dialogueExtension)
@@ -424,7 +425,7 @@ namespace {NAMESPACE}
 
 	bool ProjectAssets::IsGameFile(const std::string& name)
 	{
-		return HasExtension(name, gameFileExtensions) || IsShaderFile(name) || IsDialogueFile(name) || IsTwoDFile(name) || IsSoundFile(name) || IsFontFile(name);
+		return HasExtension(name, gameFileExtensions) || IsShaderFile(name) || IsDialogueFile(name) || IsPreVertexFile(name) || IsTwoDFile(name) || IsSoundFile(name) || IsFontFile(name);
 	};
 
 	bool ProjectAssets::IsScriptFile(const std::string& name)
@@ -440,6 +441,11 @@ namespace {NAMESPACE}
 	bool ProjectAssets::IsDialogueFile(const std::string& name)
 	{
 		return HasExtension(name, dialogueExtensions);
+	};
+
+	bool ProjectAssets::IsPreVertexFile(const std::string& name)
+	{
+		return HasExtension(name, preVertexExtensions);
 	};
 
 	bool ProjectAssets::IsTextureFile(const std::string& name)
@@ -521,6 +527,16 @@ namespace {NAMESPACE}
 		const std::filesystem::path path = std::filesystem::path(folder) / (name + dialogueExtension);
 
 		if (!IsValidName(name) || !WriteNew(path, defaultDialogue, error))
+			return "";
+
+		return path.string();
+	};
+
+	std::string ProjectAssets::CreatePreVertex(const std::string& folder, const std::string& name, std::string* error)
+	{
+		const std::filesystem::path path = std::filesystem::path(folder) / (name + preVertexExtension);
+
+		if (!IsValidName(name) || !WriteNew(path, defaultPreVertex, error))
 			return "";
 
 		return path.string();
@@ -965,6 +981,18 @@ void main()
 
 	const char* const ProjectAssets::defaultDialogue = R"(Hello! This text streams out of a [Color, yellow].dialogue[/Color] file.[Pause]
 [Clear][Size, 32]Commands[/Size] are written in brackets.[Pause]
+)";
+
+	const char* const ProjectAssets::defaultPreVertex = R"(uniform float u_time;
+
+vec3 PreVertex(vec3 world)
+{
+	const float SPEED = 2.0;
+	const float HEIGHT = 0.25;
+
+	world.y += sin(world.x + u_time * SPEED) * HEIGHT;
+	return world;
+}
 )";
 
 	std::vector<std::string> ProjectAssets::ShadersIn(const std::string& folder)

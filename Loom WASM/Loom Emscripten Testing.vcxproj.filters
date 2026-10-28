@@ -109,6 +109,9 @@
     <ClCompile Include="Material.cpp">
       <Filter>Material</Filter>
     </ClCompile>
+    <ClCompile Include="PreVertex.cpp">
+      <Filter>Material</Filter>
+    </ClCompile>
     <ClCompile Include="Geo.cpp">
       <Filter>Mesh\Geo</Filter>
     </ClCompile>
@@ -383,6 +386,9 @@
     </ClInclude>
     <ClInclude Include="RenderMath.h">
       <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="PreVertex.h">
+      <Filter>Material</Filter>
     </ClInclude>
     <ClInclude Include="Material.h">
       <Filter>Material</Filter>

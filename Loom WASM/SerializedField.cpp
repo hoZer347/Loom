@@ -89,6 +89,22 @@ namespace Loom
 			return text + ')';
 		};
 
+		// ["a", "b"], each quoted as a String is.
+		std::string WriteStrings(const std::vector<std::string>& values)
+		{
+			std::string text = "[";
+
+			for (size_t i = 0; i < values.size(); i++)
+			{
+				if (i)
+					text += ", ";
+
+				text += Quote(values[i]);
+			};
+
+			return text + ']';
+		};
+
 		#pragma endregion
 
 		#pragma region Reading
@@ -185,6 +201,36 @@ namespace Loom
 			};
 
 			std::copy(read, read + count, values);
+
+			return true;
+		};
+
+		// The quoted strings in text, in order, or false with values as they were.
+		bool ReadStrings(const std::string& text, std::vector<std::string>& values)
+		{
+			if (text.size() < 2 || text.front() != '[' || text.back() != ']')
+				return false;
+
+			std::vector<std::string> read;
+
+			for (size_t at = 1; at + 1 < text.size(); at++)
+			{
+				if (text[at] != '"')
+					continue;
+
+				size_t end = at + 1;
+
+				while (end + 1 < text.size() && text[end] != '"')
+					end += text[end] == '\\' ? 2 : 1;
+
+				if (end + 1 >= text.size())
+					return false;
+
+				read.push_back(Unquote(text.substr(at, end - at + 1)));
+				at = end;
+			};
+
+			values = std::move(read);
 
 			return true;
 		};
@@ -298,6 +344,7 @@ namespace Loom
 
 		case FieldType::FloatArray:	return WriteArray(*(std::vector<float>*)data);
 		case FieldType::UIntArray:	return WriteArray(*(std::vector<unsigned int>*)data);
+		case FieldType::AssetList:	return WriteStrings(*(std::vector<std::string>*)data);
 
 		case FieldType::Uniforms:	return Quote(((UniformValues*)data)->Write());
 
@@ -438,6 +485,7 @@ namespace Loom
 
 		case FieldType::FloatArray:	return ReadArray(text, *(std::vector<float>*)data);
 		case FieldType::UIntArray:	return ReadArray(text, *(std::vector<unsigned int>*)data);
+		case FieldType::AssetList:	return ReadStrings(text, *(std::vector<std::string>*)data);
 
 		case FieldType::Uniforms:	((UniformValues*)data)->Read(Unquote(text));	return true;
 

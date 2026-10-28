@@ -1,0 +1,19 @@
+// PreVertex demo: every vertex rises and falls on a sine of its world X,
+// rolling along X as the game clock runs.
+
+uniform float u_time;
+
+// Radians a second.
+const float SPEED = 2.0;
+
+// Radians a world unit along X.
+const float WAVELENGTH = 1.0;
+
+// World units above and below where the vertex was.
+const float HEIGHT = 0.4;
+
+vec3 PreVertex(vec3 world)
+{
+	world.y += sin(world.x * WAVELENGTH + u_time * SPEED) * HEIGHT;
+	return world;
+}

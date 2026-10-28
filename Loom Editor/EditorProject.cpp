@@ -130,6 +130,7 @@ namespace Loom
 			{ AssetKind::Test, EditorIcons::Test, "Test", "NewTests", ProjectAssets::ScriptKind::Test, "the Tests panel" },
 			{ AssetKind::Shader, EditorIcons::Shader, "Shader", "NewShader" },
 			{ AssetKind::PixelShader, EditorIcons::PixelShader, "Pixel Shader", "NewPixelShader" },
+			{ AssetKind::PreVertex, EditorIcons::PreVertex, "Pre-Vertex", "NewPreVertex" },
 			{ AssetKind::Dialogue, EditorIcons::Dialogue, "Dialogue", "NewDialogue" },
 			{ AssetKind::Texture, EditorIcons::Texture, "Texture", "NewTexture" },
 			{ AssetKind::Palette, EditorIcons::Palette, "Palette", "NewPalette" },
@@ -164,7 +165,7 @@ namespace Loom
 
 		bool IsScriptsPanels(AssetKind kind)
 		{
-			return IsScript(kind) || kind == AssetKind::Shader || kind == AssetKind::PixelShader || kind == AssetKind::Dialogue;
+			return IsScript(kind) || kind == AssetKind::Shader || kind == AssetKind::PixelShader || kind == AssetKind::PreVertex || kind == AssetKind::Dialogue;
 		};
 
 		const FileTabKind* TabMaking(AssetKind kind)
@@ -207,6 +208,7 @@ namespace Loom
 			{ EditorIcons::State, "States" },
 			{ EditorIcons::Shader, "Shaders" },
 			{ EditorIcons::PixelShader, "Pixel Shaders" },
+			{ EditorIcons::PreVertex, "Pre-Vertices" },
 			{ EditorIcons::Dialogue, "Dialogues" },
 		};
 
@@ -225,6 +227,9 @@ namespace Loom
 
 			case ScriptEntryKind::Dialogue:
 				return EditorIcons::Dialogue;
+
+			case ScriptEntryKind::PreVertex:
+				return EditorIcons::PreVertex;
 
 			default:
 				return EditorIcons::Script;
@@ -711,6 +716,7 @@ namespace Loom
 		m_projectFolders.clear();
 		m_projectShaders.clear();
 		m_projectDialogues.clear();
+		m_projectPreVertices.clear();
 		m_noThumbnail.clear();
 
 		for (FileTab& tab : m_fileTabs)
@@ -746,6 +752,8 @@ namespace Loom
 					m_projectShaders.push_back(file);
 				else if (ProjectAssets::IsDialogueFile(file))
 					m_projectDialogues.push_back(file);
+				else if (ProjectAssets::IsPreVertexFile(file))
+					m_projectPreVertices.push_back(file);
 			};
 		};
 
@@ -1185,6 +1193,7 @@ namespace Loom
 		case AssetKind::Shader:		return (folder / (name + ProjectAssets::shaderExtension)).string();
 		case AssetKind::PixelShader:	return (folder / (name + ProjectAssets::pixelShaderExtension)).string();
 		case AssetKind::Dialogue:	return (folder / (name + ProjectAssets::dialogueExtension)).string();
+		case AssetKind::PreVertex:	return (folder / (name + ProjectAssets::preVertexExtension)).string();
 		case AssetKind::Texture:	return (folder / (name + ProjectAssets::textureExtension)).string();
 		default:					return (folder / name).string();
 		};
@@ -1295,6 +1304,10 @@ namespace Loom
 
 		case AssetKind::Dialogue:
 			path = ProjectAssets::CreateDialogue(folder, name, &error);
+			break;
+
+		case AssetKind::PreVertex:
+			path = ProjectAssets::CreatePreVertex(folder, name, &error);
 			break;
 
 		case AssetKind::Texture:
@@ -1980,6 +1993,11 @@ namespace Loom
 				ProjectAssets::RelativeTo(dialogue, m_projectPath),
 				ScriptEntry{ dialogue, std::filesystem::path(dialogue).stem().string(), ScriptEntryKind::Dialogue, true });
 
+		for (const std::string& preVertex : m_projectPreVertices)
+			m_scriptEntries.try_emplace(
+				ProjectAssets::RelativeTo(preVertex, m_projectPath),
+				ScriptEntry{ preVertex, std::filesystem::path(preVertex).stem().string(), ScriptEntryKind::PreVertex, true });
+
 		if (!m_scripts.HasProject())
 		{
 			m_scriptWatch.Watch("", false);
@@ -2355,6 +2373,8 @@ namespace Loom
 				? std::optional(ScriptEntryKind::PixelShader)
 				: extension == ProjectAssets::dialogueExtension
 					? std::optional(ScriptEntryKind::Dialogue)
+					: extension == ProjectAssets::preVertexExtension
+						? std::optional(ScriptEntryKind::PreVertex)
 					: std::nullopt;
 
 		bool changed = false;
@@ -2450,6 +2470,58 @@ namespace Loom
 		};
 
 		EndPicker();
+
+		return changed;
+	};
+
+	bool Editor::DrawAssetListField(const SerializedField& field)
+	{
+		std::vector<std::string>& paths = *(std::vector<std::string>*)field.data;
+
+		SerializedField element = field;
+		element.type = FieldType::Asset;
+
+		const float column = ImGui::GetCursorPosX();
+		const float remove_width = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.x;
+
+		bool changed = false;
+		std::optional<size_t> removed{ };
+
+		for (size_t i = 0; i < paths.size(); i++)
+		{
+			ImGui::PushID((int)i);
+
+			if (i > 0)
+				ImGui::SetCursorPosX(column);
+
+			element.data = &paths[i];
+
+			ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - remove_width);
+			changed |= DrawAssetField(element);
+			ImGui::PopItemWidth();
+
+			ImGui::SameLine();
+
+			if (ImGui::SmallButton("x"))
+				removed = i;
+
+			ImGui::PopID();
+		};
+
+		if (removed)
+		{
+			paths.erase(paths.begin() + *removed);
+			changed = true;
+		};
+
+		if (!paths.empty())
+			ImGui::SetCursorPosX(column);
+
+		if (ImGui::Button("+", ImVec2(-FLT_MIN, 0.0f)))
+		{
+			paths.emplace_back();
+			changed = true;
+		};
 
 		return changed;
 	};

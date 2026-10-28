@@ -53,6 +53,10 @@ namespace Loom
 		// Text that may run over several lines, written as a String is. The
 		// editor draws it in a box tall enough to show them.
 		MultilineText,
+
+		// Files in the project, each written as an Asset is, in brackets. The
+		// editor draws each as an Asset field.
+		AssetList,
 	};
 
 	#pragma region Names
@@ -114,7 +118,7 @@ namespace Loom
 
 		#pragma region Names
 
-		// Asset fields only: what the files it names may end in, such as
+		// Asset and AssetList fields only: what the files it names may end in, such as
 		// ".shader", the one it is filed under first, or none for a folder.
 		// Copied for the same reason.
 		std::vector<std::string> extensions;

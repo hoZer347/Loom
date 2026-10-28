@@ -1,6 +1,7 @@
 #include "Material.h"
 
 #include "EditorGui.h"
+#include "PreVertex.h"
 #include "RenderMath.h"
 #include "Renderer.h"
 #include "Shaders.h"
@@ -147,6 +148,21 @@ namespace Loom
 			if (std::filesystem::last_write_time(path, code) != written)
 				Compile(path);
 		};
+
+		PreVertex::ReloadIfChanged();
+	};
+
+	void Material::ReloadShaders(const std::function<bool(const std::string&)>& covers)
+	{
+		for (const auto& [path, shader] : SharedShaders())
+			if (covers(path))
+				shader->Reload();
+
+		const auto failed = FailedShaders();
+
+		for (const auto& [path, written] : failed)
+			if (covers(path))
+				Compile(path);
 	};
 
 	Shader* Material::SharedShader(const std::string& path)

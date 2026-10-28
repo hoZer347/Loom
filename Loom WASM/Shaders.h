@@ -55,8 +55,10 @@ namespace Loom
 		};
 
 		// Throws std::runtime_error at a setting it does not know, a stage the
-		// sections it asks for have nothing to add to, or a PIXEL PASS section.
-		static Stages Assemble(const std::string& source);
+		// sections it asks for have nothing to add to, or a PIXEL PASS
+		// section. preVertex is a PreVertex's code, run in front of the vertex
+		// stage and the shadow pass's.
+		static Stages Assemble(const std::string& source, const std::string& preVertex = { });
 
 		// What a pixel shader file compiles to: one quad over the view, and the
 		// file as its fragment stage behind the pixel pass library.
@@ -104,6 +106,10 @@ namespace Loom
 
 		// The same for the text of a pixel shader file.
 		static std::vector<ShaderMessage> CheckPixel(const std::string& text);
+
+		// Compiles a PreVertex's code in front of the engine's own vertex
+		// stage, with what is wrong on the code's own lines.
+		static std::vector<ShaderMessage> CheckPreVertex(const std::string& text);
 
 		#pragma endregion
 #endif
@@ -182,16 +188,16 @@ namespace Loom
 
 		#pragma region Assembly
 
-		// Assembles the source and links its programs. The caller holds the
-		// mutex.
-		uint32_t Build(const std::string& name, std::istream& source);
+		// Assembles the source, with preVertex run on its vertices, and links
+		// its programs. The caller holds the mutex.
+		uint32_t Build(const std::string& name, std::istream& source, const std::string& preVertex);
 
 		#pragma endregion
 
 #ifdef __EMSCRIPTEN__
 		#pragma region Fetching
 
-		void Request(
+		static void Request(
 			const std::string& file_path,
 			std::string& shader_source);
 
@@ -203,6 +209,7 @@ namespace Loom
 	protected:
 	public:
 		friend struct Engine;
+		friend struct PreVertex;
 
 		static inline std::unordered_map<std::string, Programs> shaders;
 	};

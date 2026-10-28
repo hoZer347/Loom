@@ -17,6 +17,7 @@
 #include "PixelShader.h"
 #include "MissingComponent.h"
 #include "Prefab.h"
+#include "PreVertex.h"
 #include "Profiler.h"
 #include "Scene.h"
 #include "SceneSerializer.h"
@@ -977,7 +978,8 @@ namespace Loom
 			file.extension() == SpriteAsset::extension ||
 			file.extension() == Palette::extension ||
 			file.extension() == BuildSettings::extension ||
-			file.extension() == Shader::pixel_extension) &&
+			file.extension() == Shader::pixel_extension ||
+			file.extension() == PreVertex::extension) &&
 			std::filesystem::is_regular_file(file, code))
 		{
 			const std::filesystem::path absolute = std::filesystem::absolute(file, code).lexically_normal();
@@ -3606,6 +3608,25 @@ namespace Loom
 		m_historyDirty = true;
 	};
 
+	void Editor::DropPreVertex(GameObject* gameObject, const std::string& path)
+	{
+		ChangeComponents(
+			*gameObject,
+			[gameObject, &path]()
+			{
+				PreVertex* preVertex = gameObject->GetComponent<PreVertex>();
+
+				if (preVertex == nullptr)
+					preVertex = gameObject->Attach<PreVertex>();
+
+				preVertex->file = path;
+				PreVertex::ReloadIfChanged();
+			});
+
+		Select(gameObject);
+		m_historyDirty = true;
+	};
+
 	bool Editor::DropScript(GameObject* gameObject)
 	{
 		const ImGuiPayload* dragged = ImGui::GetDragDropPayload();
@@ -3632,6 +3653,14 @@ namespace Loom
 		{
 			if (ImGui::AcceptDragDropPayload(script_payload))
 				DropPixelShader(gameObject, name);
+
+			return true;
+		};
+
+		if (entry != m_scriptEntries.end() && entry->second.kind == ScriptEntryKind::PreVertex)
+		{
+			if (ImGui::AcceptDragDropPayload(script_payload))
+				DropPreVertex(gameObject, name);
 
 			return true;
 		};
@@ -4338,6 +4367,10 @@ namespace Loom
 
 			case FieldType::Asset:
 				changed = DrawAssetField(field);
+				break;
+
+			case FieldType::AssetList:
+				changed = DrawAssetListField(field);
 				break;
 
 			case FieldType::State:

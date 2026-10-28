@@ -5,6 +5,7 @@
 
 #include "InputActions.h"
 #include "Prefab.h"
+#include "PreVertex.h"
 #include "SceneSerializer.h"
 #include "Shaders.h"
 
@@ -41,6 +42,7 @@ namespace Loom
 			{ FileTabs::Fonts.extension, L"Loom.FontFolders", L"Loom Font Folders" },
 			{ InputActions::extension, L"Loom.InputActions", L"Loom Key Bindings" },
 			{ Shader::pixel_extension, L"Loom.PixelShader", L"Loom Pixel Shader" },
+			{ PreVertex::extension, L"Loom.PreVertex", L"Loom Pre-Vertex Shader" },
 		};
 
 		constexpr const wchar_t* COMMAND_KEY = L"\\shell\\open\\command";

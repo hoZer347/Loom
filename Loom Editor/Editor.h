@@ -97,6 +97,7 @@ namespace Loom
 		Dialogue,
 		Texture,
 		Palette,
+		PreVertex,
 	};
 
 	// What the Scripts tab lists.
@@ -107,6 +108,7 @@ namespace Loom
 		Shader,
 		PixelShader,
 		Dialogue,
+		PreVertex,
 	};
 
 	/**
@@ -548,6 +550,10 @@ namespace Loom
 		// Takes such a file dragged onto it. Whether it changed.
 		bool DrawAssetField(const SerializedField& field);
 
+		// An AssetList field: one Asset field per file, each with a button that
+		// takes it out, under the label's column, and a button that adds one.
+		bool DrawAssetListField(const SerializedField& field);
+
 		#pragma endregion
 
 		#pragma region Hierarchy
@@ -938,8 +944,11 @@ namespace Loom
 		// Gives the GameObject the pixel shader, on its PixelShader or a new one.
 		void DropPixelShader(GameObject* gameObject, const std::string& path);
 
-		// What the Scripts tab drags: a script type's name, a shader's path
-		// from the project, or a folder's path.
+		// Gives the GameObject the pre-vertex file, on its PreVertex or a new one.
+		void DropPreVertex(GameObject* gameObject, const std::string& path);
+
+		// What the Scripts tab drags: a script type's name, a shader's or
+		// pre-vertex file's path from the project, or a folder's path.
 		static constexpr const char* script_payload = "LoomScript";
 		static constexpr const char* script_folder_payload = "LoomScriptFolder";
 
@@ -1278,6 +1287,7 @@ namespace Loom
 		// The shaders from the last scan, which the Scripts tab lists.
 		std::vector<std::string> m_projectShaders{ };
 		std::vector<std::string> m_projectDialogues{ };
+		std::vector<std::string> m_projectPreVertices{ };
 
 		#pragma endregion
 

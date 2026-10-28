@@ -5,6 +5,7 @@
 #include <array>
 #include <string>
 #include <utility>
+#include <vector>
 
 
 namespace Loom
@@ -35,6 +36,26 @@ namespace Loom
 		Asset(std::string path) : std::string(std::move(path)) { };
 
 		static constexpr std::array<const char*, sizeof...(extensions)> fileExtensions{ extensions.value... };
+	};
+
+	/**
+	* Loom::AssetList
+	* - Files in the project, each named as an Asset is, in an order of the
+	*   user's choosing: Serial<AssetList<".shader">> m_shaders
+	* - The editor's inspector draws each as an Asset field, with a button to
+	*   take it out and one under them to add another
+	* - Written to scenes as a list of the strings it holds
+	*/
+	template <Str... extensions>
+	struct AssetList final : std::vector<std::string>
+	{
+		static_assert(sizeof...(extensions) > 0, "An AssetList names the extensions of its files");
+
+		using std::vector<std::string>::vector;
+
+		AssetList() = default;
+
+		static constexpr std::array<const char*, sizeof...(extensions)> listExtensions{ extensions.value... };
 	};
 
 	/**
