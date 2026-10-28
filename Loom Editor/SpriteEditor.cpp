@@ -165,10 +165,7 @@ namespace Loom
 			return ImGui::ColorConvertU32ToFloat4(ToImGui(colour));
 		};
 
-		// Leans the text drawn into the window from first_vertex on, short of
-		// right, about the middle of its line. ImGui has no italic font of its
-		// own, and the frame round the text is drawn in the atlas's white
-		// pixel, so it stays upright.
+		// Frames use the atlas's white pixel, so only glyphs lean.
 		void Italicise(int first_vertex, float right)
 		{
 			ImDrawList& draw_list = *ImGui::GetWindowDrawList();
