@@ -623,13 +623,11 @@ TEST_SUITE("SpriteEditor")
 		const std::filesystem::path palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension);
 		const std::filesystem::path clone = palette.parent_path() / (palette.stem().string() + "1" + Loom::Palette::extension);
 
-		Loom::Palette original;
-		Loom::Palette cloned;
-		REQUIRE(Loom::Palette::Load(palette.string(), original));
-		REQUIRE(Loom::Palette::Load(clone.string(), cloned));
-		CHECK(cloned == original);
-
 		REQUIRE(driven.editor.SaveAll());
+
+		Loom::Palette cloned;
+		REQUIRE(Loom::Palette::Load(clone.string(), cloned));
+		CHECK(cloned.colours == std::vector<SpriteAsset::Colour>{ RED });
 
 		SpriteAsset saved;
 		SpriteAsset::Links links;
@@ -638,6 +636,36 @@ TEST_SUITE("SpriteEditor")
 
 		std::filesystem::remove(palette);
 		std::filesystem::remove(clone);
+	};
+
+	TEST_CASE("a palette not yet saved is renamed where it waits, and saved under its new name")
+	{
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.layers[0].cels[0].Set(0, 0, RED);
+
+		Driven driven("loom sprite palette rename unsaved.tga", &sprite);
+
+		driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\nrightclick \"Palette\" \"New\" left -40 0\nwait 2\nkey ctrl+a\ntype Unsaved Hot\nkey enter\nwait 2\n");
+
+		const std::filesystem::path folder = std::filesystem::path(driven.path).parent_path();
+		const std::string hot = (folder / ("Unsaved Hot" + std::string(Loom::Palette::extension))).string();
+
+		CHECK_FALSE(std::filesystem::exists(hot));
+		CHECK(driven.editor.TakeRenamed().empty());
+
+		REQUIRE(driven.editor.SaveAll());
+
+		Loom::Palette saved_palette;
+		REQUIRE(Loom::Palette::Load(hot, saved_palette));
+		CHECK(saved_palette.colours == std::vector<SpriteAsset::Colour>{ RED });
+		CHECK_FALSE(std::filesystem::exists(std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension)));
+
+		SpriteAsset saved;
+		SpriteAsset::Links links;
+		REQUIRE(SpriteAsset::Load(SpriteAsset::For(driven.path), saved, links));
+		CHECK(links.palette == hot);
+
+		std::filesystem::remove(hot);
 	};
 
 	TEST_CASE("a palette renamed from its right-click menu takes the sprites painted from it along, open or saved, without marking them unsaved")

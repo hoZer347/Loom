@@ -1354,14 +1354,10 @@ namespace Loom
 
 		if (ImGui::Button("Clone"))
 		{
-			const std::string path = NewPalettePath(current);
-			const Palette palette = PaletteAt(current);
+			const std::string path = NewPalettePath(current, [this](const std::string& taken) { return m_palettes.contains(taken); });
 
-			if (Palette::Save(path, palette))
-			{
-				m_palettes[path] = palette;
-				SetPalette(path);
-			};
+			m_palettes[path] = PaletteFile{ PaletteAt(current).palette };
+			SetPalette(path);
 		};
 
 		ImGui::EndDisabled();
@@ -1387,7 +1383,7 @@ namespace Loom
 
 		std::error_code code;
 		const bool same = target == std::filesystem::path(current);
-		const bool taken = !same && std::filesystem::exists(target, code) && !std::filesystem::equivalent(current, target, code);
+		const bool taken = !same && (m_palettes.contains(target.string()) || (std::filesystem::exists(target, code) && !std::filesystem::equivalent(current, target, code)));
 		const bool usable = ProjectAssets::IsValidName(m_paletteName) && !taken;
 
 		if (!usable)
@@ -1402,7 +1398,9 @@ namespace Loom
 			return;
 		};
 
-		if (entered)
+		if (entered && !std::filesystem::exists(current, code))
+			Relocate(current, target.string());
+		else if (entered)
 		{
 			std::string error;
 
@@ -1418,9 +1416,10 @@ namespace Loom
 				Relocate(current, renamed);
 				m_renamed.emplace_back(current, renamed);
 			};
-
-			ImGui::CloseCurrentPopup();
 		};
+
+		if (entered)
+			ImGui::CloseCurrentPopup();
 
 		ImGui::EndPopup();
 	};
