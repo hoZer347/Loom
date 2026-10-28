@@ -17591,10 +17591,6 @@ static void ImGui::WindowSelectViewport(ImGuiWindow* window)
                 window->Viewport->ID = window->ID;
                 window->Viewport->LastNameHash = 0;
             }
-            else if (IsWindowHeldInHostViewport(window))
-            {
-                SetWindowViewport(window, main_viewport);
-            }
             else if (!UpdateTryMergeWindowIntoHostViewports(window)) // Merge?
             {
                 // New viewport
