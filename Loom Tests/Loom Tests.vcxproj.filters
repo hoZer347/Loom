@@ -232,6 +232,9 @@
     <ClCompile Include="EditHistory Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="UndoHistory Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="StageTiming Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

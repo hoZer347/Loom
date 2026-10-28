@@ -363,6 +363,9 @@
     <ClInclude Include="EditHistory.h">
       <Filter>Editor</Filter>
     </ClInclude>
+    <ClInclude Include="UndoHistory.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
     <ClInclude Include="PlayHistory.h">
       <Filter>Editor</Filter>
     </ClInclude>

@@ -336,9 +336,11 @@ namespace Loom
 			relocate(document->links);
 			relocate(document->savedLinks);
 
-			for (std::vector<Snapshot>* history : { &document->undo, &document->redo })
-				for (Snapshot& snapshot : *history)
-					relocate(snapshot.links);
+			document->history.Rewrite([&](Snapshot snapshot)
+			{
+				relocate(snapshot.links);
+				return snapshot;
+			});
 		};
 
 		m_loosePalette = ProjectAssets::Relocate(m_loosePalette, from, to);
@@ -1908,22 +1910,12 @@ namespace Loom
 
 	void SpriteEditor::RememberPalette(PaletteFile& file)
 	{
-		file.undo.push_back(file.palette);
-		file.redo.clear();
+		file.history.Push(file.palette);
 	};
 
 	bool SpriteEditor::StepPalette(PaletteFile& file, bool undo)
 	{
-		std::vector<Palette>& from = undo ? file.undo : file.redo;
-		std::vector<Palette>& to = undo ? file.redo : file.undo;
-
-		if (from.empty())
-			return false;
-
-		to.push_back(std::move(file.palette));
-		file.palette = std::move(from.back());
-		from.pop_back();
-		return true;
+		return file.history.Step(file.palette, undo);
 	};
 
 	bool SpriteEditor::SavePalette(const std::string& path)
@@ -2058,17 +2050,13 @@ namespace Loom
 		const size_t bytes = (std::max)(document.sprite.Bytes(), (size_t)1);
 		const size_t kept = (std::max)(max_undo_bytes / bytes, (size_t)1);
 
-		document.undo.push_back({ document.sprite, document.links });
-		document.redo.clear();
-
-		if (document.undo.size() > kept)
-			document.undo.erase(document.undo.begin(), document.undo.end() - (ptrdiff_t)kept);
+		document.history.Push({ document.sprite, document.links }, kept);
 	};
 
 	void SpriteEditor::Settle(Document& document)
 	{
-		if (!document.undo.empty() && document.undo.back().sprite == document.sprite && document.undo.back().links == document.links)
-			document.undo.pop_back();
+		if (const Snapshot* last = document.history.Last(); last && last->sprite == document.sprite && last->links == document.links)
+			document.history.Pop();
 
 		Edited(document);
 	};
@@ -2082,16 +2070,13 @@ namespace Loom
 
 	void SpriteEditor::Step(Document& document, bool undo)
 	{
-		std::vector<Snapshot>& from = undo ? document.undo : document.redo;
-		std::vector<Snapshot>& to = undo ? document.redo : document.undo;
-
-		if (from.empty())
+		if (document.history.Next(undo) == nullptr)
 			return;
 
-		to.push_back({ std::move(document.sprite), std::move(document.links) });
-		document.sprite = std::move(from.back().sprite);
-		document.links = std::move(from.back().links);
-		from.pop_back();
+		Snapshot step{ std::move(document.sprite), std::move(document.links) };
+		document.history.Step(step, undo);
+		document.sprite = std::move(step.sprite);
+		document.links = std::move(step.links);
 
 		// The layer or frame picked may be gone.
 		document.layer = (std::min)(document.layer, (int)document.sprite.layers.size() - 1);

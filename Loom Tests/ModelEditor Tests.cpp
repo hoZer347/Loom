@@ -713,11 +713,16 @@ TEST_SUITE("ModelEditor")
 			driven.editor.AddMesh();
 			CHECK(driven.Mesh().faces.size() == 6);
 
-			// The components the cube went on stay, so it is never as saved.
 			driven.editor.Undo();
-			CHECK(driven.editor.Unsaved());
+			CHECK(driven.editor.Editing() == nullptr);
+			CHECK_FALSE(driven.editor.Unsaved());
+			REQUIRE(driven.editor.Save());
+			CHECK(ReadFile(prefab.string()).find("Mesh") == std::string::npos);
+			CHECK(ReadFile(prefab.string()).find("Material") == std::string::npos);
 
 			driven.editor.Redo();
+			CHECK(driven.Mesh().faces.size() == 6);
+			CHECK(driven.editor.Unsaved());
 			REQUIRE(driven.editor.Save());
 
 			ModelEditor reopened;

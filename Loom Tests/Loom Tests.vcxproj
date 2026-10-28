@@ -189,6 +189,7 @@
     <ClCompile Include="WebPlayer Tests.cpp" />
     <ClCompile Include="BuildSettings Tests.cpp" />
     <ClCompile Include="EditHistory Tests.cpp" />
+    <ClCompile Include="UndoHistory Tests.cpp" />
     <ClCompile Include="StageTiming Tests.cpp" />
     <ClCompile Include="SerializedField Tests.cpp" />
     <ClCompile Include="Guid Tests.cpp" />

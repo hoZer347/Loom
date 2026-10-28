@@ -40,7 +40,6 @@ namespace Loom
 
 		constexpr const char* model_light = "Model Light";
 
-		constexpr size_t max_steps = 100;
 		constexpr double message_seconds = 4.0;
 
 		constexpr float side_width = 230.0f;
@@ -529,10 +528,9 @@ void main()
 		document.parts.clear();
 		document.part = 0;
 		document.selection = { };
-		document.undo.clear();
-		document.redo.clear();
-		document.steps = 0;
-		document.savedAt = 0;
+		document.history.Clear();
+		document.addedMesh.reset();
+		document.addedMaterial.reset();
 		document.drag = Drag::None;
 		document.hoveredHandle.reset();
 		document.hoveredVertex.reset();
@@ -633,7 +631,7 @@ void main()
 		document.text = text;
 		document.unwritten.clear();
 		document.unsaved = false;
-		document.savedAt = document.steps;
+		document.history.Saved();
 		document.message = "Saved.";
 		document.messageTime = ImGui::GetTime();
 
@@ -938,10 +936,10 @@ void main()
 		ImGui::TextDisabled("|");
 		ImGui::SameLine();
 
-		if (action("Undo", !document.undo.empty(), "Undo last change", "Nothing to undo", "Ctrl+Z"))
+		if (action("Undo", document.history.CanUndo(), "Undo last change", "Nothing to undo", "Ctrl+Z"))
 			Step(document, true);
 
-		if (action("Redo", !document.redo.empty(), "Redo last undo", "Nothing to redo", "Ctrl+Y"))
+		if (action("Redo", document.history.CanRedo(), "Redo last undo", "Nothing to redo", "Ctrl+Y"))
 			Step(document, false);
 
 		if (action("Save", document.unsaved, "Save into the prefab", "Nothing to save", "Ctrl+S"))
@@ -2075,6 +2073,7 @@ void main()
 	ModelEditor::Snapshot ModelEditor::Take(const Document& document)
 	{
 		Snapshot snapshot{ document.part, document.parts.empty() ? EditableMesh{ } : document.parts[document.part].editing, document.selection };
+		snapshot.meshed = !document.parts.empty();
 
 		if (document.root)
 		{
@@ -2090,16 +2089,7 @@ void main()
 
 	void ModelEditor::Commit(Document& document, Snapshot snapshot)
 	{
-		document.undo.push_back(std::move(snapshot));
-
-		if (document.undo.size() > max_steps)
-			document.undo.erase(document.undo.begin());
-
-		if (document.savedAt > document.steps)
-			document.savedAt.reset();
-
-		document.redo.clear();
-		document.steps++;
+		document.history.Push(std::move(snapshot));
 		document.unsaved = true;
 	};
 
@@ -2110,19 +2100,23 @@ void main()
 
 	void ModelEditor::Step(Document& document, bool undo)
 	{
-		std::vector<Snapshot>& from = undo ? document.undo : document.redo;
-		std::vector<Snapshot>& to = undo ? document.redo : document.undo;
+		const Snapshot* next = document.history.Next(undo);
 
-		if (from.empty())
+		if (next == nullptr)
 			return;
 
-		Snapshot step = std::move(from.back());
-		from.pop_back();
-
-		document.part = step.part;
-		to.push_back(Take(document));
+		document.part = next->part;
+		Snapshot step = Take(document);
+		document.history.Step(step, undo);
 
 		document.selection = std::move(step.selection);
+
+		if (document.root && step.meshed != !document.parts.empty())
+		{
+			if (step.meshed)
+				Remesh(document);
+			else Unmesh(document);
+		};
 
 		if (document.root)
 		{
@@ -2141,8 +2135,39 @@ void main()
 			Changed(document);
 		};
 
-		document.steps = undo ? document.steps - 1 : document.steps + 1;
-		document.unsaved = document.savedAt != document.steps;
+		document.unsaved = document.history.Unsaved();
+	};
+
+	void ModelEditor::Unmesh(Document& document)
+	{
+		GameObject& root = *document.root;
+
+		root.DetachComponent(document.parts.front().mesh);
+
+		for (ComponentBase* component : root.GetComponents())
+			if (document.addedMaterial == component->GetGuid())
+				root.DetachComponent(component);
+
+		// Gone at once, so a redo straight after puts back their guids rather than meeting them.
+		Engine::DoTasks();
+
+		document.parts.clear();
+		document.part = 0;
+	};
+
+	void ModelEditor::Remesh(Document& document)
+	{
+		GameObject& root = *document.root;
+
+		if (document.addedMaterial)
+			root.Attach<Material>()->SetGuid(*document.addedMaterial);
+
+		Mesh* mesh = root.Attach<Mesh>(Mesh::Triangles);
+
+		if (document.addedMesh)
+			mesh->SetGuid(*document.addedMesh);
+
+		document.parts.push_back(Part{ &root, mesh, EditableMesh{ } });
 	};
 
 	void ModelEditor::Undo()
@@ -2371,6 +2396,11 @@ void main()
 
 	void ModelEditor::Add(Shapes::Shape shape)
 	{
+		AddShape(shape, std::nullopt);
+	};
+
+	void ModelEditor::AddShape(Shapes::Shape shape, std::optional<Snapshot> before)
+	{
 		Document* document = Front();
 
 		if (document == nullptr || document->parts.empty())
@@ -2393,7 +2423,7 @@ void main()
 		const glm::mat4 local = glm::inverse(document->parts[document->part].object->WorldMatrix());
 		added.Transform(all, glm::translate(glm::mat4(1.0f), glm::vec3(local * glm::vec4(document->target, 1.0f))));
 
-		Remember(*document);
+		Commit(*document, before ? std::move(*before) : Take(*document));
 
 		document->pick = Pick::Faces;
 		document->selection = Selection{ { }, { }, mesh.Append(added) };
@@ -2417,19 +2447,22 @@ void main()
 		if (document == nullptr || document->root == nullptr || !document->parts.empty() || document->root->GetComponent<Mesh>())
 			return;
 
+		Snapshot before = Take(*document);
+		document->addedMaterial.reset();
+
 		if (document->root->GetComponent<Material>() == nullptr)
 		{
 			const std::string shader = ShaderOf(*document->root);
-			document->root->Attach<Material>()->SetShaderPath(shader.empty() ? ProjectAssets::ProjectShader(ProjectFolder(document->path).string()) : shader);
+			Material* material = document->root->Attach<Material>();
+			material->SetShaderPath(shader.empty() ? ProjectAssets::ProjectShader(ProjectFolder(document->path).string()) : shader);
+			document->addedMaterial = material->GetGuid();
 		};
 
 		Mesh* mesh = document->root->Attach<Mesh>(Mesh::Triangles);
+		document->addedMesh = mesh->GetGuid();
 		document->parts.push_back(Part{ document->root, mesh, EditableMesh{ } });
 
-		Add(Shapes::Shape::Cube);
-
-		// Undo leaves the components the cube went on, so the save is out of reach.
-		document->savedAt.reset();
+		AddShape(Shapes::Shape::Cube, std::move(before));
 	};
 
 	#pragma endregion

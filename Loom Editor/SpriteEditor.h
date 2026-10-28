@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SpriteAsset.h"
+#include "UndoHistory.h"
 
 #include "imgui.h"
 
@@ -146,8 +147,7 @@ namespace Loom
 			std::optional<Image> outside;
 
 			// The sprite and its links as they were before each edit.
-			std::vector<Snapshot> undo;
-			std::vector<Snapshot> redo;
+			UndoHistory<Snapshot> history;
 
 			// What is painted, as the timeline picked it.
 			int layer = 0;
@@ -273,8 +273,7 @@ namespace Loom
 			std::optional<Palette> saved;
 
 			// The palette as it was before each edit.
-			std::vector<Palette> undo;
-			std::vector<Palette> redo;
+			UndoHistory<Palette> history;
 
 			bool Unsaved() const { return !saved || palette != *saved; };
 		};

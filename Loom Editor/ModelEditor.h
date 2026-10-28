@@ -3,6 +3,7 @@
 #include "EditableMesh.h"
 #include "EditorViewport.h"
 #include "Shapes.h"
+#include "UndoHistory.h"
 
 #include "Camera.h"
 #include "Guid.h"
@@ -203,6 +204,9 @@ namespace Loom
 
 			// Each material's shader, by the material's guid.
 			std::vector<std::pair<Guid, std::string>> shaders;
+
+			// False for the prefab as it was before Add a Mesh gave it one.
+			bool meshed = true;
 		};
 
 		// One of the handles round what is picked, along an axis or, with
@@ -254,15 +258,13 @@ namespace Loom
 			Pick pick = Pick::Faces;
 			Selection selection;
 
-			std::vector<Snapshot> undo;
-			std::vector<Snapshot> redo;
+			UndoHistory<Snapshot> history;
 			bool unsaved = false;
 
-			// How many steps have been made since the prefab was read, less those
-			// taken back, and how many it was saved at. None once a new step
-			// leaves what was saved where redo cannot reach it.
-			size_t steps = 0;
-			std::optional<size_t> savedAt = 0;
+			// The Mesh and any Material Add a Mesh put on the top object, which
+			// undo takes off and redo puts back as the same components.
+			std::optional<Guid> addedMesh;
+			std::optional<Guid> addedMaterial;
 
 			// When the file was last read or written, and what it held then, so
 			// a change made to it elsewhere is read in again.
@@ -425,6 +427,13 @@ namespace Loom
 		static void Commit(Document& document, Snapshot snapshot);
 		static void Remember(Document& document);
 		static void Step(Document& document, bool undo);
+
+		// Off the top object, and back on, what Add a Mesh put there.
+		static void Unmesh(Document& document);
+		static void Remesh(Document& document);
+
+		// Add, as one step with before as it stood ahead of it.
+		void AddShape(Shapes::Shape shape, std::optional<Snapshot> before);
 
 		#pragma endregion
 
