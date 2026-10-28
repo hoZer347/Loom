@@ -407,7 +407,10 @@ TEST_SUITE("Prefabs")
 		REQUIRE(merged.children.size() == 3);
 		CHECK(merged.children[0].guid == ours.child);
 		CHECK(merged.children[1].name == "Shield");
+		CHECK(merged.children[1].guid == shielded.children[1].guid);
 		CHECK(merged.children[2].name == "Helmet");
+		CHECK(merged.children[2].guid != merged.children[1].guid);
+		CHECK(merged.children[2].guid != helmeted.children[1].guid);
 
 		ObjectNode expected = ours.Node("Orc", "(4, 4, 4)", "6");
 		expected.children.push_back(ObjectNode{ "Shield", NewGuid() });

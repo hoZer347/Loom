@@ -319,10 +319,30 @@ namespace Loom
 			return merged;
 		};
 
+		Prefabs::ComponentNode Fresh(const Prefabs::ComponentNode& component)
+		{
+			return { component.type, Guid::New().ToString(), component.fields };
+		};
+
+		// Its references inside it follow its new guids.
+		Prefabs::ObjectNode Fresh(const Prefabs::ObjectNode& object)
+		{
+			static const std::vector<std::string> no_keys{ };
+			Retargeter retargeter{ no_keys, Prefabs::Part::Whole };
+
+			retargeter.Match(object, nullptr, false);
+
+			return retargeter.Build(object, nullptr, false);
+		};
+
 		// Matched by place, as everything in a prefab is. What both added is
-		// kept, and a list both changed otherwise is ours.
+		// kept, theirs on guids of its own, and a list both changed otherwise is ours.
 		template<typename Node, typename MergeOne>
-		std::vector<Node> MergeList(const std::vector<Node>& base, const std::vector<Node>& ours, const std::vector<Node>& theirs, const MergeOne& merge)
+		std::vector<Node> MergeList(
+			const std::vector<Node>& base,
+			const std::vector<Node>& ours,
+			const std::vector<Node>& theirs,
+			const MergeOne& merge)
 		{
 			const bool both_added = ours.size() > base.size() && theirs.size() > base.size();
 
@@ -336,12 +356,16 @@ namespace Loom
 				merged.push_back(i < base.size() ? merge(base[i], ours[i], theirs[i]) : lengths[i]);
 
 			if (both_added)
-				merged.insert(merged.end(), theirs.begin() + base.size(), theirs.end());
+				for (size_t i = base.size(); i < theirs.size(); i++)
+					merged.push_back(Fresh(theirs[i]));
 
 			return merged;
 		};
 
-		Prefabs::ComponentNode MergeComponent(const Prefabs::ComponentNode& base, const Prefabs::ComponentNode& ours, const Prefabs::ComponentNode& theirs)
+		Prefabs::ComponentNode MergeComponent(
+			const Prefabs::ComponentNode& base,
+			const Prefabs::ComponentNode& ours,
+			const Prefabs::ComponentNode& theirs)
 		{
 			if (ours.type != base.type || theirs.type != base.type)
 				return ours.type != base.type ? ours : theirs;
@@ -349,7 +373,10 @@ namespace Loom
 			return { ours.type, ours.guid, MergeFields(base.fields, ours.fields, theirs.fields) };
 		};
 
-		Prefabs::ObjectNode MergeObject(const Prefabs::ObjectNode& base, const Prefabs::ObjectNode& ours, const Prefabs::ObjectNode& theirs)
+		Prefabs::ObjectNode MergeObject(
+			const Prefabs::ObjectNode& base,
+			const Prefabs::ObjectNode& ours,
+			const Prefabs::ObjectNode& theirs)
 		{
 			return {
 				ours.name == base.name ? theirs.name : ours.name,
