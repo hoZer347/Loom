@@ -1158,7 +1158,7 @@ TEST_SUITE("SpriteEditor")
 		std::filesystem::remove(palette);
 	};
 
-	TEST_CASE("a swatch's x deletes its colour, asking first while any sprite on the palette still has pixels of it, and Ctrl+Z and Ctrl+Y step it")
+	TEST_CASE("a swatch's x deletes its colour, asking first while any sprite on the palette still has pixels of it, which it then clears, and Ctrl+Z and Ctrl+Y step it")
 	{
 		using Users = std::vector<std::pair<std::string, size_t>>;
 
@@ -1203,15 +1203,33 @@ TEST_SUITE("SpriteEditor")
 			REQUIRE(SpriteAsset::Save((folder / "Units" / "Tank.loomsprite").string(), tank, { (folder / "Units" / "Tank.png").string(), palette }));
 			REQUIRE(SpriteAsset::Save((folder / "Units" / "Other.loomsprite").string(), tank, { (folder / "Units" / "Other.png").string(), (folder / "Other.loompalette").string() }));
 
+			const std::filesystem::path ghost_path = std::filesystem::path(SpriteAsset::For(driven.path)).lexically_normal();
+			const std::filesystem::path tank_path = (folder / "Units" / "Tank.loomsprite").lexically_normal();
+
+			const auto red_on_disk = [](const std::filesystem::path& file)
+			{
+				SpriteAsset loaded;
+				SpriteAsset::Links links;
+				REQUIRE(SpriteAsset::Load(file.string(), loaded, links));
+
+				return loaded.Count(RED);
+			};
+
 			driven.Run(last);
 			REQUIRE(driven.editor.ColourUsers() != nullptr);
-			CHECK(*driven.editor.ColourUsers() == Users{ { "Ghost.loomsprite", 1 }, { "Tank.loomsprite", 2 } });
+			CHECK(*driven.editor.ColourUsers() == Users{ { ghost_path.string(), 1 }, { tank_path.string(), 2 } });
 
 			CHECK(saved_after("click \"Delete Colour?\" \"Cancel\"\nwait 2\n") == std::vector<SpriteAsset::Colour>{ RED });
 			CHECK(driven.editor.ColourUsers() == nullptr);
 
+			// The shut sprite opens behind the one in front, and neither is written.
 			driven.Run(last + "click \"Delete Colour?\" \"Delete\"\nwait 2\n");
 			CHECK(saved() == std::vector<SpriteAsset::Colour>{ RED });
+			CHECK(Driven::SelectedTab().find("Ghost") != std::string::npos);
+			CHECK(Driven::TabMiddle("Tank").x > 0.0f);
+			CHECK(Driven::Unsaved());
+			CHECK(red_on_disk(ghost_path) == 1);
+			CHECK(red_on_disk(tank_path) == 2);
 			CHECK(saved_after("").empty());
 			CHECK(saved_after("key ctrl+z\nwait 2\n") == std::vector<SpriteAsset::Colour>{ RED });
 			CHECK(saved_after("key ctrl+y\nwait 2\n").empty());
@@ -1225,6 +1243,19 @@ TEST_SUITE("SpriteEditor")
 			driven.Run("click \"Palette\" \"+\" left -15 0\nwait 2\nclick \"Palette\" \"+\"\nwait 2\n" + last);
 			CHECK(driven.editor.ColourUsers() == nullptr);
 			CHECK(saved_after("") == std::vector<SpriteAsset::Colour>{ RED });
+
+			// Each sprite's own Ctrl+S writes it cleared, and its Ctrl+Z gives the pixels back.
+			const ImVec2 tank_tab = Driven::TabMiddle("Tank");
+			driven.Stroke(tank_tab, tank_tab);
+			driven.Press(ImGuiKey_S);
+			CHECK(red_on_disk(tank_path) == 0);
+
+			const ImVec2 ghost_tab = Driven::TabMiddle("Ghost");
+			driven.Stroke(ghost_tab, ghost_tab);
+			CHECK(Count(driven.Saved(), RED) == 0);
+			CHECK(red_on_disk(ghost_path) == 0);
+
+			driven.Press(ImGuiKey_Z);
 			CHECK(Count(driven.Saved(), RED) == 1);
 		};
 

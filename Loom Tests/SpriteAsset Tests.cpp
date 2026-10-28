@@ -426,6 +426,20 @@ TEST_SUITE("SpriteAsset")
 		CHECK(sprite.Count({ 1, 2, 3, HALF }) == 0);
 	};
 
+	TEST_CASE("a sprite erases a colour to clear in every cel, hidden layers too, and leaves the rest")
+	{
+		SpriteAsset sprite = TwoByTwo();
+		sprite.layers[1].cels[0].Set(0, 1, RED);
+
+		const size_t clear = sprite.Count({ });
+
+		sprite.Erase(RED);
+
+		CHECK(sprite.Count(RED) == 0);
+		CHECK(sprite.Count(BLUE) == 1);
+		CHECK(sprite.Count({ }) == clear + 2);
+	};
+
 	#pragma endregion
 
 	#pragma region Linked Images

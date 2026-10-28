@@ -92,8 +92,8 @@ namespace Loom
 		bool IsFocused() const { return m_focused; };
 		bool IsPaletteFocused() const { return m_paletteFocused; };
 
-		// While a swatch's x asks, the sprites with pixels of its colour and
-		// how many each has. Null otherwise.
+		// While a swatch's x asks, the sprite files with pixels of its colour
+		// and how many each has. Null otherwise.
 		const std::vector<std::pair<std::string, size_t>>* ColourUsers() const { return m_deleting && m_deleting->users ? &*m_deleting->users : nullptr; };
 
 		#pragma endregion
@@ -241,7 +241,8 @@ namespace Loom
 		void DrawCategories(const std::string& path);
 
 		// Asks before a swatch's x takes out the last of a colour any sprite
-		// painted from the palette still has pixels of.
+		// painted from the palette still has pixels of, then clears them,
+		// opening each sprite that was shut so the change can be undone.
 		void DrawColourDeletion(const std::string& project_folder);
 		void DrawPaletteChoice(const std::string& project_folder);
 		void DrawPaletteMenu(const std::string& project_folder);
@@ -401,7 +402,8 @@ namespace Loom
 		std::vector<std::pair<std::string, std::string>> m_renamed;
 
 		// A swatch whose x was clicked, by where it sits in the palette, and
-		// once counted, the sprites with pixels of it and how many each has.
+		// once counted, the sprite files with pixels of it and how many each
+		// has.
 		struct ColourDeletion
 		{
 			std::string path;

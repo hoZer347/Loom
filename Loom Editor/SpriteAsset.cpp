@@ -693,6 +693,16 @@ namespace Loom
 		height = to_height;
 	};
 
+	void SpriteAsset::Erase(const Colour& colour)
+	{
+		for (Layer& layer : layers)
+			for (Image& cel : layer.cels)
+				for (int y = 0; y < cel.height; y++)
+					for (int x = 0; x < cel.width; x++)
+						if (cel.Get(x, y) == colour)
+							cel.Set(x, y, { });
+	};
+
 	#pragma endregion
 
 	#pragma region Contents

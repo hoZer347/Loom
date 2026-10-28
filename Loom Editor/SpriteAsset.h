@@ -177,6 +177,9 @@ namespace Loom
 		// bottom.
 		void Resize(int width, int height, bool scale, float anchor_x, float anchor_y);
 
+		// Every pixel of the colour clear, in every cel, hidden layers too.
+		void Erase(const Colour& colour);
+
 		#pragma endregion
 
 		#pragma region Contents

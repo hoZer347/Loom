@@ -390,7 +390,7 @@ namespace Loom
 
 			if (m_documents.empty())
 				ImGui::TextDisabled("No sprite open");
-			else if (ImGui::BeginTabBar("##sprites", ImGuiTabBarFlags_AutoSelectNewTabs | ImGuiTabBarFlags_FittingPolicyScroll))
+			else if (ImGui::BeginTabBar("##sprites", ImGuiTabBarFlags_FittingPolicyScroll))
 			{
 				const Document* closed = nullptr;
 
@@ -1695,7 +1695,7 @@ namespace Loom
 				counted.insert(document->path);
 
 				if (const size_t pixels = document->sprite.Count(deleting.colour); pixels > 0)
-					users.emplace_back(FileName(document->path), pixels);
+					users.emplace_back(document->path, pixels);
 			};
 
 			const std::string root = !project_folder.empty()
@@ -1719,7 +1719,7 @@ namespace Loom
 					continue;
 
 				if (const size_t pixels = sprite.Count(deleting.colour); pixels > 0)
-					users.emplace_back(FileName(sprite_path), pixels);
+					users.emplace_back(sprite_path, pixels);
 			};
 
 			deleting.users = std::move(users);
@@ -1736,17 +1736,44 @@ namespace Loom
 
 		ImGui::ColorButton("##colour", ToFloats(deleting.colour), ImGuiColorEditFlags_AlphaPreviewHalf | ImGuiColorEditFlags_NoTooltip);
 		ImGui::SameLine();
-		ImGui::TextUnformatted("Pixels left of this colour");
+		ImGui::TextUnformatted("Pixels to clear");
 
-		for (const auto& [name, pixels] : *deleting.users)
-			ImGui::BulletText("%s: %zu", name.c_str(), pixels);
+		for (const auto& [sprite_path, pixels] : *deleting.users)
+			ImGui::BulletText("%s: %zu", FileName(sprite_path).c_str(), pixels);
 
 		const bool confirmed = ImGui::Button("Delete");
 		ImGui::SameLine();
 		const bool cancelled = ImGui::Button("Cancel");
 
 		if (confirmed)
+		{
+			for (const auto& [sprite_path, pixels] : *deleting.users)
+			{
+				const auto opened = [&sprite_path](const std::unique_ptr<Document>& document) { return document->path == sprite_path; };
+
+				auto found = std::find_if(m_documents.begin(), m_documents.end(), opened);
+
+				if (found == m_documents.end())
+				{
+					const auto focusing = m_focusFrames;
+					Open(sprite_path, false);
+					m_focusFrames = focusing;
+					found = std::find_if(m_documents.begin(), m_documents.end(), opened);
+
+					if (found == m_documents.end())
+						continue;
+
+					// Behind the one in front.
+					(*found)->select = false;
+				};
+
+				Remember(**found);
+				(*found)->sprite.Erase(deleting.colour);
+				Edited(**found);
+			};
+
 			erase();
+		}
 		else if (cancelled)
 			m_deleting.reset();
 
