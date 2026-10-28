@@ -1576,10 +1576,7 @@ namespace Loom
 		ImGui::BeginDisabled(!listed);
 
 		if (ImGui::Button("-", ImVec2(side, side)))
-		{
-			RememberPalette(file);
-			colours.erase(found);
-		};
+			m_deleting = ColourDeletion{ path, category, (size_t)(found - colours.begin()), left };
 
 		ImGui::EndDisabled();
 		ImGui::SetItemTooltip("Remove left colour");

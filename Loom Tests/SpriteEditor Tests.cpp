@@ -1108,7 +1108,7 @@ TEST_SUITE("SpriteEditor")
 		CHECK(Count(saved, WHITE) == 0);
 	};
 
-	TEST_CASE("a swatch clicked with either button is that button's colour, + and - put the left colour in the palette and take it out, + again even when it is there, written on Ctrl+S, and Ctrl+Z and Ctrl+Y step them")
+	TEST_CASE("a swatch clicked with either button is that button's colour, + and - put the left colour in the palette and take it out, - asking while it is painted, + again even when it is there, written on Ctrl+S, and Ctrl+Z and Ctrl+Y step them")
 	{
 		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
 		sprite.layers[0].cels[0].Set(0, 0, RED);
@@ -1135,7 +1135,11 @@ TEST_SUITE("SpriteEditor")
 
 		Loom::Palette saved;
 
+		// Red is still painted, so - asks as a swatch's x does.
 		driven.Run("click \"Palette\" \"-\"\nwait 2\n");
+		CHECK(driven.editor.ColourUsers() != nullptr);
+
+		driven.Run("click \"Delete Colour?\" \"Delete\"\nwait 2\n");
 		REQUIRE(Loom::Palette::Load(palette, saved));
 		CHECK(saved.colours == std::vector<SpriteAsset::Colour>{ RED });
 
