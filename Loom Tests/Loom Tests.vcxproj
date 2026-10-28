@@ -209,6 +209,7 @@
     <ClCompile Include="MeshCollider Tests.cpp" />
     <ClCompile Include="Physics Performance Tests.cpp" />
     <ClCompile Include="SceneHistory Performance Tests.cpp" />
+    <ClCompile Include="Skin Performance Tests.cpp" />
     <ClCompile Include="Contacts Tests.cpp" />
     <ClCompile Include="DialogueArgs Tests.cpp" />
     <ClCompile Include="Jobs Tests.cpp" />

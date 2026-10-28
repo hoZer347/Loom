@@ -302,12 +302,13 @@ vec3 LoomLight(vec3 normal)
 					continue;
 
 				const Shader& shader = *mesh->material->shader;
+				const uint32_t program = mesh->ProgramFor(shader.shadow_id, shader.shadow_skinned_id);
 
-				if (!shader.shadow_id || batch.Add(*mesh, shader.shadow_id, shader.shadow_instanced_id))
+				if (!program || batch.Add(*mesh, program, shader.shadow_instanced_id))
 					continue;
 
-				ReadyCaster(*mesh, shader.shadow_id);
-				mesh->Draw(shader.shadow_id);
+				ReadyCaster(*mesh, program);
+				mesh->Draw(program);
 			}
 			else if (strcmp(component->GetTypeName(), typeid(Sprite).name()) == 0)
 				((Sprite*)component)->DrawShadow(m_view_projection);

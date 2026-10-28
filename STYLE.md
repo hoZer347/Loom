@@ -33,7 +33,7 @@ Derived from settled files: Loom WASM/Camera.h, Camera.cpp, Audio.h, Audio.cpp, 
 - Locals and parameters: snake_case in the Editor (`select_all`, EditorConsole.cpp). camelCase in the engine, Utilities and scripts (`toLocal`, Laser.hpp).
 - File-scope constants (anonymous namespace, `static constexpr` in scripts): UPPER_SNAKE: `constexpr float PARALLEL = 1e-4f;`
 - Public constants on a type or namespace: PascalCase (`EditorTheme::DefaultFontSize`, `EditorSettings::MinScale`). A type whose constants already use another casing keeps it for new ones (`SpriteAsset::maxFrames`).
-- Function-local constants: lower case (`constexpr float half = 0.5f;`).
+- Function-local constants: UPPER_SNAKE (`constexpr float HALF = 0.5f;`).
 - `enum class` with PascalCase values: `enum class Theme { Loom, Dark, Light, Classic, Count };`
 - Template parameters: `T`, `Enum`, or `_ValueType` in Utilities.
 - Files: PascalCase, `.h`/`.cpp` in engine and editor, `.hpp` for game scripts; a few engine files have spaces (`Loom API.h`, `Macro Helpers.h`); tests are `<Name> Tests.cpp`.

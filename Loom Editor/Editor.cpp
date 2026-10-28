@@ -1812,7 +1812,7 @@ namespace Loom
 		DrawLoading();
 
 #ifndef LOOM_FINAL
-		Profiler::SetRecording(m_stagesShown);
+		Profiler::SetRecording(m_stagesShown || UiScript::RecordingStages());
 #endif
 		Input::SetFocused(m_gameFocus.Update(m_gamePanelFocused, m_gamePanelHovered, AnyMouseClicked(), ImGui::IsAnyMouseDown() || AnyMouseReleased()));
 

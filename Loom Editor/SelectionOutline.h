@@ -45,12 +45,14 @@ namespace Loom
 	private:
 		#pragma region Programs
 
-		// A mask program, and the shader program it was made beside, which a
-		// reloaded shader no longer matches.
+		// A mask program, its twin for meshes the GPU bends or 0 without one,
+		// and the shader program they were made beside, which a reloaded
+		// shader no longer matches.
 		struct ShaderMask
 		{
 			uint32_t shader = 0;
 			uint32_t program = 0;
+			uint32_t skinned = 0;
 		};
 
 		// Compiles the programs the first time it is asked. False when they
@@ -58,10 +60,10 @@ namespace Loom
 		bool Compile();
 		void Destroy();
 
-		// The mask program for meshes drawn with shader: its own vertex stage,
-		// so the silhouette lands where the mesh does, or the plain one when
-		// that will not compile.
-		uint32_t MeshMask(const Shader& shader);
+		// The mask programs for meshes drawn with shader: its own vertex
+		// stages, so the silhouette lands where the mesh does, or the plain one
+		// when that will not compile.
+		const ShaderMask& MeshMask(const Shader& shader);
 
 		#pragma endregion
 

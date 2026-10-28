@@ -485,6 +485,12 @@ namespace Loom
 			glUniformMatrix4fv(Location(program, name), 1, GL_FALSE, glm::value_ptr(value));
 		};
 
+		void SetUniforms(uint32_t program, const char* name, const glm::mat4* values, size_t count) override
+		{
+			glUseProgram(program);
+			glUniformMatrix4fv(Location(program, name), (GLsizei)count, GL_FALSE, glm::value_ptr(*values));
+		};
+
 		void SetUniform(uint32_t program, const char* name, UniformType type, const void* components) override
 		{
 			glUseProgram(program);

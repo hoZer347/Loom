@@ -42,6 +42,12 @@ namespace Loom
 	*                          shown window whose name contains window
 	*     items [file]         every labelled item drawn last frame, to the file
 	*                          or the console: window, label, x, y, width, height
+	*     stages <frames> <file>
+	*                          records every frame's stages for that many
+	*                          frames, then writes the last hundred's to the
+	*                          file: a frame row of its average length, as both
+	*                          average and peak, then thread, stage, depth,
+	*                          average and peak, in milliseconds
 	*     resize <width> <height>
 	*                          the window, in pixels
 	*     quit
@@ -52,8 +58,9 @@ namespace Loom
 	*   A target not drawn yet is waited for. An item with no label of its own,
 	*   like the Hierarchy's eyes, is aimed at through its row:
 	*   click "Hierarchy" "Cube" right
-	* - The script, and the files screenshot and items write, are found from
-	*   the folder it is given, not wherever the working directory has moved to
+	* - The script, and the files screenshot, items and stages write, are
+	*   found from the folder it is given, not wherever the working directory
+	*   has moved to
 	* - The script ends when it runs out of commands, at quit, or at the first
 	*   command that fails, which says why on stderr
 	*/
@@ -92,6 +99,13 @@ namespace Loom
 
 		// What items lists, from the windows whose names contain window.
 		void WriteItems(std::ostream& out, const std::string& window = "") const;
+
+		// What stages writes, from the profiler's last frame.
+		static void WriteStages(std::ostream& out);
+
+		// Whether a script is in the middle of stages, so the editor records
+		// them whether or not Stats shows them.
+		static bool RecordingStages();
 
 		// Where the first window whose name contains window was drawn last
 		// frame, in the framebuffer's pixels. None when it is closed, behind
@@ -144,6 +158,8 @@ namespace Loom
 		// leaves no key stuck for the person at the keyboard.
 		void ReleaseHeld();
 
+		void RecordStages(bool recording);
+
 		#pragma endregion
 
 		ImGuiContext* m_context = nullptr;
@@ -159,6 +175,8 @@ namespace Loom
 
 		std::vector<ImGuiKey> m_held{ };
 		bool m_mouseHeld = false;
+		bool m_recordingStages = false;
+		bool m_everyFrameBefore = false;
 
 		ImVec2 m_mouse{ };
 		bool m_mouseSet = false;

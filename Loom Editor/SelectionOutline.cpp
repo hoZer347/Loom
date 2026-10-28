@@ -45,6 +45,7 @@ namespace Loom
 		#pragma region Programs
 
 		constexpr const char* mesh_mask_name = "Loom Editor Mesh Mask";
+		constexpr const char* mesh_mask_skinned = " Skinned: ";
 
 		const char* const mesh_mask_vertex = R"(
 layout(location = 0) in vec3 aPos;
@@ -209,8 +210,13 @@ void main()
 		Renderer* renderer = Renderer::Get();
 
 		for (const auto& [shader, mask] : m_meshMasks)
+		{
 			if (renderer && mask.program != m_meshMask)
 				renderer->DeleteProgram(mask.program);
+
+			if (renderer && mask.skinned)
+				renderer->DeleteProgram(mask.skinned);
+		};
 
 		m_meshMasks.clear();
 
@@ -223,19 +229,23 @@ void main()
 		};
 	};
 
-	uint32_t SelectionOutline::MeshMask(const Shader& shader)
+	const SelectionOutline::ShaderMask& SelectionOutline::MeshMask(const Shader& shader)
 	{
 		ShaderMask& mask = m_meshMasks[&shader];
 
 		if (mask.program && mask.shader == shader.id)
-			return mask.program;
+			return mask;
 
 		Renderer& renderer = *Renderer::Get();
 
 		if (mask.program && mask.program != m_meshMask)
 			renderer.DeleteProgram(mask.program);
 
+		if (mask.skinned)
+			renderer.DeleteProgram(mask.skinned);
+
 		mask.shader = shader.id;
+		mask.skinned = 0;
 
 		try
 		{
@@ -247,7 +257,17 @@ void main()
 			mask.program = m_meshMask;
 		};
 
-		return mask.program;
+		if (!shader.skinned_vertex.empty())
+			try
+			{
+				mask.skinned = renderer.CreateProgram(std::string(mesh_mask_name) + mesh_mask_skinned + shader.file_path, shader.skinned_vertex, mesh_mask_fragment);
+			}
+			catch (const std::exception& e)
+			{
+				std::cerr << "Selection outline: " << e.what() << std::endl;
+			};
+
+		return mask;
 	};
 
 	#pragma endregion
@@ -267,7 +287,8 @@ void main()
 				if (!mesh->IsDrawable())
 					continue;
 
-				const uint32_t program = MeshMask(*mesh->material->shader);
+				const ShaderMask& mask = MeshMask(*mesh->material->shader);
+				const uint32_t program = mesh->ProgramFor(mask.program, mask.skinned ? mask.skinned : mask.program);
 
 				mesh->material->Apply(program, &*std::as_const(mesh->variables));
 				camera.Apply(program);

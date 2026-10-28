@@ -8,6 +8,8 @@
 #include "Material.h"
 #include "PixelPass.h"
 #include "GameObject.h"
+#include "Jobs.h"
+#include "Profiler.h"
 #include "Scene.h"
 #include "Skin.h"
 #include "Utilities/Clock.h"
@@ -198,7 +200,7 @@ namespace Loom
 			return;
 		};
 
-		const uint32_t program = material->shader->id;
+		const uint32_t program = ProgramFor(material->shader->id, material->shader->skinned_id);
 
 		if (batch && batch->Add(*this, program, material->shader->instanced_id))
 			return;
@@ -223,7 +225,31 @@ namespace Loom
 
 		renderer->SetUniform(program, "u_model", m_gameObject->WorldMatrix());
 		renderer->SetUniform(program, "u_seed", Seed(*m_gameObject));
+
+		if (m_handed.skinned)
+			renderer->SetUniforms(program, "u_joints", m_joints.data(), m_joints.size());
+
 		renderer->DrawVertices(program, *std::as_const(primitive_id), m_kept);
+	};
+
+	uint32_t Mesh::ProgramFor(uint32_t program, uint32_t skinned)
+	{
+		return GpuSkin() ? skinned : program;
+	};
+
+	Skin* Mesh::GpuSkin()
+	{
+		Skin* skin = m_gameObject->GetComponent<Skin>();
+
+		if (!skin || !IsDrawable())
+			return nullptr;
+
+		const Shader& shader = *material->shader;
+
+		if (!shader.skinned_id || (shader.shadow_id && !shader.shadow_skinned_id) || !skin->FitsGpu(*this))
+			return nullptr;
+
+		return skin;
 	};
 
 	bool Mesh::Keep(Renderer& renderer)
@@ -247,18 +273,30 @@ namespace Loom
 		constexpr size_t NORMAL_COMPONENTS = 3;
 		constexpr size_t COLOR_COMPONENTS = 4;
 
+		// Enough vertices a job that handing them out costs little beside copying them.
+		constexpr size_t VERTEX_GRAIN = 1024;
+
+		Skin* const gpuSkin = GpuSkin();
+
 		if (Skin* skin = m_gameObject->GetComponent<Skin>())
 		{
 			if (m_deformed.size() != std::as_const(m_vertices)->size() || m_deformedFrame != Time::FrameCount())
 			{
-				skin->Deform(*this);
+				if (gpuSkin ? skin->Shape(*this) : skin->Deform(*this))
+					m_deformedVersion++;
+
 				m_deformedFrame = Time::FrameCount();
+
+				if (gpuSkin)
+					m_joints = skin->JointMatrices(*this);
+				else m_joints.clear();
 			};
 		}
 		else
 		{
 			m_deformed.clear();
 			m_deformedNormals.clear();
+			m_joints.clear();
 		};
 
 		// Read through const, so looking does not count as changing them.
@@ -277,7 +315,10 @@ namespace Loom
 			m_uvLayers.Version(),
 			m_draw_type.Version(),
 			deformed,
-			deformed ? m_deformedFrame : 0 };
+			deformed ? m_deformedVersion : 0,
+			gpuSkin != nullptr,
+			gpuSkin ? gpuSkin->m_influences.Version() : 0,
+			gpuSkin ? gpuSkin->m_joints.Version() : 0 };
 
 		if (m_keeper != &renderer)
 		{
@@ -287,6 +328,8 @@ namespace Loom
 
 		if (m_kept == 0 || handed != m_handed)
 		{
+			LOOM_STAGE("Mesh::Keep");
+
 			if (m_kept == 0)
 				m_kept = renderer.CreateVertices();
 
@@ -319,12 +362,20 @@ namespace Loom
 
 			EachLayer(words, [&](uint32_t id, uint32_t perVertex, size_t first, size_t last)
 			{
-				if (perVertex && last - first == count * perVertex)
+				if (id != Skin::UV_LAYER && perVertex && last - first == count * perVertex)
 				{
 					layers.push_back({ perVertex, words.data() + first });
 					layout.layers.push_back({ id, perVertex });
 				};
 			});
+
+			const std::vector<uint32_t> influences = gpuSkin ? gpuSkin->GpuInfluences() : std::vector<uint32_t>();
+
+			if (gpuSkin)
+			{
+				layers.push_back({ (uint32_t)Skin::FLOATS_PER_INFLUENCE, influences.data() });
+				layout.layers.push_back({ Skin::UV_LAYER, (uint32_t)Skin::FLOATS_PER_INFLUENCE });
+			};
 
 			// Only vertices that can join a batch are worth hashing.
 			const bool batchable = *std::as_const(m_draw_type) == Static && !deformed;
@@ -337,33 +388,45 @@ namespace Loom
 			else
 			{
 				constexpr float NO_NORMAL[NORMAL_COMPONENTS] = { };
-				std::vector<float> interleaved(count * FloatsPerVertex(layout));
-				float* out = interleaved.data();
+				const size_t stride = FloatsPerVertex(layout);
 
-				for (size_t i = 0; i < count; i++)
-				{
-					out = std::copy_n(positions.data() + i * POSITION_COMPONENTS, POSITION_COMPONENTS, out);
+				std::vector<float> handedOnce;
+				std::vector<float>& interleaved = deformed && !gpuSkin ? m_interleaved : handedOnce;
+				interleaved.resize(count * stride);
 
-					// Without texture coordinates, aUV reads the position's x and y.
-					if (layout.format != VertexFormat::Position)
-						out = std::copy_n(hasUVs ? textureCoordinates.data() + i * UV_COMPONENTS : positions.data() + i * POSITION_COMPONENTS, UV_COMPONENTS, out);
+				if (!deformed || gpuSkin)
+					m_interleaved = { };
 
-					// With colours and no normals, aNormal reads zeros.
-					if (hasNormals)
-						out = std::copy_n(normals.data() + i * NORMAL_COMPONENTS, NORMAL_COMPONENTS, out);
-					else if (hasColors)
-						out = std::copy_n(NO_NORMAL, NORMAL_COMPONENTS, out);
-
-					if (hasColors)
-						out = std::copy_n(colors.data() + i * COLOR_COMPONENTS, COLOR_COMPONENTS, out);
-
-					// Copied as bytes, so each word's bits arrive as they were.
-					for (const Drawn& layer : layers)
+				Jobs::For(count, VERTEX_GRAIN,
+					[&](size_t, size_t begin, size_t end)
 					{
-						std::memcpy(out, layer.values + i * layer.words, layer.words * sizeof(uint32_t));
-						out += layer.words;
-					};
-				};
+						float* out = interleaved.data() + begin * stride;
+
+						for (size_t i = begin; i < end; i++)
+						{
+							out = std::copy_n(positions.data() + i * POSITION_COMPONENTS, POSITION_COMPONENTS, out);
+
+							// Without texture coordinates, aUV reads the position's x and y.
+							if (layout.format != VertexFormat::Position)
+								out = std::copy_n(hasUVs ? textureCoordinates.data() + i * UV_COMPONENTS : positions.data() + i * POSITION_COMPONENTS, UV_COMPONENTS, out);
+
+							// With colours and no normals, aNormal reads zeros.
+							if (hasNormals)
+								out = std::copy_n(normals.data() + i * NORMAL_COMPONENTS, NORMAL_COMPONENTS, out);
+							else if (hasColors)
+								out = std::copy_n(NO_NORMAL, NORMAL_COMPONENTS, out);
+
+							if (hasColors)
+								out = std::copy_n(colors.data() + i * COLOR_COMPONENTS, COLOR_COMPONENTS, out);
+
+							// Copied as bytes, so each word's bits arrive as they were.
+							for (const Drawn& layer : layers)
+							{
+								std::memcpy(out, layer.values + i * layer.words, layer.words * sizeof(uint32_t));
+								out += layer.words;
+							};
+						};
+					});
 
 				renderer.SetVertices(m_kept, interleaved.data(), count, *std::as_const(m_draw_type), layout);
 				m_geometry = batchable ? Hashed(interleaved, layout) : 0;

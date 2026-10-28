@@ -624,6 +624,12 @@ namespace Loom
 			Write(program, name, glm::value_ptr(value), sizeof(value));
 		};
 
+		// A mat4 array's stride is a mat4's under std140 and std430 alike.
+		void SetUniforms(uint32_t program, const char* name, const glm::mat4* values, size_t count) override
+		{
+			Write(program, name, values, (uint32_t)(count * sizeof(glm::mat4)));
+		};
+
 		void SetUniform(uint32_t handle, const char* name, UniformType type, const void* components) override
 		{
 			const auto found = m_programs.find(handle);

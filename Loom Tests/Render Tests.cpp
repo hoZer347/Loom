@@ -10,6 +10,7 @@
 #include "Mesh.h"
 #include "Scene.h"
 #include "Shaders.h"
+#include "Skin.h"
 
 #include <fstream>
 #include <iterator>
@@ -127,6 +128,49 @@ namespace
 		mesh->SetUV<float, bool>(1, std::vector<std::tuple<float, bool>>(vertices, { 1.0f, true }));
 		mesh->SetUV<glm::vec4, float>(2, std::vector<std::tuple<glm::vec4, float>>(vertices, { glm::vec4(0.5f), 1.0f }));
 		Pump();
+
+		const Image image = fixture.Frame();
+
+		image.Save(name);
+
+		return image;
+	};
+
+	// The right half, bound to a joint the GPU moves left by a whole half.
+	Image SkinnedFrame(RenderFixture& fixture, const std::string& name)
+	{
+		const ClearedTo cleared(CLEAR);
+
+		std::istringstream source(CLIP_SPACE_RED);
+		Loom::Shader shader(name, source);
+
+		REQUIRE(shader.skinned_id != 0);
+
+		Loom::Scene scene(name);
+		Pump();
+
+		scene.Attach<Loom::Camera>();
+		Loom::GameObject* bone = scene.AddChild("Bone");
+		Loom::GameObject* half = scene.AddChild("Right Half");
+		Pump();
+
+		half->Attach<Loom::Material>()->shader = &shader;
+
+		Loom::Mesh* mesh = half->Attach<Loom::Mesh>();
+		Loom::Skin* skin = half->Attach<Loom::Skin>();
+		Pump();
+
+		const glm::mat4 identity(1.0f);
+
+		mesh->m_vertices = RIGHT_HALF;
+		skin->skeleton = &scene.GetRoot();
+		skin->m_joints = "Bone\n";
+		skin->m_inverseBinds = std::vector<float>(glm::value_ptr(identity), glm::value_ptr(identity) + Loom::Skin::MATRIX_FLOATS);
+		skin->m_influences = LoomTests::Bound({ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f });
+		bone->transform.position = glm::vec3(-1.0f, 0.0f, 0.0f);
+		Pump();
+
+		REQUIRE(mesh->ProgramFor(shader.id, shader.skinned_id) == shader.skinned_id);
 
 		const Image image = fixture.Frame();
 
@@ -290,6 +334,30 @@ TEST_SUITE("Render")
 
 		CHECK(image.At(image.width / 4, middle) == CLEARED);
 		CHECK(image.At(image.width * 3 / 4, middle) == WHITE);
+	};
+
+	#pragma endregion
+
+	#pragma region Skinning
+
+	TEST_CASE_FIXTURE(RenderFixture, "a skinned mesh is bent by its joints on the GPU, on OpenGL")
+	{
+		const Image image = SkinnedFrame(*this, "Render - GPU skinning on OpenGL");
+		const int middle = image.height / 2;
+
+		CHECK(image.At(image.width / 4, middle) == RED);
+		CHECK(image.At(image.width * 3 / 4, middle) == CLEARED);
+	};
+
+	TEST_CASE_FIXTURE(VulkanRenderFixture, "a skinned mesh is bent by its joints on the GPU, on Vulkan")
+	{
+		REQUIRE(Loom::Engine::backend == Loom::Backend::Vulkan);
+
+		const Image image = SkinnedFrame(*this, "Render - GPU skinning on Vulkan");
+		const int middle = image.height / 2;
+
+		CHECK(image.At(image.width / 4, middle) == RED);
+		CHECK(image.At(image.width * 3 / 4, middle) == CLEARED);
 	};
 
 	#pragma endregion

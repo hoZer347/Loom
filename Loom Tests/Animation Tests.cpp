@@ -3,18 +3,24 @@
 #include "Test Support.h"
 
 #include "Animator.h"
+#include "Jobs.h"
+#include "Light.h"
 #include "Material.h"
 #include "Mesh.h"
 #include "Scene.h"
 #include "Shaders.h"
 #include "Skin.h"
+#include "Utilities/Clock.h"
 
 #include "glm/gtc/epsilon.hpp"
+#include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
+#include <bit>
 #include <limits>
 #include <sstream>
 
+using LoomTests::Bound;
 using LoomTests::Pump;
 using LoomTests::RecordingRenderer;
 using LoomTests::EPSILON;
@@ -35,16 +41,10 @@ namespace
 		return std::vector<float>(glm::value_ptr(matrix), glm::value_ptr(matrix) + Loom::Skin::MATRIX_FLOATS);
 	};
 
-	// One joint per vertex, all of its weight.
-	std::vector<float> Bound(std::initializer_list<float> joints)
-	{
-		std::vector<float> influences;
-
-		for (const float joint : joints)
-			influences.insert(influences.end(), { joint, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f });
-
-		return influences;
-	};
+	// A vertex stage the engine makes a skinned twin of.
+	const std::string SKINNABLE =
+		"// ===VERTEX===\nin vec3 aPos;\nuniform mat4 u_model;\nvoid main() { gl_Position = u_model * vec4(aPos, 1.0); }\n"
+		"// ===FRAGMENT===\nout vec4 c;\nvoid main() { c = vec4(1.0); }\n";
 
 	// A scene with a joint called Bone at the origin, and a mesh beside it with a
 	// Skin whose skeleton is the scene's root.
@@ -67,6 +67,12 @@ namespace
 			skin->skeleton = &scene.GetRoot();
 			skin->m_joints = "Bone\n";
 			skin->m_inverseBinds = Floats(IDENTITY);
+		};
+
+		void Shade(Loom::Shader& shader)
+		{
+			body->Attach<Loom::Material>()->shader = &shader;
+			Pump();
 		};
 
 		glm::vec3 Bent(size_t vertex)
@@ -277,6 +283,335 @@ TEST_SUITE("Skin")
 
 		CHECK(*rig.mesh->m_vertices == std::vector<float>{ 0.0f, 1.0f, 0.0f });
 		CHECK(glm::all(glm::epsilonEqual(rig.Bent(0), glm::vec3(2.0f, 1.0f, 0.0f), EPSILON)));
+	};
+
+	#pragma endregion
+
+	#pragma region Bending Once
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a Skin bends again only once its joints, weights or vertices change")
+	{
+		Rig rig;
+		rig.mesh->m_vertices = { 0.0f, 1.0f, 0.0f };
+		rig.skin->m_influences = Bound({ 0.0f });
+		rig.skin->m_shapes = "Smile\n";
+		rig.skin->m_shapeOffsets = { 1.0f, 0.0f, 1.0f, 0.0f, 0.0f };
+		rig.skin->m_shapeWeights = { 0.0f };
+
+		CHECK(rig.skin->Deform(*rig.mesh));
+		CHECK_FALSE(rig.skin->Deform(*rig.mesh));
+
+		rig.bone->transform.position = glm::vec3(2.0f, 0.0f, 0.0f);
+		CHECK(rig.skin->Deform(*rig.mesh));
+		CHECK_FALSE(rig.skin->Deform(*rig.mesh));
+
+		rig.skin->SetShapeWeight("Smile", 0.0f);
+		CHECK_FALSE(rig.skin->Deform(*rig.mesh));
+
+		rig.skin->SetShapeWeight("Smile", 1.0f);
+		CHECK(rig.skin->Deform(*rig.mesh));
+
+		rig.mesh->m_vertices = { 0.0f, 2.0f, 0.0f };
+		CHECK(rig.skin->Deform(*rig.mesh));
+		CHECK(glm::all(glm::epsilonEqual(glm::make_vec3(rig.mesh->m_deformed.data()), glm::vec3(3.0f, 2.0f, 0.0f), EPSILON)));
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "bending does not count as changing the mesh's own vertices")
+	{
+		Rig rig;
+		rig.mesh->m_vertices = { 0.0f, 1.0f, 0.0f };
+		rig.mesh->m_normals = { 1.0f, 0.0f, 0.0f };
+		rig.skin->m_influences = Bound({ 0.0f });
+		rig.bone->transform.position = glm::vec3(2.0f, 0.0f, 0.0f);
+
+		const unsigned long long vertices = rig.mesh->m_vertices.Version();
+		const unsigned long long normals = rig.mesh->m_normals.Version();
+		const unsigned long long influences = rig.skin->m_influences.Version();
+
+		rig.skin->Deform(*rig.mesh);
+
+		CHECK(rig.mesh->m_vertices.Version() == vertices);
+		CHECK(rig.mesh->m_normals.Version() == normals);
+		CHECK(rig.skin->m_influences.Version() == influences);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a skinned mesh held still is handed to the renderer once")
+	{
+		RecordingRenderer renderer;
+
+		Rig rig;
+		rig.mesh->m_vertices = { 0.0f, 1.0f, 0.0f };
+		rig.skin->m_influences = Bound({ 0.0f });
+
+		rig.mesh->Draw(1);
+		const auto handed = renderer.handed;
+
+		Loom::Utilities::Tick();
+		rig.mesh->Draw(1);
+		CHECK(renderer.handed == handed);
+
+		rig.bone->transform.position = glm::vec3(2.0f, 0.0f, 0.0f);
+		Loom::Utilities::Tick();
+		rig.mesh->Draw(1);
+
+		CHECK(renderer.handed == handed + 1);
+		CHECK(renderer.lastVertices == std::vector<float>{ 2.0f, 1.0f, 0.0f });
+	};
+
+	#pragma endregion
+
+	#pragma region GPU Skinning
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a skinned mesh whose shader has a skinned twin is handed its bind pose once and bent by its joints on the GPU")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream source(SKINNABLE);
+		Loom::Shader shader("gpu skinned", source);
+
+		REQUIRE(shader.skinned_id != 0);
+
+		Rig rig;
+		rig.Shade(shader);
+		rig.mesh->m_vertices = { 0.0f, 1.0f, 0.0f };
+		rig.skin->m_influences = Bound({ 0.0f });
+
+		rig.scene.Render();
+
+		CHECK(renderer.drawn.back() == shader.skinned_id);
+		CHECK(renderer.matrixArrays.at("u_joints") == std::vector<glm::mat4>{ IDENTITY });
+		CHECK(renderer.matrixArrayPrograms.at("u_joints") == shader.skinned_id);
+
+		const auto handed = renderer.handed;
+		const glm::vec3 moved(2.0f, 0.0f, 0.0f);
+
+		rig.bone->transform.position = moved;
+		Loom::Utilities::Tick();
+		rig.scene.Render();
+
+		CHECK(renderer.handed == handed);
+		CHECK(renderer.matrixArrays.at("u_joints") == std::vector<glm::mat4>{ glm::translate(IDENTITY, moved) });
+
+		const Loom::VertexLayout& layout = renderer.kept.begin()->second.layout;
+		REQUIRE(layout.layers.size() == 1);
+		CHECK(layout.layers[0] == Loom::UVLayout{ Loom::Skin::UV_LAYER, (uint32_t)Loom::Skin::FLOATS_PER_INFLUENCE });
+
+		std::vector<uint32_t> words;
+		for (size_t i = POSITION_FLOATS; i < renderer.lastVertices.size(); i++)
+			words.push_back(std::bit_cast<uint32_t>(renderer.lastVertices[i]));
+
+		CHECK(renderer.lastVertices.size() == POSITION_FLOATS + Loom::Skin::FLOATS_PER_INFLUENCE);
+		CHECK(words == std::vector<uint32_t>{ 0, 0, 0, 0, std::bit_cast<uint32_t>(1.0f), 0, 0, 0 });
+		CHECK(std::vector<float>(renderer.lastVertices.begin(), renderer.lastVertices.begin() + POSITION_FLOATS) == std::vector<float>{ 0.0f, 1.0f, 0.0f });
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the GPU is handed a joint's index and weight, and nothing for a joint past the skeleton or no weight")
+	{
+		Rig rig;
+		rig.mesh->m_vertices = { 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f };
+		rig.skin->m_influences = { 0.0f, 1.0f, 0.0f, 0.0f, 0.25f, 0.75f, 0.0f, 0.0f,  1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f };
+
+		const uint32_t quarter = std::bit_cast<uint32_t>(0.25f);
+		const uint32_t rest = std::bit_cast<uint32_t>(0.75f);
+		const uint32_t whole = std::bit_cast<uint32_t>(1.0f);
+
+		CHECK(rig.skin->GpuInfluences() == std::vector<uint32_t>{ 0, 0, 0, 0, quarter, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0 });
+
+		rig.scene.GetRoot().AddChild("Still");
+		Pump();
+		rig.skin->m_joints = "Bone\nStill\n";
+
+		CHECK(rig.skin->GpuInfluences() == std::vector<uint32_t>{ 0, 1, 0, 0, quarter, rest, 0, 0,  1, 0, 0, 0, whole, 0, 0, 0 });
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shape key on a mesh bent on the GPU hands its vertices over again, shaped")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream source(SKINNABLE);
+		Loom::Shader shader("gpu shaped", source);
+
+		Rig rig;
+		rig.Shade(shader);
+		rig.mesh->m_vertices = { 0.0f, 1.0f, 0.0f };
+		rig.skin->m_influences = Bound({ 0.0f });
+		rig.skin->m_shapes = "Smile\n";
+		rig.skin->m_shapeOffsets = { 1.0f, 0.0f, 1.0f, 0.0f, 0.0f };
+		rig.skin->m_shapeWeights = { 0.0f };
+
+		rig.scene.Render();
+		const auto handed = renderer.handed;
+
+		rig.skin->SetShapeWeight("Smile", 1.0f);
+		Loom::Utilities::Tick();
+		rig.scene.Render();
+
+		CHECK(renderer.drawn.back() == shader.skinned_id);
+		CHECK(renderer.handed == handed + 1);
+		CHECK(std::vector<float>(renderer.lastVertices.begin(), renderer.lastVertices.begin() + POSITION_FLOATS) == std::vector<float>{ 1.0f, 1.0f, 0.0f });
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh bent on the GPU hands its vertices over again when its joints change, which pick the influences it keeps")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream source(SKINNABLE);
+		Loom::Shader shader("gpu rejointed", source);
+
+		Rig rig;
+		rig.Shade(shader);
+		rig.scene.GetRoot().AddChild("Still");
+		Pump();
+
+		rig.mesh->m_vertices = { 0.0f, 1.0f, 0.0f };
+		rig.skin->m_influences = { 0.0f, 1.0f, 0.0f, 0.0f, 0.5f, 0.5f, 0.0f, 0.0f };
+
+		rig.scene.Render();
+		const auto handed = renderer.handed;
+
+		std::vector<float> inverseBinds = Floats(IDENTITY);
+		const std::vector<float> still = Floats(IDENTITY);
+		inverseBinds.insert(inverseBinds.end(), still.begin(), still.end());
+
+		rig.skin->m_joints = "Bone\nStill\n";
+		rig.skin->m_inverseBinds = inverseBinds;
+		Loom::Utilities::Tick();
+		rig.scene.Render();
+
+		const uint32_t half = std::bit_cast<uint32_t>(0.5f);
+		std::vector<uint32_t> words;
+		for (size_t i = POSITION_FLOATS; i < renderer.lastVertices.size(); i++)
+			words.push_back(std::bit_cast<uint32_t>(renderer.lastVertices[i]));
+
+		CHECK(renderer.drawn.back() == shader.skinned_id);
+		CHECK(renderer.handed == handed + 1);
+		CHECK(words == std::vector<uint32_t>{ 0, 1, 0, 0, half, half, 0, 0 });
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh bent on the GPU casts its shadow with the skinned shadow program")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream source("// ===SETTINGS===\nshadows = on\n" + SKINNABLE);
+		Loom::Shader shader("gpu skinned shadow", source);
+
+		REQUIRE(shader.shadow_skinned_id != 0);
+
+		Rig rig;
+		Loom::Light* light = rig.scene.Attach<Loom::Light>();
+		rig.Shade(shader);
+		rig.mesh->m_vertices = { 0.0f, 1.0f, 0.0f };
+		rig.skin->m_influences = Bound({ 0.0f });
+		rig.bone->transform.position = glm::vec3(2.0f, 0.0f, 0.0f);
+
+		light->RenderShadowMap({ &rig.scene.GetRoot() });
+
+		CHECK(renderer.drawn == std::vector<uint32_t>{ shader.shadow_skinned_id });
+		CHECK(renderer.matrixArrayPrograms.at("u_joints") == shader.shadow_skinned_id);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh with more joints than the GPU takes is bent on the CPU")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream source(SKINNABLE);
+		Loom::Shader shader("too many joints", source);
+
+		Rig rig;
+		rig.Shade(shader);
+		rig.mesh->m_vertices = { 0.0f, 1.0f, 0.0f };
+		rig.skin->m_influences = Bound({ 0.0f });
+
+		std::string joints;
+		std::vector<float> inverseBinds;
+
+		for (size_t i = 0; i <= Loom::Skin::MAX_GPU_JOINTS; i++)
+		{
+			joints += "Bone\n";
+			inverseBinds.insert(inverseBinds.end(), glm::value_ptr(IDENTITY), glm::value_ptr(IDENTITY) + Loom::Skin::MATRIX_FLOATS);
+		};
+
+		rig.skin->m_joints = joints;
+		rig.skin->m_inverseBinds = inverseBinds;
+		rig.bone->transform.position = glm::vec3(2.0f, 0.0f, 0.0f);
+
+		rig.scene.Render();
+
+		CHECK(renderer.drawn.back() == shader.id);
+		CHECK(renderer.matrixArrays.count("u_joints") == 0);
+		CHECK(renderer.lastVertices == std::vector<float>{ 2.0f, 1.0f, 0.0f });
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh whose shader has no skinned twin is bent on the CPU")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream source("// ===VERTEX===\nUV_1<vec4 a, vec4 b, vec4 c, vec4 d>;\nUV_2<vec4 a, float b>;\nvoid main() { }\n// ===FRAGMENT===\nvoid main() { }\n");
+		Loom::Shader shader("no skinned twin", source);
+
+		REQUIRE(shader.id != 0);
+		REQUIRE(shader.skinned_id == 0);
+
+		Rig rig;
+		rig.Shade(shader);
+		rig.mesh->m_vertices = { 0.0f, 1.0f, 0.0f };
+		rig.skin->m_influences = Bound({ 0.0f });
+		rig.bone->transform.position = glm::vec3(2.0f, 0.0f, 0.0f);
+
+		rig.scene.Render();
+
+		CHECK(renderer.drawn.back() == shader.id);
+		CHECK(renderer.lastVertices == std::vector<float>{ 2.0f, 1.0f, 0.0f });
+	};
+
+	#pragma endregion
+
+	#pragma region Threads
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "vertices bent across threads land where one thread bends them")
+	{
+		// Enough vertices for the work to be shared out several ways.
+		constexpr size_t VERTICES = 10000;
+
+		Rig rig;
+		rig.scene.GetRoot().AddChild("Other");
+		Pump();
+
+		rig.skin->m_joints = "Bone\nOther\n";
+		rig.skin->m_inverseBinds = Floats(IDENTITY);
+		rig.skin->m_inverseBinds->insert(rig.skin->m_inverseBinds->end(), glm::value_ptr(IDENTITY), glm::value_ptr(IDENTITY) + Loom::Skin::MATRIX_FLOATS);
+
+		std::vector<float> vertices;
+		std::vector<float> normals;
+		std::vector<float> influences;
+
+		for (size_t i = 0; i < VERTICES; i++)
+		{
+			const float along = (float)i;
+
+			vertices.insert(vertices.end(), { along, 1.0f, -along });
+			normals.insert(normals.end(), { 0.0f, 1.0f, 0.0f });
+			influences.insert(influences.end(), { 0.0f, 1.0f, 0.0f, 0.0f, 0.25f, 0.75f, 0.0f, 0.0f });
+		};
+
+		rig.mesh->m_vertices = vertices;
+		rig.mesh->m_normals = normals;
+		rig.skin->m_influences = influences;
+		rig.bone->transform.rotation = glm::vec3(0.0f, 0.0f, EIGHTH_TURN);
+		rig.scene.GetRoot().GetChildren().back()->transform.position = glm::vec3(0.0f, 3.0f, 0.0f);
+
+		Loom::Jobs::SetMostThreads(1);
+		rig.skin->Deform(*rig.mesh);
+		const std::vector<float> alone = rig.mesh->m_deformed;
+		const std::vector<float> aloneNormals = rig.mesh->m_deformedNormals;
+
+		rig.mesh->m_deformed.clear();
+
+		Loom::Jobs::SetMostThreads(0);
+		rig.skin->Deform(*rig.mesh);
+
+		CHECK(rig.mesh->m_deformed == alone);
+		CHECK(rig.mesh->m_deformedNormals == aloneNormals);
 	};
 
 	#pragma endregion

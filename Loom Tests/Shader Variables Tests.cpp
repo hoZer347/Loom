@@ -65,6 +65,7 @@ namespace
 
 	const std::string STAGES =
 		"// ===VERTEX===\n"
+		"in vec3 aPos;\n"
 		"uniform mat4 u_model;\n"
 		"void main() { }\n"
 		"// ===FRAGMENT===\n"
@@ -355,10 +356,11 @@ TEST_SUITE("Shader variables")
 		file.Write("// ===COMMON===\nuniform float u_speed;\nuniform vec3 u_tint; // instance\n" + STAGES);
 
 		const uint32_t firstInstanced = shader.instanced_id;
+		const uint32_t firstSkinned = shader.skinned_id;
 
 		CHECK(shader.Reload());
 		CHECK(shader.id != first);
-		CHECK(renderer.deleted == std::vector<uint32_t>{ first, firstInstanced });
+		CHECK(renderer.deleted == std::vector<uint32_t>{ first, firstInstanced, firstSkinned });
 		REQUIRE(shader.variables.size() == 2);
 		CHECK(shader.variables[1].scope == Loom::UniformScope::Instance);
 
@@ -495,6 +497,8 @@ TEST_SUITE("Shader variables")
 		uint32_t shadow = 0;
 		uint32_t instanced = 0;
 		uint32_t shadowInstanced = 0;
+		uint32_t skinned = 0;
+		uint32_t shadowSkinned = 0;
 
 		{
 			std::istringstream source("// ===SETTINGS===\nshadows = on\n" + STAGES);
@@ -504,14 +508,17 @@ TEST_SUITE("Shader variables")
 			shadow = shader.shadow_id;
 			instanced = shader.instanced_id;
 			shadowInstanced = shader.shadow_instanced_id;
+			skinned = shader.skinned_id;
+			shadowSkinned = shader.shadow_skinned_id;
 
 			CHECK(shader.settings.shadows);
 			CHECK(shadow != 0);
 			CHECK(shadow != main);
 			CHECK(shadowInstanced != 0);
+			CHECK(shadowSkinned != 0);
 		};
 
-		CHECK(renderer.deleted == std::vector<uint32_t>{ main, shadow, instanced, shadowInstanced });
+		CHECK(renderer.deleted == std::vector<uint32_t>{ main, shadow, instanced, shadowInstanced, skinned, shadowSkinned });
 
 		std::istringstream unshadowed(STAGES);
 		CHECK(Loom::Shader("no shadow program", unshadowed).shadow_id == 0);
@@ -566,6 +573,56 @@ TEST_SUITE("Shader variables")
 			"// ===VERTEX===\nuniform mat4 u_model;\nuniform vec2 u_seed;\nvoid main() { }\n"
 			"// ===FRAGMENT===\nvoid main() { }\n");
 		CHECK(Loom::Shader("vec2 seed", vec2Seed).instanced_id == 0);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader has a skinned program that bends its vertex stage's position and normal by the joints")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream source(
+			"// ===VERTEX===\nlayout(location = 0) in vec3 aPos;\nlayout(location = 2) in highp vec3 aNormal;\nout vec3 n;\n"
+			"void main() { n = aNormal; gl_Position = vec4(aPos, 1.0); }\n"
+			"// ===FRAGMENT===\nvoid main() { }\n");
+		Loom::Shader shader("skinned", source);
+
+		REQUIRE(shader.skinned_id != 0);
+		CHECK(shader.skinned_id != shader.id);
+
+		const std::string& vertex = renderer.vertices.at("skinned skinned");
+		CHECK(vertex.find("in vec3 aPos;") == std::string::npos);
+		CHECK(vertex.find("in highp vec3 aNormal;") == std::string::npos);
+		CHECK(vertex.find("layout(location = 0) in vec3 loom_BindPos;") != std::string::npos);
+		CHECK(vertex.find("layout(location = 2) in vec3 loom_BindNormal;") != std::string::npos);
+		CHECK(vertex.find("uniform mat4 u_joints[64];") != std::string::npos);
+		CHECK(vertex.find("#define aPos loom_SkinnedPos") != std::string::npos);
+		CHECK(vertex.find("loom_skin_main()") != std::string::npos);
+
+		CHECK(renderer.fragments.at("skinned skinned") == renderer.fragments.at("skinned"));
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a vertex stage that reads no aPos has no skinned program")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream positionless("// ===VERTEX===\nvoid main() { gl_Position = vec4(0.0); }\n// ===FRAGMENT===\nvoid main() { }\n");
+		Loom::Shader shader("positionless", positionless);
+
+		CHECK(shader.skinned_id == 0);
+		CHECK(shader.skinned_vertex.empty());
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader whose UV layers reach the Skin's locations has no skinned program, and none may read the Skin's layer")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream reaches("// ===VERTEX===\nUV_1<vec4 a, vec4 b, vec4 c, vec4 d>;\nUV_2<vec4 a, float b>;\nvoid main() { }\n// ===FRAGMENT===\nvoid main() { }\n");
+		CHECK(Loom::Shader("reaches the skin", reaches).skinned_id == 0);
+
+		std::istringstream short_of("// ===VERTEX===\nin vec3 aPos;\nUV_1<vec4 a, vec4 b, vec4 c, vec4 d>;\nUV_2<vec4>;\nvoid main() { }\n// ===FRAGMENT===\nvoid main() { }\n");
+		CHECK(Loom::Shader("short of the skin", short_of).skinned_id != 0);
+
+		std::istringstream skins("// ===VERTEX===\nUV_4294967295<float>;\nvoid main() { }\n// ===FRAGMENT===\nvoid main() { }\n");
+		CHECK_THROWS_WITH_AS(Loom::Shader("reads the skin", skins), doctest::Contains("the Skin's"), std::runtime_error);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a second shader of the same name takes the compiled one's settings and shadow program")

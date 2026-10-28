@@ -10,7 +10,11 @@
 #include "Scene.h"
 #include "SelectionOutline.h"
 #include "Shaders.h"
+#include "Skin.h"
 #include "Sprite.h"
+
+#include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/type_ptr.hpp"
 
 #include <sstream>
 #include <string>
@@ -25,6 +29,7 @@ using LoomTests::RecordingRenderer;
 namespace
 {
 	constexpr const char* MESH_MASK = "Loom Editor Mesh Mask: ";
+	constexpr const char* MESH_MASK_SKINNED = "Loom Editor Mesh Mask Skinned: ";
 	constexpr const char* SPRITE_MASK = "Loom Editor Sprite Mask";
 	constexpr const char* EDGE = "Loom Editor Selection Outline";
 
@@ -120,6 +125,56 @@ TEST_SUITE("SelectionOutline")
 		CHECK(renderer.drawn == std::vector<uint32_t>{
 			renderer.programs.at(mask), renderer.programs.at(EDGE),
 			renderer.programs.at(mask), renderer.programs.at(EDGE) });
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh the GPU bends is masked by its shader's skinned vertex stage and its joints, so it is ringed where it stands")
+	{
+		RecordingRenderer renderer;
+		renderer.windowSize = VIEW;
+
+		std::istringstream source(
+			"// ===VERTEX===\n"
+			"layout(location = 0) in vec3 aPos;\n"
+			"void main() { gl_Position = vec4(aPos, 1.0); }\n"
+			"// ===FRAGMENT===\n"
+			"void main() { }\n");
+		Loom::Shader shader("selection outline skinned", source);
+
+		REQUIRE(shader.skinned_id != 0);
+
+		Loom::Scene scene("selection outline skinned");
+		Pump();
+
+		Loom::Camera* camera = scene.Attach<Loom::Camera>();
+		Loom::GameObject* bone = scene.AddChild("Bone");
+		Loom::GameObject* selected = scene.AddChild("Skinned");
+		Pump();
+
+		selected->Attach<Loom::Material>()->shader = &shader;
+		Loom::Mesh* mesh = selected->Attach<Loom::Mesh>();
+		Loom::Skin* skin = selected->Attach<Loom::Skin>();
+		Pump();
+
+		const glm::mat4 identity(1.0f);
+		const glm::vec3 moved(-1.0f, 0.0f, 0.0f);
+
+		mesh->m_vertices = TRIANGLE;
+		skin->skeleton = &scene.GetRoot();
+		skin->m_joints = "Bone\n";
+		skin->m_inverseBinds = std::vector<float>(glm::value_ptr(identity), glm::value_ptr(identity) + Loom::Skin::MATRIX_FLOATS);
+		skin->m_influences = LoomTests::Bound({ 0.0f, 0.0f, 0.0f });
+		bone->transform.position = moved;
+		Pump();
+
+		Loom::SelectionOutline outline;
+		outline.Draw(*selected, *camera);
+
+		const std::string mask = MESH_MASK_SKINNED + shader.file_path;
+
+		CHECK(renderer.vertices.at(mask) == shader.skinned_vertex);
+		CHECK(renderer.drawn.front() == renderer.programs.at(mask));
+		CHECK(renderer.matrixArrayPrograms.at("u_joints") == renderer.programs.at(mask));
+		CHECK(renderer.matrixArrays.at("u_joints") == std::vector<glm::mat4>{ glm::translate(identity, moved) });
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh with no material leaves nothing to ring")

@@ -115,6 +115,13 @@ namespace Loom
 		uint32_t instanced_id = 0;
 		uint32_t shadow_instanced_id = 0;
 
+		// The program and the shadow program drawing a mesh a Skin bends, its
+		// vertices bent on the GPU by the joints, or 0 for a vertex stage with
+		// no main, that does not read aPos as a vec3, or whose UV layers leave
+		// no room for the Skin's. Declared before id, which is what fills them in.
+		uint32_t skinned_id = 0;
+		uint32_t shadow_skinned_id = 0;
+
 		// The program PixelPass runs over a view drawn with this shader, or 0
 		// without a PIXEL PASS section. Declared before id, which is what
 		// fills it in.
@@ -124,6 +131,10 @@ namespace Loom
 		// shape with another fragment stage. Declared before id, which is what
 		// fills it in.
 		std::string vertex;
+
+		// The vertex stage skinned_id was linked from, or empty without one.
+		// Declared before id, which is what fills it in.
+		std::string skinned_vertex;
 
 		#pragma endregion
 
@@ -142,9 +153,12 @@ namespace Loom
 			uint32_t shadow = 0;
 			uint32_t instanced = 0;
 			uint32_t shadowInstanced = 0;
+			uint32_t skinned = 0;
+			uint32_t shadowSkinned = 0;
 			uint32_t pixelPass = 0;
 			ShaderSettings settings;
 			std::string vertex;
+			std::string skinnedVertex;
 		};
 
 		uint32_t CompileSource(const std::string& file_path);

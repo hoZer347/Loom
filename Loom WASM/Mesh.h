@@ -6,6 +6,8 @@
 #include "ShaderVariables.h"
 #include "UVLayer.h"
 
+#include "glm/glm.hpp"
+
 #include <cstdint>
 #include <functional>
 #include <tuple>
@@ -17,6 +19,7 @@ namespace Loom
 	struct Material;
 	struct MeshBatch;
 	struct Renderer;
+	struct Skin;
 
 	struct LOOM_API Mesh : Component<Mesh, "Rendering">
 	{
@@ -59,12 +62,18 @@ namespace Loom
 		// world matrix (as u_model) and its seed (as u_seed), which is how a
 		// pass that is not the material's (the shadow pass) draws the same
 		// geometry. A shader that declares no u_model draws the vertices
-		// untransformed. A Skin on the GameObject bends them first, and
+		// untransformed. A Skin on the GameObject bends them, and
 		// m_textureCoordinates go with them as aUV, m_normals as aNormal,
 		// m_colors as aColor and the UV layers as UV_<id>. The renderer keeps
 		// them between draws, and they are handed over again only once one of
-		// those fields has changed, or the Skin has bent them again.
+		// those fields has changed, or the Skin has moved them again on the
+		// CPU. A Skin bending them on the GPU hands over only its joints, as
+		// u_joints, to a program from ProgramFor.
 		void Draw(uint32_t program);
+
+		// Of a shader's program and its skinned twin, the one to draw this
+		// mesh with: the twin while a Skin bends it on the GPU.
+		uint32_t ProgramFor(uint32_t program, uint32_t skinned);
 
 		// Gives the program the mesh's material and the scene's view, as its
 		// own pass does before drawing it.
@@ -187,6 +196,11 @@ namespace Loom
 		// when there is nothing it can draw.
 		bool Keep(Renderer& renderer);
 
+		// The Skin bending this mesh on the GPU, or null when none does: the
+		// mesh has none, it does not fit the GPU, or the material's shader has
+		// no skinned twin for its program or its shadow program.
+		Skin* GpuSkin();
+
 		#pragma endregion
 
 		#pragma region Kept Vertices
@@ -195,8 +209,17 @@ namespace Loom
 		// a frame draw what it bent.
 		unsigned long long m_deformedFrame = 0;
 
+		// What the GPU bends the vertices by this frame, while a Skin bends
+		// them there.
+		std::vector<glm::mat4> m_joints;
+
+		// Goes up each time the Skin bends m_deformed differently, so a pose
+		// held still is not handed to the renderer again.
+		unsigned long long m_deformedVersion = 0;
+
 		// What the renderer was last handed, by the versions of the fields it
-		// was made from, and whether the Skin bent them and for which frame.
+		// was made from, whether the Skin bent them and into which pose, and
+		// while the GPU bends them, the influences and joints they were packed by.
 		struct Handed
 		{
 			unsigned long long vertices = 0;
@@ -206,7 +229,10 @@ namespace Loom
 			unsigned long long uvLayers = 0;
 			unsigned long long drawType = 0;
 			bool deformed = false;
-			unsigned long long deformedFrame = 0;
+			unsigned long long deformedVersion = 0;
+			bool skinned = false;
+			unsigned long long influences = 0;
+			unsigned long long joints = 0;
 
 			bool operator==(const Handed&) const = default;
 		};
@@ -216,6 +242,10 @@ namespace Loom
 		uint32_t m_kept = 0;
 		Renderer* m_keeper = nullptr;
 		Handed m_handed;
+
+		// The vertices last handed over, laid out as the renderer reads them,
+		// kept while a Skin bends them so each pose fills it again in place.
+		std::vector<float> m_interleaved;
 
 		// What the vertices last handed over hash to, so meshes handing over
 		// the same can be drawn as instances of one, or 0 when they never can

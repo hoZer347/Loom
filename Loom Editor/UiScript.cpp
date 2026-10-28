@@ -3,8 +3,10 @@
 #include "Engine.h"
 #include "Input.h"
 #include "OpenGL.h"
+#include "Profiler.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -143,6 +145,9 @@ namespace Loom
 		};
 
 		#pragma endregion
+
+		// The scripts in the middle of stages.
+		std::atomic<int> s_recordingStages{ 0 };
 	};
 
 	UiScript::UiScript(const std::filesystem::path& folder) :
@@ -155,6 +160,8 @@ namespace Loom
 
 	UiScript::~UiScript()
 	{
+		RecordStages(false);
+
 		if (m_context->TestEngine != this)
 			return;
 
@@ -199,6 +206,7 @@ namespace Loom
 	void UiScript::Run(const std::string& text)
 	{
 		ReleaseHeld();
+		RecordStages(false);
 
 		m_next = m_lines.size();
 		m_actions.clear();
@@ -301,6 +309,24 @@ namespace Loom
 					<< item.min.y - origin.y << '\t'
 					<< item.max.x - item.min.x << '\t'
 					<< item.max.y - item.min.y << '\n';
+
+		out.flush();
+	};
+
+	void UiScript::WriteStages(std::ostream& out)
+	{
+#ifndef LOOM_FINAL
+		out << "Frame\t\t0\t" << Profiler::FrameLength() << '\t' << Profiler::FrameLength() << '\n';
+
+		for (const Profiler::Thread& thread : Profiler::Threads())
+			for (const Profiler::Row& row : thread.rows)
+				out
+					<< thread.name << '\t'
+					<< row.name << '\t'
+					<< row.depth << '\t'
+					<< row.average << '\t'
+					<< row.peak << '\n';
+#endif
 
 		out.flush();
 	};
@@ -604,6 +630,43 @@ namespace Loom
 					return Result::Done;
 				});
 		}
+		else if (verb == "stages")
+		{
+			float frames = 0.0f;
+
+			if (tokens.size() != 3 || !Number(tokens[1], &frames) || frames < 1.0f || frames >= (float)std::numeric_limits<int>::max())
+			{
+				Fail("stages takes a number of frames and a file");
+				return false;
+			};
+
+			const std::string path = (m_folder / tokens[2]).string();
+
+			m_actions.push_back(
+				[this, frames]()
+				{
+					RecordStages(true);
+					m_wait = (int)frames - 1;
+					return Result::Done;
+				});
+
+			m_actions.push_back(
+				[this, path]()
+				{
+					RecordStages(false);
+
+					std::ofstream file(path);
+
+					if (!file)
+					{
+						Fail("could not write " + path);
+						return Result::Done;
+					};
+
+					WriteStages(file);
+					return Result::Done;
+				});
+		}
 		else if (verb == "resize")
 		{
 			float width = 0.0f;
@@ -745,6 +808,27 @@ namespace Loom
 		};
 	};
 
+	void UiScript::RecordStages(bool recording)
+	{
+		if (m_recordingStages == recording)
+			return;
+
+		m_recordingStages = recording;
+		s_recordingStages += recording ? 1 : -1;
+
+#ifndef LOOM_FINAL
+		if (recording)
+			m_everyFrameBefore = Profiler::EveryFrame();
+
+		Profiler::SetEveryFrame(recording || m_everyFrameBefore);
+#endif
+	};
+
+	bool UiScript::RecordingStages()
+	{
+		return s_recordingStages > 0;
+	};
+
 	void UiScript::Fail(const std::string& why)
 	{
 		std::cerr
@@ -752,6 +836,7 @@ namespace Loom
 			<< why << std::endl;
 
 		ReleaseHeld();
+		RecordStages(false);
 
 		m_actions.clear();
 		m_finished = true;

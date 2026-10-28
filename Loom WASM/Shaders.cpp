@@ -3,6 +3,7 @@
 #include "GlslCompiler.h"
 #include "Light.h"
 #include "Renderer.h"
+#include "Skin.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -87,6 +88,7 @@ bool LoomDitheredOut(float alpha)
 
 		constexpr const char* SHADOW_PROGRAM_SUFFIX = " shadows";
 		constexpr const char* INSTANCED_PROGRAM_SUFFIX = " instanced";
+		constexpr const char* SKINNED_PROGRAM_SUFFIX = " skinned";
 		constexpr const char* PIXEL_PASS_PROGRAM_SUFFIX = " pixel pass";
 
 		#pragma endregion
@@ -211,17 +213,17 @@ bool LoomDitheredOut(float alpha)
 
 		#pragma endregion
 
-		#pragma region Instancing
+		#pragma region Variants
 
-		// The stages of a program drawn as instances.
-		struct InstancedStages
+		// The stages of a program drawn another way: as instances, or bent by a Skin.
+		struct VariantStages
 		{
 			std::string vertex;
 			std::string fragment;
 		};
 
 		// Stages reading per-draw values from instances, or none when the vertex stage lacks a plain model matrix or the fragment stage reads it.
-		std::optional<InstancedStages> Instanced(const std::string& vertex, const std::string& fragment)
+		std::optional<VariantStages> Instanced(const std::string& vertex, const std::string& fragment)
 		{
 			static const std::regex model(R"(\buniform\s+(?:(?:lowp|mediump|highp)\s+)?mat4\s+u_model\s*;)");
 			static const std::regex color(R"(\buniform\s+(?:(?:lowp|mediump|highp)\s+)?vec3\s+u_color\s*;)");
@@ -237,7 +239,7 @@ bool LoomDitheredOut(float alpha)
 				return std::regex_replace(std::regex_replace(stage, color, ""), seed, "");
 			};
 
-			InstancedStages stages{ undeclared(std::regex_replace(vertex, model, "")), undeclared(fragment) };
+			VariantStages stages{ undeclared(std::regex_replace(vertex, model, "")), undeclared(fragment) };
 
 			if (std::regex_search(stages.vertex, otherwise) ||
 				std::regex_search(stages.fragment, otherwise) ||
@@ -265,8 +267,65 @@ bool LoomDitheredOut(float alpha)
 			return stages;
 		};
 
+		// Stages bending aPos and aNormal by the joints before main reads them, or none without main or aPos, or when UV layers reach the Skin's locations.
+		std::optional<VariantStages> Skinned(const std::string& vertex, const std::string& fragment)
+		{
+			static const std::regex position(R"((?:\blayout\s*\([^)]*\)\s*)?\bin\s+(?:(?:lowp|mediump|highp)\s+)?vec3\s+aPos\s*;)");
+			static const std::regex normal(R"((?:\blayout\s*\([^)]*\)\s*)?\bin\s+(?:(?:lowp|mediump|highp)\s+)?vec3\s+aNormal\s*;)");
+			static const std::regex layer(R"(\blayout\s*\(\s*location\s*=\s*(\d+)\s*\)\s*in\s+uvec4\s+loom_UV_)");
+
+			constexpr uint32_t SKIN_LOCATIONS = Skin::FLOATS_PER_INFLUENCE / Renderer::WordsPerUVLocation;
+			constexpr uint32_t FIRST = Renderer::UVLayerLocation + Renderer::UVLayerLocations - SKIN_LOCATIONS;
+
+			static_assert(SKIN_LOCATIONS * Renderer::WordsPerUVLocation == Skin::FLOATS_PER_INFLUENCE);
+			static_assert(Skin::JOINTS_PER_VERTEX == Renderer::WordsPerUVLocation);
+
+			if (!std::regex_search(vertex, MainPattern()) || !std::regex_search(vertex, position))
+				return std::nullopt;
+
+			for (std::sregex_iterator found(vertex.begin(), vertex.end(), layer), end; found != end; ++found)
+				if (std::stoul((*found)[1].str()) >= FIRST)
+					return std::nullopt;
+
+			const std::string joints = "loom_UV_" + std::to_string(Skin::UV_LAYER) + "_0";
+			const std::string weights = "loom_UV_" + std::to_string(Skin::UV_LAYER) + "_1";
+			const std::string own = std::regex_replace(std::regex_replace(vertex, position, ""), normal, "");
+
+			// Weighed as on the CPU, so a vertex with no weight stays where it was bound.
+			VariantStages stages;
+			stages.fragment = fragment;
+			stages.vertex =
+				"layout(location = 0) in vec3 loom_BindPos;\n"
+				"layout(location = 2) in vec3 loom_BindNormal;\n"
+				"layout(location = " + std::to_string(FIRST) + ") in uvec4 " + joints + ";\n"
+				"layout(location = " + std::to_string(FIRST + 1) + ") in uvec4 " + weights + ";\n"
+				"uniform mat4 u_joints[" + std::to_string(Skin::MAX_GPU_JOINTS) + "];\n"
+				"vec3 loom_SkinnedPos;\n"
+				"vec3 loom_SkinnedNormal;\n"
+				"#define aPos loom_SkinnedPos\n"
+				"#define aNormal loom_SkinnedNormal\n" +
+				std::regex_replace(own, MainPattern(), "$1loom_skin_main$2") +
+				"\nvoid main()\n{\n"
+				"\tvec4 loom_weights = uintBitsToFloat(" + weights + ");\n"
+				"\tfloat loom_total = dot(loom_weights, vec4(1.0));\n"
+				"\tmat4 loom_skin = mat4(1.0);\n\n"
+				"\tif (loom_total > 0.0)\n"
+				"\t\tloom_skin = (u_joints[int(" + joints + ".x)] * loom_weights.x +\n"
+				"\t\t\tu_joints[int(" + joints + ".y)] * loom_weights.y +\n"
+				"\t\t\tu_joints[int(" + joints + ".z)] * loom_weights.z +\n"
+				"\t\t\tu_joints[int(" + joints + ".w)] * loom_weights.w) / loom_total;\n\n"
+				"\tloom_SkinnedPos = (loom_skin * vec4(loom_BindPos, 1.0)).xyz;\n"
+				"\tloom_SkinnedNormal = mat3(loom_skin) * loom_BindNormal;\n\n"
+				"\tif (dot(loom_SkinnedNormal, loom_SkinnedNormal) > 0.0)\n"
+				"\t\tloom_SkinnedNormal = normalize(loom_SkinnedNormal);\n\n"
+				"\tloom_skin_main();\n"
+				"}\n";
+
+			return stages;
+		};
+
 		// The program, or 0 when the stages do not compile.
-		uint32_t CreateIfCompiles(Renderer& renderer, const std::string& name, const std::optional<InstancedStages>& stages)
+		uint32_t CreateIfCompiles(Renderer& renderer, const std::string& name, const std::optional<VariantStages>& stages)
 		{
 			if (!stages)
 				return 0;
@@ -714,7 +773,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 		if (Renderer* renderer = Renderer::Get())
 		{
-			for (const uint32_t program : { id, shadow_id, instanced_id, shadow_instanced_id, pixel_pass_id })
+			for (const uint32_t program : { id, shadow_id, instanced_id, shadow_instanced_id, skinned_id, shadow_skinned_id, pixel_pass_id })
 				if (program)
 					renderer->DeleteProgram(program);
 		};
@@ -760,7 +819,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 	{
 		std::scoped_lock lock{ mutex };
 
-		const uint32_t previous[] = { id, shadow_id, instanced_id, shadow_instanced_id, pixel_pass_id };
+		const uint32_t previous[] = { id, shadow_id, instanced_id, shadow_instanced_id, skinned_id, shadow_skinned_id, pixel_pass_id };
 
 		try
 		{
@@ -796,8 +855,11 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		shadow_id = programs.shadow;
 		instanced_id = programs.instanced;
 		shadow_instanced_id = programs.shadowInstanced;
+		skinned_id = programs.skinned;
+		shadow_skinned_id = programs.shadowSkinned;
 		pixel_pass_id = programs.pixelPass;
 		vertex = programs.vertex;
+		skinned_vertex = programs.skinnedVertex;
 
 		return programs.id;
 	};
@@ -872,6 +934,9 @@ vec3 LoomSceneNormal(ivec2 pixel)
 				{
 					throw std::runtime_error(where + "the id is too large");
 				};
+
+				if (id == Skin::UV_LAYER)
+					throw std::runtime_error(where + "the id is the Skin's");
 
 				if (!declared.insert(id).second)
 					throw std::runtime_error(where + "declared twice");
@@ -1128,6 +1193,15 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 		if (stages.settings.shadows)
 			programs.shadowInstanced = CreateIfCompiles(*renderer, name + SHADOW_PROGRAM_SUFFIX + INSTANCED_PROGRAM_SUFFIX, Instanced(stages.shadowVertex, stages.shadowFragment));
+
+		const std::optional<VariantStages> skinned = Skinned(stages.vertex, stages.fragment);
+		programs.skinned = CreateIfCompiles(*renderer, name + SKINNED_PROGRAM_SUFFIX, skinned);
+
+		if (programs.skinned)
+			programs.skinnedVertex = skinned->vertex;
+
+		if (stages.settings.shadows)
+			programs.shadowSkinned = CreateIfCompiles(*renderer, name + SHADOW_PROGRAM_SUFFIX + SKINNED_PROGRAM_SUFFIX, Skinned(stages.shadowVertex, stages.shadowFragment));
 
 		// After the programs, so a failed reload leaves these matching the ones in use.
 		variables = ParseShaderVariables(text);

@@ -1,12 +1,16 @@
 #include "Skin.h"
 
 #include "GameObject.h"
+#include "Jobs.h"
 #include "Mesh.h"
+#include "Profiler.h"
 
 #include "glm/gtc/type_ptr.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <sstream>
+#include <utility>
 
 
 namespace Loom
@@ -14,6 +18,9 @@ namespace Loom
 	namespace
 	{
 		constexpr size_t POSITION_COMPONENTS = 3;
+
+		// Enough vertices a job that handing them out costs little beside bending them.
+		constexpr size_t VERTEX_GRAIN = 256;
 
 		void CollectByName(GameObject& object, std::unordered_map<std::string, GameObject*>& found)
 		{
@@ -96,7 +103,7 @@ namespace Loom
 
 	std::vector<size_t> Skin::ShapeStarts() const
 	{
-		const std::vector<float>& offsets = *m_shapeOffsets;
+		const std::vector<float>& offsets = *std::as_const(m_shapeOffsets);
 		std::vector<size_t> starts;
 
 		for (size_t at = 0; at < offsets.size(); )
@@ -118,7 +125,9 @@ namespace Loom
 	{
 		const std::vector<std::string>& names = m_jointNames.Of(m_joints);
 
-		if (skeleton == nullptr || names.empty() || m_inverseBinds->size() != names.size() * MATRIX_FLOATS)
+		const std::vector<float>& inverseBinds = *std::as_const(m_inverseBinds);
+
+		if (skeleton == nullptr || names.empty() || inverseBinds.size() != names.size() * MATRIX_FLOATS)
 			return { };
 
 		const std::vector<GameObject*>& joints = m_jointObjects.Find(skeleton, names);
@@ -128,28 +137,95 @@ namespace Loom
 
 		for (size_t i = 0; i < names.size(); i++)
 			if (joints[i])
-				matrices[i] = toMesh * joints[i]->WorldMatrix() * glm::make_mat4(m_inverseBinds->data() + i * MATRIX_FLOATS);
+				matrices[i] = toMesh * joints[i]->WorldMatrix() * glm::make_mat4(inverseBinds.data() + i * MATRIX_FLOATS);
 
 		return matrices;
 	};
 
-	void Skin::Deform(Mesh& mesh)
+	bool Skin::Deform(Mesh& mesh)
 	{
+		return Bend(mesh, JointMatrices(mesh));
+	};
+
+	bool Skin::Shape(Mesh& mesh)
+	{
+		return Bend(mesh, { });
+	};
+
+	bool Skin::FitsGpu(const Mesh& mesh)
+	{
+		const size_t joints = m_jointNames.Of(m_joints).size();
+		const size_t vertices = std::as_const(mesh.m_vertices)->size() / POSITION_COMPONENTS;
+
+		return skeleton != nullptr &&
+			joints > 0 &&
+			joints <= MAX_GPU_JOINTS &&
+			std::as_const(m_inverseBinds)->size() == joints * MATRIX_FLOATS &&
+			std::as_const(m_influences)->size() == vertices * FLOATS_PER_INFLUENCE;
+	};
+
+	std::vector<uint32_t> Skin::GpuInfluences()
+	{
+		const std::vector<float>& influences = *std::as_const(m_influences);
+		const size_t joints = m_jointNames.Of(m_joints).size();
+
+		std::vector<uint32_t> words(influences.size());
+
+		for (size_t at = 0; at + FLOATS_PER_INFLUENCE <= influences.size(); at += FLOATS_PER_INFLUENCE)
+			for (size_t k = 0; k < JOINTS_PER_VERTEX; k++)
+			{
+				const float joint = influences[at + k];
+				const float weight = influences[at + JOINTS_PER_VERTEX + k];
+
+				if (weight <= 0.0f || !(joint >= 0.0f && joint < (float)joints))
+					continue;
+
+				words[at + k] = (uint32_t)joint;
+				words[at + JOINTS_PER_VERTEX + k] = std::bit_cast<uint32_t>(weight);
+			};
+
+		return words;
+	};
+
+	bool Skin::Bend(Mesh& mesh, std::vector<glm::mat4> matrices)
+	{
+		LOOM_STAGE("Skin::Deform");
+
+		// Read through const, so bending them does not count as changing them.
+		const std::vector<float>& vertices = *std::as_const(mesh.m_vertices);
+		const std::vector<float>& normals = *std::as_const(mesh.m_normals);
+		const std::vector<float>& influences = *std::as_const(m_influences);
+		const std::vector<float>& offsets = *std::as_const(m_shapeOffsets);
+		const std::vector<float>& weights = *std::as_const(m_shapeWeights);
+
+		Pose pose{
+			&mesh,
+			mesh.m_vertices.Version(),
+			mesh.m_normals.Version(),
+			m_influences.Version(),
+			m_shapeOffsets.Version(),
+			weights,
+			std::move(matrices) };
+
+		if (pose == m_bent && mesh.m_deformed.size() == vertices.size())
+			return false;
+
+		m_bent = std::move(pose);
+
 		std::vector<float>& bent = mesh.m_deformed;
-		bent = *mesh.m_vertices;
+		bent = vertices;
 
 		std::vector<float>& turned = mesh.m_deformedNormals;
 
-		if (mesh.m_normals->size() == bent.size())
-			turned = *mesh.m_normals;
+		if (normals.size() == bent.size())
+			turned = normals;
 		else turned.clear();
 
-		const std::vector<float>& offsets = *m_shapeOffsets;
 		const std::vector<size_t> starts = ShapeStarts();
 
-		for (size_t shape = 0; shape < starts.size() && shape < m_shapeWeights->size(); shape++)
+		for (size_t shape = 0; shape < starts.size() && shape < weights.size(); shape++)
 		{
-			const float weight = (*m_shapeWeights)[shape];
+			const float weight = weights[shape];
 
 			if (weight == 0.0f)
 				continue;
@@ -169,48 +245,54 @@ namespace Loom
 			};
 		};
 
-		const std::vector<glm::mat4> matrices = JointMatrices(mesh);
-		const size_t vertices = bent.size() / POSITION_COMPONENTS;
+		const std::vector<glm::mat4>& joints = m_bent.matrices;
+		const size_t count = bent.size() / POSITION_COMPONENTS;
 
-		if (matrices.empty() || m_influences->size() != vertices * FLOATS_PER_INFLUENCE)
-			return;
+		if (joints.empty() || influences.size() != count * FLOATS_PER_INFLUENCE)
+			return true;
 
-		for (size_t v = 0; v < vertices; v++)
-		{
-			const float* influence = m_influences->data() + v * FLOATS_PER_INFLUENCE;
-
-			glm::mat4 blended(0.0f);
-			float total = 0.0f;
-
-			for (size_t k = 0; k < JOINTS_PER_VERTEX; k++)
+		Jobs::For(count, VERTEX_GRAIN,
+			[&](size_t, size_t begin, size_t end)
 			{
-				const size_t joint = (size_t)influence[k];
-				const float weight = influence[JOINTS_PER_VERTEX + k];
+				for (size_t v = begin; v < end; v++)
+				{
+					const float* influence = influences.data() + v * FLOATS_PER_INFLUENCE;
 
-				if (weight <= 0.0f || joint >= matrices.size())
-					continue;
+					glm::mat4 blended(0.0f);
+					float total = 0.0f;
 
-				blended += matrices[joint] * weight;
-				total += weight;
-			};
+					for (size_t k = 0; k < JOINTS_PER_VERTEX; k++)
+					{
+						const size_t joint = (size_t)influence[k];
+						const float weight = influence[JOINTS_PER_VERTEX + k];
 
-			if (total <= 0.0f)
-				continue;
+						if (weight <= 0.0f || joint >= joints.size())
+							continue;
 
-			float* position = bent.data() + v * POSITION_COMPONENTS;
-			const glm::vec3 moved = glm::vec3(blended * glm::vec4(position[0], position[1], position[2], 1.0f)) / total;
+						blended += joints[joint] * weight;
+						total += weight;
+					};
 
-			std::copy_n(glm::value_ptr(moved), POSITION_COMPONENTS, position);
+					if (total <= 0.0f)
+						continue;
 
-			if (turned.empty())
-				continue;
+					float* position = bent.data() + v * POSITION_COMPONENTS;
+					const glm::vec3 moved = glm::vec3(blended * glm::vec4(position[0], position[1], position[2], 1.0f)) / total;
 
-			// Assumes even joint scale; uneven stretch leaves normals off square.
-			float* normal = turned.data() + v * POSITION_COMPONENTS;
-			const glm::vec3 facing = glm::normalize(glm::mat3(blended) * glm::make_vec3(normal));
+					std::copy_n(glm::value_ptr(moved), POSITION_COMPONENTS, position);
 
-			std::copy_n(glm::value_ptr(facing), POSITION_COMPONENTS, normal);
-		};
+					if (turned.empty())
+						continue;
+
+					// Assumes even joint scale; uneven stretch leaves normals off square.
+					float* normal = turned.data() + v * POSITION_COMPONENTS;
+					const glm::vec3 facing = glm::normalize(glm::mat3(blended) * glm::make_vec3(normal));
+
+					std::copy_n(glm::value_ptr(facing), POSITION_COMPONENTS, normal);
+				};
+			});
+
+		return true;
 	};
 
 	void Skin::SetShapeWeight(const std::string& name, float weight)

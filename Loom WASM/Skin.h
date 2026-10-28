@@ -7,6 +7,7 @@
 
 #include "glm/glm.hpp"
 
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -70,8 +71,12 @@ namespace Loom
 	*   A joint that is not there holds its vertices where they were bound
 	* - Its shape keys each move some vertices by an offset, scaled by the
 	*   key's weight, before the joints bend them
-	* - The Mesh's own vertices are never changed: they are bent again, from
-	*   where the model was bound, once a frame, when the Mesh first draws
+	* - The Mesh's own vertices are never changed. The GPU bends them as they
+	*   are drawn, from where the model was bound, by each joint's matrix,
+	*   handed over once a frame. A mesh with more joints than the GPU takes,
+	*   or drawn with a shader that cannot bend it, is bent on the CPU instead,
+	*   once a frame, when the Mesh first draws, unless nothing that bends it
+	*   has changed since
 	*/
 	struct LOOM_API Skin : Component<Skin, "Rendering">
 	{
@@ -85,12 +90,40 @@ namespace Loom
 
 		static constexpr size_t MATRIX_FLOATS = 16;
 
+		// The most joints a skin the GPU bends can have: u_joints' length.
+		static constexpr size_t MAX_GPU_JOINTS = 64;
+
+		// The id of the UV layer the GPU reads each vertex's joints and
+		// weights from, which no other layer may take.
+		static constexpr uint32_t UV_LAYER = UINT32_MAX;
+
 		Skin();
 
 		// Fills the mesh's m_deformed with its vertices moved by the shape keys
 		// and bent by the joints, and its m_deformedNormals with its normals
 		// turned by the joints. Shape keys leave the normals as they are.
-		void Deform(Mesh& mesh);
+		// False, leaving them as they were, when it bent them last and nothing
+		// it bends by has changed since.
+		bool Deform(Mesh& mesh);
+
+		// The same, moving the vertices by the shape keys alone, for the GPU to
+		// bend by the joints.
+		bool Shape(Mesh& mesh);
+
+		// Whether the GPU can bend the mesh: it has no more than MAX_GPU_JOINTS
+		// joints, a skeleton, a bind matrix for every joint, and joints and
+		// weights for every vertex.
+		bool FitsGpu(const Mesh& mesh);
+
+		// Each vertex's four joints, then its four weights' bits, as the GPU
+		// reads them from UV_LAYER. A joint out of range or a weight below
+		// zero is weighed at nothing, as Deform weighs it.
+		std::vector<uint32_t> GpuInfluences();
+
+		// From the mesh's space, bent by each joint as it now is, or none
+		// without a skeleton or a bind matrix for every joint. A joint not
+		// found holds its vertices where they were bound.
+		std::vector<glm::mat4> JointMatrices(const Mesh& mesh);
 
 		// 0 leaves a shape key's vertices where they are; 1 moves them all the
 		// way. A name the skin has no key for is ignored.
@@ -132,8 +165,24 @@ namespace Loom
 		// Where each shape key's run of offsets starts in m_shapeOffsets.
 		std::vector<size_t> ShapeStarts() const;
 
-		// From the mesh's space, bent by each joint as it now is.
-		std::vector<glm::mat4> JointMatrices(const Mesh& mesh);
+		// Deform's work, bending by the matrices, or by none at all when there are none.
+		bool Bend(Mesh& mesh, std::vector<glm::mat4> matrices);
+
+		// What Deform last bent the vertices by.
+		struct Pose
+		{
+			const Mesh* mesh = nullptr;
+			unsigned long long vertices = 0;
+			unsigned long long normals = 0;
+			unsigned long long influences = 0;
+			unsigned long long shapeOffsets = 0;
+			std::vector<float> shapeWeights;
+			std::vector<glm::mat4> matrices;
+
+			bool operator==(const Pose&) const = default;
+		};
+
+		Pose m_bent;
 
 		NameList m_jointNames;
 		NameList m_shapeNames;

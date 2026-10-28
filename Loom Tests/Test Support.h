@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <initializer_list>
 #include <iostream>
 #include <map>
 #include <set>
@@ -40,6 +41,17 @@ namespace LoomTests
 	inline void Pump()
 	{
 		Loom::Engine::DoTasks();
+	};
+
+	// A Skin's influences binding each vertex to one joint, all of its weight.
+	inline std::vector<float> Bound(std::initializer_list<float> joints)
+	{
+		std::vector<float> influences;
+
+		for (const float joint : joints)
+			influences.insert(influences.end(), { joint, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f });
+
+		return influences;
 	};
 
 	// Base for test cases that touch engine objects. Draining on the way in
@@ -180,6 +192,12 @@ namespace LoomTests
 				viewed.push_back(program);
 		};
 
+		void SetUniforms(uint32_t program, const char* name, const glm::mat4* values, size_t count) override
+		{
+			matrixArrays[name] = std::vector<glm::mat4>(values, values + count);
+			matrixArrayPrograms[name] = program;
+		};
+
 		void SetUniform(uint32_t, const char* name, Loom::UniformType type, const void* components) override
 		{
 			const Loom::UniformTypeInfo& info = Loom::InfoOf(type);
@@ -197,7 +215,9 @@ namespace LoomTests
 			drawnInto.push_back(m_targets.empty() ? WINDOW : m_targets.back());
 			const Loom::VertexLayout layout = m_drawing ? *m_drawing : Loom::VertexLayout(format);
 
-			lastVertices.assign(vertices, vertices + count * Loom::FloatsPerVertex(layout));
+			if (recordVertices)
+				lastVertices.assign(vertices, vertices + count * Loom::FloatsPerVertex(layout));
+
 			lastFormat = format;
 			lastLayout = layout;
 
@@ -208,7 +228,8 @@ namespace LoomTests
 			drawnColors.push_back(color == vec4s.end() ? glm::vec4(0.0f) : color->second);
 			drawnTextures.push_back(texture == textures.end() ? 0 : texture->second);
 			drawnScenes.push_back(scene == textures.end() ? 0 : scene->second);
-			drawnVertices.push_back(lastVertices);
+			if (recordVertices)
+				drawnVertices.push_back(lastVertices);
 		};
 
 		// Kept vertices are recorded as they are set, and drawn as Draw would draw them.
@@ -295,6 +316,8 @@ namespace LoomTests
 
 		std::map<std::string, float> floats;
 		std::map<std::string, glm::mat4> matrices;
+		std::map<std::string, std::vector<glm::mat4>> matrixArrays;
+		std::map<std::string, uint32_t> matrixArrayPrograms;
 		std::map<std::string, Uniform> uniforms;
 		std::map<std::string, glm::vec4> vec4s;
 		std::map<std::string, uint32_t> textures;
@@ -310,6 +333,10 @@ namespace LoomTests
 
 		// What each of drawn was drawn into: a target, or WINDOW.
 		std::vector<uint32_t> drawnInto;
+
+		// Whether draws record their vertices in lastVertices and drawnVertices,
+		// which a timing test turns off so copying them does not count.
+		bool recordVertices = true;
 
 		// The vertices of the last draw, as handed over, and how they were laid out.
 		std::vector<float> lastVertices;

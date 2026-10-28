@@ -5,10 +5,13 @@
 #include "UiScript.h"
 
 #include "Input.h"
+#include "Profiler.h"
 
 #include "imgui.h"
 
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -24,7 +27,7 @@ namespace
 	// and a script listening to it.
 	struct ScriptedUi
 	{
-		explicit ScriptedUi(const std::string& text)
+		explicit ScriptedUi(const std::string& text, const std::filesystem::path& folder = { })
 		{
 			constexpr float width = 800.0f;
 			constexpr float height = 600.0f;
@@ -42,9 +45,9 @@ namespace
 			int atlas_height = 0;
 			io.Fonts->GetTexDataAsRGBA32(&pixels, &atlas_width, &atlas_height);
 
-			// No folder: the tests write no files, and the web build has no
+			// No folder unless a test writes files, since the web build has no
 			// working directory to ask for.
-			script = std::make_unique<Loom::UiScript>(std::filesystem::path());
+			script = std::make_unique<Loom::UiScript>(folder);
 			script->LoadText(text);
 		};
 
@@ -382,7 +385,7 @@ TEST_SUITE("UiScript")
 	{
 		const LoomTests::Captured errors(std::cerr);
 
-		for (const char* text : { "fly away\n", "key ctrl+nothing\n", "click \"Panel\"\n", "wait\n", "\"\" \"Cube\"\n", "hold\n", "release\n", "hold mouse right\n", "scroll\n", "scroll up\n", "resize 800\n", "resize wide 600\n", "resize 0 600\n" })
+		for (const char* text : { "fly away\n", "key ctrl+nothing\n", "click \"Panel\"\n", "wait\n", "\"\" \"Cube\"\n", "hold\n", "release\n", "hold mouse right\n", "scroll\n", "scroll up\n", "resize 800\n", "resize wide 600\n", "resize 0 600\n", "stages 3\n", "stages 0 stages.tsv\n" })
 		{
 			ScriptedUi ui(text);
 			ui.Run([]() { });
@@ -711,6 +714,104 @@ TEST_SUITE("UiScript")
 		CHECK(ui.script->Failed());
 		CHECK(errors.Says("Missing"));
 	};
+
+	#pragma endregion
+
+	#pragma region Stages
+
+	// A final build records no stages, so there is nothing to write.
+#ifndef LOOM_FINAL
+	TEST_CASE("stages writes the frame's length and each stage recorded")
+	{
+		Loom::Profiler::SetEveryFrame(true);
+		Loom::Profiler::SetRecording(true);
+		Loom::Profiler::EndFrame();
+
+		{
+			LOOM_STAGE("UiScript stage");
+		};
+
+		Loom::Profiler::EndFrame();
+
+		std::ostringstream written;
+		Loom::UiScript::WriteStages(written);
+
+		Loom::Profiler::SetRecording(false);
+		Loom::Profiler::SetEveryFrame(false);
+
+		CHECK(written.str().rfind("Frame\t", 0) == 0);
+		CHECK(written.str().find("\tUiScript stage\t") != std::string::npos);
+	};
+#endif
+
+	TEST_CASE("stages has the frame stages recorded over its frames, and not once it fails")
+	{
+		constexpr int frames = 3;
+
+		const LoomTests::Captured errors(std::cerr);
+		ScriptedUi ui("stages " + std::to_string(frames) + " \"No such folder/stages.tsv\"\n");
+		int recorded = 0;
+
+		ui.Run([&]() { recorded += Loom::UiScript::RecordingStages() ? 1 : 0; });
+
+		CHECK(recorded == frames);
+		CHECK_FALSE(Loom::UiScript::RecordingStages());
+		CHECK(ui.script->Failed());
+		CHECK(errors.Says("could not write"));
+	};
+
+	// The web build has no folder to write to.
+#if !defined(LOOM_FINAL) && !defined(__EMSCRIPTEN__)
+	TEST_CASE("stages records every frame it is given and writes them into the script's folder, then stops recording")
+	{
+		const std::filesystem::path folder = std::filesystem::temp_directory_path();
+		const std::filesystem::path written = folder / "Loom UiScript Stages.tsv";
+		std::filesystem::remove(written);
+
+		ScriptedUi ui("stages 3 \"Loom UiScript Stages.tsv\"\n", folder);
+		bool everyFrame = true;
+
+		// As the editor does each frame.
+		ui.Run(
+			[&]()
+			{
+				const bool recording = Loom::UiScript::RecordingStages();
+				Loom::Profiler::SetRecording(recording);
+
+				if (recording)
+					everyFrame = everyFrame && Loom::Profiler::EveryFrame();
+
+				{
+					LOOM_STAGE("UiScript written stage");
+				};
+
+				Loom::Profiler::EndFrame();
+			});
+
+		Loom::Profiler::SetRecording(false);
+
+		std::ifstream file(written);
+		const std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+		file.close();
+		std::filesystem::remove(written);
+
+		std::istringstream frame(text);
+		std::string name, stage, depth;
+		double length = 0.0;
+		std::getline(frame, name, '\t');
+		std::getline(frame, stage, '\t');
+		std::getline(frame, depth, '\t');
+		frame >> length;
+
+		CHECK_FALSE(ui.script->Failed());
+		CHECK(everyFrame);
+		CHECK_FALSE(Loom::UiScript::RecordingStages());
+		CHECK_FALSE(Loom::Profiler::EveryFrame());
+		CHECK(name == "Frame");
+		CHECK(length > 0.0);
+		CHECK(text.find("\tUiScript written stage\t") != std::string::npos);
+	};
+#endif
 
 	#pragma endregion
 };
