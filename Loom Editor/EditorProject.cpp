@@ -55,8 +55,8 @@ namespace Loom
 		// Fields take files by ASSET_PAYLOAD, so a folder goes by its own.
 		constexpr const char* FOLDER_PAYLOAD = "LoomFolder";
 
-		constexpr float namePromptWidth = 320.0f;
-		constexpr float promptButtonWidth = 120.0f;
+		constexpr float NAME_PROMPT_WIDTH = 320.0f;
+		constexpr float PROMPT_BUTTON_WIDTH = 120.0f;
 
 		// How long a frame spends reading a scene being opened: long enough
 		// that the reading, not the frames between, takes the time, and short
@@ -67,23 +67,23 @@ namespace Loom
 		constexpr float OPENING_BAR_LINES = 20.0f;
 
 		// A pinged file's row flashes this many times over this long, fading.
-		constexpr double pingSeconds = 1.5;
-		constexpr double pingFlashes = 3.0;
-		constexpr float pingFillAlpha = 0.5f;
-		constexpr float pingOutlineThickness = 2.0f;
-		constexpr float pingRounding = 3.0f;
+		constexpr double PING_SECONDS = 1.5;
+		constexpr double PING_FLASHES = 3.0;
+		constexpr float PING_FILL_ALPHA = 0.5f;
+		constexpr float PING_OUTLINE_THICKNESS = 2.0f;
+		constexpr float PING_ROUNDING = 3.0f;
 
 		// How far NewShader, NewShader1, ... counts before leaving the name to
 		// the user to sort out.
-		constexpr int maxDefaultNameSuffix = 1000;
+		constexpr int MAX_DEFAULT_NAME_SUFFIX = 1000;
 
 		#pragma endregion
 
 		#pragma region Field Pickers
 
 		// A field picker's list: at least this wide, and this many rows tall.
-		constexpr float pickerMinWidth = 240.0f;
-		constexpr float pickerRows = 12.0f;
+		constexpr float PICKER_MIN_WIDTH = 240.0f;
+		constexpr float PICKER_ROWS = 12.0f;
 		constexpr const char* PICKER = "##picker";
 
 		// icon, then as much of the end of text as fits beside it in width,
@@ -163,7 +163,7 @@ namespace Loom
 
 			std::string path = folders.AddFolder(parent, newFolder);
 
-			for (int suffix = 1; path.empty() && suffix < maxDefaultNameSuffix; suffix++)
+			for (int suffix = 1; path.empty() && suffix < MAX_DEFAULT_NAME_SUFFIX; suffix++)
 				path = folders.AddFolder(parent, newFolder + std::to_string(suffix));
 
 			tree.Rename(path);
@@ -935,8 +935,6 @@ namespace Loom
 
 		ImGui::BeginChild("##assets", m_projectFilter.DrawUnder(projectKinds), ImGuiChildFlags_Borders);
 
-		if (m_assets.children.empty())
-			ImGui::TextDisabled("Nothing here yet. Right-click to create something.");
 
 		m_assetSearch.BeginResults();
 
@@ -1024,17 +1022,17 @@ namespace Loom
 		{
 			const double pinged = ImGui::GetTime() - m_pingedSince;
 
-			if (pinged < pingSeconds)
+			if (pinged < PING_SECONDS)
 			{
-				const double fade = 1.0 - pinged / pingSeconds;
-				const double flash = (1.0 + std::cos(pinged / pingSeconds * pingFlashes * 2.0 * std::numbers::pi)) * 0.5;
+				const double fade = 1.0 - pinged / PING_SECONDS;
+				const double flash = (1.0 + std::cos(pinged / PING_SECONDS * PING_FLASHES * 2.0 * std::numbers::pi)) * 0.5;
 				ImVec4 colour = EditorTheme::AccentText;
 				ImDrawList* draw = ImGui::GetWindowDrawList();
 
 				colour.w = (float)(flash * fade);
-				draw->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImGui::GetColorU32(colour), pingRounding, 0, pingOutlineThickness);
-				colour.w *= pingFillAlpha;
-				draw->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImGui::GetColorU32(colour), pingRounding);
+				draw->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImGui::GetColorU32(colour), PING_ROUNDING, 0, PING_OUTLINE_THICKNESS);
+				colour.w *= PING_FILL_ALPHA;
+				draw->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImGui::GetColorU32(colour), PING_ROUNDING);
 			}
 			else m_pingedAsset.clear();
 		};
@@ -1181,7 +1179,7 @@ namespace Loom
 
 		m_newAssetProblem = NewAssetProblem();
 
-		for (int suffix = 1; !m_newAssetProblem.empty() && suffix < maxDefaultNameSuffix; suffix++)
+		for (int suffix = 1; !m_newAssetProblem.empty() && suffix < MAX_DEFAULT_NAME_SUFFIX; suffix++)
 		{
 			snprintf(m_newAssetName, sizeof(m_newAssetName), "%s%d", info.defaultName, suffix);
 			m_newAssetProblem = NewAssetProblem();
@@ -1412,7 +1410,7 @@ namespace Loom
 				m_focusAssetName = false;
 			};
 
-			ImGui::SetNextItemWidth(namePromptWidth);
+			ImGui::SetNextItemWidth(NAME_PROMPT_WIDTH);
 
 			const bool entered = ImGui::InputText(
 				"Name",
@@ -1433,7 +1431,7 @@ namespace Loom
 
 			// Opened from here rather than in CreateAsset, so --create-script
 			// leaves Visual Studio closed.
-			if (ImGui::Button("Create", ImVec2(promptButtonWidth, 0.0f)) || (entered && usable))
+			if (ImGui::Button("Create", ImVec2(PROMPT_BUTTON_WIDTH, 0.0f)) || (entered && usable))
 				if (const std::string path = CreateAsset(); !path.empty() && IsScript(m_newAssetKind))
 					OpenAsset(path);
 
@@ -1445,7 +1443,7 @@ namespace Loom
 				ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
 				ImGui::IsKeyPressed(ImGuiKey_Escape);
 
-			if (ImGui::Button("Cancel", ImVec2(promptButtonWidth, 0.0f)) || escaped)
+			if (ImGui::Button("Cancel", ImVec2(PROMPT_BUTTON_WIDTH, 0.0f)) || escaped)
 				m_askForAsset = false;
 		};
 
@@ -1620,7 +1618,7 @@ namespace Loom
 
 		if (m_projectScenes.empty())
 		{
-			ImGui::TextDisabled("This project has no scenes yet. File > New Scene makes one.");
+			ImGui::TextDisabled("No scenes");
 			return;
 		};
 
@@ -2309,7 +2307,7 @@ namespace Loom
 	bool Editor::BeginPicker(bool* appearing)
 	{
 		const ImVec2 under(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y);
-		const float width = (std::max)(ImGui::GetItemRectSize().x, pickerMinWidth);
+		const float width = (std::max)(ImGui::GetItemRectSize().x, PICKER_MIN_WIDTH);
 
 		ImGui::SetNextWindowPos(under, ImGuiCond_Appearing);
 
@@ -2326,7 +2324,7 @@ namespace Loom
 
 		m_fieldPicker.DrawSearch();
 
-		ImGui::BeginChild("##choices", ImVec2(width, ImGui::GetFrameHeightWithSpacing() * pickerRows), ImGuiChildFlags_Borders);
+		ImGui::BeginChild("##choices", ImVec2(width, ImGui::GetFrameHeightWithSpacing() * PICKER_ROWS), ImGuiChildFlags_Borders);
 
 		return true;
 	};

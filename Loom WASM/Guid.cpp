@@ -34,7 +34,9 @@ namespace Loom
 
 	std::string Guid::ToString() const
 	{
-		char buffer[37]{ };
+		constexpr size_t textLength = 36;
+
+		char buffer[textLength + 1]{ };
 
 		snprintf(
 			buffer,

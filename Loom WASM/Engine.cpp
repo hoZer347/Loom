@@ -287,8 +287,6 @@ namespace Loom
 			onUpdate();
 		};
 
-		//Shader::SetUniforms();
-
 		if (updateScenes)
 		{
 			// As many fixed steps as the frame's time covers, carrying the
@@ -546,7 +544,10 @@ namespace Loom
 
 			// DoTasks is noexcept because it runs from the frame loop, where an
 			// escaping exception would take the whole application down.
-			try { task(); }
+			try
+			{
+				task();
+			}
 			catch (const std::exception& e)
 			{
 				std::cerr << "Queued task threw: " << e.what() << std::endl;
@@ -574,7 +575,6 @@ namespace Loom
 					std::cerr << "Nothing to capture: " << (region ? "the region is outside the window" : "the window has no size") << std::endl;
 				else if (!WriteBitmap(path, width, height, rgb))
 					std::cerr << "Could not write " << path << std::endl;
-				else std::cout << "Wrote " << path << " (" << width << 'x' << height << ')' << std::endl;
 			});
 	};
 

@@ -722,7 +722,7 @@ void main()
 			m_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
 			if (m_documents.empty())
-				ImGui::TextDisabled("Right-click a prefab in the Project panel and pick Edit Model to shape it here.");
+				ImGui::TextDisabled("No model open");
 			else if (ImGui::BeginTabBar("##models", ImGuiTabBarFlags_AutoSelectNewTabs | ImGuiTabBarFlags_FittingPolicyScroll))
 			{
 				const Document* closed = nullptr;
@@ -799,17 +799,16 @@ void main()
 			ImGui::BeginGroup();
 
 			if (document.root == nullptr)
-				ImGui::TextDisabled("This prefab could not be read. It may have been moved, deleted or broken.");
+				ImGui::TextDisabled("Unreadable prefab");
 			else if (document.skipped > 0)
-				ImGui::TextDisabled("This prefab's meshes cannot be shaped here: they are animated, made by a script, or not triangles.");
+				ImGui::TextDisabled("No editable mesh");
 			else
 			{
-				ImGui::TextDisabled("This prefab has no mesh to shape yet.");
+				ImGui::TextDisabled("No mesh");
 
 				if (ImGui::Button("Add a Mesh"))
 					AddMesh();
 
-				ImGui::SetItemTooltip("Gives the prefab's top object a mesh, starting as a cube.");
 			};
 
 			ImGui::EndGroup();
@@ -1053,7 +1052,7 @@ void main()
 		if (document.skipped > 0)
 		{
 			ImGui::PushTextWrapPos();
-			ImGui::TextDisabled("%zu more cannot be shaped here: animated, made by a script, or not triangles.", document.skipped);
+			ImGui::TextDisabled("%zu meshes not editable", document.skipped);
 			ImGui::PopTextWrapPos();
 		};
 

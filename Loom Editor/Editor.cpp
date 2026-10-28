@@ -2580,11 +2580,6 @@ namespace Loom
 			ImGuiWindowFlags_NoCollapse |
 			ImGuiWindowFlags_NoSavedSettings))
 		{
-			ImGui::TextUnformatted("Where every panel sits, and which are open.");
-			ImGui::TextDisabled("Letters, digits, spaces, _ and - in the name.");
-
-			ImGui::Separator();
-
 			if (ImGui::IsWindowAppearing())
 				ImGui::SetKeyboardFocusHere();
 
@@ -2642,6 +2637,9 @@ namespace Loom
 		if (!m_askForFolder)
 			return;
 
+		constexpr float folder_width = 460.0f;
+		constexpr float button_width = 160.0f;
+
 		const ImGuiViewport* viewport = ImGui::GetMainViewport();
 
 		ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
@@ -2656,12 +2654,7 @@ namespace Loom
 			ImGuiWindowFlags_NoCollapse |
 			ImGuiWindowFlags_NoSavedSettings))
 		{
-			ImGui::TextUnformatted("The editor works out of a folder of scene files.");
-			ImGui::TextDisabled("The Project panel lists it in tabs: its scenes and prefabs under Scenes, its scripts and shaders under Scripts, and its textures, models, sounds and fonts each under a tab of their own.");
-
-			ImGui::Separator();
-
-			ImGui::SetNextItemWidth(460.0f);
+			ImGui::SetNextItemWidth(folder_width);
 			ImGui::InputText("##folder", m_folderBuffer, sizeof(m_folderBuffer));
 
 			ImGui::SameLine();
@@ -2669,13 +2662,13 @@ namespace Loom
 			if (ImGui::Button("Browse..."))
 				m_dialogs->folder.Open();
 
-			if (ImGui::Button("Open Folder", ImVec2(160.0f, 0.0f)))
+			if (ImGui::Button("Open Folder", ImVec2(button_width, 0.0f)))
 				if (OpenProject(m_folderBuffer))
 					m_askForFolder = false;
 
 			ImGui::SameLine();
 
-			if (ImGui::Button("Skip", ImVec2(160.0f, 0.0f)))
+			if (ImGui::Button("Skip", ImVec2(button_width, 0.0f)))
 			{
 				if (Scene::GetScenes().empty())
 					CreateScene("Untitled Scene");
@@ -3764,7 +3757,7 @@ namespace Loom
 		if (!m_modelPreview.IsLoaded())
 		{
 			ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-			ImGui::TextWrapped("Could not read this model. The Console has the reason.");
+			ImGui::TextWrapped("Unreadable model");
 			ImGui::PopStyleColor();
 			return;
 		};
@@ -3873,8 +3866,6 @@ namespace Loom
 
 		ImGui::EndDisabled();
 
-		if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-			ImGui::SetTooltip("%d is not processed, 0 updates on the main thread, and each above on a thread of its own", GameObject::Unprocessed);
 
 		ImGui::PopItemWidth();
 	};

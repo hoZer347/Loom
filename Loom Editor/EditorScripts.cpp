@@ -613,6 +613,9 @@ namespace Loom
 		if (!m_askForNewProject)
 			return;
 
+		constexpr float field_width = 420.0f;
+		constexpr float button_width = 160.0f;
+
 		const ImGuiViewport* viewport = ImGui::GetMainViewport();
 
 		ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
@@ -625,12 +628,7 @@ namespace Loom
 			ImGuiWindowFlags_NoCollapse |
 			ImGuiWindowFlags_NoSavedSettings))
 		{
-			ImGui::TextUnformatted("A folder of scenes, and a C++ project for the scripts.");
-			ImGui::TextDisabled("Letters, digits, _ and - in the name; it becomes a project name.");
-
-			ImGui::Separator();
-
-			ImGui::SetNextItemWidth(420.0f);
+			ImGui::SetNextItemWidth(field_width);
 			ImGui::InputText("Location", m_newProjectFolder, sizeof(m_newProjectFolder));
 
 			ImGui::SameLine();
@@ -638,7 +636,7 @@ namespace Loom
 			if (ImGui::Button("Browse..."))
 				m_dialogs->newProjectFolder.Open();
 
-			ImGui::SetNextItemWidth(420.0f);
+			ImGui::SetNextItemWidth(field_width);
 			ImGui::InputText("Name", m_newProjectName, sizeof(m_newProjectName));
 
 			const bool usable =
@@ -649,11 +647,11 @@ namespace Loom
 				"%s",
 				usable
 					? (std::filesystem::path(m_newProjectFolder) / m_newProjectName).string().c_str()
-					: "Pick a folder and a usable name.");
+					: "");
 
 			ImGui::BeginDisabled(!usable);
 
-			if (ImGui::Button("Create", ImVec2(160.0f, 0.0f)))
+			if (ImGui::Button("Create", ImVec2(button_width, 0.0f)))
 				if (CreateProject(m_newProjectFolder, m_newProjectName))
 					m_askForNewProject = false;
 
@@ -661,7 +659,7 @@ namespace Loom
 
 			ImGui::SameLine();
 
-			if (ImGui::Button("Cancel", ImVec2(160.0f, 0.0f)))
+			if (ImGui::Button("Cancel", ImVec2(button_width, 0.0f)))
 				m_askForNewProject = false;
 		};
 

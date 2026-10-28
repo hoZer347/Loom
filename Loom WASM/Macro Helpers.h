@@ -18,7 +18,7 @@
 //
 #define HAS_FUNCTION_DECL(function_name)\
 	template <typename T>\
-	class has_##function_name {\
+	struct has_##function_name {\
 	private:\
 		template <typename U>\
 		static constexpr auto check(int) -> decltype(std::declval<U>().function_name(), std::true_type{})\
@@ -53,7 +53,7 @@
 //
 #define HAS_VARIABLE_DECL(member_variable_name) \
 	template <typename T> \
-	class has_##member_variable_name { \
+	struct has_##member_variable_name { \
 	private: \
 		template <typename U> \
 		static constexpr auto check(int) -> decltype(std::declval<U>().member_variable_name, std::true_type{}) \

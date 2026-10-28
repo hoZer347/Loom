@@ -1258,9 +1258,10 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		attr.userData = new std::pair<std::string*, bool*>(&shader_source, &fetchComplete);
 		emscripten_fetch(&attr, file_path.c_str());
 
-		// Busy-wait until fetch is complete
+		constexpr int pollMilliseconds = 10;
+
 		while (!fetchComplete)
-			emscripten_sleep(10); // Yield control to the browser (non-blocking wait)
+			emscripten_sleep(pollMilliseconds);
 
 		// Thrown like a file that will not open, so a Material or a reload
 		// reports it once, with the path.
