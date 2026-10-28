@@ -220,7 +220,7 @@ bool LoomDitheredOut(float alpha)
 			std::string fragment;
 		};
 
-		// Stages reading per-draw values from instances, or none when that cannot work.
+		// Stages reading per-draw values from instances, or none when the vertex stage lacks a plain model matrix or the fragment stage reads it.
 		std::optional<InstancedStages> Instanced(const std::string& vertex, const std::string& fragment)
 		{
 			static const std::regex model(R"(\buniform\s+(?:(?:lowp|mediump|highp)\s+)?mat4\s+u_model\s*;)");

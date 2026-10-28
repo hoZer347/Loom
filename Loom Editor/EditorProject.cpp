@@ -896,7 +896,6 @@ namespace Loom
 
 		ImGui::BeginChild("##assets", m_projectFilter.DrawUnder(projectKinds), ImGuiChildFlags_Borders);
 
-
 		m_assetSearch.BeginResults();
 
 		for (const AssetNode& node : m_assets.children)

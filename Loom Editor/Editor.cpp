@@ -2496,13 +2496,13 @@ namespace Loom
 			ImGui::TextDisabled(
 				"%s",
 				!usable
-					? "Pick a usable name."
+					? "Invalid name"
 					: std::any_of(
 						m_layouts.begin(),
 						m_layouts.end(),
 						[this](const std::string& layout) { return EditorLayouts::SameName(layout, m_layoutName); })
-						? "Replaces the saved layout of that name."
-						: "Listed in the Layout menu once saved.");
+						? "Replaces existing"
+						: "");
 
 			ImGui::BeginDisabled(!usable);
 
@@ -3747,6 +3747,8 @@ namespace Loom
 
 		ImGui::EndDisabled();
 
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+			ImGui::SetTooltip("%d: none, 0: main thread", GameObject::Unprocessed);
 
 		ImGui::PopItemWidth();
 	};

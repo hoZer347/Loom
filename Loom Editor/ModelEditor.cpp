@@ -791,6 +791,7 @@ void main()
 				if (ImGui::Button("Add a Mesh"))
 					AddMesh();
 
+				ImGui::SetItemTooltip("Starts as a cube");
 			};
 
 			ImGui::EndGroup();
@@ -975,7 +976,7 @@ void main()
 				: document.selection.faces.size();
 
 			if (count == 0)
-				ImGui::TextDisabled("Nothing. Click the model.");
+				ImGui::TextDisabled("Nothing picked");
 			else ImGui::Text("%zu %s", count, PickName(document.pick, count));
 
 			if (std::optional<glm::vec3> pivot = Pivot(document))

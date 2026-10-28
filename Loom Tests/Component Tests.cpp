@@ -84,7 +84,6 @@ TEST_SUITE("Component")
 		CHECK(true);
 	};
 
-	// An unattached m_gameObject is uninitialised, so only the attached side is checked.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a component's parent is the GameObject that attached it")
 	{
 		Loom::Scene scene("component parent");

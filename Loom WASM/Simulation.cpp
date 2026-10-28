@@ -55,7 +55,7 @@ namespace Loom
 		constexpr float SLEEP_ENERGY = 0.005f;
 		constexpr float SLEEP_AFTER = 0.5f;
 
-		// Well above sleeping speed, so jostling does not keep a pile awake.
+		// A strike faster than this wakes a sleeper; well above sleeping speed so jostling does not.
 		constexpr float WAKE_SPEED = 0.5f;
 
 		// Per-job chunk sizes, big enough to outweigh handing a chunk out.
