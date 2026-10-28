@@ -168,8 +168,7 @@ namespace Loom
 
 	std::string Material::EditShader(const std::string& path, const std::string& source)
 	{
-		const auto key = [](const std::string& file) { return std::filesystem::path(file).lexically_normal().generic_string(); };
-		const std::string edited = key(path);
+		const std::string edited = Shader::SourceKey(path);
 
 		Shader::SetSource(edited, source);
 		Shader::lastError.clear();
@@ -177,7 +176,11 @@ namespace Loom
 		if (edited.ends_with(PreVertex::extension))
 			PreVertex::ReloadIfChanged();
 		else
-			ReloadShaders([&](const std::string& shader) { return key(shader) == edited; });
+			ReloadShaders(
+				[&](const std::string& shader)
+				{
+					return Shader::SourceKey(shader) == edited;
+				});
 
 		return Shader::lastError;
 	};

@@ -928,14 +928,19 @@ vec3 LoomSceneNormal(ivec2 pixel)
 	{
 		std::scoped_lock lock{ sourcesMutex };
 
-		sources[std::filesystem::path(file_path).lexically_normal().generic_string()] = source;
+		sources[SourceKey(file_path)] = source;
+	};
+
+	std::string Shader::SourceKey(const std::string& file_path)
+	{
+		return std::filesystem::path(file_path).lexically_normal().generic_string();
 	};
 
 	std::optional<std::string> Shader::SourceFor(const std::string& file_path)
 	{
 		std::scoped_lock lock{ sourcesMutex };
 
-		const auto found = sources.find(std::filesystem::path(file_path).lexically_normal().generic_string());
+		const auto found = sources.find(SourceKey(file_path));
 
 		return found != sources.end() ? std::optional(found->second) : std::nullopt;
 	};

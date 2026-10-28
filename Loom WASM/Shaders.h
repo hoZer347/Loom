@@ -94,6 +94,9 @@ namespace Loom
 		// edit a shader it has no file for.
 		static void SetSource(const std::string& file_path, const std::string& source);
 
+		// The one spelling of file_path that SetSource and SourceFor key by.
+		static std::string SourceKey(const std::string& file_path);
+
 		// What SetSource last gave file_path, if anything.
 		static std::optional<std::string> SourceFor(const std::string& file_path);
 
