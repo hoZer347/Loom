@@ -856,7 +856,7 @@ namespace Loom
 		m_newAssetKind = kind;
 		m_newAssetFolder = folder;
 		m_newScriptFolder.clear();
-		m_newScriptFor = Guid();
+		m_newScriptFor.clear();
 
 		for (FileTab& tab : m_fileTabs)
 			tab.newFolder.clear();
@@ -939,7 +939,7 @@ namespace Loom
 		m_newAssetKind = kind;
 		m_newAssetFolder = m_projectPath;
 		m_newScriptFolder.clear();
-		m_newScriptFor = Guid();
+		m_newScriptFor.clear();
 		snprintf(m_newAssetName, sizeof(m_newAssetName), "%s", name.c_str());
 
 		CreateAsset();
@@ -1045,9 +1045,9 @@ namespace Loom
 
 		m_askForAsset = false;
 
-		if (IsScript(m_newAssetKind) && m_newScriptFor.IsValid())
+		if (IsScript(m_newAssetKind) && !m_newScriptFor.empty())
 		{
-			m_attachAfterBuildTo = std::exchange(m_newScriptFor, Guid());
+			m_attachAfterBuildTo = std::exchange(m_newScriptFor, { });
 			m_attachAfterBuild = name;
 			CompileScripts();
 		}
@@ -1972,12 +1972,10 @@ namespace Loom
 	{
 		const float width = ImGui::CalcItemWidth();
 
-		constexpr const char* mixed_value = "-";
-
 		bool cut = false;
 		const std::string label = FitPickerLabel(
 			icon,
-			m_mixedField ? mixed_value : shown,
+			m_mixedField ? MIXED_VALUE : shown,
 			width - ImGui::GetStyle().FramePadding.x * 2.0f,
 			cut);
 

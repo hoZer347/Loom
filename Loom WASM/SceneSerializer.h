@@ -141,9 +141,13 @@ namespace Loom
 		// above it is written, so the text is what a clipboard holds.
 		static std::string Serialize(GameObject& gameObject);
 
-		// Builds the GameObjects in that text under parent and returns the first.
-		// Each gets a new guid, so the same text can go in any number of times,
-		// and references between them follow them to their new guids.
+		// Builds the GameObjects in that text under parent and returns the ones
+		// at its top level, or none when it could not. Each gets a new guid, so
+		// the same text can go in any number of times, and references between
+		// them follow them to their new guids.
+		static std::vector<GameObject*> DeserializeAll(const std::string& text, GameObject& parent, std::string* error = nullptr);
+
+		// The same, returning the first or null.
 		static GameObject* Deserialize(const std::string& text, GameObject& parent, std::string* error = nullptr);
 
 		#pragma endregion

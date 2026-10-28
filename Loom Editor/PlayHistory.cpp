@@ -162,21 +162,25 @@ namespace Loom
 
 	#pragma region Recording
 
-	void PlayHistory::RecordField(LoomObject& object, size_t index, const std::string& before)
+	void PlayHistory::RecordFields(std::vector<Field> edits)
 	{
-		std::string after = object.GetFields()[index].Write();
-
-		if (after == before)
-			return;
-
 		Step step{ };
 
-		step.before = before;
-		step.after = std::move(after);
-		step.object = object.GetGuid();
-		step.index = index;
+		for (Field& edit : edits)
+		{
+			const LoomObject* object = LoomObject::GetByGuid<LoomObject>(edit.object);
 
-		Push(std::move(step));
+			if (object == nullptr)
+				continue;
+
+			edit.after = object->GetFields()[edit.index].Write();
+
+			if (edit.after != edit.before)
+				step.push_back(Part{ std::move(edit) });
+		};
+
+		if (!step.empty())
+			Push(std::move(step));
 	};
 
 	PlayHistory::Components PlayHistory::ReadComponents(GameObject& gameObject)
@@ -189,34 +193,42 @@ namespace Loom
 		return read;
 	};
 
-	void PlayHistory::RecordComponents(Components before)
+	void PlayHistory::RecordComponents(std::vector<Components> before)
 	{
-		GameObject* gameObject = LoomObject::GetByGuid<GameObject>(before.gameObject);
-
-		if (gameObject == nullptr)
-			return;
-
 		Step step{ };
 
-		step.before = std::move(before.own);
-		step.after = SceneSerializer::SerializeOwn(*gameObject);
-		step.object = before.gameObject;
-		step.index = components;
-
-		for (Field& held : before.held)
+		for (Components& read : before)
 		{
-			LoomObject* holder = LoomObject::GetByGuid<LoomObject>(held.object);
+			GameObject* gameObject = LoomObject::GetByGuid<GameObject>(read.gameObject);
 
-			if (holder == nullptr)
+			if (gameObject == nullptr)
 				continue;
 
-			held.after = holder->GetFields()[held.index].Write();
+			Part part{ };
 
-			if (held.after != held.before)
-				step.held.push_back(std::move(held));
+			part.before = std::move(read.own);
+			part.after = SceneSerializer::SerializeOwn(*gameObject);
+			part.object = read.gameObject;
+			part.index = components;
+
+			for (Field& held : read.held)
+			{
+				LoomObject* holder = LoomObject::GetByGuid<LoomObject>(held.object);
+
+				if (holder == nullptr)
+					continue;
+
+				held.after = holder->GetFields()[held.index].Write();
+
+				if (held.after != held.before)
+					part.held.push_back(std::move(held));
+			};
+
+			if (part.after != part.before || !part.held.empty())
+				step.push_back(std::move(part));
 		};
 
-		if (step.after != step.before || !step.held.empty())
+		if (!step.empty())
 			Push(std::move(step));
 	};
 
@@ -224,12 +236,12 @@ namespace Loom
 
 	#pragma region Stepping
 
-	GameObject* PlayHistory::Undo()
+	std::vector<GameObject*> PlayHistory::Undo()
 	{
 		return Move(m_undo, m_redo, &Sides::after, &Sides::before);
 	};
 
-	GameObject* PlayHistory::Redo()
+	std::vector<GameObject*> PlayHistory::Redo()
 	{
 		return Move(m_redo, m_undo, &Sides::before, &Sides::after);
 	};
@@ -250,53 +262,61 @@ namespace Loom
 		m_undo.push_back(std::move(step));
 	};
 
-	GameObject* PlayHistory::Move(std::vector<Step>& from, std::vector<Step>& to, std::string Sides::* was, std::string Sides::* wanted)
+	std::vector<GameObject*> PlayHistory::Move(std::vector<Step>& from, std::vector<Step>& to, std::string Sides::* was, std::string Sides::* wanted)
 	{
 		while (!from.empty())
 		{
 			Step step = std::move(from.back());
+			std::vector<GameObject*> stepped{ };
 
 			from.pop_back();
 
-			LoomObject* object = LoomObject::GetByGuid<LoomObject>(step.object);
-
-			if (object == nullptr)
-				continue;
-
-			if (step.index == components)
+			for (const Part& part : step)
 			{
-				PutComponents(static_cast<GameObject&>(*object), step.*was, step.*wanted);
+				LoomObject* object = LoomObject::GetByGuid<LoomObject>(part.object);
 
-				// A holder the run has pointed elsewhere since keeps what it holds.
-				for (const Field& held : step.held)
+				if (object == nullptr)
+					continue;
+
+				if (part.index == components)
 				{
-					LoomObject* holder = LoomObject::GetByGuid<LoomObject>(held.object);
+					PutComponents(static_cast<GameObject&>(*object), part.*was, part.*wanted);
 
-					if (holder == nullptr)
-						continue;
+					// A holder the run has pointed elsewhere since keeps what it holds.
+					for (const Field& held : part.held)
+					{
+						LoomObject* holder = LoomObject::GetByGuid<LoomObject>(held.object);
 
-					const SerializedField& field = holder->GetFields()[held.index];
+						if (holder == nullptr)
+							continue;
 
-					if (field.Write() == held.*was && field.Read(held.*wanted))
-						holder->OnFieldChanged(field);
+						const SerializedField& field = holder->GetFields()[held.index];
+
+						if (field.Write() == held.*was && field.Read(held.*wanted))
+							holder->OnFieldChanged(field);
+					};
+				}
+				else
+				{
+					const SerializedField& field = object->GetFields()[part.index];
+
+					if (field.Read(part.*wanted))
+						object->OnFieldChanged(field);
 				};
-			}
-			else
-			{
-				const SerializedField& field = object->GetFields()[step.index];
 
-				if (field.Read(step.*wanted))
-					object->OnFieldChanged(field);
+				if (GameObject* on = GameObjectOf(object); std::find(stepped.begin(), stepped.end(), on) == stepped.end())
+					stepped.push_back(on);
 			};
 
-			GameObject* stepped = GameObjectOf(object);
+			if (stepped.empty())
+				continue;
 
 			to.push_back(std::move(step));
 
 			return stepped;
 		};
 
-		return nullptr;
+		return { };
 	};
 
 	void PlayHistory::PutComponents(GameObject& gameObject, const std::string& from, const std::string& to)

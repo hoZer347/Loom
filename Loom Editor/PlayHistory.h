@@ -18,17 +18,18 @@ namespace Loom
 	* - Undo and redo of the edits made in the Inspector while the game runs,
 	*   which SceneHistory never sees, since nothing is watched while a run
 	*   changes the scenes every frame
-	* - A field step is one field's text either side of one edit, and putting
-	*   it back writes only that field
-	* - A component step is a GameObject's own scene text either side of
+	* - A field step is the text of each field one edit changed, on every
+	*   object it was made to, either side of it, and putting it back writes
+	*   only those fields
+	* - A component step is each GameObject's own scene text either side of
 	*   adding, removing or reordering its components, with each Reference
 	*   field elsewhere that pointed at one of them. Putting it back adds,
 	*   removes or orders what the edit did and writes only the fields the edit
 	*   changed, so whatever the run has done to the rest since is left as it
 	*   is
 	* - Steps find their objects by guid, so a component a step puts back is
-	*   the same one to the steps before it. A step whose object has gone is
-	*   thrown away on the way past
+	*   the same one to the steps before it. A step whose objects have all gone
+	*   is thrown away on the way past
 	*/
 	struct PlayHistory final
 	{
@@ -57,16 +58,18 @@ namespace Loom
 			std::vector<Field> held{ };
 		};
 
-		// An edit to object's field at index from before, the text Write gave
-		// for it, to what it holds now. One that changed nothing is not a step.
-		void RecordField(LoomObject& object, size_t index, const std::string& before);
+		// One edit to each field from its before, the text Write gave for it, to
+		// what it holds now, as one step. A field it left as it was is no part
+		// of the step, and an edit that changed nothing is not one.
+		void RecordFields(std::vector<Field> edits);
 
 		// gameObject's components as they are, read before an edit to them.
 		static Components ReadComponents(GameObject& gameObject);
 
-		// Components added to, taken off or reordered on the GameObject since
-		// it read as before. One that changed nothing is not a step.
-		void RecordComponents(Components before);
+		// Components added to, taken off or reordered on each GameObject since
+		// it read as before, as one step. An edit that changed nothing is not
+		// one.
+		void RecordComponents(std::vector<Components> before);
 
 		#pragma endregion
 
@@ -74,10 +77,10 @@ namespace Loom
 
 		static constexpr size_t max_steps = 100;
 
-		// Puts the newest step whose object is still there back, or forward,
-		// and returns the GameObject it was on, or null when there was none.
-		GameObject* Undo();
-		GameObject* Redo();
+		// Puts the newest step whose objects are still there back, or forward,
+		// and returns the GameObjects it was on, or none when there was none.
+		std::vector<GameObject*> Undo();
+		std::vector<GameObject*> Redo();
 
 		bool CanUndo() const { return !m_undo.empty(); };
 		bool CanRedo() const { return !m_redo.empty(); };
@@ -91,15 +94,17 @@ namespace Loom
 
 		static constexpr size_t components = (std::numeric_limits<size_t>::max)();
 
-		// A field step, or a component step whose index is components.
-		struct Step : Field
+		// One field, or one GameObject's components when index is components.
+		struct Part : Field
 		{
 			std::vector<Field> held{ };
 		};
 
+		using Step = std::vector<Part>;
+
 		void Push(Step step);
 
-		static GameObject* Move(std::vector<Step>& from, std::vector<Step>& to, std::string Sides::* was, std::string Sides::* wanted);
+		static std::vector<GameObject*> Move(std::vector<Step>& from, std::vector<Step>& to, std::string Sides::* was, std::string Sides::* wanted);
 
 		// Makes gameObject read as to where it read as from, and leaves the rest.
 		static void PutComponents(GameObject& gameObject, const std::string& from, const std::string& to);

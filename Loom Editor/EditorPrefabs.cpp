@@ -250,9 +250,15 @@ namespace Loom
 
 		const std::string text = Prefabs::Splice(SceneSerializer::Serialize(*m_prefabScene), root->GetGuid().ToString(), subtree);
 
-		const Guid selected = IsSelectedIn(m_prefabScene->GetRoot()) ? m_selected->GetGuid() : Guid();
+		const std::vector<GameObject*> selection = GetSelection();
+		const bool in_prefab = std::any_of(
+			selection.begin(),
+			selection.end(),
+			[this](const GameObject* gameObject) { return Hierarchy::Contains(m_prefabScene->GetRoot(), gameObject); });
 
-		if (selected != Guid())
+		const std::vector<Guid> selected = in_prefab ? GetSelectedGuids() : std::vector<Guid>{ };
+
+		if (in_prefab)
 			Select(nullptr);
 
 		std::string error;
@@ -272,8 +278,7 @@ namespace Loom
 
 		m_historyDirty = true;
 
-		if (GameObject* again = LoomObject::GetByGuid<GameObject>(selected))
-			Select(again);
+		SelectAgain(selected);
 
 		return true;
 	};

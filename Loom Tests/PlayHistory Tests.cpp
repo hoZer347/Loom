@@ -16,6 +16,7 @@
 #include <vector>
 
 using LoomTests::Pump;
+using Stepped = std::vector<Loom::GameObject*>;
 
 #pragma region Helpers
 
@@ -46,9 +47,9 @@ namespace
 			Loom::ComponentRegistry::Unregister("PlayMarker");
 		};
 
-		// Sets serial as a drag would, and records it as letting go does.
-		template <typename T, typename U>
-		void Edit(Loom::LoomObject& object, Loom::Serial<T>& serial, const U& value)
+		// serial as it is, for an edit to record once it is made.
+		template <typename T>
+		Loom::PlayHistory::Field Before(Loom::LoomObject& object, Loom::Serial<T>& serial)
 		{
 			const std::vector<Loom::SerializedField>& fields = object.GetFields();
 			const T& held = serial;
@@ -59,17 +60,30 @@ namespace
 
 			REQUIRE(index < fields.size());
 
-			const std::string before = fields[index].Write();
+			Loom::PlayHistory::Field edit{ };
+
+			edit.before = fields[index].Write();
+			edit.object = object.GetGuid();
+			edit.index = index;
+
+			return edit;
+		};
+
+		// Sets serial as a drag would, and records it as letting go does.
+		template <typename T, typename U>
+		void Edit(Loom::LoomObject& object, Loom::Serial<T>& serial, const U& value)
+		{
+			const Loom::PlayHistory::Field edit = Before(object, serial);
 
 			serial = value;
-			history.RecordField(object, index, before);
+			history.RecordFields({ edit });
 		};
 
 		// Changes cube's components as the Inspector does, and records it once
 		// the queue has caught up.
 		void Change(const std::function<void()>& change)
 		{
-			Loom::PlayHistory::Components before = Loom::PlayHistory::ReadComponents(*cube);
+			std::vector<Loom::PlayHistory::Components> before{ Loom::PlayHistory::ReadComponents(*cube) };
 
 			change();
 			Pump();
@@ -117,12 +131,12 @@ TEST_SUITE("PlayHistory")
 		Edit(*cube, cube->transform.position, moved);
 
 		REQUIRE(history.CanUndo());
-		CHECK(history.Undo() == cube);
+		CHECK(history.Undo() == Stepped{ cube });
 		CHECK(*cube->transform.position == glm::vec3(0.0f));
 		CHECK_FALSE(history.CanUndo());
 
 		REQUIRE(history.CanRedo());
-		CHECK(history.Redo() == cube);
+		CHECK(history.Redo() == Stepped{ cube });
 		CHECK(*cube->transform.position == moved);
 		CHECK_FALSE(history.CanRedo());
 	};
@@ -132,7 +146,29 @@ TEST_SUITE("PlayHistory")
 		Edit(*cube, cube->transform.scale, glm::vec3(1.0f));
 
 		CHECK_FALSE(history.CanUndo());
-		CHECK(history.Undo() == nullptr);
+		CHECK(history.Undo().empty());
+	};
+
+	TEST_CASE_FIXTURE(Running, "an edit made to several objects at once is one step, and undo puts each back")
+	{
+		Loom::GameObject* sphere = scene->GetRoot().AddChild("Sphere");
+		Pump();
+
+		const glm::vec3 grown(2.0f);
+		const std::vector<Loom::PlayHistory::Field> edits{ Before(*cube, cube->transform.scale), Before(*sphere, sphere->transform.scale) };
+
+		cube->transform.scale = grown;
+		sphere->transform.scale = grown;
+		history.RecordFields(edits);
+
+		CHECK(history.Undo() == Stepped{ cube, sphere });
+		CHECK(*cube->transform.scale == glm::vec3(1.0f));
+		CHECK(*sphere->transform.scale == glm::vec3(1.0f));
+		CHECK_FALSE(history.CanUndo());
+
+		CHECK(history.Redo() == Stepped{ cube, sphere });
+		CHECK(*cube->transform.scale == grown);
+		CHECK(*sphere->transform.scale == grown);
 	};
 
 	TEST_CASE_FIXTURE(Running, "steps go back newest first, each to its own field")
@@ -172,10 +208,10 @@ TEST_SUITE("PlayHistory")
 
 		Edit(*marker, marker->label, std::string("second"));
 
-		CHECK(history.Undo() == cube);
+		CHECK(history.Undo() == Stepped{ cube });
 		CHECK(*marker->label == "first");
 
-		CHECK(history.Redo() == cube);
+		CHECK(history.Redo() == Stepped{ cube });
 		CHECK(*marker->label == "second");
 	};
 
@@ -187,7 +223,7 @@ TEST_SUITE("PlayHistory")
 		Edit(*cube, cube->transform.scale, glm::vec3(2.0f));
 
 		CHECK_FALSE(history.CanRedo());
-		CHECK(history.Redo() == nullptr);
+		CHECK(history.Redo().empty());
 	};
 
 	TEST_CASE_FIXTURE(Running, "a step whose object has gone is passed over for the one before it")
@@ -201,7 +237,7 @@ TEST_SUITE("PlayHistory")
 		other->Destroy();
 		Pump();
 
-		CHECK(history.Undo() == cube);
+		CHECK(history.Undo() == Stepped{ cube });
 		CHECK(*cube->transform.position == glm::vec3(0.0f));
 		CHECK_FALSE(history.CanUndo());
 	};
@@ -213,7 +249,7 @@ TEST_SUITE("PlayHistory")
 
 		size_t undone = 0;
 
-		while (history.Undo())
+		while (!history.Undo().empty())
 			undone++;
 
 		CHECK(undone == Loom::PlayHistory::max_steps);
@@ -236,6 +272,27 @@ TEST_SUITE("PlayHistory")
 
 	#pragma region Component Steps
 
+	TEST_CASE_FIXTURE(Running, "components added to several GameObjects at once are one step")
+	{
+		Loom::GameObject* sphere = scene->GetRoot().AddChild("Sphere");
+		Pump();
+
+		const size_t had = cube->GetComponents().size();
+		std::vector<Loom::PlayHistory::Components> before{ Loom::PlayHistory::ReadComponents(*cube), Loom::PlayHistory::ReadComponents(*sphere) };
+
+		cube->Attach<PlayMarker>();
+		sphere->Attach<PlayMarker>();
+		Pump();
+		history.RecordComponents(std::move(before));
+
+		CHECK(history.Undo() == Stepped{ cube, sphere });
+		Pump();
+
+		CHECK(cube->GetComponents().size() == had);
+		CHECK(sphere->GetComponents().size() == had);
+		CHECK_FALSE(history.CanUndo());
+	};
+
 	TEST_CASE_FIXTURE(Running, "undo puts a removed component back in its place, and redo takes it off again")
 	{
 		Marker("first");
@@ -248,7 +305,7 @@ TEST_SUITE("PlayHistory")
 
 		REQUIRE(Labels() == std::vector<std::string>{ "first", "third" });
 
-		CHECK(history.Undo() == cube);
+		CHECK(history.Undo() == Stepped{ cube });
 		Pump();
 
 		CHECK(Labels() == std::vector<std::string>{ "first", "second", "third" });
@@ -361,7 +418,7 @@ TEST_SUITE("PlayHistory")
 		Pump();
 
 		REQUIRE(Labels() == std::vector<std::string>{ "second" });
-		CHECK(history.Undo() == cube);
+		CHECK(history.Undo() == Stepped{ cube });
 		CHECK(Labels() == std::vector<std::string>{ "first" });
 	};
 

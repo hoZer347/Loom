@@ -12,6 +12,10 @@ namespace Loom
 	// terminating null.
 	inline constexpr const char* ASSET_PAYLOAD = "LoomAsset";
 
+	// What a field shows in place of its value when the objects it edits
+	// disagree on it.
+	inline constexpr const char* MIXED_VALUE = "-";
+
 	// ImGui's InputText over a std::string, which ImGui itself only has in the
 	// stdlib helper.
 	LOOM_API bool InputTextString(const char* label, std::string& value);

@@ -491,9 +491,6 @@ namespace Loom
 		// One a pixel, as ImGui drags a whole number by default.
 		constexpr float integer_drag_speed = 1.0f;
 
-		// What a field shows when the selected objects disagree on it.
-		constexpr const char* mixed_value = "-";
-
 		// A MultilineText field's box shows its lines and one more to type on, within these.
 		constexpr int min_text_lines = 3;
 		constexpr int max_text_lines = 12;
@@ -711,7 +708,7 @@ namespace Loom
 		{
 			const long long value = IntegerOf(field);
 			const bool known = value >= 0 && value < (long long)choices.size();
-			const std::string shown = mixed ? mixed_value : known ? choices[(size_t)value] : std::to_string(value);
+			const std::string shown = mixed ? MIXED_VALUE : known ? choices[(size_t)value] : std::to_string(value);
 
 			bool changed = false;
 
@@ -742,7 +739,7 @@ namespace Loom
 					shown = enumerator.label;
 
 			if (mixed)
-				shown = mixed_value;
+				shown = MIXED_VALUE;
 
 			bool changed = false;
 
@@ -1610,38 +1607,21 @@ namespace Loom
 		m_selected = gameObject;
 		m_selectedId = gameObject ? gameObject->m_ID : 0;
 		m_selection.assign(gameObject ? 1 : 0, m_selectedId);
-		m_selectionAnchor = m_selectedId;
 		m_nameBufferOwner = nullptr;
 		m_selectedModel.clear();
 		m_renaming = false;
 	};
 
-	void Editor::ToggleSelected(GameObject* gameObject)
+	void Editor::SetSelection(const std::vector<GameObject*>& objects)
 	{
-		// A scene's root is only ever selected alone.
-		if (m_selected && m_selected->GetParent() == nullptr)
-			Select(nullptr);
+		Select(objects.empty() ? nullptr : objects.front());
 
-		const auto found = std::find(m_selection.begin(), m_selection.end(), gameObject->m_ID);
+		if (m_selected == nullptr || m_selected->GetParent() == nullptr)
+			return;
 
-		if (found == m_selection.end())
-		{
-			m_selection.push_back(gameObject->m_ID);
-			m_selected = gameObject;
-		}
-		else
-		{
-			m_selection.erase(found);
-
-			if (m_selected == gameObject)
-				m_selected = m_selection.empty() ? nullptr : LiveObject(m_selection.back());
-		};
-
-		m_selectedId = m_selected ? m_selected->m_ID : 0;
-		m_selectionAnchor = gameObject->m_ID;
-		m_nameBufferOwner = nullptr;
-		m_selectedModel.clear();
-		m_renaming = false;
+		for (size_t i = 1; i < objects.size(); i++)
+			if (objects[i]->GetParent() && !IsSelected(*objects[i]))
+				m_selection.push_back(objects[i]->m_ID);
 	};
 
 	std::vector<GameObject*> Editor::GetSelection() const
@@ -1665,47 +1645,129 @@ namespace Loom
 		return std::find(m_selection.begin(), m_selection.end(), gameObject.m_ID) != m_selection.end();
 	};
 
-	void Editor::ClickNode(GameObject* gameObject)
+	std::vector<Guid> Editor::GetSelectedGuids() const
 	{
-		const ImGuiIO& io = ImGui::GetIO();
-		GameObject* anchor = LiveObject(m_selectionAnchor);
+		std::vector<Guid> guids{ };
 
-		if (io.KeyShift && anchor && anchor->GetParent() != nullptr)
+		for (const GameObject* gameObject : GetSelection())
+			guids.push_back(gameObject->GetGuid());
+
+		return guids;
+	};
+
+	void Editor::SelectAgain(const std::vector<Guid>& guids)
+	{
+		std::vector<GameObject*> found{ };
+
+		for (const Guid& guid : guids)
+			if (GameObject* gameObject = LoomObject::GetByGuid<GameObject>(guid))
+				found.push_back(gameObject);
+
+		if (!found.empty())
+			SetSelection(found);
+	};
+
+	std::vector<GameObject*> Editor::HierarchyRows() const
+	{
+		const auto open = [this](const GameObject& node) { return ShownOpen(node); };
+
+		std::vector<GameObject*> rows{ };
+
+		const auto add = [&](GameObject& parent)
 		{
-			GameObject* top = gameObject;
+			const std::vector<GameObject*> under = MultiEdit::Rows(parent, open);
 
-			while (top->GetParent())
-				top = top->GetParent();
-
-			const std::vector<GameObject*> range = MultiEdit::Range(
-				MultiEdit::Rows(*top, [this](const GameObject& node) { return ShownOpen(node); }),
-				anchor,
-				gameObject);
-
-			if (!range.empty())
-			{
-				const uint64_t kept = m_selectionAnchor;
-
-				if (!io.KeyCtrl)
-					Select(nullptr);
-
-				for (GameObject* row : range)
-					if (!IsSelected(*row))
-						ToggleSelected(row);
-
-				if (!IsSelected(*gameObject))
-					ToggleSelected(gameObject);
-
-				m_selected = gameObject;
-				m_selectedId = gameObject->m_ID;
-				m_selectionAnchor = kept;
-				return;
-			};
+			rows.insert(rows.end(), under.begin(), under.end());
 		};
 
-		if (io.KeyCtrl)
-			ToggleSelected(gameObject);
-		else Select(gameObject);
+		for (Scene* scene : Scene::GetScenes())
+			if (ShownOpen(scene->GetRoot()))
+				add(scene->GetRoot());
+
+		if (GameObject* prefab = GetPrefabRoot())
+		{
+			rows.push_back(prefab);
+
+			if (ShownOpen(*prefab))
+				add(*prefab);
+		};
+
+		return rows;
+	};
+
+	void Editor::ApplySelection(const ImGuiMultiSelectIO& io)
+	{
+		if (io.Requests.empty())
+			return;
+
+		const bool root = m_selected && m_selected->GetParent() == nullptr;
+
+		std::vector<GameObject*> selection = root ? std::vector<GameObject*>{ } : GetSelection();
+		std::vector<GameObject*> rows{ };
+		GameObject* clicked = nullptr;
+
+		for (const ImGuiSelectionRequest& request : io.Requests)
+		{
+			if (request.Type == ImGuiSelectionRequestType_SetAll)
+			{
+				selection = request.Selected ? HierarchyRows() : std::vector<GameObject*>{ };
+				continue;
+			};
+
+			GameObject* first = LiveObject((uint64_t)request.RangeFirstItem);
+			GameObject* last = LiveObject((uint64_t)request.RangeLastItem);
+
+			if (first == nullptr || last == nullptr)
+				continue;
+
+			if (first != last && rows.empty())
+				rows = HierarchyRows();
+
+			const std::vector<GameObject*> range = first == last
+				? std::vector<GameObject*>{ first }
+				: MultiEdit::Range(rows, first, last);
+
+			for (GameObject* row : range)
+			{
+				const auto found = std::find(selection.begin(), selection.end(), row);
+
+				if (request.Selected && found == selection.end())
+					selection.push_back(row);
+				else if (!request.Selected && found != selection.end())
+					selection.erase(found);
+			};
+
+			if (request.Selected)
+				clicked = last;
+		};
+
+		const auto has = [&selection](const GameObject* gameObject)
+		{
+			return std::find(selection.begin(), selection.end(), gameObject) != selection.end();
+		};
+
+		// The row clicked last is the one the Inspector is drawn from, as in Unity.
+		GameObject* primary =
+			clicked && has(clicked) ? clicked :
+			has(m_selected) ? m_selected :
+			selection.empty() ? nullptr : selection.back();
+
+		if (primary)
+		{
+			selection.erase(std::find(selection.begin(), selection.end(), primary));
+			selection.insert(selection.begin(), primary);
+		};
+
+		const std::vector<GameObject*> now = GetSelection();
+
+		// A click on a row selected alone changes nothing, so its double-click can rename it.
+		if (!root &&
+			primary == m_selected &&
+			selection.size() == now.size() &&
+			std::is_permutation(selection.begin(), selection.end(), now.begin()))
+			return;
+
+		SetSelection(selection);
 	};
 
 	void Editor::SelectModel(const std::string& path)
@@ -1750,10 +1812,10 @@ namespace Loom
 				if (named == nullptr)
 					break;
 
-				if (m_pendingSelectionAdds)
-					ToggleSelected(named);
-				else
-					Select(named);
+				std::vector<GameObject*> chosen = m_pendingSelectionAdds ? GetSelection() : std::vector<GameObject*>{ };
+
+				chosen.push_back(named);
+				SetSelection(chosen);
 
 				m_pendingSelectionAdds = true;
 				m_pendingSelection.erase(m_pendingSelection.begin());
@@ -1852,15 +1914,15 @@ namespace Loom
 
 		std::string error;
 
-		GameObject* pasted = SceneSerializer::Deserialize(text, *parent, &error);
+		const std::vector<GameObject*> pasted = SceneSerializer::DeserializeAll(text, *parent, &error);
 
-		if (pasted == nullptr)
+		if (pasted.empty())
 		{
 			std::cerr << "Nothing to paste: " << error << std::endl;
 			return;
 		};
 
-		Select(pasted);
+		SetSelection(pasted);
 
 		m_historyDirty = true;
 	};
@@ -1875,8 +1937,8 @@ namespace Loom
 		{
 			RecordPlayEdit();
 
-			if (GameObject* stepped = m_playHistory.Undo())
-				Select(stepped);
+			if (const std::vector<GameObject*> stepped = m_playHistory.Undo(); !stepped.empty())
+				SetSelection(stepped);
 
 			return;
 		};
@@ -1892,8 +1954,8 @@ namespace Loom
 		{
 			RecordPlayEdit();
 
-			if (GameObject* stepped = m_playHistory.Redo())
-				Select(stepped);
+			if (const std::vector<GameObject*> stepped = m_playHistory.Redo(); !stepped.empty())
+				SetSelection(stepped);
 
 			return;
 		};
@@ -1934,17 +1996,7 @@ namespace Loom
 		if (again == before)
 			return;
 
-		Select(again.empty() ? nullptr : again.front());
-
-		for (size_t i = 1; i < again.size(); i++)
-			ToggleSelected(again[i]);
-
-		// The first is the one the Inspector was drawn from.
-		if (again.size() > 1)
-		{
-			m_selected = again.front();
-			m_selectedId = m_selected->m_ID;
-		};
+		SetSelection(again);
 	};
 
 	bool Editor::CanStepHistory() const
@@ -1980,27 +2032,47 @@ namespace Loom
 
 	void Editor::RecordPlayEdit()
 	{
+		std::vector<PlayHistory::Field> edits{ };
+
 		for (const PlayEdit& edit : m_playEdits)
 			if (m_playing && LoomObject::GetByID(edit.id) == edit.object)
-				m_playHistory.RecordField(*edit.object, edit.index, edit.before);
+			{
+				PlayHistory::Field& field = edits.emplace_back();
 
+				field.before = edit.before;
+				field.object = edit.object->GetGuid();
+				field.index = edit.index;
+			};
+
+		m_playHistory.RecordFields(std::move(edits));
 		m_playEdits.clear();
 	};
 
 	void Editor::ChangeComponents(GameObject& gameObject, const std::function<void()>& change)
 	{
+		ChangeComponents({ &gameObject }, [&change](size_t) { change(); });
+	};
+
+	void Editor::ChangeComponents(const std::vector<GameObject*>& objects, const std::function<void(size_t)>& change)
+	{
 		if (!m_playing)
 		{
-			change();
+			for (size_t i = 0; i < objects.size(); i++)
+				change(i);
+
 			return;
 		};
 
 		// The held edit goes first, since the change may take its object off.
 		RecordPlayEdit();
 
-		PlayHistory::Components before = PlayHistory::ReadComponents(gameObject);
+		std::vector<PlayHistory::Components> before{ };
 
-		change();
+		for (GameObject* gameObject : objects)
+			before.push_back(PlayHistory::ReadComponents(*gameObject));
+
+		for (size_t i = 0; i < objects.size(); i++)
+			change(i);
 
 		// Removing a component waits for the queue, so the change is read once it gets here.
 		Engine::QueueTask(
@@ -3131,6 +3203,24 @@ namespace Loom
 
 			GatherOpenNodes();
 
+			const bool root = m_selected && m_selected->GetParent() == nullptr;
+
+			// Focus moving into the rename field is not the selection moving.
+			const bool focused_rename = m_renameFieldId != 0 && ImGui::GetCurrentContext()->NavJustMovedToId == m_renameFieldId;
+
+			ImGui::BeginMultiSelect(
+				focused_rename ? ImGuiMultiSelectFlags_NoAutoClear : ImGuiMultiSelectFlags_None,
+				root ? 0 : (int)m_selection.size(),
+				-1);
+
+			// A selection made elsewhere is where a Shift+click range starts.
+			if (m_rangeSourceFor != m_selectedId)
+				ImGui::GetCurrentContext()->CurrentMultiSelect->Storage->RangeSrcItem = root || m_selected == nullptr
+					? ImGuiSelectionUserData_Invalid
+					: (ImGuiSelectionUserData)m_selectedId;
+
+			ApplySelection(ImGui::GetCurrentContext()->CurrentMultiSelect->IO);
+
 			// Tree ids are GUIDs, which a scene opened twice shares with its copy.
 			std::unordered_map<Guid, int> copies{ };
 
@@ -3142,6 +3232,9 @@ namespace Loom
 			};
 
 			DrawPrefabNode();
+
+			ApplySelection(*ImGui::EndMultiSelect());
+			m_rangeSourceFor = m_selectedId;
 
 			GameObject* last_rows = GetPrefabRoot();
 
@@ -3303,6 +3396,8 @@ namespace Loom
 		else if (in_prefab)
 			ImGui::PushStyleColor(ImGuiCol_Text, EditorTheme::AccentText);
 
+		ImGui::SetNextItemSelectionUserData((ImGuiSelectionUserData)gameObject->m_ID);
+
 		const bool open = ImGui::TreeNodeEx(
 			gameObject->GetGuid().ToString().c_str(),
 			flags,
@@ -3320,11 +3415,6 @@ namespace Loom
 		DragAndDropNode(gameObject, open);
 
 		DragSource(*gameObject);
-
-		// Not when already selected alone, or the double-click's release cancels the rename.
-		if (NodeReleased() &&
-			(m_selected != gameObject || m_selection.size() > 1 || ImGui::GetIO().KeyCtrl || ImGui::GetIO().KeyShift))
-			ClickNode(gameObject);
 
 		if (ImGui::IsItemHovered() &&
 			ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
@@ -3685,6 +3775,8 @@ namespace Loom
 			m_focusRename = false;
 		};
 
+		m_renameFieldId = ImGui::GetID("##rename");
+
 		ImGui::InputText(
 			"##rename",
 			m_nameBuffer,
@@ -3707,24 +3799,11 @@ namespace Loom
 		if (ImGui::IsItemActivated())
 			m_nodePressOpened = ImGui::IsItemToggledOpen();
 
-		const ImGuiIO& io = ImGui::GetIO();
-		const bool still = !ImGui::IsMouseDragPastThreshold(ImGuiMouseButton_Left);
-
-		// A tree node takes no press with ctrl or shift held, so that click is caught here.
-		const bool modified =
-			(io.KeyCtrl || io.KeyShift) &&
-			!ImGui::IsItemDeactivated() &&
-			ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
-			ImGui::IsItemHovered() &&
-			ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()).Contains(io.MouseClickedPos[ImGuiMouseButton_Left]) &&
-			still;
-
 		return
-			modified ||
-			(ImGui::IsItemDeactivated() &&
+			ImGui::IsItemDeactivated() &&
 			ImGui::IsItemHovered() &&
-			still &&
-			!m_nodePressOpened);
+			!ImGui::IsMouseDragPastThreshold(ImGuiMouseButton_Left) &&
+			!m_nodePressOpened;
 	};
 
 	#pragma endregion
@@ -4010,10 +4089,11 @@ namespace Loom
 
 				if (ImGui::InputTextWithHint(
 					"##name",
-					mixed_name ? mixed_value : "",
+					mixed_name ? MIXED_VALUE : "",
 					m_nameBuffer,
 					sizeof(m_nameBuffer),
-					ImGuiInputTextFlags_EnterReturnsTrue))
+					ImGuiInputTextFlags_EnterReturnsTrue) &&
+					!(mixed_name && m_nameBuffer[0] == '\0'))
 					for (GameObject* each : objects)
 						each->SetName(m_nameBuffer);
 
@@ -4093,10 +4173,12 @@ namespace Loom
 				if (base != std::end(derived) && !m_projectPath.empty())
 				{
 					AskForAsset(base->second, m_projectPath);
-					m_newScriptFor = objects.front()->GetGuid();
+					m_newScriptFor.clear();
+
+					for (const GameObject* gameObject : objects)
+						m_newScriptFor.push_back(gameObject->GetGuid());
 				}
-				else for (GameObject* gameObject : objects)
-					ChangeComponents(*gameObject, [&]() { ComponentRegistry::Create(component, *gameObject); });
+				else ChangeComponents(objects, [&](size_t i) { ComponentRegistry::Create(component, *objects[i]); });
 			};
 
 			if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
@@ -4365,7 +4447,7 @@ namespace Loom
 			&thread,
 			GameObject::Unprocessed,
 			(int)Jobs::Cores(),
-			mixed_thread ? mixed_value : "%d"))
+			mixed_thread ? MIXED_VALUE : "%d"))
 			for (GameObject* each : objects)
 				each->SetThreadID(thread);
 
@@ -4415,8 +4497,7 @@ namespace Loom
 		// The remove button rides on the header's own line, Unity-style.
 		ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::GetFrameHeight());
 		if (ImGui::SmallButton("x"))
-			for (size_t i = 0; i < objects.size(); i++)
-				ChangeComponents(*objects[i], [held = objects[i], removed = components[i]]() { held->DetachComponent(removed); });
+			ChangeComponents(objects, [&](size_t i) { objects[i]->DetachComponent(components[i]); });
 
 		if (!open)
 		{
@@ -4567,7 +4648,7 @@ namespace Loom
 			std::array<float, MultiEdit::max_axes> was{ };
 			std::copy_n((const float*)field.data, axes, was.begin());
 
-			const char* integer_format = mixed ? mixed_value : nullptr;
+			const char* integer_format = mixed ? MIXED_VALUE : nullptr;
 
 			// Rounded through "-", a drag would start from 0.
 			const ImGuiSliderFlags mixed_flags = mixed ? ImGuiSliderFlags_NoRoundToFormat : ImGuiSliderFlags_None;
@@ -4604,11 +4685,11 @@ namespace Loom
 				break;
 
 			case FieldType::Float:
-				changed = ImGui::DragFloat(label, (float*)field.data, drag_speed, 0.0f, 0.0f, mixed ? mixed_value : float_format, mixed_flags);
+				changed = ImGui::DragFloat(label, (float*)field.data, drag_speed, 0.0f, 0.0f, mixed ? MIXED_VALUE : float_format, mixed_flags);
 				break;
 
 			case FieldType::Double:
-				changed = ImGui::DragScalar(label, ImGuiDataType_Double, field.data, drag_speed, nullptr, nullptr, mixed ? mixed_value : double_format, mixed_flags);
+				changed = ImGui::DragScalar(label, ImGuiDataType_Double, field.data, drag_speed, nullptr, nullptr, mixed ? MIXED_VALUE : double_format, mixed_flags);
 				break;
 
 			case FieldType::String:
@@ -4625,7 +4706,7 @@ namespace Loom
 				{
 					std::string typed{ };
 
-					if (InputTextString(label, typed, mixed_value))
+					if (InputTextString(label, typed, MIXED_VALUE))
 					{
 						text = typed;
 						changed = true;

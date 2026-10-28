@@ -56,6 +56,7 @@
 struct ImGuiContext;
 struct ImGuiWindow;
 struct ImRect;
+struct ImGuiMultiSelectIO;
 
 
 namespace Loom
@@ -382,10 +383,9 @@ namespace Loom
 		// Clears the selected model too.
 		void Select(GameObject* gameObject);
 
-		// Adds gameObject to what is selected, or takes it off when it already
-		// is, as a Ctrl+click in the Hierarchy does. One added becomes the one
-		// the Inspector is drawn from.
-		void ToggleSelected(GameObject* gameObject);
+		// Selects objects, the Inspector drawn from the first. A scene's root is
+		// only ever selected alone, so one among others is left out.
+		void SetSelection(const std::vector<GameObject*>& objects);
 
 		// Every GameObject selected, the one the Inspector is drawn from first.
 		std::vector<GameObject*> GetSelection() const;
@@ -816,6 +816,9 @@ namespace Loom
 		// components, and while playing puts it in m_playHistory.
 		void ChangeComponents(GameObject& gameObject, const std::function<void()>& change);
 
+		// The same for each of objects, change given its index, as one step.
+		void ChangeComponents(const std::vector<GameObject*>& objects, const std::function<void(size_t)>& change);
+
 		// Undo or Redo, keeping the selection on its object when the step
 		// takes it out and makes it again.
 		void StepHistory(bool (SceneHistory::* step)(const std::vector<Scene*>&));
@@ -1095,11 +1098,22 @@ namespace Loom
 		// gone, which can happen partway through a frame.
 		bool IsSelectedIn(const GameObject& root) const;
 
+		// Whether gameObject is any of those selected, not only the one the
+		// Inspector is drawn from.
 		bool IsSelected(const GameObject& gameObject) const;
 
-		// A click on gameObject's row: Ctrl adds or takes it off, Shift selects
-		// the rows from the last one clicked, and Ctrl+Shift adds them.
-		void ClickNode(GameObject* gameObject);
+		// The guids of what is selected, in GetSelection's order, and the
+		// selection again from them once those still there are found, or as
+		// it is when none is.
+		std::vector<Guid> GetSelectedGuids() const;
+		void SelectAgain(const std::vector<Guid>& guids);
+
+		// Every GameObject row the Hierarchy has under its open nodes, in the
+		// order it draws them.
+		std::vector<GameObject*> HierarchyRows() const;
+
+		// Makes the selection what a click or key in the Hierarchy asked for.
+		void ApplySelection(const ImGuiMultiSelectIO& io);
 
 		// Whether the Hierarchy draws node open, without counting it as drawn.
 		bool ShownOpen(const GameObject& node) const;
@@ -1277,10 +1291,11 @@ namespace Loom
 		GameObject* m_selected = nullptr;
 		uint64_t m_selectedId = 0;
 
-		// The ids of every GameObject selected, m_selected's among them, and of
-		// the row a Shift+click selects from.
+		// The ids of every GameObject selected, m_selected's among them, and
+		// m_selectedId when the Hierarchy last saw it, so a selection made
+		// elsewhere is where its Shift+click range starts.
 		std::vector<uint64_t> m_selection{ };
-		uint64_t m_selectionAnchor = 0;
+		uint64_t m_rangeSourceFor = 0;
 		bool m_nodePressOpened = false;
 		std::vector<std::string> m_pendingSelection{ };
 		bool m_pendingSelectionAdds = false;
@@ -1417,7 +1432,7 @@ namespace Loom
 		// One entry per scene that was open when a rebuild started, and what a
 		// Stop pressed during that rebuild leaves behind for it to come back to.
 		std::vector<SceneSnapshot> m_snapshots{ };
-		Guid m_selectedBeforeBuild{ };
+		std::vector<Guid> m_selectedBeforeBuild{ };
 		bool m_playAfterCompile = false;
 
 		// The scenes as they were when Play was pressed, held for as long as the
@@ -1591,8 +1606,8 @@ namespace Loom
 		// Add Component's StateMachine and DialogueManager make a script of that kind
 		// for the object rather than attaching one, and the script attaches to it
 		// once the compile that follows has loaded it.
-		Guid m_newScriptFor{ };
-		Guid m_attachAfterBuildTo{ };
+		std::vector<Guid> m_newScriptFor{ };
+		std::vector<Guid> m_attachAfterBuildTo{ };
 		std::string m_attachAfterBuild{ };
 		bool m_compileAfterBuild = false;
 
@@ -1677,6 +1692,7 @@ namespace Loom
 		// in the same buffer as the inspector's name box.
 		bool m_renaming = false;
 		bool m_focusRename = false;
+		unsigned int m_renameFieldId = 0;
 
 		#pragma endregion
 

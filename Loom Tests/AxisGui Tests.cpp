@@ -15,6 +15,7 @@ namespace
 	constexpr int vertices_per_stripe = 4;
 
 	constexpr float drag_speed = 0.01f;
+	constexpr const char* value_format = "%.3f";
 
 	// A window spends its first frame hidden while it sizes itself, so what
 	// it draws is only measured on the frames after.
@@ -127,6 +128,68 @@ TEST_SUITE("AxisGui")
 		});
 
 		CHECK(striped_vertices - plain_vertices == vertices_per_stripe * axis_count);
+	};
+
+	TEST_CASE("an axis the selection disagrees on shows a dash in place of its value")
+	{
+		ImGuiFrames frames;
+
+		float values[axis_count] = { 123.456f, 123.456f, 123.456f };
+		const bool agreed[axis_count] = { };
+		const bool mixed[axis_count] = { false, true, false };
+
+		const int agreed_vertices = ImGuiFrames::VerticesAdded([&]()
+		{
+			Loom::AxisGui::DragFloatN("##value", values, axis_count, agreed, drag_speed, value_format);
+		});
+
+		const int mixed_vertices = ImGuiFrames::VerticesAdded([&]()
+		{
+			Loom::AxisGui::DragFloatN("##value", values, axis_count, mixed, drag_speed, value_format);
+		});
+
+		CHECK(mixed_vertices < agreed_vertices);
+	};
+
+	TEST_CASE("dragging an axis the selection disagrees on starts from the value it holds")
+	{
+		constexpr float held = 5.0f;
+		constexpr float moved = 40.0f;
+		constexpr float grab = 10.0f;
+		constexpr int drag_frames = 4;
+
+		ImGuiFrames frames;
+
+		float values[axis_count] = { held, held, held };
+		const bool mixed[axis_count] = { true, true, true };
+		ImVec2 box{ };
+
+		ImGuiFrames::VerticesAdded([&]()
+		{
+			Loom::AxisGui::DragFloatN("##value", values, axis_count, mixed, drag_speed, value_format);
+			box = ImGui::GetItemRectMin();
+		});
+
+		ImGuiIO& io = ImGui::GetIO();
+		const ImVec2 start(box.x + grab, box.y + grab / 2.0f);
+
+		for (int frame = 0; frame < drag_frames; frame++)
+		{
+			if (frame == 0)
+				io.AddMousePosEvent(start.x, start.y);
+			else if (frame == 1)
+				io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+			else
+				io.AddMousePosEvent(start.x + moved * (frame - 1), start.y);
+
+			ImGuiFrames::VerticesAdded([&]()
+			{
+				Loom::AxisGui::DragFloatN("##value", values, axis_count, mixed, drag_speed, value_format);
+			});
+		};
+
+		CHECK(values[0] > held);
+		CHECK(values[1] == held);
 	};
 
 	TEST_CASE("a collapsed window draws nothing")

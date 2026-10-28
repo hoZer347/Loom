@@ -720,6 +720,13 @@ namespace Loom
 
 	GameObject* SceneSerializer::Deserialize(const std::string& text, GameObject& parent, std::string* error)
 	{
+		const std::vector<GameObject*> built = DeserializeAll(text, parent, error);
+
+		return built.empty() ? nullptr : built.front();
+	};
+
+	std::vector<GameObject*> SceneSerializer::DeserializeAll(const std::string& text, GameObject& parent, std::string* error)
+	{
 		std::vector<GameObject*> built{ };
 		Reader reader;
 
@@ -765,7 +772,7 @@ namespace Loom
 		if (read && !built.empty())
 		{
 			SceneSerializer::ResolveReferences(reader.pending);
-			return built.front();
+			return built;
 		};
 
 		if (error)
@@ -777,7 +784,7 @@ namespace Loom
 		for (GameObject* gameObject : built)
 			gameObject->Destroy();
 
-		return nullptr;
+		return { };
 	};
 
 	#pragma endregion

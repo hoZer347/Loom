@@ -185,7 +185,7 @@ namespace Loom
 
 		// The code behind the scenes' components is about to unload, so they go out as text.
 		m_snapshots = TakeSnapshots();
-		m_selectedBeforeBuild = m_selected ? m_selected->GetGuid() : Guid();
+		m_selectedBeforeBuild = GetSelectedGuids();
 		m_prefabBeforeBuild = m_prefabPath;
 		HoldPrefabEdits();
 
@@ -198,7 +198,7 @@ namespace Loom
 		if (!m_scripts.Build())
 		{
 			m_attachAfterBuild.clear();
-			m_attachAfterBuildTo = Guid();
+			m_attachAfterBuildTo.clear();
 			RestoreAfterBuild();
 		};
 	};
@@ -219,7 +219,7 @@ namespace Loom
 		if (!opened.empty())
 		{
 			m_snapshots.insert(m_snapshots.end(), std::make_move_iterator(opened.begin()), std::make_move_iterator(opened.end()));
-			m_selectedBeforeBuild = m_selected ? m_selected->GetGuid() : Guid();
+			m_selectedBeforeBuild = GetSelectedGuids();
 		};
 
 		if (!m_prefabPath.empty())
@@ -257,16 +257,26 @@ namespace Loom
 	void Editor::AttachAfterBuild()
 	{
 		const std::string name = std::exchange(m_attachAfterBuild, { });
-		GameObject* object = LoomObject::GetByGuid<GameObject>(std::exchange(m_attachAfterBuildTo, Guid()));
+		std::vector<GameObject*> objects{ };
 
-		if (name.empty() || object == nullptr)
+		for (const Guid& guid : std::exchange(m_attachAfterBuildTo, { }))
+			if (GameObject* object = LoomObject::GetByGuid<GameObject>(guid))
+				objects.push_back(object);
+
+		if (name.empty() || objects.empty())
 			return;
 
-		bool made = false;
+		std::vector<GameObject*> missed{ };
 
-		ChangeComponents(*object, [&]() { made = ComponentRegistry::Create(name, *object) != nullptr; });
+		ChangeComponents(
+			objects,
+			[&](size_t i)
+			{
+				if (ComponentRegistry::Create(name, *objects[i]) == nullptr)
+					missed.push_back(objects[i]);
+			});
 
-		if (!made)
+		for (GameObject* object : missed)
 			std::cerr << name << " did not compile, so it is not on " << object->GetName() << " yet." << std::endl;
 	};
 
@@ -285,8 +295,7 @@ namespace Loom
 				std::exchange(m_prefabHeldBeforeBuild, { }),
 				std::exchange(m_prefabShapeBeforeBuild, { }));
 
-		if (GameObject* selected = LoomObject::GetByGuid<GameObject>(m_selectedBeforeBuild))
-			Select(selected);
+		SelectAgain(m_selectedBeforeBuild);
 	};
 
 	std::vector<Editor::SceneSnapshot> Editor::TakeSnapshots() const

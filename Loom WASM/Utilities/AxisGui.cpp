@@ -1,5 +1,7 @@
 #include "AxisGui.h"
 
+#include "EditorGui.h"
+
 #include "imgui.h"
 #include "imgui_internal.h"
 
@@ -18,9 +20,6 @@ namespace Loom
 		constexpr int axis_count = IM_ARRAYSIZE(axis_colors);
 
 		constexpr float stripe_width = 3.0f;
-
-		// What a mixed axis shows in place of its value.
-		constexpr const char* mixed_format = "-";
 	};
 
 	bool AxisGui::DragFloatN(const char* label, float* values, int count, float speed, const char* format)
@@ -57,7 +56,7 @@ namespace Loom
 				speed,
 				0.0f,
 				0.0f,
-				axis_mixed ? mixed_format : format,
+				axis_mixed ? MIXED_VALUE : format,
 				axis_mixed ? ImGuiSliderFlags_NoRoundToFormat : ImGuiSliderFlags_None);
 
 			if (i < axis_count)

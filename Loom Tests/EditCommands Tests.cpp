@@ -296,6 +296,22 @@ TEST_SUITE("EditCommands")
 		CHECK(scene->GetRoot().GetChildren().size() == 2);
 	};
 
+	TEST_CASE_FIXTURE(Selection, "several copied GameObjects paste as one of each, all handed back")
+	{
+		Loom::GameObject* other = scene->AddChild("Other");
+		Pump();
+
+		const std::string copied = Loom::SceneSerializer::Serialize(*child) + Loom::SceneSerializer::Serialize(*other);
+		const std::vector<Loom::GameObject*> pasted = Loom::SceneSerializer::DeserializeAll(copied, scene->GetRoot());
+		Pump();
+
+		REQUIRE(pasted.size() == 2);
+		CHECK(pasted[0]->GetName() == "Child");
+		CHECK(pasted[0]->GetChildren().size() == 1);
+		CHECK(pasted[1]->GetName() == "Other");
+		CHECK(scene->GetRoot().GetChildren().size() == 4);
+	};
+
 	TEST_CASE_FIXTURE(Selection, "a cut brings the original back on undo, and pastes as a new copy")
 	{
 		std::vector<Loom::Scene*> open{ scene };

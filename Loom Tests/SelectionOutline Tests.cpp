@@ -91,6 +91,40 @@ TEST_SUITE("SelectionOutline")
 		CHECK(renderer.textures["u_mask"] == mask);
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "several selected objects share one mask and are ringed once together")
+	{
+		RecordingRenderer renderer;
+		renderer.windowSize = VIEW;
+
+		std::istringstream source(STAGES);
+		Loom::Shader shader("selection outline several", source);
+
+		Loom::Scene scene("selection outline several");
+		Pump();
+
+		Loom::Camera* camera = scene.Attach<Loom::Camera>();
+		Loom::GameObject* first = scene.AddChild("First");
+		Loom::GameObject* second = scene.AddChild("Second");
+		Pump();
+
+		for (Loom::GameObject* object : { first, second })
+		{
+			object->Attach<Loom::Material>()->shader = &shader;
+			object->Attach<Loom::Mesh>()->m_vertices = TRIANGLE;
+		};
+
+		Pump();
+
+		Loom::SelectionOutline outline;
+		outline.Draw(std::vector<Loom::GameObject*>{ first, second }, *camera);
+
+		const uint32_t mask = Mask(renderer);
+		const uint32_t mesh = renderer.programs.at(MESH_MASK + shader.file_path);
+
+		CHECK(renderer.drawn == std::vector<uint32_t>{ mesh, mesh, renderer.programs.at(EDGE) });
+		CHECK(renderer.drawnInto == std::vector<uint32_t>{ mask, mask, RecordingRenderer::WINDOW });
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh's mask is drawn with its own shader's vertex stage, so a shader that places it in clip space is ringed where it shows")
 	{
 		RecordingRenderer renderer;
