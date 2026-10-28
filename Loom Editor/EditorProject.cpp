@@ -1972,10 +1972,12 @@ namespace Loom
 	{
 		const float width = ImGui::CalcItemWidth();
 
+		constexpr const char* mixed_value = "-";
+
 		bool cut = false;
 		const std::string label = FitPickerLabel(
 			icon,
-			shown,
+			m_mixedField ? mixed_value : shown,
 			width - ImGui::GetStyle().FramePadding.x * 2.0f,
 			cut);
 

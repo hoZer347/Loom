@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <unordered_map>
+#include <vector>
 
 
 namespace Loom
@@ -39,6 +40,9 @@ namespace Loom
 		// Draws over the target being drawn into, seen through camera. When the
 		// selection has anything to draw, leaves that target's depth cleared.
 		void Draw(GameObject& selected, const Camera& camera);
+
+		// One ring around all of them, in one pass.
+		void Draw(const std::vector<GameObject*>& selected, const Camera& camera);
 
 		#pragma endregion
 

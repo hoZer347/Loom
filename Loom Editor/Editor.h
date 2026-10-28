@@ -382,8 +382,17 @@ namespace Loom
 		// Clears the selected model too.
 		void Select(GameObject* gameObject);
 
+		// Adds gameObject to what is selected, or takes it off when it already
+		// is, as a Ctrl+click in the Hierarchy does. One added becomes the one
+		// the Inspector is drawn from.
+		void ToggleSelected(GameObject* gameObject);
+
+		// Every GameObject selected, the one the Inspector is drawn from first.
+		std::vector<GameObject*> GetSelection() const;
+
 		// Selects the GameObject with this name once its scene has loaded, so a
-		// screenshot can show it in the inspector.
+		// screenshot can show it in the inspector. Each further request before
+		// then adds another to the selection.
 		void RequestSelection(const std::string& name);
 
 		#pragma endregion
@@ -629,10 +638,13 @@ namespace Loom
 
 		#pragma region Inspector
 
+		// Each takes every selected GameObject, or the match on each, the one
+		// drawn from first. A field they disagree on shows "-", and an edit
+		// writes into them all.
 		void DrawInspector();
-		void DrawTransform(GameObject* gameObject, float column);
-		void DrawThread(GameObject* gameObject, float column);
-		void DrawComponent(GameObject* gameObject, ComponentBase* component);
+		void DrawTransform(const std::vector<GameObject*>& objects, float column);
+		void DrawThread(const std::vector<GameObject*>& objects, float column);
+		void DrawComponent(const std::vector<GameObject*>& objects, const std::vector<ComponentBase*>& components);
 
 		// Takes a component of gameObject dragged over onto, which fills area,
 		// putting it above onto or below it by the half under the mouse, and
@@ -642,7 +654,7 @@ namespace Loom
 		// Scrolls the Inspector on while a component is held near its top or
 		// bottom, to reorder past what is in sight.
 		void ScrollWhileReordering();
-		void DrawComponentMenu(GameObject* gameObject, const ComponentMenu::Node& node);
+		void DrawComponentMenu(const std::vector<GameObject*>& objects, const ComponentMenu::Node& node);
 
 		// Right-click on a component in the Add Component menu: the category it
 		// is filed under in this project.
@@ -665,7 +677,7 @@ namespace Loom
 		// A DialogueManager's New Binding: a LOOM_DIALOGUE_BINDING function written into
 		// the header defining type, opened there in Visual Studio.
 		void AddDialogueBinding(const std::string& type);
-		void DrawFields(LoomObject& object, const std::vector<std::string>& labels, float column);
+		void DrawFields(const std::vector<LoomObject*>& objects, const std::vector<std::string>& labels, float column);
 
 		// A reference field of object: what it holds, which a click swaps for
 		// another picked from what it could hold in the scene or prefab object
@@ -794,10 +806,10 @@ namespace Loom
 		bool CanUndo() const;
 		bool CanRedo() const;
 
-		// While playing, the Inspector's field at index of object changed from
-		// before. The edit goes in m_playHistory once it is let go of, or
-		// another field is edited.
-		void TrackPlayEdit(LoomObject& object, size_t index, const std::string& before);
+		// While playing, the Inspector's field at index of each of objects
+		// changed from its before. The edits go in m_playHistory once they are
+		// let go of, or another field is edited.
+		void TrackPlayEdit(const std::vector<LoomObject*>& objects, size_t index, const std::vector<std::string>& before);
 		void RecordPlayEdit();
 
 		// Runs change, which adds, takes off or orders gameObject's
@@ -1083,6 +1095,15 @@ namespace Loom
 		// gone, which can happen partway through a frame.
 		bool IsSelectedIn(const GameObject& root) const;
 
+		bool IsSelected(const GameObject& gameObject) const;
+
+		// A click on gameObject's row: Ctrl adds or takes it off, Shift selects
+		// the rows from the last one clicked, and Ctrl+Shift adds them.
+		void ClickNode(GameObject* gameObject);
+
+		// Whether the Hierarchy draws node open, without counting it as drawn.
+		bool ShownOpen(const GameObject& node) const;
+
 		#pragma endregion
 
 		#pragma region Prefabs
@@ -1255,8 +1276,14 @@ namespace Loom
 		Scene* m_activeScene = nullptr;
 		GameObject* m_selected = nullptr;
 		uint64_t m_selectedId = 0;
+
+		// The ids of every GameObject selected, m_selected's among them, and of
+		// the row a Shift+click selects from.
+		std::vector<uint64_t> m_selection{ };
+		uint64_t m_selectionAnchor = 0;
 		bool m_nodePressOpened = false;
-		std::string m_pendingSelection{ };
+		std::vector<std::string> m_pendingSelection{ };
+		bool m_pendingSelectionAdds = false;
 		int m_selectionFramesLeft = 0;
 		std::vector<Scene*> m_ownedScenes{ };
 
@@ -1361,6 +1388,10 @@ namespace Loom
 		// apart from any tab's own.
 		FolderTree m_fieldPicker;
 
+		// Set while the Inspector draws a field the selection disagrees on, so
+		// a picker shows "-" for what it holds.
+		bool m_mixedField = false;
+
 		// Where the Create prompt's script is filed once it is written.
 		std::string m_newScriptFolder{ };
 
@@ -1418,7 +1449,7 @@ namespace Loom
 			std::string before{ };
 		};
 
-		std::optional<PlayEdit> m_playEdit{ };
+		std::vector<PlayEdit> m_playEdits{ };
 
 		// Set when a click lands or a widget is let go of in a window that
 		// CanEditScenes, or a scene arrives; a step is recorded on the first

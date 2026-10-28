@@ -18,10 +18,18 @@ namespace Loom
 		constexpr int axis_count = IM_ARRAYSIZE(axis_colors);
 
 		constexpr float stripe_width = 3.0f;
+
+		// What a mixed axis shows in place of its value.
+		constexpr const char* mixed_format = "-";
+	};
+
+	bool AxisGui::DragFloatN(const char* label, float* values, int count, float speed, const char* format)
+	{
+		return DragFloatN(label, values, count, nullptr, speed, format);
 	};
 
 	// ImGui::DragScalarN, with the stripe drawn over each box after it.
-	bool AxisGui::DragFloatN(const char* label, float* values, int count, float speed, const char* format)
+	bool AxisGui::DragFloatN(const char* label, float* values, int count, const bool* mixed, float speed, const char* format)
 	{
 		if (ImGui::GetCurrentWindow()->SkipItems)
 			return false;
@@ -40,7 +48,17 @@ namespace Loom
 			if (i > 0)
 				ImGui::SameLine(0.0f, style.ItemInnerSpacing.x);
 
-			changed |= ImGui::DragFloat("", &values[i], speed, 0.0f, 0.0f, format);
+			const bool axis_mixed = mixed && mixed[i];
+
+			// Rounded through "-", a drag would start from 0.
+			changed |= ImGui::DragFloat(
+				"",
+				&values[i],
+				speed,
+				0.0f,
+				0.0f,
+				axis_mixed ? mixed_format : format,
+				axis_mixed ? ImGuiSliderFlags_NoRoundToFormat : ImGuiSliderFlags_None);
 
 			if (i < axis_count)
 			{

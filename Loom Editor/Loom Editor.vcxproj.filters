@@ -166,6 +166,9 @@
     <ClCompile Include="SelectionOutline.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
+    <ClCompile Include="MultiEdit.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
     <ClCompile Include="GameFocus.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
@@ -358,6 +361,9 @@
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="SelectionOutline.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="MultiEdit.h">
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="GameFocus.h">

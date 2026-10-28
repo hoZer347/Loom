@@ -204,6 +204,7 @@
     <ClCompile Include="Sprite Tests.cpp" />
     <ClCompile Include="Ui Tests.cpp" />
     <ClCompile Include="SelectionOutline Tests.cpp" />
+    <ClCompile Include="MultiEdit Tests.cpp" />
     <ClCompile Include="Render Tests.cpp" />
     <ClCompile Include="Mesh Tests.cpp" />
     <ClCompile Include="Animation Tests.cpp" />
@@ -303,6 +304,7 @@
     <ClCompile Include="..\Loom Editor\EditorViewport.cpp" />
     <ClCompile Include="..\Loom Editor\ColliderGizmos.cpp" />
     <ClCompile Include="..\Loom Editor\SelectionOutline.cpp" />
+    <ClCompile Include="..\Loom Editor\MultiEdit.cpp" />
     <ClCompile Include="..\Loom Editor\GameFocus.cpp" />
     <ClCompile Include="..\Loom Editor\LoadProgress.cpp" />
     <ClCompile Include="..\Loom Editor\WindowFrame.cpp" />

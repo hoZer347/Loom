@@ -30,6 +30,7 @@
 #include <string_view>
 #include <thread>
 #include <utility>
+#include <vector>
 
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
@@ -173,7 +174,8 @@ namespace
 			<< "                                 over the Project or an asset panel, copy the\n"
 			<< "                                 file there\n"
 			<< "  --preview <file>               select a model file, showing it in the Inspector\n"
-			<< "  --select <name>                select the first GameObject called that\n"
+			<< "  --select <name>                select the first GameObject called that;\n"
+			<< "                                 again to add another to the selection\n"
 			<< "  --open-project-dialog          start with File > Open Project... open\n"
 			<< "  --settings                     start with the Settings window open\n"
 			<< "  --open-demo <name>             open a project from the engine's Demos folder\n"
@@ -347,7 +349,7 @@ int main(int argc, char** argv)
 		std::string screenshot;
 		std::string screenshot_window;
 		std::string preview;
-		std::string selection;
+		std::vector<std::string> selection;
 		std::string new_script;
 		AssetKind new_script_kind = AssetKind::Script;
 		std::vector<std::pair<std::string, std::string>> categories;
@@ -503,7 +505,7 @@ int main(int argc, char** argv)
 					return 1;
 				};
 
-				selection = argv[++i];
+				selection.push_back(argv[++i]);
 			}
 			else if (argument == "--desktop")
 			{
@@ -655,8 +657,8 @@ int main(int argc, char** argv)
 		if (!preview.empty())
 			editor.SelectModel(preview);
 
-		if (!selection.empty())
-			editor.RequestSelection(selection);
+		for (const std::string& name : selection)
+			editor.RequestSelection(name);
 
 		if (!screenshot.empty())
 			editor.RequestScreenshot(screenshot, frames, true, screenshot_window);

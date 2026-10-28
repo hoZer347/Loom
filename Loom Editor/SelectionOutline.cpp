@@ -306,6 +306,11 @@ void main()
 
 	void SelectionOutline::Draw(GameObject& selected, const Camera& camera)
 	{
+		Draw(std::vector<GameObject*>{ &selected }, camera);
+	};
+
+	void SelectionOutline::Draw(const std::vector<GameObject*>& selected, const Camera& camera)
+	{
 		Renderer* renderer = Renderer::Get();
 
 		if (!renderer || !Compile())
@@ -324,7 +329,8 @@ void main()
 				camera.Apply(m_spriteMask);
 				camera.Apply(m_meshMask);
 
-				drew = DrawSilhouettes(selected, camera);
+				for (GameObject* gameObject : selected)
+					drew |= DrawSilhouettes(*gameObject, camera);
 			});
 
 		if (!drew)

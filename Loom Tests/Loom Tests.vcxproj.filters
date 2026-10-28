@@ -136,6 +136,9 @@
     <ClCompile Include="SelectionOutline Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="MultiEdit Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="Mesh Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

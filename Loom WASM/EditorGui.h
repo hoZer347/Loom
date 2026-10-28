@@ -16,6 +16,9 @@ namespace Loom
 	// stdlib helper.
 	LOOM_API bool InputTextString(const char* label, std::string& value);
 
+	// The same, showing hint while value is empty.
+	LOOM_API bool InputTextString(const char* label, std::string& value, const char* hint);
+
 	// The same in a box of the given height, taking Enter as a new line.
 	LOOM_API bool InputTextMultilineString(const char* label, std::string& value, float height);
 

@@ -31,6 +31,18 @@ namespace Loom
 			&value);
 	};
 
+	bool InputTextString(const char* label, std::string& value, const char* hint)
+	{
+		return ImGui::InputTextWithHint(
+			label,
+			hint,
+			value.data(),
+			value.capacity() + 1,
+			ImGuiInputTextFlags_CallbackResize,
+			Resize,
+			&value);
+	};
+
 	bool InputTextMultilineString(const char* label, std::string& value, float height)
 	{
 		return ImGui::InputTextMultiline(

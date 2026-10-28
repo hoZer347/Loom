@@ -17,6 +17,16 @@ namespace Loom
 			float speed = 1.0f,
 			const char* format = "%.3f");
 
+		/// As above, with each axis that mixed marks drawn as "-", for a field
+		/// several objects disagree on. mixed may be null.
+		static bool DragFloatN(
+			const char* label,
+			float* values,
+			int count,
+			const bool* mixed,
+			float speed,
+			const char* format);
+
 		AxisGui() = delete;
 	};
 };
