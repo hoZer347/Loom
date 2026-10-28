@@ -288,6 +288,7 @@ namespace Loom
 		// False when there is nothing that way.
 		static bool StepPalette(PaletteFile& file, bool undo);
 		bool SavePalette(const std::string& path);
+		// Whether SaveAll writes the palette.
 		bool Kept(const std::string& path) const;
 
 		#pragma endregion

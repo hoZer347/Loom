@@ -210,6 +210,7 @@ namespace Loom
 		std::vector<Step> m_redo{ };
 		unsigned long long m_lastStep = 0;
 
+		// The mark of a scene that can no longer be undone back to its save.
 		static constexpr unsigned long long never_saved = std::numeric_limits<unsigned long long>::max();
 
 		// Each scene's NewestOf when it was saved.
