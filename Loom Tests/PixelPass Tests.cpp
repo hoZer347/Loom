@@ -3,8 +3,9 @@
 #include "Test Support.h"
 
 #include "EditorViewport.h"
-#include "Material.h"
 #include "PixelPass.h"
+#include "PixelShader.h"
+#include "Scene.h"
 #include "Shaders.h"
 
 #include <sstream>
@@ -21,32 +22,22 @@ namespace
 {
 	const glm::ivec2 VIEW(64, 32);
 
-	const std::string STAGES =
-		"// ===VERTEX===\n"
-		"void main() { }\n"
-		"// ===FRAGMENT===\n"
-		"out vec4 FragColor;\n"
-		"void main() { FragColor = vec4(1.0); }\n";
-
 	const std::string PASS =
-		"// ===PIXEL PASS===\n"
 		"out vec4 FragColor;\n"
 		"void main() { FragColor = LoomScenePixel(LoomScreenPixel()); }\n";
 
-	// A shader with a pixel pass, and a material drawn with it.
+	// A pixel shader's program, compiled from a .loompixel file of the name.
 	struct Passed
 	{
 		explicit Passed(const std::string& name) :
-			source(STAGES + PASS),
-			shader(name, source)
+			source(PASS),
+			shader(name + Loom::Shader::pixel_extension, source)
 		{
-			material.shader = &shader;
 			Pump();
 		};
 
 		std::istringstream source;
 		Loom::Shader shader;
-		Loom::Material material;
 	};
 };
 
@@ -57,18 +48,15 @@ TEST_SUITE("PixelPass")
 {
 	#pragma region Passes
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a shader with a pixel pass section builds a program for it, and one without does not")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a .loompixel file builds one program, the pass")
 	{
 		RecordingRenderer renderer;
 
 		Passed passed("passed");
 
-		std::istringstream plain_source(STAGES);
-		Loom::Shader plain("plain", plain_source);
-
-		CHECK(passed.shader.pixel_pass_id != 0);
-		CHECK(renderer.programs.at("passed pixel pass") == passed.shader.pixel_pass_id);
-		CHECK(plain.pixel_pass_id == 0);
+		CHECK(passed.shader.id != 0);
+		CHECK(renderer.programs.size() == 1);
+		CHECK(renderer.programs.at("passed.loompixel") == passed.shader.id);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a view drawn with no pixel pass is copied as it is")
@@ -76,16 +64,10 @@ TEST_SUITE("PixelPass")
 		RecordingRenderer renderer;
 		Loom::PixelPass pass;
 
-		std::istringstream plain_source(STAGES);
-		Loom::Shader plain("plain", plain_source);
-		Loom::Material material;
-		material.shader = &plain;
-		Pump();
-
 		const uint32_t view = renderer.CreateColorTarget(VIEW.x, VIEW.y);
 
 		pass.Begin();
-		Loom::PixelPass::Note(material);
+		Loom::PixelPass::Note(0);
 		CHECK_FALSE(pass.End());
 
 		pass.Draw(view, VIEW);
@@ -95,32 +77,28 @@ TEST_SUITE("PixelPass")
 		CHECK(renderer.drawnScenes[0] == view);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a pass reads the view and its depth, once however many of its materials were drawn")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a pass reads the view and its depth, once however many times it was noted")
 	{
 		RecordingRenderer renderer;
 		Loom::PixelPass pass;
 		Passed passed("passed");
 
-		Loom::Material other;
-		other.shader = &passed.shader;
-		Pump();
-
 		const uint32_t view = renderer.CreateColorTarget(VIEW.x, VIEW.y);
 
 		pass.Begin();
-		Loom::PixelPass::Note(passed.material);
-		Loom::PixelPass::Note(other);
+		Loom::PixelPass::Note(passed.shader.id);
+		Loom::PixelPass::Note(passed.shader.id);
 		CHECK(pass.End());
 
 		pass.Draw(view, VIEW);
 
-		CHECK(renderer.drawn == std::vector<uint32_t>{ passed.shader.pixel_pass_id });
+		CHECK(renderer.drawn == std::vector<uint32_t>{ passed.shader.id });
 		CHECK(renderer.drawnInto == std::vector<uint32_t>{ RecordingRenderer::WINDOW });
 		CHECK(renderer.drawnScenes == std::vector<uint32_t>{ view });
 		CHECK(renderer.textures.at("u_sceneDepth") == renderer.TargetDepth(view));
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "passes run in the order their materials were drawn, each reading what the one before it left")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "passes run in the order they were noted, each reading what the one before it left")
 	{
 		RecordingRenderer renderer;
 		Loom::PixelPass pass;
@@ -131,14 +109,14 @@ TEST_SUITE("PixelPass")
 		const uint32_t view = renderer.CreateColorTarget(VIEW.x, VIEW.y);
 
 		pass.Begin();
-		Loom::PixelPass::Note(second.material);
-		Loom::PixelPass::Note(first.material);
-		Loom::PixelPass::Note(third.material);
+		Loom::PixelPass::Note(second.shader.id);
+		Loom::PixelPass::Note(first.shader.id);
+		Loom::PixelPass::Note(third.shader.id);
 		pass.End();
 
 		pass.Draw(view, VIEW);
 
-		const std::vector<uint32_t> order{ second.shader.pixel_pass_id, first.shader.pixel_pass_id, third.shader.pixel_pass_id };
+		const std::vector<uint32_t> order{ second.shader.id, first.shader.id, third.shader.id };
 		REQUIRE(renderer.drawn == order);
 
 		const uint32_t into_first = renderer.drawnInto[0];
@@ -152,7 +130,7 @@ TEST_SUITE("PixelPass")
 		CHECK(renderer.drawnScenes == std::vector<uint32_t>{ view, into_first, into_second });
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a material drawn while nothing is noting is not noted")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a pass noted while nothing is noting is not run")
 	{
 		RecordingRenderer renderer;
 		Loom::PixelPass pass;
@@ -163,25 +141,54 @@ TEST_SUITE("PixelPass")
 		pass.Begin();
 		CHECK_FALSE(pass.End());
 
-		Loom::PixelPass::Note(passed.material);
+		Loom::PixelPass::Note(passed.shader.id);
 		pass.Draw(view, VIEW);
 
 		REQUIRE(renderer.drawn.size() == 1);
-		CHECK(renderer.drawn[0] != passed.shader.pixel_pass_id);
+		CHECK(renderer.drawn[0] != passed.shader.id);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the window takes the pixel pass path only while a shader with one is loaded")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the window takes the pixel pass path only while a PixelShader exists")
 	{
 		RecordingRenderer renderer;
 
-		CHECK_FALSE(Loom::Shader::AnyPixelPass());
+		CHECK_FALSE(Loom::PixelShader::Any());
 
 		{
-			Passed passed("passed");
-			CHECK(Loom::Shader::AnyPixelPass());
+			Loom::Scene scene("pixel shaders");
+			scene.GetRoot().AddChild("Screen")->Attach<Loom::PixelShader>();
+			Pump();
+
+			CHECK(Loom::PixelShader::Any());
 		};
 
-		CHECK_FALSE(Loom::Shader::AnyPixelPass());
+		// The root deletes its children a task later, and they their components a task after that.
+		Pump();
+		Pump();
+
+		CHECK_FALSE(Loom::PixelShader::Any());
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a PixelShader drawn notes its pass with the time, and one with no file notes nothing")
+	{
+		RecordingRenderer renderer;
+		Loom::PixelPass pass;
+		Passed passed("passed");
+		Loom::Scene scene("pixel shaders");
+
+		Loom::PixelShader* empty = scene.GetRoot().AddChild("Empty")->Attach<Loom::PixelShader>();
+		Loom::PixelShader* pixel = scene.GetRoot().AddChild("Screen")->Attach<Loom::PixelShader>();
+		pixel->shader = &passed.shader;
+		Pump();
+
+		pass.Begin();
+		empty->OnRender();
+		CHECK_FALSE(pass.End());
+
+		pass.Begin();
+		pixel->OnRender();
+		CHECK(pass.End());
+		CHECK(renderer.floats.contains("u_time"));
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a pass begun inside another notes in its place, then hands noting back")
@@ -194,7 +201,7 @@ TEST_SUITE("PixelPass")
 		outer.Begin();
 		inner.Begin();
 		inner.End();
-		Loom::PixelPass::Note(passed.material);
+		Loom::PixelPass::Note(passed.shader.id);
 
 		CHECK(outer.End());
 	};
@@ -213,7 +220,7 @@ TEST_SUITE("PixelPass")
 			VIEW.x,
 			VIEW.y,
 			nullptr,
-			[&]() { Loom::PixelPass::Note(passed.material); },
+			[&]() { Loom::PixelPass::Note(passed.shader.id); },
 			[&]() { renderer.Draw(0, 0, nullptr, 0, 0, Loom::VertexFormat::Position); });
 
 		REQUIRE(renderer.drawn.size() == 2);
@@ -221,7 +228,7 @@ TEST_SUITE("PixelPass")
 		const uint32_t shown = viewport.GetTexture();
 		const uint32_t drawn_into = renderer.drawnScenes[0];
 
-		CHECK(renderer.drawn[0] == passed.shader.pixel_pass_id);
+		CHECK(renderer.drawn[0] == passed.shader.id);
 		CHECK(shown != drawn_into);
 		CHECK(renderer.drawnInto == std::vector<uint32_t>{ shown, shown });
 		CHECK(renderer.targetSizes.at(shown) == VIEW);
@@ -256,7 +263,7 @@ TEST_SUITE("PixelPass")
 			VIEW.x,
 			VIEW.y,
 			nullptr,
-			[&]() { Loom::PixelPass::Note(passed.material); },
+			[&]() { Loom::PixelPass::Note(passed.shader.id); },
 			[&]() { renderer.Draw(0, 0, nullptr, 0, 0, Loom::VertexFormat::Position); });
 
 		CHECK_FALSE(outer.End());

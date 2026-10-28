@@ -122,13 +122,8 @@ namespace Loom
 
 	void Material::PickUpShader()
 	{
-		if (shader != nullptr || m_shader_path->empty())
-			return;
-
-		const auto found = SharedShaders().find(m_shader_path);
-
-		if (found != SharedShaders().end())
-			shader = found->second;
+		if (shader == nullptr && !m_shader_path->empty())
+			shader = CompiledShader(m_shader_path);
 	};
 
 	void Material::ChangeShader(const std::string& path)
@@ -152,6 +147,18 @@ namespace Loom
 			if (std::filesystem::last_write_time(path, code) != written)
 				Compile(path);
 		};
+	};
+
+	Shader* Material::SharedShader(const std::string& path)
+	{
+		return Shared(path);
+	};
+
+	Shader* Material::CompiledShader(const std::string& path)
+	{
+		const auto found = SharedShaders().find(path);
+
+		return found != SharedShaders().end() ? found->second : nullptr;
 	};
 
 	#pragma endregion

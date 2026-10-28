@@ -79,9 +79,11 @@ namespace Loom
 		return Glsl();
 	};
 
-	std::vector<ShaderMessage> ShaderEditor::Check(const std::string& text) const
+	std::vector<ShaderMessage> ShaderEditor::Check(const Document& document) const
 	{
-		return Shader::Check(text);
+		const std::string text = document.editor.GetText();
+
+		return Shader::IsPixel(document.path) ? Shader::CheckPixel(text) : Shader::Check(text);
 	};
 
 	void ShaderEditor::Explain(const Document& document) const

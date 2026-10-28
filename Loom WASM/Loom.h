@@ -24,6 +24,7 @@
 #include "Mesh.h"
 #include "MeshCollider.h"
 #include "Physics.h"
+#include "PixelShader.h"
 #include "Prefab.h"
 #include "Renderer.h"
 #include "Rigidbody.h"

@@ -129,6 +129,7 @@ namespace Loom
 			{ AssetKind::DialogueManager, EditorIcons::Dialogue, "Dialogue Manager", "NewDialogueManager", ProjectAssets::ScriptKind::DialogueManager, "Add Component" },
 			{ AssetKind::Test, EditorIcons::Test, "Test", "NewTests", ProjectAssets::ScriptKind::Test, "the Tests panel" },
 			{ AssetKind::Shader, EditorIcons::Shader, "Shader", "NewShader" },
+			{ AssetKind::PixelShader, EditorIcons::PixelShader, "Pixel Shader", "NewPixelShader" },
 			{ AssetKind::Dialogue, EditorIcons::Dialogue, "Dialogue", "NewDialogue" },
 			{ AssetKind::Texture, EditorIcons::Texture, "Texture", "NewTexture" },
 			{ AssetKind::Palette, EditorIcons::Palette, "Palette", "NewPalette" },
@@ -163,7 +164,7 @@ namespace Loom
 
 		bool IsScriptsPanels(AssetKind kind)
 		{
-			return IsScript(kind) || kind == AssetKind::Shader || kind == AssetKind::Dialogue;
+			return IsScript(kind) || kind == AssetKind::Shader || kind == AssetKind::PixelShader || kind == AssetKind::Dialogue;
 		};
 
 		const FileTabKind* TabMaking(AssetKind kind)
@@ -205,6 +206,7 @@ namespace Loom
 			{ EditorIcons::Script, "Scripts" },
 			{ EditorIcons::State, "States" },
 			{ EditorIcons::Shader, "Shaders" },
+			{ EditorIcons::PixelShader, "Pixel Shaders" },
 			{ EditorIcons::Dialogue, "Dialogues" },
 		};
 
@@ -217,6 +219,9 @@ namespace Loom
 
 			case ScriptEntryKind::Shader:
 				return EditorIcons::Shader;
+
+			case ScriptEntryKind::PixelShader:
+				return EditorIcons::PixelShader;
 
 			case ScriptEntryKind::Dialogue:
 				return EditorIcons::Dialogue;
@@ -1178,6 +1183,7 @@ namespace Loom
 		case AssetKind::Scene:		return (folder / (name + SceneSerializer::extension)).string();
 		case AssetKind::Prefab:		return (folder / (name + Prefab::extension)).string();
 		case AssetKind::Shader:		return (folder / (name + ProjectAssets::shaderExtension)).string();
+		case AssetKind::PixelShader:	return (folder / (name + ProjectAssets::pixelShaderExtension)).string();
 		case AssetKind::Dialogue:	return (folder / (name + ProjectAssets::dialogueExtension)).string();
 		case AssetKind::Texture:	return (folder / (name + ProjectAssets::textureExtension)).string();
 		default:					return (folder / name).string();
@@ -1281,6 +1287,10 @@ namespace Loom
 
 		case AssetKind::Shader:
 			path = ProjectAssets::CreateShader(folder, name, &error);
+			break;
+
+		case AssetKind::PixelShader:
+			path = ProjectAssets::CreatePixelShader(folder, name, &error);
 			break;
 
 		case AssetKind::Dialogue:
@@ -1959,7 +1969,11 @@ namespace Loom
 		for (const std::string& shader : m_projectShaders)
 			m_scriptEntries.try_emplace(
 				ProjectAssets::RelativeTo(shader, m_projectPath),
-				ScriptEntry{ shader, std::filesystem::path(shader).stem().string(), ScriptEntryKind::Shader, true });
+				ScriptEntry{
+					shader,
+					std::filesystem::path(shader).stem().string(),
+					Shader::IsPixel(shader) ? ScriptEntryKind::PixelShader : ScriptEntryKind::Shader,
+					true });
 
 		for (const std::string& dialogue : m_projectDialogues)
 			m_scriptEntries.try_emplace(
@@ -2337,9 +2351,11 @@ namespace Loom
 		const std::string_view extension = folder ? std::string_view() : field.extensions.front();
 		const std::optional<ScriptEntryKind> listed = extension == ProjectAssets::shaderExtension
 			? std::optional(ScriptEntryKind::Shader)
-			: extension == ProjectAssets::dialogueExtension
-				? std::optional(ScriptEntryKind::Dialogue)
-				: std::nullopt;
+			: extension == ProjectAssets::pixelShaderExtension
+				? std::optional(ScriptEntryKind::PixelShader)
+				: extension == ProjectAssets::dialogueExtension
+					? std::optional(ScriptEntryKind::Dialogue)
+					: std::nullopt;
 
 		bool changed = false;
 

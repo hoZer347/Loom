@@ -2,6 +2,7 @@
 
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
+#include "Shaders.h"
 
 #include "Utilities/StateReference.h"
 
@@ -351,6 +352,7 @@ TEST_SUITE("ProjectAssets")
 		CHECK(opener("Scenes/Main.loomscene", scripts) == ProjectAssets::Opener::Editor);
 		CHECK(opener("Assets/Lit.shader", scripts) == ProjectAssets::Opener::Shaders);
 		CHECK(opener("Assets/Lit.shader", "") == ProjectAssets::Opener::Shaders);
+		CHECK(opener("Assets/Inked.loompixel", scripts) == ProjectAssets::Opener::Shaders);
 		CHECK(opener("Assets/Intro.dialogue", scripts) == ProjectAssets::Opener::Dialogues);
 		CHECK(opener("Scripts/Spinner.hpp", scripts) == ProjectAssets::Opener::VisualStudio);
 		CHECK(opener("Scripts/Spinner.hpp", "") == ProjectAssets::Opener::Shell);
@@ -380,6 +382,8 @@ TEST_SUITE("ProjectAssets")
 		CHECK(Loom::ProjectAssets::IsGameFile("Theme.MP3"));
 		CHECK(Loom::ProjectAssets::IsGameFile("Rain.flac"));
 		CHECK(Loom::ProjectAssets::IsShaderFile("Flat.Shader"));
+		CHECK(Loom::ProjectAssets::IsShaderFile("Inked.LoomPixel"));
+		CHECK(Loom::ProjectAssets::IsGameFile("Inked.loompixel"));
 		CHECK_FALSE(Loom::ProjectAssets::IsShaderFile("Level.loomscene"));
 		CHECK(Loom::ProjectAssets::IsGameFile("Hero.loomsprite"));
 		CHECK(Loom::ProjectAssets::IsGameFile("Hero.loompalette"));
@@ -553,6 +557,7 @@ TEST_SUITE("ProjectAssets")
 
 		std::ofstream(root / "Assets" / "Units" / "Tank.shader") << "tank";
 		std::ofstream(root / "Assets" / "Terrain.shader") << "terrain";
+		std::ofstream(root / "Assets" / "Inked.loompixel") << "inked";
 
 		CHECK(Loom::ProjectAssets::ShadersIn(root.string()) == std::vector<std::string>{ "Assets/Terrain.shader", "Assets/Units/Tank.shader" });
 		CHECK(Loom::ProjectAssets::ProjectShader(root.string()) == "Assets/Terrain.shader");
@@ -560,6 +565,29 @@ TEST_SUITE("ProjectAssets")
 		std::ofstream(root / Loom::ProjectTemplate::shader_path) << "template";
 
 		CHECK(Loom::ProjectAssets::ProjectShader(root.string()) == Loom::ProjectTemplate::shader_path);
+
+		std::filesystem::remove_all(root);
+	};
+
+	TEST_CASE("a new pixel shader is a .loompixel file that shows the scene as it is")
+	{
+		const std::filesystem::path root = std::filesystem::temp_directory_path() / "loom project assets pixel shader";
+		std::filesystem::remove_all(root);
+		std::filesystem::create_directories(root);
+
+		const std::string path = Loom::ProjectAssets::CreatePixelShader(root.string(), "Inked");
+
+		REQUIRE(path == (root / "Inked.loompixel").string());
+
+		std::ifstream file(path);
+		const std::string text(std::istreambuf_iterator<char>(file), { });
+		file.close();
+
+		CHECK(text.find("LoomScenePixel(LoomScreenPixel())") != std::string::npos);
+#ifndef __EMSCRIPTEN__
+		CHECK(Loom::Shader::CheckPixel(text).empty());
+#endif
+		CHECK(Loom::ProjectAssets::CreatePixelShader(root.string(), "Inked").empty());
 
 		std::filesystem::remove_all(root);
 	};

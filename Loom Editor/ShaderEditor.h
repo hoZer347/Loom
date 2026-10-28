@@ -7,7 +7,7 @@ namespace Loom
 {
 	/**
 	* Loom::ShaderEditor
-	* - The Shaders panel: a tab for each open .shader file, highlighted as
+	* - The Shaders panel: a tab for each open .shader or .loompixel file, highlighted as
 	*   GLSL, completing GLSL's words, the file's own and the engine's, and
 	*   explaining the engine's on hover
 	* - Checks the text with glslang a moment after each edit and marks what it
@@ -23,7 +23,7 @@ namespace Loom
 		const char* Icon() const override;
 		const char* Hint() const override;
 		const TextEditor::Language* Language() const override;
-		std::vector<ShaderMessage> Check(const std::string& text) const override;
+		std::vector<ShaderMessage> Check(const Document& document) const override;
 		void Explain(const Document& document) const override;
 
 		#pragma endregion

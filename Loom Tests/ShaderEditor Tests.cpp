@@ -41,12 +41,18 @@ namespace
 		"out vec4 FragColor;\n"
 		"void main() { FragColor = vec4(1.0); }\n";
 
+	// The second line is empty here too.
+	const char* const pixel_shader =
+		"out vec4 FragColor;\n"
+		"\n"
+		"void main() { FragColor = LoomScenePixel(LoomScreenPixel()); }\n";
+
 	// An ImGui context of the test's own, with no window and no renderer, the
 	// Shaders panel filling the display and a shader that compiles open in it.
 	struct Driven
 	{
-		explicit Driven(const char* text = shader) :
-			path(std::filesystem::temp_directory_path() / "ShaderEditor Tests.shader")
+		explicit Driven(const char* text = shader, const char* extension = Loom::Shader::extension) :
+			path(std::filesystem::temp_directory_path() / (std::string("ShaderEditor Tests") + extension))
 		{
 			constexpr float frame_time = 1.0f / 60.0f;
 
@@ -246,6 +252,25 @@ TEST_SUITE("ShaderEditor")
 		CHECK(Driven::Listed());
 	};
 
+	TEST_CASE("a .loompixel file is checked as a pixel shader, which a .shader file is not")
+	{
+		{
+			Driven pixel(pixel_shader, Loom::Shader::pixel_extension);
+
+			pixel.Type(" ");
+			pixel.Settle();
+
+			CHECK_FALSE(Driven::Listed());
+		};
+
+		Driven plain(pixel_shader);
+
+		plain.Type(" ");
+		plain.Settle();
+
+		CHECK(Driven::Listed());
+	};
+
 	TEST_CASE("an edit stays out of the file until Ctrl+S")
 	{
 		Driven driven;
@@ -397,14 +422,14 @@ TEST_SUITE("ShaderEditor")
 
 	TEST_CASE("a kernel of any size is explained by its kind")
 	{
-		Driven sized("// ===PIXEL PASS===\nPositionKernel_17x5 around;\n");
+		Driven sized("// Blurs the view.\nPositionKernel_17x5 around;\n", Loom::Shader::pixel_extension);
 
 		CHECK(sized.TooltipAlong(1));
 	};
 
 	TEST_CASE("a kernel's size run straight onto its kind gets no explanation")
 	{
-		Driven unsized("// ===PIXEL PASS===\nPositionKernel17x5 around;\n");
+		Driven unsized("// Blurs the view.\nPositionKernel17x5 around;\n", Loom::Shader::pixel_extension);
 
 		CHECK_FALSE(unsized.TooltipAlong(1));
 	};

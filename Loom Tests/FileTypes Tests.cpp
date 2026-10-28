@@ -6,6 +6,7 @@
 #include "InputActions.h"
 #include "Prefab.h"
 #include "SceneSerializer.h"
+#include "Shaders.h"
 
 #include "BuildSettings.h"
 #include "FileTab.h"
@@ -82,6 +83,7 @@ TEST_SUITE("FileTypes")
 			Loom::FileTabs::Sounds.extension,
 			Loom::FileTabs::Fonts.extension,
 			Loom::InputActions::extension,
+			Loom::Shader::pixel_extension,
 		};
 
 		const auto types = Loom::FileTypes::All();

@@ -60,7 +60,7 @@ namespace Loom
 			Prefab::extension,
 		};
 
-		constexpr std::string_view shaderExtensions[] = { ProjectAssets::shaderExtension };
+		constexpr std::string_view shaderExtensions[] = { ProjectAssets::shaderExtension, ProjectAssets::pixelShaderExtension };
 		constexpr std::string_view dialogueExtensions[] = { ProjectAssets::dialogueExtension };
 
 		// 2D art besides textures.
@@ -405,7 +405,7 @@ namespace {NAMESPACE}
 		if (extension == Prefab::extension)
 			return Opener::Prefab;
 
-		if (extension == shaderExtension)
+		if (IsShaderFile(path))
 			return Opener::Shaders;
 
 		if (extension == dialogueExtension)
@@ -501,6 +501,16 @@ namespace {NAMESPACE}
 		const std::filesystem::path path = std::filesystem::path(folder) / (name + shaderExtension);
 
 		if (!IsValidName(name) || !WriteNew(path, defaultShader, error))
+			return "";
+
+		return path.string();
+	};
+
+	std::string ProjectAssets::CreatePixelShader(const std::string& folder, const std::string& name, std::string* error)
+	{
+		const std::filesystem::path path = std::filesystem::path(folder) / (name + pixelShaderExtension);
+
+		if (!IsValidName(name) || !WriteNew(path, defaultPixelShader, error))
 			return "";
 
 		return path.string();
@@ -941,6 +951,15 @@ out vec4 FragColor;
 void main()
 {
 	FragColor = vec4(u_color, 1.0);
+}
+)";
+
+	const char* const ProjectAssets::defaultPixelShader = R"(
+out vec4 FragColor;
+
+void main()
+{
+	FragColor = LoomScenePixel(LoomScreenPixel());
 }
 )";
 

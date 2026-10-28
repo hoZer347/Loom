@@ -43,9 +43,8 @@ namespace Loom
 		#pragma region Assembly
 
 		// What a shader file compiles to: its stages with the engine's
-		// sections added as its settings ask, the shadow pass's stages, empty
-		// unless shadows are on, and the pixel pass's, empty unless the file
-		// has a PIXEL PASS section.
+		// sections added as its settings ask, and the shadow pass's stages,
+		// empty unless shadows are on.
 		struct Stages
 		{
 			ShaderSettings settings;
@@ -53,20 +52,32 @@ namespace Loom
 			std::string fragment;
 			std::string shadowVertex;
 			std::string shadowFragment;
-			std::string pixelPassVertex;
-			std::string pixelPass;
 		};
 
 		// Throws std::runtime_error at a setting it does not know, a stage the
-		// sections it asks for have nothing to add to, or a kernel with no
-		// centre.
+		// sections it asks for have nothing to add to, or a PIXEL PASS section.
 		static Stages Assemble(const std::string& source);
+
+		// What a pixel shader file compiles to: one quad over the view, and the
+		// file as its fragment stage behind the pixel pass library.
+		struct PixelStages
+		{
+			std::string vertex;
+			std::string fragment;
+		};
+
+		// Throws std::runtime_error at a kernel with no centre, or a file that
+		// writes no colour.
+		static PixelStages AssemblePixel(const std::string& source);
 
 		#pragma endregion
 
 		#pragma region Loading
 
 		static constexpr char extension[] = ".shader";
+
+		// A pixel shader's file, which compiles to its pixel pass alone, as id.
+		static constexpr char pixel_extension[] = ".loompixel";
 
 		// Compiles the file again, for after it has been edited, and swaps the
 		// new program in. A file that no longer compiles keeps the old program
@@ -80,8 +91,7 @@ namespace Loom
 
 		#pragma region Queries
 
-		// Whether any shader compiled has a pixel pass.
-		static bool AnyPixelPass();
+		static bool IsPixel(const std::string& file_path);
 
 		#pragma endregion
 
@@ -91,6 +101,9 @@ namespace Loom
 		// Compiles the text of a shader file the way the Vulkan renderer would,
 		// whichever renderer is running, without making a program of it.
 		static std::vector<ShaderMessage> Check(const std::string& text);
+
+		// The same for the text of a pixel shader file.
+		static std::vector<ShaderMessage> CheckPixel(const std::string& text);
 
 		#pragma endregion
 #endif
@@ -122,11 +135,6 @@ namespace Loom
 		uint32_t skinned_id = 0;
 		uint32_t shadow_skinned_id = 0;
 
-		// The program PixelPass runs over a view drawn with this shader, or 0
-		// without a PIXEL PASS section. Declared before id, which is what
-		// fills it in.
-		uint32_t pixel_pass_id = 0;
-
 		// The vertex stage the program was linked from, for drawing the same
 		// shape with another fragment stage. Declared before id, which is what
 		// fills it in.
@@ -155,7 +163,6 @@ namespace Loom
 			uint32_t shadowInstanced = 0;
 			uint32_t skinned = 0;
 			uint32_t shadowSkinned = 0;
-			uint32_t pixelPass = 0;
 			ShaderSettings settings;
 			std::string vertex;
 			std::string skinnedVertex;

@@ -6,7 +6,6 @@
 #include "Renderer.h"
 #include "Shaders.h"
 #include "Material.h"
-#include "PixelPass.h"
 #include "GameObject.h"
 #include "Jobs.h"
 #include "Profiler.h"
@@ -216,7 +215,6 @@ namespace Loom
 	{
 		mesh.material->Apply(program, &*std::as_const(mesh.variables));
 		Scene::ApplyView(program);
-		PixelPass::Note(**mesh.material);
 	};
 
 	void Mesh::Draw(uint32_t program)

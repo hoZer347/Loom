@@ -184,6 +184,7 @@
     <ClCompile Include="Shaders.cpp" />
     <ClCompile Include="GlslCompiler.cpp" />
     <ClCompile Include="PixelPass.cpp" />
+    <ClCompile Include="PixelShader.cpp" />
     <ClCompile Include="Sprite.cpp" />
     <ClCompile Include="Ui.cpp" />
     <ClCompile Include="RichText.cpp" />
@@ -256,6 +257,7 @@
     <ClInclude Include="Shaders.h" />
     <ClInclude Include="GlslCompiler.h" />
     <ClInclude Include="PixelPass.h" />
+    <ClInclude Include="PixelShader.h" />
     <ClInclude Include="Sprite.h" />
     <ClInclude Include="Ui.h" />
     <ClInclude Include="RichText.h" />

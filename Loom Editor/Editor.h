@@ -93,6 +93,7 @@ namespace Loom
 		DialogueManager,
 		Test,
 		Shader,
+		PixelShader,
 		Dialogue,
 		Texture,
 		Palette,
@@ -104,6 +105,7 @@ namespace Loom
 		Script,
 		State,
 		Shader,
+		PixelShader,
 		Dialogue,
 	};
 
@@ -932,6 +934,9 @@ namespace Loom
 
 		// Gives the GameObject the shader, on its Material or a new one.
 		void DropShader(GameObject* gameObject, const std::string& path);
+
+		// Gives the GameObject the pixel shader, on its PixelShader or a new one.
+		void DropPixelShader(GameObject* gameObject, const std::string& path);
 
 		// What the Scripts tab drags: a script type's name, a shader's path
 		// from the project, or a folder's path.

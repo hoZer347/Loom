@@ -24,6 +24,7 @@ namespace Loom
 		#pragma region File Kinds
 
 		static constexpr const char* shaderExtension = Shader::extension;
+		static constexpr const char* pixelShaderExtension = Shader::pixel_extension;
 		static constexpr const char* dialogueExtension = DialogueManagerBase::extension;
 		static constexpr const char* textureExtension = TextureAsset::fileExtensions.front();
 		static constexpr std::string_view scriptExtensions[] = { ".hpp", ".h", ".cpp" };
@@ -40,21 +41,22 @@ namespace Loom
 			Shell,
 		};
 
-		// Scenes open in the editor, prefabs in its Prefab panel, shaders in its
-		// Shaders panel, dialogues in its Dialogues panel, textures and sprites
+		// Scenes open in the editor, prefabs in its Prefab panel, shaders and
+		// pixel shaders in its Shaders panel, dialogues in its Dialogues panel, textures and sprites
 		// in its Sprites panel, palettes in its Palette panel, the scripts
 		// project's sources in Visual Studio, and anything else through the
 		// shell.
 		// scripts_folder is empty when there is no scripts project.
 		static Opener OpenerOf(const std::string& path, const std::string& scripts_folder);
 
-		// Whether name is a scene, prefab, shader, dialogue, texture, sprite, palette,
+		// Whether name is a scene, prefab, shader, pixel shader, dialogue, texture, sprite, palette,
 		// sound or font, which the Project panel's tabs list along with
 		// models. The scripts are the Scripts tab's too, and anything else in
 		// the project folder (Visual Studio's files, notes) is not part of
 		// the game.
 		static bool IsGameFile(const std::string& name);
 		static bool IsScriptFile(const std::string& name);
+		// A shader or a pixel shader.
 		static bool IsShaderFile(const std::string& name);
 		static bool IsDialogueFile(const std::string& name);
 		static bool IsTextureFile(const std::string& name);
@@ -85,6 +87,7 @@ namespace Loom
 		// error.
 		static std::string CreateFolder(const std::string& folder, const std::string& name, std::string* error = nullptr);
 		static std::string CreateShader(const std::string& folder, const std::string& name, std::string* error = nullptr);
+		static std::string CreatePixelShader(const std::string& folder, const std::string& name, std::string* error = nullptr);
 		static std::string CreateDialogue(const std::string& folder, const std::string& name, std::string* error = nullptr);
 		static std::string CreateTexture(const std::string& folder, const std::string& name, std::string* error = nullptr);
 		static std::string CreatePalette(const std::string& folder, const std::string& name, std::string* error = nullptr);
@@ -169,6 +172,9 @@ namespace Loom
 		// The shader every new one starts from: the mesh through the camera,
 		// in the material's colour, with every engine section off.
 		static const char* const defaultShader;
+
+		// The pixel shader every new one starts from: the view as it was drawn.
+		static const char* const defaultPixelShader;
 		static const char* const defaultDialogue;
 
 		// Every shader under the project folder, relative to it with / between

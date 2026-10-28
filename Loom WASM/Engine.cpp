@@ -6,11 +6,11 @@
 #include "OpenGL.h"
 #include "Renderer.h"
 #include "Scene.h"
-#include "Shaders.h"
 #include "Input.h"
 #include "Lane.h"
 #include "Physics.h"
 #include "PixelPass.h"
+#include "PixelShader.h"
 #include "Profiler.h"
 #include "Ui.h"
 #include "Utilities/Clock.h"
@@ -335,7 +335,7 @@ namespace Loom
 			};
 
 			const glm::ivec2 size = renderer->TargetSize();
-			const uint32_t frame = Shader::AnyPixelPass() ? Frame(size) : 0;
+			const uint32_t frame = PixelShader::Any() ? Frame(size) : 0;
 
 			if (!frame)
 				ReleaseFrame();

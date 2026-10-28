@@ -10,13 +10,11 @@
 
 namespace Loom
 {
-	struct Material;
-
 	/**
 	* Loom::PixelPass
-	* - Runs the PIXEL PASS sections of the shaders a view was drawn with over
-	*   the finished view, once for each pixel, one after another, each reading
-	*   what the one before it left
+	* - Runs the pixel shaders noted while a view was drawn over the finished
+	*   view, once for each pixel, one after another, each reading what the
+	*   one before it left
 	* - A view drawn with none of them is left as it is
 	*/
 	struct LOOM_API PixelPass final
@@ -29,16 +27,16 @@ namespace Loom
 
 		#pragma region Noting
 
-		// Notes the pixel pass of each material drawn until End, in place of
-		// any pass noting already.
+		// Notes each pixel shader drawn until End, in place of any pass noting
+		// already.
 		void Begin();
 
 		// Stops noting, hands noting back to the pass it took over from, and
 		// answers whether any pass was noted.
 		bool End();
 
-		// Called for each material drawn.
-		static void Note(const Material& material);
+		// Called by each PixelShader drawn, with its program.
+		static void Note(uint32_t program);
 
 		#pragma endregion
 

@@ -14,6 +14,7 @@
 #include "Light.h"
 #include "LoomObject.h"
 #include "Material.h"
+#include "PixelShader.h"
 #include "MissingComponent.h"
 #include "Prefab.h"
 #include "Profiler.h"
@@ -975,7 +976,8 @@ namespace Loom
 			(file.extension() == Prefab::extension ||
 			file.extension() == SpriteAsset::extension ||
 			file.extension() == Palette::extension ||
-			file.extension() == BuildSettings::extension) &&
+			file.extension() == BuildSettings::extension ||
+			file.extension() == Shader::pixel_extension) &&
 			std::filesystem::is_regular_file(file, code))
 		{
 			const std::filesystem::path absolute = std::filesystem::absolute(file, code).lexically_normal();
@@ -3586,6 +3588,24 @@ namespace Loom
 		m_historyDirty = true;
 	};
 
+	void Editor::DropPixelShader(GameObject* gameObject, const std::string& path)
+	{
+		ChangeComponents(
+			*gameObject,
+			[gameObject, &path]()
+			{
+				PixelShader* pixel = gameObject->GetComponent<PixelShader>();
+
+				if (pixel == nullptr)
+					pixel = gameObject->Attach<PixelShader>();
+
+				pixel->ChangeShader(path);
+			});
+
+		Select(gameObject);
+		m_historyDirty = true;
+	};
+
 	bool Editor::DropScript(GameObject* gameObject)
 	{
 		const ImGuiPayload* dragged = ImGui::GetDragDropPayload();
@@ -3604,6 +3624,14 @@ namespace Loom
 		{
 			if (ImGui::AcceptDragDropPayload(script_payload))
 				DropShader(gameObject, name);
+
+			return true;
+		};
+
+		if (entry != m_scriptEntries.end() && entry->second.kind == ScriptEntryKind::PixelShader)
+		{
+			if (ImGui::AcceptDragDropPayload(script_payload))
+				DropPixelShader(gameObject, name);
 
 			return true;
 		};

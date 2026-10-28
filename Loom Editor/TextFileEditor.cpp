@@ -363,7 +363,7 @@ namespace Loom
 	{
 		TextEditor& editor = document.editor;
 
-		document.messages = Check(editor.GetText());
+		document.messages = Check(document);
 
 		editor.ClearMarkers();
 		editor.ClearSquiggles(message_squiggles);

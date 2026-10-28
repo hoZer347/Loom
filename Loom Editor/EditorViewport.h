@@ -16,7 +16,7 @@ namespace Loom
 	*/
 	struct EditorViewport final
 	{
-		// A view whose shaders' pixel passes would run over more than the scene,
+		// A view whose pixel shaders would run over more than the scene,
 		// such as an editing overlay, leaves them out.
 		explicit EditorViewport(bool pixel_passes = true) : m_pixelPasses(pixel_passes) { };
 		~EditorViewport();
@@ -26,7 +26,7 @@ namespace Loom
 
 		// Runs draw at the requested size with the target bound and cleared to
 		// clear_colour (RGBA), reallocating the target if the size changed, then
-		// the pixel passes of what it drew, then over on top of them.
+		// the pixel shaders it drew, then over on top of them.
 		// Safe to call while an ImGui frame is being built: the target is pushed
 		// and popped around draw, and ImGui only records the texture id until
 		// it draws.

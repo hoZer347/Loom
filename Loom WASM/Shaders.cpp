@@ -89,7 +89,6 @@ bool LoomDitheredOut(float alpha)
 		constexpr const char* SHADOW_PROGRAM_SUFFIX = " shadows";
 		constexpr const char* INSTANCED_PROGRAM_SUFFIX = " instanced";
 		constexpr const char* SKINNED_PROGRAM_SUFFIX = " skinned";
-		constexpr const char* PIXEL_PASS_PROGRAM_SUFFIX = " pixel pass";
 
 		#pragma endregion
 
@@ -773,7 +772,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 		if (Renderer* renderer = Renderer::Get())
 		{
-			for (const uint32_t program : { id, shadow_id, instanced_id, shadow_instanced_id, skinned_id, shadow_skinned_id, pixel_pass_id })
+			for (const uint32_t program : { id, shadow_id, instanced_id, shadow_instanced_id, skinned_id, shadow_skinned_id })
 				if (program)
 					renderer->DeleteProgram(program);
 		};
@@ -783,7 +782,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 	#pragma region Loading
 
-	enum class ShaderType { NONE, COMMON, VERTEX, FRAGMENT, SETTINGS, PIXEL_PASS };
+	enum class ShaderType { NONE, COMMON, VERTEX, FRAGMENT, SETTINGS };
 
 	uint32_t Shader::CompileSource(const std::string& file_path)
 	{
@@ -819,7 +818,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 	{
 		std::scoped_lock lock{ mutex };
 
-		const uint32_t previous[] = { id, shadow_id, instanced_id, shadow_instanced_id, skinned_id, shadow_skinned_id, pixel_pass_id };
+		const uint32_t previous[] = { id, shadow_id, instanced_id, shadow_instanced_id, skinned_id, shadow_skinned_id };
 
 		try
 		{
@@ -857,7 +856,6 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		shadow_instanced_id = programs.shadowInstanced;
 		skinned_id = programs.skinned;
 		shadow_skinned_id = programs.shadowSkinned;
-		pixel_pass_id = programs.pixelPass;
 		vertex = programs.vertex;
 		skinned_vertex = programs.skinnedVertex;
 
@@ -1088,7 +1086,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 			else if (line.find(SETTINGS_SECTION) != std::string::npos)
 				current = ShaderType::SETTINGS;
 			else if (line.find(PIXEL_PASS_SECTION) != std::string::npos)
-				current = ShaderType::PIXEL_PASS;
+				throw std::runtime_error(std::string("A pixel pass is a ") + pixel_extension + " file of its own, run by a PixelShader component");
 			else if (current == ShaderType::VERTEX)
 			{
 				const std::optional<std::string> expanded = uvDeclarations.Expand(line, number);
@@ -1138,13 +1136,12 @@ vec3 LoomSceneNormal(ivec2 pixel)
 			if (!stage->empty())
 				*stage = EngineCode(Light::FragmentLibrary(*stage)) + *stage;
 
-		if (sections.contains(ShaderType::PIXEL_PASS))
-		{
-			stages.pixelPassVertex = EngineCode(PIXEL_PASS_VERTEX);
-			stages.pixelPass = PixelPassFragment(common + sections[ShaderType::PIXEL_PASS].str());
-		};
-
 		return stages;
+	};
+
+	Shader::PixelStages Shader::AssemblePixel(const std::string& source)
+	{
+		return { EngineCode(PIXEL_PASS_VERTEX), PixelPassFragment(LineDirective(1, FILE_SOURCE) + source) };
 	};
 
 	uint32_t Shader::Build(const std::string& name, std::istream& source)
@@ -1155,6 +1152,17 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 		if (!renderer)
 			throw std::runtime_error("No renderer to compile " + name + " with");
+
+		if (IsPixel(name))
+		{
+			const PixelStages pixel = AssemblePixel(text);
+
+			Programs programs;
+			programs.id = renderer->CreateProgram(name, pixel.vertex, pixel.fragment);
+			shaders[name] = programs;
+
+			return Cached(programs);
+		};
 
 		const Stages stages = Assemble(text);
 
@@ -1172,20 +1180,6 @@ vec3 LoomSceneNormal(ivec2 pixel)
 			catch (...)
 			{
 				renderer->DeleteProgram(programs.id);
-				throw;
-			};
-
-		if (!stages.pixelPass.empty())
-			try
-			{
-				programs.pixelPass = renderer->CreateProgram(name + PIXEL_PASS_PROGRAM_SUFFIX, stages.pixelPassVertex, stages.pixelPass);
-			}
-			catch (...)
-			{
-				for (const uint32_t program : { programs.id, programs.shadow })
-					if (program)
-						renderer->DeleteProgram(program);
-
 				throw;
 			};
 
@@ -1233,10 +1227,23 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		if (stages.settings.shadows)
 			log += Glsl::Compile(stages.shadowVertex, stages.shadowFragment).log;
 
-		if (!stages.pixelPass.empty())
-			log += Glsl::Compile(stages.pixelPassVertex, stages.pixelPass).log;
-
 		return ParseMessages(log);
+	};
+
+	std::vector<ShaderMessage> Shader::CheckPixel(const std::string& text)
+	{
+		PixelStages stages;
+
+		try
+		{
+			stages = AssemblePixel(text);
+		}
+		catch (const std::runtime_error& e)
+		{
+			return { ShaderMessage{ 0, true, e.what() } };
+		};
+
+		return ParseMessages(Glsl::Compile(stages.vertex, stages.fragment).log);
 	};
 
 	#pragma endregion
@@ -1244,11 +1251,17 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 	#pragma region Queries
 
-	bool Shader::AnyPixelPass()
+	bool Shader::IsPixel(const std::string& file_path)
 	{
-		std::scoped_lock lock{ mutex };
+		std::string extension = std::filesystem::path(file_path).extension().string();
 
-		return std::ranges::any_of(shaders, [](const auto& shader) { return shader.second.pixelPass != 0; });
+		std::transform(
+			extension.begin(),
+			extension.end(),
+			extension.begin(),
+			[](unsigned char c) { return (char)std::tolower(c); });
+
+		return extension == pixel_extension;
 	};
 
 	#pragma endregion

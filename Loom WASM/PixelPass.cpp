@@ -1,10 +1,8 @@
 #include "PixelPass.h"
 
-#include "Material.h"
 #include "Mesh.h"
 #include "Renderer.h"
 #include "Scene.h"
-#include "Shaders.h"
 
 #include <algorithm>
 #include <iterator>
@@ -86,19 +84,13 @@ void main()
 		return !m_noted.empty();
 	};
 
-	void PixelPass::Note(const Material& material)
+	void PixelPass::Note(uint32_t program)
 	{
-		if (!s_noting || !material.shader || !material.shader->pixel_pass_id)
+		if (!s_noting || !program || std::ranges::find(s_noting->m_noted, program) != s_noting->m_noted.end())
 			return;
 
-		const uint32_t program = material.shader->pixel_pass_id;
-
-		if (std::ranges::find(s_noting->m_noted, program) != s_noting->m_noted.end())
-			return;
-
-		// Now, while the material's view is the one being drawn.
+		// Now, while the view being drawn is the one the pass runs over.
 		s_noting->m_noted.push_back(program);
-		material.Apply(program);
 		Scene::ApplyView(program);
 	};
 

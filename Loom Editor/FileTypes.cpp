@@ -6,6 +6,7 @@
 #include "InputActions.h"
 #include "Prefab.h"
 #include "SceneSerializer.h"
+#include "Shaders.h"
 
 #include "BuildSettings.h"
 #include "FileTab.h"
@@ -39,6 +40,7 @@ namespace Loom
 			{ FileTabs::Sounds.extension, L"Loom.SoundFolders", L"Loom Sound Folders" },
 			{ FileTabs::Fonts.extension, L"Loom.FontFolders", L"Loom Font Folders" },
 			{ InputActions::extension, L"Loom.InputActions", L"Loom Key Bindings" },
+			{ Shader::pixel_extension, L"Loom.PixelShader", L"Loom Pixel Shader" },
 		};
 
 		constexpr const wchar_t* COMMAND_KEY = L"\\shell\\open\\command";

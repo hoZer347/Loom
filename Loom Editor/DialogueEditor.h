@@ -39,7 +39,7 @@ namespace Loom
 		const char* Icon() const override;
 		const char* Hint() const override;
 		const TextEditor::Language* Language() const override;
-		std::vector<ShaderMessage> Check(const std::string& text) const override;
+		std::vector<ShaderMessage> Check(const Document& document) const override;
 		void Suggest(const Document& document, TextEditor::AutoCompleteState& state) const override;
 
 		#pragma endregion

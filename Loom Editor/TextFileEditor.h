@@ -85,8 +85,8 @@ namespace Loom
 
 		virtual const TextEditor::Language* Language() const = 0;
 
-		// What is wrong with the text, by line.
-		virtual std::vector<ShaderMessage> Check(const std::string& text) const = 0;
+		// What is wrong with the document's text, by line.
+		virtual std::vector<ShaderMessage> Check(const Document& document) const = 0;
 
 		// The language's words and the file's own.
 		virtual void Suggest(const Document& document, TextEditor::AutoCompleteState& state) const;

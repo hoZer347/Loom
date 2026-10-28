@@ -142,7 +142,7 @@ namespace Loom
 		return Dialogue();
 	};
 
-	std::vector<ShaderMessage> DialogueEditor::Check(const std::string&) const
+	std::vector<ShaderMessage> DialogueEditor::Check(const Document&) const
 	{
 		return { };
 	};
