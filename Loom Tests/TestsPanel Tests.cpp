@@ -8,7 +8,6 @@
 #include "imgui_internal.h"
 
 #include <algorithm>
-#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -149,6 +148,9 @@ TEST_SUITE("TestsPanel")
 		io.DisplaySize = ImVec2(width, height);
 		io.DeltaTime = frame_time;
 
+		// Clicks this close together would otherwise double-click the title bar shut.
+		io.MouseDoubleClickTime = 0.0f;
+
 		unsigned char* pixels = nullptr;
 		int atlas_width = 0;
 		int atlas_height = 0;
@@ -160,7 +162,7 @@ TEST_SUITE("TestsPanel")
 
 		const Loom::TestsPanel::Callbacks callbacks{
 			[&created] { ++created; },
-			[&followed](const std::string& file, int line) { followed.push_back(std::filesystem::path(file).filename().string() + ":" + std::to_string(line)); } };
+			[&followed](const std::string& file, int line) { followed.push_back(file.substr(file.find_last_of("/\\") + 1) + ":" + std::to_string(line)); } };
 
 		const auto frame =
 			[&]
@@ -187,9 +189,12 @@ TEST_SUITE("TestsPanel")
 
 		followed.erase(std::unique(followed.begin(), followed.end()), followed.end());
 
-		const std::string failure = "TestsPanel Tests.cpp:" + std::to_string(suite.failure_line);
+		std::string order;
 
-		CHECK(followed == std::vector<std::string>{ "Laser.hpp:3", "Laser.hpp:4", failure, "Door.hpp:5" });
+		for (const std::string& place : followed)
+			order += place + " ";
+
+		CHECK(order == "Laser.hpp:3 Laser.hpp:4 TestsPanel Tests.cpp:" + std::to_string(suite.failure_line) + " Door.hpp:5 ");
 		CHECK_FALSE(panel.HasQueued());
 		CHECK(open);
 		CHECK(created == 0);
