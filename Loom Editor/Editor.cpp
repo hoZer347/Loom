@@ -440,9 +440,11 @@ namespace Loom
 		constexpr ImGuiWindowFlags view_flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoCollapse;
 
 		constexpr const char* camera_controls =
-			"Right mouse: look, with WASD and QE to fly (Shift for faster)\n"
-			"Middle mouse: pan\n"
-			"Wheel: in and out";
+			"Right drag: look\n"
+			"WASD, QE: fly\n"
+			"Shift: faster\n"
+			"Middle drag: pan\n"
+			"Wheel: zoom";
 
 		#pragma endregion
 

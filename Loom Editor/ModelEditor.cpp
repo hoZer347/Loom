@@ -176,15 +176,15 @@ void main()
 
 		constexpr ToolInfo tools[] =
 		{
-			{ ModelEditor::Tool::Move, "Move", "The handles move what is picked", ImGuiKey_W },
-			{ ModelEditor::Tool::Rotate, "Rotate", "The rings turn what is picked", ImGuiKey_E },
-			{ ModelEditor::Tool::Scale, "Scale", "The handles size what is picked", ImGuiKey_R },
+			{ ModelEditor::Tool::Move, "Move", "Move handles", ImGuiKey_W },
+			{ ModelEditor::Tool::Rotate, "Rotate", "Rotate rings", ImGuiKey_E },
+			{ ModelEditor::Tool::Scale, "Scale", "Scale handles", ImGuiKey_R },
 		};
 
 		const char* const controls =
 			"Click: pick\n"
 			"Shift+click: toggle\n"
-			"Drag: box pick\n"
+			"Drag: box\n"
 			"Drag a handle: move, rotate, scale\n"
 			"Ctrl while dragging: snap\n"
 			"Right drag, Alt+drag: orbit\n"
@@ -878,7 +878,7 @@ void main()
 		ImGui::TextDisabled("|");
 		ImGui::SameLine();
 		ImGui::Checkbox("See Through", &m_seeThrough);
-		ImGui::SetItemTooltip("Pick hidden parts too");
+		ImGui::SetItemTooltip("Show and pick hidden parts");
 
 		const bool faces = editable && !PickedFaces(document).empty();
 		const bool any = editable && !Moving(document).empty();
@@ -895,16 +895,16 @@ void main()
 			return pressed;
 		};
 
-		if (action("Extrude", faces, "Pull the picked faces out, walled in from where they were", "Pick faces to extrude first", "Ctrl+E"))
+		if (action("Extrude", faces, "Extrude faces", "Pick faces first", "Ctrl+E"))
 			Extrude();
 
-		if (action("Duplicate", faces, "Copy the picked faces, to move the copy", "Pick faces to duplicate first", "Ctrl+D"))
+		if (action("Duplicate", faces, "Duplicate faces", "Pick faces first", "Ctrl+D"))
 			Duplicate();
 
-		if (action("Flip", faces, "Turn the picked faces to face the other way", "Pick faces to flip first", "no key"))
+		if (action("Flip", faces, "Flip faces", "Pick faces first", "no key"))
 			Flip();
 
-		if (action("Delete", any, "Delete what is picked, and every face it is part of", "Pick something to delete first", "Delete"))
+		if (action("Delete", any, "Delete with attached faces", "Pick something first", "Delete"))
 			Delete();
 
 		if (ImGui::Button("+ Add"))
@@ -927,13 +927,13 @@ void main()
 		ImGui::TextDisabled("|");
 		ImGui::SameLine();
 
-		if (action("Undo", !document.undo.empty(), "Take back the last change", "Nothing to take back", "Ctrl+Z"))
+		if (action("Undo", !document.undo.empty(), "Undo last change", "Nothing to undo", "Ctrl+Z"))
 			Step(document, true);
 
-		if (action("Redo", !document.redo.empty(), "Make the change taken back again", "Nothing to make again", "Ctrl+Y"))
+		if (action("Redo", !document.redo.empty(), "Redo last undo", "Nothing to redo", "Ctrl+Y"))
 			Step(document, false);
 
-		if (action("Save", document.unsaved, "Write the meshes back into the prefab", "Nothing to save", "Ctrl+S"))
+		if (action("Save", document.unsaved, "Save into the prefab", "Nothing to save", "Ctrl+S"))
 			SaveDocument(document);
 
 		ImGui::TextDisabled("|");

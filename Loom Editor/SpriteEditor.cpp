@@ -727,7 +727,7 @@ namespace Loom
 			Edited(document);
 		};
 
-		ImGui::SetItemTooltip("A clear frame after this one");
+		ImGui::SetItemTooltip("Adds a clear frame after");
 		ImGui::SameLine();
 
 		if (ImGui::Button("Copy Frame"))
@@ -903,7 +903,7 @@ namespace Loom
 				Edited(document);
 			};
 
-			ImGui::SetItemTooltip(visible ? "Shown and saved" : "Hidden, not saved");
+			ImGui::SetItemTooltip(visible ? "Shown, in image" : "Hidden, not in image");
 			ImGui::SameLine();
 
 			// A square drawn as the outline is, bright while it is on.
@@ -1293,7 +1293,7 @@ namespace Loom
 		};
 
 		ImGui::EndDisabled();
-		ImGui::SetItemTooltip("Into a palette category");
+		ImGui::SetItemTooltip("Import into a palette category");
 
 		DrawImportQuestion();
 	};
@@ -1571,7 +1571,7 @@ namespace Loom
 		};
 
 		ImGui::EndDisabled();
-		ImGui::SetItemTooltip("Add the left colour here");
+		ImGui::SetItemTooltip("Add left colour");
 		ImGui::SameLine();
 		ImGui::BeginDisabled(!listed);
 
