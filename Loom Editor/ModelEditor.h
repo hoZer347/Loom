@@ -104,6 +104,9 @@ namespace Loom
 		// not be written.
 		bool SaveAll();
 
+		// The names of the prefabs with unsaved changes.
+		std::vector<std::string> UnsavedFiles() const;
+
 		// The prefabs saved since the last call.
 		std::vector<std::string> TakeSaved();
 

@@ -388,10 +388,16 @@ namespace Loom
 
 		#pragma endregion
 
-		#pragma region File Drops
+		#pragma region Window Callbacks
 
-		// GLFW's drop callback carries no user data, and there is one editor.
-		Editor* drop_receiver = nullptr;
+		// GLFW's callbacks carry no user data, and there is one editor.
+		Editor* window_editor = nullptr;
+
+		void OnClose(GLFWwindow* window)
+		{
+			glfwSetWindowShouldClose(window, GLFW_FALSE);
+			window_editor->Quit();
+		};
 
 		void OnDrop(GLFWwindow* window, int count, const char** paths)
 		{
@@ -411,7 +417,7 @@ namespace Loom
 			};
 
 			for (int i = 0; i < count; i++)
-				drop_receiver->Drop(paths[i], (float)x, (float)y);
+				window_editor->Drop(paths[i], (float)x, (float)y);
 		};
 
 		std::unordered_map<unsigned int, std::unique_ptr<WindowFrame>>* torn_frames = nullptr;
@@ -760,7 +766,10 @@ namespace Loom
 
 		m_windowFrame.Install(Engine::window);
 
-		drop_receiver = this;
+		window_editor = this;
+
+		if (Engine::window)
+			glfwSetWindowCloseCallback(Engine::window, OnClose);
 		torn_frames = &m_tornFrames;
 		destroy_platform_window = ImGui::GetPlatformIO().Platform_DestroyWindow;
 
@@ -784,7 +793,11 @@ namespace Loom
 		m_tornWindows.RemoveSettings();
 
 		SetDropCallback(nullptr);
-		drop_receiver = nullptr;
+
+		if (Engine::window)
+			glfwSetWindowCloseCallback(Engine::window, nullptr);
+
+		window_editor = nullptr;
 
 		if (destroy_platform_window != nullptr)
 			ImGui::GetPlatformIO().Platform_DestroyWindow = destroy_platform_window;
@@ -1210,6 +1223,7 @@ namespace Loom
 		m_ownedScenes.push_back(scene);
 		m_historyDirty = true;
 		m_scenePaths[scene] = std::filesystem::path(path).lexically_normal().string();
+		m_history.Saved(*scene);
 
 		SetActiveScene(scene);
 
@@ -1239,20 +1253,31 @@ namespace Loom
 			return true;
 		};
 
-		for (Scene* scene : m_ownedScenes)
-			if (!SaveToProject(scene))
+		std::vector<std::string> unsaved{ };
+
+		for (Scene* scene : UnsavedScenes())
+			unsaved.push_back(scene->GetName());
+
+		AskToSave(
+			unsaved,
+			[this]()
 			{
-				std::cerr << "'" << scene->GetName() << "' did not save, so it stays open." << std::endl;
-				return false;
-			};
+				for (Scene* scene : UnsavedScenes())
+					if (!SaveToProject(scene))
+						return false;
 
-		const std::vector<Scene*> closing = m_ownedScenes;
+				return true;
+			},
+			[this, normal]()
+			{
+				const std::vector<Scene*> closing = m_ownedScenes;
 
-		for (Scene* scene : closing)
-			CloseScene(scene);
+				for (Scene* scene : closing)
+					CloseScene(scene);
 
-		RefreshProjectAssets();
-		BeginOpeningScene(normal);
+				RefreshProjectAssets();
+				BeginOpeningScene(normal);
+			});
 
 		return true;
 	};
@@ -1270,6 +1295,22 @@ namespace Loom
 		const auto path = m_scenePaths.find(scene);
 
 		return path == m_scenePaths.end() ? "" : path->second;
+	};
+
+	bool Editor::SceneUnsaved(Scene* scene) const
+	{
+		return ScenePathOf(scene).empty() || m_history.Unsaved(*scene);
+	};
+
+	std::vector<Scene*> Editor::UnsavedScenes() const
+	{
+		std::vector<Scene*> unsaved{ };
+
+		for (Scene* scene : m_ownedScenes)
+			if (SceneUnsaved(scene))
+				unsaved.push_back(scene);
+
+		return unsaved;
 	};
 
 	void Editor::CloseScene(Scene* scene)
@@ -1321,6 +1362,10 @@ namespace Loom
 		if (scene == nullptr)
 			return false;
 
+		// What is saved is what the history marks, so it has to have seen it.
+		if (!m_playing)
+			RecordHistory();
+
 		std::string error;
 
 		if (!SceneSerializer::SaveToFile(*scene, path, &error))
@@ -1330,6 +1375,7 @@ namespace Loom
 		};
 
 		m_scenePaths[scene] = std::filesystem::path(path).lexically_normal().string();
+		m_history.Saved(*scene);
 
 		return true;
 	};
@@ -1341,6 +1387,43 @@ namespace Loom
 
 		if (SaveToProject(m_activeScene))
 			RefreshProjectAssets();
+	};
+
+	void Editor::Quit()
+	{
+		Stop();
+
+		AskToSave(UnsavedWork(), [this]() { return SaveProject(); }, []() { Engine::Stop(); });
+	};
+
+	std::vector<std::string> Editor::UnsavedWork() const
+	{
+		std::vector<std::string> unsaved{ };
+
+		for (Scene* scene : UnsavedScenes())
+			unsaved.push_back(scene->GetName());
+
+		if (m_prefabUnsaved)
+			unsaved.push_back(std::filesystem::path(m_prefabPath).filename().string());
+
+		const std::vector<std::string> panels[] =
+		{
+			m_shaders.UnsavedFiles(),
+			m_dialogues.UnsavedFiles(),
+			m_sprites.UnsavedFiles(),
+			m_models.UnsavedFiles(),
+		};
+
+		for (const std::vector<std::string>& files : panels)
+			unsaved.insert(unsaved.end(), files.begin(), files.end());
+
+		if (m_keyBindings.Unsaved())
+			unsaved.push_back("Key Bindings");
+
+		if (m_buildSettings.Unsaved())
+			unsaved.push_back("Build Settings");
+
+		return unsaved;
 	};
 
 	#pragma endregion
@@ -1909,6 +1992,7 @@ namespace Loom
 		DrawSaveLayoutPrompt();
 		DrawCreateAssetPrompt();
 		DrawFileDialogs();
+		DrawSaveQuestion();
 
 		if (m_flyingView)
 			return;
@@ -2139,7 +2223,7 @@ namespace Loom
 		DrawMenus();
 
 		if (DrawWindowButtons(Engine::window, m_windowFrame))
-			Engine::Stop();
+			Quit();
 
 		ImGui::EndMainMenuBar();
 		ImGui::PopStyleVar();
@@ -2191,7 +2275,7 @@ namespace Loom
 
 				for (const std::filesystem::path& demo : m_demos)
 					if (ImGui::MenuItem(demo.filename().string().c_str()))
-						OpenDemo(demo.filename().string());
+						LeaveFor(demo.string());
 
 				ImGui::EndMenu();
 			};
@@ -2202,7 +2286,7 @@ namespace Loom
 				FullRefresh();
 
 			if (ImGui::MenuItem("Exit"))
-				Engine::Stop();
+				Quit();
 
 			ImGui::EndMenu();
 		};
@@ -2703,6 +2787,78 @@ namespace Loom
 		ImGui::End();
 	};
 
+	void Editor::LeaveFor(const std::string& project)
+	{
+		AskToSave(
+			UnsavedWork(),
+			[this]() { return SaveProject(); },
+			[this, project]()
+			{
+				if (OpenProject(project))
+					m_askForFolder = false;
+			});
+	};
+
+	void Editor::AskToSave(
+		std::vector<std::string> unsaved,
+		std::function<bool()> save,
+		std::function<void()> then)
+	{
+		if (m_saveQuestion)
+			return;
+
+		if (unsaved.empty())
+			then();
+		else m_saveQuestion = SaveQuestion{ std::move(unsaved), std::move(save), std::move(then) };
+	};
+
+	void Editor::DrawSaveQuestion()
+	{
+		constexpr const char* popup = "Unsaved Changes";
+
+		if (m_saveQuestion && !ImGui::IsPopupOpen(popup))
+			ImGui::OpenPopup(popup);
+
+		if (!ImGui::BeginPopupModal(popup, nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+			return;
+
+		if (!m_saveQuestion)
+		{
+			ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+			return;
+		};
+
+		ImGui::TextUnformatted("Save the changes to:");
+
+		for (const std::string& name : m_saveQuestion->unsaved)
+			ImGui::BulletText("%s", name.c_str());
+
+		const bool save = ImGui::Button("Save");
+		ImGui::SameLine();
+		const bool discard = ImGui::Button("Don't Save");
+		ImGui::SameLine();
+		const bool cancel = ImGui::Button("Cancel");
+
+		// A save that fails leaves the question up, with everything still open.
+		const bool saved = save && m_saveQuestion->save();
+
+		if (saved)
+			RefreshProjectAssets();
+
+		if (saved || discard || cancel)
+		{
+			const SaveQuestion question = std::move(*std::exchange(m_saveQuestion, std::nullopt));
+
+			ImGui::CloseCurrentPopup();
+
+			if (!cancel)
+				question.then();
+		};
+
+		ImGui::EndPopup();
+	};
+
 	void Editor::ShowOpenProjectDialog()
 	{
 		const std::filesystem::path start = m_projectPath.empty()
@@ -2732,9 +2888,7 @@ namespace Loom
 
 		if (m_dialogs->openProject.HasSelected())
 		{
-			if (OpenProject(m_dialogs->openProject.GetSelected().string()))
-				m_askForFolder = false;
-
+			LeaveFor(m_dialogs->openProject.GetSelected().string());
 			m_dialogs->openProject.ClearSelected();
 		};
 
@@ -2856,9 +3010,10 @@ namespace Loom
 		const bool open = ImGui::TreeNodeEx(
 			scene->GetGuid().ToString().c_str(),
 			flags,
-			"%s %s%s",
+			"%s %s%s%s",
 			EditorIcons::Scene,
 			scene->NameAndID().c_str(),
+			IsOwned(scene) && SceneUnsaved(scene) ? " *" : "",
 			is_active ? "  [active]" : "");
 
 		if (open != was_open)
@@ -2888,7 +3043,14 @@ namespace Loom
 			ImGui::Separator();
 
 			if (ImGui::MenuItem("Close Scene", nullptr, false, IsOwned(scene)))
-				CloseScene(scene);
+				AskToSave(
+					SceneUnsaved(scene) ? std::vector<std::string>{ scene->GetName() } : std::vector<std::string>{ },
+					[this, scene]() { return !IsOwned(scene) || SaveToProject(scene); },
+					[this, scene]()
+					{
+						if (IsOwned(scene))
+							CloseScene(scene);
+					});
 
 			ImGui::EndPopup();
 		};

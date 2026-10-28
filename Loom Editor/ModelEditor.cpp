@@ -564,6 +564,17 @@ void main()
 		return saved;
 	};
 
+	std::vector<std::string> ModelEditor::UnsavedFiles() const
+	{
+		std::vector<std::string> unsaved{ };
+
+		for (const std::unique_ptr<Document>& document : m_documents)
+			if (document->unsaved)
+				unsaved.push_back(std::filesystem::path(document->path).filename().string());
+
+		return unsaved;
+	};
+
 	bool ModelEditor::SaveDocument(Document& document)
 	{
 		Prefabs::ObjectNode file;

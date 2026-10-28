@@ -113,6 +113,9 @@ namespace Loom
 		// not be written.
 		bool SaveAll();
 
+		// The names of the sprites and palettes with unsaved changes.
+		std::vector<std::string> UnsavedFiles() const;
+
 		#pragma endregion
 
 	private:

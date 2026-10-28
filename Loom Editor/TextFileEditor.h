@@ -36,6 +36,9 @@ namespace Loom
 		// be written.
 		bool SaveAll();
 
+		// The names of the files with unsaved changes.
+		std::vector<std::string> UnsavedFiles() const;
+
 		#pragma endregion
 
 		#pragma region Drawing

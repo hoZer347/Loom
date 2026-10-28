@@ -149,8 +149,8 @@ namespace Loom
 		static constexpr const char* object_payload = "LoomObject";
 
 		// What double-clicking a scene in the Project panel does: every open
-		// scene is saved and closed, so this one is all there is. Stops a run
-		// first. Nothing closes if something will not save. The scene is read
+		// scene is closed, so this one is all there is, once the question
+		// about any unsaved is answered. Stops a run first. The scene is read
 		// over the frames that follow, with a bar in the views; false when it
 		// cannot start.
 		bool OpenSceneAlone(const std::string& path);
@@ -162,6 +162,9 @@ namespace Loom
 		// The file an owned scene was opened from or saved to, empty for one
 		// never saved.
 		std::string ScenePathOf(Scene* scene) const;
+
+		// Whether an owned scene differs from its file, or has none.
+		bool SceneUnsaved(Scene* scene) const;
 
 		#pragma endregion
 
@@ -203,6 +206,10 @@ namespace Loom
 		// the project's scenes folder. Refused while playing, when the scene
 		// holds what the run has done to it.
 		void SaveActiveScene();
+
+		// File > Exit, the window's close button and Alt+F4: stops any run,
+		// then closes once the question about anything unsaved is answered.
+		void Quit();
 
 		#pragma endregion
 
@@ -738,6 +745,23 @@ namespace Loom
 		void DrawNewProjectPrompt();
 		void DrawFileDialogs();
 
+		// Runs then, after asking whether to save what is named unsaved
+		// first, or at once when nothing is. Save leaves the question up when
+		// save fails, and Cancel runs nothing. One question at a time.
+		void AskToSave(
+			std::vector<std::string> unsaved,
+			std::function<bool()> save,
+			std::function<void()> then);
+		void DrawSaveQuestion();
+
+		// Everything unsaved anywhere in the editor, by name, for SaveProject
+		// to write.
+		std::vector<std::string> UnsavedWork() const;
+		std::vector<Scene*> UnsavedScenes() const;
+
+		// Another project in place of this one, asking about the unsaved first.
+		void LeaveFor(const std::string& project);
+
 		#pragma endregion
 
 		#pragma region History
@@ -1139,6 +1163,16 @@ namespace Loom
 		// What the Prefab panel shows once the question about its unsaved
 		// edits is answered: another prefab's path, or empty to close.
 		std::optional<std::string> m_prefabNext{ };
+
+		// AskToSave's question, until it is answered.
+		struct SaveQuestion
+		{
+			std::vector<std::string> unsaved{ };
+			std::function<bool()> save{ };
+			std::function<void()> then{ };
+		};
+
+		std::optional<SaveQuestion> m_saveQuestion{ };
 
 		// The open prefab, while a build has its scene down.
 		std::string m_prefabBeforeBuild{ };

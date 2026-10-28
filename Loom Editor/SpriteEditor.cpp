@@ -2165,6 +2165,27 @@ namespace Loom
 		return saved;
 	};
 
+	std::vector<std::string> SpriteEditor::UnsavedFiles() const
+	{
+		std::vector<std::string> unsaved{ };
+
+		for (const std::unique_ptr<Document>& document : m_documents)
+			if (document->unsaved)
+				unsaved.push_back(std::filesystem::path(document->path).filename().string());
+
+		// As SaveAll writes them: one made by New and since let go of is not.
+		for (const auto& [path, file] : m_palettes)
+		{
+			const bool linked = path == m_loosePalette || std::any_of(m_documents.begin(), m_documents.end(),
+				[&path](const std::unique_ptr<Document>& document) { return document->links.palette == path; });
+
+			if (file.Unsaved() && (file.saved || linked))
+				unsaved.push_back(std::filesystem::path(path).filename().string());
+		};
+
+		return unsaved;
+	};
+
 	bool SpriteEditor::SaveDocument(Document& document)
 	{
 		if (document.outside)

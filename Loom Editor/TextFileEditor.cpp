@@ -133,6 +133,17 @@ namespace Loom
 		return saved;
 	};
 
+	std::vector<std::string> TextFileEditor::UnsavedFiles() const
+	{
+		std::vector<std::string> unsaved{ };
+
+		for (const std::unique_ptr<Document>& document : m_documents)
+			if (document->unsaved)
+				unsaved.push_back(std::filesystem::path(document->path).filename().string());
+
+		return unsaved;
+	};
+
 	bool TextFileEditor::Save(Document& document)
 	{
 		std::ofstream file(document.path, std::ios::binary);
