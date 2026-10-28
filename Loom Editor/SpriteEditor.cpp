@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <iostream>
 #include <iterator>
+#include <limits>
 #include <optional>
 #include <utility>
 
@@ -155,17 +156,20 @@ namespace Loom
 		struct ToolInfo
 		{
 			SpriteEditor::Tool tool;
+			const char* icon;
 			const char* label;
 			ImGuiKey key;
 		};
 
 		constexpr ToolInfo tools[] =
 		{
-			{ SpriteEditor::Tool::Pencil, "Pencil", ImGuiKey_B },
-			{ SpriteEditor::Tool::Eraser, "Eraser", ImGuiKey_E },
-			{ SpriteEditor::Tool::Fill, "Fill", ImGuiKey_G },
-			{ SpriteEditor::Tool::Picker, "Picker", ImGuiKey_I },
+			{ SpriteEditor::Tool::Pencil, "✏", "Pencil", ImGuiKey_B },
+			{ SpriteEditor::Tool::Eraser, "🧽", "Eraser", ImGuiKey_E },
+			{ SpriteEditor::Tool::Fill, "🪣", "Fill", ImGuiKey_G },
+			{ SpriteEditor::Tool::Picker, "💧", "Picker", ImGuiKey_I },
 		};
+
+		constexpr const char* import_icon = "📥";
 
 		#pragma endregion
 
@@ -1230,16 +1234,24 @@ namespace Loom
 
 	void SpriteEditor::DrawTools()
 	{
+		const float side = ImGui::GetFrameHeight();
+
 		for (const ToolInfo& info : tools)
 		{
-			if (ImGui::RadioButton(info.label, m_tool == info.tool))
+			const bool chosen = m_tool == info.tool;
+
+			if (chosen)
+				ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetColorU32(ImGuiCol_ButtonActive));
+
+			if (ImGui::Button((std::string(info.icon) + "##" + info.label).c_str(), ImVec2(side, side)))
 				m_tool = info.tool;
+
+			if (chosen)
+				ImGui::PopStyleColor();
 
 			ImGui::SetItemTooltip("%s (%s)", info.label, ImGui::GetKeyName(info.key));
 			ImGui::SameLine();
 		};
-
-		ImGui::NewLine();
 
 		for (const ImGuiMouseButton button : paint_buttons)
 		{
@@ -1249,18 +1261,29 @@ namespace Loom
 			for (int i = 0; i < channels; i++)
 				colour[i] = chosen[i] / (float)UINT8_MAX;
 
-			if (ImGui::ColorEdit4(button_names[button], colour, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf))
+			if (ImGui::ColorEdit4((std::string("##") + button_names[button]).c_str(), colour, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf))
 				for (int i = 0; i < channels; i++)
 					chosen[i] = (uint8_t)std::lround(colour[i] * UINT8_MAX);
 
-			ImGui::SetItemTooltip("What the %s mouse button paints with", button_names[button]);
+			ImGui::SetItemTooltip("What the %s mouse button paints with (%s swaps them)", button_names[button], ImGui::GetKeyName(swap_key));
 			ImGui::SameLine();
 		};
 
-		if (ImGui::Button("Swap"))
-			std::swap(m_colours[ImGuiMouseButton_Left], m_colours[ImGuiMouseButton_Right]);
+		const std::string& path = PalettePath();
 
-		ImGui::SetItemTooltip("Swap the colours (%s)", ImGui::GetKeyName(swap_key));
+		ImGui::BeginDisabled(m_active == nullptr || path.empty());
+
+		if (ImGui::Button((std::string(import_icon) + "##Import").c_str(), ImVec2(side, side)))
+		{
+			PaletteFile& file = PaletteAt(path);
+			const std::string name = std::filesystem::path(m_active->path).stem().string();
+
+			RememberPalette(file);
+			file.palette.categories.push_back({ name, m_active->sprite.Colours(std::numeric_limits<size_t>::max()) });
+		};
+
+		ImGui::EndDisabled();
+		ImGui::SetItemTooltip("Import the sprite's colours into a category of the palette");
 	};
 
 	void SpriteEditor::DrawPaletteChoice(const std::string& project_folder)

@@ -19,13 +19,14 @@ namespace Loom
 	* - The Sprites panel: a tab for each open sprite, its frame drawn pixel
 	*   for pixel over a checkerboard where it is see-through, over a timeline
 	*   of its layers and frames
-	* - The Palette panel: the pencil, eraser, fill and picker, a colour for
-	*   each of the left and right mouse buttons, which X swaps, and the
-	*   swatches of the palette the sprite in front paints from, clear always
-	*   first, a click on one picking it for the button that clicked. A
-	*   sprite whose Palette panel is out of sight says so, with a button to
-	*   bring it, and the Sprites panel opening with it closed asks whether
-	*   to open it, docked in the bottom quarter of the Sprites panel
+	* - The Palette panel: a bar of the pencil, eraser, fill and picker as
+	*   icons, a colour for each of the left and right mouse buttons, which X
+	*   swaps, and an import of the sprite's colours as a category; under it
+	*   the swatches of the palette the sprite in front paints from, clear
+	*   always first, a click on one picking it for the button that clicked.
+	*   A sprite whose Palette panel is out of sight says so, with a button
+	*   to bring it, and the Sprites panel opening with it closed asks
+	*   whether to open it, docked in the bottom quarter of the Sprites panel
 	* - Right-clicking the Palette panel adds a category, a header that opens
 	*   and shuts on swatches of its own, which right-clicking renames or
 	*   deletes, or opens another of the project's palettes

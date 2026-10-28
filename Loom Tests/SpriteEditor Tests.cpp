@@ -908,6 +908,29 @@ TEST_SUITE("SpriteEditor")
 		CHECK(Count(driven.Saved(), RED) == Driven::side * Driven::side);
 	};
 
+	TEST_CASE("the tool icons on the Palette panel's bar pick the fill, eraser and pencil as their keys do")
+	{
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.layers[0].cels[0].Fill(0, 0, RED);
+
+		Driven driven("loom sprite tool icons.tga", &sprite);
+
+		driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"🪣\"\nwait 2\n");
+		driven.Stroke(middle, middle, ImGuiMouseButton_Right);
+
+		CHECK(Count(driven.Saved(), WHITE) == Driven::side * Driven::side);
+
+		driven.Run("click \"Palette\" \"🧽\"\nwait 2\n");
+		driven.Stroke(middle, middle);
+
+		CHECK(Count(driven.Saved(), WHITE) == Driven::side * Driven::side - 1);
+
+		driven.Run("click \"Palette\" \"✏\"\nwait 2\n");
+		driven.Stroke(middle, middle);
+
+		CHECK(Count(driven.Saved(), BLACK) == 1);
+	};
+
 	TEST_CASE("a stroke ends when its own button lets go, whatever the other does")
 	{
 		Driven driven("loom sprite two buttons.tga");
@@ -1006,6 +1029,43 @@ TEST_SUITE("SpriteEditor")
 		Loom::Palette saved;
 		REQUIRE(Loom::Palette::Load(palette, saved));
 		CHECK(saved.colours == std::vector<SpriteAsset::Colour>{ RED });
+
+		std::filesystem::remove(palette);
+	};
+
+	TEST_CASE("import puts every colour of the sprite in a category named after it, those the palette has already included, written on Ctrl+S and stepped by Ctrl+Z and Ctrl+Y")
+	{
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.layers[0].cels[0].Set(0, 0, RED);
+		sprite.layers[0].cels[0].Set(1, 0, WHITE);
+
+		Driven driven("loom sprite import.tga", &sprite);
+
+		const std::string palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension).string();
+
+		driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\nclick \"Palette\" \"📥\"\nwait 2\n");
+
+		CHECK_FALSE(std::filesystem::exists(palette));
+
+		const auto saved_after = [&driven, &palette](const std::string& keys)
+		{
+			driven.Run(keys + "key ctrl+s\nwait 2\n");
+
+			Loom::Palette saved;
+			REQUIRE(Loom::Palette::Load(palette, saved));
+
+			return saved;
+		};
+
+		using Categories = std::vector<Loom::Palette::Category>;
+		const Categories imported = { { "loom sprite import", { RED, WHITE } } };
+
+		const Loom::Palette saved = saved_after("");
+		CHECK(saved.colours == std::vector<SpriteAsset::Colour>{ RED, WHITE });
+		CHECK(saved.categories == imported);
+
+		CHECK(saved_after("key ctrl+z\nwait 2\n").categories.empty());
+		CHECK(saved_after("key ctrl+y\nwait 2\n").categories == imported);
 
 		std::filesystem::remove(palette);
 	};

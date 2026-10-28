@@ -226,8 +226,8 @@ namespace Loom
 		std::vector<SpriteAsset::Colour> colours;
 		std::vector<Category> categories;
 
-		// Each says what went wrong on std::cerr. A line that is not a colour
-		// is skipped.
+		// Each says what went wrong on std::cerr. A line that is neither a
+		// colour nor a [Name] is skipped.
 		static bool Load(const std::string& path, Palette& palette);
 		static bool Save(const std::string& path, const Palette& palette);
 

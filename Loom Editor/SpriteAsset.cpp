@@ -12,11 +12,13 @@
 #include <cctype>
 #include <charconv>
 #include <cmath>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 
 
@@ -687,6 +689,7 @@ namespace Loom
 	std::vector<SpriteAsset::Colour> SpriteAsset::Colours(size_t limit) const
 	{
 		std::vector<Colour> colours;
+		std::unordered_set<uint32_t> met;
 
 		for (const Layer& layer : layers)
 		{
@@ -698,8 +701,10 @@ namespace Loom
 					for (int x = 0; x < cel.width; x++)
 					{
 						const Colour colour = cel.Get(x, y);
+						uint32_t packed = 0;
+						std::memcpy(&packed, colour.data(), sizeof(packed));
 
-						if (colour[alpha] == 0 || std::find(colours.begin(), colours.end(), colour) != colours.end())
+						if (colour[alpha] == 0 || !met.insert(packed).second)
 							continue;
 
 						colours.push_back(colour);
