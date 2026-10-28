@@ -2,13 +2,10 @@
 
 #include "TestsPanel.h"
 
-#include "EditorIcons.h"
-
 #include "imgui.h"
-#include "imgui_internal.h"
 
-#include <algorithm>
 #include <string>
+#include <utility>
 #include <vector>
 
 
@@ -129,12 +126,13 @@ TEST_SUITE("TestsPanel")
 		CHECK(suite.laser_runs == 0);
 	};
 
-	TEST_CASE("clicking down the test column follows each case and the failure under it")
+	TEST_CASE("rows select as files do, and a double click follows a case or a failure")
 	{
 		constexpr float width = 800.0f;
 		constexpr float height = 400.0f;
 		constexpr float frame_time = 1.0f / 60.0f;
-		constexpr float click_step = 4.0f;
+		constexpr float scan_step = 2.0f;
+		constexpr float double_click_time = 0.3f;
 
 		Suite suite;
 		Loom::TestsPanel panel;
@@ -147,9 +145,6 @@ TEST_SUITE("TestsPanel")
 		io.IniFilename = nullptr;
 		io.DisplaySize = ImVec2(width, height);
 		io.DeltaTime = frame_time;
-
-		// Clicks this close together would otherwise double-click the title bar shut.
-		io.MouseDoubleClickTime = 0.0f;
 
 		unsigned char* pixels = nullptr;
 		int atlas_width = 0;
@@ -174,28 +169,130 @@ TEST_SUITE("TestsPanel")
 				ImGui::EndFrame();
 			};
 
+		const auto click =
+			[&](float y, ImGuiKey modifier = ImGuiKey_None, float x = -1.0f)
+			{
+				if (modifier != ImGuiKey_None)
+					io.AddKeyEvent(modifier, true);
+
+				io.AddMousePosEvent(x < 0.0f ? width / 2.0f : x, y);
+				frame();
+				io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+				frame();
+				io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+				frame();
+
+				if (modifier != ImGuiKey_None)
+					io.AddKeyEvent(modifier, false);
+
+				frame();
+			};
+
+		const auto chosen =
+			[&]
+			{
+				std::string names;
+
+				for (const std::string& name : Names(panel.Chosen()))
+					names += name + "|";
+
+				return names;
+			};
+
+		const std::string everything = chosen();
+
+		// Clicks this close together would otherwise double-click.
+		io.MouseDoubleClickTime = 0.0f;
 		frame();
 
-		// Down the middle of the panel, which is the test column below its toolbar.
-		for (float y = 0.0f; y < height; y += click_step)
+		// Run, found by clicking across the toolbar below the title bar, past New.
+		ImVec2 run{ };
+
+		for (float y = ImGui::GetFrameHeight() + scan_step; y < height && !panel.HasQueued(); y += scan_step)
+			for (float x = scan_step; x < width && !panel.HasQueued(); x += scan_step)
+			{
+				click(y, ImGuiKey_None, x);
+				run = ImVec2(x, y);
+			};
+
+		REQUIRE(panel.HasQueued());
+		CHECK(created > 0);
+		created = 0;
+		panel.RunQueued();
+
+		// Each row's y, found by clicking down the panel and reading what a click chose.
+		std::vector<std::pair<float, std::string>> rows;
+
+		for (float y = 0.0f; y < height; y += scan_step)
 		{
-			io.AddMousePosEvent(width / 2.0f, y);
-			frame();
-			io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
-			frame();
-			io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
-			frame();
+			click(y);
+
+			const std::string now = chosen();
+
+			if (now != everything && (rows.empty() || rows.back().second != now))
+				rows.emplace_back(y, now);
 		};
 
-		followed.erase(std::unique(followed.begin(), followed.end()), followed.end());
+		// Door.hpp's row and its one case's row choose the same, so they read as one.
+		REQUIRE(rows.size() == 4);
+		CHECK(rows[0].second == "TestsPanel laser stops at a wall|TestsPanel laser misses|");
+		CHECK(rows[1].second == "TestsPanel laser stops at a wall|");
+		CHECK(rows[2].second == "TestsPanel laser misses|");
+		CHECK(rows[3].second == "TestsPanel door opens|");
+		CHECK(followed.empty());
+
+		click(rows[1].first);
+		click(rows[3].first, ImGuiMod_Ctrl);
+		CHECK(chosen() == "TestsPanel laser stops at a wall|TestsPanel door opens|");
+
+		click(rows[2].first);
+		click(rows[3].first, ImGuiMod_Shift);
+		CHECK(chosen() == "TestsPanel laser misses|TestsPanel door opens|");
+
+		click(rows[1].first, ImGuiMod_Ctrl);
+		click(rows[1].first, ImGuiMod_Ctrl);
+		CHECK(chosen() == "TestsPanel laser misses|TestsPanel door opens|");
+
+		io.MouseDoubleClickTime = double_click_time;
+
+		const auto double_click =
+			[&](float y)
+			{
+				click(y);
+				click(y);
+
+				// Long enough that the next click starts a new double click.
+				io.DeltaTime = double_click_time;
+				frame();
+				io.DeltaTime = frame_time;
+			};
+
+		// Up from Door.hpp's row, the first row a double click follows is the failure's.
+		for (float y = rows[3].first - scan_step; y > rows[2].first && followed.empty(); y -= scan_step)
+			double_click(y);
+
+		double_click(rows[1].first);
 
 		std::string order;
 
 		for (const std::string& place : followed)
 			order += place + " ";
 
-		CHECK(order == "Laser.hpp:3 Laser.hpp:4 TestsPanel Tests.cpp:" + std::to_string(suite.failure_line) + " Door.hpp:5 ");
-		CHECK_FALSE(panel.HasQueued());
+		CHECK(order == "TestsPanel Tests.cpp:" + std::to_string(suite.failure_line) + " Laser.hpp:3 ");
+
+		io.MouseDoubleClickTime = 0.0f;
+		click(rows[3].first);
+		click(rows[1].first, ImGuiMod_Ctrl);
+
+		const int laser_runs = suite.laser_runs;
+		const int door_runs = suite.door_runs;
+
+		click(run.y, ImGuiKey_None, run.x);
+		CHECK(panel.HasQueued());
+		panel.RunQueued();
+
+		CHECK(suite.laser_runs == laser_runs + 1);
+		CHECK(suite.door_runs == door_runs + 1);
 		CHECK(open);
 		CHECK(created == 0);
 
