@@ -267,7 +267,7 @@ bool LoomDitheredOut(float alpha)
 			return stages;
 		};
 
-		// Stages bending aPos and aNormal by the joints before main reads them, or none without main or aPos, or when UV layers reach the Skin's locations.
+		// Stages bending aPos and aNormal by the joints, or none without main or aPos, or with UV layers on the Skin's.
 		std::optional<VariantStages> Skinned(const std::string& vertex, const std::string& fragment)
 		{
 			static const std::regex position(R"((?:\blayout\s*\([^)]*\)\s*)?\bin\s+(?:(?:lowp|mediump|highp)\s+)?vec3\s+aPos\s*;)");
