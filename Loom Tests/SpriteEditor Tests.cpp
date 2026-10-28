@@ -55,10 +55,22 @@ namespace
 		// Enough for the panel to dock its tab and take focus.
 		static constexpr int opening_frames = 4;
 
+		static constexpr const char* paletteQuestion = "Open Palette?";
+
+		// How the Palette panel starts: shut with the panel's question about it
+		// answered Not Now, shut with the question left up, or open.
+		enum struct PaletteStart
+		{
+			Declined,
+			Asked,
+			Open,
+		};
+
 		// With a sprite, it is written beside the image first, with the image
 		// its sheet unless another is given, and the image opens as it.
-		explicit Driven(const std::string& name, const SpriteAsset* sprite = nullptr, const SpriteAsset::Image* image = nullptr) :
-			path(LoomTests::WriteTga(name, side, side, SpriteAsset::Image::Blank(side, side).pixels))
+		explicit Driven(const std::string& name, const SpriteAsset* sprite = nullptr, const SpriteAsset::Image* image = nullptr, PaletteStart palette = PaletteStart::Declined) :
+			path(LoomTests::WriteTga(name, side, side, SpriteAsset::Image::Blank(side, side).pixels)),
+			paletteOpen(palette == PaletteStart::Open)
 		{
 			if (sprite != nullptr)
 			{
@@ -85,6 +97,9 @@ namespace
 
 			for (int i = 0; i < opening_frames; i++)
 				Frame();
+
+			if (palette == PaletteStart::Declined)
+				Run(std::string("click \"") + paletteQuestion + "\" \"Not Now\"\nwait 2\n");
 		};
 
 		~Driven()
@@ -185,6 +200,14 @@ namespace
 			return sprite;
 		};
 
+		// Whether the question about the Palette panel was up last frame.
+		static bool Asking()
+		{
+			const ImGuiWindow* window = ImGui::FindWindowByName(paletteQuestion);
+
+			return window != nullptr && window->Active;
+		};
+
 		// How many tabs the panel has.
 		static int Tabs()
 		{
@@ -240,7 +263,7 @@ namespace
 		ImGuiContext* context = nullptr;
 		SpriteEditor editor;
 		bool open = true;
-		bool paletteOpen = false;
+		bool paletteOpen;
 	};
 
 	// A point in the canvas well inside the image, which sits in the middle of
@@ -532,6 +555,40 @@ TEST_SUITE("SpriteEditor")
 		CHECK(links.palette == palette);
 
 		std::filesystem::remove(palette);
+	};
+
+	TEST_CASE("the panel opening with the Palette panel shut asks to open it, and Open Palette does")
+	{
+		Driven driven("loom sprite palette asked.tga", nullptr, nullptr, Driven::PaletteStart::Asked);
+
+		CHECK(Driven::Asking());
+		CHECK_FALSE(driven.paletteOpen);
+
+		driven.Run(std::string("click \"") + Driven::paletteQuestion + "\" \"Open Palette\"\nwait 2\n");
+
+		CHECK(driven.paletteOpen);
+		CHECK_FALSE(Driven::Asking());
+	};
+
+	TEST_CASE("Not Now leaves the Palette panel shut and is not asked again while the panel stays open")
+	{
+		Driven driven("loom sprite palette declined.tga", nullptr, nullptr, Driven::PaletteStart::Asked);
+
+		driven.Run(std::string("click \"") + Driven::paletteQuestion + "\" \"Not Now\"\nwait 2\n");
+
+		for (int i = 0; i < Driven::opening_frames; i++)
+			driven.Frame();
+
+		CHECK_FALSE(driven.paletteOpen);
+		CHECK_FALSE(Driven::Asking());
+	};
+
+	TEST_CASE("the panel opening with the Palette panel open asks nothing")
+	{
+		Driven driven("loom sprite palette open.tga", nullptr, nullptr, Driven::PaletteStart::Open);
+
+		CHECK_FALSE(Driven::Asking());
+		CHECK(driven.paletteOpen);
 	};
 
 	TEST_CASE("+ Layer adds a clear layer above the one painted, a drag moves it, and - Layer takes it out")
