@@ -409,6 +409,68 @@ TEST_SUITE("Mesh")
 
 	#pragma endregion
 
+	#pragma region Inspector
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the inspector draws a mesh's geometry as one summary, and its material only when it is not the GameObject's")
+	{
+		Loom::Scene scene("mesh inspector");
+		Pump();
+
+		Loom::GameObject* holder = scene.AddChild("Cube");
+		Loom::GameObject* other = scene.AddChild("Other");
+		Loom::Material* own = holder->Attach<Loom::Material>();
+		Loom::Material* elsewhere = other->Attach<Loom::Material>();
+		Loom::Mesh* mesh = holder->Attach<Loom::Mesh>(Loom::Mesh::Triangles);
+		Pump();
+
+		const auto shown = [mesh](const void* data)
+		{
+			for (const Loom::SerializedField& field : mesh->GetFields())
+				if (field.data == data)
+					return mesh->IsShown(field);
+
+			FAIL("no such field");
+			return false;
+		};
+
+		for (const void* geometry : { (const void*)&*mesh->m_vertices, (const void*)&*mesh->m_textureCoordinates, (const void*)&*mesh->m_normals, (const void*)&*mesh->m_colors, (const void*)&*mesh->m_uvLayers })
+			CHECK_FALSE(shown(geometry));
+
+		CHECK(shown(&*mesh->primitive_id));
+		CHECK(shown(&*mesh->m_draw_type));
+
+		mesh->material = own;
+		CHECK_FALSE(shown(&*mesh->material));
+
+		mesh->material = elsewhere;
+		CHECK(shown(&*mesh->material));
+
+		CHECK(mesh->Summary() == "0 vertices");
+
+		constexpr size_t vertices = 3;
+		mesh->m_vertices = std::vector<float>(vertices * 3, 0.0f);
+		mesh->m_normals = std::vector<float>(vertices * 3, 0.0f);
+		mesh->SetUV<float>(2, std::vector<float>(vertices, 0.0f));
+		mesh->m_generated = true;
+
+		CHECK(mesh->Summary() == "3 vertices, normals, UV_2, generated");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the inspector draws a mesh's material while the GameObject has none of its own to stand for it")
+	{
+		Loom::Scene scene("mesh inspector, no material");
+		Pump();
+
+		Loom::Mesh* mesh = scene.AddChild("Cube")->Attach<Loom::Mesh>(Loom::Mesh::Triangles);
+		Pump();
+
+		for (const Loom::SerializedField& field : mesh->GetFields())
+			if (field.data == &*mesh->material)
+				CHECK(mesh->IsShown(field));
+	};
+
+	#pragma endregion
+
 	#pragma region UV Layers
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh's UV layers hold each vertex's values as raw words, in order of id")

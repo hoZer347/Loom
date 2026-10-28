@@ -102,6 +102,10 @@ namespace Loom
 		// it to make again.
 		virtual bool IsSaved(const SerializedField& field) const { return true; };
 
+		// Whether the inspector draws a field as a row of its own, rather than
+		// leaving it to the object's OnGui or out altogether.
+		virtual bool IsShown(const SerializedField& field) const { return true; };
+
 		// For an integer field that indexes a list only the object knows, such
 		// as an Animator's clips, the names the editor offers in its place, as
 		// it does an enum's. Empty for a field that is just a number.

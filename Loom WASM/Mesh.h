@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <string>
 #include <tuple>
 #include <unordered_map>
 #include <vector>
@@ -137,6 +138,14 @@ namespace Loom
 
 		// Leaves a generated mesh's geometry out of what is written.
 		bool IsSaved(const SerializedField& field) const override;
+
+		// Leaves the geometry to Summary, and the material to its own
+		// component while it is the GameObject's.
+		bool IsShown(const SerializedField& field) const override;
+
+		// The geometry in one line: its vertices, the attributes they carry,
+		// and whether a script generates them.
+		std::string Summary() const;
 
 		#pragma endregion
 

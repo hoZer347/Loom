@@ -522,6 +522,9 @@ namespace Loom
 
 			for (size_t i = 0; i < labels.size(); i++)
 			{
+				if (!object.IsShown(fields[i]))
+					continue;
+
 				const std::string_view category = fields[i].Category();
 				const float depth = category.empty() ? 0.0f : (float)(std::count(category.begin(), category.end(), '/') + 1);
 				const float width = ImGui::CalcTextSize(Shortened(labels[i], FLT_MAX).c_str()).x;
@@ -4190,7 +4193,7 @@ namespace Loom
 		{
 			const SerializedField& field = object.GetFields()[i];
 
-			if (field.type == FieldType::Uniforms)
+			if (field.type == FieldType::Uniforms || !object.IsShown(field))
 				return;
 
 			ImGui::PushID(&field);
