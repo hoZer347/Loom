@@ -14,6 +14,7 @@
 #include "ScriptFolders.h"
 #include "SpriteAsset.h"
 
+#include <process.h>
 #include <windows.h>
 
 #include <algorithm>
@@ -25,9 +26,10 @@
 
 namespace
 {
-	// Under HKEY_CURRENT_USER, apart from the classes Explorer reads.
-	constexpr const wchar_t* TEST_KEY = L"Software\\Loom Tests";
-	constexpr const wchar_t* TEST_CLASSES = L"Software\\Loom Tests\\Classes";
+	// Under HKEY_CURRENT_USER, apart from the classes Explorer reads and from
+	// another suite running at the same time.
+	const std::wstring TEST_KEY = L"Software\\Loom Tests " + std::to_wstring(_getpid());
+	const std::wstring TEST_CLASSES = TEST_KEY + L"\\Classes";
 
 	// An engine checkout under the temp directory with an editor built in it,
 	// gone again afterwards with the classes the test registered.
@@ -44,14 +46,14 @@ namespace
 			std::filesystem::create_directories(root / "Loom WASM");
 			std::filesystem::create_directories(editor.parent_path());
 			std::ofstream(root / "Loom WASM" / "Loom.h");
-			RegDeleteTreeW(HKEY_CURRENT_USER, TEST_KEY);
+			RegDeleteTreeW(HKEY_CURRENT_USER, TEST_KEY.c_str());
 		};
 
 		~Engine()
 		{
 			std::error_code code;
 			std::filesystem::remove_all(root, code);
-			RegDeleteTreeW(HKEY_CURRENT_USER, TEST_KEY);
+			RegDeleteTreeW(HKEY_CURRENT_USER, TEST_KEY.c_str());
 		};
 	};
 
@@ -120,6 +122,18 @@ TEST_SUITE("FileTypes")
 
 		for (const Loom::FileTypes::Type& type : Loom::FileTypes::All())
 			CHECK_MESSAGE(Loom::FileTypes::OpenCommand(type.extension, TEST_CLASSES) == CommandFor(main.editor), type.extension);
+	};
+
+	TEST_CASE("a Debug editor leaves the file types to the Release one")
+	{
+		const Engine engine("loom file types debug");
+		const std::filesystem::path debug = engine.root / "x64" / "Debug" / "Loom Editor.exe";
+
+		std::filesystem::create_directory(engine.root / ".git");
+
+		CHECK_FALSE(Loom::FileTypes::MayClaim(debug));
+		CHECK_FALSE(Loom::FileTypes::Claim(debug, TEST_CLASSES));
+		CHECK(Loom::FileTypes::OpenCommand(Loom::SceneSerializer::extension, TEST_CLASSES).empty());
 	};
 
 	TEST_CASE("an editor outside any engine takes no file types")

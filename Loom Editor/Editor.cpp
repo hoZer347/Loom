@@ -977,8 +977,8 @@ namespace Loom
 				return OpenProject(std::filesystem::absolute(path, code).parent_path().string(), open_scene);
 			};
 
-		// A prefab, sprite, palette or build settings file opens its panel in the
-		// project it belongs to.
+		// A prefab, sprite, palette or build settings file opens as it does from
+		// the Project panel, in the project it belongs to.
 		if (const std::filesystem::path file = path;
 			(file.extension() == Prefab::extension ||
 			file.extension() == SpriteAsset::extension ||
@@ -991,13 +991,12 @@ namespace Loom
 			if (!OpenProject(ProjectFolderOf(absolute).string(), open_scene))
 				return false;
 
-			if (file.extension() == Prefab::extension)
-				OpenModel(absolute.string());
-			else if (file.extension() == SpriteAsset::extension)
-				OpenSprite(absolute.string());
-			else if (file.extension() == Palette::extension)
-				OpenPalette(absolute.string());
-			else m_showBuildSettings = true;
+			// A prefab's components need the scripts, whose build reopens it.
+			if (file.extension() == BuildSettings::extension)
+				m_showBuildSettings = true;
+			else if (file.extension() == Prefab::extension && m_scripts.IsBuilding())
+				m_prefabBeforeBuild = ProjectAssets::RelativeTo(absolute.string(), m_projectPath);
+			else OpenAsset(absolute.string());
 
 			return true;
 		};

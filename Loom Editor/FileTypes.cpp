@@ -18,6 +18,8 @@
 
 #include <iostream>
 
+#pragma comment(lib, "shell32.lib")
+
 
 namespace Loom
 {
@@ -76,12 +78,14 @@ namespace Loom
 
 	bool FileTypes::MayClaim(const std::filesystem::path& executable)
 	{
-		// <engine>/x64/<configuration>/Loom Editor.exe
+		// <engine>/x64/Release/Loom Editor.exe, the configuration games' scripts
+		// are built for.
 		const std::filesystem::path root = executable.parent_path().parent_path().parent_path();
 
 		std::error_code code;
 
-		return std::filesystem::exists(root / "Loom WASM" / "Loom.h", code) &&
+		return executable.parent_path() == root / "x64" / "Release" &&
+			std::filesystem::exists(root / "Loom WASM" / "Loom.h", code) &&
 			!ProjectTemplate::IsWorktree(root.string());
 	};
 
@@ -93,6 +97,7 @@ namespace Loom
 		const std::wstring command = L"\"" + executable.wstring() + L"\" \"%1\"";
 
 		bool changed = false;
+		bool failed = false;
 
 		for (const Type& type : TYPES)
 		{
@@ -108,13 +113,16 @@ namespace Loom
 				WriteString(prog_id_key + COMMAND_KEY, nullptr, command))
 				changed = true;
 			else
+			{
+				failed = true;
 				std::cerr << "Could not register " << type.extension << " files with Explorer" << std::endl;
+			};
 		};
 
 		if (changed && classes == UserClasses)
 			SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
 
-		return true;
+		return !failed;
 	};
 
 	std::wstring FileTypes::OpenCommand(const char* extension, const std::wstring& classes)

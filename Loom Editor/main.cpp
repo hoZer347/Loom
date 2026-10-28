@@ -4,7 +4,6 @@
 #include <windows.h>
 #include <dwmapi.h>
 #include <objbase.h>
-#include <shlobj.h>
 
 #include "CrashReports.h"
 #include "Editor.h"
@@ -34,7 +33,6 @@
 #include <GLFW/glfw3native.h>
 
 #pragma comment(lib, "dwmapi.lib")
-#pragma comment(lib, "shell32.lib")
 
 using namespace Loom;
 
