@@ -4391,7 +4391,6 @@ namespace Loom
 				{
 					serial = value;
 
-					// A drag moves every object by as much, and a typed value puts them all there.
 					if (dragged)
 						MultiEdit::Shift(held, index, glm::value_ptr(before));
 					else
