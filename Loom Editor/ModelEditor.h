@@ -5,6 +5,7 @@
 #include "Shapes.h"
 
 #include "Camera.h"
+#include "Guid.h"
 
 #include "imgui.h"
 
@@ -197,8 +198,8 @@ namespace Loom
 			EditableMesh mesh;
 			Selection selection;
 
-			// Each material's, in the order MaterialsOf finds them.
-			std::vector<std::string> shaders;
+			// Each material's shader, by the material's guid.
+			std::vector<std::pair<Guid, std::string>> shaders;
 		};
 
 		// One of the handles round what is picked, along an axis or, with

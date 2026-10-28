@@ -2070,7 +2070,7 @@ void main()
 			MaterialsOf(*document.root, materials);
 
 			for (const Material* material : materials)
-				snapshot.shaders.push_back(material->GetShaderPath());
+				snapshot.shaders.emplace_back(material->GetGuid(), material->GetShaderPath());
 		};
 
 		return snapshot;
@@ -2117,9 +2117,10 @@ void main()
 			std::vector<Material*> materials{ };
 			MaterialsOf(*document.root, materials);
 
-			for (size_t i = 0; i < std::min(materials.size(), step.shaders.size()); i++)
-				if (materials[i]->GetShaderPath() != step.shaders[i])
-					materials[i]->ChangeShader(step.shaders[i]);
+			for (Material* material : materials)
+				for (const auto& [guid, shader] : step.shaders)
+					if (guid == material->GetGuid() && material->GetShaderPath() != shader)
+						material->ChangeShader(shader);
 		};
 
 		if (!document.parts.empty())
@@ -2414,6 +2415,10 @@ void main()
 		document->parts.push_back(Part{ document->root, mesh, EditableMesh{ } });
 
 		Add(Shapes::Shape::Cube);
+
+		// Undo takes the cube back but not the components it went on, so the
+		// prefab as saved is never reached again.
+		document->savedAt.reset();
 	};
 
 	#pragma endregion

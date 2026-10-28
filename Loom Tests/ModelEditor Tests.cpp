@@ -611,6 +611,7 @@ TEST_SUITE("ModelEditor")
 		driven.editor.Undo();
 		driven.editor.Add(Shapes::Shape::Cube);
 		driven.editor.Undo();
+		driven.editor.Redo();
 		CHECK(driven.editor.Unsaved());
 	};
 
@@ -697,6 +698,12 @@ TEST_SUITE("ModelEditor")
 
 			driven.editor.AddMesh();
 			CHECK(driven.Mesh().faces.size() == 6);
+
+			// The components the cube went on stay, so it is never as saved.
+			driven.editor.Undo();
+			CHECK(driven.editor.Unsaved());
+
+			driven.editor.Redo();
 			REQUIRE(driven.editor.Save());
 
 			ModelEditor reopened;
@@ -754,6 +761,7 @@ TEST_SUITE("ModelEditor")
 
 			driven.editor.SetShader("Assets/Lit.shader");
 			CHECK(driven.editor.Unsaved());
+			CHECK(ReadFile(prefab.string()).find("\"Assets/Lit.shader\"") == std::string::npos);
 
 			driven.editor.Undo();
 			CHECK_FALSE(driven.editor.Unsaved());
@@ -771,6 +779,41 @@ TEST_SUITE("ModelEditor")
 		std::error_code code;
 		std::filesystem::remove_all(project, code);
 		std::filesystem::remove(std::filesystem::temp_directory_path() / "model_shaders_source.loomprefab", code);
+	};
+
+	TEST_CASE("The Model panel steps through shaders chosen for a prefab with no mesh it can shape")
+	{
+		const std::filesystem::path project = std::filesystem::temp_directory_path() / "model_shaders_unshaped";
+		const std::filesystem::path prefab = project / "Assets" / "Prefabs" / "Crate.loomprefab";
+		const EditableMesh cube = EditableMesh::Cube(1.0f);
+
+		std::filesystem::create_directories(prefab.parent_path());
+		std::ofstream(project / "Model.loomproject") << "name=Model\n";
+		std::ofstream(project / "Assets" / "Model.shader") << "";
+		std::ofstream(prefab, std::ios::binary) << ReadFile(WritePrefab("model_shaders_unshaped_source", nullptr, &cube, true));
+
+		{
+			const LoomTests::Captured captured(std::cerr);
+			Driven driven("model_shaders_unshaped", nullptr, prefab.string());
+			REQUIRE(driven.editor.Editing() == nullptr);
+
+			driven.editor.SetShader("Assets/Model.shader");
+			CHECK(driven.editor.Unsaved());
+
+			driven.editor.Undo();
+			CHECK_FALSE(driven.editor.Unsaved());
+			REQUIRE(driven.editor.Save());
+			CHECK(ReadFile(prefab.string()).find("\"Assets/Model.shader\"") == std::string::npos);
+
+			driven.editor.Redo();
+			CHECK(driven.editor.Unsaved());
+			REQUIRE(driven.editor.Save());
+			CHECK(ReadFile(prefab.string()).find("\"Assets/Model.shader\"") != std::string::npos);
+		};
+
+		std::error_code code;
+		std::filesystem::remove_all(project, code);
+		std::filesystem::remove(std::filesystem::temp_directory_path() / "model_shaders_unshaped_source.loomprefab", code);
 	};
 #endif
 
