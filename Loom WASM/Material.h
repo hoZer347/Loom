@@ -42,8 +42,9 @@ namespace Loom
 		// any that failed to once its file has been written.
 		static void ReloadChangedShaders();
 
-		// The shader compiled from path that every material naming it shares,
-		// compiled now if it has not been, or null when it does not compile.
+		// The shader compiled from path that every Material and PixelShader
+		// naming it shares, compiled now if it has not been, or null when it
+		// does not compile.
 		static Shader* SharedShader(const std::string& path);
 
 		// The same, without compiling, so cheap enough for every draw.

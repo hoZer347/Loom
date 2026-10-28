@@ -753,7 +753,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 	{ };
 
 	Shader::Shader(const std::string& file_path) :
-		file_path(file_path.ends_with(extension) ?
+		file_path(file_path.ends_with(extension) || IsPixel(file_path) ?
 			file_path :
 			file_path + extension),
 		id(CompileSource(file_path))

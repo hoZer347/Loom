@@ -7,9 +7,9 @@ namespace Loom
 {
 	/**
 	* Loom::ShaderEditor
-	* - The Shaders panel: a tab for each open .shader or .loompixel file, highlighted as
-	*   GLSL, completing GLSL's words, the file's own and the engine's, and
-	*   explaining the engine's on hover
+	* - The Shaders panel: a tab for each open .shader or .loompixel file,
+	*   highlighted as GLSL, completing GLSL's words, the file's own and the
+	*   engine's, and explaining the engine's on hover
 	* - Checks the text with glslang a moment after each edit and marks what it
 	*   says on the line it is about. Ctrl+S saves, and the engine reloads the
 	*   shader from the file

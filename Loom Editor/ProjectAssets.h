@@ -42,21 +42,20 @@ namespace Loom
 		};
 
 		// Scenes open in the editor, prefabs in its Prefab panel, shaders and
-		// pixel shaders in its Shaders panel, dialogues in its Dialogues panel, textures and sprites
-		// in its Sprites panel, palettes in its Palette panel, the scripts
-		// project's sources in Visual Studio, and anything else through the
-		// shell.
+		// pixel shaders in its Shaders panel, dialogues in its Dialogues
+		// panel, textures and sprites in its Sprites panel, palettes in its
+		// Palette panel, the scripts project's sources in Visual Studio, and
+		// anything else through the shell.
 		// scripts_folder is empty when there is no scripts project.
 		static Opener OpenerOf(const std::string& path, const std::string& scripts_folder);
 
-		// Whether name is a scene, prefab, shader, pixel shader, dialogue, texture, sprite, palette,
-		// sound or font, which the Project panel's tabs list along with
-		// models. The scripts are the Scripts tab's too, and anything else in
-		// the project folder (Visual Studio's files, notes) is not part of
-		// the game.
+		// Whether name is a scene, prefab, shader, pixel shader, dialogue,
+		// texture, sprite, palette, sound or font, which the Project panel's
+		// tabs list along with models. The scripts are the Scripts tab's too,
+		// and anything else in the project folder (Visual Studio's files,
+		// notes) is not part of the game.
 		static bool IsGameFile(const std::string& name);
 		static bool IsScriptFile(const std::string& name);
-		// A shader or a pixel shader.
 		static bool IsShaderFile(const std::string& name);
 		static bool IsDialogueFile(const std::string& name);
 		static bool IsTextureFile(const std::string& name);

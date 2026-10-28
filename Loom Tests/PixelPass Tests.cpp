@@ -3,11 +3,15 @@
 #include "Test Support.h"
 
 #include "EditorViewport.h"
+#include "Material.h"
 #include "PixelPass.h"
 #include "PixelShader.h"
 #include "Scene.h"
 #include "Shaders.h"
 
+#include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -58,6 +62,33 @@ TEST_SUITE("PixelPass")
 		CHECK(renderer.programs.size() == 1);
 		CHECK(renderer.programs.at("passed.loompixel") == passed.shader.id);
 	};
+
+#ifndef __EMSCRIPTEN__
+	// Native only: the file is read from disk, which needs a browser on the web.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a .loompixel file written again is built again by the poll")
+	{
+		const std::filesystem::path path = std::filesystem::temp_directory_path() / "loom polled pass.loompixel";
+
+		RecordingRenderer renderer;
+
+		std::ofstream(path) << PASS;
+
+		Loom::Shader* shader = Loom::Material::SharedShader(path.string());
+		REQUIRE(shader != nullptr);
+
+		const uint32_t first = shader->id;
+
+		std::ofstream(path) << PASS << "\n";
+		std::filesystem::last_write_time(path, std::filesystem::last_write_time(path) + std::chrono::seconds(1));
+
+		Loom::Material::ReloadChangedShaders();
+
+		CHECK(shader->file_path == path.string());
+		CHECK(shader->id != first);
+
+		std::filesystem::remove(path);
+	};
+#endif
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a view drawn with no pixel pass is copied as it is")
 	{
