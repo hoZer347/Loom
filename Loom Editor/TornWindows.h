@@ -43,6 +43,11 @@ namespace Loom
 
 		const std::vector<Torn>& Windows() const { return m_torn; };
 
+		// Saves the windows with the layout, and brings them back from it. Added
+		// before the layout is read, removed before the context goes.
+		void AddSettings();
+		void RemoveSettings();
+
 	private:
 		void Tear(float bar_height);
 

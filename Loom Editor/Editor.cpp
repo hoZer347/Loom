@@ -746,6 +746,7 @@ namespace Loom
 		static const std::string layout = BesideExecutable("LoomEditor.layout.ini").string();
 		ImGui::GetIO().IniFilename = layout.c_str();
 		AddPanelSettings();
+		m_tornWindows.AddSettings();
 		ImGui::LoadIniSettingsFromDisk(layout.c_str());
 
 		// Floating windows stay inside the editor, or dialogs fall behind it.
@@ -780,6 +781,7 @@ namespace Loom
 
 		io.IniFilename = nullptr;
 		ImGui::RemoveSettingsHandler(panel_settings);
+		m_tornWindows.RemoveSettings();
 
 		SetDropCallback(nullptr);
 		drop_receiver = nullptr;

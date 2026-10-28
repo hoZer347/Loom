@@ -3,6 +3,8 @@
 #include "imgui_internal.h"
 
 #include <algorithm>
+#include <cstdlib>
+#include <cstring>
 #include <unordered_map>
 
 
@@ -21,6 +23,11 @@ namespace Loom
 		// Above and below the text.
 		constexpr float padding_sides = 2.0f;
 
+		constexpr const char* settings_type = "LoomTornWindows";
+		constexpr const char* torn_prefix = "##Torn";
+		constexpr const char* pos_key = "Pos=";
+		constexpr const char* size_key = "Size=";
+
 		ImGuiDockNode* RootNode(const ImGuiWindow* window)
 		{
 			ImGuiDockNode* const node = window->DockId != 0 ? ImGui::DockBuilderGetNode(window->DockId) : nullptr;
@@ -33,6 +40,16 @@ namespace Loom
 			const ImGuiDockNode* const root = RootNode(window);
 
 			return root != nullptr && root->IsDockSpace();
+		};
+
+		// "x,y"
+		ImVec2 ReadPair(const char* text)
+		{
+			char* end = nullptr;
+			const float x = std::strtof(text, &end);
+			const float y = *end == ',' ? std::strtof(end + 1, nullptr) : 0.0f;
+
+			return ImVec2(x, y);
 		};
 
 		int CountWindows(const ImGuiDockNode* node)
@@ -53,7 +70,7 @@ namespace Loom
 
 		Tear(g.FontSize + bar_padding.y * padding_sides);
 
-		for (const Torn& torn : m_torn)
+		for (Torn& torn : m_torn)
 		{
 			ImGuiWindowClass own;
 			own.ViewportFlagsOverrideSet = ImGuiViewportFlags_NoAutoMerge;
@@ -73,6 +90,9 @@ namespace Loom
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
 			ImGui::Begin(torn.name.c_str(), nullptr, torn_flags);
 			ImGui::PopStyleVar(3);
+
+			torn.pos = ImGui::GetWindowPos();
+			torn.size = ImGui::GetWindowSize();
 
 			g.NextWindowData.MenuBarOffsetMinVal = ImVec2(0.0f, 0.0f);
 
@@ -113,6 +133,59 @@ namespace Loom
 		return docked;
 	};
 
+	void TornWindows::AddSettings()
+	{
+		ImGuiSettingsHandler handler;
+		handler.TypeName = settings_type;
+		handler.TypeHash = ImHashStr(handler.TypeName);
+		handler.UserData = this;
+
+		handler.ClearAllFn = [](ImGuiContext*, ImGuiSettingsHandler* handler)
+		{
+			((TornWindows*)handler->UserData)->m_torn.clear();
+		};
+
+		handler.ReadOpenFn = [](ImGuiContext*, ImGuiSettingsHandler* handler, const char* name) -> void*
+		{
+			const size_t prefix = strlen(torn_prefix);
+
+			if (strncmp(name, torn_prefix, prefix) != 0)
+				return nullptr;
+
+			TornWindows& windows = *(TornWindows*)handler->UserData;
+			windows.m_count = ImMax(windows.m_count, atoi(name + prefix));
+
+			Torn& torn = windows.m_torn.emplace_back();
+			torn.name = name;
+			torn.dockspace = ImHashStr((torn.name + "Dock").c_str());
+
+			return &torn;
+		};
+
+		handler.ReadLineFn = [](ImGuiContext*, ImGuiSettingsHandler*, void* entry, const char* line)
+		{
+			Torn& torn = *(Torn*)entry;
+
+			if (strncmp(line, pos_key, strlen(pos_key)) == 0)
+				torn.pos = ReadPair(line + strlen(pos_key));
+			else if (strncmp(line, size_key, strlen(size_key)) == 0)
+				torn.size = ReadPair(line + strlen(size_key));
+		};
+
+		handler.WriteAllFn = [](ImGuiContext*, ImGuiSettingsHandler* handler, ImGuiTextBuffer* buffer)
+		{
+			for (const Torn& torn : ((TornWindows*)handler->UserData)->m_torn)
+				buffer->appendf("[%s][%s]\n%s%d,%d\n%s%d,%d\n\n", handler->TypeName, torn.name.c_str(), pos_key, (int)torn.pos.x, (int)torn.pos.y, size_key, (int)torn.size.x, (int)torn.size.y);
+		};
+
+		ImGui::AddSettingsHandler(&handler);
+	};
+
+	void TornWindows::RemoveSettings()
+	{
+		ImGui::RemoveSettingsHandler(settings_type);
+	};
+
 	void TornWindows::Tear(float bar_height)
 	{
 		const ImGuiContext& g = *GImGui;
@@ -139,7 +212,7 @@ namespace Loom
 			if (first)
 			{
 				Torn& torn = m_torn.emplace_back();
-				torn.name = "##Torn" + std::to_string(++m_count);
+				torn.name = torn_prefix + std::to_string(++m_count);
 				torn.dockspace = ImHashStr((torn.name + "Dock").c_str());
 				torn.pos = ImVec2(root->Pos.x, root->Pos.y - bar_height);
 				torn.size = ImVec2(root->Size.x, root->Size.y + bar_height);

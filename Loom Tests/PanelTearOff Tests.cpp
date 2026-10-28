@@ -7,6 +7,7 @@
 #include "TornWindows.h"
 
 #include <algorithm>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -36,6 +37,7 @@ namespace
 			constexpr float frame_time = 1.0f / 60.0f;
 
 			context = ImGui::CreateContext();
+			torn.AddSettings();
 			windows.clear();
 
 			ImGuiIO& io = ImGui::GetIO();
@@ -324,5 +326,48 @@ TEST_SUITE("PanelTearOff")
 		CHECK(driven.torn.Windows().empty());
 		CHECK(Driven::Viewports() == 1);
 		CHECK(Driven::windows.size() == 1);
+	};
+
+	TEST_CASE("a torn window comes back from the layout with its panels, and the next one torn off is new")
+	{
+		std::string layout;
+
+		{
+			Driven driven;
+			driven.DockBoth();
+
+			driven.Drag(Driven::Tab(Driven::Find(PANEL)), OFF_EDITOR, true);
+			driven.Release(true);
+			REQUIRE(driven.Torn(Driven::Find(PANEL)));
+
+			ImGui::DockBuilderDockWindow(OTHER, Driven::Find(PANEL)->DockId);
+			driven.Frame(true);
+			driven.Frame(true);
+			REQUIRE(driven.torn.Windows().size() == 1);
+
+			layout = ImGui::SaveIniSettingsToMemory();
+		}
+
+		Driven driven;
+		ImGui::LoadIniSettingsFromMemory(layout.c_str());
+		driven.Frame(true);
+		driven.Frame(true);
+		driven.Frame(true);
+
+		REQUIRE(driven.torn.Windows().size() == 1);
+		const Loom::TornWindows::Torn back = driven.torn.Windows().front();
+		CHECK(driven.Torn(Driven::Find(PANEL)));
+		CHECK(Driven::Find(OTHER)->Viewport == Driven::Find(PANEL)->Viewport);
+		CHECK(driven.HasBar(Driven::Find(PANEL)));
+		CHECK(driven.torn.Docked(back).size() == 2);
+		CHECK(Driven::Viewports() == 2);
+
+		driven.Drag(Driven::Tab(Driven::Find(OTHER)), BELOW_EDITOR, true);
+		driven.Release(true);
+
+		REQUIRE(driven.torn.Windows().size() == 2);
+		CHECK(driven.torn.Windows().back().name != back.name);
+		CHECK(driven.torn.Docked(driven.torn.Windows().front()) == std::vector<ImGuiWindow*>{ Driven::Find(PANEL) });
+		CHECK(Driven::Viewports() == 3);
 	};
 };
