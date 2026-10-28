@@ -183,7 +183,6 @@
     <ClCompile Include="ModelEditor Tests.cpp" />
     <ClCompile Include="ModelImporter Tests.cpp" />
     <ClCompile Include="McpProtocol Tests.cpp" />
-    <ClCompile Include="McpRelay Tests.cpp" />
     <ClCompile Include="UiScript Tests.cpp" />
     <ClCompile Include="EditCommands Tests.cpp" />
     <ClCompile Include="HiddenProcess Tests.cpp" />
@@ -292,7 +291,6 @@
     <ClCompile Include="..\Loom Editor\ModelEditor.cpp" />
     <ClCompile Include="..\Loom Editor\UiScript.cpp" />
     <ClCompile Include="..\Loom Editor\McpProtocol.cpp" />
-    <ClCompile Include="..\Loom Editor\McpRelay.cpp" />
     <ClCompile Include="..\Loom Editor\HiddenProcess.cpp" />
     <ClCompile Include="..\Loom Editor\CrashReports.cpp" />
     <ClCompile Include="..\Loom Editor\EditorLog.cpp" />
@@ -306,9 +304,11 @@
     <ClCompile Include="..\Loom Editor\TornWindows.cpp" />
     <ClCompile Include="..\Loom Editor\WindowFullscreen.cpp" />
   </ItemGroup>
-  <!-- Built against Assimp, which the web build has no wasm copy of. -->
+  <!-- Built against Assimp and Winsock, which the web build has no wasm copy of. -->
   <ItemGroup Label="Desktop">
+    <ClCompile Include="..\Loom Editor\McpRelay.cpp" />
     <ClCompile Include="..\Loom Editor\ModelImporter.cpp" />
+    <ClCompile Include="McpRelay Tests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <!-- ImGui is linked rather than recompiled: Component<T>::Gui and
