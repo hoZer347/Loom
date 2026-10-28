@@ -377,9 +377,10 @@ namespace Loom
 		int m_renameCategory = -1;
 
 		// What the palette's rename box holds while it is open.
-		static constexpr size_t paletteNameSize = 64;
+		static constexpr size_t paletteNameSize = 256;
 		char m_paletteName[paletteNameSize] = { };
 
+		// Palettes renamed since TakeRenamed last ran, from where to where.
 		std::vector<std::pair<std::string, std::string>> m_renamed;
 
 		#pragma endregion

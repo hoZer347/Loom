@@ -3468,7 +3468,10 @@ namespace Loom
 		const std::vector<std::pair<std::string, std::string>> renamed = m_sprites.TakeRenamed();
 
 		for (const auto& [from, to] : renamed)
+		{
 			Refile(from, to);
+			m_selectedAsset = ProjectAssets::Relocate(m_selectedAsset, from, to);
+		};
 
 		if (!renamed.empty())
 			RefreshProjectAssets();
