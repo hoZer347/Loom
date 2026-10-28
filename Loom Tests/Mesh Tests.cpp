@@ -18,6 +18,20 @@
 using LoomTests::Pump;
 using LoomTests::RecordingRenderer;
 
+namespace
+{
+	// Whether the inspector draws the mesh's field at data, failing when it has none there.
+	bool MeshFieldShown(const Loom::Mesh& mesh, const void* data)
+	{
+		for (const Loom::SerializedField& field : mesh.GetFields())
+			if (field.data == data)
+				return mesh.IsShown(field);
+
+		FAIL("no such field");
+		return false;
+	};
+};
+
 
 TEST_SUITE("Mesh")
 {
@@ -423,15 +437,7 @@ TEST_SUITE("Mesh")
 		Loom::Mesh* mesh = holder->Attach<Loom::Mesh>(Loom::Mesh::Triangles);
 		Pump();
 
-		const auto shown = [mesh](const void* data)
-		{
-			for (const Loom::SerializedField& field : mesh->GetFields())
-				if (field.data == data)
-					return mesh->IsShown(field);
-
-			FAIL("no such field");
-			return false;
-		};
+		const auto shown = [mesh](const void* data) { return MeshFieldShown(*mesh, data); };
 
 		for (const void* geometry : { (const void*)&*mesh->m_vertices, (const void*)&*mesh->m_textureCoordinates, (const void*)&*mesh->m_normals, (const void*)&*mesh->m_colors, (const void*)&*mesh->m_uvLayers })
 			CHECK_FALSE(shown(geometry));
@@ -454,6 +460,13 @@ TEST_SUITE("Mesh")
 		mesh->m_generated = true;
 
 		CHECK(mesh->Summary() == "3 vertices, normals, UV_2, generated");
+
+		mesh->m_vertices = std::vector<float>(3, 0.0f);
+		mesh->m_normals = std::vector<float>();
+		mesh->ClearUV(2);
+		mesh->m_generated = false;
+
+		CHECK(mesh->Summary() == "1 vertex");
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the inspector draws a mesh's material while the GameObject has none of its own to stand for it")
@@ -464,9 +477,7 @@ TEST_SUITE("Mesh")
 		Loom::Mesh* mesh = scene.AddChild("Cube")->Attach<Loom::Mesh>(Loom::Mesh::Triangles);
 		Pump();
 
-		for (const Loom::SerializedField& field : mesh->GetFields())
-			if (field.data == &*mesh->material)
-				CHECK(mesh->IsShown(field));
+		CHECK(MeshFieldShown(*mesh, &*mesh->material));
 	};
 
 	#pragma endregion

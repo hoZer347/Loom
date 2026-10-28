@@ -41,6 +41,9 @@ namespace Loom
 
 	namespace
 	{
+		// Floats a vertex's position takes in m_vertices.
+		constexpr size_t POSITION_COMPONENTS = 3;
+
 		#pragma region Instances
 
 		// What each instance MeshBatch hands over holds: its model matrix, its colour, then its seed.
@@ -268,7 +271,6 @@ namespace Loom
 			return false;
 		};
 
-		constexpr size_t POSITION_COMPONENTS = 3;
 		constexpr size_t UV_COMPONENTS = 2;
 		constexpr size_t NORMAL_COMPONENTS = 3;
 		constexpr size_t COLOR_COMPONENTS = 4;
@@ -561,9 +563,9 @@ namespace Loom
 
 	std::string Mesh::Summary() const
 	{
-		constexpr size_t position_floats = 3;
+		const size_t vertices = std::as_const(m_vertices)->size() / POSITION_COMPONENTS;
 
-		std::string summary = std::to_string(std::as_const(m_vertices)->size() / position_floats) + " vertices";
+		std::string summary = std::to_string(vertices) + (vertices == 1 ? " vertex" : " vertices");
 
 		if (!m_indices.empty())
 			summary += ", " + std::to_string(m_indices.size()) + " indices";
