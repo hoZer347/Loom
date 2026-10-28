@@ -247,8 +247,9 @@ namespace Loom
 		// In a tab of the Dialogues panel, which comes forward.
 		void OpenDialogue(const std::string& path);
 
-		// In a tab of the Sprites panel, which comes forward.
-		void OpenSprite(const std::string& path);
+		// In a tab of the Sprites panel, which comes forward. A preview takes
+		// the place of the one before it.
+		void OpenSprite(const std::string& path, bool preview = false);
 
 		// A prefab, by its path in the project or on disk, in a tab of the
 		// Model panel, which comes forward. A model opens as the prefab named
@@ -836,8 +837,9 @@ namespace Loom
 		// A model in the Model panel, anything else where
 		// ProjectAssets::OpenerOf says; the shell's opener is whatever Windows
 		// opens that kind of file with, and the text editor when nothing
-		// claims it.
-		void OpenAsset(const std::string& path);
+		// claims it. A sprite opened as a preview takes the place of the one
+		// before it.
+		void OpenAsset(const std::string& path, bool preview = false);
 
 		// In the scripts project's solution when it has one, at the line and
 		// column when they are given, counting from one.

@@ -1666,7 +1666,7 @@ namespace Loom
 
 	#pragma region Opening Assets
 
-	void Editor::OpenAsset(const std::string& path)
+	void Editor::OpenAsset(const std::string& path, bool preview)
 	{
 		if (IsModelFile(path))
 		{
@@ -1699,7 +1699,7 @@ namespace Loom
 			break;
 
 		case ProjectAssets::Opener::Sprites:
-			OpenSprite(path);
+			OpenSprite(path, preview);
 			break;
 
 		case ProjectAssets::Opener::Palette:
@@ -1728,9 +1728,9 @@ namespace Loom
 		m_showDialogues = true;
 	};
 
-	void Editor::OpenSprite(const std::string& path)
+	void Editor::OpenSprite(const std::string& path, bool preview)
 	{
-		m_sprites.Open(path);
+		m_sprites.Open(path, preview);
 		m_showSprites = true;
 	};
 
@@ -2572,8 +2572,8 @@ namespace Loom
 		};
 
 		// A texture, sprite or palette opens on the release, so dragging one
-		// out to a field leaves its panel shut. Anything else opens on a
-		// double click.
+		// out to a field leaves its panel shut, a sprite as a preview the
+		// next one replaces. A double click opens anything, and keeps it.
 		const ImGuiIO& io = ImGui::GetIO();
 		const float drag_threshold = io.MouseDragThreshold * io.MouseDragThreshold;
 
@@ -2585,8 +2585,10 @@ namespace Loom
 
 		const bool double_clicked = ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
 
-		if (ProjectAssets::IsTwoDFile(node.path) ? released : double_clicked)
+		if (double_clicked)
 			OpenAsset(node.path);
+		else if (released && ProjectAssets::IsTwoDFile(node.path))
+			OpenAsset(node.path, true);
 
 		ImGui::SetItemTooltip("%s", file.c_str());
 

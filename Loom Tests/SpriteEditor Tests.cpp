@@ -221,6 +221,21 @@ namespace
 			return "";
 		};
 
+		// The middle of the tab whose name holds name, which a script cannot
+		// aim at by its label, or nowhere when there is none.
+		static ImVec2 TabMiddle(const std::string& name)
+		{
+			ImGuiContext& g = *ImGui::GetCurrentContext();
+
+			for (int i = 0; i < g.TabBars.GetMapSize(); i++)
+				if (ImGuiTabBar* bar = g.TabBars.TryGetMapData(i))
+					for (ImGuiTabItem& tab : bar->Tabs)
+						if (std::string(ImGui::TabBarGetTabName(bar, &tab)).find(name) != std::string::npos)
+							return ImVec2(bar->BarRect.Min.x + tab.Offset + tab.Width * 0.5f, (bar->BarRect.Min.y + bar->BarRect.Max.y) * 0.5f);
+
+			return ImVec2();
+		};
+
 		std::string path;
 		ImGuiContext* context = nullptr;
 		SpriteEditor editor;
@@ -413,6 +428,83 @@ TEST_SUITE("SpriteEditor")
 		// Had a second tab opened, it would be the one in front, and painted.
 		CHECK(Count(driven.Saved(), CLEAR) == Driven::side * Driven::side - 1);
 		CHECK(Driven::Tabs() == 1);
+	};
+
+	TEST_CASE("a preview takes the place of the one before it, and leaves a kept tab open")
+	{
+		Driven driven("loom sprite preview kept.tga");
+
+		const std::string first = LoomTests::WriteTga("loom sprite preview first.tga", Driven::side, Driven::side, SpriteAsset::Image::Blank(Driven::side, Driven::side).pixels);
+		const std::string second = LoomTests::WriteTga("loom sprite preview second.tga", Driven::side, Driven::side, SpriteAsset::Image::Blank(Driven::side, Driven::side).pixels);
+
+		driven.editor.Open(first, true);
+		driven.Frame();
+		driven.Frame();
+
+		CHECK(Driven::Tabs() == 2);
+
+		driven.editor.Open(second, true);
+		driven.Frame();
+		driven.Frame();
+
+		CHECK(Driven::Tabs() == 2);
+		CHECK(Driven::SelectedTab().find("loom sprite preview second") != std::string::npos);
+
+		std::filesystem::remove(first);
+		std::filesystem::remove(second);
+	};
+
+	TEST_CASE("a preview is kept by an edit, a double click on its tab, or opening it again to keep")
+	{
+		Driven driven("loom sprite preview edited.tga");
+
+		std::vector<std::string> images;
+
+		for (const char* name : { "loom sprite preview a.tga", "loom sprite preview b.tga", "loom sprite preview c.tga", "loom sprite preview d.tga" })
+			images.push_back(LoomTests::WriteTga(name, Driven::side, Driven::side, SpriteAsset::Image::Blank(Driven::side, Driven::side).pixels));
+
+		const auto preview = [&driven](const std::string& image)
+		{
+			driven.editor.Open(image, true);
+			driven.Frame();
+			driven.Frame();
+		};
+
+		preview(images[0]);
+		driven.Stroke(middle, middle);
+		preview(images[1]);
+
+		CHECK(Driven::Tabs() == 3);
+
+		const ImVec2 tab = Driven::TabMiddle("loom sprite preview b");
+		REQUIRE(tab.x > 0.0f);
+
+		ImGuiIO& io = ImGui::GetIO();
+		io.AddMousePosEvent(tab.x, tab.y);
+		driven.Frame();
+
+		for (int click = 0; click < 2; click++)
+		{
+			io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+			driven.Frame();
+			io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+			driven.Frame();
+		};
+
+		preview(images[2]);
+
+		CHECK(Driven::Tabs() == 4);
+
+		driven.editor.Open(images[2]);
+		preview(images[3]);
+
+		CHECK(Driven::Tabs() == 5);
+
+		for (const std::string& image : images)
+		{
+			std::filesystem::remove(image);
+			std::filesystem::remove(SpriteAsset::For(image));
+		};
 	};
 
 	TEST_CASE("a sprite with the Palette panel shut offers to open it, and New there makes a palette of the sprite's colours")
@@ -872,18 +964,7 @@ TEST_SUITE("SpriteEditor")
 		driven.Frame();
 
 		const std::string first = Driven::SelectedTab();
-		const std::string other_name = std::filesystem::path(SpriteAsset::For(other)).filename().string();
-
-		// The middle of the other sprite's tab, which a script cannot aim at
-		// by its label.
-		ImVec2 other_tab{ };
-		ImGuiContext& g = *ImGui::GetCurrentContext();
-
-		for (int i = 0; i < g.TabBars.GetMapSize(); i++)
-			if (ImGuiTabBar* bar = g.TabBars.TryGetMapData(i))
-				for (ImGuiTabItem& tab : bar->Tabs)
-					if (std::string(ImGui::TabBarGetTabName(bar, &tab)).find(other_name) != std::string::npos)
-						other_tab = ImVec2(bar->BarRect.Min.x + tab.Offset + tab.Width * 0.5f, (bar->BarRect.Min.y + bar->BarRect.Max.y) * 0.5f);
+		const ImVec2 other_tab = Driven::TabMiddle(std::filesystem::path(SpriteAsset::For(other)).filename().string());
 
 		REQUIRE(other_tab.x > 0.0f);
 

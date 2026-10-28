@@ -53,8 +53,10 @@ namespace Loom
 		// Opens a sprite, or the sprite kept for an image, in a tab of its own,
 		// or brings its tab forward, and the panel with it. An image with no
 		// sprite yet opens as one of a frame and a layer, written beside it on
-		// the first save.
-		void Open(const std::string& path);
+		// the first save. A preview takes the place of the one before it, until
+		// an edit or a double click on its tab keeps it; opening it again
+		// without preview keeps it too.
+		void Open(const std::string& path, bool preview = false);
 
 		// Into the Palette panel, as the palette of the sprite in front, or on
 		// its own when there is none.
@@ -159,6 +161,9 @@ namespace Loom
 
 			// Brings the tab forward on the next frame.
 			bool select = true;
+
+			// Shown in italics, and replaced by the next preview opened.
+			bool preview = false;
 		};
 
 		#pragma endregion

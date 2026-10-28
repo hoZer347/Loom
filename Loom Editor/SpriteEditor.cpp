@@ -99,6 +99,9 @@ namespace Loom
 
 		constexpr ImGuiKey swap_key = ImGuiKey_X;
 
+		// How far a preview's tab name leans, across per line down.
+		constexpr float italic_slant = 0.2f;
+
 		#pragma endregion
 
 		#pragma region Colours
@@ -162,6 +165,25 @@ namespace Loom
 			return ImGui::ColorConvertU32ToFloat4(ToImGui(colour));
 		};
 
+		// Leans the text drawn into the window from first_vertex on, short of
+		// right, about the middle of its line. ImGui has no italic font of its
+		// own, and the frame round the text is drawn in the atlas's white
+		// pixel, so it stays upright.
+		void Italicise(int first_vertex, float right)
+		{
+			ImDrawList& draw_list = *ImGui::GetWindowDrawList();
+			const ImVec2 white = ImGui::GetFontTexUvWhitePixel();
+			const float middle = (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * half;
+
+			for (int i = first_vertex; i < draw_list.VtxBuffer.Size; i++)
+			{
+				ImDrawVert& vertex = draw_list.VtxBuffer[i];
+
+				if (vertex.pos.x < right && (vertex.uv.x != white.x || vertex.uv.y != white.y))
+					vertex.pos.x += (middle - vertex.pos.y) * italic_slant;
+			};
+		};
+
 		std::string FileName(const std::string& path)
 		{
 			return std::filesystem::path(path).filename().string();
@@ -187,7 +209,7 @@ namespace Loom
 
 	#pragma region Opening
 
-	void SpriteEditor::Open(const std::string& path)
+	void SpriteEditor::Open(const std::string& path, bool preview)
 	{
 		// Absolute, since opening a project moves the working directory.
 		std::error_code code;
@@ -202,6 +224,7 @@ namespace Loom
 			if (document->path == sprite_path || document->links.image == normal)
 			{
 				document->select = true;
+				document->preview = document->preview && preview;
 				return;
 			};
 
@@ -240,8 +263,21 @@ namespace Loom
 
 		document->saved = document->sprite;
 		document->savedLinks = document->links;
+		document->preview = preview;
 
-		m_documents.push_back(std::move(document));
+		const auto previewed = std::find_if(m_documents.begin(), m_documents.end(),
+			[](const std::unique_ptr<Document>& open) { return open->preview; });
+
+		if (!preview || previewed == m_documents.end())
+		{
+			m_documents.push_back(std::move(document));
+			return;
+		};
+
+		if (m_active == previewed->get())
+			m_active = nullptr;
+
+		*previewed = std::move(document);
 	};
 
 	void SpriteEditor::OpenPalette(const std::string& path)
@@ -326,7 +362,15 @@ namespace Loom
 					// in the Project panel keeps its tab.
 					const std::string label = std::string(EditorIcons::Sprite) + " " + FileName(document->path) + "###" + std::to_string((uintptr_t)document.get());
 					bool keep = true;
+					const int first_vertex = ImGui::GetWindowDrawList()->VtxBuffer.Size;
 					const bool shown = ImGui::BeginTabItem(label.c_str(), &keep, flags);
+
+					// Short of the close button, which sits a line wide at the right.
+					if (document->preview)
+						Italicise(first_vertex, ImGui::GetItemRectMax().x - ImGui::GetStyle().FramePadding.x - ImGui::GetFontSize());
+
+					if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+						document->preview = false;
 
 					ImGui::SetItemTooltip("%s\n%s", document->path.c_str(), document->links.image.c_str());
 
@@ -1360,6 +1404,7 @@ namespace Loom
 	{
 		document.unsaved = document.sprite != document.saved || document.links != document.savedLinks;
 		document.stale = true;
+		document.preview = false;
 	};
 
 	void SpriteEditor::Step(Document& document, bool undo)
