@@ -336,11 +336,12 @@ namespace Loom
 			relocate(document->links);
 			relocate(document->savedLinks);
 
-			document->history.Rewrite([&](Snapshot snapshot)
-			{
-				relocate(snapshot.links);
-				return snapshot;
-			});
+			document->history.Rewrite(
+				[&](Snapshot snapshot)
+				{
+					relocate(snapshot.links);
+					return snapshot;
+				});
 		};
 
 		m_loosePalette = ProjectAssets::Relocate(m_loosePalette, from, to);
