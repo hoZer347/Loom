@@ -24,24 +24,27 @@ namespace Loom
 	{
 		#pragma region Constants
 
-		constexpr const char* endpoint = "/mcp";
+		constexpr const char* ENDPOINT = "/mcp";
 
-		constexpr size_t max_request_bytes = 1 << 20;
-		constexpr size_t receive_buffer_bytes = 4096;
-		constexpr std::string_view header_end = "\r\n\r\n";
-		constexpr DWORD receive_timeout_ms = 5000;
-		constexpr int listen_backlog = 8;
+		constexpr size_t MAX_REQUEST_BYTES = 1 << 20;
+		constexpr size_t RECEIVE_BUFFER_BYTES = 4096;
+		constexpr std::string_view HEADER_END = "\r\n\r\n";
+		constexpr DWORD RECEIVE_TIMEOUT_MS = 5000;
+		constexpr int LISTEN_BACKLOG = 8;
+
+		// Port 0 asks for any free one.
+		constexpr unsigned short ANY_PORT = 0;
 
 		// Past EditorMcp's own five minutes for a call, so that it answers first.
-		constexpr DWORD relay_timeout_ms = 6 * 60 * 1000;
+		constexpr DWORD RELAY_TIMEOUT_MS = 6 * 60 * 1000;
 
 		// How often an editor without the shared port tries to take it.
-		constexpr long take_over_seconds = 1;
+		constexpr long TAKE_OVER_SECONDS = 1;
 
-		constexpr const char* editor_argument = "editor";
-		constexpr const char* editors_tool = "editors";
+		constexpr const char* EDITOR_ARGUMENT = "editor";
+		constexpr const char* EDITORS_TOOL = "editors";
 
-		constexpr const char* shared_instructions =
+		constexpr const char* SHARED_INSTRUCTIONS =
 			" Every open editor answers here: editors lists them, and each tool's editor argument picks one when more than one is open.";
 
 		#pragma endregion
@@ -59,7 +62,7 @@ namespace Loom
 
 			if (listener == INVALID_SOCKET ||
 				bind(listener, (const sockaddr*)&address, sizeof(address)) != 0 ||
-				listen(listener, listen_backlog) != 0)
+				listen(listener, LISTEN_BACKLOG) != 0)
 			{
 				if (listener != INVALID_SOCKET)
 					closesocket(listener);
@@ -134,41 +137,59 @@ namespace Loom
 				"Connection: close\r\n" + extra_headers + "\r\n" + body);
 		};
 
+		// A POST of body over a connected socket, answered with the response's body.
+		std::string Exchange(SOCKET server, const std::string& body)
+		{
+			setsockopt(server, SOL_SOCKET, SO_RCVTIMEO, (const char*)&RELAY_TIMEOUT_MS, sizeof(RELAY_TIMEOUT_MS));
+
+			const std::string request =
+				std::string("POST ") + ENDPOINT + " HTTP/1.1\r\n"
+				"Host: 127.0.0.1\r\n"
+				"Content-Type: application/json\r\n"
+				"Accept: application/json, text/event-stream\r\n"
+				"Content-Length: " + std::to_string(body.size()) + "\r\n"
+				"Connection: close\r\n\r\n" + body;
+
+			std::string response{ };
+
+			if (SendAll(server, request))
+			{
+				char buffer[RECEIVE_BUFFER_BYTES];
+				int count = 0;
+
+				while ((count = recv(server, buffer, sizeof(buffer), 0)) > 0)
+					response.append(buffer, count);
+			};
+
+			const size_t head_size = response.find(HEADER_END);
+
+			return head_size == std::string::npos ? "" : response.substr(head_size + HEADER_END.size());
+		};
+
 		#pragma endregion
 
 		#pragma region Registry
 
-		// One empty file per editor, named by its own port.
-		std::filesystem::path RegistryOf(unsigned short shared_port)
+		// One file per editor, named by its own port and holding its process id.
+		bool Note(const std::filesystem::path& file)
 		{
-			std::error_code error{ };
-			std::filesystem::path folder = std::filesystem::temp_directory_path(error) / "Loom MCP" / std::to_string(shared_port);
+			std::ofstream out(file);
+			out << GetCurrentProcessId();
 
-			std::filesystem::create_directories(folder, error);
-
-			return folder;
+			return (bool)out;
 		};
 
-		std::vector<unsigned short> Registered(const std::filesystem::path& registry)
+		bool Running(DWORD process_id)
 		{
-			constexpr unsigned long highest_port = 65535;
+			const HANDLE process = OpenProcess(SYNCHRONIZE, FALSE, process_id);
 
-			std::vector<unsigned short> ports{ };
-			std::error_code error{ };
+			if (!process)
+				return false;
 
-			for (const auto& entry : std::filesystem::directory_iterator(registry, error))
-			{
-				const std::string name = entry.path().filename().string();
-				char* end = nullptr;
-				const unsigned long port = strtoul(name.c_str(), &end, 10);
+			const bool running = WaitForSingleObject(process, 0) == WAIT_TIMEOUT;
+			CloseHandle(process);
 
-				if (!name.empty() && *end == '\0' && port > 0 && port <= highest_port)
-					ports.push_back((unsigned short)port);
-			};
-
-			std::sort(ports.begin(), ports.end());
-
-			return ports;
+			return running;
 		};
 
 		#pragma endregion
@@ -186,16 +207,33 @@ namespace Loom
 
 	McpRelay::~McpRelay()
 	{
-		m_stopping = true;
+		{
+			std::lock_guard<std::mutex> lock(m_mutex);
+			m_stopping = true;
+
+			for (const uintptr_t connection : m_connections)
+				shutdown(connection, SD_BOTH);
+		};
+
+		// Closing them wakes Serve from its select, and again after, for one it took meanwhile.
+		const auto close_listeners = [this]()
+		{
+			for (std::atomic<uintptr_t>* listener : { &m_own, &m_shared })
+				if (const uintptr_t listening = listener->exchange(Invalid); listening != Invalid)
+					closesocket(listening);
+		};
+
+		close_listeners();
 
 		if (m_thread.joinable())
 			m_thread.join();
 
-		if (m_own != invalid)
-			closesocket(m_own);
+		close_listeners();
 
-		if (m_shared != invalid)
-			closesocket(m_shared);
+		{
+			std::unique_lock<std::mutex> lock(m_mutex);
+			m_released.wait(lock, [this]() { return m_answering == 0; });
+		};
 
 		if (!m_registry.empty())
 		{
@@ -223,8 +261,7 @@ namespace Loom
 
 		m_started = true;
 
-		// Any free port will do for its own.
-		const SOCKET own = Bound(0);
+		const SOCKET own = Bound(ANY_PORT);
 
 		if (own == INVALID_SOCKET)
 		{
@@ -235,9 +272,19 @@ namespace Loom
 		m_own = own;
 		m_ownPort = PortOf(own);
 		m_sharedPort = shared_port;
-		m_registry = RegistryOf(shared_port);
 
-		std::ofstream(m_registry / std::to_string(m_ownPort));
+		std::error_code error{ };
+		const std::filesystem::path registry = std::filesystem::temp_directory_path(error) / "Loom MCP" / std::to_string(shared_port);
+
+		std::filesystem::create_directories(registry, error);
+
+		if (error || !Note(registry / std::to_string(m_ownPort)))
+		{
+			std::cerr << "The MCP server could not note its port in " << registry.string() << std::endl;
+			return false;
+		};
+
+		m_registry = registry;
 
 		TakeShared();
 
@@ -253,50 +300,33 @@ namespace Loom
 		if (server == INVALID_SOCKET)
 			return "";
 
-		setsockopt(server, SOL_SOCKET, SO_RCVTIMEO, (const char*)&relay_timeout_ms, sizeof(relay_timeout_ms));
-
-		std::string response{ };
-
-		const std::string request =
-			std::string("POST ") + endpoint + " HTTP/1.1\r\n"
-			"Host: 127.0.0.1\r\n"
-			"Content-Type: application/json\r\n"
-			"Accept: application/json, text/event-stream\r\n"
-			"Content-Length: " + std::to_string(body.size()) + "\r\n"
-			"Connection: close\r\n\r\n" + body;
-
-		if (SendAll(server, request))
-		{
-			char buffer[receive_buffer_bytes];
-			int count = 0;
-
-			while ((count = recv(server, buffer, sizeof(buffer), 0)) > 0)
-				response.append(buffer, count);
-		};
-
+		const std::string response = Exchange(server, body);
 		closesocket(server);
 
-		const size_t head_size = response.find(header_end);
-
-		return head_size == std::string::npos ? "" : response.substr(head_size + header_end.size());
+		return response;
 	};
 
 	void McpRelay::Serve()
 	{
 		while (!m_stopping)
 		{
+			const SOCKET own = m_own;
+			const SOCKET shared = m_shared;
+
 			fd_set ready{ };
 			FD_ZERO(&ready);
-			FD_SET((SOCKET)m_own, &ready);
-
-			const SOCKET shared = m_shared;
+			FD_SET(own, &ready);
 
 			if (shared != INVALID_SOCKET)
 				FD_SET(shared, &ready);
 
-			timeval wait{ take_over_seconds, 0 };
+			timeval wait{ TAKE_OVER_SECONDS, 0 };
+			const int count = select(0, &ready, nullptr, nullptr, &wait);
 
-			if (select(0, &ready, nullptr, nullptr, &wait) <= 0)
+			if (m_stopping)
+				return;
+
+			if (count <= 0)
 			{
 				if (shared == INVALID_SOCKET)
 					TakeShared();
@@ -304,18 +334,15 @@ namespace Loom
 				continue;
 			};
 
-			for (const auto& [listener, is_shared] : { std::pair{ (SOCKET)m_own, false }, std::pair{ shared, true } })
+			for (const auto& [listener, is_shared] : { std::pair{ own, false }, std::pair{ shared, true } })
 			{
 				if (listener == INVALID_SOCKET || !FD_ISSET(listener, &ready))
 					continue;
 
 				const SOCKET client = accept(listener, nullptr, nullptr);
 
-				if (client == INVALID_SOCKET)
-					continue;
-
-				Answer(client, is_shared);
-				closesocket(client);
+				if (client != INVALID_SOCKET)
+					Spawn(client, is_shared);
 			};
 		};
 	};
@@ -328,17 +355,39 @@ namespace Loom
 			m_shared = shared;
 	};
 
+	void McpRelay::Spawn(uintptr_t client, bool shared)
+	{
+		if (!Track(client))
+			return;
+
+		{
+			std::lock_guard<std::mutex> lock(m_mutex);
+			m_answering++;
+		};
+
+		std::thread(
+			[this, client, shared]()
+			{
+				Answer(client, shared);
+				Untrack(client);
+
+				std::lock_guard<std::mutex> lock(m_mutex);
+				m_answering--;
+				m_released.notify_all();
+			}).detach();
+	};
+
 	void McpRelay::Answer(uintptr_t connection, bool shared)
 	{
 		const SOCKET client = connection;
 
-		setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, (const char*)&receive_timeout_ms, sizeof(receive_timeout_ms));
+		setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, (const char*)&RECEIVE_TIMEOUT_MS, sizeof(RECEIVE_TIMEOUT_MS));
 
 		std::string request{ };
 		size_t head_size = std::string::npos;
-		char buffer[receive_buffer_bytes];
+		char buffer[RECEIVE_BUFFER_BYTES];
 
-		while ((head_size = request.find(header_end)) == std::string::npos)
+		while ((head_size = request.find(HEADER_END)) == std::string::npos)
 		{
 			const int count = recv(client, buffer, sizeof(buffer), 0);
 
@@ -347,7 +396,7 @@ namespace Loom
 
 			request.append(buffer, count);
 
-			if (request.size() > max_request_bytes)
+			if (request.size() > MAX_REQUEST_BYTES)
 				return Send(client, "413 Content Too Large", "");
 		};
 
@@ -380,7 +429,7 @@ namespace Loom
 				origin = value;
 		};
 
-		if (target.substr(0, target.find('?')) != endpoint)
+		if (target.substr(0, target.find('?')) != ENDPOINT)
 			return Send(client, "404 Not Found", "");
 
 		if (!origin.empty() && !McpProtocol::LocalOrigin(origin))
@@ -389,10 +438,10 @@ namespace Loom
 		if (method != "POST")
 			return Send(client, "405 Method Not Allowed", "", "Allow: POST\r\n");
 
-		if (content_length > max_request_bytes)
+		if (content_length > MAX_REQUEST_BYTES)
 			return Send(client, "413 Content Too Large", "");
 
-		std::string body = request.substr(head_size + header_end.size());
+		std::string body = request.substr(head_size + HEADER_END.size());
 
 		while (body.size() < content_length)
 		{
@@ -407,7 +456,7 @@ namespace Loom
 		body.resize(content_length);
 
 		const std::string response = shared
-			? McpProtocol::Respond(body, SharedTools(), m_instructions + shared_instructions,
+			? McpProtocol::Respond(body, SharedTools(), m_instructions + SHARED_INSTRUCTIONS,
 				[this](const std::string& name, const json& arguments) { return Relay(name, arguments); })
 			: McpProtocol::Respond(body, m_tools, m_instructions, m_call);
 
@@ -415,6 +464,42 @@ namespace Loom
 			Send(client, "202 Accepted", "");
 		else
 			Send(client, "200 OK", response);
+	};
+
+	std::string McpRelay::Forward(unsigned short port, const std::string& body)
+	{
+		const SOCKET server = Connected(port);
+
+		if (server == INVALID_SOCKET || !Track(server))
+			return "";
+
+		const std::string response = Exchange(server, body);
+		Untrack(server);
+
+		return response;
+	};
+
+	bool McpRelay::Track(uintptr_t connection)
+	{
+		std::lock_guard<std::mutex> lock(m_mutex);
+
+		if (m_stopping)
+		{
+			closesocket(connection);
+			return false;
+		};
+
+		m_connections.insert(connection);
+
+		return true;
+	};
+
+	void McpRelay::Untrack(uintptr_t connection)
+	{
+		std::lock_guard<std::mutex> lock(m_mutex);
+
+		m_connections.erase(connection);
+		closesocket(connection);
 	};
 
 	#pragma endregion
@@ -426,12 +511,12 @@ namespace Loom
 		json tools = m_tools;
 
 		for (json& tool : tools)
-			tool["inputSchema"]["properties"][editor_argument] = {
+			tool["inputSchema"]["properties"][EDITOR_ARGUMENT] = {
 				{ "type", "string" },
 				{ "description", "Which editor, by the id editors gives it; needed only when more than one is open" } };
 
 		tools.push_back({
-			{ "name", editors_tool },
+			{ "name", EDITORS_TOOL },
 			{ "description", "Every open editor, by the id the other tools' editor argument takes, with each one's state." },
 			{ "inputSchema", { { "type", "object" }, { "properties", json::object() } } } });
 
@@ -440,7 +525,7 @@ namespace Loom
 
 	std::optional<json> McpRelay::Relay(const std::string& name, json arguments)
 	{
-		if (name == editors_tool)
+		if (name == EDITORS_TOOL)
 			return McpProtocol::Text(Listing());
 
 		if (std::none_of(m_tools.begin(), m_tools.end(), [&](const json& tool) { return tool["name"] == name; }))
@@ -448,14 +533,17 @@ namespace Loom
 
 		std::string editor{ };
 
-		if (arguments.is_object() && arguments.contains(editor_argument))
+		if (arguments.is_object() && arguments.contains(EDITOR_ARGUMENT))
 		{
-			const json& value = arguments[editor_argument];
+			const json& value = arguments[EDITOR_ARGUMENT];
 			editor = value.is_string() ? value.get<std::string>() : value.dump();
-			arguments.erase(editor_argument);
+			arguments.erase(EDITOR_ARGUMENT);
 		};
 
 		const std::vector<unsigned short> editors = Editors();
+
+		if (editors.empty())
+			return McpProtocol::Failure("No editor is noted in " + m_registry.string());
 
 		if (editor.empty())
 		{
@@ -474,29 +562,29 @@ namespace Loom
 
 	std::vector<unsigned short> McpRelay::Editors()
 	{
+		constexpr unsigned long HIGHEST_PORT = 65535;
+
 		std::vector<unsigned short> open{ };
+		std::error_code error{ };
 
-		for (const unsigned short port : Registered(m_registry))
+		for (const auto& entry : std::filesystem::directory_iterator(m_registry, error))
 		{
-			// This thread answers its own port, so it would wait on itself.
-			if (port == m_ownPort)
-			{
-				open.push_back(port);
+			const std::string name = entry.path().filename().string();
+			char* end = nullptr;
+			const unsigned long port = strtoul(name.c_str(), &end, 10);
+
+			if (name.empty() || *end != '\0' || port == 0 || port > HIGHEST_PORT)
 				continue;
-			};
 
-			const SOCKET probe = Connected(port);
+			DWORD process_id = 0;
 
-			if (probe != INVALID_SOCKET)
-			{
-				closesocket(probe);
-				open.push_back(port);
-				continue;
-			};
-
-			std::error_code error{ };
-			std::filesystem::remove(m_registry / std::to_string(port), error);
+			if (std::ifstream(entry.path()) >> process_id && Running(process_id))
+				open.push_back((unsigned short)port);
+			else
+				std::filesystem::remove(entry.path(), error);
 		};
+
+		std::sort(open.begin(), open.end());
 
 		return open;
 	};
@@ -535,7 +623,7 @@ namespace Loom
 			{ "method", "tools/call" },
 			{ "params", { { "name", name }, { "arguments", arguments } } } };
 
-		const json response = json::parse(Post(port, request.dump()), nullptr, false);
+		const json response = json::parse(Forward(port, request.dump()), nullptr, false);
 
 		if (response.is_object() && response.contains("result"))
 			return response["result"];

@@ -862,8 +862,8 @@ namespace Loom
 			{
 				"command",
 				"One of the editor's commands: play, pause, stop, compile (the scripts), save (the active scene), undo, redo or refresh "
-				"(Ctrl+Shift+R: rebuild the editor from the engine's sources, save the project and restart on it, after which this server "
-				"is back on the same port; a failed build says so in the console and the editor carries on). Answers with the state after.",
+				"(Ctrl+Shift+R: rebuild the editor from the engine's sources, save the project and restart on it, after which it is back "
+				"under a new id, which editors lists; a failed build says so in the console and the editor carries on). Answers with the state after.",
 				R"({
 					"type": "object",
 					"properties": { "command": { "type": "string", "enum": [ "play", "pause", "stop", "compile", "save", "undo", "redo", "refresh" ] } },

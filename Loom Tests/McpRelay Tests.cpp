@@ -2,9 +2,11 @@
 
 #include "McpRelay.h"
 
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <future>
 #include <memory>
 #include <string>
 #include <thread>
@@ -20,21 +22,28 @@ namespace
 	constexpr std::chrono::seconds take_over_limit{ 5 };
 	constexpr std::chrono::milliseconds take_over_poll{ 50 };
 
-	// Where nothing listens, as with an editor that closed without saying so.
+	// A port in the registry with no process noted for it, as a crashed editor can leave.
 	constexpr unsigned short closed_port = 1;
 
-	// An editor whose one tool, whoami, and whose state answer with its name.
-	std::unique_ptr<Loom::McpRelay> Editor(const std::string& name)
+	// Far longer than a call that holds up nothing else takes.
+	constexpr std::chrono::seconds held_limit{ 3 };
+
+	// An editor whose tools, whoami and its state, answer with its name.
+	// whoami waits on hold first, when given one.
+	std::unique_ptr<Loom::McpRelay> Editor(const std::string& name, std::shared_future<void> hold = { })
 	{
 		const json tools = json::array({ {
 			{ "name", "whoami" },
 			{ "inputSchema", { { "type", "object" }, { "properties", json::object() } } } } });
 
 		auto relay = std::make_unique<Loom::McpRelay>(tools, "Instructions", "whoami",
-			[name](const std::string& tool, const json& arguments) -> std::optional<json>
+			[name, hold](const std::string& tool, const json& arguments) -> std::optional<json>
 			{
 				if (tool != "whoami")
 					return std::nullopt;
+
+				if (hold.valid() && arguments.contains("held"))
+					hold.wait();
 
 				return Loom::McpProtocol::Text(name + (arguments.empty() ? "" : " " + arguments.dump()));
 			});
@@ -132,7 +141,34 @@ TEST_SUITE("McpRelay")
 		CHECK(Call("whoami") == "B");
 	};
 
-	TEST_CASE("an editor that closed without saying so is forgotten")
+	TEST_CASE("a call held up in one editor holds up no other, nor the hub's closing")
+	{
+		std::promise<void> release{ };
+		auto hub = Editor("A");
+		const auto slow = Editor("B", release.get_future().share());
+		const std::string slow_id = std::to_string(slow->OwnPort());
+
+		auto held = std::async(std::launch::async,
+			[&slow_id]()
+			{
+				return Loom::McpRelay::Post(shared_port, json{
+					{ "jsonrpc", "2.0" }, { "id", 1 }, { "method", "tools/call" },
+					{ "params", { { "name", "whoami" }, { "arguments", { { "editor", slow_id }, { "held", true } } } } } }.dump());
+			});
+
+		const auto start = std::chrono::steady_clock::now();
+
+		CHECK(Call("whoami", { { "editor", std::to_string(hub->OwnPort()) } }) == "A");
+
+		hub.reset();
+
+		CHECK(std::chrono::steady_clock::now() - start < held_limit);
+		CHECK(held.get().empty());
+
+		release.set_value();
+	};
+
+	TEST_CASE("an editor whose process has ended is forgotten")
 	{
 		const auto editor = Editor("A");
 
