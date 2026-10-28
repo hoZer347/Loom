@@ -182,18 +182,19 @@ void main()
 		};
 
 		const char* const controls =
-			"Left click: pick what is under the mouse\n"
-			"Shift + click: add to or take from what is picked\n"
-			"Drag a box: pick everything in it\n"
-			"Drag a handle: move, turn or size what is picked\n"
-			"Hold Ctrl while dragging a handle: snap\n"
-			"Right drag or Alt + left drag: orbit\n"
+			"Click: pick\n"
+			"Shift+click: toggle\n"
+			"Drag: box pick\n"
+			"Drag a handle: move, rotate, scale\n"
+			"Ctrl while dragging: snap\n"
+			"Right drag, Alt+drag: orbit\n"
 			"Middle drag: pan\n"
 			"Wheel: zoom\n"
-			"F: frame what is picked, or the whole model\n"
-			"1, 2, 3: pick vertices, edges, faces\n"
+			"F: frame\n"
+			"1, 2, 3: vertices, edges, faces\n"
 			"W, E, R: move, rotate, scale\n"
-			"Ctrl+A: pick everything, Esc: pick nothing";
+			"Ctrl+A: pick all\n"
+			"Esc: pick none";
 
 		const char* PickName(ModelEditor::Pick pick, size_t count)
 		{
@@ -877,7 +878,7 @@ void main()
 		ImGui::TextDisabled("|");
 		ImGui::SameLine();
 		ImGui::Checkbox("See Through", &m_seeThrough);
-		ImGui::SetItemTooltip("Show and pick what is behind the front of the model too");
+		ImGui::SetItemTooltip("Pick hidden parts too");
 
 		const bool faces = editable && !PickedFaces(document).empty();
 		const bool any = editable && !Moving(document).empty();
@@ -909,7 +910,7 @@ void main()
 		if (ImGui::Button("+ Add"))
 			ImGui::OpenPopup("##add");
 
-		ImGui::SetItemTooltip("Add a shape where the view is looking, picked so it can be moved");
+		ImGui::SetItemTooltip("Adds at the view's centre");
 
 		if (ImGui::BeginPopup("##add"))
 		{
@@ -997,7 +998,7 @@ void main()
 				if (ImGui::IsItemActivated())
 					document.pending = Take(document);
 
-				ImGui::SetItemTooltip("Where the middle of what is picked is. Drag or type to move it.");
+				ImGui::SetItemTooltip("Centre of the selection");
 
 				if (changed)
 				{
@@ -1058,21 +1059,21 @@ void main()
 			return;
 		};
 
-		const char* hint = "Click the model to pick part of it, or drag a box round several. Right drag orbits, the wheel zooms.";
+		const char* hint = "Click: pick    Drag: box    Right drag: orbit    Wheel: zoom";
 
 		if (document.drag == Drag::Box)
-			hint = "Let go to pick everything in the box. Hold Shift to add to what is picked.";
+			hint = "Release: pick    Shift: add";
 		else if (document.drag == Drag::Handle)
-			hint = "Hold Ctrl to snap. Press Esc to put it back.";
+			hint = "Ctrl: snap    Esc: cancel";
 		else if (document.hoveredHandle)
-			hint = document.hoveredHandle->tool == Tool::Move ? "Drag to move what is picked." :
-				document.hoveredHandle->tool == Tool::Rotate ? "Drag round to turn what is picked." :
-				document.hoveredHandle->axis ? "Drag out along the arrow to make what is picked bigger, in to make it smaller." :
-				"Drag right or up to make what is picked bigger, left or down to make it smaller.";
+			hint = document.hoveredHandle->tool == Tool::Move ? "Drag: move" :
+				document.hoveredHandle->tool == Tool::Rotate ? "Drag: rotate" :
+				document.hoveredHandle->axis ? "Drag: scale along axis" :
+				"Drag: scale";
 		else if (document.hoveredFace && document.hoveredPart != document.part)
-			hint = "Click to edit this part, picking this face.";
+			hint = "Click: edit part";
 		else if (document.hoveredVertex || document.hoveredEdge || document.hoveredFace)
-			hint = "Click to pick this. Shift + click adds it to, or takes it from, what is picked.";
+			hint = "Click: pick    Shift+click: toggle";
 
 		ImGui::TextDisabled("%s", hint);
 	};

@@ -400,7 +400,7 @@ namespace Loom
 			changed = true;
 		};
 
-		ImGui::SetItemTooltip("Add a key, to be held with the others");
+		ImGui::SetItemTooltip("Add a held key");
 
 		if (changed)
 			keys = std::move(shown);

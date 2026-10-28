@@ -701,7 +701,7 @@ namespace Loom
 			Edited(document);
 		};
 
-		ImGui::SetItemTooltip("A clear layer above the one painted");
+		ImGui::SetItemTooltip("Adds a clear layer above");
 		ImGui::SameLine();
 		ImGui::BeginDisabled(layers == 1);
 
@@ -877,7 +877,7 @@ namespace Loom
 			if (ImGui::IsItemHovered() && document.grabbed < 0)
 				ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
 
-			ImGui::SetItemTooltip("Drag up or down to move the layer");
+			ImGui::SetItemTooltip("Drag to reorder");
 
 			if (ImGui::IsItemVisible())
 			{
@@ -903,7 +903,7 @@ namespace Loom
 				Edited(document);
 			};
 
-			ImGui::SetItemTooltip(visible ? "Shown, and saved into the image" : "Hidden, and left out of the image");
+			ImGui::SetItemTooltip(visible ? "Shown and saved" : "Hidden, not saved");
 			ImGui::SameLine();
 
 			// A square drawn as the outline is, bright while it is on.
@@ -930,7 +930,7 @@ namespace Loom
 					outline_thickness);
 			};
 
-			ImGui::SetItemTooltip(row.outlined ? "Outlined on the canvas" : "Outline its pixels on the canvas");
+			ImGui::SetItemTooltip(row.outlined ? "Outlined" : "Outline pixels");
 			ImGui::SameLine();
 
 			if (ImGui::Selectable(row.name.c_str(), layer == document.layer))
@@ -1039,13 +1039,13 @@ namespace Loom
 				Edited(document);
 			};
 
-			ImGui::SetItemTooltip("As a new layer, cut into the frames when it is the size of their sheet");
+			ImGui::SetItemTooltip("As a new layer, split into frames if sheet-sized");
 			ImGui::SameLine();
 
 			if (ImGui::SmallButton("Keep Sprite"))
 				document.outside.reset();
 
-			ImGui::SetItemTooltip("Saving writes the sprite over the image");
+			ImGui::SetItemTooltip("Overwrites the image on save");
 			ImGui::SameLine();
 			ImGui::TextDisabled("|");
 			ImGui::SameLine();
@@ -1126,7 +1126,7 @@ namespace Loom
 		m_resizeHeight = std::clamp(m_resizeHeight, 1, SpriteAsset::maxSide);
 
 		ImGui::Checkbox("Scale", &m_resizeScale);
-		ImGui::SetItemTooltip(m_resizeScale ? "The pixels stretch or shrink to the size" : "The pixels stay as they are, cut or grown round the anchor");
+		ImGui::SetItemTooltip(m_resizeScale ? "Stretch pixels" : "Crop or pad around anchor");
 		ImGui::EndGroup();
 
 		ImGui::SameLine();
@@ -1270,7 +1270,7 @@ namespace Loom
 				for (int i = 0; i < channels; i++)
 					chosen[i] = (uint8_t)std::lround(colour[i] * UINT8_MAX);
 
-			ImGui::SetItemTooltip("What the %s mouse button paints with (%s swaps them)", button_names[button], ImGui::GetKeyName(swap_key));
+			ImGui::SetItemTooltip("%s mouse colour (%s swaps)", button_names[button], ImGui::GetKeyName(swap_key));
 			ImGui::SameLine();
 		};
 
@@ -1293,7 +1293,7 @@ namespace Loom
 		};
 
 		ImGui::EndDisabled();
-		ImGui::SetItemTooltip("Import the sprite's colours into a category of the palette");
+		ImGui::SetItemTooltip("Into a palette category");
 
 		DrawImportQuestion();
 	};
@@ -1385,7 +1385,7 @@ namespace Loom
 		};
 
 		ImGui::EndDisabled();
-		ImGui::SetItemTooltip("A palette beside the sprite, of the colours it already has");
+		ImGui::SetItemTooltip("New palette of the sprite's colours");
 
 		ImGui::SameLine();
 		ImGui::BeginDisabled(current.empty());
@@ -1399,7 +1399,7 @@ namespace Loom
 		};
 
 		ImGui::EndDisabled();
-		ImGui::SetItemTooltip("A copy of this palette beside it, painted from in its place");
+		ImGui::SetItemTooltip("Copy beside it, used instead");
 	};
 
 	void SpriteEditor::DrawPaletteRename(const std::string& project_folder)
@@ -1501,7 +1501,7 @@ namespace Loom
 			if (!shown[i])
 			{
 				ImGui::ColorButton("##swatch", ToFloats(colour), ImGuiColorEditFlags_NoTooltip, ImVec2(side, side));
-				ImGui::SetItemTooltip("Clear, which paints as the eraser does");
+				ImGui::SetItemTooltip("Clear: erases");
 			}
 			else
 			{
@@ -1582,7 +1582,7 @@ namespace Loom
 		};
 
 		ImGui::EndDisabled();
-		ImGui::SetItemTooltip("Take the left colour out of here");
+		ImGui::SetItemTooltip("Remove left colour");
 	};
 
 	void SpriteEditor::DrawCategories(const std::string& path)

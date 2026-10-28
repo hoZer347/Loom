@@ -3501,7 +3501,7 @@ namespace Loom
 			};
 
 			if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
-				ImGui::SetTooltip("Right-click to change its category");
+				ImGui::SetTooltip("Right-click: category");
 
 			DrawCategoryPopup(component);
 		};
