@@ -202,5 +202,23 @@ namespace Loom
 		};
 	};
 
+	void MultiEdit::Shift(const std::vector<LoomObject*>& objects, size_t index, const float* before)
+	{
+		const size_t count = AxisCount(*objects.front(), index);
+		const float* from = (const float*)objects.front()->GetFields()[index].data;
+
+		for (size_t i = 1; i < objects.size(); i++)
+		{
+			const SerializedField& field = objects[i]->GetFields()[index];
+			float* to = (float*)field.data;
+
+			for (size_t axis = 0; axis < count; axis++)
+				to[axis] += from[axis] - before[axis];
+
+			field.Changed();
+			objects[i]->OnFieldChanged(field);
+		};
+	};
+
 	#pragma endregion
 };

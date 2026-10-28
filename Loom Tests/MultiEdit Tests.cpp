@@ -205,5 +205,26 @@ TEST_SUITE("MultiEdit")
 		CHECK(a->changes == 0);
 	};
 
+	TEST_CASE_FIXTURE(Selected, "shifting moves the rest by as much as the first moved, so each keeps its own value")
+	{
+		Loom::GameObject& root = scene->GetRoot();
+		Marked* a = Attach<Marked>(*Add(root, "A"));
+		Marked* b = Attach<Marked>(*Add(root, "B"));
+
+		const size_t offset = IndexOf(*a, &(const glm::vec3&)a->offset);
+		const std::vector<Loom::LoomObject*> objects{ a, b };
+
+		a->offset = glm::vec3(1.0f, 0.0f, 0.0f);
+		b->offset = glm::vec3(0.0f, 5.0f, 2.0f);
+
+		const glm::vec3 before = a->offset;
+		a->offset = glm::vec3(3.0f, 0.0f, -1.0f);
+		Loom::MultiEdit::Shift(objects, offset, &before.x);
+
+		CHECK((const glm::vec3&)b->offset == glm::vec3(2.0f, 5.0f, 1.0f));
+		CHECK(b->changes == 1);
+		CHECK(a->changes == 0);
+	};
+
 	#pragma endregion
 };

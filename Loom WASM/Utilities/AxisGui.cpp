@@ -28,7 +28,7 @@ namespace Loom
 	};
 
 	// ImGui::DragScalarN, with the stripe drawn over each box after it.
-	bool AxisGui::DragFloatN(const char* label, float* values, int count, const bool* mixed, float speed, const char* format)
+	bool AxisGui::DragFloatN(const char* label, float* values, int count, const bool* mixed, float speed, const char* format, bool* dragged)
 	{
 		if (ImGui::GetCurrentWindow()->SkipItems)
 			return false;
@@ -48,9 +48,10 @@ namespace Loom
 				ImGui::SameLine(0.0f, style.ItemInnerSpacing.x);
 
 			const bool axis_mixed = mixed && mixed[i];
+			const bool typing = ImGui::TempInputIsActive(ImGui::GetID(""));
 
 			// Rounded through "-", a drag would start from 0.
-			changed |= ImGui::DragFloat(
+			const bool axis_changed = ImGui::DragFloat(
 				"",
 				&values[i],
 				speed,
@@ -58,6 +59,11 @@ namespace Loom
 				0.0f,
 				axis_mixed ? MIXED_VALUE : format,
 				axis_mixed ? ImGuiSliderFlags_NoRoundToFormat : ImGuiSliderFlags_None);
+
+			if (axis_changed && dragged)
+				*dragged = !typing;
+
+			changed |= axis_changed;
 
 			if (i < axis_count)
 			{

@@ -18,7 +18,7 @@ namespace Loom
 	*   Inspector at once, the first of them the one it is drawn from
 	* - A field whose objects disagree shows as mixed, per axis for a vector,
 	*   and an edit to the first is written into the rest, only the axes it
-	*   changed for a vector
+	*   changed for a vector, or moves the rest by as much when it was dragged
 	*/
 	namespace MultiEdit
 	{
@@ -67,6 +67,10 @@ namespace Loom
 		// Writes the first object's field at index into the rest. A vector
 		// writes only the axes where the first now differs from before.
 		void Spread(const std::vector<LoomObject*>& objects, size_t index, const float* before = nullptr);
+
+		// Moves the rest's vector field at index by as much as the first's
+		// moved from before, so each keeps its distance from the first.
+		void Shift(const std::vector<LoomObject*>& objects, size_t index, const float* before);
 
 		#pragma endregion
 	};

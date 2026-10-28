@@ -162,6 +162,7 @@ TEST_SUITE("AxisGui")
 
 		float values[axis_count] = { held, held, held };
 		const bool mixed[axis_count] = { true, true, true };
+		bool dragged = false;
 		ImVec2 box{ };
 
 		ImGuiFrames::VerticesAdded([&]()
@@ -184,12 +185,66 @@ TEST_SUITE("AxisGui")
 
 			ImGuiFrames::VerticesAdded([&]()
 			{
-				Loom::AxisGui::DragFloatN("##value", values, axis_count, mixed, drag_speed, value_format);
+				Loom::AxisGui::DragFloatN("##value", values, axis_count, mixed, drag_speed, value_format, &dragged);
 			});
 		};
 
 		CHECK(values[0] > held);
 		CHECK(values[1] == held);
+		CHECK(dragged);
+	};
+
+	TEST_CASE("a value typed into an axis is not a drag")
+	{
+		constexpr float held = 5.0f;
+		constexpr float typed = 9.0f;
+		constexpr float grab = 10.0f;
+		constexpr int type_frames = 6;
+
+		ImGuiFrames frames;
+
+		float values[axis_count] = { held, held, held };
+		const bool mixed[axis_count] = { true, true, true };
+		bool dragged = true;
+		ImVec2 box{ };
+
+		ImGuiFrames::VerticesAdded([&]()
+		{
+			Loom::AxisGui::DragFloatN("##value", values, axis_count, mixed, drag_speed, value_format);
+			box = ImGui::GetItemRectMin();
+		});
+
+		ImGuiIO& io = ImGui::GetIO();
+
+		for (int frame = 0; frame < type_frames; frame++)
+		{
+			if (frame == 0)
+			{
+				io.AddMousePosEvent(box.x + grab, box.y + grab / 2.0f);
+				io.AddKeyEvent(ImGuiMod_Ctrl, true);
+			}
+			else if (frame == 1)
+				io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+			else if (frame == 2)
+			{
+				io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+				io.AddKeyEvent(ImGuiMod_Ctrl, false);
+			}
+			else if (frame == 3)
+				io.AddInputCharactersUTF8("9");
+			else if (frame == 4)
+				io.AddKeyEvent(ImGuiKey_Enter, true);
+			else
+				io.AddKeyEvent(ImGuiKey_Enter, false);
+
+			ImGuiFrames::VerticesAdded([&]()
+			{
+				Loom::AxisGui::DragFloatN("##value", values, axis_count, mixed, drag_speed, value_format, &dragged);
+			});
+		};
+
+		CHECK(values[0] == typed);
+		CHECK_FALSE(dragged);
 	};
 
 	TEST_CASE("a collapsed window draws nothing")

@@ -4385,10 +4385,17 @@ namespace Loom
 				const MultiEdit::Axes mixed = MultiEdit::MixedAxes(held, index);
 				const std::vector<std::string> written = m_playing ? Written(held, index) : std::vector<std::string>();
 
-				if (AxisGui::DragFloatN("##value", glm::value_ptr(value), 3, mixed.data(), speed, float_format))
+				bool dragged = false;
+
+				if (AxisGui::DragFloatN("##value", glm::value_ptr(value), 3, mixed.data(), speed, float_format, &dragged))
 				{
 					serial = value;
-					MultiEdit::Spread(held, index, glm::value_ptr(before));
+
+					// A drag moves every object by as much, and a typed value puts them all there.
+					if (dragged)
+						MultiEdit::Shift(held, index, glm::value_ptr(before));
+					else
+						MultiEdit::Spread(held, index, glm::value_ptr(before));
 
 					if (m_playing)
 						TrackPlayEdit(held, index, written);

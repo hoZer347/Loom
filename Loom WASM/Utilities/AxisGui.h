@@ -18,14 +18,16 @@ namespace Loom
 			const char* format = "%.3f");
 
 		/// As above, with each axis that mixed marks drawn as "-", for a field
-		/// several objects disagree on. mixed may be null.
+		/// several objects disagree on. mixed may be null. dragged, when given,
+		/// says whether a change came from a drag rather than a typed value.
 		static bool DragFloatN(
 			const char* label,
 			float* values,
 			int count,
 			const bool* mixed,
 			float speed,
-			const char* format);
+			const char* format,
+			bool* dragged = nullptr);
 
 		AxisGui() = delete;
 	};
