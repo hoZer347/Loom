@@ -282,6 +282,84 @@ namespace Loom
 		};
 
 		#pragma endregion
+
+		#pragma region Merging
+
+		const std::string* FindField(const std::vector<Prefabs::Field>& fields, const std::string& key)
+		{
+			for (const Prefabs::Field& field : fields)
+				if (field.key == key)
+					return &field.value;
+
+			return nullptr;
+		};
+
+		std::vector<Prefabs::Field> MergeFields(
+			const std::vector<Prefabs::Field>& base,
+			const std::vector<Prefabs::Field>& ours,
+			const std::vector<Prefabs::Field>& theirs)
+		{
+			std::vector<Prefabs::Field> merged{ };
+
+			for (const Prefabs::Field& field : ours)
+			{
+				const std::string* was = FindField(base, field.key);
+				const std::string* now = FindField(theirs, field.key);
+
+				if (was == nullptr || *was != field.value)
+					merged.push_back(field);
+				else if (now)
+					merged.push_back({ field.key, *now });
+			};
+
+			for (const Prefabs::Field& field : theirs)
+				if (!FindField(ours, field.key) && !FindField(base, field.key))
+					merged.push_back(field);
+
+			return merged;
+		};
+
+		// Matched by place, as everything in a prefab is. What both added is
+		// kept, and a list both changed otherwise is ours.
+		template<typename Node, typename MergeOne>
+		std::vector<Node> MergeList(const std::vector<Node>& base, const std::vector<Node>& ours, const std::vector<Node>& theirs, const MergeOne& merge)
+		{
+			const bool both_added = ours.size() > base.size() && theirs.size() > base.size();
+
+			if (!both_added && base.size() != ours.size() && base.size() != theirs.size())
+				return ours;
+
+			const std::vector<Node>& lengths = both_added || base.size() == theirs.size() ? ours : theirs;
+			std::vector<Node> merged{ };
+
+			for (size_t i = 0; i < lengths.size(); i++)
+				merged.push_back(i < base.size() ? merge(base[i], ours[i], theirs[i]) : lengths[i]);
+
+			if (both_added)
+				merged.insert(merged.end(), theirs.begin() + base.size(), theirs.end());
+
+			return merged;
+		};
+
+		Prefabs::ComponentNode MergeComponent(const Prefabs::ComponentNode& base, const Prefabs::ComponentNode& ours, const Prefabs::ComponentNode& theirs)
+		{
+			if (ours.type != base.type || theirs.type != base.type)
+				return ours.type != base.type ? ours : theirs;
+
+			return { ours.type, ours.guid, MergeFields(base.fields, ours.fields, theirs.fields) };
+		};
+
+		Prefabs::ObjectNode MergeObject(const Prefabs::ObjectNode& base, const Prefabs::ObjectNode& ours, const Prefabs::ObjectNode& theirs)
+		{
+			return {
+				ours.name == base.name ? theirs.name : ours.name,
+				ours.guid,
+				MergeFields(base.fields, ours.fields, theirs.fields),
+				MergeList(base.components, ours.components, theirs.components, MergeComponent),
+				MergeList(base.children, ours.children, theirs.children, MergeObject) };
+		};
+
+		#pragma endregion
 	};
 
 	#pragma region Links
@@ -533,26 +611,45 @@ namespace Loom
 		return isolated;
 	};
 
+	Prefabs::ObjectNode Prefabs::Merge(
+		const ObjectNode& base,
+		const ObjectNode& ours,
+		const ObjectNode& theirs,
+		const std::vector<std::string>& transform_keys)
+	{
+		// On ours' guids, so references compare equal where they agree.
+		return MergeObject(
+			Retarget(base, ours, transform_keys, Part::Whole),
+			ours,
+			Retarget(theirs, ours, transform_keys, Part::Whole));
+	};
+
 	Prefabs::Outcome Prefabs::Sync(
 		const ObjectNode& prefab,
 		const ObjectNode* panel,
 		const std::string& panel_shape,
 		const std::vector<Instance>& instances,
-		const std::vector<std::string>& transform_keys)
+		const std::vector<std::string>& transform_keys,
+		bool save)
 	{
 		Outcome outcome{ };
 		outcome.instances.resize(instances.size());
 
 		const std::string shared = Shape(prefab, transform_keys, Part::Shared);
+		const bool edited = panel && Shape(*panel, transform_keys, Part::Whole) != panel_shape;
 
-		if (panel && Shape(*panel, transform_keys, Part::Whole) != panel_shape)
+		if (edited && save)
 			outcome.prefab = Retarget(*panel, prefab, transform_keys, Part::Whole);
 		else
 			for (const Instance& instance : instances)
 				if (instance.known && Shape(instance.tree, transform_keys, Part::Shared) != shared)
 				{
 					outcome.prefab = Retarget(instance.tree, prefab, transform_keys, Part::Shared);
-					outcome.reshow = panel != nullptr;
+
+					if (edited)
+						outcome.panel = Merge(prefab, *panel, *outcome.prefab, transform_keys);
+					else outcome.reshow = panel != nullptr;
+
 					break;
 				};
 

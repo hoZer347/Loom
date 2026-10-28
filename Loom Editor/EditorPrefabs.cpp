@@ -282,15 +282,23 @@ namespace Loom
 	{
 		OpenPrefab(path);
 
-		// The same prefab as before the build, whose steps still apply.
-		m_prefabOpened = false;
-
 		if (held.empty() || GetPrefabRoot() == nullptr)
 			return;
 
 		Engine::DoTasks();
 
-		if (ShowPrefab(held))
+		GameObject* root = GetPrefabRoot();
+		const std::string reopened_text = root ? SceneSerializer::Serialize(*root) : std::string();
+		Prefabs::ObjectNode reopened, edits;
+
+		if (root == nullptr || !Prefabs::Parse(reopened_text, reopened) || !Prefabs::Parse(held, edits))
+			return;
+
+		// The reopened copy has guids of its own, so the held edit is one step from it.
+		m_prefabOpened = false;
+		m_prefabHistory.Reset(reopened_text);
+
+		if (ShowPrefab(Prefabs::Write(Prefabs::Retarget(edits, reopened, Prefabs::TransformKeys(*root), Prefabs::Part::Whole))))
 			m_prefabShape = shape;
 	};
 
@@ -450,18 +458,19 @@ namespace Loom
 		Prefabs::ObjectNode shown;
 		const std::string panel_text = root ? SceneSerializer::Serialize(*root) : std::string();
 		const bool showing = root && Prefabs::Parse(panel_text, shown);
+		const std::vector<std::string> keys = root ? Prefabs::TransformKeys(*root) : std::vector<std::string>();
+		const std::string shown_shape = showing ? Prefabs::Shape(shown, keys, Prefabs::Part::Whole) : std::string();
 
 		// A copy just shown agrees with its file as it now serializes.
 		if (showing && m_prefabShape.empty())
-			m_prefabShape = Prefabs::Shape(shown, Prefabs::TransformKeys(*root), Prefabs::Part::Whole);
-
-		// An edit in the panel stays there until saved, for the instances to sync without it.
-		const bool held = showing && !m_savePrefab && Prefabs::Shape(shown, Prefabs::TransformKeys(*root), Prefabs::Part::Whole) != m_prefabShape;
+			m_prefabShape = shown_shape;
 
 		if (showing && (m_savePrefab || panel_text != m_panelText))
 			paths.insert(m_prefabPath);
 
 		bool reshow = false;
+		std::optional<Prefabs::ObjectNode> carried{ };
+		Prefabs::ObjectNode carried_from{ }, carried_to{ };
 
 		for (const std::string& path : paths)
 		{
@@ -470,7 +479,7 @@ namespace Loom
 			if (prefab == nullptr)
 				continue;
 
-			const bool panel = showing && !held && path == m_prefabPath;
+			const bool panel = showing && path == m_prefabPath;
 
 			std::vector<GameObject*> mine{ };
 			std::vector<Prefabs::Instance> instances{ };
@@ -517,10 +526,21 @@ namespace Loom
 			if (any == nullptr)
 				continue;
 
-			const Prefabs::Outcome outcome = Prefabs::Sync(*prefab, panel ? &shown : nullptr, m_prefabShape, instances, Prefabs::TransformKeys(*any));
+			// An edit in the panel stays there until saved, for the instances to sync without it.
+			Prefabs::Outcome outcome = Prefabs::Sync(*prefab, panel ? &shown : nullptr, m_prefabShape, instances, Prefabs::TransformKeys(*any), m_savePrefab);
+			const Prefabs::ObjectNode before = outcome.panel ? *prefab : Prefabs::ObjectNode();
 
-			if (outcome.prefab && WritePrefab(path, *outcome.prefab) && panel && !outcome.reshow)
-				m_prefabShape = Prefabs::Shape(shown, Prefabs::TransformKeys(*root), Prefabs::Part::Whole);
+			if (outcome.prefab && WritePrefab(path, *outcome.prefab) && panel)
+			{
+				if (outcome.panel)
+				{
+					carried = std::move(outcome.panel);
+					carried_from = before;
+					carried_to = *outcome.prefab;
+				}
+				else if (!outcome.reshow)
+					m_prefabShape = shown_shape;
+			};
 
 			reshow = reshow || outcome.reshow;
 
@@ -536,10 +556,23 @@ namespace Loom
 			};
 		};
 
-		m_prefabUnsaved = showing && !reshow && Prefabs::Shape(shown, Prefabs::TransformKeys(*root), Prefabs::Part::Whole) != m_prefabShape;
+		m_prefabUnsaved = showing && !reshow && shown_shape != m_prefabShape;
 
 		if (reshow)
 			ReshowPrefab();
+		else if (carried)
+		{
+			// Every step of the panel carries the instance's edit, so none takes it back.
+			m_prefabHistory.Rewrite(
+				[&](const std::string& text)
+				{
+					Prefabs::ObjectNode step;
+					return Prefabs::Parse(text, step) ? Prefabs::Write(Prefabs::Merge(carried_from, step, carried_to, keys)) : text;
+				});
+
+			if (ShowPrefab(Prefabs::Write(*carried)))
+				m_prefabShape = Prefabs::Shape(Prefabs::Retarget(carried_to, shown, keys, Prefabs::Part::Whole), keys, Prefabs::Part::Whole);
+		};
 
 		root = GetPrefabRoot();
 		m_panelText = root ? SceneSerializer::Serialize(*root) : std::string();
@@ -549,7 +582,7 @@ namespace Loom
 
 		if (std::exchange(m_prefabOpened, false))
 			m_prefabHistory.Reset(m_panelText);
-		else if (reshow || reshown)
+		else if (reshow || reshown || carried)
 			m_prefabHistory.Amend(m_panelText);
 		else m_prefabHistory.Keep(m_panelText);
 	};

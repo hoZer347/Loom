@@ -69,6 +69,19 @@ namespace Loom
 			m_kept = value;
 		};
 
+		// Every copy, saved, kept and to step to, through change, for a change
+		// the user did not make that every step should carry.
+		template<typename Change>
+		void Rewrite(const Change& change)
+		{
+			m_saved = change(m_saved);
+			m_kept = change(m_kept);
+
+			for (std::vector<T>* steps : { &m_undo, &m_redo })
+				for (T& value : *steps)
+					value = change(value);
+		};
+
 		void Saved(const T& value) { m_saved = value; };
 
 		bool Unsaved(const T& value) const { return !(value == m_saved); };

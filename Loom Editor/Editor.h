@@ -1055,7 +1055,7 @@ namespace Loom
 		void SyncPrefabs(const std::unordered_set<GameObject*>& changed);
 
 		// Whether SyncPrefabs has work with no scene changed: a prefab file
-		// written from outside, or a Prefab panel edited or still to agree
+		// written from outside, a Prefab panel edited, saved or still to agree
 		// with its file.
 		bool PrefabsNeedSync() const;
 
@@ -1115,7 +1115,7 @@ namespace Loom
 		// The Prefab panel: the prefab open in it, by its path from the project
 		// folder, the scene it is shown in, whose first child is the prefab
 		// and second the light, and the prefab as the panel last agreed with
-		// its file.
+		// its file, which its held edits differ from until saved.
 		EditorViewport m_prefabView;
 		EditorCamera m_prefabCamera;
 		SelectionOutline m_prefabOutline;

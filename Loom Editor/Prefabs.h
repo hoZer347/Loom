@@ -103,12 +103,14 @@ namespace Loom
 
 		// What a sync changes: the prefab, when something edited it, each
 		// instance that has to take it, and whether the Prefab panel has to
-		// show it again, an instance having edited it.
+		// show it again, an instance having edited it, or show its own unsaved
+		// edit with the instance's carried into it.
 		struct Outcome
 		{
 			std::optional<ObjectNode> prefab;
 			std::vector<std::optional<ObjectNode>> instances;
 			bool reshow = false;
+			std::optional<ObjectNode> panel;
 		};
 
 		// The same text for two trees exactly when they agree on part.
@@ -128,16 +130,27 @@ namespace Loom
 		// it: there is nothing outside a prefab to point at.
 		ObjectNode Isolated(const ObjectNode& root);
 
+		// ours with what theirs changed from base, all three the same prefab:
+		// ours' guids, and ours' wherever both changed the same thing.
+		ObjectNode Merge(
+			const ObjectNode& base,
+			const ObjectNode& ours,
+			const ObjectNode& theirs,
+			const std::vector<std::string>& transform_keys);
+
 		// One pass of keeping the prefab and its instances alike. The panel is
 		// the Prefab panel's copy, when it shows this prefab, with the Whole
-		// shape it last agreed with the file at. An edit there wins, then the
-		// first known instance's, and everything else takes the result.
+		// shape it last agreed with the file at. An edit there wins when saved,
+		// then the first known instance's, and everything else takes the
+		// result. An unsaved edit stays in the panel, with an instance's carried
+		// into it.
 		Outcome Sync(
 			const ObjectNode& prefab,
 			const ObjectNode* panel,
 			const std::string& panel_shape,
 			const std::vector<Instance>& instances,
-			const std::vector<std::string>& transform_keys);
+			const std::vector<std::string>& transform_keys,
+			bool save = true);
 
 		#pragma endregion
 	};

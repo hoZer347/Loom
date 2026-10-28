@@ -328,22 +328,92 @@ TEST_SUITE("Prefabs")
 		CHECK(from_instance.reshow);
 	};
 
-	TEST_CASE("an instance's edit reaches the prefab past a Prefab panel holding its own, which is not shown again")
+	TEST_CASE("an unsaved edit in the Prefab panel leaves the file and the instances alone until saved")
 	{
 		const Tree prefab;
+		const Tree panel;
 		const Tree instance;
 
-		// A panel holding an unsaved edit takes no part in the sync.
-		const Loom::Prefabs::Outcome outcome = Loom::Prefabs::Sync(
+		const ObjectNode edited = panel.Node("Goblin", "(1, 2, 3)", "8");
+		const std::vector<Loom::Prefabs::Instance> instances = { { instance.Node(), true } };
+
+		const Loom::Prefabs::Outcome held = Loom::Prefabs::Sync(prefab.Node(), &edited, Whole(prefab.Node()), instances, transform_keys, false);
+
+		CHECK_FALSE(held.prefab);
+		CHECK_FALSE(held.panel);
+		CHECK_FALSE(held.reshow);
+		CHECK_FALSE(held.instances[0]);
+
+		const Loom::Prefabs::Outcome saved = Loom::Prefabs::Sync(prefab.Node(), &edited, Whole(prefab.Node()), instances, transform_keys, true);
+
+		REQUIRE(saved.prefab);
+		CHECK(Whole(*saved.prefab) == Whole(prefab.Node("Goblin", "(1, 2, 3)", "8")));
+		REQUIRE(saved.instances[0]);
+		CHECK(Shared(*saved.instances[0]) == Shared(prefab.Node("Goblin", "(1, 2, 3)", "8")));
+	};
+
+	TEST_CASE("an instance's edit made while the Prefab panel holds its own is carried into the panel, and outlives its save")
+	{
+		const Tree prefab;
+		const Tree panel;
+		const Tree instance;
+
+		const ObjectNode renamed = panel.Node("Orc");
+
+		const Loom::Prefabs::Outcome from_instance = Loom::Prefabs::Sync(
 			prefab.Node(),
-			nullptr,
+			&renamed,
 			Whole(prefab.Node()),
 			{ { instance.Node("Goblin", "(1, 2, 3)", "7"), true } },
-			transform_keys);
+			transform_keys,
+			false);
 
-		REQUIRE(outcome.prefab);
-		CHECK(Shared(*outcome.prefab) == Shared(prefab.Node("Goblin", "(1, 2, 3)", "7")));
-		CHECK_FALSE(outcome.reshow);
+		REQUIRE(from_instance.prefab);
+		CHECK(Whole(*from_instance.prefab) == Whole(prefab.Node("Goblin", "(1, 2, 3)", "7")));
+		CHECK_FALSE(from_instance.reshow);
+		REQUIRE(from_instance.panel);
+		CHECK(from_instance.panel->guid == panel.top);
+		CHECK(Whole(*from_instance.panel) == Whole(panel.Node("Orc", "(1, 2, 3)", "7")));
+
+		const Loom::Prefabs::Outcome saved = Loom::Prefabs::Sync(
+			*from_instance.prefab,
+			&*from_instance.panel,
+			Whole(*from_instance.prefab),
+			{ { instance.Node("Goblin", "(1, 2, 3)", "7"), true } },
+			transform_keys,
+			true);
+
+		REQUIRE(saved.prefab);
+		CHECK(Whole(*saved.prefab) == Whole(prefab.Node("Orc", "(1, 2, 3)", "7")));
+		CHECK_FALSE(saved.instances[0]);
+	};
+
+	TEST_CASE("a merge keeps ours, takes what theirs changed, keeps what both added, and keeps ours where both changed one thing")
+	{
+		const Tree base;
+		const Tree ours;
+		const Tree theirs;
+
+		ObjectNode shielded = ours.Node("Orc", "(1, 2, 3)", "6");
+		shielded.children.push_back(ObjectNode{ "Shield", NewGuid() });
+
+		ObjectNode helmeted = theirs.Node("Goblin", "(4, 4, 4)", "7");
+		helmeted.children.push_back(ObjectNode{ "Helmet", NewGuid() });
+
+		const ObjectNode merged = Loom::Prefabs::Merge(base.Node(), shielded, helmeted, transform_keys);
+
+		CHECK(merged.guid == ours.top);
+		CHECK(merged.name == "Orc");
+		REQUIRE(merged.children.size() == 3);
+		CHECK(merged.children[0].guid == ours.child);
+		CHECK(merged.children[1].name == "Shield");
+		CHECK(merged.children[2].name == "Helmet");
+
+		ObjectNode expected = ours.Node("Orc", "(4, 4, 4)", "6");
+		expected.children.push_back(ObjectNode{ "Shield", NewGuid() });
+		expected.children.push_back(ObjectNode{ "Helmet", NewGuid() });
+
+		CHECK(Whole(merged) == Whole(expected));
 	};
 
 	TEST_CASE("nothing changes when the prefab, the panel and every instance agree")

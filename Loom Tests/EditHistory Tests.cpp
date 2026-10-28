@@ -46,4 +46,26 @@ TEST_SUITE("EditHistory")
 		REQUIRE(history.Step(value, true));
 		CHECK(value == "saved again");
 	};
+
+	TEST_CASE("a rewrite reaches every step both ways and what was saved")
+	{
+		Loom::EditHistory<std::string> history;
+		std::string value = "a";
+
+		history.Reset(value);
+		history.Keep("b");
+		history.Keep("c");
+		REQUIRE(history.Step(value, true));
+
+		history.Rewrite([](const std::string& step) { return step + "!"; });
+
+		CHECK(history.Unsaved("b!"));
+		CHECK_FALSE(history.Unsaved("a!"));
+		REQUIRE(history.Step(value, false));
+		CHECK(value == "c!");
+		REQUIRE(history.Step(value, true));
+		CHECK(value == "b!");
+		REQUIRE(history.Step(value, true));
+		CHECK(value == "a!");
+	};
 };
