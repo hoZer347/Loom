@@ -1110,10 +1110,15 @@ TEST_SUITE("SpriteEditor")
 
 	TEST_CASE("a swatch clicked with either button is that button's colour, + and - put the left colour in the palette and take it out, - asking while it is painted, + again even when it is there, written on Ctrl+S, and Ctrl+Z and Ctrl+Y step them")
 	{
+		const std::filesystem::path folder = std::filesystem::temp_directory_path() / "loom sprite swatches";
+		std::filesystem::remove_all(folder);
+		std::filesystem::create_directories(folder);
+
 		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
 		sprite.layers[0].cels[0].Set(0, 0, RED);
 
-		Driven driven("loom sprite swatches.tga", &sprite);
+		Driven driven("loom sprite swatches/Swatches.tga", &sprite);
+		driven.projectFolder = folder.string();
 
 		const std::string palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension).string();
 
@@ -1137,7 +1142,8 @@ TEST_SUITE("SpriteEditor")
 
 		// Red is still painted, so - asks as a swatch's x does.
 		driven.Run("click \"Palette\" \"-\"\nwait 2\n");
-		CHECK(driven.editor.ColourUsers() != nullptr);
+		REQUIRE(driven.editor.ColourUsers() != nullptr);
+		CHECK(*driven.editor.ColourUsers() == std::vector<std::pair<std::string, size_t>>{ { std::filesystem::path(SpriteAsset::For(driven.path)).lexically_normal().string(), 2 } });
 
 		driven.Run("click \"Delete Colour?\" \"Delete\"\nwait 2\n");
 		REQUIRE(Loom::Palette::Load(palette, saved));
@@ -1146,6 +1152,10 @@ TEST_SUITE("SpriteEditor")
 		driven.Run("key ctrl+s\nwait 2\n");
 		REQUIRE(Loom::Palette::Load(palette, saved));
 		CHECK(saved.colours.empty());
+
+		const ImVec2 tab = Driven::TabMiddle("Swatches");
+		driven.Stroke(tab, tab);
+		CHECK(Count(driven.Saved(), RED) == 0);
 
 		driven.Run("click \"Palette\" \"+\"\nwait 2\nkey ctrl+z\nwait 2\nkey ctrl+s\nwait 2\n");
 		REQUIRE(Loom::Palette::Load(palette, saved));
@@ -1159,7 +1169,7 @@ TEST_SUITE("SpriteEditor")
 		REQUIRE(Loom::Palette::Load(palette, saved));
 		CHECK(saved.colours == std::vector<SpriteAsset::Colour>{ RED, RED });
 
-		std::filesystem::remove(palette);
+		std::filesystem::remove_all(folder);
 	};
 
 	TEST_CASE("a swatch's x deletes its colour, asking first while any sprite on the palette still has pixels of it, which it then clears, and Ctrl+Z and Ctrl+Y step it")
