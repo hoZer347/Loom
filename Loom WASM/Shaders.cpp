@@ -870,6 +870,9 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 	std::string Shader::ReadSource(const std::string& file_path)
 	{
+		if (std::optional<std::string> source = SourceFor(file_path))
+			return *source;
+
 #if __EMSCRIPTEN__
 		std::string source;
 		Request(file_path, source);
@@ -899,6 +902,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		}
 		catch (const std::exception& e)
 		{
+			lastError = e.what();
 			std::cerr << "Shader: " << file_path << ": " << e.what() << std::endl;
 			return false;
 		};
@@ -918,6 +922,22 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 		if (!code && written != m_written)
 			Reload();
+	};
+
+	void Shader::SetSource(const std::string& file_path, const std::string& source)
+	{
+		std::scoped_lock lock{ sourcesMutex };
+
+		sources[std::filesystem::path(file_path).lexically_normal().generic_string()] = source;
+	};
+
+	std::optional<std::string> Shader::SourceFor(const std::string& file_path)
+	{
+		std::scoped_lock lock{ sourcesMutex };
+
+		const auto found = sources.find(std::filesystem::path(file_path).lexically_normal().generic_string());
+
+		return found != sources.end() ? std::optional(found->second) : std::nullopt;
 	};
 
 	uint32_t Shader::Cached(const Programs& programs)

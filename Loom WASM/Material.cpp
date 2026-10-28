@@ -52,6 +52,7 @@ namespace Loom
 				std::error_code code;
 				FailedShaders()[path] = std::filesystem::last_write_time(path, code);
 
+				Shader::lastError = e.what();
 				std::cerr << "Material: " << path << ": " << e.what() << std::endl;
 
 				return nullptr;
@@ -163,6 +164,22 @@ namespace Loom
 		for (const auto& [path, written] : failed)
 			if (covers(path))
 				Compile(path);
+	};
+
+	std::string Material::EditShader(const std::string& path, const std::string& source)
+	{
+		const auto key = [](const std::string& file) { return std::filesystem::path(file).lexically_normal().generic_string(); };
+		const std::string edited = key(path);
+
+		Shader::SetSource(edited, source);
+		Shader::lastError.clear();
+
+		if (edited.ends_with(PreVertex::extension))
+			PreVertex::ReloadIfChanged();
+		else
+			ReloadShaders([&](const std::string& shader) { return key(shader) == edited; });
+
+		return Shader::lastError;
 	};
 
 	Shader* Material::SharedShader(const std::string& path)

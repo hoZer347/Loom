@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <istream>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -88,6 +89,16 @@ namespace Loom
 
 		// Reloads when the file has been written since it was last compiled.
 		void ReloadIfChanged();
+
+		// Read in place of the file at file_path from now on, so a page can
+		// edit a shader it has no file for.
+		static void SetSource(const std::string& file_path, const std::string& source);
+
+		// What SetSource last gave file_path, if anything.
+		static std::optional<std::string> SourceFor(const std::string& file_path);
+
+		// Why the last compile that failed did.
+		static inline std::string lastError;
 
 		#pragma endregion
 
@@ -205,6 +216,10 @@ namespace Loom
 #endif
 
 		static inline std::mutex mutex;
+
+		// SetSource's, by normalised path.
+		static inline std::mutex sourcesMutex;
+		static inline std::unordered_map<std::string, std::string> sources;
 
 	protected:
 	public:

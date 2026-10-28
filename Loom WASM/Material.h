@@ -43,6 +43,11 @@ namespace Loom
 		// any that failed to once its file has been written.
 		static void ReloadChangedShaders();
 
+		// Compiles source in place of the file at path, from now on, into
+		// whatever reads it: a shader, a pixel shader or a PreVertex's code.
+		// Returns why it does not compile, or nothing.
+		static std::string EditShader(const std::string& path, const std::string& source);
+
 		// The shader compiled from path that every Material and PixelShader
 		// naming it shares, compiled now if it has not been, or null when it
 		// does not compile.

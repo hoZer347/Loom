@@ -3,6 +3,7 @@
 #include "Test Support.h"
 
 #include "Material.h"
+#include "PreVertex.h"
 #include "Scene.h"
 #include "SerializedField.h"
 
@@ -22,6 +23,18 @@ namespace
 	constexpr size_t FIELDS = 5;
 
 	enum { PATH, COLOR, SHADOWS, VARIABLES, SAMPLING };
+
+	const std::string VERTEX =
+		"// ===VERTEX===\n"
+		"layout(location = 0) in vec3 aPos;\n"
+		"uniform mat4 u_viewProjection;\n"
+		"uniform mat4 u_model;\n"
+		"void main() { gl_Position = u_viewProjection * u_model * vec4(aPos, 1.0); }\n";
+
+	std::string Fragment(const std::string& colour)
+	{
+		return "// ===FRAGMENT===\nout vec4 FragColor;\nvoid main() { FragColor = " + colour + "; }\n";
+	};
 };
 
 #pragma endregion
@@ -234,6 +247,80 @@ TEST_SUITE("Material")
 		CHECK(changed == 2);
 	};
 #endif
+
+	#pragma endregion
+
+	#pragma region Edits
+
+	// Named for no file on disk, so the source edited in is all there is.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an edited shader compiles again from the source given, keeping its program when that does not compile")
+	{
+		LoomTests::RecordingRenderer renderer;
+		const std::string path = "Edited/./edited.shader";
+		const std::string spelt = "Edited/edited.shader";
+
+		CHECK(Loom::Material::EditShader(path, VERTEX + Fragment("vec4(1.0)")).empty());
+
+		Loom::Scene scene("edited");
+		Loom::Material* material = scene.Attach<Loom::Material>();
+		material->SetShaderPath(spelt);
+		Pump();
+
+		REQUIRE(material->shader != nullptr);
+		const uint32_t first = material->shader->id;
+
+		CHECK(Loom::Material::EditShader(path, VERTEX + Fragment("vec4(0.5)")).empty());
+		CHECK(renderer.fragments.at(spelt).find("vec4(0.5)") != std::string::npos);
+
+		const uint32_t second = material->shader->id;
+		CHECK(second != first);
+
+		const LoomTests::Captured captured(std::cerr);
+
+		CHECK(Loom::Material::EditShader(path, VERTEX + Fragment(LoomTests::RecordingRenderer::BROKEN)).find("Shader compile error") != std::string::npos);
+		CHECK(material->shader->id == second);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an edited pixel shader compiles again from the source given")
+	{
+		LoomTests::RecordingRenderer renderer;
+		const std::string path = "edited.loompixel";
+		const std::string pass = "out vec4 FragColor;\nvoid main() { FragColor = LoomScenePixel(LoomScreenPixel()); }\n";
+
+		CHECK(Loom::Material::EditShader(path, pass).empty());
+
+		Loom::Shader* shader = Loom::Material::SharedShader(path);
+		REQUIRE(shader != nullptr);
+
+		CHECK(Loom::Material::EditShader(path, pass + "// edited\n").empty());
+		CHECK(renderer.fragments.at(path).find("// edited") != std::string::npos);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "editing a PreVertex's file compiles the shaders it covers again with the code given")
+	{
+		LoomTests::RecordingRenderer renderer;
+		const std::string shader = "edited covered.shader";
+		const std::string file = "edited.loomprevertex";
+
+		Loom::Material::EditShader(shader, VERTEX + Fragment("vec4(1.0)"));
+		Loom::Material::EditShader(file, "vec3 PreVertex(vec3 world) { return world; }\n");
+
+		Loom::Scene scene("edited pre vertex");
+		Loom::PreVertex* preVertex = scene.Attach<Loom::PreVertex>();
+		preVertex->file = file;
+		preVertex->everything = false;
+		preVertex->shaders = { shader };
+		Loom::PreVertex::ReloadIfChanged();
+
+		scene.GetRoot().AddChild("Mesh")->Attach<Loom::Material>()->SetShaderPath(shader);
+		Pump();
+
+		CHECK(Loom::Material::EditShader(file, "vec3 PreVertex(vec3 world) { return world * 2.0; }\n").empty());
+		CHECK(renderer.vertices.at(shader).find("return world * 2.0;") != std::string::npos);
+
+		scene.GetRoot().DetachComponent(preVertex);
+		Pump();
+	};
 
 	#pragma endregion
 };

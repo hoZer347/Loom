@@ -113,7 +113,9 @@ namespace Loom
 			previous = s_cover;
 		};
 
-		if (!next.file.empty())
+		if (std::optional<std::string> edited = Shader::SourceFor(next.file))
+			next.code = *edited;
+		else if (!next.file.empty())
 		{
 #ifdef __EMSCRIPTEN__
 			if (next.file == previous.file)

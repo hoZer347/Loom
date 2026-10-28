@@ -197,8 +197,8 @@ if (Test-Stale $module $linkInputs)
 
     # The whole archive goes in because components register themselves from
     # static initialisers nothing else refers to. The page preloads the scene
-    # through FS.
-    & (Get-EmscriptenTool $emcc 'em++') @webCompileFlags @webLinkFlags @webIncludes '-sEXPORTED_RUNTIME_METHODS=FS' $player @($scriptJobs | ForEach-Object { $_.Object }) `
+    # through FS, and edits shaders through ccall.
+    & (Get-EmscriptenTool $emcc 'em++') @webCompileFlags @webLinkFlags @webIncludes '-sEXPORTED_RUNTIME_METHODS=FS,ccall' $player @($scriptJobs | ForEach-Object { $_.Object }) `
         '-Wl,--whole-archive' $library '-Wl,--no-whole-archive' `
         -o $module
 
