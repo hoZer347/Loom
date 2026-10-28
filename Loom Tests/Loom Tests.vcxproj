@@ -157,6 +157,7 @@
     <ClCompile Include="EditorIcons Tests.cpp" />
     <ClCompile Include="ProjectAssets Tests.cpp" />
     <ClCompile Include="FileTypes Tests.cpp" />
+    <ClCompile Include="VisualStudio Tests.cpp" />
     <ClCompile Include="ProjectTemplate Tests.cpp" />
     <ClCompile Include="Script Exports Tests.cpp" />
     <ClCompile Include="EditorCamera Tests.cpp" />
@@ -267,6 +268,7 @@
     <ClCompile Include="..\Loom Editor\ProjectAssets.cpp" />
     <ClCompile Include="..\Loom Editor\ProjectTemplate.cpp" />
     <ClCompile Include="..\Loom Editor\FileTypes.cpp" />
+    <ClCompile Include="..\Loom Editor\VisualStudio.cpp" />
     <ClCompile Include="..\Loom Editor\BuildSettings.cpp" />
     <ClCompile Include="..\Loom Editor\EditorCamera.cpp" />
     <ClCompile Include="..\Loom Editor\EditorConsole.cpp" />

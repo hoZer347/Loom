@@ -5,6 +5,7 @@
 #include "LoadProgress.h"
 #include "ProjectTemplate.h"
 #include "ScriptTests.h"
+#include "VisualStudio.h"
 
 #include "Utilities/StateReference.h"
 
@@ -41,36 +42,6 @@ namespace Loom
 			std::error_code code;
 
 			return std::filesystem::last_write_time(buffer, code);
-		};
-
-		// vswhere ships with every Visual Studio since 2017; the first match that exists wins.
-		std::string VsWhere(const std::string& arguments)
-		{
-			char program_files[MAX_PATH]{ };
-
-			if (!GetEnvironmentVariableA("ProgramFiles(x86)", program_files, MAX_PATH))
-				snprintf(program_files, sizeof(program_files), "C:\\Program Files (x86)");
-
-			const std::filesystem::path vswhere =
-				std::filesystem::path(program_files) /
-				"Microsoft Visual Studio" / "Installer" / "vswhere.exe";
-
-			std::error_code code;
-
-			if (!std::filesystem::exists(vswhere, code))
-				return "";
-
-			std::string found;
-
-			HiddenProcess::Run(
-				'"' + vswhere.string() + "\" -latest -prerelease -products * " + arguments,
-				[&](const std::string& line)
-				{
-					if (found.empty() && !line.empty() && std::filesystem::exists(line, code))
-						found = line;
-				});
-
-			return found;
 		};
 	};
 
@@ -512,17 +483,9 @@ namespace Loom
 
 	#pragma region Tools
 
-	const std::string& ScriptLibrary::FindVisualStudio()
-	{
-		// vswhere is a process, and installations do not change while the editor is up.
-		static const std::string devenv = VsWhere("-find Common7\\IDE\\devenv.exe");
-
-		return devenv;
-	};
-
 	std::string ScriptLibrary::FindMSBuild()
 	{
-		const std::string found = VsWhere(
+		const std::string found = VisualStudio::Where(
 			"-requires Microsoft.Component.MSBuild "
 			"-find MSBuild\\**\\Bin\\MSBuild.exe");
 

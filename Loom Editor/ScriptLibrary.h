@@ -96,10 +96,6 @@ namespace Loom
 
 		#pragma region Tools
 
-		// devenv.exe from the newest Visual Studio on this machine, or empty
-		// when there is none. Looked up once and held.
-		static const std::string& FindVisualStudio();
-
 		// The MSBuild this machine has. Empty when none is found.
 		static std::string FindMSBuild();
 

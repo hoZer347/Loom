@@ -61,6 +61,9 @@
     <ClCompile Include="FileTypes Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="VisualStudio Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="ProjectTemplate Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

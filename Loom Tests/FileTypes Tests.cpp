@@ -15,6 +15,7 @@
 #include "ProjectTemplate.h"
 #include "ScriptFolders.h"
 #include "SpriteAsset.h"
+#include "VisualStudio.h"
 
 #include <process.h>
 #include <windows.h>
@@ -86,6 +87,7 @@ TEST_SUITE("FileTypes")
 			Loom::InputActions::extension,
 			Loom::Shader::pixel_extension,
 			Loom::PreVertex::extension,
+			Loom::VisualStudio::header_extension,
 		};
 
 		const auto types = Loom::FileTypes::All();

@@ -10,6 +10,7 @@
 #include "FileTypes.h"
 #include "ProjectAssets.h"
 #include "UiScript.h"
+#include "VisualStudio.h"
 
 #include "Audio.h"
 #include "Engine.h"
@@ -26,6 +27,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 
 #define GLFW_EXPOSE_NATIVE_WIN32
@@ -143,6 +145,8 @@ namespace
 	{
 		std::cout
 			<< "Loom Editor [project folder or one of its .loom files]\n"
+			<< "Loom Editor <header.hpp>         open it in Visual Studio on the nearest\n"
+			<< "                                 solution above it, and exit\n"
 			<< "  --new-project <folder> <name>  create a project and open it\n"
 			<< "  --new-script <scripts project> <folder> <name>\n"
 			<< "                                 write a script into that folder and exit,\n"
@@ -253,6 +257,15 @@ int main(int argc, char** argv)
 			std::cout << path << std::endl;
 			return 0;
 		};
+
+	// Explorer sends a double-clicked header here, to open in its project's Visual Studio.
+	if (argc == 2 && std::filesystem::path(argv[1]).extension() == VisualStudio::header_extension)
+	{
+		if (std::thread opening = VisualStudio::Open(VisualStudio::SolutionFor(argv[1]), argv[1]); opening.joinable())
+			opening.join();
+
+		return 0;
+	};
 
 	// Automated runs and runs on another desktop start hidden; read before the Engine opens the window.
 	std::string desktop;

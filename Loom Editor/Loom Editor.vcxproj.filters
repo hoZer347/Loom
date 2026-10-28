@@ -34,6 +34,9 @@
     <ClCompile Include="ScriptLibrary.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
+    <ClCompile Include="VisualStudio.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
     <ClCompile Include="FolderWatch.cpp">
       <Filter>Panels</Filter>
     </ClCompile>
@@ -235,6 +238,9 @@
       <Filter>Scripts</Filter>
     </ClInclude>
     <ClInclude Include="FileTypes.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="VisualStudio.h">
       <Filter>Scripts</Filter>
     </ClInclude>
     <ClInclude Include="ProjectAssets.h">

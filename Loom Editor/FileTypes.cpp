@@ -14,6 +14,7 @@
 #include "ProjectTemplate.h"
 #include "ScriptFolders.h"
 #include "SpriteAsset.h"
+#include "VisualStudio.h"
 
 #include <windows.h>
 #include <shlobj.h>
@@ -43,6 +44,7 @@ namespace Loom
 			{ InputActions::extension, L"Loom.InputActions", L"Loom Key Bindings" },
 			{ Shader::pixel_extension, L"Loom.PixelShader", L"Loom Pixel Shader" },
 			{ PreVertex::extension, L"Loom.PreVertex", L"Loom Pre-Vertex Shader" },
+			{ VisualStudio::header_extension, L"Loom.Header", L"C++ Header" },
 		};
 
 		constexpr const wchar_t* COMMAND_KEY = L"\\shell\\open\\command";
