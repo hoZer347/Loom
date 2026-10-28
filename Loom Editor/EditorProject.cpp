@@ -2055,11 +2055,11 @@ namespace Loom
 		const VirtualFolders::Node root = ScriptsByLabel(names);
 
 		if (root.children.empty() && root.items.empty() && !m_scriptEntries.empty())
-			ImGui::TextDisabled("None of the kinds highlighted below.");
+			ImGui::TextDisabled("No matches");
 		else if (root.children.empty() && root.items.empty())
 			ImGui::TextDisabled(m_scripts.HasProject()
-				? "No scripts yet. Right-click to create one."
-				: "No scripts project. Right-click to create a script.");
+				? "No scripts"
+				: "No scripts project");
 
 		const FolderTree::Hooks hooks = ScriptFolderHooks();
 
@@ -2458,13 +2458,9 @@ namespace Loom
 		const VirtualFolders::Node root = tab.folders.Build(tab.filter.Shows(tab.kind.filter.icon) ? tab.files : none);
 
 		if (root.children.empty() && root.items.empty() && !tab.files.empty())
-			ImGui::TextDisabled("None of the kinds highlighted below.");
+			ImGui::TextDisabled("No matches");
 		else if (root.children.empty() && root.items.empty())
-			ImGui::TextDisabled(
-				std::ranges::any_of(assetKinds, [&tab](const AssetKindInfo& info) { return TabMaking(info.kind) == &tab.kind; })
-					? "No %s yet. Right-click to create one."
-					: "No %s yet.",
-				tab.kind.files);
+			ImGui::TextDisabled("No %s", tab.kind.files);
 
 		const FolderTree::Hooks hooks = FileFolderHooks(tab);
 

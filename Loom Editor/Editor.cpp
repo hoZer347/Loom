@@ -3541,7 +3541,7 @@ namespace Loom
 			SetComponentCategory(component, "");
 
 		if (m_projectFile.empty())
-			ImGui::TextDisabled("No project is open to keep this in.");
+			ImGui::TextDisabled("No project open");
 
 		ImGui::EndPopup();
 	};

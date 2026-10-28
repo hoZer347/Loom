@@ -113,7 +113,7 @@ namespace Loom
 		if (backend != Engine::backend)
 		{
 			ImGui::BeginDisabled();
-			ImGui::TextWrapped("Takes effect when the editor restarts.");
+			ImGui::TextWrapped("Needs a restart");
 			ImGui::EndDisabled();
 		};
 

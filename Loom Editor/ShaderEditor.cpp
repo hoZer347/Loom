@@ -71,7 +71,7 @@ namespace Loom
 
 	const char* ShaderEditor::Hint() const
 	{
-		return "Double-click a shader in the Scripts tab to edit it here.";
+		return "No shader open";
 	};
 
 	const TextEditor::Language* ShaderEditor::Language() const

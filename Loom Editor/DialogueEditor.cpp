@@ -134,7 +134,7 @@ namespace Loom
 
 	const char* DialogueEditor::Hint() const
 	{
-		return "Double-click a dialogue in the Scripts tab to edit it here.";
+		return "No dialogue open";
 	};
 
 	const TextEditor::Language* DialogueEditor::Language() const

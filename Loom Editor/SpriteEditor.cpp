@@ -381,7 +381,7 @@ namespace Loom
 				m_askPalette = true;
 
 			if (m_documents.empty())
-				ImGui::TextDisabled("Click an image or a sprite in the 2D tab to edit it here.");
+				ImGui::TextDisabled("No sprite open");
 			else if (ImGui::BeginTabBar("##sprites", ImGuiTabBarFlags_AutoSelectNewTabs | ImGuiTabBarFlags_FittingPolicyScroll))
 			{
 				const Document* closed = nullptr;
@@ -1218,9 +1218,9 @@ namespace Loom
 			if (!PalettePath().empty())
 				DrawSwatches(PalettePath());
 			else if (m_active != nullptr)
-				ImGui::TextDisabled("No palette yet. New makes one of the sprite's colours.");
+				ImGui::TextDisabled("No palette");
 			else
-				ImGui::TextDisabled("Open a sprite to paint it.");
+				ImGui::TextDisabled("No sprite open");
 
 			DrawPaletteMenu(project_folder);
 		};

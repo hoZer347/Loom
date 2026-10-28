@@ -90,7 +90,7 @@ namespace Loom
 					m_history.Keep(Current());
 			}
 			else
-				ImGui::TextDisabled("Open a project to bind its keys.");
+				ImGui::TextDisabled("No project open");
 		};
 
 		ImGui::End();
