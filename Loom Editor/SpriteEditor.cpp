@@ -185,6 +185,16 @@ namespace Loom
 			return ImGui::ColorConvertU32ToFloat4(ToImGui(colour));
 		};
 
+		// Without padding, as a glyph wider than the padded inside starts at its left.
+		bool IconButton(const char* icon, const char* id, float side)
+		{
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
+			const bool clicked = ImGui::Button((std::string(icon) + "##" + id).c_str(), ImVec2(side, side));
+			ImGui::PopStyleVar();
+
+			return clicked;
+		};
+
 		// Frames use the atlas's white pixel, so only glyphs lean.
 		void Italicise(int first_vertex, float right)
 		{
@@ -1243,7 +1253,7 @@ namespace Loom
 			if (chosen)
 				ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetColorU32(ImGuiCol_ButtonActive));
 
-			if (ImGui::Button((std::string(info.icon) + "##" + info.label).c_str(), ImVec2(side, side)))
+			if (IconButton(info.icon, info.label, side))
 				m_tool = info.tool;
 
 			if (chosen)
@@ -1273,7 +1283,7 @@ namespace Loom
 
 		ImGui::BeginDisabled(m_active == nullptr || path.empty());
 
-		if (ImGui::Button((std::string(import_icon) + "##Import").c_str(), ImVec2(side, side)))
+		if (IconButton(import_icon, "Import", side))
 		{
 			PaletteFile& file = PaletteAt(path);
 			const std::string name = std::filesystem::path(m_active->path).stem().string();
