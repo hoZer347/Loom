@@ -284,28 +284,28 @@ namespace Loom
 		};
 
 		#pragma endregion
-
-		#pragma region Starting
-
-		void Start(const std::string& file, const std::string& parameters)
-		{
-			const HINSTANCE result = ShellExecuteA(
-				nullptr,
-				"open",
-				file.c_str(),
-				parameters.empty() ? nullptr : parameters.c_str(),
-				nullptr,
-				SW_SHOWNORMAL);
-
-			// The one error code ShellExecute has: anything at or below 32.
-			if ((INT_PTR)result <= 32)
-				std::cerr
-					<< "Could not open " << file << ' ' << parameters
-					<< " (error " << (INT_PTR)result << ')' << std::endl;
-		};
-
-		#pragma endregion
 	};
+
+	#pragma region Shell
+
+	void VisualStudio::Shell(const char* file, const std::string& parameters)
+	{
+		const HINSTANCE result = ShellExecuteA(
+			nullptr,
+			"open",
+			file,
+			parameters.empty() ? nullptr : parameters.c_str(),
+			nullptr,
+			SW_SHOWNORMAL);
+
+		// The one error code ShellExecute has: anything at or below 32.
+		if ((INT_PTR)result <= 32)
+			std::cerr
+				<< "Could not open " << file << ' ' << parameters
+				<< " (error " << (INT_PTR)result << ')' << std::endl;
+	};
+
+	#pragma endregion
 
 	#pragma region Installation
 
@@ -350,6 +350,11 @@ namespace Loom
 
 	#pragma region Opening
 
+	bool VisualStudio::IsHeader(const std::filesystem::path& file)
+	{
+		return _stricmp(file.extension().string().c_str(), header_extension) == 0;
+	};
+
 	std::string VisualStudio::SolutionFor(const std::filesystem::path& file)
 	{
 		std::error_code code;
@@ -382,16 +387,18 @@ namespace Loom
 
 		if (!devenv.empty() && has_solution)
 		{
-			Start(devenv, '"' + solution + '"');
+			Shell(devenv.c_str(), '"' + solution + '"');
 			return OpenOnceLoaded(solution, file, line, column);
 		};
 
 		if (!devenv.empty())
-			Start(devenv, "/Edit \"" + file + '"');
+			Shell(devenv.c_str(), "/Edit \"" + file + '"');
 		else if (has_solution)
-			Start(solution, "");
-		else
+			Shell(solution.c_str(), "");
+		else if (IsHeader(file))
 			std::cerr << "No Visual Studio to open " << file << " in" << std::endl;
+		else
+			Shell(file.c_str(), "");
 
 		return { };
 	};

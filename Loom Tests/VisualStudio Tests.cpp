@@ -39,6 +39,14 @@ namespace
 
 TEST_SUITE("VisualStudio")
 {
+	TEST_CASE("a header is told by its extension in any case")
+	{
+		CHECK(Loom::VisualStudio::IsHeader("Scripts/Tank.hpp"));
+		CHECK(Loom::VisualStudio::IsHeader("Scripts/Tank.HPP"));
+		CHECK_FALSE(Loom::VisualStudio::IsHeader("Scripts/Tank.h"));
+		CHECK_FALSE(Loom::VisualStudio::IsHeader("Scripts/Tank.hpp.bak"));
+	};
+
 	TEST_CASE("a header opens with the solution in the nearest folder above it")
 	{
 		const Project project("loom visual studio nearest");
@@ -63,6 +71,7 @@ TEST_SUITE("VisualStudio")
 
 	TEST_CASE("a header with no solution above it has none")
 	{
+		// Holds while the drive root has no solution of its own.
 		const std::filesystem::path header = std::filesystem::path(std::filesystem::temp_directory_path().root_path()) / "loom no such folder" / "Tank.hpp";
 
 		CHECK(Loom::VisualStudio::SolutionFor(header).empty());

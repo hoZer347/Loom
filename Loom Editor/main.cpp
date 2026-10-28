@@ -259,7 +259,7 @@ int main(int argc, char** argv)
 		};
 
 	// Explorer sends a double-clicked header here, to open in its project's Visual Studio.
-	if (argc == 2 && std::filesystem::path(argv[1]).extension() == VisualStudio::header_extension)
+	if (argc == 2 && VisualStudio::IsHeader(argv[1]))
 	{
 		if (std::thread opening = VisualStudio::Open(VisualStudio::SolutionFor(argv[1]), argv[1]); opening.joinable())
 			opening.join();

@@ -18,6 +18,12 @@ namespace Loom
 		// The files Explorer opens through the editor in Visual Studio.
 		static constexpr const char* header_extension = ".hpp";
 
+		// Whether file has the header extension, in any case, as Explorer matches it.
+		static bool IsHeader(const std::filesystem::path& file);
+
+		// Opens file with parameters as Explorer would, reporting a failure.
+		static void Shell(const char* file, const std::string& parameters);
+
 		// The first path that exists among vswhere's answers for the newest
 		// Visual Studio, empty when there is none.
 		static std::string Where(const std::string& arguments);
@@ -31,7 +37,8 @@ namespace Loom
 		static std::string SolutionFor(const std::filesystem::path& file);
 
 		// Opens file at line, or where Visual Studio puts the caret for a line
-		// of zero. A Visual Studio started on solution only takes the file once
+		// of zero. Without Visual Studio a file other than a header opens as
+		// Explorer would; a header would only come back here. A Visual Studio started on solution only takes the file once
 		// it has loaded, which the returned thread waits for; empty when there
 		// is nothing to wait for.
 		static std::thread Open(const std::string& solution, const std::string& file, int line = 0, int column = 0);

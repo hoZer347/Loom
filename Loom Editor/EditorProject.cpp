@@ -356,26 +356,9 @@ namespace Loom
 
 		#pragma region Shell
 
-		void Shell(const char* file, const std::string& parameters)
-		{
-			const HINSTANCE result = ShellExecuteA(
-				nullptr,
-				"open",
-				file,
-				parameters.empty() ? nullptr : parameters.c_str(),
-				nullptr,
-				SW_SHOWNORMAL);
-
-			// The one error code ShellExecute has: anything at or below 32.
-			if ((INT_PTR)result <= 32)
-				std::cerr
-					<< "Could not open " << file << ' ' << parameters
-					<< " (error " << (INT_PTR)result << ')' << std::endl;
-		};
-
 		void ShowInExplorer(const std::string& path)
 		{
-			Shell("explorer.exe", "/select,\"" + path + '"');
+			VisualStudio::Shell("explorer.exe", "/select,\"" + path + '"');
 		};
 
 		bool HasOpener(const std::string& extension)
@@ -403,7 +386,7 @@ namespace Loom
 		void OpenFile(const std::string& path)
 		{
 			if (HasOpener(std::filesystem::path(path).extension().string()))
-				Shell(path.c_str(), "");
+				VisualStudio::Shell(path.c_str(), "");
 			else
 				OpenAsText(path);
 		};
@@ -1457,7 +1440,7 @@ namespace Loom
 		if (std::filesystem::is_regular_file(path, code))
 			static_cast<Editor*>(ImGui::GetPlatformIO().Platform_OpenInShellUserData)->OpenAsset(path);
 		else
-			Shell(path, "");
+			VisualStudio::Shell(path, "");
 
 		return true;
 	};
