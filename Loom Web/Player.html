@@ -65,8 +65,12 @@
         ],
         // The engine takes its viewport from resize events, and a canvas that
         // is already the right size never sends one. Queued, so it lands once
-        // main has made the window.
-        onRuntimeInitialized: () => setTimeout(() => window.dispatchEvent(new Event("resize"))),
+        // main has made the window. A page holding the player calls in, as
+        // loom_edit_shader, only once initialized is set.
+        onRuntimeInitialized: () => {
+          Module.initialized = true;
+          setTimeout(() => window.dispatchEvent(new Event("resize")));
+        },
       };
 
       // GLFW sizes the canvas to the window it was asked for once the engine
