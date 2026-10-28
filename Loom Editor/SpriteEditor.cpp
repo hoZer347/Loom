@@ -111,6 +111,9 @@ namespace Loom
 		constexpr int anchor_columns = 3;
 		constexpr int middle_anchor = anchor_columns * anchor_columns / 2;
 
+		// Wide enough for the longest side a sprite can have.
+		constexpr float resize_field_ems = 3.5f;
+
 		#pragma endregion
 
 		#pragma region Colours
@@ -1087,21 +1090,31 @@ namespace Loom
 		if (!ImGui::BeginPopup(resize_popup))
 			return;
 
-		const float width = ImGui::GetFontSize() * name_lines;
+		const float width = ImGui::GetFontSize() * resize_field_ems;
 
+		ImGui::BeginGroup();
 		ImGui::SetNextItemWidth(width);
-		ImGui::InputInt("Width", &m_resizeWidth);
+		ImGui::InputInt("##Width", &m_resizeWidth, 0);
+		ImGui::SetItemTooltip("Width");
+		ImGui::SameLine();
+		ImGui::TextUnformatted("x");
+		ImGui::SameLine();
 		ImGui::SetNextItemWidth(width);
-		ImGui::InputInt("Height", &m_resizeHeight);
+		ImGui::InputInt("##Height", &m_resizeHeight, 0);
+		ImGui::SetItemTooltip("Height");
 
 		m_resizeWidth = std::clamp(m_resizeWidth, 1, SpriteAsset::maxSide);
 		m_resizeHeight = std::clamp(m_resizeHeight, 1, SpriteAsset::maxSide);
 
 		ImGui::Checkbox("Scale", &m_resizeScale);
 		ImGui::SetItemTooltip(m_resizeScale ? "The pixels stretch or shrink to the size" : "The pixels stay as they are, cut or grown round the anchor");
+		ImGui::EndGroup();
 
+		ImGui::SameLine();
 		ImGui::BeginDisabled(m_resizeScale);
-		ImGui::TextUnformatted("Anchor");
+		ImGui::BeginGroup();
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
 
 		for (int anchor = 0; anchor < anchor_columns * anchor_columns; anchor++)
 		{
@@ -1110,16 +1123,19 @@ namespace Loom
 			if (ImGui::RadioButton("##anchor", m_resizeAnchor == anchor))
 				m_resizeAnchor = anchor;
 
+			ImGui::SetItemTooltip("Anchor");
 			ImGui::PopID();
 
 			if (anchor % anchor_columns != anchor_columns - 1)
 				ImGui::SameLine();
 		};
 
+		ImGui::PopStyleVar(2);
+		ImGui::EndGroup();
 		ImGui::EndDisabled();
 		ImGui::BeginDisabled(m_resizeWidth == document.sprite.width && m_resizeHeight == document.sprite.height);
 
-		if (ImGui::Button("OK"))
+		if (ImGui::SmallButton("OK"))
 		{
 			constexpr float last_column = anchor_columns - 1;
 
@@ -1140,7 +1156,7 @@ namespace Loom
 		ImGui::EndDisabled();
 		ImGui::SameLine();
 
-		if (ImGui::Button("Cancel"))
+		if (ImGui::SmallButton("Cancel"))
 			ImGui::CloseCurrentPopup();
 
 		ImGui::EndPopup();

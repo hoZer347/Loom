@@ -632,7 +632,7 @@ TEST_SUITE("SpriteEditor")
 
 		driven.Run(
 			"click \"Sprites\" \"Resize\"\nwait 2\n"
-			"click \"Popup\" \"Width\" left\nkey ctrl+a\ntype " + std::to_string(wider) + "\nwait 2\n"
+			"click \"Popup\" \"##Width\" left\nkey ctrl+a\ntype " + std::to_string(wider) + "\nwait 2\n"
 			"click \"Popup\" \"OK\"\nwait 2\n");
 
 		SpriteAsset::Image image;
