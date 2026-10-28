@@ -4,18 +4,17 @@
 
 #include <chrono>
 #include <condition_variable>
-#include <cstdint>
 #include <deque>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
-#include <thread>
 
 
 namespace Loom
 {
 	struct Editor;
+	struct McpRelay;
 	struct UiScript;
 
 	/**
@@ -24,10 +23,8 @@ namespace Loom
 	*   at and change it while someone is using it: the open scenes, their
 	*   hierarchy and fields, the console, Play and the other commands,
 	*   screenshots, and the panels themselves through a UiScript
-	* - Streamable HTTP at http://127.0.0.1:<port>/mcp, answering each POST
-	*   with one JSON response and offering no event stream. A request with an
-	*   Origin that is not this machine, which is a web page, is turned away
-	* - Requests are read on a thread of its own. The tools run in Step, on the
+	* - Every open editor answers on one port through McpRelay, which reads
+	*   requests on a thread of its own. The tools run in Step, on the
 	*   main thread between frames, so they see the editor as it was drawn and
 	*   their edits are undone like any other
 	* - The UiScript only hears about ImGui's items while a tool needs them
@@ -48,7 +45,8 @@ namespace Loom
 
 		static constexpr unsigned short default_port = 47800;
 
-		// False, with why on stderr, when the port cannot be had.
+		// False, with why on stderr, when the editor cannot serve at all.
+		// Another editor holding the port answers for this one as well.
 		bool Listen(unsigned short port);
 
 		#pragma endregion
@@ -68,13 +66,6 @@ namespace Loom
 		#pragma endregion
 
 	private:
-		#pragma region Server
-
-		void Serve();
-		void Answer(uintptr_t connection);
-
-		#pragma endregion
-
 		#pragma region Call Queue
 
 		// Blocks the server's thread until the main thread has answered.
@@ -91,8 +82,7 @@ namespace Loom
 		// Whether the script was listening before a tool turned it on.
 		const bool m_scriptListened;
 
-		uintptr_t m_listener;
-		std::thread m_thread{ };
+		std::unique_ptr<McpRelay> m_relay{ };
 
 		std::mutex m_mutex{ };
 		std::condition_variable m_answered{ };

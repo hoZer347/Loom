@@ -1,9 +1,3 @@
-// Before windows.h, which would otherwise pull in the old winsock.h.
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <winsock2.h>
-#include <ws2tcpip.h>
-
 #include "EditorMcp.h"
 
 #include "Editor.h"
@@ -11,6 +5,7 @@
 #include "EditorLog.h"
 #include "FieldNames.h"
 #include "McpProtocol.h"
+#include "McpRelay.h"
 #include "SpriteAsset.h"
 #include "UiScript.h"
 
@@ -24,13 +19,9 @@
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
-#include <iostream>
 #include <sstream>
 #include <stdexcept>
-#include <string_view>
 #include <vector>
-
-#pragma comment(lib, "ws2_32.lib")
 
 using json = nlohmann::json;
 
@@ -48,14 +39,6 @@ namespace Loom
 	namespace
 	{
 		#pragma region Constants
-
-		constexpr const char* endpoint = "/mcp";
-
-		constexpr size_t max_request_bytes = 1 << 20;
-		constexpr size_t receive_buffer_bytes = 4096;
-		constexpr std::string_view header_end = "\r\n\r\n";
-		constexpr DWORD receive_timeout_ms = 5000;
-		constexpr int listen_backlog = 8;
 
 		// How long a request waits for the main thread, and a tool to finish.
 		constexpr std::chrono::minutes call_timeout{ 5 };
@@ -958,37 +941,6 @@ namespace Loom
 		};
 
 		#pragma endregion
-
-		#pragma region HTTP
-
-		std::string Lower(std::string text)
-		{
-			std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return (char)tolower(c); });
-			return text;
-		};
-
-		void Send(SOCKET client, const char* status, const std::string& body, const char* extra_headers = "")
-		{
-			std::string response =
-				std::string("HTTP/1.1 ") + status + "\r\n"
-				"Content-Type: application/json\r\n"
-				"Content-Length: " + std::to_string(body.size()) + "\r\n"
-				"Connection: close\r\n" + extra_headers + "\r\n" + body;
-
-			size_t sent = 0;
-
-			while (sent < response.size())
-			{
-				const int count = send(client, response.data() + sent, (int)(response.size() - sent), 0);
-
-				if (count <= 0)
-					return;
-
-				sent += count;
-			};
-		};
-
-		#pragma endregion
 	};
 
 	#pragma region Lifetime
@@ -996,8 +948,7 @@ namespace Loom
 	EditorMcp::EditorMcp(Editor& editor, UiScript& script) :
 		m_editor(editor),
 		m_script(script),
-		m_scriptListened(script.Listening()),
-		m_listener(INVALID_SOCKET)
+		m_scriptListened(script.Listening())
 	{
 	};
 
@@ -1010,14 +961,7 @@ namespace Loom
 
 		m_answered.notify_all();
 
-		if (m_listener != INVALID_SOCKET)
-			closesocket(m_listener);
-
-		if (m_thread.joinable())
-			m_thread.join();
-
-		if (m_listener != INVALID_SOCKET)
-			WSACleanup();
+		m_relay.reset();
 	};
 
 	#pragma endregion
@@ -1026,134 +970,7 @@ namespace Loom
 
 	bool EditorMcp::Listen(unsigned short port)
 	{
-		WSADATA data{ };
-
-		if (WSAStartup(MAKEWORD(2, 2), &data) != 0)
-		{
-			std::cerr << "The MCP server could not start Windows Sockets" << std::endl;
-			return false;
-		};
-
-		const SOCKET listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-
-		sockaddr_in address{ };
-		address.sin_family = AF_INET;
-		address.sin_port = htons(port);
-		address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-
-		if (listener == INVALID_SOCKET ||
-			bind(listener, (const sockaddr*)&address, sizeof(address)) != 0 ||
-			listen(listener, listen_backlog) != 0)
-		{
-			std::cerr << "The MCP server could not listen on port " << port << ", which another editor may have" << std::endl;
-
-			if (listener != INVALID_SOCKET)
-				closesocket(listener);
-
-			WSACleanup();
-			return false;
-		};
-
-		m_listener = listener;
-		m_thread = std::thread(&EditorMcp::Serve, this);
-
-		return true;
-	};
-
-	void EditorMcp::Serve()
-	{
-		while (true)
-		{
-			const SOCKET client = accept(m_listener, nullptr, nullptr);
-
-			// Closing the listener is how the editor says to stop.
-			if (client == INVALID_SOCKET)
-				return;
-
-			Answer(client);
-			closesocket(client);
-		};
-	};
-
-	void EditorMcp::Answer(uintptr_t connection)
-	{
-		const SOCKET client = connection;
-
-		setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, (const char*)&receive_timeout_ms, sizeof(receive_timeout_ms));
-
-		std::string request{ };
-		size_t head_size = std::string::npos;
-		char buffer[receive_buffer_bytes];
-
-		while ((head_size = request.find(header_end)) == std::string::npos)
-		{
-			const int count = recv(client, buffer, sizeof(buffer), 0);
-
-			if (count <= 0)
-				return;
-
-			request.append(buffer, count);
-
-			if (request.size() > max_request_bytes)
-				return Send(client, "413 Content Too Large", "");
-		};
-
-		std::istringstream head(request.substr(0, head_size));
-		std::string method, target, line;
-		head >> method >> target;
-		std::getline(head, line);
-
-		size_t content_length = 0;
-		std::string origin{ };
-
-		while (std::getline(head, line))
-		{
-			const size_t colon = line.find(':');
-
-			if (colon == std::string::npos)
-				continue;
-
-			const std::string name = Lower(line.substr(0, colon));
-			std::string value = line.substr(colon + 1);
-
-			value.erase(0, value.find_first_not_of(' '));
-
-			if (!value.empty() && value.back() == '\r')
-				value.pop_back();
-
-			if (name == "content-length")
-				content_length = strtoull(value.c_str(), nullptr, 10);
-			else if (name == "origin")
-				origin = value;
-		};
-
-		if (target.substr(0, target.find('?')) != endpoint)
-			return Send(client, "404 Not Found", "");
-
-		if (!origin.empty() && !McpProtocol::LocalOrigin(origin))
-			return Send(client, "403 Forbidden", "");
-
-		if (method != "POST")
-			return Send(client, "405 Method Not Allowed", "", "Allow: POST\r\n");
-
-		if (content_length > max_request_bytes)
-			return Send(client, "413 Content Too Large", "");
-
-		std::string body = request.substr(head_size + header_end.size());
-
-		while (body.size() < content_length)
-		{
-			const int count = recv(client, buffer, sizeof(buffer), 0);
-
-			if (count <= 0)
-				return;
-
-			body.append(buffer, count);
-		};
-
-		body.resize(content_length);
-
-		const std::string response = McpProtocol::Respond(body, ToolList(), instructions,
+		m_relay = std::make_unique<McpRelay>(ToolList(), instructions, "state",
 			[this](const std::string& name, const json& arguments) -> std::optional<json>
 			{
 				if (!ToolNamed(name))
@@ -1166,10 +983,12 @@ namespace Loom
 				return Wait(call);
 			});
 
-		if (response.empty())
-			Send(client, "202 Accepted", "");
-		else
-			Send(client, "200 OK", response);
+		if (m_relay->Listen(port))
+			return true;
+
+		m_relay.reset();
+
+		return false;
 	};
 
 	#pragma endregion

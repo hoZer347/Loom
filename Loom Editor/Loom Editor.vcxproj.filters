@@ -67,6 +67,9 @@
     <ClCompile Include="McpProtocol.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
+    <ClCompile Include="McpRelay.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
     <ClCompile Include="EditorLog.cpp">
       <Filter>Panels</Filter>
     </ClCompile>
@@ -253,6 +256,9 @@
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="McpProtocol.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="McpRelay.h">
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="EditorLog.h">

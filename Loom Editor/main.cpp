@@ -201,8 +201,9 @@ namespace
 			<< "                                 without showing a window\n"
 			<< "  --desktop <id>                 show the window on that virtual desktop,\n"
 			<< "                                 without activating it\n"
-			<< "  --mcp <port>                   serve the editor's MCP tools on that port; a\n"
-			<< "                                 run with a window serves them on "
+			<< "  --mcp <port>                   serve the editor's MCP tools on that port,\n"
+			<< "                                 shared by every editor given it; a run\n"
+			<< "                                 with a window serves them on "
 			<< EditorMcp::default_port << " unasked"
 			<< std::endl;
 	};

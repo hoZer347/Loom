@@ -166,6 +166,7 @@
     <ClCompile Include="EditorLog.cpp" />
     <ClCompile Include="EditorMcp.cpp" />
     <ClCompile Include="McpProtocol.cpp" />
+    <ClCompile Include="McpRelay.cpp" />
     <ClCompile Include="EditorConsole.cpp" />
     <ClCompile Include="KeyBindings.cpp" />
     <ClCompile Include="ComponentMenu.cpp" />
@@ -230,6 +231,7 @@
     <ClInclude Include="EditorLog.h" />
     <ClInclude Include="EditorMcp.h" />
     <ClInclude Include="McpProtocol.h" />
+    <ClInclude Include="McpRelay.h" />
     <ClInclude Include="EditorConsole.h" />
     <ClInclude Include="KeyBindings.h" />
     <ClInclude Include="ComponentMenu.h" />
