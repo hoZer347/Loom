@@ -166,6 +166,7 @@
     <ClCompile Include="ComponentMenu Tests.cpp" />
     <ClCompile Include="ScriptFolders Tests.cpp" />
     <ClCompile Include="EditorLayouts Tests.cpp" />
+    <ClCompile Include="PanelTearOff Tests.cpp" />
     <ClCompile Include="ShaderEditor Tests.cpp" />
     <ClCompile Include="DialogueEditor Tests.cpp" />
     <ClCompile Include="Cutscenes Tests.cpp" />

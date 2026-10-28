@@ -1480,6 +1480,8 @@ static void             WindowSyncOwnedViewport(ImGuiWindow* window, ImGuiWindow
 static bool             UpdateTryMergeWindowIntoHostViewport(ImGuiWindow* window, ImGuiViewportP* host_viewport);
 static bool             UpdateTryMergeWindowIntoHostViewports(ImGuiWindow* window);
 static bool             GetWindowAlwaysWantOwnViewport(ImGuiWindow* window);
+static bool             IsWindowHeldInHostViewport(ImGuiWindow* window);
+static void             PlaceReleasedWindow(ImGuiWindow* window);
 static int              FindPlatformMonitorForPos(const ImVec2& pos);
 static int              FindPlatformMonitorForRect(const ImRect& r);
 static void             UpdateViewportPlatformMonitor(ImGuiViewportP* viewport);
@@ -5555,6 +5557,8 @@ void ImGui::UpdateMouseMovingWindowNewFrame()
         }
         else
         {
+            if (!window_disappeared && !moving_window->ViewportOwned && (g.ConfigFlagsCurrFrame & ImGuiConfigFlags_ViewportsEnable) && !IsDragDropPayloadBeingAccepted())
+                PlaceReleasedWindow(moving_window);
             StopMouseMovingWindow();
             ClearActiveID();
         }
@@ -8341,7 +8345,7 @@ bool ImGui::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags)
             window->Pos = FindBestWindowPosForPopup(window);
 
         // Late create viewport if we don't fit within our current host viewport.
-        if (window->ViewportAllowPlatformMonitorExtend >= 0 && !window->ViewportOwned && !(window->Viewport->Flags & ImGuiViewportFlags_IsMinimized))
+        if (window->ViewportAllowPlatformMonitorExtend >= 0 && !window->ViewportOwned && !(window->Viewport->Flags & ImGuiViewportFlags_IsMinimized) && !IsWindowHeldInHostViewport(window))
             if (!window->Viewport->GetMainRect().Contains(window->Rect()))
             {
                 // This is based on the assumption that the DPI will be known ahead (same as the DPI of the selection done in UpdateSelectWindowViewport)
@@ -16945,6 +16949,27 @@ static bool ImGui::GetWindowAlwaysWantOwnViewport(ImGuiWindow* window)
 }
 
 
+// Loom: a window dragged out of the main viewport stays in it while the mouse holds it, and gets a platform window of its own only once let go.
+static bool ImGui::IsWindowHeldInHostViewport(ImGuiWindow* window)
+{
+    ImGuiContext& g = *GImGui;
+    return g.MovingWindow && g.MovingWindow->RootWindowDockTree == window && g.IO.MouseDown[0];
+}
+
+// Loom: let go outside the main viewport, a held window moves back under the mouse, where it gets a platform window of its own.
+// Let go inside, it moves fully inside so that it stays there.
+static void ImGui::PlaceReleasedWindow(ImGuiWindow* window)
+{
+    ImGuiContext& g = *GImGui;
+    if (!IsMousePosValid(&g.IO.MousePos))
+        return;
+    ImRect host_rect = ((ImGuiViewportP*)GetMainViewport())->GetMainRect();
+    if (!host_rect.Contains(g.IO.MousePos))
+        SetWindowPos(window, g.IO.MousePos - g.ActiveIdClickOffset, ImGuiCond_Always);
+    else if (!host_rect.Contains(window->Rect()))
+        SetWindowPos(window, ImClamp(window->Pos, host_rect.Min, ImMax(host_rect.Min, host_rect.Max - window->Size)), ImGuiCond_Always);
+}
+
 // Heuristic, see #8948: depends on how backends handle OS-level parenting.
 // Due to how parent viewport stack is layed out, note that IsViewportAbove(a,b) isn't always the same as !IsViewportAbove(b,a).
 static bool IsViewportAbove(ImGuiViewportP* potential_above, ImGuiViewportP* potential_below)
@@ -17561,6 +17586,10 @@ static void ImGui::WindowSelectViewport(ImGuiWindow* window)
                 window->Viewport->Window = window;
                 window->Viewport->ID = window->ID;
                 window->Viewport->LastNameHash = 0;
+            }
+            else if (IsWindowHeldInHostViewport(window))
+            {
+                SetWindowViewport(window, main_viewport);
             }
             else if (!UpdateTryMergeWindowIntoHostViewports(window)) // Merge?
             {

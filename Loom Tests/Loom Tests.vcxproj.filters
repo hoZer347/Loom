@@ -85,6 +85,9 @@
     <ClCompile Include="EditorLayouts Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="PanelTearOff Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="ShaderEditor Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
