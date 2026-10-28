@@ -317,7 +317,7 @@ namespace Loom
 				c.tabIndex = 0;
 				c.style.outline = 'none';
 				c.style.touchAction = 'none';
-				c.focus();
+				if (!(window.frameElement && window.frameElement.inert)) c.focus();
 				c.addEventListener('click', () => c.focus());
 				c.addEventListener('contextmenu', e => e.preventDefault());
 				c.addEventListener('wheel', e => e.preventDefault(), { passive: false });
