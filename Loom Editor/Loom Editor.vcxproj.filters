@@ -163,6 +163,9 @@
     <ClCompile Include="WindowFrame.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
+    <ClCompile Include="TornWindows.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
     <ClCompile Include="WindowFullscreen.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
@@ -340,6 +343,9 @@
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="WindowFrame.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="TornWindows.h">
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="WindowFullscreen.h">

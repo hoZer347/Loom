@@ -8373,7 +8373,7 @@ bool ImGui::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags)
         // FIXME: Similar to code in GetWindowAllowedExtentRect()
         if (!window_pos_set_by_api && !(flags & ImGuiWindowFlags_ChildWindow))
         {
-            if (!window->ViewportOwned && viewport_rect.GetWidth() > 0 && viewport_rect.GetHeight() > 0.0f)
+            if (!window->ViewportOwned && viewport_rect.GetWidth() > 0 && viewport_rect.GetHeight() > 0.0f && (g.IO.MouseDown[0] || !IsWindowHeldInHostViewport(window))) // Loom: a window just let go keeps where it was let go.
             {
                 ClampWindowPos(window, visibility_rect);
             }
@@ -16950,10 +16950,13 @@ static bool ImGui::GetWindowAlwaysWantOwnViewport(ImGuiWindow* window)
 
 
 // Loom: a window dragged out of the main viewport stays in it while the mouse holds it, and gets a platform window of its own only once let go.
+// It also stays through the frame it is let go in, which is when a dock node takes it.
 static bool ImGui::IsWindowHeldInHostViewport(ImGuiWindow* window)
 {
     ImGuiContext& g = *GImGui;
-    return g.MovingWindow && g.MovingWindow->RootWindowDockTree == window && g.IO.MouseDown[0];
+    if (g.MovingWindow && g.MovingWindow->RootWindowDockTree == window && g.IO.MouseDown[0])
+        return true;
+    return g.DragDropActive && g.DragDropPayload.IsDataType(IMGUI_PAYLOAD_TYPE_WINDOW) && (*(ImGuiWindow**)g.DragDropPayload.Data)->RootWindowDockTree == window;
 }
 
 // Loom: let go outside the main viewport, a held window moves back under the mouse, where it gets a platform window of its own.
@@ -17590,6 +17593,10 @@ static void ImGui::WindowSelectViewport(ImGuiWindow* window)
                 window->Viewport->Window = window;
                 window->Viewport->ID = window->ID;
                 window->Viewport->LastNameHash = 0;
+            }
+            else if (IsWindowHeldInHostViewport(window)) // Loom: a window pulled out of another's viewport is held in the main one too.
+            {
+                SetWindowViewport(window, main_viewport);
             }
             else if (!UpdateTryMergeWindowIntoHostViewports(window)) // Merge?
             {

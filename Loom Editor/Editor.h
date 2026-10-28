@@ -33,6 +33,7 @@
 #include "FolderTree.h"
 #include "ScriptFolders.h"
 #include "ScriptLibrary.h"
+#include "TornWindows.h"
 #include "WebPlayer.h"
 #include "WindowFrame.h"
 #include "WindowFullscreen.h"
@@ -690,9 +691,15 @@ namespace Loom
 
 		void DrawMainMenuBar();
 
+		// What every window's menu bar holds, the editor's and each torn off.
+		void DrawMenus();
+
 		// Minimize, maximize and close, at the right of the menu bar, in place
-		// of the title bar the window frame takes away.
-		void DrawWindowButtons();
+		// of the title bar frame takes away; true when close is clicked.
+		bool DrawWindowButtons(GLFWwindow* window, WindowFrame& frame);
+
+		// The menu bar of a window torn off the editor, whose close closes its panels.
+		void DrawTornBar(const TornWindows::Torn& torn);
 
 		// The menu bar and the panels docked round the dock space.
 		void DrawWorkspace();
@@ -1347,6 +1354,10 @@ namespace Loom
 		View m_lastView = View::Game;
 		WindowFullscreen m_windowFullscreen;
 		WindowFrame m_windowFrame;
+		TornWindows m_tornWindows;
+
+		// By viewport, and gone before the window it is on.
+		std::unordered_map<unsigned int, std::unique_ptr<WindowFrame>> m_tornFrames;
 		double m_fullscreenSince = 0.0;
 		bool m_showSceneData = true;
 		bool m_showConsole = true;

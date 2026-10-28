@@ -190,6 +190,7 @@
     <ClCompile Include="GameFocus.cpp" />
     <ClCompile Include="LoadProgress.cpp" />
     <ClCompile Include="WindowFrame.cpp" />
+    <ClCompile Include="TornWindows.cpp" />
     <ClCompile Include="WindowFullscreen.cpp" />
     <ClCompile Include="SceneHistory.cpp" />
     <ClCompile Include="PlayHistory.cpp" />
@@ -252,6 +253,7 @@
     <ClInclude Include="GameFocus.h" />
     <ClInclude Include="LoadProgress.h" />
     <ClInclude Include="WindowFrame.h" />
+    <ClInclude Include="TornWindows.h" />
     <ClInclude Include="WindowFullscreen.h" />
     <ClInclude Include="SceneHistory.h" />
     <ClInclude Include="EditHistory.h" />

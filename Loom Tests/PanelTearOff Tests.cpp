@@ -4,7 +4,11 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
+#include "TornWindows.h"
+
+#include <algorithm>
 #include <unordered_map>
+#include <vector>
 
 namespace
 {
@@ -23,8 +27,8 @@ namespace
 	// ImGui keeps window positions on whole pixels.
 	constexpr float PIXEL = 1.0f;
 
-	// An ImGui context set up as the editor's, docking and viewports on, over
-	// a platform that only remembers where each window is.
+	// An ImGui context set up as the editor's, docking and viewports on, with
+	// torn windows, over a platform that only remembers where each window is.
 	struct Driven
 	{
 		Driven()
@@ -40,8 +44,6 @@ namespace
 			io.DeltaTime = frame_time;
 			io.ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable;
 			io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_RendererHasViewports;
-			io.ConfigViewportsNoDecoration = false;
-			io.ConfigDockingAlwaysTabBar = true;
 
 			unsigned char* pixels = nullptr;
 			int atlas_width = 0;
@@ -73,8 +75,8 @@ namespace
 			ImGui::DestroyContext(context);
 		};
 
-		// One frame of the editor's order: the dockspace when docking, then the
-		// panels, then the platform windows brought up to date.
+		// One frame of the editor's order: the dockspace when docking, the torn
+		// windows, then the panels, then the platform windows brought up to date.
 		void Frame(bool dockspace)
 		{
 			ImGui::NewFrame();
@@ -82,10 +84,20 @@ namespace
 			if (dockspace)
 				dock = ImGui::DockSpaceOverViewport();
 
-			ImGui::SetNextWindowPos(PANEL_POS, ImGuiCond_FirstUseEver);
-			ImGui::SetNextWindowSize(PANEL_SIZE, ImGuiCond_FirstUseEver);
-			ImGui::Begin(PANEL);
-			ImGui::End();
+			bars.clear();
+			torn.Draw(ImGui::GetStyle().FramePadding, [this](const Loom::TornWindows::Torn&)
+			{
+				if (ImGui::GetCurrentWindow()->DC.MenuBarAppending)
+					bars.push_back(ImGui::GetWindowViewport());
+			});
+
+			if (show_panel)
+			{
+				ImGui::SetNextWindowPos(PANEL_POS, ImGuiCond_FirstUseEver);
+				ImGui::SetNextWindowSize(PANEL_SIZE, ImGuiCond_FirstUseEver);
+				ImGui::Begin(PANEL);
+				ImGui::End();
+			};
 
 			if (dockspace)
 			{
@@ -93,6 +105,7 @@ namespace
 				ImGui::End();
 			};
 
+			torn.Prune();
 			ImGui::EndFrame();
 			ImGui::UpdatePlatformWindows();
 		};
@@ -125,11 +138,16 @@ namespace
 			};
 		};
 
+		// Lets go, then gives the window the frames a dock node has to take it
+		// in before it is torn off.
 		void Release(bool dockspace)
 		{
+			constexpr int settle_frames = 4;
+
 			ImGui::GetIO().AddMouseButtonEvent(ImGuiMouseButton_Left, false);
-			Frame(dockspace);
-			Frame(dockspace);
+
+			for (int frame = 0; frame < settle_frames; frame++)
+				Frame(dockspace);
 		};
 
 		static ImGuiWindow* Find(const char* name)
@@ -137,10 +155,12 @@ namespace
 			return ImGui::FindWindowByName(name);
 		};
 
-		// The middle of the window's tab.
+		// The middle of the window's tab, or of its title bar when it has none.
 		static ImVec2 Tab(ImGuiWindow* window)
 		{
-			REQUIRE(window->DockNode);
+			if (window->DockNode == nullptr)
+				return window->TitleBarRect().GetCenter();
+
 			const ImGuiTabBar* const tabs = window->DockNode->TabBar;
 			REQUIRE(tabs);
 			const ImGuiTabItem* const tab = ImGui::TabBarFindTabByID(const_cast<ImGuiTabBar*>(tabs), window->TabId);
@@ -154,10 +174,20 @@ namespace
 			return window->Viewport == ImGui::GetMainViewport();
 		};
 
-		// Whether the window is all there is in a platform window of its own.
-		static bool Alone(ImGuiWindow* window)
+		// Whether the window is docked in a torn window, with a platform window of its own.
+		bool Torn(ImGuiWindow* window) const
 		{
-			return !InEditor(window) && window->Viewport->Window == window->RootWindowDockTree && windows.count(window->Viewport) == 1;
+			const ImGuiWindow* const owner = window->Viewport->Window;
+			const auto named = [owner](const Loom::TornWindows::Torn& entry) { return owner != nullptr && entry.name == owner->Name; };
+			const std::vector<Loom::TornWindows::Torn>& all = torn.Windows();
+
+			return !InEditor(window) && windows.count(window->Viewport) == 1 && std::any_of(all.begin(), all.end(), named);
+		};
+
+		// Whether the menu bar of the window's torn window was drawn this frame.
+		bool HasBar(ImGuiWindow* window) const
+		{
+			return std::find(bars.begin(), bars.end(), window->Viewport) != bars.end();
 		};
 
 		static int Viewports()
@@ -168,12 +198,15 @@ namespace
 		inline static std::unordered_map<ImGuiViewport*, ImRect> windows;
 		ImGuiContext* context = nullptr;
 		ImGuiID dock = 0;
+		Loom::TornWindows torn;
+		std::vector<ImGuiViewport*> bars;
+		bool show_panel = true;
 	};
 };
 
 TEST_SUITE("PanelTearOff")
 {
-	TEST_CASE("a panel dragged off the editor stays in it while held, and gets a window of its own where it is let go")
+	TEST_CASE("a panel dragged off the editor stays in it while held, and is torn into a window with a menu bar where it is let go")
 	{
 		Driven driven;
 		driven.Frame(false);
@@ -188,8 +221,10 @@ TEST_SUITE("PanelTearOff")
 
 		driven.Release(false);
 
-		ImGuiWindow* const window = Driven::Find(PANEL)->RootWindowDockTree;
-		REQUIRE(Driven::Alone(window));
+		ImGuiWindow* const window = Driven::Find(PANEL);
+		REQUIRE(driven.Torn(window));
+		CHECK(driven.HasBar(window));
+		CHECK(Driven::Viewports() == 2);
 		CHECK(ImFabs(window->Pos.x - (OFF_EDITOR.x - offset.x)) <= PIXEL);
 		CHECK(ImFabs(window->Pos.y - (OFF_EDITOR.y - offset.y)) <= PIXEL);
 	};
@@ -225,7 +260,7 @@ TEST_SUITE("PanelTearOff")
 
 		driven.Release(true);
 
-		REQUIRE(Driven::Alone(Driven::Find(PANEL)));
+		REQUIRE(driven.Torn(Driven::Find(PANEL)));
 		CHECK(Driven::InEditor(Driven::Find(OTHER)));
 		CHECK(Driven::Viewports() == 2);
 
@@ -240,6 +275,7 @@ TEST_SUITE("PanelTearOff")
 		CHECK(Driven::InEditor(window));
 		CHECK(Driven::Viewports() == 1);
 		CHECK(Driven::windows.size() == 1);
+		CHECK(driven.torn.Windows().empty());
 	};
 
 	TEST_CASE("a tab dragged out of a torn-off window waits for release before it gets a window of its own")
@@ -249,7 +285,7 @@ TEST_SUITE("PanelTearOff")
 
 		driven.Drag(Driven::Tab(Driven::Find(PANEL)), OFF_EDITOR, true);
 		driven.Release(true);
-		REQUIRE(Driven::Alone(Driven::Find(PANEL)));
+		REQUIRE(driven.Torn(Driven::Find(PANEL)));
 
 		ImGui::DockBuilderDockWindow(OTHER, Driven::Find(PANEL)->DockId);
 		driven.Frame(true);
@@ -264,8 +300,29 @@ TEST_SUITE("PanelTearOff")
 
 		driven.Release(true);
 
-		CHECK(Driven::Alone(Driven::Find(OTHER)));
-		CHECK(Driven::Alone(Driven::Find(PANEL)));
+		CHECK(driven.Torn(Driven::Find(OTHER)));
+		CHECK(driven.Torn(Driven::Find(PANEL)));
+		CHECK(Driven::Find(OTHER)->Viewport != Driven::Find(PANEL)->Viewport);
 		CHECK(Driven::Viewports() == 3);
+		CHECK(driven.torn.Docked(driven.torn.Windows().front()) == std::vector<ImGuiWindow*>{ Driven::Find(PANEL) });
+	};
+
+	TEST_CASE("a torn window goes once its panel is closed")
+	{
+		Driven driven;
+		driven.DockBoth();
+
+		driven.Drag(Driven::Tab(Driven::Find(PANEL)), OFF_EDITOR, true);
+		driven.Release(true);
+		REQUIRE(driven.Torn(Driven::Find(PANEL)));
+
+		driven.show_panel = false;
+		driven.Frame(true);
+		driven.Frame(true);
+		driven.Frame(true);
+
+		CHECK(driven.torn.Windows().empty());
+		CHECK(Driven::Viewports() == 1);
+		CHECK(Driven::windows.size() == 1);
 	};
 };

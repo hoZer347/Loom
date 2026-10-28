@@ -414,6 +414,19 @@ namespace Loom
 				drop_receiver->Drop(paths[i], (float)x, (float)y);
 		};
 
+		std::unordered_map<unsigned int, std::unique_ptr<WindowFrame>>* torn_frames = nullptr;
+
+		// The platform's, run once the window's frame is off it.
+		void (*destroy_platform_window)(ImGuiViewport*) = nullptr;
+
+		void DestroyPlatformWindow(ImGuiViewport* viewport)
+		{
+			if (torn_frames != nullptr)
+				torn_frames->erase(viewport->ID);
+
+			destroy_platform_window(viewport);
+		};
+
 		// On every OS window, since a panel dragged out takes drops in its own.
 		void SetDropCallback(GLFWdropfun callback)
 		{
@@ -433,6 +446,9 @@ namespace Loom
 
 		// Panels docked as a tab beside another, each with the one it goes beside.
 		constexpr std::pair<const char*, const char*> side_windows[] = { { EditorPanels::KeyBindings, EditorPanels::Console }, { EditorPanels::BuildSettings, EditorPanels::Console }, { EditorPanels::Palette, EditorPanels::Inspector } };
+
+		// The name ImGui::ShowDemoWindow gives its window.
+		constexpr const char* imgui_demo = "Dear ImGui Demo";
 
 		// The ImGui settings entry that holds which panels are open.
 		constexpr const char* panel_settings = "LoomEditor";
@@ -735,11 +751,6 @@ namespace Loom
 		// Floating windows stay inside the editor, or dialogs fall behind it.
 		ImGui::GetIO().ConfigViewportsNoAutoMerge = false;
 
-		// A panel dragged out is a Windows window, with a title bar that snaps
-		// it over a tab bar that docks it back.
-		ImGui::GetIO().ConfigViewportsNoDecoration = false;
-		ImGui::GetIO().ConfigDockingAlwaysTabBar = true;
-
 		// Clicking a number field types into it, Unity-style; dragging still scrubs.
 		ImGui::GetIO().ConfigDragClickToInputText = true;
 
@@ -749,6 +760,11 @@ namespace Loom
 		m_windowFrame.Install(Engine::window);
 
 		drop_receiver = this;
+		torn_frames = &m_tornFrames;
+		destroy_platform_window = ImGui::GetPlatformIO().Platform_DestroyWindow;
+
+		if (destroy_platform_window != nullptr)
+			ImGui::GetPlatformIO().Platform_DestroyWindow = DestroyPlatformWindow;
 
 		LoadSettings();
 		m_settings.Apply();
@@ -767,6 +783,12 @@ namespace Loom
 
 		SetDropCallback(nullptr);
 		drop_receiver = nullptr;
+
+		if (destroy_platform_window != nullptr)
+			ImGui::GetPlatformIO().Platform_DestroyWindow = destroy_platform_window;
+
+		m_tornFrames.clear();
+		torn_frames = nullptr;
 
 		Engine::SetGuiFunction(Task{ });
 
@@ -1871,6 +1893,9 @@ namespace Loom
 		const ImGuiID dockspace_id =
 			ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
 
+		const ImVec2 padding = ImGui::GetStyle().FramePadding;
+		m_tornWindows.Draw(ImVec2(padding.x, padding.y * menu_bar_padding), [this](const TornWindows::Torn& torn) { DrawTornBar(torn); });
+
 		ImGui::PopStyleVar();
 
 		if (m_firstFrame)
@@ -1969,6 +1994,8 @@ namespace Loom
 
 		if (m_showBuildSettings)
 			DrawBuildSettings();
+
+		m_tornWindows.Prune();
 	};
 
 	void Editor::DrawFullscreen()
@@ -2068,6 +2095,17 @@ namespace Loom
 			return;
 		};
 
+		DrawMenus();
+
+		if (DrawWindowButtons(Engine::window, m_windowFrame))
+			Engine::Stop();
+
+		ImGui::EndMainMenuBar();
+		ImGui::PopStyleVar();
+	};
+
+	void Editor::DrawMenus()
+	{
 		if (ImGui::BeginMenu("File"))
 		{
 			if (ImGui::MenuItem((std::string(EditorIcons::Project) + " New Project...").c_str()))
@@ -2240,28 +2278,24 @@ namespace Loom
 
 		if (ImGui::MenuItem("Play Web", nullptr, false, m_activeScene != nullptr && !m_projectPath.empty()))
 			PlayWeb();
-
-		DrawWindowButtons();
-
-		ImGui::EndMainMenuBar();
-		ImGui::PopStyleVar();
 	};
 
-	void Editor::DrawWindowButtons()
+	bool Editor::DrawWindowButtons(GLFWwindow* window, WindowFrame& frame)
 	{
-		if (!m_windowFrame.IsInstalled())
-			return;
+		if (!frame.IsInstalled())
+			return false;
 
-		const ImVec2 bar_min = ImGui::GetWindowPos();
-		const ImVec2 bar_max(bar_min.x + ImGui::GetWindowWidth(), bar_min.y + ImGui::GetWindowHeight());
+		const ImRect bar = ImGui::GetCurrentWindow()->MenuBarRect();
+		const ImVec2 bar_min = bar.Min;
+		const ImVec2 bar_max = bar.Max;
 		const float height = bar_max.y - bar_min.y;
 		const float width = height * window_button_aspect;
 		const float buttons_left = bar_max.x - width * window_button_count;
 		const float strip_left = ImGui::GetItemRectMax().x;
-		const ImVec2 origin = ImGui::GetMainViewport()->Pos;
+		const ImVec2 origin = ImGui::GetWindowViewport()->Pos;
 
 		// A click on the bar has to reach ImGui to close an open menu.
-		m_windowFrame.SetDragStrip(ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId)
+		frame.SetDragStrip(ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId)
 			? WindowFrame::Rect{ }
 			: WindowFrame::Rect{ strip_left - origin.x, bar_min.y - origin.y, buttons_left - origin.x, bar_max.y - origin.y });
 
@@ -2270,7 +2304,7 @@ namespace Loom
 		ImDrawList& draw = *ImGui::GetWindowDrawList();
 		const float glyph = height * window_glyph_size;
 		const float offset = glyph * window_glyph_offset;
-		const bool maximized = glfwGetWindowAttrib(Engine::window, GLFW_MAXIMIZED);
+		const bool maximized = glfwGetWindowAttrib(window, GLFW_MAXIMIZED);
 		ImVec2 center{ };
 		ImU32 color = 0;
 
@@ -2294,15 +2328,15 @@ namespace Loom
 		draw.PushClipRect(bar_min, bar_max, false);
 
 		if (button(0, "##Minimize", ImGui::GetColorU32(ImGuiCol_HeaderHovered), ImGui::GetColorU32(ImGuiCol_HeaderActive)))
-			glfwIconifyWindow(Engine::window);
+			glfwIconifyWindow(window);
 
 		draw.AddLine(ImVec2(center.x - glyph, center.y), ImVec2(center.x + glyph, center.y), color);
 
 		if (button(1, "##Maximize", ImGui::GetColorU32(ImGuiCol_HeaderHovered), ImGui::GetColorU32(ImGuiCol_HeaderActive)))
 		{
 			if (maximized)
-				glfwRestoreWindow(Engine::window);
-			else glfwMaximizeWindow(Engine::window);
+				glfwRestoreWindow(window);
+			else glfwMaximizeWindow(window);
 		};
 
 		if (maximized)
@@ -2315,8 +2349,7 @@ namespace Loom
 		}
 		else draw.AddRect(ImVec2(center.x - glyph, center.y - glyph), ImVec2(center.x + glyph, center.y + glyph), color);
 
-		if (button(2, "##Close", close_hovered, close_pressed))
-			Engine::Stop();
+		const bool close = button(2, "##Close", close_hovered, close_pressed);
 
 		if (ImGui::IsItemHovered())
 			color = close_glyph;
@@ -2325,6 +2358,49 @@ namespace Loom
 		draw.AddLine(ImVec2(center.x - glyph, center.y + glyph), ImVec2(center.x + glyph, center.y - glyph), color);
 
 		draw.PopClipRect();
+
+		return close;
+	};
+
+	void Editor::DrawTornBar(const TornWindows::Torn& torn)
+	{
+		DrawMenus();
+
+		ImGuiViewport* const viewport = ImGui::GetWindowViewport();
+		GLFWwindow* const window = (GLFWwindow*)viewport->PlatformHandle;
+
+		// The OS window comes at the end of the first frame.
+		if (window == nullptr)
+			return;
+
+		std::unique_ptr<WindowFrame>& frame = m_tornFrames[viewport->ID];
+
+		if (frame == nullptr)
+		{
+			frame = std::make_unique<WindowFrame>();
+			frame->Install(window);
+		};
+
+		if (!DrawWindowButtons(window, *frame) && !viewport->PlatformRequestClose)
+			return;
+
+		const std::vector<ImGuiWindow*> docked = m_tornWindows.Docked(torn);
+
+		const auto close = [&docked](const char* name, bool* shown)
+		{
+			const ImGuiID id = ImHashStr(name);
+
+			for (const ImGuiWindow* panel : docked)
+				if (panel->ID == id)
+					*shown = false;
+		};
+
+		for (const Panel& panel : Panels())
+			close(panel.title, panel.shown);
+
+		close(EditorPanels::PrefabId, &m_showPrefab);
+		close(EditorPanels::Settings, &m_showSettings);
+		close(imgui_demo, &m_showImGuiDemo);
 	};
 
 	#pragma endregion

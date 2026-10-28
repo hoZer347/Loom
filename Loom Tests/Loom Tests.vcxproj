@@ -294,6 +294,7 @@
     <ClCompile Include="..\Loom Editor\GameFocus.cpp" />
     <ClCompile Include="..\Loom Editor\LoadProgress.cpp" />
     <ClCompile Include="..\Loom Editor\WindowFrame.cpp" />
+    <ClCompile Include="..\Loom Editor\TornWindows.cpp" />
     <ClCompile Include="..\Loom Editor\WindowFullscreen.cpp" />
   </ItemGroup>
   <!-- Built against Assimp, which the web build has no wasm copy of. -->
