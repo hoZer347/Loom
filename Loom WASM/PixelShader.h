@@ -6,8 +6,8 @@
 #include "Component.h"
 #include "Shaders.h"
 
-#include <atomic>
-#include <cstddef>
+#include <mutex>
+#include <vector>
 
 
 namespace Loom
@@ -36,9 +36,9 @@ namespace Loom
 		void OnAttach() override;
 		void OnFieldChanged(const SerializedField& field) override;
 
-		// Whether any exists, so the window draws through a pass only while
-		// one might run.
-		static bool Any() { return s_count > 0; };
+		// Whether any enabled one names a shader, so the window draws through
+		// a pass only while one might run.
+		static bool Any();
 
 		Shader* shader = nullptr;
 
@@ -55,6 +55,10 @@ namespace Loom
 		// Relative to the project folder, which is where the editor works from.
 		Serial<Asset<Shader::pixel_extension>, "Shader"> m_shader_path;
 
-		static inline std::atomic<size_t> s_count = 0;
+		// Whether it and every GameObject above it are enabled.
+		bool Enabled() const;
+
+		static inline std::mutex s_mutex;
+		static inline std::vector<const PixelShader*> s_all;
 	};
 };

@@ -14,8 +14,12 @@ namespace Loom
 	namespace RenderingObjects
 	{
 		constexpr const char* PreVertexLabel = "Pre-Vertex";
+		constexpr const char* PixelShaderLabel = "Pixel Shader";
 
 		// A child of parent with a PreVertex running file, which may be empty.
 		GameObject* AddPreVertex(GameObject& parent, const std::string& file);
+
+		// A child of parent with a PixelShader naming no file yet.
+		GameObject* AddPixelShader(GameObject& parent);
 	};
 };

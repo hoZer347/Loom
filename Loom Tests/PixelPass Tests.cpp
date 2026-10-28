@@ -6,6 +6,7 @@
 #include "Material.h"
 #include "PixelPass.h"
 #include "PixelShader.h"
+#include "RenderingObjects.h"
 #include "Scene.h"
 #include "Shaders.h"
 
@@ -179,17 +180,33 @@ TEST_SUITE("PixelPass")
 		CHECK(renderer.drawn[0] != passed.shader.id);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the window takes the pixel pass path only while a PixelShader exists")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the window takes the pixel pass path only while an enabled PixelShader names a shader")
 	{
 		RecordingRenderer renderer;
+		Passed passed("passed");
 
 		CHECK_FALSE(Loom::PixelShader::Any());
 
 		{
 			Loom::Scene scene("pixel shaders");
-			scene.GetRoot().AddChild("Screen")->Attach<Loom::PixelShader>();
+			Loom::GameObject* effects = scene.GetRoot().AddChild("Effects");
+			Loom::GameObject* screen = effects->AddChild("Screen");
+			Loom::PixelShader* pixel = screen->Attach<Loom::PixelShader>();
 			Pump();
 
+			CHECK_FALSE(Loom::PixelShader::Any());
+
+			pixel->shader = &passed.shader;
+			CHECK(Loom::PixelShader::Any());
+
+			screen->SetDisabled(true);
+			CHECK_FALSE(Loom::PixelShader::Any());
+
+			screen->SetDisabled(false);
+			effects->SetDisabled(true);
+			CHECK_FALSE(Loom::PixelShader::Any());
+
+			effects->SetDisabled(false);
 			CHECK(Loom::PixelShader::Any());
 		};
 
@@ -197,6 +214,27 @@ TEST_SUITE("PixelPass")
 		Pump();
 		Pump();
 
+		CHECK_FALSE(Loom::PixelShader::Any());
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the Rendering menu's Pixel Shader is a child with a PixelShader naming no file, which takes no pass")
+	{
+		RecordingRenderer renderer;
+		Loom::Scene scene("pixel shader menu");
+		Pump();
+
+		Loom::GameObject* made = Loom::RenderingObjects::AddPixelShader(scene.GetRoot());
+		Pump();
+
+		REQUIRE(made != nullptr);
+		CHECK(made->GetName() == Loom::RenderingObjects::PixelShaderLabel);
+		CHECK(made->GetParent() == &scene.GetRoot());
+
+		const Loom::PixelShader* pixel = made->GetComponent<Loom::PixelShader>();
+
+		REQUIRE(pixel != nullptr);
+		CHECK(pixel->shader == nullptr);
+		CHECK(pixel->GetShaderPath().empty());
 		CHECK_FALSE(Loom::PixelShader::Any());
 	};
 

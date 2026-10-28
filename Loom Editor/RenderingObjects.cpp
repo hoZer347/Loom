@@ -1,6 +1,7 @@
 #include "RenderingObjects.h"
 
 #include "GameObject.h"
+#include "PixelShader.h"
 #include "PreVertex.h"
 
 
@@ -10,6 +11,14 @@ namespace Loom
 	{
 		GameObject* gameObject = parent.AddChild(PreVertexLabel);
 		gameObject->Attach<PreVertex>()->file = file;
+
+		return gameObject;
+	};
+
+	GameObject* RenderingObjects::AddPixelShader(GameObject& parent)
+	{
+		GameObject* gameObject = parent.AddChild(PixelShaderLabel);
+		gameObject->Attach<PixelShader>();
 
 		return gameObject;
 	};

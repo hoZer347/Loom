@@ -3235,6 +3235,9 @@ namespace Loom
 		if (ImGui::MenuItem(RenderingObjects::PreVertexLabel))
 			Select(RenderingObjects::AddPreVertex(*parent, FirstPreVertex()));
 
+		if (ImGui::MenuItem(RenderingObjects::PixelShaderLabel))
+			Select(RenderingObjects::AddPixelShader(*parent));
+
 		ImGui::EndMenu();
 	};
 
