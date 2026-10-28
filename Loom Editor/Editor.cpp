@@ -483,6 +483,10 @@ namespace Loom
 
 		constexpr float drag_speed = 0.01f;
 
+		// A Text field's box shows its lines and one more to type on, within these.
+		constexpr int min_text_lines = 3;
+		constexpr int max_text_lines = 12;
+
 		// Cut to max_label_chars, ellipsis included, then further until it fits in width.
 		std::string Shortened(const std::string& text, float width)
 		{
@@ -4077,6 +4081,15 @@ namespace Loom
 				changed = InputTextString(label, text);
 				changed |= AcceptAssetDrop(text);
 				changed |= AcceptScriptsDrop(text, ScriptEntryKind::Shader);
+			}
+			break;
+
+			case FieldType::MultilineText:
+			{
+				std::string& text = *(std::string*)field.data;
+				const int lines = std::clamp((int)std::count(text.begin(), text.end(), '\n') + 2, min_text_lines, max_text_lines);
+
+				changed = InputTextMultilineString(label, text, ImGui::GetTextLineHeight() * lines + ImGui::GetStyle().FramePadding.y * 2.0f);
 			}
 			break;
 

@@ -49,6 +49,7 @@ namespace
 		Loom::Serial<Loom::Asset<".shader">> shader;
 		Loom::Serial<std::string> path;
 		Loom::Serial<Loom::Folder> folder;
+		Loom::Serial<Loom::MultilineText> message;
 	};
 
 	struct Pointer final : Loom::Component<Pointer>
@@ -673,6 +674,26 @@ TEST_SUITE("SerializedField")
 		REQUIRE(folder.Read(Field(object, 1).Write()));
 
 		CHECK(*object.folder == "Assets/Prefabs/Mechs");
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "text is written as a string, its new lines kept, and reads what a string field saved")
+	{
+		Files object;
+		Pump();
+
+		const Loom::SerializedField& message = Field(object, 3);
+
+		CHECK(message.type == Loom::FieldType::MultilineText);
+
+		object.message = "first\nsecond";
+
+		CHECK(message.Write() == "\"first\\nsecond\"");
+
+		object.path = "one\ntwo";
+
+		REQUIRE(message.Read(Field(object, 1).Write()));
+
+		CHECK(*object.message == "one\ntwo");
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an empty float list is still a float list")

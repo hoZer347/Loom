@@ -161,7 +161,7 @@ namespace Loom
 		// Where the text is laid out: its UiRect, or the whole screen.
 		Ui::Rect Area() const;
 
-		Serial<std::string> text = std::string("Text");
+		Serial<MultilineText> text = MultilineText("Text");
 		Serial<FontAsset> fontPath;
 		Serial<float> fontSize = 24.0f;
 		Serial<glm::vec4> color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);

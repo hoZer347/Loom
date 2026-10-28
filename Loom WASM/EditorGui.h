@@ -16,6 +16,9 @@ namespace Loom
 	// stdlib helper.
 	LOOM_API bool InputTextString(const char* label, std::string& value);
 
+	// The same in a box of the given height, taking Enter as a new line.
+	LOOM_API bool InputTextMultilineString(const char* label, std::string& value, float height);
+
 	// Makes the last item a drop target for files dragged out of the Project
 	// panel, and puts a dropped file's path in path. Whether one was dropped.
 	LOOM_API bool AcceptAssetDrop(std::string& path);

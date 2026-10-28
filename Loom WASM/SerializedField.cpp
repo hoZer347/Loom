@@ -295,6 +295,7 @@ namespace Loom
 		case FieldType::Float:	return Number(*(float*)data);
 		case FieldType::Double:	return Number(*(double*)data);
 		case FieldType::String:
+		case FieldType::MultilineText:
 		case FieldType::Asset:	return Quote(*(std::string*)data);
 		case FieldType::Vec2:	return WriteVector((float*)data, 2);
 		case FieldType::Vec3:	return WriteVector((float*)data, 3);
@@ -434,6 +435,7 @@ namespace Loom
 		case FieldType::Float:	return ReadReal<float>(text, data);
 		case FieldType::Double:	return ReadReal<double>(text, data);
 		case FieldType::String:
+		case FieldType::MultilineText:
 		case FieldType::Asset:	*(std::string*)data = Unquote(text);					return true;
 		case FieldType::Vec2:	return ReadVector(text, (float*)data, 2);
 		case FieldType::Vec3:	return ReadVector(text, (float*)data, 3);

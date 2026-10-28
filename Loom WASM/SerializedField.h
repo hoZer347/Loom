@@ -49,6 +49,10 @@ namespace Loom
 		// editor offers the project's files of its extensions to pick from, or
 		// its folders where it has none.
 		Asset,
+
+		// Text that may run over several lines, written as a String is. The
+		// editor draws it in a box tall enough to show them.
+		MultilineText,
 	};
 
 	#pragma region Names

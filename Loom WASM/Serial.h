@@ -24,6 +24,21 @@ namespace Loom
 	struct StateReference;
 	struct UniformValues;
 
+	/**
+	* Loom::MultilineText
+	* - A string the inspector edits in a box of several lines rather than
+	*   one: Serial<MultilineText> m_message = "Hello"
+	* - Written to scenes as the string it is, so a Serial<std::string> that
+	*   becomes one keeps the values already saved
+	*/
+	struct MultilineText final : std::string
+	{
+		using std::string::string;
+
+		MultilineText() = default;
+		MultilineText(std::string text) : std::string(std::move(text)) { };
+	};
+
 	#pragma region Registration
 
 	// Hands a field to the last LoomObject whose constructor started on this
@@ -92,6 +107,7 @@ namespace Loom
 		else if constexpr (std::is_same_v<T, float>)				return FieldType::Float;
 		else if constexpr (std::is_same_v<T, double>)				return FieldType::Double;
 		else if constexpr (std::is_same_v<T, std::string>)			return FieldType::String;
+		else if constexpr (std::is_same_v<T, MultilineText>)		return FieldType::MultilineText;
 		else if constexpr (requires { T::fileExtensions; })			return FieldType::Asset;
 		else if constexpr (std::is_same_v<T, glm::vec2>)			return FieldType::Vec2;
 		else if constexpr (std::is_same_v<T, glm::vec3>)			return FieldType::Vec3;
@@ -284,7 +300,7 @@ namespace Loom
 
 		// The vector types are written out of their components, so the field
 		// points at those rather than at the struct around them, and an Asset
-		// out of the string it is.
+		// or MultilineText out of the string it is.
 		void* Data()
 		{
 			constexpr FieldType type = FieldTypeOf<T>();
@@ -294,7 +310,7 @@ namespace Loom
 				type == FieldType::Vec3 ||
 				type == FieldType::Vec4)
 				return glm::value_ptr(m_value);
-			else if constexpr (type == FieldType::Asset)
+			else if constexpr (type == FieldType::Asset || type == FieldType::MultilineText)
 				return static_cast<std::string*>(&m_value);
 			else return &m_value;
 		};
