@@ -128,6 +128,8 @@ namespace Loom
 		#pragma region Palette
 
 		constexpr char colour_mark = '#';
+		constexpr char category_open = '[';
+		constexpr char category_close = ']';
 		constexpr size_t rgb = 3;
 		constexpr int hex = 16;
 		constexpr size_t hex_digits = 2;
@@ -743,6 +745,12 @@ namespace Loom
 			if (!line.empty() && line.back() == '\r')
 				line.pop_back();
 
+			if (line.size() > 1 && line.front() == category_open && line.back() == category_close)
+			{
+				loaded.categories.push_back({ line.substr(1, line.size() - 2), { } });
+				continue;
+			};
+
 			// #RRGGBB is opaque.
 			if (line.empty() || line[0] != colour_mark || (line.size() != 1 + hex_digits * rgb && line.size() != 1 + hex_digits * channels))
 				continue;
@@ -759,7 +767,7 @@ namespace Loom
 			};
 
 			if (read)
-				loaded.colours.push_back(colour);
+				(loaded.categories.empty() ? loaded.colours : loaded.categories.back().colours).push_back(colour);
 		};
 
 		palette = std::move(loaded);
@@ -774,11 +782,22 @@ namespace Loom
 
 		std::string text;
 
-		for (const SpriteAsset::Colour& colour : palette.colours)
+		const auto write = [&text](const std::vector<SpriteAsset::Colour>& colours)
 		{
-			char line[line_size];
-			snprintf(line, sizeof(line), format, colour[0], colour[1], colour[2], colour[3]);
-			text += line;
+			for (const SpriteAsset::Colour& colour : colours)
+			{
+				char line[line_size];
+				snprintf(line, sizeof(line), format, colour[0], colour[1], colour[2], colour[3]);
+				text += line;
+			};
+		};
+
+		write(palette.colours);
+
+		for (const Palette::Category& category : palette.categories)
+		{
+			text += category_open + category.name + category_close + '\n';
+			write(category.colours);
 		};
 
 		return WriteFile(path, text, "Palette");

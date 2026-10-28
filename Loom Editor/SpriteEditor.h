@@ -26,6 +26,9 @@ namespace Loom
 	*   sprite whose Palette panel is out of sight says so, with a button to
 	*   bring it, and the Sprites panel opening with it closed asks whether
 	*   to open it, docked in the bottom quarter of the Sprites panel
+	* - Right-clicking the Palette panel adds a category, a header that opens
+	*   and shuts on swatches of its own, which right-clicking renames or
+	*   deletes, or opens another of the project's palettes
 	* - The left and right mouse paint the layer and frame picked in the
 	*   timeline, each with its own colour, and the picker picks for the
 	*   button that clicked; the middle mouse pans and the wheel zooms about
@@ -219,7 +222,14 @@ namespace Loom
 
 		void DrawTools();
 		void DrawSwatches(const std::string& path);
+		// Clear is first among the palette's own colours, and in no category.
+		void DrawSection(const std::string& path, std::vector<Colour>& colours, bool with_clear, const std::string& add_label);
+		void DrawCategories(const std::string& path);
 		void DrawPaletteChoice(const std::string& project_folder);
+		void DrawPaletteMenu(const std::string& project_folder);
+
+		// Into m_paletteFiles, from the project, or beside the sprite, and those made and not yet saved.
+		void FindPalettes(const std::string& project_folder);
 
 		#pragma endregion
 
@@ -331,9 +341,10 @@ namespace Loom
 		std::array<Colour, paintButtons> m_colours{ Colour{ 0, 0, 0, UINT8_MAX }, Colour{ UINT8_MAX, UINT8_MAX, UINT8_MAX, UINT8_MAX } };
 		bool m_grid = true;
 
-		// What a layer's rename box holds while it is open.
-		static constexpr size_t layerNameSize = 64;
-		char m_layerName[layerNameSize] = { };
+		// What a layer's or a category's rename box holds while it is open.
+		static constexpr size_t nameSize = 64;
+		char m_layerName[nameSize] = { };
+		char m_categoryName[nameSize] = { };
 
 		// What the Resize popup holds while it is open. The anchor counts
 		// across its grid from the top left.
@@ -354,6 +365,10 @@ namespace Loom
 
 		// Found when the list of them opens.
 		std::vector<std::string> m_paletteFiles;
+
+		// The category just added, whose rename box opens on the next frame,
+		// or -1.
+		int m_renameCategory = -1;
 
 		#pragma endregion
 

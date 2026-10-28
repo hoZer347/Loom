@@ -480,4 +480,18 @@ TEST_SUITE("SpriteAsset")
 
 		std::filesystem::remove(path);
 	};
+
+	TEST_CASE("a palette's categories save and load back with the colours under each, apart from its own")
+	{
+		const std::string path = Temp("loom palette categories.loompalette").string();
+		const Palette palette{ { RED }, { { "Greens", { GREEN } }, { "Empty", { } }, { "Blues", { BLUE, { 1, 2, 3, HALF } } } } };
+
+		REQUIRE(Palette::Save(path, palette));
+
+		Palette loaded;
+		REQUIRE(Palette::Load(path, loaded));
+		CHECK(loaded == palette);
+
+		std::filesystem::remove(path);
+	};
 };

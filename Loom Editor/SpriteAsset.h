@@ -208,12 +208,23 @@ namespace Loom
 	* Loom::Palette
 	* - The colours a sprite is painted from, in a .loompalette file of its
 	*   own, a #RRGGBBAA line each, so sprites can share one
+	* - A [Name] line starts a category, which holds the colours after it
 	*/
 	struct Palette final
 	{
 		static constexpr const char* extension = ".loompalette";
 
+		struct Category
+		{
+			std::string name;
+			std::vector<SpriteAsset::Colour> colours;
+
+			bool operator==(const Category&) const = default;
+		};
+
+		// The colours before any category.
 		std::vector<SpriteAsset::Colour> colours;
+		std::vector<Category> categories;
 
 		// Each says what went wrong on std::cerr. A line that is not a colour
 		// is skipped.

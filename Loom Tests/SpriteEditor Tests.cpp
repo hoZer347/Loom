@@ -1005,6 +1005,85 @@ TEST_SUITE("SpriteEditor")
 		std::filesystem::remove(palette);
 	};
 
+	// Below the swatches, where no item is.
+	constexpr const char* palette_space = "1050 550";
+
+	TEST_CASE("right-clicking the Palette panel adds a category, named as it is added, whose + adds the left colour under it, written on Ctrl+S")
+	{
+		Driven driven("loom sprite category.tga");
+
+		const std::string palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension).string();
+
+		driven.Run(std::string("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\n")
+			+ "rightclick " + palette_space + "\nwait 2\nclick \"\" \"New Category\"\nwait 2\n"
+			+ "key ctrl+a\ntype Darks\nkey enter\nwait 2\nclick \"Palette\" \"+##Darks\"\nwait 2\n");
+
+		CHECK_FALSE(std::filesystem::exists(palette));
+
+		driven.Run("key ctrl+s\nwait 2\n");
+
+		Loom::Palette saved;
+		REQUIRE(Loom::Palette::Load(palette, saved));
+		CHECK(saved.colours.empty());
+		CHECK(saved.categories == std::vector<Loom::Palette::Category>{ { "Darks", { BLACK } } });
+
+		driven.Run("rightclick \"Palette\" \"Darks\"\nwait 2\nclick \"\" \"Delete Category\"\nwait 2\nkey ctrl+s\nwait 2\n");
+		REQUIRE(Loom::Palette::Load(palette, saved));
+		CHECK(saved.categories.empty());
+
+		std::filesystem::remove(palette);
+	};
+
+	TEST_CASE("Ctrl+Z in the Palette panel takes back a category's colour, its name and the category itself, and Ctrl+Y puts them back")
+	{
+		Driven driven("loom sprite category undo.tga");
+
+		const std::string palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension).string();
+
+		driven.Run(std::string("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\n")
+			+ "rightclick " + palette_space + "\nwait 2\nclick \"\" \"New Category\"\nwait 2\n"
+			+ "key ctrl+a\ntype Darks\nkey enter\nwait 2\nclick \"Palette\" \"+##Darks\"\nwait 2\n"
+			+ "rightclick \"Palette\" \"Darks\"\nwait 2\nclick \"\" \"Delete Category\"\nwait 2\n");
+
+		const auto saved_after = [&driven, &palette](const std::string& keys)
+		{
+			driven.Run(keys + "\nwait 2\nkey ctrl+s\nwait 2\n");
+
+			Loom::Palette saved;
+			REQUIRE(Loom::Palette::Load(palette, saved));
+
+			return saved.categories;
+		};
+
+		using Categories = std::vector<Loom::Palette::Category>;
+
+		CHECK(saved_after("key ctrl+z") == Categories{ { "Darks", { BLACK } } });
+		CHECK(saved_after("key ctrl+z") == Categories{ { "Darks", { } } });
+		CHECK(saved_after("key ctrl+z") == Categories{ { "Category", { } } });
+		CHECK(saved_after("key ctrl+z").empty());
+		CHECK(saved_after("key ctrl+y") == Categories{ { "Category", { } } });
+
+		std::filesystem::remove(palette);
+	};
+
+	TEST_CASE("right-clicking the Palette panel opens another palette from the list of them")
+	{
+		Driven driven("loom sprite open palette.tga");
+
+		const std::string other = std::filesystem::path(driven.path).replace_filename("loom other.loompalette").lexically_normal().string();
+		REQUIRE(Loom::Palette::Save(other, Loom::Palette{ { RED } }));
+
+		driven.Run(std::string("click \"Sprites\" \"Open Palette\"\nwait 2\n")
+			+ "rightclick " + palette_space + "\nwait 2\nclick \"\" \"Open Palette\"\nwait 2\nclick \"\" \"loom other.loompalette\"\nwait 2\n"
+			+ "click \"Palette\" \"+\"\nwait 2\nkey ctrl+s\nwait 2\n");
+
+		Loom::Palette saved;
+		REQUIRE(Loom::Palette::Load(other, saved));
+		CHECK(saved.colours == std::vector<SpriteAsset::Colour>{ RED, BLACK });
+
+		std::filesystem::remove(other);
+	};
+
 	TEST_CASE("a layer's outline toggle is kept with the sprite, changes nothing in the image, and Ctrl+Z turns it back")
 	{
 		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));

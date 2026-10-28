@@ -100,6 +100,10 @@ namespace Loom
 		constexpr float swatch_lines = 1.75f;
 		constexpr float marker_share = 0.4f;
 
+		// What a new category is called, numbered from the second on.
+		constexpr const char* new_category = "Category";
+		constexpr int first_numbered = 2;
+
 		constexpr ImGuiKey swap_key = ImGuiKey_X;
 
 		// How far a preview's tab name leans, across per line down.
@@ -1210,6 +1214,8 @@ namespace Loom
 				ImGui::TextDisabled("No palette yet. New makes one of the sprite's colours.");
 			else
 				ImGui::TextDisabled("Open a sprite to paint it.");
+
+			DrawPaletteMenu(project_folder);
 		};
 
 		ImGui::End();
@@ -1260,25 +1266,7 @@ namespace Loom
 		if (ImGui::BeginCombo("##palette", (std::string(EditorIcons::Palette) + " " + shown).c_str()))
 		{
 			if (ImGui::IsWindowAppearing())
-			{
-				m_paletteFiles.clear();
-
-				const std::string root = !project_folder.empty() || m_active == nullptr
-					? project_folder
-					: std::filesystem::path(m_active->path).parent_path().string();
-
-				std::error_code code;
-
-				for (auto entry = std::filesystem::recursive_directory_iterator(root, std::filesystem::directory_options::skip_permission_denied, code);
-					entry != std::filesystem::recursive_directory_iterator();
-					entry.increment(code))
-					if (entry->path().extension() == Palette::extension)
-						m_paletteFiles.push_back(entry->path().lexically_normal().string());
-
-				for (const auto& [path, file] : m_palettes)
-					if (!file.saved)
-						m_paletteFiles.push_back(path);
-			};
+				FindPalettes(project_folder);
 
 			if (ImGui::Selectable("None", current.empty()))
 				SetPalette("");
@@ -1311,8 +1299,13 @@ namespace Loom
 
 	void SpriteEditor::DrawSwatches(const std::string& path)
 	{
+		DrawSection(path, PaletteAt(path).palette.colours, true, "+");
+		DrawCategories(path);
+	};
+
+	void SpriteEditor::DrawSection(const std::string& path, std::vector<Colour>& colours, bool with_clear, const std::string& add_label)
+	{
 		PaletteFile& file = PaletteAt(path);
-		Palette& palette = file.palette;
 
 		const ImGuiStyle& style = ImGui::GetStyle();
 		const float side = ImGui::GetFontSize() * swatch_lines;
@@ -1323,8 +1316,12 @@ namespace Loom
 		const ImU32 marker_edge = ImGui::GetColorU32(ImGuiCol_WindowBg);
 		const float corner = side * marker_share;
 
-		std::vector<Colour> shown = { clear };
-		std::copy_if(palette.colours.begin(), palette.colours.end(), std::back_inserter(shown), [](const Colour& colour) { return !SeeThrough(colour); });
+		std::vector<Colour> shown;
+
+		if (with_clear)
+			shown.push_back(clear);
+
+		std::copy_if(colours.begin(), colours.end(), std::back_inserter(shown), [](const Colour& colour) { return !SeeThrough(colour); });
 
 		for (size_t i = 0; i < shown.size(); i++)
 		{
@@ -1368,31 +1365,153 @@ namespace Loom
 		};
 
 		const Colour& left = m_colours[ImGuiMouseButton_Left];
-		const auto found = std::find(palette.colours.begin(), palette.colours.end(), left);
-		const bool listed = found != palette.colours.end() && !SeeThrough(left);
+		const auto found = std::find(colours.begin(), colours.end(), left);
+		const bool listed = found != colours.end() && !SeeThrough(left);
 		const bool has = listed || SeeThrough(left);
 
 		ImGui::BeginDisabled(has);
 
-		if (ImGui::Button("+", ImVec2(side, side)))
+		if (ImGui::Button(add_label.c_str(), ImVec2(side, side)))
 		{
 			RememberPalette(file);
-			palette.colours.push_back(left);
+			colours.push_back(left);
 		};
 
 		ImGui::EndDisabled();
-		ImGui::SetItemTooltip(has ? "The left colour is in the palette" : "Add the left colour to the palette");
+		ImGui::SetItemTooltip(has ? "The left colour is in here" : "Add the left colour here");
 		ImGui::SameLine();
 		ImGui::BeginDisabled(!listed);
 
 		if (ImGui::Button("-", ImVec2(side, side)))
 		{
 			RememberPalette(file);
-			palette.colours.erase(found);
+			colours.erase(found);
 		};
 
 		ImGui::EndDisabled();
-		ImGui::SetItemTooltip("Take the left colour out of the palette");
+		ImGui::SetItemTooltip("Take the left colour out of here");
+	};
+
+	void SpriteEditor::DrawCategories(const std::string& path)
+	{
+		PaletteFile& file = PaletteAt(path);
+		Palette& palette = file.palette;
+		std::optional<size_t> deleted;
+
+		for (size_t i = 0; i < palette.categories.size(); i++)
+		{
+			Palette::Category& category = palette.categories[i];
+
+			ImGui::PushID((int)i);
+
+			const bool open = ImGui::CollapsingHeader((category.name + "###category").c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+
+			if (m_renameCategory == (int)i)
+			{
+				ImGui::OpenPopup("##category");
+				m_renameCategory = -1;
+			};
+
+			if (ImGui::BeginPopupContextItem("##category"))
+			{
+				if (ImGui::IsWindowAppearing())
+				{
+					snprintf(m_categoryName, sizeof(m_categoryName), "%s", category.name.c_str());
+					ImGui::SetKeyboardFocusHere();
+				};
+
+				if (ImGui::InputText("##name", m_categoryName, sizeof(m_categoryName), ImGuiInputTextFlags_EnterReturnsTrue))
+				{
+					if (m_categoryName[0] != '\0' && category.name != m_categoryName)
+					{
+						RememberPalette(file);
+						category.name = m_categoryName;
+					};
+
+					ImGui::CloseCurrentPopup();
+				};
+
+				if (ImGui::MenuItem("Delete Category"))
+					deleted = i;
+
+				ImGui::EndPopup();
+			};
+
+			if (open)
+				DrawSection(path, category.colours, false, "+##" + category.name);
+
+			ImGui::PopID();
+		};
+
+		if (deleted)
+		{
+			RememberPalette(file);
+			palette.categories.erase(palette.categories.begin() + *deleted);
+		};
+	};
+
+	void SpriteEditor::DrawPaletteMenu(const std::string& project_folder)
+	{
+		if (!ImGui::BeginPopupContextWindow("##palette menu", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
+			return;
+
+		const std::string& path = PalettePath();
+
+		if (ImGui::MenuItem("New Category", nullptr, false, !path.empty()))
+		{
+			PaletteFile& file = PaletteAt(path);
+			Palette& palette = file.palette;
+			std::string name = new_category;
+
+			for (int suffix = first_numbered; std::any_of(palette.categories.begin(), palette.categories.end(), [&name](const Palette::Category& category) { return category.name == name; }); suffix++)
+				name = std::string(new_category) + " " + std::to_string(suffix);
+
+			RememberPalette(file);
+			palette.categories.push_back({ name, { } });
+			m_renameCategory = (int)palette.categories.size() - 1;
+		};
+
+		if (ImGui::BeginMenu("Open Palette"))
+		{
+			if (ImGui::IsWindowAppearing())
+				FindPalettes(project_folder);
+
+			for (const std::string& file : m_paletteFiles)
+			{
+				if (ImGui::MenuItem(FileName(file).c_str(), nullptr, file == path))
+					SetPalette(file);
+
+				ImGui::SetItemTooltip("%s", file.c_str());
+			};
+
+			if (m_paletteFiles.empty())
+				ImGui::MenuItem("None", nullptr, false, false);
+
+			ImGui::EndMenu();
+		};
+
+		ImGui::EndPopup();
+	};
+
+	void SpriteEditor::FindPalettes(const std::string& project_folder)
+	{
+		m_paletteFiles.clear();
+
+		const std::string root = !project_folder.empty() || m_active == nullptr
+			? project_folder
+			: std::filesystem::path(m_active->path).parent_path().string();
+
+		std::error_code code;
+
+		for (auto entry = std::filesystem::recursive_directory_iterator(root, std::filesystem::directory_options::skip_permission_denied, code);
+			entry != std::filesystem::recursive_directory_iterator();
+			entry.increment(code))
+			if (entry->path().extension() == Palette::extension)
+				m_paletteFiles.push_back(entry->path().lexically_normal().string());
+
+		for (const auto& [path, file] : m_palettes)
+			if (!file.saved)
+				m_paletteFiles.push_back(path);
 	};
 
 	#pragma endregion
