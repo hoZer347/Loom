@@ -441,8 +441,8 @@ namespace Loom
 
 		constexpr const char* camera_controls =
 			"Right drag: look\n"
-			"WASD, QE: fly\n"
-			"Shift: faster\n"
+			"Right drag + WASD, QE: fly\n"
+			"Shift: fly faster\n"
 			"Middle drag: pan\n"
 			"Wheel: zoom";
 
