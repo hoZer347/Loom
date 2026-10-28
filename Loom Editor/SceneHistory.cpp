@@ -30,19 +30,32 @@ namespace Loom
 
 		for (Change& change : m_pending)
 			if (change.before != change.after)
-				step.push_back(std::move(change));
+			{
+				if (std::find(step.scenes.begin(), step.scenes.end(), change.scene) == step.scenes.end())
+					step.scenes.push_back(change.scene);
+
+				step.changes.push_back(std::move(change));
+			};
 
 		m_pending.clear();
 		m_pendingAt.clear();
 
-		if (step.empty())
+		if (step.changes.empty())
 			return;
 
+		step.id = ++m_lastStep;
 		m_undo.push_back(std::move(step));
 		m_redo.clear();
 
 		if (m_undo.size() > max_steps)
+		{
+			// A scene saved at the step let go had no step of its own before it.
+			for (auto& [scene, saved] : m_saved)
+				if (saved == m_undo.front().id)
+					saved = 0;
+
 			m_undo.erase(m_undo.begin());
+		};
 	};
 
 	void SceneHistory::Take(const std::vector<Scene*>& scenes, bool record)
@@ -479,7 +492,7 @@ namespace Loom
 			{
 				std::unordered_map<Tracker*, Wanted> wanted{ };
 
-				for (const Change& change : step)
+				for (const Change& change : step.changes)
 				{
 					const auto found = copies.find(change.scene);
 
@@ -506,6 +519,38 @@ namespace Loom
 		};
 
 		return false;
+	};
+
+	unsigned long long SceneHistory::NewestOf(const Guid& scene) const
+	{
+		for (auto step = m_undo.rbegin(); step != m_undo.rend(); step++)
+			if (std::find(step->scenes.begin(), step->scenes.end(), scene) != step->scenes.end())
+				return step->id;
+
+		return 0;
+	};
+
+	#pragma endregion
+
+	#pragma region Saving
+
+	void SceneHistory::Saved(const Scene& scene)
+	{
+		m_saved[scene.GetGuid()] = NewestOf(scene.GetGuid());
+	};
+
+	bool SceneHistory::Unsaved(const Scene& scene) const
+	{
+		const Guid guid = scene.GetGuid();
+
+		if (const auto pending = m_pendingAt.find(guid); pending != m_pendingAt.end())
+			for (const auto& [object, at] : pending->second)
+				if (m_pending[at].before != m_pending[at].after)
+					return true;
+
+		const auto saved = m_saved.find(guid);
+
+		return NewestOf(guid) != (saved == m_saved.end() ? 0 : saved->second);
 	};
 
 	#pragma endregion

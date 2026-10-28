@@ -62,6 +62,15 @@ namespace Loom
 
 		#pragma endregion
 
+		#pragma region Saving
+
+		// Takes the scene as it stands, as of the last Record, as what is on
+		// disk. A step back past it, or a new one on top, leaves it unsaved.
+		void Saved(const Scene& scene);
+		bool Unsaved(const Scene& scene) const;
+
+		#pragma endregion
+
 		#pragma region Queries
 
 		// The GameObjects seen changing since the last call, by an edit or a
@@ -115,7 +124,12 @@ namespace Loom
 			std::optional<State> after;
 		};
 
-		using Step = std::vector<Change>;
+		struct Step
+		{
+			unsigned long long id = 0;
+			std::vector<Guid> scenes{ };
+			std::vector<Change> changes{ };
+		};
 
 		// One open scene, which a scene's copies each have their own of.
 		struct Tracker
@@ -160,6 +174,9 @@ namespace Loom
 
 		bool Move(std::vector<Step>& from, std::vector<Step>& to, std::optional<State> Change::* side, const std::vector<Scene*>& scenes);
 
+		// The newest step to undo that changed the scene, 0 with none.
+		unsigned long long NewestOf(const Guid& scene) const;
+
 		#pragma endregion
 
 		#pragma region Queries
@@ -190,10 +207,14 @@ namespace Loom
 
 		std::vector<Step> m_undo{ };
 		std::vector<Step> m_redo{ };
+		unsigned long long m_lastStep = 0;
+
+		// Each scene's NewestOf when it was saved.
+		std::unordered_map<Guid, unsigned long long> m_saved{ };
 
 		// The differences since the last step, by scene and object, each
 		// from what it was before the first of them.
-		Step m_pending{ };
+		std::vector<Change> m_pending{ };
 		std::unordered_map<Guid, std::unordered_map<Guid, size_t>> m_pendingAt{ };
 
 		// The last Collect's changes per tracker, as they came out, for the

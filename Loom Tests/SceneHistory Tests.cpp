@@ -354,6 +354,104 @@ TEST_SUITE("SceneHistory")
 
 	#pragma endregion
 
+	#pragma region Saving
+
+	TEST_CASE_FIXTURE(Editing, "a scene is unsaved after an edit, saved once marked, and unsaved again past the mark either way")
+	{
+		Open("Saved");
+		Record();
+
+		Root(0).AddChild("First");
+		Record();
+
+		CHECK(history.Unsaved(*open[0]));
+
+		history.Saved(*open[0]);
+		CHECK_FALSE(history.Unsaved(*open[0]));
+
+		Rename(0, "Second");
+		Record();
+		CHECK(history.Unsaved(*open[0]));
+
+		REQUIRE(Undo());
+		CHECK_FALSE(history.Unsaved(*open[0]));
+
+		REQUIRE(Undo());
+		CHECK(history.Unsaved(*open[0]));
+
+		REQUIRE(Redo());
+		CHECK_FALSE(history.Unsaved(*open[0]));
+	};
+
+	TEST_CASE_FIXTURE(Editing, "an edit not recorded yet leaves a scene unsaved, and an edit to another scene does not")
+	{
+		Open("Mine");
+		Open("Other");
+		Record();
+
+		Root(0).AddChild("Child");
+		Root(1).AddChild("Child");
+		Record();
+
+		history.Saved(*open[0]);
+		history.Saved(*open[1]);
+
+		Rename(1, "Renamed");
+		Record();
+		CHECK_FALSE(history.Unsaved(*open[0]));
+		CHECK(history.Unsaved(*open[1]));
+
+		Rename(0, "Renamed");
+		history.Collect(open);
+		CHECK(history.Unsaved(*open[0]));
+	};
+
+	TEST_CASE_FIXTURE(Editing, "a new edit after an undo past the mark leaves a scene unsaved, even back where it was")
+	{
+		Open("Rebranched");
+		Record();
+
+		Root(0).AddChild("Saved");
+		Record();
+		history.Saved(*open[0]);
+
+		REQUIRE(Undo());
+		Root(0).AddChild("Saved");
+		Record();
+
+		CHECK(history.Unsaved(*open[0]));
+	};
+
+	TEST_CASE_FIXTURE(Editing, "a scene saved at a step since let go is still saved, and an edit after it is not")
+	{
+		Open("Saved Early");
+		Record();
+
+		Root(0).AddChild("Edit 0");
+		Record();
+		history.Saved(*open[0]);
+
+		Open("Busy");
+		Record();
+
+		Root(1).AddChild("Edit 0");
+		Record();
+
+		for (size_t i = 1; i <= Loom::SceneHistory::max_steps; i++)
+		{
+			Rename(1, "Edit " + std::to_string(i));
+			Record();
+		};
+
+		CHECK_FALSE(history.Unsaved(*open[0]));
+
+		Rename(0, "Edit 1");
+		Record();
+		CHECK(history.Unsaved(*open[0]));
+	};
+
+	#pragma endregion
+
 	#pragma region Restoring
 
 	TEST_CASE_FIXTURE(Editing, "undo brings objects back under their own guids, references and all")
