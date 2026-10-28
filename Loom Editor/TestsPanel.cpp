@@ -444,14 +444,20 @@ namespace Loom
 		};
 
 		if (!queued.started)
+		{
+			for (const std::string& name : *queued.names)
+				m_results.erase(name);
+
+			m_stale = true;
 			queued.started = std::chrono::steady_clock::now();
+		};
 
 		const std::vector<std::string>& names = *queued.names;
 		const auto start = std::chrono::steady_clock::now();
 
 		while (queued.next < names.size())
 		{
-			const std::string& name = names[queued.next++];
+			const std::string& name = names[queued.next];
 
 			if (const ScriptTests::Case* test = ScriptTests::Find(name))
 			{
@@ -459,6 +465,8 @@ namespace Loom
 				m_stale = true;
 				++queued.ran.cases;
 			};
+
+			++queued.next;
 
 			if (std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() >= step_milliseconds)
 				break;

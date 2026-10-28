@@ -42,7 +42,8 @@ namespace Loom
 		void RunQueued();
 		bool HasQueued() const { return m_queued.has_value(); };
 
-		// How far the run going on has got. Its total is 0 until it starts.
+		// How many cases of the run going on have finished. Its total is 0
+		// until it starts, which clears the results of the cases it takes.
 		struct Progress
 		{
 			size_t done = 0;

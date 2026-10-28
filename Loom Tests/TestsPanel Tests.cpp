@@ -386,6 +386,25 @@ TEST_SUITE("TestsPanel")
 		CHECK(panel.LastRun()->milliseconds >= std::chrono::duration<double, std::milli>(case_time * cases + between_calls * (calls - 1)).count());
 		CHECK(panel.LastRun()->at.size() == std::string("00:00:00").size());
 
+		// A second run clears its cases' results, and fills them in as each finishes.
+		panel.SetFilter("TestsPanel slow");
+		panel.QueueShown();
+		panel.RunQueued();
+
+		REQUIRE(panel.RunProgress());
+		const size_t done = panel.RunProgress()->done;
+		size_t results = 0;
+
+		for (int i = 0; i < cases; ++i)
+			results += panel.ResultOf("TestsPanel slow case " + std::to_string(i)) != nullptr;
+
+		CHECK(done < cases);
+		CHECK(results == done);
+		CHECK((size_t)runs == cases + done);
+
+		while (panel.HasQueued())
+			panel.RunQueued();
+
 		Loom::ScriptTests::Truncate(before);
 	};
 };
