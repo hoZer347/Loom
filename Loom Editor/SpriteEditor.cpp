@@ -1374,9 +1374,8 @@ namespace Loom
 		const Colour& left = m_colours[ImGuiMouseButton_Left];
 		const auto found = std::find(colours.begin(), colours.end(), left);
 		const bool listed = found != colours.end() && !SeeThrough(left);
-		const bool has = listed || SeeThrough(left);
 
-		ImGui::BeginDisabled(has);
+		ImGui::BeginDisabled(SeeThrough(left));
 
 		if (ImGui::Button(add_label.c_str(), ImVec2(side, side)))
 		{
@@ -1385,7 +1384,7 @@ namespace Loom
 		};
 
 		ImGui::EndDisabled();
-		ImGui::SetItemTooltip(has ? "The left colour is in here" : "Add the left colour here");
+		ImGui::SetItemTooltip("Add the left colour here");
 		ImGui::SameLine();
 		ImGui::BeginDisabled(!listed);
 
