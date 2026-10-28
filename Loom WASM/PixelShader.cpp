@@ -63,7 +63,7 @@ namespace Loom
 
 	bool PixelShader::Enabled() const
 	{
-		if (GetGameObject() == nullptr)
+		if (!GetGameObject())
 			return false;
 
 		for (const GameObject* above = GetGameObject(); above != nullptr; above = above->GetParent())
