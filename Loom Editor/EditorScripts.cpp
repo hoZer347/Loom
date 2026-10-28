@@ -57,6 +57,7 @@ namespace Loom
 			tab.folders.Clear();
 
 		InputActions::Set({ });
+		m_keyBindings.Loaded();
 		m_buildSettings = BuildSettings{ };
 
 		// Unless the project file names it otherwise.
@@ -84,6 +85,7 @@ namespace Loom
 			tab.Load(FileFoldersFile(tab));
 
 		InputActions::Load(InputActionsFile());
+		m_keyBindings.Loaded();
 		m_buildSettings.Load(BuildSettingsFile());
 
 		std::ifstream in(m_projectFile);
@@ -500,10 +502,15 @@ namespace Loom
 			: std::filesystem::path(m_projectFile).replace_extension(BuildSettings::extension).string();
 	};
 
-	void Editor::SaveBuildSettings()
+	bool Editor::SaveBuildSettings()
 	{
 		if (const std::string file = BuildSettingsFile(); !m_buildSettings.Save(file))
+		{
 			std::cerr << "Build Settings: could not write them to " << file << std::endl;
+			return false;
+		};
+
+		return true;
 	};
 
 	std::vector<std::string> Editor::BuildScenes() const
@@ -542,7 +549,7 @@ namespace Loom
 		// Starting on the scene being edited, until another is chosen.
 		if (m_buildSettings.scene.empty() && !m_projectPath.empty())
 			if (const auto path = m_scenePaths.find(m_activeScene); path != m_scenePaths.end() && !path->second.empty())
-				m_buildSettings.scene = std::filesystem::path(path->second).lexically_relative(m_projectPath).generic_string();
+				m_buildSettings.DefaultScene(std::filesystem::path(path->second).lexically_relative(m_projectPath).generic_string());
 
 		const GameBuilder::Status status = m_gameBuilder.GetStatus();
 
@@ -556,7 +563,7 @@ namespace Loom
 
 		switch (action)
 		{
-		case BuildSettings::Action::Changed:
+		case BuildSettings::Action::Save:
 			SaveBuildSettings();
 			break;
 
@@ -580,8 +587,6 @@ namespace Loom
 
 	void Editor::BuildGame(bool run)
 	{
-		SaveBuildSettings();
-
 		m_gameBuilder.Launch(
 			m_buildSettings.Arguments(m_projectPath, m_projectName),
 			run ? m_buildSettings.Program(m_projectPath, m_projectName) : std::filesystem::path());

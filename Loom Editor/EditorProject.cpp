@@ -1974,10 +1974,17 @@ namespace Loom
 			: std::filesystem::path(m_projectFile).replace_extension(InputActions::extension).string();
 	};
 
-	void Editor::SaveInputActions()
+	bool Editor::SaveInputActions()
 	{
 		if (const std::string file = InputActionsFile(); !InputActions::Save(file))
+		{
 			std::cerr << "Key Bindings: could not write them to " << file << std::endl;
+			return false;
+		};
+
+		m_keyBindings.Saved();
+
+		return true;
 	};
 
 	std::string Editor::FileFoldersFile(const FileTab& tab) const

@@ -348,6 +348,9 @@
     <ClInclude Include="SceneHistory.h">
       <Filter>Editor</Filter>
     </ClInclude>
+    <ClInclude Include="EditHistory.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
     <ClInclude Include="PlayHistory.h">
       <Filter>Editor</Filter>
     </ClInclude>

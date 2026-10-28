@@ -254,6 +254,7 @@
     <ClInclude Include="WindowFrame.h" />
     <ClInclude Include="WindowFullscreen.h" />
     <ClInclude Include="SceneHistory.h" />
+    <ClInclude Include="EditHistory.h" />
     <ClInclude Include="PlayHistory.h" />
     <ClInclude Include="Prefabs.h" />
     <ClInclude Include="ColliderGizmos.h" />

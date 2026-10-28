@@ -1,5 +1,6 @@
 #pragma once
 
+#include "EditHistory.h"
 #include "FolderTree.h"
 #include "InputActions.h"
 #include "VirtualFolders.h"
@@ -26,9 +27,26 @@ namespace Loom
 	{
 		#pragma region Panel
 
-		// Whether the actions changed, for the editor to save them. Without a
-		// project open there is nowhere to save them, so none are shown.
+		// Whether Ctrl+S asked for the actions to be saved. Changes are held
+		// in InputActions until then, and Ctrl+Z and Ctrl+Y step through
+		// them. Without a project open there is nowhere to save them, so none
+		// are shown.
 		bool Draw(bool* open, bool project_open);
+
+		bool IsFocused() const { return m_focused; };
+
+		#pragma endregion
+
+		#pragma region Saving
+
+		// InputActions as they are now are as their file has them, with
+		// nothing to undo.
+		void Loaded();
+
+		// InputActions as they are now were written to their file.
+		void Saved();
+
+		bool Unsaved() const;
 
 		#pragma endregion
 
@@ -52,6 +70,11 @@ namespace Loom
 		};
 
 		bool DrawActions();
+
+		// Ctrl+Z and Ctrl+Y, and whether Ctrl+S was pressed.
+		bool Shortcuts();
+
+		static InputActions::File Current();
 
 		// How the FolderTree draws and files this frame's actions.
 		FolderTree::Hooks Hooks(Edit& edit);
@@ -85,6 +108,9 @@ namespace Loom
 		std::string m_name{ };
 
 		FolderTree m_tree;
+
+		EditHistory<InputActions::File> m_history;
+		bool m_focused = false;
 
 		#pragma endregion
 	};

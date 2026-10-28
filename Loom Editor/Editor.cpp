@@ -1178,6 +1178,12 @@ namespace Loom
 		saved = m_sprites.SaveAll() && saved;
 		saved = m_models.SaveAll() && saved;
 
+		if (m_keyBindings.Unsaved())
+			saved = SaveInputActions() && saved;
+
+		if (m_buildSettings.Unsaved())
+			saved = SaveBuildSettings() && saved;
+
 		// An active scene saved for the first time just now is the one the
 		// next session starts on.
 		SetActiveScene(m_activeScene);
@@ -1806,6 +1812,9 @@ namespace Loom
 			return;
 
 		if (m_showModels && m_models.IsFocused())
+			return;
+
+		if ((m_showKeyBindings && m_keyBindings.IsFocused()) || (m_showBuildSettings && m_buildSettings.IsFocused()))
 			return;
 
 		switch (EditCommands::FromShortcut(m_showHierarchy && m_hierarchyFocused))
@@ -2721,7 +2730,7 @@ namespace Loom
 		{
 			m_buildSettings.folder = m_dialogs->buildFolder.GetSelected().string();
 			m_dialogs->buildFolder.ClearSelected();
-			SaveBuildSettings();
+			m_buildSettings.Keep();
 		};
 	};
 

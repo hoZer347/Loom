@@ -1,5 +1,7 @@
 #pragma once
 
+#include "EditHistory.h"
+
 #include <algorithm>
 #include <array>
 #include <filesystem>
@@ -32,6 +34,8 @@ namespace Loom
 
 		#pragma endregion
 
+		BuildSettings() { m_history.Reset(Current()); };
+
 		std::string configuration = std::string(configurations[1]);
 
 		// Relative to the project folder, or absolute.
@@ -42,9 +46,24 @@ namespace Loom
 
 		static constexpr const char* extension = ".loombuild";
 
-		// A setting the file lacks keeps the value it had.
+		// A setting the file lacks keeps the value it had. Either leaves
+		// nothing unsaved, and Load nothing to undo.
 		void Load(const std::string& path);
-		bool Save(const std::string& path) const;
+		bool Save(const std::string& path);
+
+		bool Unsaved() const { return m_history.Unsaved(Current()); };
+
+		#pragma endregion
+
+		#pragma region History
+
+		// One step to undo for a change made outside the tab, such as a
+		// folder the browser chose.
+		void Keep() { m_history.Keep(Current()); };
+
+		// Starts on scene until another is chosen. Not the user's change, so
+		// neither a step to undo nor unsaved.
+		void DefaultScene(const std::string& scene);
 
 		#pragma endregion
 
@@ -65,11 +84,11 @@ namespace Loom
 		#pragma region Window
 
 		// What a press in the window asks of the editor.
-		enum class Action { None, Changed, Browse, Build, BuildAndRun };
+		enum class Action { None, Save, Browse, Build, BuildAndRun };
 
 		// The tab, which lists the project's scenes each time its list opens,
 		// holds back another build while one is under way, and with no project
-		// open has nothing to build.
+		// open has nothing to build. Ctrl+Z and Ctrl+Y step through its changes.
 		Action Draw(
 			bool* open,
 			const std::string& project,
@@ -77,6 +96,8 @@ namespace Loom
 			const std::function<std::vector<std::string>()>& list_scenes,
 			std::string_view status,
 			bool building);
+
+		bool IsFocused() const { return m_focused; };
 
 		#pragma endregion
 
@@ -87,9 +108,31 @@ namespace Loom
 
 		#pragma endregion
 
+		#pragma region History
+
+		// What is saved, undone and redone.
+		struct Settings
+		{
+			std::string configuration;
+			std::string scene;
+			std::string folder;
+
+			bool operator==(const Settings&) const = default;
+		};
+
+		Settings Current() const { return { configuration, scene, folder }; };
+
+		// Ctrl+Z and Ctrl+Y, and whether Ctrl+S was pressed.
+		bool Shortcuts();
+
+		#pragma endregion
+
 		static constexpr size_t folder_capacity = 512;
 
 		std::vector<std::string> m_scenes{ };
 		char m_folder[folder_capacity] = { };
+
+		EditHistory<Settings> m_history;
+		bool m_focused = false;
 	};
 };

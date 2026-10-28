@@ -483,11 +483,11 @@ namespace Loom
 		// Where the project keeps its InputActions, beside its .loomproject in
 		// the same way. Empty for a folder with no project file.
 		std::string InputActionsFile() const;
-		void SaveInputActions();
+		bool SaveInputActions();
 
 		// The Build Settings tab, and the game built from it.
 		std::string BuildSettingsFile() const;
-		void SaveBuildSettings();
+		bool SaveBuildSettings();
 		std::vector<std::string> BuildScenes() const;
 		void DrawBuildSettings();
 		void BuildGame(bool run);

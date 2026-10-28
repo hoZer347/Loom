@@ -51,9 +51,11 @@ namespace Loom
 			if (const std::string value = ProjectTemplate::ValueOf(line, folder_key); !value.empty())
 				folder = value;
 		};
+
+		m_history.Reset(Current());
 	};
 
-	bool BuildSettings::Save(const std::string& path) const
+	bool BuildSettings::Save(const std::string& path)
 	{
 		std::ofstream out(path, std::ios::binary);
 
@@ -65,7 +67,37 @@ namespace Loom
 		if (!folder.empty())
 			out << folder_key << '=' << folder << '\n';
 
-		return (bool)out;
+		if (!out)
+			return false;
+
+		m_history.Saved(Current());
+
+		return true;
+	};
+
+	#pragma endregion
+
+	#pragma region History
+
+	void BuildSettings::DefaultScene(const std::string& scene)
+	{
+		this->scene = scene;
+		m_history.Amend(Current());
+	};
+
+	bool BuildSettings::Shortcuts()
+	{
+		const bool undo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z);
+		const bool redo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y) || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z);
+
+		if (Settings settings = Current(); (undo || redo) && m_history.Step(settings, undo))
+		{
+			configuration = settings.configuration;
+			scene = settings.scene;
+			folder = settings.folder;
+		};
+
+		return ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_S);
 	};
 
 	#pragma endregion
@@ -120,10 +152,20 @@ namespace Loom
 
 		ImGui::SetNextWindowSize(window_size, ImGuiCond_FirstUseEver);
 
-		if (!ImGui::Begin(EditorPanels::BuildSettings, open))
+		m_focused = false;
+
+		if (!ImGui::Begin(EditorPanels::BuildSettings, open, Unsaved() ? ImGuiWindowFlags_UnsavedDocument : ImGuiWindowFlags_None))
 		{
 			ImGui::End();
 			return action;
+		};
+
+		if (!project.empty())
+		{
+			m_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+
+			if (Shortcuts())
+				action = Action::Save;
 		};
 
 		ImGui::BeginDisabled(project.empty());
@@ -134,7 +176,7 @@ namespace Loom
 				if (ImGui::Selectable(std::string(option).c_str(), option == configuration) && option != configuration)
 				{
 					configuration = option;
-					action = Action::Changed;
+					Keep();
 				};
 
 			ImGui::EndCombo();
@@ -149,7 +191,7 @@ namespace Loom
 				if (ImGui::Selectable(option.c_str(), option == scene) && option != scene)
 				{
 					scene = option;
-					action = Action::Changed;
+					Keep();
 				};
 
 			ImGui::EndCombo();
@@ -172,7 +214,7 @@ namespace Loom
 			folder = m_folder;
 
 		if (ImGui::IsItemDeactivatedAfterEdit())
-			action = Action::Changed;
+			Keep();
 
 		ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
 

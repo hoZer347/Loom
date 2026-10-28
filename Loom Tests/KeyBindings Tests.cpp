@@ -18,6 +18,7 @@
 namespace
 {
 	using Action = Loom::InputActions::Action;
+	using File = Loom::InputActions::File;
 
 	// A Key Bindings panel filling an ImGui context of the test's own, with no
 	// window and no renderer, driven by a UiScript.
@@ -40,7 +41,15 @@ namespace
 			io.Fonts->GetTexDataAsRGBA32(&pixels, &atlas_width, &atlas_height);
 
 			Loom::InputActions::Set(std::move(actions), std::move(folders));
+			panel.Loaded();
 
+			script = std::make_unique<Loom::UiScript>(std::filesystem::path());
+			script->LoadText(text);
+		};
+
+		// A script of its own to carry on with, since one that has ended stays ended.
+		void Next(const std::string& text)
+		{
 			script = std::make_unique<Loom::UiScript>(std::filesystem::path());
 			script->LoadText(text);
 		};
@@ -53,6 +62,8 @@ namespace
 		};
 
 		// Frames until the script ends; how many of them changed the actions.
+		// Ctrl+S is counted in saves, and has the panel told they were saved,
+		// as the editor does once it has written them.
 		int Run(bool project_open = true)
 		{
 			constexpr int most_frames = 600;
@@ -68,7 +79,15 @@ namespace
 				ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
 				ImGui::SetNextWindowSize(ImVec2(width, height));
 
+				const File before = Current();
+
 				if (panel.Draw(&open, project_open))
+				{
+					saves++;
+					panel.Saved();
+				};
+
+				if (!(Current() == before))
 					changes++;
 
 				ImGui::Render();
@@ -77,12 +96,18 @@ namespace
 			return changes;
 		};
 
+		static File Current()
+		{
+			return { Loom::InputActions::All(), Loom::InputActions::Folders() };
+		};
+
 		static constexpr float width = 800.0f;
 		static constexpr float height = 600.0f;
 
 		ImGuiContext* context = nullptr;
 		std::unique_ptr<Loom::UiScript> script;
 		Loom::KeyBindings panel;
+		int saves = 0;
 	};
 
 	const std::vector<Action> slowdown = { { "Slowdown", { Loom::Key::Space } } };
@@ -226,6 +251,47 @@ TEST_SUITE("KeyBindings")
 		CHECK(driven.Run() == 1);
 		CHECK_FALSE(driven.script->Failed());
 		CHECK(Loom::InputActions::All().empty());
+	};
+
+	TEST_CASE("a change is held until Ctrl+S saves it")
+	{
+		Driven driven(std::string(drawn) + "click \"Key Bindings\" \"Remove\"\n" + drawn, slowdown);
+
+		CHECK(driven.Run() == 1);
+		CHECK(driven.saves == 0);
+		CHECK(driven.panel.Unsaved());
+
+		driven.Next("key ctrl+s\n" + std::string(drawn));
+		driven.Run();
+
+		CHECK_FALSE(driven.script->Failed());
+		CHECK(driven.saves == 1);
+		CHECK_FALSE(driven.panel.Unsaved());
+	};
+
+	TEST_CASE("Ctrl+Z takes a change back, saved again, and Ctrl+Y puts it back")
+	{
+		Driven driven(std::string(drawn) + "click \"Key Bindings\" \"Remove\"\n" + drawn + "key ctrl+z\n" + drawn, slowdown);
+
+		CHECK(driven.Run() == 2);
+		CHECK(Loom::InputActions::All() == slowdown);
+		CHECK_FALSE(driven.panel.Unsaved());
+
+		driven.Next("key ctrl+y\n" + std::string(drawn));
+
+		CHECK(driven.Run() == 1);
+		CHECK_FALSE(driven.script->Failed());
+		CHECK(Loom::InputActions::All().empty());
+		CHECK(driven.panel.Unsaved());
+	};
+
+	TEST_CASE("an action renamed then taken back by Ctrl+Z has its old name")
+	{
+		Driven driven(std::string(drawn) + "click \"Key Bindings\" \"##Name\"\nkey ctrl+a\ntype Pause\nkey enter\n" + drawn + "key ctrl+z\n" + drawn, slowdown);
+
+		CHECK(driven.Run() == 2);
+		CHECK_FALSE(driven.script->Failed());
+		CHECK(Loom::InputActions::All()[0].name == "Slowdown");
 	};
 
 	TEST_CASE("with no project open there is nothing to change")

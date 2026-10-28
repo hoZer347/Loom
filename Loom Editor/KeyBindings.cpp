@@ -77,19 +77,45 @@ namespace Loom
 
 	bool KeyBindings::Draw(bool* open, bool project_open)
 	{
-		bool changed = false;
+		bool save = false;
+		m_focused = false;
 
-		if (ImGui::Begin(EditorPanels::KeyBindings, open))
+		if (ImGui::Begin(EditorPanels::KeyBindings, open, Unsaved() ? ImGuiWindowFlags_UnsavedDocument : ImGuiWindowFlags_None))
 		{
 			if (project_open)
-				changed = DrawActions();
+			{
+				m_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+				save = Shortcuts();
+
+				if (DrawActions())
+					m_history.Keep(Current());
+			}
 			else
 				ImGui::TextDisabled("Open a project to bind its keys.");
 		};
 
 		ImGui::End();
 
-		return changed;
+		return save;
+	};
+
+	bool KeyBindings::Shortcuts()
+	{
+		const bool undo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z);
+		const bool redo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y) || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z);
+
+		if (InputActions::File file = Current(); (undo || redo) && m_history.Step(file, undo))
+		{
+			InputActions::Set(std::move(file.actions), std::move(file.folders));
+			m_renaming.reset();
+		};
+
+		return ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_S);
+	};
+
+	InputActions::File KeyBindings::Current()
+	{
+		return { InputActions::All(), InputActions::Folders() };
 	};
 
 	bool KeyBindings::DrawActions()
@@ -218,6 +244,26 @@ namespace Loom
 			name = Numbered(default_name, number);
 
 		return name;
+	};
+
+	#pragma endregion
+
+	#pragma region Saving
+
+	void KeyBindings::Loaded()
+	{
+		m_history.Reset(Current());
+		m_renaming.reset();
+	};
+
+	void KeyBindings::Saved()
+	{
+		m_history.Saved(Current());
+	};
+
+	bool KeyBindings::Unsaved() const
+	{
+		return m_history.Unsaved(Current());
 	};
 
 	#pragma endregion
