@@ -193,8 +193,8 @@ void main()
 			"F: frame\n"
 			"1, 2, 3: vertices, edges, faces\n"
 			"W, E, R: move, rotate, scale\n"
-			"Ctrl+A: pick all\n"
-			"Esc: pick none";
+			"Ctrl+A: Pick All\n"
+			"Esc: Unpick All";
 
 		const char* PickName(ModelEditor::Pick pick, size_t count)
 		{
