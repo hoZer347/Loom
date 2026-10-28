@@ -140,10 +140,12 @@ namespace Loom
 		handler.TypeHash = ImHashStr(handler.TypeName);
 		handler.UserData = this;
 
+		// A layout read replaces the windows, as it does the dock nodes.
 		handler.ClearAllFn = [](ImGuiContext*, ImGuiSettingsHandler* handler)
 		{
 			((TornWindows*)handler->UserData)->m_torn.clear();
 		};
+		handler.ReadInitFn = handler.ClearAllFn;
 
 		handler.ReadOpenFn = [](ImGuiContext*, ImGuiSettingsHandler* handler, const char* name) -> void*
 		{

@@ -370,4 +370,24 @@ TEST_SUITE("PanelTearOff")
 		CHECK(driven.torn.Docked(driven.torn.Windows().front()) == std::vector<ImGuiWindow*>{ Driven::Find(PANEL) });
 		CHECK(Driven::Viewports() == 3);
 	};
+
+	TEST_CASE("a layout read while a torn window is open replaces it rather than adding another")
+	{
+		Driven driven;
+		driven.DockBoth();
+
+		driven.Drag(Driven::Tab(Driven::Find(PANEL)), OFF_EDITOR, true);
+		driven.Release(true);
+		REQUIRE(driven.Torn(Driven::Find(PANEL)));
+
+		const std::string layout = ImGui::SaveIniSettingsToMemory();
+		ImGui::LoadIniSettingsFromMemory(layout.c_str());
+		driven.Frame(true);
+		driven.Frame(true);
+
+		REQUIRE(driven.torn.Windows().size() == 1);
+		CHECK(driven.Torn(Driven::Find(PANEL)));
+		CHECK(driven.torn.Docked(driven.torn.Windows().front()) == std::vector<ImGuiWindow*>{ Driven::Find(PANEL) });
+		CHECK(Driven::Viewports() == 2);
+	};
 };
