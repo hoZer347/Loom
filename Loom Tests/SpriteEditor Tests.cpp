@@ -1172,6 +1172,38 @@ TEST_SUITE("SpriteEditor")
 		std::filesystem::remove_all(folder);
 	};
 
+	TEST_CASE("with a left colour the palette lacks, - takes out the last swatch, asking while it is painted")
+	{
+		const std::filesystem::path folder = std::filesystem::temp_directory_path() / "loom sprite minus last";
+		std::filesystem::remove_all(folder);
+		std::filesystem::create_directories(folder);
+
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.layers[0].cels[0].Set(0, 0, RED);
+		sprite.layers[0].cels[0].Set(1, 0, WHITE);
+
+		Driven driven("loom sprite minus last/Last.tga", &sprite);
+		driven.projectFolder = folder.string();
+
+		const std::string palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension).string();
+		Loom::Palette saved;
+
+		driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\nkey ctrl+s\nwait 2\n");
+		REQUIRE(Loom::Palette::Load(palette, saved));
+		REQUIRE(saved.colours == std::vector<SpriteAsset::Colour>{ RED, WHITE });
+
+		// The left colour starts black, which the palette lacks.
+		driven.Run("click \"Palette\" \"-\"\nwait 2\n");
+		REQUIRE(driven.editor.ColourUsers() != nullptr);
+		CHECK(*driven.editor.ColourUsers() == std::vector<std::pair<std::string, size_t>>{ { std::filesystem::path(SpriteAsset::For(driven.path)).lexically_normal().string(), 1 } });
+
+		driven.Run("click \"Delete Colour?\" \"Delete\"\nwait 2\nkey ctrl+s\nwait 2\n");
+		REQUIRE(Loom::Palette::Load(palette, saved));
+		CHECK(saved.colours == std::vector<SpriteAsset::Colour>{ RED });
+
+		std::filesystem::remove_all(folder);
+	};
+
 	TEST_CASE("a swatch's x deletes its colour, asking first while any sprite on the palette still has pixels of it, which it then clears, and Ctrl+Z and Ctrl+Y step it")
 	{
 		using Users = std::vector<std::pair<std::string, size_t>>;

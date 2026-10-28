@@ -1573,13 +1573,16 @@ namespace Loom
 		ImGui::EndDisabled();
 		ImGui::SetItemTooltip("Add left colour");
 		ImGui::SameLine();
-		ImGui::BeginDisabled(!listed);
+		ImGui::BeginDisabled(colours.empty());
 
 		if (ImGui::Button("-", ImVec2(side, side)))
-			m_deleting = ColourDeletion{ path, category, (size_t)(found - colours.begin()), left };
+		{
+			const size_t index = listed ? (size_t)(found - colours.begin()) : colours.size() - 1;
+			m_deleting = ColourDeletion{ path, category, index, colours[index] };
+		};
 
 		ImGui::EndDisabled();
-		ImGui::SetItemTooltip("Remove left colour");
+		ImGui::SetItemTooltip("Remove left colour, or the last");
 	};
 
 	void SpriteEditor::DrawCategories(const std::string& path)
