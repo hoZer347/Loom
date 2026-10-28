@@ -226,6 +226,7 @@ TEST_SUITE("TestsPanel")
 		panel.RunQueued();
 
 		// A clicked run names its cases, and is timed from its first case all the same.
+		CHECK_FALSE(panel.HasQueued());
 		REQUIRE(panel.LastRun());
 		CHECK(panel.LastRun()->milliseconds < most_clicked_run_milliseconds);
 
