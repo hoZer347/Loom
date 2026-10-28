@@ -100,8 +100,10 @@ namespace Loom
 		editor.SetLanguage(Language());
 		editor.SetTabSize(tab_size);
 		editor.SetShowWhitespacesEnabled(false);
-		opened->savedText.assign(std::istreambuf_iterator<char>(file), { });
-		editor.SetText(opened->savedText);
+		editor.SetText(std::string(std::istreambuf_iterator<char>(file), { }));
+
+		// As the editor holds it, without the file's carriage returns.
+		opened->savedText = editor.GetText();
 		editor.SetChangeCallback([this, opened]() { Mark(*opened); }, check_delay_milliseconds);
 
 		TextEditor::AutoCompleteConfig autoComplete;
@@ -224,12 +226,20 @@ namespace Loom
 		if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_S))
 			Save(document);
 
+		// For the rest of the panel, as the text takes these itself while it has the keyboard.
+		const size_t undo_index = document.editor.GetUndoIndex();
+
+		if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z))
+			document.editor.Undo();
+		else if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y) || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z))
+			document.editor.Redo();
+
 		const size_t rows = std::min(document.messages.size(), max_message_rows);
 		const float messages_height = rows == 0 ? 0.0f : (float)rows * ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y;
 
 		ImGui::PushFont(EditorTheme::CodeFont(), 0.0f);
 		// Against the text, since an edit after an undo can return to the saved state.
-		if (document.editor.Render("##text", ImVec2(0.0f, -messages_height)))
+		if (document.editor.Render("##text", ImVec2(0.0f, -messages_height)) || undo_index != document.editor.GetUndoIndex())
 			document.unsaved = document.editor.GetText() != document.savedText;
 		ImGui::PopFont();
 

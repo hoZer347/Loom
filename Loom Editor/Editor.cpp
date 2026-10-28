@@ -1728,6 +1728,9 @@ namespace Loom
 		if ((m_showKeyBindings && m_keyBindings.IsFocused()) || (m_showBuildSettings && m_buildSettings.IsFocused()))
 			return;
 
+		if ((m_showShaders && m_shaders.IsFocused()) || (m_showDialogues && m_dialogues.IsFocused()))
+			return;
+
 		switch (EditCommands::FromShortcut(m_showHierarchy && m_hierarchyFocused))
 		{
 		case EditCommand::Undo:		Undo();				break;
@@ -1737,10 +1740,7 @@ namespace Loom
 		case EditCommand::Paste:	Paste();			break;
 		case EditCommand::Delete:	DeleteSelected();	break;
 		case EditCommand::None:							break;
-		case EditCommand::Save:
-			if (!(m_showShaders && m_shaders.IsFocused()) && !(m_showDialogues && m_dialogues.IsFocused()))
-				SaveActiveScene();
-			break;
+		case EditCommand::Save:		SaveActiveScene();	break;
 		};
 	};
 

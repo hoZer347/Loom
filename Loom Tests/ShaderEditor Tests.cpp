@@ -3,6 +3,7 @@
 // The shader editor checks with glslang, which the web build does not have.
 #ifndef __EMSCRIPTEN__
 
+#include "EditorIcons.h"
 #include "ShaderEditor.h"
 
 #include "imgui.h"
@@ -316,6 +317,39 @@ TEST_SUITE("ShaderEditor")
 
 		driven.Press(ImGuiKey_Z, true);
 		CHECK_FALSE(driven.Unsaved());
+	};
+
+	TEST_CASE("undoing back to what was saved counts as saved in a file with Windows line endings")
+	{
+		constexpr const char* crlf = "#version 330 core\r\nvoid main() { }\r\n";
+
+		Driven driven(crlf);
+
+		driven.Type("x");
+		CHECK(driven.Unsaved());
+
+		driven.Press(ImGuiKey_Z, true);
+		CHECK_FALSE(driven.Unsaved());
+		CHECK(driven.Saved() == crlf);
+	};
+
+	TEST_CASE("Ctrl+Z and Ctrl+Y step the text with the panel rather than the text holding the keyboard")
+	{
+		Driven driven;
+
+		driven.Type("x");
+		ImGui::FocusWindow(ImGui::FindWindowByName(Loom::EditorPanels::Shaders));
+		driven.Frame();
+
+		driven.Press(ImGuiKey_Z, true);
+		CHECK_FALSE(driven.Unsaved());
+
+		driven.Press(ImGuiKey_Y, true);
+		CHECK(driven.Unsaved());
+		CHECK(driven.Saved() == shader);
+
+		driven.Press(ImGuiKey_S, true);
+		CHECK(driven.Saved().find('x') != std::string::npos);
 	};
 
 	#pragma endregion
