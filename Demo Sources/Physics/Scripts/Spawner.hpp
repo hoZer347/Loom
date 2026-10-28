@@ -21,6 +21,9 @@ namespace PhysicsScripts
 	// One that falls off the world goes too.
 	struct Spawner : Loom::Component<Spawner>
 	{
+		// Below the floor, out of sight.
+		static constexpr float LOST = -10.0f;
+
 		void OnUpdate() override
 		{
 			m_wait -= Loom::Time::DeltaTime();
@@ -31,50 +34,7 @@ namespace PhysicsScripts
 				Drop(*m_from + Scatter());
 			};
 
-			std::erase_if(m_bodies,
-				[this](Loom::GameObject* body)
-				{
-					if (body->transform.position->y > LOST)
-						return false;
-
-					m_gameObject->RemoveChild(body);
-					return true;
-				});
-
-			while ((int)m_bodies.size() > *m_most)
-			{
-				m_gameObject->RemoveChild(m_bodies.front());
-				m_bodies.pop_front();
-			};
-		};
-
-	private:
-		// Boxes and balls in turn.
-		static constexpr int KINDS = 2;
-		static constexpr unsigned SEED = 1;
-
-		static constexpr float LEAST_SIZE = 0.35f;
-		static constexpr float MOST_SIZE = 0.9f;
-		static constexpr float FULL_TURN = 360.0f;
-
-		// Below the floor, out of sight.
-		static constexpr float LOST = -10.0f;
-
-		static constexpr glm::vec3 COLOURS[] =
-		{
-			{ 0.85f, 0.35f, 0.25f },
-			{ 0.3f, 0.5f, 0.85f },
-			{ 0.35f, 0.75f, 0.45f },
-			{ 0.75f, 0.6f, 0.85f },
-			{ 0.3f, 0.7f, 0.75f },
-			{ 0.9f, 0.7f, 0.3f },
-		};
-
-		glm::vec3 Scatter()
-		{
-			std::uniform_real_distribution<float> offset(-*m_spread, *m_spread);
-
-			return { offset(m_random), 0.0f, offset(m_random) };
+			Tidy();
 		};
 
 		void Drop(const glm::vec3& at)
@@ -108,10 +68,62 @@ namespace PhysicsScripts
 			m_dropped++;
 		};
 
+		// Lets go of each body below LOST, then of the oldest until no more
+		// than most are left.
+		void Tidy()
+		{
+			std::erase_if(m_bodies,
+				[this](Loom::GameObject* body)
+				{
+					if (body->transform.position->y > LOST)
+						return false;
+
+					m_gameObject->RemoveChild(body);
+					return true;
+				});
+
+			while (!m_bodies.empty() && (int)m_bodies.size() > *m_most)
+			{
+				m_gameObject->RemoveChild(m_bodies.front());
+				m_bodies.pop_front();
+			};
+		};
+
+		const std::deque<Loom::GameObject*>& Bodies() const { return m_bodies; };
+		int Most() const { return *m_most; };
+
+	private:
+		// Boxes and balls in turn.
+		static constexpr int KINDS = 2;
+		static constexpr unsigned SEED = 1;
+
+		static constexpr float LEAST_SIZE = 0.35f;
+		static constexpr float MOST_SIZE = 0.9f;
+		static constexpr float FULL_TURN = 360.0f;
+
+		static constexpr glm::vec3 COLOURS[] =
+		{
+			{ 0.85f, 0.35f, 0.25f },
+			{ 0.3f, 0.5f, 0.85f },
+			{ 0.35f, 0.75f, 0.45f },
+			{ 0.75f, 0.6f, 0.85f },
+			{ 0.3f, 0.7f, 0.75f },
+			{ 0.9f, 0.7f, 0.3f },
+		};
+
+		glm::vec3 Scatter()
+		{
+			std::uniform_real_distribution<float> offset(-*m_spread, *m_spread);
+
+			return { offset(m_random), 0.0f, offset(m_random) };
+		};
+
 		Loom::Serial<glm::vec3> m_from = glm::vec3(0.0f, 9.0f, 0.0f);
+		// Half-width of the drop square, in units.
 		Loom::Serial<float> m_spread = 1.5f;
 		// Seconds between drops.
 		Loom::Serial<float> m_interval = 0.25f;
+		// Most bodies alive at once.
 		Loom::Serial<int> m_most = 120;
 		Loom::Serial<float> m_bounciness = 0.3f;
 
