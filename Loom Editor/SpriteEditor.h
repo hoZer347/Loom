@@ -29,12 +29,16 @@ namespace Loom
 	* - The left and right mouse paint the layer and frame picked in the
 	*   timeline, each with its own colour, and the picker picks for the
 	*   button that clicked; the middle mouse pans and the wheel zooms about
-	*   the mouse. Ctrl+Z and Ctrl+Y step back and forward an edit at a time
+	*   the mouse. Ctrl+Z and Ctrl+Y step back and forward an edit at a time,
+	*   Resize included, which scales the pixels or cuts and grows round them
 	* - A layer can be outlined, hidden or not, which draws round its pixels
 	*   on the canvas and nowhere else, and dragged by its grip up or down the
 	*   timeline, the others making way as it goes
-	* - Ctrl+S writes the sprite and the image it is flattened into, and every
-	*   Sprite showing that image picks the change up
+	* - Ctrl+S writes the sprite, the image it is flattened into and its
+	*   palette, and every Sprite showing that image picks the change up.
+	*   Nothing is written before then
+	* - The Palette panel keeps its own Ctrl+Z, Ctrl+Y and Ctrl+S, for the
+	*   palette it shows
 	*/
 	struct SpriteEditor final
 	{
@@ -105,6 +109,12 @@ namespace Loom
 		using Image = SpriteAsset::Image;
 		using Colour = SpriteAsset::Colour;
 
+		struct Snapshot
+		{
+			SpriteAsset sprite;
+			SpriteAsset::Links links;
+		};
+
 		struct Document
 		{
 			// The .loomsprite, which may not be written yet.
@@ -121,8 +131,8 @@ namespace Loom
 			std::optional<Image> outside;
 
 			// The sprite as it was before each edit.
-			std::vector<SpriteAsset> undo;
-			std::vector<SpriteAsset> redo;
+			std::vector<Snapshot> undo;
+			std::vector<Snapshot> redo;
 
 			// What is painted, as the timeline picked it.
 			int layer = 0;
@@ -190,6 +200,7 @@ namespace Loom
 		#pragma region Status
 
 		void DrawStatus(Document& document, bool* palette_open, bool palette_shown);
+		void DrawResize(Document& document);
 
 		#pragma endregion
 
@@ -221,10 +232,28 @@ namespace Loom
 
 		#pragma region Palettes
 
+		struct PaletteFile
+		{
+			Palette palette;
+
+			// As last written, or nothing for one made since.
+			std::optional<Palette> saved;
+
+			// The palette as it was before each edit.
+			std::vector<Palette> undo;
+			std::vector<Palette> redo;
+
+			bool Unsaved() const { return !saved || palette != *saved; };
+		};
+
 		// The palette of the sprite in front, or the one opened on its own.
 		const std::string& PalettePath() const;
 		void SetPalette(const std::string& path);
-		Palette& PaletteAt(const std::string& path);
+		PaletteFile& PaletteAt(const std::string& path);
+
+		static void RememberPalette(PaletteFile& file);
+		static void StepPalette(PaletteFile& file, bool undo);
+		bool SavePalette(const std::string& path);
 
 		#pragma endregion
 
@@ -247,6 +276,11 @@ namespace Loom
 		#pragma region History
 
 		static void Remember(Document& document);
+
+		// Ends an edit begun by Remember, leaving nothing to undo when it
+		// changed nothing.
+		static void Settle(Document& document);
+
 		static void Edited(Document& document);
 		static void Step(Document& document, bool undo);
 
@@ -300,12 +334,19 @@ namespace Loom
 		static constexpr size_t layerNameSize = 64;
 		char m_layerName[layerNameSize] = { };
 
+		// What the Resize popup holds while it is open. The anchor counts
+		// across its grid from the top left.
+		int m_resizeWidth = 0;
+		int m_resizeHeight = 0;
+		bool m_resizeScale = true;
+		int m_resizeAnchor = 0;
+
 		#pragma endregion
 
 		#pragma region Palettes
 
-		// Every palette shown so far, by path, as last saved.
-		std::map<std::string, Palette> m_palettes;
+		// Every palette shown or made so far, by path.
+		std::map<std::string, PaletteFile> m_palettes;
 
 		// Opened with no sprite in front to take it.
 		std::string m_loosePalette;

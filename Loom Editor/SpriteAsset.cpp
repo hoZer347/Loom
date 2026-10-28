@@ -258,6 +258,28 @@ namespace Loom
 		};
 	};
 
+	SpriteAsset::Image SpriteAsset::Image::Scaled(int to_width, int to_height) const
+	{
+		Image scaled = Blank(to_width, to_height);
+
+		for (int y = 0; y < to_height; y++)
+			for (int x = 0; x < to_width; x++)
+				scaled.Set(x, y, Get((int)((int64_t)x * width / to_width), (int)((int64_t)y * height / to_height)));
+
+		return scaled;
+	};
+
+	SpriteAsset::Image SpriteAsset::Image::Placed(int to_width, int to_height, int left, int top) const
+	{
+		Image placed = Blank(to_width, to_height);
+
+		for (int y = 0; y < height; y++)
+			for (int x = 0; x < width; x++)
+				placed.Set(left + x, top + y, Get(x, y));
+
+		return placed;
+	};
+
 	bool SpriteAsset::LoadImage(const std::string& path, Image& image)
 	{
 		try
@@ -610,6 +632,19 @@ namespace Loom
 
 		for (Layer& layer : layers)
 			layer.cels.erase(layer.cels.begin() + frame);
+	};
+
+	void SpriteAsset::Resize(int to_width, int to_height, bool scale, float anchor_x, float anchor_y)
+	{
+		const int left = (int)std::floor((to_width - width) * anchor_x);
+		const int top = (int)std::floor((to_height - height) * anchor_y);
+
+		for (Layer& layer : layers)
+			for (Image& cel : layer.cels)
+				cel = scale ? cel.Scaled(to_width, to_height) : cel.Placed(to_width, to_height, left, top);
+
+		width = to_width;
+		height = to_height;
 	};
 
 	#pragma endregion

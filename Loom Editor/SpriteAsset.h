@@ -75,6 +75,13 @@ namespace Loom
 			// Laid over this one where they meet, see-through as its alpha says.
 			void Over(const Image& above);
 
+			// Stretched or shrunk to the size, each pixel the nearest of this one's.
+			Image Scaled(int width, int height) const;
+
+			// On a clear image of the size with its top left at x, y, cut where
+			// it falls off.
+			Image Placed(int width, int height, int x, int y) const;
+
 			bool operator==(const Image&) const = default;
 		};
 
@@ -158,6 +165,11 @@ namespace Loom
 		void TakeIn(Image image, const std::string& name);
 		void AddFrame(int at, bool copy_previous);
 		void RemoveFrame(int frame);
+
+		// Every cel to the size, scaled, or else cut or grown clear about the
+		// anchor, which runs from 0 at the left or top to 1 at the right or
+		// bottom.
+		void Resize(int width, int height, bool scale, float anchor_x, float anchor_y);
 
 		#pragma endregion
 

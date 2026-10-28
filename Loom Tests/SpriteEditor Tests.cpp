@@ -530,7 +530,7 @@ TEST_SUITE("SpriteEditor")
 		};
 	};
 
-	TEST_CASE("a sprite with the Palette panel shut offers to open it, and New there makes a palette of the sprite's colours")
+	TEST_CASE("a sprite with the Palette panel shut offers to open it, New there makes a palette of the sprite's colours written on save, and Ctrl+Z takes the choice back")
 	{
 		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
 		sprite.layers[0].cels[0].Set(0, 0, RED);
@@ -543,16 +543,25 @@ TEST_SUITE("SpriteEditor")
 
 		const std::string palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension).string();
 
-		Loom::Palette made;
-		REQUIRE(Loom::Palette::Load(palette, made));
-		CHECK(made.colours == std::vector<SpriteAsset::Colour>{ RED });
-
-		REQUIRE(driven.editor.SaveAll());
+		CHECK_FALSE(std::filesystem::exists(palette));
 
 		SpriteAsset saved;
 		SpriteAsset::Links links;
+
+		driven.Run("click \"Sprites\" \"Fit\"\nwait 2\n");
+		driven.Press(ImGuiKey_Z);
+		REQUIRE(driven.editor.SaveAll());
+		REQUIRE(SpriteAsset::Load(SpriteAsset::For(driven.path), saved, links));
+		CHECK(links.palette.empty());
+
+		driven.Press(ImGuiKey_Y);
+		REQUIRE(driven.editor.SaveAll());
 		REQUIRE(SpriteAsset::Load(SpriteAsset::For(driven.path), saved, links));
 		CHECK(links.palette == palette);
+
+		Loom::Palette made;
+		REQUIRE(Loom::Palette::Load(palette, made));
+		CHECK(made.colours == std::vector<SpriteAsset::Colour>{ RED });
 
 		std::filesystem::remove(palette);
 	};
@@ -589,6 +598,30 @@ TEST_SUITE("SpriteEditor")
 
 		CHECK_FALSE(Driven::Asking());
 		CHECK(driven.paletteOpen);
+	};
+
+	TEST_CASE("Resize scales the sprite, is written only on Ctrl+S, and Ctrl+Z and Ctrl+Y step it")
+	{
+		constexpr int wider = Driven::side * 2;
+
+		Driven driven("loom sprite resize.tga");
+
+		driven.Run(
+			"click \"Sprites\" \"Resize\"\nwait 2\n"
+			"click \"Popup\" \"Width\" left\nkey ctrl+a\ntype " + std::to_string(wider) + "\nwait 2\n"
+			"click \"Popup\" \"OK\"\nwait 2\n");
+
+		SpriteAsset::Image image;
+		REQUIRE(SpriteAsset::LoadImage(driven.path, image));
+		CHECK(image.width == Driven::side);
+
+		CHECK(driven.Saved().width == wider);
+
+		driven.Press(ImGuiKey_Z);
+		CHECK(driven.Saved().width == Driven::side);
+
+		driven.Press(ImGuiKey_Y);
+		CHECK(driven.Saved().width == wider);
 	};
 
 	TEST_CASE("+ Layer adds a clear layer above the one painted, a drag moves it, and - Layer takes it out")
@@ -845,7 +878,7 @@ TEST_SUITE("SpriteEditor")
 		CHECK(Count(saved, WHITE) == 0);
 	};
 
-	TEST_CASE("a swatch clicked with either button is that button's colour, and + and - put the left colour in the palette and take it out")
+	TEST_CASE("a swatch clicked with either button is that button's colour, + and - put the left colour in the palette and take it out, written on Ctrl+S, and Ctrl+Z and Ctrl+Y step them")
 	{
 		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
 		sprite.layers[0].cels[0].Set(0, 0, RED);
@@ -874,9 +907,17 @@ TEST_SUITE("SpriteEditor")
 
 		driven.Run("click \"Palette\" \"-\"\nwait 2\n");
 		REQUIRE(Loom::Palette::Load(palette, saved));
+		CHECK(saved.colours == std::vector<SpriteAsset::Colour>{ RED });
+
+		driven.Run("key ctrl+s\nwait 2\n");
+		REQUIRE(Loom::Palette::Load(palette, saved));
 		CHECK(saved.colours.empty());
 
-		driven.Run("click \"Palette\" \"+\"\nwait 2\n");
+		driven.Run("click \"Palette\" \"+\"\nwait 2\nkey ctrl+z\nwait 2\nkey ctrl+s\nwait 2\n");
+		REQUIRE(Loom::Palette::Load(palette, saved));
+		CHECK(saved.colours.empty());
+
+		driven.Run("key ctrl+y\nwait 2\nkey ctrl+s\nwait 2\n");
 		REQUIRE(Loom::Palette::Load(palette, saved));
 		CHECK(saved.colours == std::vector<SpriteAsset::Colour>{ RED });
 

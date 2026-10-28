@@ -359,6 +359,33 @@ TEST_SUITE("SpriteAsset")
 		CHECK(names() == std::vector<std::string>{ "Layer 1", "Layer 2", "Layer 3" });
 	};
 
+	TEST_CASE("a resized sprite scales every cel to the size, or cuts and grows it clear about the anchor")
+	{
+		constexpr int scale = 2;
+
+		SpriteAsset scaled = TwoByTwo();
+		scaled.Resize(scaled.width * scale, scaled.height * scale, true, 0.0f, 0.0f);
+
+		CHECK(scaled.width == TwoByTwo().width * scale);
+		CHECK(scaled.durations == TwoByTwo().durations);
+		CHECK(Count(scaled.layers[0].cels[0], RED) == scale * scale);
+		CHECK(scaled.layers[0].cels[1].Get(3, 3) == GREEN);
+		CHECK(scaled.layers[1].cels[1].Get(5, 5) == BLUE);
+
+		SpriteAsset grown = TwoByTwo();
+		grown.Resize(grown.width + 2, grown.height + 2, false, 0.5f, 0.5f);
+
+		CHECK(grown.layers[0].cels[0].Get(1, 1) == RED);
+		CHECK(grown.layers[0].cels[0].Get(0, 0) == CLEAR);
+		CHECK(grown.layers[0].cels[1].Get(2, 2) == GREEN);
+
+		SpriteAsset cut = TwoByTwo();
+		cut.Resize(1, 1, false, 1.0f, 1.0f);
+
+		CHECK(cut.layers[0].cels[0].Get(0, 0) == CLEAR);
+		CHECK(cut.layers[1].cels[1].Get(0, 0) == BLUE);
+	};
+
 	TEST_CASE("a sprite's colours are its visible ones, each once")
 	{
 		const std::vector<SpriteAsset::Colour> colours = TwoByTwo().Colours(SIZE_MAX);

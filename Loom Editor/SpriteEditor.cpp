@@ -105,6 +105,12 @@ namespace Loom
 		// How far a preview's tab name leans, across per line down.
 		constexpr float italic_slant = 0.2f;
 
+		// The Resize popup's anchors, a grid of them with the middle first
+		// picked.
+		constexpr const char* resize_popup = "Resize";
+		constexpr int anchor_columns = 3;
+		constexpr int middle_anchor = anchor_columns * anchor_columns / 2;
+
 		#pragma endregion
 
 		#pragma region Colours
@@ -190,15 +196,16 @@ namespace Loom
 		};
 
 		// Beside the sprite, under its stem, or with the first number after it
-		// that nothing there is using.
-		std::string NewPalettePath(const std::string& sprite)
+		// that nothing there, nor any palette made and not yet saved, is using.
+		template <typename Taken>
+		std::string NewPalettePath(const std::string& sprite, const Taken& taken)
 		{
 			std::filesystem::path path = std::filesystem::path(sprite).replace_extension(Palette::extension);
 			const std::string stem = path.stem().string();
 
 			std::error_code code;
 
-			for (int suffix = 1; std::filesystem::exists(path, code); suffix++)
+			for (int suffix = 1; std::filesystem::exists(path, code) || taken(path.string()); suffix++)
 				path.replace_filename(stem + std::to_string(suffix) + Palette::extension);
 
 			return path.string();
@@ -740,12 +747,7 @@ namespace Loom
 			sprite.durations[document.frame] = duration;
 
 		if (ImGui::IsItemDeactivated())
-		{
-			if (!document.undo.empty() && sprite == document.undo.back())
-				document.undo.pop_back();
-
-			Edited(document);
-		};
+			Settle(document);
 
 		ImGui::SetItemTooltip("How long this frame shows");
 
@@ -1048,6 +1050,17 @@ namespace Loom
 			document.zoom = 0.0f;
 
 		ImGui::SameLine();
+
+		if (ImGui::SmallButton("Resize"))
+		{
+			m_resizeWidth = document.sprite.width;
+			m_resizeHeight = document.sprite.height;
+			m_resizeAnchor = middle_anchor;
+			ImGui::OpenPopup(resize_popup);
+		};
+
+		DrawResize(document);
+		ImGui::SameLine();
 		ImGui::TextDisabled(
 			"%d x %d, %g%%, frame %d of %d",
 			document.sprite.width,
@@ -1063,6 +1076,70 @@ namespace Loom
 			ImGui::SameLine();
 			ImGui::TextDisabled("  %d, %d  #%02X%02X%02X%02X", document.hoverX, document.hoverY, colour[0], colour[1], colour[2], colour[3]);
 		};
+	};
+
+	void SpriteEditor::DrawResize(Document& document)
+	{
+		if (!ImGui::BeginPopup(resize_popup))
+			return;
+
+		const float width = ImGui::GetFontSize() * name_lines;
+
+		ImGui::SetNextItemWidth(width);
+		ImGui::InputInt("Width", &m_resizeWidth);
+		ImGui::SetNextItemWidth(width);
+		ImGui::InputInt("Height", &m_resizeHeight);
+
+		m_resizeWidth = std::clamp(m_resizeWidth, 1, SpriteAsset::maxSide);
+		m_resizeHeight = std::clamp(m_resizeHeight, 1, SpriteAsset::maxSide);
+
+		ImGui::Checkbox("Scale", &m_resizeScale);
+		ImGui::SetItemTooltip(m_resizeScale ? "The pixels stretch or shrink to the size" : "The pixels stay as they are, cut or grown round the anchor");
+
+		ImGui::BeginDisabled(m_resizeScale);
+		ImGui::TextUnformatted("Anchor");
+
+		for (int anchor = 0; anchor < anchor_columns * anchor_columns; anchor++)
+		{
+			ImGui::PushID(anchor);
+
+			if (ImGui::RadioButton("##anchor", m_resizeAnchor == anchor))
+				m_resizeAnchor = anchor;
+
+			ImGui::PopID();
+
+			if (anchor % anchor_columns != anchor_columns - 1)
+				ImGui::SameLine();
+		};
+
+		ImGui::EndDisabled();
+		ImGui::BeginDisabled(m_resizeWidth == document.sprite.width && m_resizeHeight == document.sprite.height);
+
+		if (ImGui::Button("OK"))
+		{
+			constexpr float last_column = anchor_columns - 1;
+
+			Remember(document);
+			document.sprite.Resize(
+				m_resizeWidth,
+				m_resizeHeight,
+				m_resizeScale,
+				(float)(m_resizeAnchor % anchor_columns) / last_column,
+				(float)(m_resizeAnchor / anchor_columns) / last_column);
+			Edited(document);
+
+			// Fitted again at the new size.
+			document.zoom = 0.0f;
+			ImGui::CloseCurrentPopup();
+		};
+
+		ImGui::EndDisabled();
+		ImGui::SameLine();
+
+		if (ImGui::Button("Cancel"))
+			ImGui::CloseCurrentPopup();
+
+		ImGui::EndPopup();
 	};
 
 	#pragma endregion
@@ -1085,6 +1162,22 @@ namespace Loom
 			m_paletteFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
 			ToolShortcuts();
+
+			// Asked every frame, as the Sprites panel's are.
+			const bool save = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_S);
+			const bool undo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z);
+			const bool redo = ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y) || ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z);
+			const std::string path = PalettePath();
+
+			if (!path.empty())
+			{
+				if (undo || redo)
+					StepPalette(PaletteAt(path), undo);
+
+				if (save)
+					SavePalette(path);
+			};
+
 			DrawTools();
 			ImGui::Separator();
 			DrawPaletteChoice(project_folder);
@@ -1138,7 +1231,7 @@ namespace Loom
 	void SpriteEditor::DrawPaletteChoice(const std::string& project_folder)
 	{
 		const std::string& current = PalettePath();
-		const std::string shown = current.empty() ? "None" : FileName(current);
+		const std::string shown = current.empty() ? "None" : FileName(current) + (PaletteAt(current).Unsaved() ? " *" : "");
 
 		ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("New").x - ImGui::GetStyle().FramePadding.x * 2.0f - ImGui::GetStyle().ItemSpacing.x);
 
@@ -1159,6 +1252,10 @@ namespace Loom
 					entry.increment(code))
 					if (entry->path().extension() == Palette::extension)
 						m_paletteFiles.push_back(entry->path().lexically_normal().string());
+
+				for (const auto& [path, file] : m_palettes)
+					if (!file.saved)
+						m_paletteFiles.push_back(path);
 			};
 
 			if (ImGui::Selectable("None", current.empty()))
@@ -1180,14 +1277,10 @@ namespace Loom
 
 		if (ImGui::Button("New"))
 		{
-			const std::string path = NewPalettePath(m_active->path);
-			const Palette palette{ m_active->sprite.Colours(seeded_colours) };
+			const std::string path = NewPalettePath(m_active->path, [this](const std::string& taken) { return m_palettes.contains(taken); });
 
-			if (Palette::Save(path, palette))
-			{
-				m_palettes[path] = palette;
-				SetPalette(path);
-			};
+			m_palettes[path] = PaletteFile{ Palette{ m_active->sprite.Colours(seeded_colours) } };
+			SetPalette(path);
 		};
 
 		ImGui::EndDisabled();
@@ -1196,7 +1289,8 @@ namespace Loom
 
 	void SpriteEditor::DrawSwatches(const std::string& path)
 	{
-		Palette& palette = PaletteAt(path);
+		PaletteFile& file = PaletteAt(path);
+		Palette& palette = file.palette;
 
 		const ImGuiStyle& style = ImGui::GetStyle();
 		const float side = ImGui::GetFontSize() * swatch_lines;
@@ -1260,8 +1354,8 @@ namespace Loom
 
 		if (ImGui::Button("+", ImVec2(side, side)))
 		{
+			RememberPalette(file);
 			palette.colours.push_back(left);
-			Palette::Save(path, palette);
 		};
 
 		ImGui::EndDisabled();
@@ -1271,8 +1365,8 @@ namespace Loom
 
 		if (ImGui::Button("-", ImVec2(side, side)))
 		{
+			RememberPalette(file);
 			palette.colours.erase(found);
-			Palette::Save(path, palette);
 		};
 
 		ImGui::EndDisabled();
@@ -1310,11 +1404,15 @@ namespace Loom
 			return;
 		};
 
+		if (m_active->links.palette == path)
+			return;
+
+		Remember(*m_active);
 		m_active->links.palette = path;
 		Edited(*m_active);
 	};
 
-	Palette& SpriteEditor::PaletteAt(const std::string& path)
+	SpriteEditor::PaletteFile& SpriteEditor::PaletteAt(const std::string& path)
 	{
 		const auto found = m_palettes.find(path);
 
@@ -1322,10 +1420,45 @@ namespace Loom
 			return found->second;
 
 		// One that will not load shows empty, and is said once.
-		Palette& palette = m_palettes[path];
-		Palette::Load(path, palette);
+		PaletteFile& file = m_palettes[path];
+		Palette::Load(path, file.palette);
+		file.saved = file.palette;
 
-		return palette;
+		return file;
+	};
+
+	void SpriteEditor::RememberPalette(PaletteFile& file)
+	{
+		file.undo.push_back(file.palette);
+		file.redo.clear();
+	};
+
+	void SpriteEditor::StepPalette(PaletteFile& file, bool undo)
+	{
+		std::vector<Palette>& from = undo ? file.undo : file.redo;
+		std::vector<Palette>& to = undo ? file.redo : file.undo;
+
+		if (from.empty())
+			return;
+
+		to.push_back(std::move(file.palette));
+		file.palette = std::move(from.back());
+		from.pop_back();
+	};
+
+	bool SpriteEditor::SavePalette(const std::string& path)
+	{
+		PaletteFile& file = PaletteAt(path);
+
+		if (!file.Unsaved())
+			return true;
+
+		if (!Palette::Save(path, file.palette))
+			return false;
+
+		file.saved = file.palette;
+
+		return true;
 	};
 
 	#pragma endregion
@@ -1365,11 +1498,7 @@ namespace Loom
 		if (document.stroking && !ImGui::IsMouseDown(document.strokeButton))
 		{
 			document.stroking = false;
-
-			if (document.sprite == document.undo.back())
-				document.undo.pop_back();
-
-			Edited(document);
+			Settle(document);
 			return;
 		};
 
@@ -1453,11 +1582,19 @@ namespace Loom
 		const size_t bytes = (std::max)(document.sprite.Bytes(), (size_t)1);
 		const size_t kept = (std::max)(max_undo_bytes / bytes, (size_t)1);
 
-		document.undo.push_back(document.sprite);
+		document.undo.push_back({ document.sprite, document.links });
 		document.redo.clear();
 
 		if (document.undo.size() > kept)
 			document.undo.erase(document.undo.begin(), document.undo.end() - (ptrdiff_t)kept);
+	};
+
+	void SpriteEditor::Settle(Document& document)
+	{
+		if (!document.undo.empty() && document.undo.back().sprite == document.sprite && document.undo.back().links == document.links)
+			document.undo.pop_back();
+
+		Edited(document);
 	};
 
 	void SpriteEditor::Edited(Document& document)
@@ -1469,14 +1606,15 @@ namespace Loom
 
 	void SpriteEditor::Step(Document& document, bool undo)
 	{
-		std::vector<SpriteAsset>& from = undo ? document.undo : document.redo;
-		std::vector<SpriteAsset>& to = undo ? document.redo : document.undo;
+		std::vector<Snapshot>& from = undo ? document.undo : document.redo;
+		std::vector<Snapshot>& to = undo ? document.redo : document.undo;
 
 		if (from.empty())
 			return;
 
-		to.push_back(std::move(document.sprite));
-		document.sprite = std::move(from.back());
+		to.push_back({ std::move(document.sprite), std::move(document.links) });
+		document.sprite = std::move(from.back().sprite);
+		document.links = std::move(from.back().links);
 		from.pop_back();
 
 		// The layer or frame picked may be gone.
@@ -1538,6 +1676,9 @@ namespace Loom
 			if (document->unsaved)
 				saved = SaveDocument(*document) && saved;
 
+		for (const auto& [path, file] : m_palettes)
+			saved = SavePalette(path) && saved;
+
 		return saved;
 	};
 
@@ -1549,8 +1690,10 @@ namespace Loom
 			return false;
 		};
 
-		// The image first, since it is what the game draws.
-		if (!SpriteAsset::SaveImage(document.links.image, document.sprite.Sheet()) ||
+		// The palette before the sprite that names it, and the image before
+		// the sprite, since it is what the game draws.
+		if ((!document.links.palette.empty() && !SavePalette(document.links.palette)) ||
+			!SpriteAsset::SaveImage(document.links.image, document.sprite.Sheet()) ||
 			!SpriteAsset::Save(document.path, document.sprite, document.links))
 			return false;
 
