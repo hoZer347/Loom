@@ -1,0 +1,3 @@
+name=Physics
+scripts=Scripts/PhysicsScripts.vcxproj
+library=Build/PhysicsScripts.dll
