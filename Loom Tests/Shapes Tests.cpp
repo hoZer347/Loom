@@ -9,7 +9,6 @@
 #include "Mesh.h"
 #include "Scene.h"
 
-#include <string>
 #include <vector>
 
 
@@ -22,15 +21,6 @@ namespace
 	constexpr size_t UV_FLOATS = 2;
 
 	constexpr const char* LIT = "Assets/Lit.shader";
-	constexpr const char* UNLIT = "Assets/Unlit.shader";
-
-	Loom::GameObject* Drawing(Loom::GameObject& parent, const std::string& name, const std::string& shader)
-	{
-		Loom::GameObject* object = parent.AddChild(name);
-		object->Attach<Loom::Material>()->SetShaderPath(shader);
-
-		return object;
-	};
 };
 
 
@@ -79,46 +69,6 @@ TEST_SUITE("Shapes")
 
 		CHECK(lid->GetParent() == crate);
 		CHECK(crate->GetChildren() == std::vector<Loom::GameObject*>{ lid });
-	};
-
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the shader the most Materials draw with wins, across every root and down their children")
-	{
-		Loom::Scene first("First");
-		Loom::Scene second("Second");
-
-		Loom::GameObject* crate = Drawing(first.GetRoot(), "Crate", UNLIT);
-		Drawing(second.GetRoot(), "Barrel", UNLIT);
-		Drawing(second.GetRoot(), "Tower", UNLIT);
-		LoomTests::Pump();
-		Drawing(*crate, "Lid", LIT);
-		Drawing(*crate, "Hinge", LIT);
-		LoomTests::Pump();
-
-		CHECK(Shapes::MostUsedShader({ &first.GetRoot() }) == LIT);
-		CHECK(Shapes::MostUsedShader({ &first.GetRoot(), &second.GetRoot() }) == UNLIT);
-	};
-
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a tie goes to the first shader by path, whichever came first")
-	{
-		Loom::Scene scene("Tie");
-
-		Drawing(scene.GetRoot(), "Barrel", UNLIT);
-		Drawing(scene.GetRoot(), "Crate", LIT);
-		LoomTests::Pump();
-
-		CHECK(Shapes::MostUsedShader({ &scene.GetRoot() }) == LIT);
-	};
-
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "no shader with no Material that has one")
-	{
-		Loom::Scene scene("Empty");
-
-		scene.GetRoot().AddChild("Empty");
-		Drawing(scene.GetRoot(), "Unset", "");
-		LoomTests::Pump();
-
-		CHECK(Shapes::MostUsedShader({ }).empty());
-		CHECK(Shapes::MostUsedShader({ &scene.GetRoot() }).empty());
 	};
 };
 #endif

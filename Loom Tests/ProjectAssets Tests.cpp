@@ -574,6 +574,15 @@ TEST_SUITE("ProjectAssets")
 		std::filesystem::remove_all(root);
 	};
 
+	TEST_CASE("a new shader is shaded and shadowed by the scene's light")
+	{
+		const Loom::Shader::Stages stages = Loom::Shader::Assemble(Loom::ProjectAssets::defaultShader);
+
+		CHECK(stages.settings.shading);
+		CHECK(stages.settings.shadows);
+		CHECK_FALSE(stages.settings.transparency);
+	};
+
 	TEST_CASE("a new pixel shader is a .loompixel file that shows the scene as it is")
 	{
 		const std::filesystem::path root = std::filesystem::temp_directory_path() / "loom project assets pixel shader";

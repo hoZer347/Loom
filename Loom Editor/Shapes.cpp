@@ -6,7 +6,6 @@
 
 #include <algorithm>
 #include <iterator>
-#include <map>
 
 
 namespace Loom::Shapes
@@ -31,15 +30,6 @@ namespace Loom::Shapes
 			{ Shape::Cone, "Cone" },
 			{ Shape::Sphere, "Sphere" },
 			{ Shape::Capsule, "Capsule" },
-		};
-
-		void CountShaders(GameObject& object, std::map<std::string, int>& counts)
-		{
-			if (const Material* material = object.GetComponent<Material>(); material && !material->GetShaderPath().empty())
-				counts[material->GetShaderPath()]++;
-
-			for (GameObject* child : object.GetChildren())
-				CountShaders(*child, counts);
 		};
 	};
 
@@ -77,21 +67,5 @@ namespace Loom::Shapes
 		Build(shape, ADDED_SIZE).WriteTo(*object->Attach<Mesh>(Mesh::Triangles));
 
 		return object;
-	};
-
-	std::string MostUsedShader(const std::vector<GameObject*>& roots)
-	{
-		std::map<std::string, int> counts{ };
-
-		for (GameObject* root : roots)
-			CountShaders(*root, counts);
-
-		// The first of the largest, so a tie goes to the first path.
-		const auto most = std::max_element(
-			counts.begin(),
-			counts.end(),
-			[](const auto& a, const auto& b) { return a.second < b.second; });
-
-		return most == counts.end() ? std::string() : most->first;
 	};
 };

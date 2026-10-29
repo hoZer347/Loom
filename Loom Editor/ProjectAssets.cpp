@@ -956,6 +956,11 @@ namespace {NAMESPACE}
 	#pragma region Shaders
 
 	const char* const ProjectAssets::defaultShader = R"(
+// ===SETTINGS===
+
+shading = on
+shadows = on
+
 // ===VERTEX===
 
 layout(location = 0) in vec3 aPos;

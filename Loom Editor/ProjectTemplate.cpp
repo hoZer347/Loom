@@ -109,7 +109,7 @@ namespace {NAME}Scripts
 		Loom::Serial<float> m_radius = 0.6f;
 		Loom::Serial<float> m_angle;
 		Loom::Serial<bool> m_spinning = true;
-		Loom::Serial<Loom::Asset<".shader">> m_shader = "Assets/Shader.shader";
+		Loom::Serial<Loom::Asset<".shader">> m_shader = "Assets/Lit.shader";
 
 		Loom::Mesh* m_mesh = nullptr;
 	};
@@ -276,7 +276,7 @@ scripts are an ordinary C++ project in Scripts/.
 
     Scenes/Main{SCENE_EXTENSION}     opened when the project loads
     Scripts/{NAME}Scripts.sln    open this in Visual Studio to write scripts
-    Assets/Shader.shader         what the starter scene draws with
+    Assets/Lit.shader            what the starter scene draws with
     Build/                       where the compiled script library lands
 
 Scripts are Loom components written in headers: add a .hpp to Scripts/ with

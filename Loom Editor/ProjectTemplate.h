@@ -20,7 +20,7 @@ namespace Loom
 		static constexpr const char* extension = ".loomproject";
 
 		// What the starter scene draws with, relative to the project folder.
-		static constexpr const char* shader_path = "Assets/Shader.shader";
+		static constexpr const char* shader_path = "Assets/Lit.shader";
 
 		// Where the scripts build to, intermediates and all.
 		static constexpr const char* build_folder = "Build";

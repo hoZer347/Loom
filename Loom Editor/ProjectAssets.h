@@ -175,7 +175,7 @@ namespace Loom
 		#pragma region Shaders
 
 		// The shader every new one starts from: the mesh through the camera,
-		// in the material's colour, with every engine section off.
+		// in the material's colour, shaded and shadowed by the scene's light.
 		static const char* const defaultShader;
 
 		// The pixel shader every new one starts from: the view as it was drawn.

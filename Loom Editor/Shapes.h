@@ -4,7 +4,6 @@
 
 #include <span>
 #include <string>
-#include <vector>
 
 
 namespace Loom
@@ -46,9 +45,5 @@ namespace Loom
 		// A child of parent named for the shape, drawing it one unit across
 		// with the shader.
 		GameObject* Add(GameObject& parent, Shape shape, const std::string& shader);
-
-		// The shader the most Materials under the roots draw with, the first
-		// by path of any tied. Empty when none has one.
-		std::string MostUsedShader(const std::vector<GameObject*>& roots);
 	};
 };

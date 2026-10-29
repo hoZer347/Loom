@@ -582,8 +582,8 @@ namespace Loom
 		// path, relative to the project.
 		std::string FirstPreVertex() const;
 
-		// The shader most meshes open already draw with, or else the
-		// project's.
+		// What a new shape or scene draws with: the new project's shader while
+		// the project has it, or else its first, and none with no project open.
 		std::string ShapeShader() const;
 		static void SkipRows(size_t rows);
 

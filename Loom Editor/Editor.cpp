@@ -1231,7 +1231,7 @@ namespace Loom
 	Scene* Editor::CreateScene(const std::string& name)
 	{
 		Scene* scene = new Scene(name);
-		RenderingObjects::AddStarter(scene->GetRoot(), m_projectPath.empty() ? "" : ShapeShader());
+		RenderingObjects::AddStarter(scene->GetRoot(), ShapeShader());
 
 		// Children join their parents through the queue, and a new scene asset is saved straight away.
 		Engine::DoTasks();
@@ -3557,17 +3557,7 @@ namespace Loom
 
 	std::string Editor::ShapeShader() const
 	{
-		std::vector<GameObject*> roots{ };
-
-		for (Scene* scene : Scene::GetScenes())
-			roots.push_back(&scene->GetRoot());
-
-		if (GameObject* prefab = GetPrefabRoot())
-			roots.push_back(prefab);
-
-		const std::string most = Shapes::MostUsedShader(roots);
-
-		return most.empty() ? ProjectAssets::ProjectShader(m_projectPath) : most;
+		return m_projectPath.empty() ? "" : ProjectAssets::ProjectShader(m_projectPath);
 	};
 
 	#pragma endregion
