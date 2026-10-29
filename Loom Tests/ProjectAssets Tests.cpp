@@ -613,12 +613,19 @@ TEST_SUITE("ProjectAssets")
 		CHECK_FALSE(Loom::AssetKinds::Making({ }).has_value());
 	};
 
+	TEST_CASE("a scene field offers no New, since a new scene takes the Inspector off it")
+	{
+		CHECK_FALSE(Loom::AssetKinds::Making({ Loom::SceneSerializer::extension }).has_value());
+	};
+
 	TEST_CASE("every kind New makes is written with the extension it is offered for")
 	{
 		for (const auto& [kind, extension] : Loom::AssetKinds::extensions)
 		{
-			CHECK(Loom::AssetKinds::Making({ extension }) == kind);
 			CHECK(std::string(Loom::AssetKinds::ExtensionOf(kind)) == extension);
+
+			if (kind != Loom::AssetKind::Scene)
+				CHECK(Loom::AssetKinds::Making({ extension }) == kind);
 		};
 
 		CHECK(std::string(Loom::AssetKinds::ExtensionOf(Loom::AssetKind::Folder)).empty());

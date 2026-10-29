@@ -1586,7 +1586,8 @@ namespace Loom
 		char m_newAssetName[128]{ };
 		std::string m_newAssetProblem{ };
 
-		// An asset field's New, and what it made, which the field takes up when next drawn.
+		// An asset field's New, and what it made, which the field takes up when next
+		// drawn. A new selection drops both.
 		void* m_newAssetFor = nullptr;
 		std::string m_newAssetMade{ };
 

@@ -858,6 +858,7 @@ namespace Loom
 		m_newScriptFolder.clear();
 		m_newScriptFor.clear();
 		m_newAssetFor = nullptr;
+		m_newAssetMade.clear();
 
 		for (FileTab& tab : m_fileTabs)
 			tab.newFolder.clear();
@@ -932,6 +933,7 @@ namespace Loom
 		m_newScriptFolder.clear();
 		m_newScriptFor.clear();
 		m_newAssetFor = nullptr;
+		m_newAssetMade.clear();
 		snprintf(m_newAssetName, sizeof(m_newAssetName), "%s", name.c_str());
 
 		CreateAsset();
@@ -1139,6 +1141,9 @@ namespace Loom
 		};
 
 		ImGui::End();
+
+		if (!m_askForAsset && m_newAssetMade.empty())
+			m_newAssetFor = nullptr;
 	};
 
 	#pragma endregion
@@ -2056,6 +2061,15 @@ namespace Loom
 				: IconOf(file);
 		};
 
+		bool changed = false;
+
+		if (field.data == m_newAssetFor && !m_newAssetMade.empty())
+		{
+			path = std::exchange(m_newAssetMade, { });
+			m_newAssetFor = nullptr;
+			changed = true;
+		};
+
 		const std::filesystem::path named(path);
 
 		DrawPickerButton(
@@ -2074,15 +2088,6 @@ namespace Loom
 					: extension == ProjectAssets::preVertexExtension
 						? std::optional(ScriptEntryKind::PreVertex)
 					: std::nullopt;
-
-		bool changed = false;
-
-		if (field.data == m_newAssetFor && !m_newAssetMade.empty())
-		{
-			path = std::exchange(m_newAssetMade, { });
-			m_newAssetFor = nullptr;
-			changed = true;
-		};
 
 		if (ImGui::BeginDragDropTarget())
 		{

@@ -35,7 +35,7 @@ namespace Loom
 	namespace AssetKinds
 	{
 		// The kinds written as one file of their own extension.
-		constexpr std::pair<AssetKind, const char*> extensions[] =
+		inline constexpr std::pair<AssetKind, const char*> extensions[] =
 		{
 			{ AssetKind::Scene, SceneSerializer::extension },
 			{ AssetKind::Prefab, Prefab::extension },
@@ -55,11 +55,12 @@ namespace Loom
 			return "";
 		};
 
-		// What New in an asset field taking those extensions makes.
+		// What New in an asset field taking those extensions makes. Never a
+		// scene, which opens in front and takes the Inspector off the field.
 		inline std::optional<AssetKind> Making(const std::vector<std::string>& accepted)
 		{
 			for (const auto& [kind, extension] : extensions)
-				if (std::find(accepted.begin(), accepted.end(), extension) != accepted.end())
+				if (kind != AssetKind::Scene && std::find(accepted.begin(), accepted.end(), extension) != accepted.end())
 					return kind;
 
 			return std::nullopt;

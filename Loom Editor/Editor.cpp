@@ -1610,6 +1610,8 @@ namespace Loom
 		m_nameBufferOwner = nullptr;
 		m_selectedModel.clear();
 		m_renaming = false;
+		m_newAssetFor = nullptr;
+		m_newAssetMade.clear();
 	};
 
 	void Editor::SetSelection(const std::vector<GameObject*>& objects)
