@@ -434,7 +434,7 @@ namespace Loom
 
 				open.resize(depth);
 
-				Node& node = (depth == 0 ? log->root : *open.back()).Part(span.name, shared.frame, shared.points);
+				Node& node = (depth == 0 ? log->root : *open.back()).Part(span.name, shared.frame, after);
 				node.sum += length;
 				open.push_back(&node);
 			};

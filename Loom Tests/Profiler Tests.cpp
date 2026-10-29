@@ -255,6 +255,21 @@ TEST_SUITE("Profiler")
 		CHECK(trend[Loom::Profiler::Trend - points - 1] == 0.0);
 	};
 
+	TEST_CASE_FIXTURE(NewFrame, "a frame running past the whole trend keeps the stages it ran")
+	{
+		Loom::Profiler::Advance(POINT);
+		Loom::Profiler::EndFrame();
+
+		{
+			LOOM_STAGE("Profiler stalled frame");
+		};
+
+		Loom::Profiler::Advance(POINT * (Loom::Profiler::Trend + 1));
+		Loom::Profiler::EndFrame();
+
+		CHECK(FindRow("Profiler stalled frame").thread);
+	};
+
 	TEST_CASE_FIXTURE(NewFrame, "a stage that has not run for the whole trend is forgotten")
 	{
 		{
