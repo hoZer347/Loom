@@ -117,8 +117,8 @@ namespace Loom
 			Nearest,
 		};
 
-		// After variables, so the fields before it keep their places in scenes saved
-		// without it.
+		// After variables, so the fields before it keep their places in scenes
+		// saved without it.
 		Serial<Sampling> sampling = AsShader;
 
 		// Which faces it draws: both, or only those facing the camera (Front)
