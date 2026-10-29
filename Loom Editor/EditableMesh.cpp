@@ -125,7 +125,7 @@ namespace Loom
 		normals.clear();
 		colors.clear();
 
-		const auto add = [&](const Corner& corner)
+		const auto add = [this, &positions, &uvs, &normals, &colors](const Corner& corner)
 		{
 			const glm::vec3& position = vertices[corner.vertex];
 			positions.insert(positions.end(), { position.x, position.y, position.z });
@@ -156,7 +156,7 @@ namespace Loom
 		for (const UVLayout& layer : layers)
 			out.push_back({ layer.id, layer.words });
 
-		const auto add = [&](const Corner& corner)
+		const auto add = [&out](const Corner& corner)
 		{
 			auto words = corner.layers.begin();
 
@@ -279,8 +279,6 @@ namespace Loom
 
 	EditableMesh EditableMesh::Cone(float radius, float height, int segments)
 	{
-		constexpr float apex_u = 0.5f;
-
 		const float half = height / 2.0f;
 
 		EditableMesh mesh;
@@ -299,6 +297,7 @@ namespace Loom
 		for (int i = 0; i < segments; i++)
 		{
 			const uint32_t next = (uint32_t)((i + 1) % segments);
+			constexpr float apex_u = 0.5f;
 
 			mesh.AddFace({ (uint32_t)i, next, apex }, { { (float)i / segments, 0.0f }, { (float)(i + 1) / segments, 0.0f }, { apex_u, 1.0f } });
 
@@ -306,7 +305,7 @@ namespace Loom
 			bottom_uvs.insert(bottom_uvs.begin(), RoundUV(i, segments));
 		};
 
-		const auto slant = [&](const glm::vec3& outward) { return glm::normalize(glm::vec3(outward.x * height, radius, outward.z * height)); };
+		const auto slant = [height, radius](const glm::vec3& outward) { return glm::normalize(glm::vec3(outward.x * height, radius, outward.z * height)); };
 
 		for (int i = 0; i < segments; i++)
 			for (Corner& corner : mesh.faces[i].corners)
@@ -323,9 +322,6 @@ namespace Loom
 		mesh.hasUVs = true;
 		mesh.hasNormals = true;
 
-		const uint32_t north = 0;
-		const uint32_t south = 1;
-
 		mesh.vertices = { { 0.0f, radius, 0.0f }, { 0.0f, -radius, 0.0f } };
 
 		// The rings between the poles, from the north down.
@@ -337,11 +333,14 @@ namespace Loom
 				mesh.vertices.push_back(Round(radius * std::sin(down), radius * std::cos(down), i, segments));
 		};
 
-		const auto at = [&](int ring, int i) { return (uint32_t)(2 + (ring - 1) * segments + (i % segments)); };
-		const auto uv = [&](int ring, int i) { return glm::vec2((float)i / segments, 1.0f - (float)ring / rings); };
+		const auto at = [segments](int ring, int i) { return (uint32_t)(2 + (ring - 1) * segments + (i % segments)); };
+		const auto uv = [segments, rings](int ring, int i) { return glm::vec2((float)i / segments, 1.0f - (float)ring / rings); };
 
 		for (int i = 0; i < segments; i++)
 		{
+			const uint32_t north = 0;
+			const uint32_t south = 1;
+
 			mesh.AddFace({ north, at(1, i), at(1, i + 1) }, { uv(0, i), uv(1, i), uv(1, i + 1) });
 
 			for (int ring = 1; ring + 1 < rings; ring++)
@@ -367,9 +366,6 @@ namespace Loom
 		mesh.hasUVs = true;
 		mesh.hasNormals = true;
 
-		const uint32_t north = 0;
-		const uint32_t south = 1;
-
 		mesh.vertices = { { 0.0f, half, 0.0f }, { 0.0f, -half, 0.0f } };
 
 		// The waist ring comes twice: once ending each half sphere.
@@ -383,11 +379,14 @@ namespace Loom
 				mesh.vertices.push_back(Round(radius * std::sin(down), y, i, segments));
 		};
 
-		const auto at = [&](int row, int i) { return (uint32_t)(2 + row * segments + (i % segments)); };
-		const auto uv = [&](uint32_t vertex, int i) { return glm::vec2((float)i / segments, (mesh.vertices[vertex].y + half) / (2.0f * half)); };
+		const auto at = [segments](int row, int i) { return (uint32_t)(2 + row * segments + (i % segments)); };
+		const auto uv = [&mesh, half, segments](uint32_t vertex, int i) { return glm::vec2((float)i / segments, (mesh.vertices[vertex].y + half) / (2.0f * half)); };
 
 		for (int i = 0; i < segments; i++)
 		{
+			const uint32_t north = 0;
+			const uint32_t south = 1;
+
 			mesh.AddFace({ north, at(0, i), at(0, i + 1) }, { uv(north, i), uv(at(0, i), i), uv(at(0, i + 1), i + 1) });
 
 			for (int row = 0; row + 1 < rows; row++)
@@ -512,7 +511,7 @@ namespace Loom
 		std::set<uint32_t> found{ };
 
 		for (uint32_t face = 0; face < faces.size(); face++)
-			if (std::all_of(faces[face].corners.begin(), faces[face].corners.end(), [&](const Corner& corner) { return selected.contains(corner.vertex); }))
+			if (std::all_of(faces[face].corners.begin(), faces[face].corners.end(), [&selected](const Corner& corner) { return selected.contains(corner.vertex); }))
 				found.insert(face);
 
 		return found;
@@ -599,7 +598,7 @@ namespace Loom
 			vertices[vertex] = glm::vec3(matrix * glm::vec4(vertices[vertex], 1.0f));
 
 		const glm::mat3 turn = glm::transpose(glm::inverse(glm::mat3(matrix)));
-		const auto is_moved = [&](const Corner& corner) { return moved.contains(corner.vertex); };
+		const auto is_moved = [&moved](const Corner& corner) { return moved.contains(corner.vertex); };
 
 		for (uint32_t face = 0; face < faces.size(); face++)
 		{
@@ -788,7 +787,7 @@ namespace Loom
 		std::set<uint32_t> doomed{ };
 
 		for (uint32_t face = 0; face < faces.size(); face++)
-			if (std::any_of(faces[face].corners.begin(), faces[face].corners.end(), [&](const Corner& corner) { return selected.contains(corner.vertex); }))
+			if (std::any_of(faces[face].corners.begin(), faces[face].corners.end(), [&selected](const Corner& corner) { return selected.contains(corner.vertex); }))
 				doomed.insert(face);
 
 		DeleteFaces(doomed);
@@ -837,7 +836,7 @@ namespace Loom
 		std::vector<Face> joined{ };
 
 		// The quad across first's edge i, if flat, convex and the edge's corners agree.
-		const auto join = [&](uint32_t first, size_t i, uint32_t second) -> std::optional<Face>
+		const auto join = [this](uint32_t first, size_t i, uint32_t second) -> std::optional<Face>
 		{
 			const std::vector<Corner>& a = faces[first].corners;
 			const std::vector<Corner>& b = faces[second].corners;

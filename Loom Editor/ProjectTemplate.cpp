@@ -422,7 +422,7 @@ SpinningTriangle is there as a worked example.
 			const std::filesystem::path folder = root / ProjectTemplate::scripts_folder;
 
 			const auto fill =
-				[&](const char* text)
+				[&name, &project, &project_guid](const char* text)
 				{
 					return Fill(text, name, project, project_guid);
 				};
@@ -537,7 +537,7 @@ SpinningTriangle is there as a worked example.
 		const std::string project = root.lexically_normal().string();
 
 		const auto fill =
-			[&](const char* text)
+			[&name, &project](const char* text)
 			{
 				return Fill(text, name, project, "");
 			};
@@ -673,7 +673,7 @@ SpinningTriangle is there as a worked example.
 		const std::string newline = text.find("\r\n") == std::string::npos ? "\n" : "\r\n";
 
 		const auto lines =
-			[&](const std::string& fragment)
+			[&newline](const std::string& fragment)
 			{
 				return ProjectAssets::Replace(fragment, "\n", newline);
 			};

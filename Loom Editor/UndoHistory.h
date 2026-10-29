@@ -18,8 +18,6 @@ namespace Loom
 	template<typename T>
 	struct UndoHistory final
 	{
-		static constexpr size_t max_steps = 100;
-
 		// Nothing to undo, as it stands in its file.
 		void Clear()
 		{
@@ -101,6 +99,8 @@ namespace Loom
 		bool CanRedo() const { return !m_redo.empty(); };
 
 	private:
+		static constexpr size_t max_steps = 100;
+
 		std::vector<T> m_undo{ };
 		std::vector<T> m_redo{ };
 

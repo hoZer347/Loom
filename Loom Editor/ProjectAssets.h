@@ -30,7 +30,6 @@ namespace Loom
 		static constexpr const char* dialogueExtension = DialogueManagerBase::extension;
 		static constexpr const char* preVertexExtension = PreVertex::extension;
 		static constexpr const char* textureExtension = TextureAsset::fileExtensions.front();
-		static constexpr std::string_view scriptExtensions[] = { ".hpp", ".h", ".cpp" };
 
 		enum struct Opener
 		{
@@ -187,13 +186,6 @@ namespace Loom
 		// in the material's colour, shaded and shadowed by the scene's light.
 		static const char* const defaultShader;
 
-		// The pixel shader every new one starts from: the view as it was drawn.
-		static const char* const defaultPixelShader;
-
-		// The compute shader every new one starts from: each cell counts the seconds.
-		static const char* const defaultComputeShader;
-		static const char* const defaultDialogue;
-
 		// What a new .loomprevertex file holds: a wave along world X.
 		static const char* const defaultPreVertex;
 
@@ -219,6 +211,24 @@ namespace Loom
 
 		// What the first <tag> in an MSBuild project holds, or an empty string.
 		static std::string Element(const std::string& xml, const std::string& tag);
+
+		#pragma endregion
+
+	private:
+		#pragma region File Kinds
+
+		static constexpr std::string_view scriptExtensions[] = { ".hpp", ".h", ".cpp" };
+
+		#pragma endregion
+
+		#pragma region Shaders
+
+		// The pixel shader every new one starts from: the view as it was drawn.
+		static const char* const defaultPixelShader;
+
+		// The compute shader every new one starts from: each cell counts the seconds.
+		static const char* const defaultComputeShader;
+		static const char* const defaultDialogue;
 
 		#pragma endregion
 	};

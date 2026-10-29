@@ -467,7 +467,7 @@ namespace Contacts
 
 			// How far each box reaches along an axis, and b's centre from a's.
 			const auto test =
-				[&](float reachA, float reachB, float distance, float length, int index, const auto& axis)
+				[&bestOverlap, &bestAxis, &best, margin](float reachA, float reachB, float distance, float length, int index, const auto& axis)
 				{
 					const float overlap = (reachA + reachB - std::abs(distance)) / length;
 
@@ -488,13 +488,13 @@ namespace Contacts
 			{
 				const float reachB = b.half[0] * across[i][0] + b.half[1] * across[i][1] + b.half[2] * across[i][2];
 
-				if (!test(a.half[i], reachB, gap[i], 1.0f, i, [&]() { return a.axes[i]; }))
+				if (!test(a.half[i], reachB, gap[i], 1.0f, i, [&a, i]() { return a.axes[i]; }))
 					return;
 
 				const float reachA = a.half[0] * across[0][i] + a.half[1] * across[1][i] + a.half[2] * across[2][i];
 				const float distance = gap[0] * turned[0][i] + gap[1] * turned[1][i] + gap[2] * turned[2][i];
 
-				if (!test(reachA, b.half[i], distance, 1.0f, AXES + i, [&]() { return b.axes[i]; }))
+				if (!test(reachA, b.half[i], distance, 1.0f, AXES + i, [&b, i]() { return b.axes[i]; }))
 					return;
 			};
 
@@ -516,7 +516,7 @@ namespace Contacts
 					const float reachB = b.half[j1] * across[i][j2] + b.half[j2] * across[i][j1];
 					const float distance = (gap[i2] * turned[i1][j] - gap[i1] * turned[i2][j]) * handed;
 
-					if (!test(reachA, reachB, distance, length, FACES + i * AXES + j, [&]() { return glm::cross(a.axes[i], b.axes[j]); }))
+					if (!test(reachA, reachB, distance, length, FACES + i * AXES + j, [&a, &b, i, j]() { return glm::cross(a.axes[i], b.axes[j]); }))
 						return;
 				};
 
@@ -636,7 +636,7 @@ namespace Contacts
 
 			// axis is in the box's frame; world is only set for the best so far.
 			const auto test =
-				[&](const glm::vec3& axis, float length, int index, const auto& world)
+				[&box, &local, margin, &bestOverlap, &bestAxis, &best](const glm::vec3& axis, float length, int index, const auto& world)
 				{
 					const float reach = box.half.x * std::abs(axis.x) + box.half.y * std::abs(axis.y) + box.half.z * std::abs(axis.z);
 
@@ -672,7 +672,7 @@ namespace Contacts
 			// The triangle's face first, the likeliest separating axis.
 			const glm::vec3 faceLocal(glm::dot(faceNormal, box.axes[0]), glm::dot(faceNormal, box.axes[1]), glm::dot(faceNormal, box.axes[2]));
 
-			if (!test(faceLocal, 1.0f, TRIANGLE_FACE, [&]() { return faceNormal; }))
+			if (!test(faceLocal, 1.0f, TRIANGLE_FACE, [&faceNormal]() { return faceNormal; }))
 				return;
 
 			for (int i = 0; i < AXES; i++)
@@ -680,7 +680,7 @@ namespace Contacts
 				glm::vec3 axis(0.0f);
 				axis[i] = 1.0f;
 
-				if (!test(axis, 1.0f, i, [&]() { return box.axes[i]; }))
+				if (!test(axis, 1.0f, i, [&box, i]() { return box.axes[i]; }))
 					return;
 			};
 
@@ -698,7 +698,7 @@ namespace Contacts
 					if (length < EPSILON)
 						continue;
 
-					if (!test(axis, length, FACES + i * CORNERS + j, [&]() { return box.axes[0] * axis.x + box.axes[1] * axis.y + box.axes[2] * axis.z; }))
+					if (!test(axis, length, FACES + i * CORNERS + j, [&box, &axis]() { return box.axes[0] * axis.x + box.axes[1] * axis.y + box.axes[2] * axis.z; }))
 						return;
 				};
 

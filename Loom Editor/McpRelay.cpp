@@ -664,7 +664,7 @@ namespace Loom
 		if (name == EDITORS_TOOL)
 			return McpProtocol::Text(Listing());
 
-		if (std::none_of(m_tools.begin(), m_tools.end(), [&](const json& tool) { return tool["name"] == name; }))
+		if (std::none_of(m_tools.begin(), m_tools.end(), [&name](const json& tool) { return tool["name"] == name; }))
 			return std::nullopt;
 
 		std::string editor{ };

@@ -325,7 +325,7 @@ void main()
 			size.x,
 			size.y,
 			uncovered,
-			[&]()
+			[this, &camera, &selected, &drew]()
 			{
 				// Mesh program last, so the sprite program is never left bound with the shadow map on its unit.
 				camera.Apply(m_spriteMask);

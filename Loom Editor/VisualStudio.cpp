@@ -336,7 +336,7 @@ namespace Loom
 
 		HiddenProcess::Run(
 			'"' + vswhere.string() + "\" -latest -prerelease -products * " + arguments,
-			[&](const std::string& line)
+			[&code, &found](const std::string& line)
 			{
 				if (found.empty() && !line.empty() && std::filesystem::exists(line, code))
 					found = line;

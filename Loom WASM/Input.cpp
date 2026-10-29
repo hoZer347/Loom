@@ -485,6 +485,8 @@ namespace Loom
 
 	#pragma region Platform
 
+	namespace
+	{
 #if __EMSCRIPTEN__
 	EM_BOOL mouse_move_callback(int eventType, const EmscriptenMouseEvent* e, void* userData)
 	{
@@ -556,6 +558,7 @@ namespace Loom
 		Input::OnMouseWheel((float)notches);
 	};
 #endif
+	};
 
 	void Input::Init()
 	{

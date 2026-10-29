@@ -690,22 +690,10 @@ namespace Loom
 		void Draw(uint32_t handle, uint32_t primitive, const float* vertices, size_t count, uint32_t, VertexFormat format) override
 		{
 			DrawWith(handle, primitive, count, format, 1,
-				[&](VkCommandBuffer command, size_t drawn, size_t stride)
+				[this, vertices, count](VkCommandBuffer command, size_t drawn, size_t stride)
 				{
 					BindStreamed(command, vertices, count, drawn, stride);
 				});
-		};
-
-		// Hands count vertices over for this draw alone, drawn of them.
-		void BindStreamed(VkCommandBuffer command, const float* vertices, size_t count, size_t drawn, size_t stride)
-		{
-			const Allocation vertexData = Allocate(drawn * stride, sizeof(float));
-			memcpy(vertexData.mapped, vertices, count * stride);
-
-			if (drawn > count)
-				memcpy(vertexData.mapped + count * stride, vertices, stride);
-
-			vkCmdBindVertexBuffers(command, VERTEX_BINDING, 1, &vertexData.buffer, &vertexData.offset);
 		};
 
 		uint32_t CreateVertices() override
@@ -743,40 +731,6 @@ namespace Loom
 			DrawKept(program, primitive, vertices, instances, count);
 		};
 
-		// Once, or once per instance.
-		void DrawKept(uint32_t program, uint32_t primitive, uint32_t handle, const float* instances, size_t instanceCount)
-		{
-			const auto found = m_kept.find(handle);
-
-			if (found == m_kept.end())
-				return;
-
-			Kept& kept = found->second;
-
-			// Moving costs a GPU wait, so only vertices stable for a whole frame move.
-			if (!kept.buffer && kept.settles && kept.setOn != m_framesBegun)
-				Settle(kept);
-
-			DrawWith(program, primitive, kept.count, kept.layout, instanceCount,
-				[&](VkCommandBuffer command, size_t drawn, size_t stride)
-				{
-					if (kept.buffer)
-					{
-						const VkDeviceSize offset = 0;
-						vkCmdBindVertexBuffers(command, VERTEX_BINDING, 1, &kept.buffer, &offset);
-					}
-					else BindStreamed(command, kept.streamed.data(), kept.count, drawn, stride);
-
-					if (instances)
-					{
-						const Allocation instanceData = Allocate(instanceCount * INSTANCE_SIZE, sizeof(float));
-						memcpy(instanceData.mapped, instances, instanceCount * INSTANCE_SIZE);
-
-						vkCmdBindVertexBuffers(command, INSTANCE_BINDING, 1, &instanceData.buffer, &instanceData.offset);
-					};
-				});
-		};
-
 		void DestroyVertices(uint32_t handle) override
 		{
 			const auto found = m_kept.find(handle);
@@ -786,120 +740,6 @@ namespace Loom
 
 			Release(found->second);
 			m_kept.erase(found);
-		};
-
-		// Vertices bound by bind, instances in INSTANCE_BINDING; a loop draws one more.
-		template<typename Bind>
-		void DrawWith(uint32_t handle, uint32_t primitive, size_t count, const VertexLayout& layout, size_t instances, const Bind& bind)
-		{
-			if (!m_recording || count == 0)
-				return;
-
-			const auto found = m_programs.find(handle);
-
-			if (found == m_programs.end())
-				return;
-
-			Program& program = found->second;
-			const uint32_t target = m_stack.back();
-
-			if (target == WINDOW && !m_haveImage)
-				return;
-
-			EnsureRendering(target);
-
-			const VertexFormat format = layout.format;
-			const VkPipeline pipeline = PipelineFor(program, Topology(primitive), target, layout);
-
-			if (!pipeline)
-				return;
-
-			const VkCommandBuffer command = Command();
-
-			if (pipeline != m_boundPipeline)
-			{
-				vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-				m_boundPipeline = pipeline;
-			};
-
-			// A loop is a strip with its first vertex again at the end.
-			const size_t drawn = primitive == GL_LINE_LOOP_ ? count + 1 : count;
-			const size_t stride = FloatsPerVertex(layout) * sizeof(float);
-
-			if (program.hasPosition || program.hasUV || program.hasNormal || program.hasColor || program.hasInstance || !program.uvSlots.empty())
-				bind(command, drawn, stride);
-
-			if (program.hasNormal && !HasNormals(format))
-			{
-				const Allocation noNormal = Allocate(NORMAL_SIZE, sizeof(float));
-				memset(noNormal.mapped, 0, NORMAL_SIZE);
-
-				vkCmdBindVertexBuffers(command, NO_NORMAL_BINDING, 1, &noNormal.buffer, &noNormal.offset);
-			};
-
-			if (program.hasColor && format != VertexFormat::PositionUVNormalColor)
-			{
-				const Allocation noColor = Allocate(COLOR_SIZE, sizeof(float));
-				memcpy(noColor.mapped, NO_COLOR, COLOR_SIZE);
-
-				vkCmdBindVertexBuffers(command, NO_COLOR_BINDING, 1, &noColor.buffer, &noColor.offset);
-			};
-
-			const bool lacksLayer = std::any_of(
-				program.uvSlots.begin(),
-				program.uvSlots.end(),
-				[&layout](const UVBinding& binding) { return SourceOf(layout, binding.slot).words == 0; });
-
-			if (lacksLayer)
-			{
-				const Allocation noUV = Allocate(UV_SLOT_SIZE, sizeof(uint32_t));
-				memset(noUV.mapped, 0, UV_SLOT_SIZE);
-
-				vkCmdBindVertexBuffers(command, NO_UV_BINDING, 1, &noUV.buffer, &noUV.offset);
-			};
-
-			// Members so a draw allocates nothing; reserved so image pointers stay put.
-			std::vector<VkWriteDescriptorSet>& writes = m_writes;
-			std::vector<VkDescriptorImageInfo>& images = m_images;
-			writes.clear();
-			images.clear();
-			images.reserve(program.samplers.size());
-
-			VkDescriptorBufferInfo block{ };
-
-			if (program.blockSize)
-			{
-				const Allocation uniforms = Allocate(program.blockSize, m_uniformAlignment);
-				memcpy(uniforms.mapped, program.block.data(), program.blockSize);
-
-				block = { uniforms.buffer, uniforms.offset, program.blockSize };
-
-				VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-				write.dstBinding = Glsl::DEFAULT_BLOCK_BINDING;
-				write.descriptorCount = 1;
-				write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				write.pBufferInfo = &block;
-				writes.push_back(write);
-			};
-
-			for (const auto& [name, sampler] : program.samplers)
-			{
-				const Texture& texture = SampledTexture(sampler);
-				const VkSampler sampling = program.pixelated && !sampler.shadow ? m_nearestSampler : texture.sampler;
-				images.push_back({ sampling, texture.Sampled().view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
-
-				VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-				write.dstBinding = sampler.binding;
-				write.descriptorCount = 1;
-				write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-				write.pImageInfo = &images.back();
-				writes.push_back(write);
-			};
-
-			if (!writes.empty())
-				m_pushDescriptorSet(command, VK_PIPELINE_BIND_POINT_GRAPHICS, program.layout, 0, (uint32_t)writes.size(), writes.data());
-
-			vkCmdDraw(command, (uint32_t)drawn, (uint32_t)instances, 0, 0);
 		};
 
 		#pragma endregion
@@ -926,7 +766,7 @@ namespace Loom
 			if (rgba && CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, staging, memory, &mapped))
 				memcpy(mapped, rgba, size);
 
-			Immediately([&](VkCommandBuffer command)
+			Immediately([&texture, staging, width, height](VkCommandBuffer command)
 			{
 				Transition(command, texture.color.image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
@@ -962,7 +802,7 @@ namespace Loom
 			texture.sampler = CreateSampler(true);
 
 			// Cleared to the far plane, so an empty map shadows nothing.
-			Immediately([&](VkCommandBuffer command)
+			Immediately([&texture](VkCommandBuffer command)
 			{
 				Transition(command, texture.depth.image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
@@ -996,7 +836,7 @@ namespace Loom
 
 			texture.sampler = CreateSampler(false);
 
-			Immediately([&](VkCommandBuffer command)
+			Immediately([&texture](VkCommandBuffer command)
 			{
 				Transition(command, texture.color.image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 				Transition(command, texture.depth.image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -1024,7 +864,7 @@ namespace Loom
 
 			texture.sampler = CreateSampler(false, VK_FILTER_NEAREST);
 
-			Immediately([&](VkCommandBuffer command)
+			Immediately([&texture](VkCommandBuffer command)
 			{
 				Transition(command, texture.color.image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 			});
@@ -1330,6 +1170,170 @@ namespace Loom
 			uint8_t* mapped = nullptr;
 			int width = 0;
 			int height = 0;
+		};
+
+		#pragma endregion
+
+		#pragma region Drawing Helpers
+
+		// Hands count vertices over for this draw alone, drawn of them.
+		void BindStreamed(VkCommandBuffer command, const float* vertices, size_t count, size_t drawn, size_t stride)
+		{
+			const Allocation vertexData = Allocate(drawn * stride, sizeof(float));
+			memcpy(vertexData.mapped, vertices, count * stride);
+
+			if (drawn > count)
+				memcpy(vertexData.mapped + count * stride, vertices, stride);
+
+			vkCmdBindVertexBuffers(command, VERTEX_BINDING, 1, &vertexData.buffer, &vertexData.offset);
+		};
+
+		// Once, or once per instance.
+		void DrawKept(uint32_t program, uint32_t primitive, uint32_t handle, const float* instances, size_t instanceCount)
+		{
+			const auto found = m_kept.find(handle);
+
+			if (found == m_kept.end())
+				return;
+
+			Kept& kept = found->second;
+
+			// Moving costs a GPU wait, so only vertices stable for a whole frame move.
+			if (!kept.buffer && kept.settles && kept.setOn != m_framesBegun)
+				Settle(kept);
+
+			DrawWith(program, primitive, kept.count, kept.layout, instanceCount,
+				[this, &kept, instances, instanceCount](VkCommandBuffer command, size_t drawn, size_t stride)
+				{
+					if (kept.buffer)
+					{
+						const VkDeviceSize offset = 0;
+						vkCmdBindVertexBuffers(command, VERTEX_BINDING, 1, &kept.buffer, &offset);
+					}
+					else BindStreamed(command, kept.streamed.data(), kept.count, drawn, stride);
+
+					if (instances)
+					{
+						const Allocation instanceData = Allocate(instanceCount * INSTANCE_SIZE, sizeof(float));
+						memcpy(instanceData.mapped, instances, instanceCount * INSTANCE_SIZE);
+
+						vkCmdBindVertexBuffers(command, INSTANCE_BINDING, 1, &instanceData.buffer, &instanceData.offset);
+					};
+				});
+		};
+
+		// Vertices bound by bind, instances in INSTANCE_BINDING; a loop draws one more.
+		template<typename Bind>
+		void DrawWith(uint32_t handle, uint32_t primitive, size_t count, const VertexLayout& layout, size_t instances, const Bind& bind)
+		{
+			if (!m_recording || count == 0)
+				return;
+
+			const auto found = m_programs.find(handle);
+
+			if (found == m_programs.end())
+				return;
+
+			Program& program = found->second;
+			const uint32_t target = m_stack.back();
+
+			if (target == WINDOW && !m_haveImage)
+				return;
+
+			EnsureRendering(target);
+
+			const VertexFormat format = layout.format;
+			const VkPipeline pipeline = PipelineFor(program, Topology(primitive), target, layout);
+
+			if (!pipeline)
+				return;
+
+			const VkCommandBuffer command = Command();
+
+			if (pipeline != m_boundPipeline)
+			{
+				vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+				m_boundPipeline = pipeline;
+			};
+
+			// A loop is a strip with its first vertex again at the end.
+			const size_t drawn = primitive == GL_LINE_LOOP_ ? count + 1 : count;
+			const size_t stride = FloatsPerVertex(layout) * sizeof(float);
+
+			if (program.hasPosition || program.hasUV || program.hasNormal || program.hasColor || program.hasInstance || !program.uvSlots.empty())
+				bind(command, drawn, stride);
+
+			if (program.hasNormal && !HasNormals(format))
+			{
+				const Allocation noNormal = Allocate(NORMAL_SIZE, sizeof(float));
+				memset(noNormal.mapped, 0, NORMAL_SIZE);
+
+				vkCmdBindVertexBuffers(command, NO_NORMAL_BINDING, 1, &noNormal.buffer, &noNormal.offset);
+			};
+
+			if (program.hasColor && format != VertexFormat::PositionUVNormalColor)
+			{
+				const Allocation noColor = Allocate(COLOR_SIZE, sizeof(float));
+				memcpy(noColor.mapped, NO_COLOR, COLOR_SIZE);
+
+				vkCmdBindVertexBuffers(command, NO_COLOR_BINDING, 1, &noColor.buffer, &noColor.offset);
+			};
+
+			const bool lacksLayer = std::any_of(
+				program.uvSlots.begin(),
+				program.uvSlots.end(),
+				[&layout](const UVBinding& binding) { return SourceOf(layout, binding.slot).words == 0; });
+
+			if (lacksLayer)
+			{
+				const Allocation noUV = Allocate(UV_SLOT_SIZE, sizeof(uint32_t));
+				memset(noUV.mapped, 0, UV_SLOT_SIZE);
+
+				vkCmdBindVertexBuffers(command, NO_UV_BINDING, 1, &noUV.buffer, &noUV.offset);
+			};
+
+			// Members so a draw allocates nothing; reserved so image pointers stay put.
+			std::vector<VkWriteDescriptorSet>& writes = m_writes;
+			std::vector<VkDescriptorImageInfo>& images = m_images;
+			writes.clear();
+			images.clear();
+			images.reserve(program.samplers.size());
+
+			VkDescriptorBufferInfo block{ };
+
+			if (program.blockSize)
+			{
+				const Allocation uniforms = Allocate(program.blockSize, m_uniformAlignment);
+				memcpy(uniforms.mapped, program.block.data(), program.blockSize);
+
+				block = { uniforms.buffer, uniforms.offset, program.blockSize };
+
+				VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+				write.dstBinding = Glsl::DEFAULT_BLOCK_BINDING;
+				write.descriptorCount = 1;
+				write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+				write.pBufferInfo = &block;
+				writes.push_back(write);
+			};
+
+			for (const auto& [name, sampler] : program.samplers)
+			{
+				const Texture& texture = SampledTexture(sampler);
+				const VkSampler sampling = program.pixelated && !sampler.shadow ? m_nearestSampler : texture.sampler;
+				images.push_back({ sampling, texture.Sampled().view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
+
+				VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+				write.dstBinding = sampler.binding;
+				write.descriptorCount = 1;
+				write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				write.pImageInfo = &images.back();
+				writes.push_back(write);
+			};
+
+			if (!writes.empty())
+				m_pushDescriptorSet(command, VK_PIPELINE_BIND_POINT_GRAPHICS, program.layout, 0, (uint32_t)writes.size(), writes.data());
+
+			vkCmdDraw(command, (uint32_t)drawn, (uint32_t)instances, 0, 0);
 		};
 
 		#pragma endregion
@@ -2454,7 +2458,7 @@ namespace Loom
 			if (CreateBuffer(size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 				kept.buffer, kept.memory, nullptr, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
 			{
-				Immediately([&](VkCommandBuffer command)
+				Immediately([&kept, size, staging](VkCommandBuffer command)
 				{
 					const VkBufferCopy copy{ 0, 0, size };
 					vkCmdCopyBuffer(command, staging, kept.buffer, 1, &copy);

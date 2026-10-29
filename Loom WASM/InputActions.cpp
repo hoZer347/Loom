@@ -218,7 +218,7 @@ namespace Loom
 			if (!action.folder.empty() && !Contains(written, action.folder))
 				written.push_back(action.folder);
 
-		const auto write = [&](const std::string& folder)
+		const auto write = [&out, &file](const std::string& folder)
 		{
 			for (const Action& action : file.actions)
 			{

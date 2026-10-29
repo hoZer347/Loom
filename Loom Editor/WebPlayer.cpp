@@ -40,7 +40,7 @@ namespace Loom
 			WebPlayer::Output output(page);
 
 			hidden.ReadLines(
-				[&](const std::string& line)
+				[&output](const std::string& line)
 				{
 					if (const std::string url = output.Hear(line); !url.empty())
 						OpenInBrowser(url);

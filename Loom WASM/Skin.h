@@ -85,9 +85,6 @@ namespace Loom
 		// A vertex's joint indices, then their weights.
 		static constexpr size_t FLOATS_PER_INFLUENCE = 2 * JOINTS_PER_VERTEX;
 
-		// A shape key's moved vertex: its index, then its offset.
-		static constexpr size_t FLOATS_PER_OFFSET = 4;
-
 		static constexpr size_t MATRIX_FLOATS = 16;
 
 		// The most joints a skin the GPU bends can have: u_joints' length.
@@ -132,8 +129,6 @@ namespace Loom
 		// 0 for a name the skin has no key for.
 		float GetShapeWeight(const std::string& name);
 
-		std::vector<std::string> GetShapeNames();
-
 		// A slider for each shape key.
 		void OnGui() override;
 
@@ -162,11 +157,16 @@ namespace Loom
 		Serial<std::vector<float>> m_shapeWeights;
 
 	private:
+		// A shape key's moved vertex: its index, then its offset.
+		static constexpr size_t FLOATS_PER_OFFSET = 4;
+
 		// Where each shape key's run of offsets starts in m_shapeOffsets.
 		std::vector<size_t> ShapeStarts() const;
 
 		// Deform's work, bending by the matrices, or by none at all when there are none.
 		bool Bend(Mesh& mesh, std::vector<glm::mat4> matrices);
+
+		std::vector<std::string> GetShapeNames();
 
 		// What Deform last bent the vertices by.
 		struct Pose

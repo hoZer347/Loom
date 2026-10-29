@@ -13,12 +13,15 @@ namespace Loom
 {
 	#pragma region StateRegistry
 
-	static std::map<std::string, std::function<std::shared_ptr<StateBase>()>>& Registry()
+	namespace
 	{
-		// Function-local, so a static initialiser elsewhere cannot run before it.
-		static std::map<std::string, std::function<std::shared_ptr<StateBase>()>> registry;
+		std::map<std::string, std::function<std::shared_ptr<StateBase>()>>& Registry()
+		{
+			// Function-local, so a static initialiser elsewhere cannot run before it.
+			static std::map<std::string, std::function<std::shared_ptr<StateBase>()>> registry;
 
-		return registry;
+			return registry;
+		};
 	};
 
 	void StateRegistry::Register(const std::string& name, std::function<std::shared_ptr<StateBase>()> create)
@@ -122,9 +125,6 @@ namespace Loom
 		/// Sub-states that all run at once.
 		std::vector<std::shared_ptr<StateBase>> SubStates{ };
 
-		/// Currently active sub-state, so a Proceed from inside one is attributed to it.
-		StateBase* _active = nullptr;
-
 		std::string Name() const override { return "St_Parallel"; };
 
 		/// Handles an individual sub-state calling Proceed. True while others remain.
@@ -148,21 +148,7 @@ namespace Loom
 			return !SubStates.empty();
 		};
 
-		/// Steps each sub-state on a copy, tracking which runs so its Proceed is attributed.
-		void Each(auto&& step)
-		{
-			for (const auto& state : std::vector<std::shared_ptr<StateBase>>(SubStates))
-			{
-				_active = state.get();
-
-				if (state)
-					step(*state);
-
-				_active = nullptr;
-			};
-		};
-
-		void OnEnter(StateBase* lastState) override { Each([&](StateBase& s) { s.OnEnter(lastState); }); };
+		void OnEnter(StateBase* lastState) override { Each([lastState](StateBase& s) { s.OnEnter(lastState); }); };
 		void OnUpdate() override { Each([](StateBase& s) { s.OnUpdate(); }); };
 		void OnPhysics() override { Each([](StateBase& s) { s.OnPhysics(); }); };
 		void OnFixedUpdate() override { Each([](StateBase& s) { s.OnFixedUpdate(); }); };
@@ -175,6 +161,24 @@ namespace Loom
 			for (const auto& state : SubStates)
 				if (state)
 					state->OnExit(nextState);
+		};
+
+	private:
+		/// Currently active sub-state, so a Proceed from inside one is attributed to it.
+		StateBase* _active = nullptr;
+
+		/// Steps each sub-state on a copy, tracking which runs so its Proceed is attributed.
+		void Each(auto&& step)
+		{
+			for (const auto& state : std::vector<std::shared_ptr<StateBase>>(SubStates))
+			{
+				_active = state.get();
+
+				if (state)
+					step(*state);
+
+				_active = nullptr;
+			};
 		};
 	};
 

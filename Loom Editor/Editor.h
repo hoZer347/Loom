@@ -132,25 +132,7 @@ namespace Loom
 
 		#pragma region Scenes
 
-		// Scenes created or loaded here are owned by the editor and can be
-		// closed from the Hierarchy; scenes created anywhere else still show up
-		// in it, they just cannot be closed from it.
-		Scene* CreateScene(const std::string& name = "New Scene");
 		Scene* OpenScene(const std::string& path);
-		void CloseScene(Scene* scene);
-
-		// What the Hierarchy drags: a GameObject's guid rather than its address,
-		// so a drop resolves against what still exists when the mouse comes up.
-		static constexpr const char* object_payload = "LoomObject";
-
-		// What double-clicking a scene in the Project panel does: every open
-		// scene is closed, so this one is all there is, once the question
-		// about any unsaved is answered. Stops a run first. The scene is read
-		// over the frames that follow, with a bar in the views; false when it
-		// cannot start.
-		bool OpenSceneAlone(const std::string& path);
-
-		void SetActiveScene(Scene* scene);
 
 		bool IsOwned(Scene* scene) const;
 
@@ -158,53 +140,15 @@ namespace Loom
 		// never saved.
 		std::string ScenePathOf(Scene* scene) const;
 
-		// Whether an owned scene differs from its file, or has none.
-		bool SceneUnsaved(Scene* scene) const;
-
-		#pragma endregion
-
-		#pragma region Prefabs
-
-		// Writes the GameObject to a new .loomprefab in folder, named after it,
-		// and makes it an instance of that prefab. The path of the file, or
-		// empty when it could not be written.
-		std::string SaveAsPrefab(GameObject* gameObject, const std::string& folder);
-
-		// Takes the link off a prefab instance, leaving its content as plain
-		// GameObjects the prefab no longer keeps alike.
-		void UnpackPrefab(GameObject& gameObject);
-
-		// A new instance of the prefab at path, from the project folder, as
-		// the last child of parent.
-		GameObject* Instantiate(const std::string& path, GameObject& parent);
-
-		// Shows the prefab in the Prefab panel, in a scene of its own that
-		// only the panel draws, with a light the Hierarchy leaves out. With
-		// edits held in the panel, another prefab waits for the question
-		// about them, and the same one keeps them.
-		void OpenPrefab(const std::string& path);
-		void ClosePrefab();
-
-		// Writes the Prefab panel's held edits to the file, and from there to
-		// every instance. Whether nothing is left unsaved.
-		bool SavePrefab();
-		GameObject* GetPrefabRoot() const;
-
 		#pragma endregion
 
 		#pragma region Saving
-
-		bool SaveScene(Scene* scene, const std::string& path);
 
 		// File > Save Scene and Ctrl+S: the active scene, to the file it was
 		// opened from, or, for one never saved, a new file named after it in
 		// the project's scenes folder. Refused while playing, when the scene
 		// holds what the run has done to it.
 		void SaveActiveScene();
-
-		// File > Exit, the window's close button and Alt+F4: stops any run,
-		// then closes once the question about anything unsaved is answered.
-		void Quit();
 
 		#pragma endregion
 
@@ -215,7 +159,6 @@ namespace Loom
 		// for main to start the new build on it. A failed build leaves this
 		// editor running.
 		void FullRefresh();
-		bool IsRefreshing() const { return m_refresh.IsRunning() || m_relaunch; };
 
 		// Asks for what a merge calls for, for ApplyUpdate to run when it can.
 		void RequestUpdate(EditorUpdate::Kind kind) { m_update.Request(kind); };
@@ -257,9 +200,6 @@ namespace Loom
 
 		// In a tab of the Shaders panel, which comes forward.
 		void OpenShader(const std::string& path);
-
-		// In a tab of the Dialogues panel, which comes forward.
-		void OpenDialogue(const std::string& path);
 
 		// In a tab of the Sprites panel, which comes forward. A preview takes
 		// the place of the one before it.
@@ -374,13 +314,6 @@ namespace Loom
 
 		// Clears the selected model too.
 		void Select(GameObject* gameObject);
-
-		// Selects objects, the Inspector drawn from the first. A scene's root is
-		// only ever selected alone, so one among others is left out.
-		void SetSelection(const std::vector<GameObject*>& objects);
-
-		// Every GameObject selected, the one the Inspector is drawn from first.
-		std::vector<GameObject*> GetSelection() const;
 
 		// Selects the GameObject with this name once its scene has loaded, so a
 		// screenshot can show it in the inspector. Each further request before
@@ -594,6 +527,10 @@ namespace Loom
 		#pragma endregion
 
 		#pragma region Hierarchy
+
+		// What the Hierarchy drags: a GameObject's guid rather than its address,
+		// so a drop resolves against what still exists when the mouse comes up.
+		static constexpr const char* object_payload = "LoomObject";
 
 		// The Hierarchy's right-click menu on empty space adds to the rows
 		// above it, as a drop there does.
@@ -938,6 +875,9 @@ namespace Loom
 
 		#pragma region Assets
 
+		// In a tab of the Dialogues panel, which comes forward.
+		void OpenDialogue(const std::string& path);
+
 		// Rescans the project folder: the asset tree the Scenes tab draws,
 		// the scenes in it, the shaders and each FileTab's files.
 		void RefreshProjectAssets();
@@ -1056,6 +996,12 @@ namespace Loom
 
 		#pragma region Project
 
+		bool IsRefreshing() const { return m_refresh.IsRunning() || m_relaunch; };
+
+		// File > Exit, the window's close button and Alt+F4: stops any run,
+		// then closes once the question about anything unsaved is answered.
+		void Quit();
+
 		// Reads <folder>/*.loomproject, if there is one, and hooks up the script
 		// library it names.
 		void LoadProjectFile();
@@ -1100,6 +1046,27 @@ namespace Loom
 
 		#pragma region Scenes
 
+		// Scenes created or loaded here are owned by the editor and can be
+		// closed from the Hierarchy; scenes created anywhere else still show up
+		// in it, they just cannot be closed from it.
+		Scene* CreateScene(const std::string& name = "New Scene");
+
+		void CloseScene(Scene* scene);
+
+		// What double-clicking a scene in the Project panel does: every open
+		// scene is closed, so this one is all there is, once the question
+		// about any unsaved is answered. Stops a run first. The scene is read
+		// over the frames that follow, with a bar in the views; false when it
+		// cannot start.
+		bool OpenSceneAlone(const std::string& path);
+
+		void SetActiveScene(Scene* scene);
+
+		// Whether an owned scene differs from its file, or has none.
+		bool SceneUnsaved(Scene* scene) const;
+
+		bool SaveScene(Scene* scene, const std::string& path);
+
 		// Deletes every open scene here and now, rather than on the task queue:
 		// the callers are about to unload the code those scenes are made of.
 		void CloseAllScenes();
@@ -1130,6 +1097,13 @@ namespace Loom
 		#pragma endregion
 
 		#pragma region Selection
+
+		// Selects objects, the Inspector drawn from the first. A scene's root is
+		// only ever selected alone, so one among others is left out.
+		void SetSelection(const std::vector<GameObject*>& objects);
+
+		// Every GameObject selected, the one the Inspector is drawn from first.
+		std::vector<GameObject*> GetSelection() const;
 
 		// Selection and the active scene are raw pointers into a hierarchy that
 		// edits itself between frames, so both are checked for liveness once per
@@ -1163,6 +1137,33 @@ namespace Loom
 		#pragma endregion
 
 		#pragma region Prefabs
+
+		// Writes the GameObject to a new .loomprefab in folder, named after it,
+		// and makes it an instance of that prefab. The path of the file, or
+		// empty when it could not be written.
+		std::string SaveAsPrefab(GameObject* gameObject, const std::string& folder);
+
+		// Takes the link off a prefab instance, leaving its content as plain
+		// GameObjects the prefab no longer keeps alike.
+		void UnpackPrefab(GameObject& gameObject);
+
+		// A new instance of the prefab at path, from the project folder, as
+		// the last child of parent.
+		GameObject* Instantiate(const std::string& path, GameObject& parent);
+
+		// Shows the prefab in the Prefab panel, in a scene of its own that
+		// only the panel draws, with a light the Hierarchy leaves out. With
+		// edits held in the panel, another prefab waits for the question
+		// about them, and the same one keeps them.
+		void OpenPrefab(const std::string& path);
+
+		void ClosePrefab();
+
+		// Writes the Prefab panel's held edits to the file, and from there to
+		// every instance. Whether nothing is left unsaved.
+		bool SavePrefab();
+
+		GameObject* GetPrefabRoot() const;
 
 		// The prefab as the file now has it, read again whenever the file
 		// changes. A change from outside the editor unlinks the prefab's

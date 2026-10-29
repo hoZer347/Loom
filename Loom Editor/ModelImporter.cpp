@@ -709,7 +709,7 @@ void main()
 					const bool keyed = std::any_of(
 						tracks.begin(),
 						tracks.end(),
-						[&](const Track& track) { return track.clip == a && track.target == target && track.property == property; });
+						[&a, &property, &target](const Track& track) { return track.clip == a && track.target == target && track.property == property; });
 
 					if (keyed)
 						continue;

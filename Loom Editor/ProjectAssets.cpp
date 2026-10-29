@@ -1001,7 +1001,7 @@ namespace {NAMESPACE}
 
 		std::string suffix;
 
-		const auto taken = [&](const std::string& name)
+		const auto taken = [&body](const std::string& name)
 		{
 			return body.find('"' + name + '"') != std::string::npos || body.find(bindingMacro + name + ')') != std::string::npos;
 		};

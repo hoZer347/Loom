@@ -18,8 +18,6 @@ namespace Loom
 		void Draw();
 		void Clear() { m_text[0] = '\0'; };
 
-		bool Searching() const { return m_text[0] != '\0'; };
-
 		// Always true while nothing is typed.
 		bool Matches(std::string_view name) const;
 
@@ -35,6 +33,8 @@ namespace Loom
 
 	private:
 		static constexpr size_t text_size = 128;
+
+		bool Searching() const { return m_text[0] != '\0'; };
 
 		char m_text[text_size]{ };
 		bool m_changed = false;

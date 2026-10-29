@@ -164,14 +164,12 @@ namespace Loom
 		void SetPick(Pick pick);
 		void SetTool(Tool tool) { m_tool = tool; };
 		void SelectAll();
-		void SelectNone();
 
 		#pragma endregion
 
 		#pragma region Edits
 
 		void Extrude();
-		void Duplicate();
 		void Delete();
 		void Flip();
 		void Add(Shapes::Shape shape);
@@ -430,6 +428,12 @@ namespace Loom
 
 		#pragma endregion
 
+		#pragma region Edits
+
+		void Duplicate();
+
+		#pragma endregion
+
 		#pragma region Undo
 
 		static Snapshot Take(const Document& document);
@@ -454,6 +458,8 @@ namespace Loom
 		#pragma endregion
 
 		#pragma region Selection
+
+		void SelectNone();
 
 		static Selection Converted(const EditableMesh& mesh, const Selection& selection, Pick from, Pick to);
 

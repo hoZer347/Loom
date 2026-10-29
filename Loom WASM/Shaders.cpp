@@ -30,10 +30,10 @@
 
 namespace Loom
 {
-	static inline std::string defaultShader;
-
 	namespace
 	{
+		std::string defaultShader;
+
 		#pragma region Engine Code
 
 		std::string LowerExtension(const std::string& file_path)

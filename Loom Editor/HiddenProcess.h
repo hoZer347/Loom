@@ -17,9 +17,6 @@ namespace Loom
 	*/
 	struct HiddenProcess final
 	{
-		void* process = nullptr;
-		void* output = nullptr;
-
 		// Given a job, the process is in it before it runs. False when it could
 		// not start; then neither handle is set.
 		bool Start(std::string command_line, void* job = nullptr);
@@ -33,5 +30,9 @@ namespace Loom
 
 		// Start, ReadLines and Finish: true when it ran and exited with 0.
 		static bool Run(const std::string& command_line, const std::function<void(const std::string&)>& on_line);
+
+	private:
+		void* process = nullptr;
+		void* output = nullptr;
 	};
 };

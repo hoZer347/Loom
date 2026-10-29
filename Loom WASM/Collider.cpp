@@ -127,7 +127,7 @@ namespace Loom
 
 		// Corner i's bits pick its side of each axis, so an edge joins corners one bit apart.
 		const auto corner =
-			[&](int i)
+			[this, &half, &world](int i)
 			{
 				glm::vec3 local = *center;
 
@@ -205,7 +205,7 @@ namespace Loom
 			const int up = (axis + 2) % glm::vec3::length();
 
 			const auto around =
-				[&](int segment)
+				[&middle, &reach, &across, &up](int segment)
 				{
 					const float turn = glm::two_pi<float>() * segment / CIRCLE_SEGMENTS;
 

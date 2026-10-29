@@ -266,7 +266,7 @@ namespace Loom
 
 	void VirtualFolders::Repath(const std::string& from, const std::string& to)
 	{
-		const auto moved = [&](const std::string& path)
+		const auto moved = [&from, &to](const std::string& path)
 		{
 			return to + path.substr(from.size());
 		};

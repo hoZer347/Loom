@@ -243,7 +243,7 @@ namespace Loom
 
 			const float slide = step * progress;
 			const int pointed = ImGui::IsItemHovered() ? std::clamp((int)std::lround((mouse.x - corner.x + slide) / step), 0, Profiler::Trend - 1) : -1;
-			const auto height = [&](double length) { return corner.y + size.y - size.y * (float)(length / highest); };
+			const auto height = [&corner, &highest, &size](double length) { return corner.y + size.y - size.y * (float)(length / highest); };
 			const Profiler::Row* under = nullptr;
 
 			draw->AddRectFilled(corner, ImVec2(corner.x + size.x, corner.y + size.y), ImGui::GetColorU32(ImGuiCol_FrameBg));

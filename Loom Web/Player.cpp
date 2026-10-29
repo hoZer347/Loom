@@ -22,7 +22,10 @@
 
 using namespace Loom;
 
-static constexpr const char* input_actions = "/project.loominput";
+namespace
+{
+	constexpr const char* input_actions = "/project.loominput";
+};
 
 
 // Queued, so it compiles between frames on the thread that owns the context.

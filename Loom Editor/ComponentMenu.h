@@ -21,7 +21,6 @@ namespace Loom
 		#pragma region Categories
 
 		static constexpr const char* custom_category = "Custom";
-		static constexpr char separator = '/';
 
 		// "Rendering / 2D/" is Rendering/2D.
 		static std::string Tidy(const std::string& category);
@@ -42,11 +41,8 @@ namespace Loom
 
 		#pragma region Project File
 
-		static constexpr const char* key_prefix = "category.";
-
 		// Takes a line of the project file, if it is one of these.
 		void Read(const std::string& line);
-		void Write(std::ostream& out) const;
 
 		// Rewrites the category lines of a project file and keeps the rest.
 		// False when it could not be read or written.
@@ -72,6 +68,20 @@ namespace Loom
 		#pragma endregion
 
 	private:
+		#pragma region Categories
+
+		static constexpr char separator = '/';
+
+		#pragma endregion
+
+		#pragma region Project File
+
+		static constexpr const char* key_prefix = "category.";
+
+		void Write(std::ostream& out) const;
+
+		#pragma endregion
+
 		std::map<std::string, std::string> m_categories{ };
 	};
 };

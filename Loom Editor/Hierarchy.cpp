@@ -39,7 +39,7 @@ namespace Loom::Hierarchy
 		RowsBelow rows_below{ };
 
 		const auto count =
-			[&](const auto& self, const GameObject& node) -> size_t
+			[&rows_below, &open_under](const auto& self, const GameObject& node) -> size_t
 			{
 				if (const auto found = rows_below.find(&node); found != rows_below.end())
 					return found->second;
@@ -87,7 +87,7 @@ namespace Loom::Hierarchy
 		size_t rows = 0;
 
 		const auto take =
-			[&](size_t index)
+			[&children, &skip, &steps](size_t index)
 			{
 				steps.push_back({ skip, children[index] });
 				skip = 0;
@@ -95,7 +95,7 @@ namespace Loom::Hierarchy
 
 		// The closed children from up to to, one row each.
 		const auto closed =
-			[&](size_t from, size_t to)
+			[&kept_at, &rows, &skip, &take, &view](size_t from, size_t to)
 			{
 				View run = view;
 				run.top += rows * view.row;
@@ -104,7 +104,7 @@ namespace Loom::Hierarchy
 				size_t at = from;
 
 				const auto draw =
-					[&](size_t index)
+					[&at, &skip, &take](size_t index)
 					{
 						skip += index - at;
 						take(index);

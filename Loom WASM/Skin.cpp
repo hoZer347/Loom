@@ -252,7 +252,7 @@ namespace Loom
 			return true;
 
 		Jobs::For(count, VERTEX_GRAIN,
-			[&](size_t, size_t begin, size_t end)
+			[&bent, &influences, &joints, &turned](size_t, size_t begin, size_t end)
 			{
 				for (size_t v = begin; v < end; v++)
 				{

@@ -180,7 +180,7 @@ namespace Loom
 						size_t drawn = 0;
 
 						const auto run =
-							[&](size_t to, ImU32 run_colour)
+							[&x, &at, &drawn, &draw_list, &text](size_t to, ImU32 run_colour)
 							{
 								draw_list->AddText(ImVec2(x, at.y), run_colour, text + drawn, text + to);
 								x += ImGui::CalcTextSize(text + drawn, text + to).x;

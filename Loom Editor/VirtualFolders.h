@@ -36,12 +36,6 @@ namespace Loom
 
 		#pragma region File
 
-		static constexpr const char* folder_key = "folder=";
-
-		// What a file of them puts between an item and its folder, so no
-		// folder's name holds one.
-		static constexpr char equals = '=';
-
 		void Clear();
 
 		// Empty when the file is not there yet.
@@ -107,6 +101,16 @@ namespace Loom
 		std::map<std::string, std::string> m_items{ };
 
 	private:
+		#pragma region File
+
+		static constexpr const char* folder_key = "folder=";
+
+		// What a file of them puts between an item and its folder, so no
+		// folder's name holds one.
+		static constexpr char equals = '=';
+
+		#pragma endregion
+
 		#pragma region Folders
 
 		// A trimmed name with no separator or '=' in it, or empty when there is none.

@@ -36,10 +36,6 @@ namespace Loom
 
 		#pragma region Drawing
 
-		// An average frame of the window: for each thread a lane for each
-		// depth of its stages, laid out by their Shares.
-		static void Lanes();
-
 		// A switch to record every frame rather than one a poll, the Lanes,
 		// then for each thread its stages stacked over the trend and each
 		// one's average and peak.
@@ -49,6 +45,15 @@ namespace Loom
 		// while it is open: collapsed, the Profiler is off and only its title
 		// bar is drawn.
 		static void Overlay();
+
+		#pragma endregion
+
+	private:
+		#pragma region Drawing
+
+		// An average frame of the window: for each thread a lane for each
+		// depth of its stages, laid out by their Shares.
+		static void Lanes();
 
 		#pragma endregion
 	};

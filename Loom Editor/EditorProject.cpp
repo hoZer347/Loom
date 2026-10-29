@@ -2478,7 +2478,7 @@ namespace Loom
 			hooks.reveal = [this, &appearing, &path](const std::string& folder) { return appearing && VirtualFolders::IsAtOrUnder(m_scriptFolders.FolderOf(path), folder); };
 			hooks.arrange = false;
 			hooks.create = nullptr;
-			hooks.item = [&](const std::string& name) { row(name, m_scriptEntries.at(name).label); };
+			hooks.item = [this, &row](const std::string& name) { row(name, m_scriptEntries.at(name).label); };
 
 			m_fieldPicker.Draw(m_scriptFolders, ScriptsByLabel(names), hooks);
 		}
@@ -2494,7 +2494,7 @@ namespace Loom
 			hooks.reveal = [&appearing, &path, tab](const std::string& folder) { return appearing && VirtualFolders::IsAtOrUnder(tab->folders.FolderOf(path), folder); };
 			hooks.arrange = false;
 			hooks.create = nullptr;
-			hooks.item = [&](const std::string& file) { row(file, std::filesystem::path(file).filename().string()); };
+			hooks.item = [&row](const std::string& file) { row(file, std::filesystem::path(file).filename().string()); };
 
 			m_fieldPicker.Draw(tab->folders, tab->folders.Build(files), hooks);
 		}

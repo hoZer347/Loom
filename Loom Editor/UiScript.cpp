@@ -390,7 +390,7 @@ namespace Loom
 			};
 
 		const auto aim_only =
-			[&]() -> bool
+			[this, &tokens]() -> bool
 			{
 				size_t end = 0;
 

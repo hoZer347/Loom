@@ -33,10 +33,6 @@ namespace Loom
 		// Visual Studio, empty when there is none.
 		static std::string Where(const std::string& arguments);
 
-		// devenv.exe from the newest Visual Studio on this machine, or empty
-		// when there is none. Looked up once and held.
-		static const std::string& Find();
-
 		// The first solution in the nearest folder above file that has one,
 		// empty when none does.
 		static std::string SolutionFor(const std::filesystem::path& file);
@@ -48,5 +44,10 @@ namespace Loom
 		// the returned thread waits for; empty when there is nothing to wait
 		// for.
 		static std::thread Open(const std::string& solution, const std::string& file, int line = 0, int column = 0);
+
+	private:
+		// devenv.exe from the newest Visual Studio on this machine, or empty
+		// when there is none. Looked up once and held.
+		static const std::string& Find();
 	};
 };

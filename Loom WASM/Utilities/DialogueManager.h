@@ -129,9 +129,6 @@ namespace Loom
 		/// read; unset means full.
 		static inline std::function<float()> VoiceLevel{ };
 
-		/// The level the next blip would play at.
-		float VoiceOut() const;
-
 		/// Blips one character, if it is one worth blipping.
 		void Speak(char c);
 
@@ -176,17 +173,6 @@ namespace Loom
 		/// What the inspector's New Binding runs, with the name of the component type it
 		/// was pressed on. The editor sets it, and without it the button is disabled.
 		static std::function<void(const std::string& type)> onNewBinding;
-
-		#pragma endregion
-
-		#pragma region Parsing
-
-		/// Splits a script into its [bracketed] commands and the plain text between,
-		/// dropping the whitespace a cleared page would otherwise open with.
-		static std::vector<std::string> Tokens(const std::string& text);
-
-		static bool IsBinding(const std::string& token);
-		static bool IsRichText(const std::string& token);
 
 		#pragma endregion
 
@@ -276,8 +262,21 @@ namespace Loom
 
 		#pragma endregion
 
+		#pragma region Voice
+
+		/// The level the next blip would play at.
+		float VoiceOut() const;
+
+		#pragma endregion
+
 		#pragma region Parsing
 
+		/// Splits a script into its [bracketed] commands and the plain text between,
+		/// dropping the whitespace a cleared page would otherwise open with.
+		static std::vector<std::string> Tokens(const std::string& text);
+
+		static bool IsBinding(const std::string& token);
+		static bool IsRichText(const std::string& token);
 		static bool IsClearBinding(const std::string& token);
 
 		#pragma endregion

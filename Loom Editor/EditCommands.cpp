@@ -73,7 +73,7 @@ namespace Loom
 		if (from == to)
 			return true;
 
-		const auto is_owned = [&](Scene* scene) { return std::find(owned.begin(), owned.end(), scene) != owned.end(); };
+		const auto is_owned = [&owned](Scene* scene) { return std::find(owned.begin(), owned.end(), scene) != owned.end(); };
 
 		return is_owned(from) && is_owned(to) && from->GetGuid() != to->GetGuid();
 	};

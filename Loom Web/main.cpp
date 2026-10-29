@@ -32,19 +32,22 @@ using namespace glm;
 
 #pragma region Constants
 
-// The shader every object in the scene shares. Fetched over HTTP by
-// Shader::Request, so the path is relative to the page that loads index.js.
-static const char* SHADER_FILE = "Loom.shader";
+namespace
+{
+	// The shader every object in the scene shares. Fetched over HTTP by
+	// Shader::Request, so the path is relative to the page that loads index.js.
+	const char* SHADER_FILE = "Loom.shader";
 
-// The camera. Fixed: the scene turns, the viewer does not.
-static const vec3 EYE = vec3(0.0f, 2.6f, 8.0f);
-static const vec3 TARGET = vec3(0.0f, 0.0f, 0.0f);
+	// The camera. Fixed: the scene turns, the viewer does not.
+	const vec3 EYE = vec3(0.0f, 2.6f, 8.0f);
+	const vec3 TARGET = vec3(0.0f, 0.0f, 0.0f);
 
-// The depth range. The fragment shader needs both to turn the nonlinear depth
-// it receives back into a distance it can shade on, so they live here rather
-// than being buried in the perspective call.
-static const float NEAR_PLANE = 0.1f;
-static const float FAR_PLANE = 100.0f;
+	// The depth range. The fragment shader needs both to turn the nonlinear depth
+	// it receives back into a distance it can shade on, so they live here rather
+	// than being buried in the perspective call.
+	const float NEAR_PLANE = 0.1f;
+	const float FAR_PLANE = 100.0f;
+};
 
 #pragma endregion
 
@@ -147,79 +150,82 @@ private:
 
 // Model-space line lists. Each pair of points is one GL_LINES segment.
 
-static std::vector<vec3> CubeEdges()
+namespace
 {
-	static const vec3 corner[8] = {
-		{ -1, -1, -1 }, { 1, -1, -1 }, { 1, 1, -1 }, { -1, 1, -1 },
-		{ -1, -1,  1 }, { 1, -1,  1 }, { 1, 1,  1 }, { -1, 1,  1 },
-	};
-	static const int edge[12][2] = {
-		{ 0, 1 }, { 1, 2 }, { 2, 3 }, { 3, 0 }, // back face
-		{ 4, 5 }, { 5, 6 }, { 6, 7 }, { 7, 4 }, // front face
-		{ 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 }, // the struts between them
-	};
-
-	std::vector<vec3> lines;
-	for (const auto& e : edge)
+	std::vector<vec3> CubeEdges()
 	{
-		lines.push_back(corner[e[0]]);
-		lines.push_back(corner[e[1]]);
-	};
-
-	return lines;
-};
-
-// A unit icosahedron, built from the three golden-ratio rectangles. Every pair
-// of vertices closer than a threshold is an edge, which is exact here because
-// an icosahedron's edges are all the same length and are strictly shorter than
-// any non-edge chord.
-static std::vector<vec3> IcosahedronEdges()
-{
-	const float t = (1.0f + std::sqrt(5.0f)) * 0.5f;
-
-	std::vector<vec3> vertex;
-	for (float s1 : { -1.0f, 1.0f })
-		for (float s2 : { -1.0f, 1.0f })
-		{
-			vertex.push_back(normalize(vec3(0.0f, s1 * 1.0f, s2 * t)));
-			vertex.push_back(normalize(vec3(s1 * 1.0f, s2 * t, 0.0f)));
-			vertex.push_back(normalize(vec3(s1 * t, 0.0f, s2 * 1.0f)));
+		static const vec3 corner[8] = {
+			{ -1, -1, -1 }, { 1, -1, -1 }, { 1, 1, -1 }, { -1, 1, -1 },
+			{ -1, -1,  1 }, { 1, -1,  1 }, { 1, 1,  1 }, { -1, 1,  1 },
+		};
+		static const int edge[12][2] = {
+			{ 0, 1 }, { 1, 2 }, { 2, 3 }, { 3, 0 }, // back face
+			{ 4, 5 }, { 5, 6 }, { 6, 7 }, { 7, 4 }, // front face
+			{ 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 }, // the struts between them
 		};
 
-	// Edge length of a unit icosahedron is 2/sqrt(phi*sqrt(5)) ~= 1.0515; the
-	// next chord up is ~1.70, so anything under 1.2 is an edge and nothing else.
-	const float edgeLength = 1.2f;
+		std::vector<vec3> lines;
+		for (const auto& e : edge)
+		{
+			lines.push_back(corner[e[0]]);
+			lines.push_back(corner[e[1]]);
+		};
 
-	std::vector<vec3> lines;
-	for (size_t i = 0; i < vertex.size(); i++)
-		for (size_t j = i + 1; j < vertex.size(); j++)
-			if (distance(vertex[i], vertex[j]) < edgeLength)
-			{
-				lines.push_back(vertex[i]);
-				lines.push_back(vertex[j]);
-			};
-
-	return lines;
-};
-
-// A flat grid on the XZ plane, for a floor the spinning shapes read against.
-static std::vector<vec3> GridLines(int half, float step)
-{
-	const float extent = half * step;
-
-	std::vector<vec3> lines;
-	for (int i = -half; i <= half; i++)
-	{
-		const float d = i * step;
-
-		lines.push_back(vec3(d, 0.0f, -extent));
-		lines.push_back(vec3(d, 0.0f, extent));
-
-		lines.push_back(vec3(-extent, 0.0f, d));
-		lines.push_back(vec3(extent, 0.0f, d));
+		return lines;
 	};
 
-	return lines;
+	// A unit icosahedron, built from the three golden-ratio rectangles. Every pair
+	// of vertices closer than a threshold is an edge, which is exact here because
+	// an icosahedron's edges are all the same length and are strictly shorter than
+	// any non-edge chord.
+	std::vector<vec3> IcosahedronEdges()
+	{
+		const float t = (1.0f + std::sqrt(5.0f)) * 0.5f;
+
+		std::vector<vec3> vertex;
+		for (float s1 : { -1.0f, 1.0f })
+			for (float s2 : { -1.0f, 1.0f })
+			{
+				vertex.push_back(normalize(vec3(0.0f, s1 * 1.0f, s2 * t)));
+				vertex.push_back(normalize(vec3(s1 * 1.0f, s2 * t, 0.0f)));
+				vertex.push_back(normalize(vec3(s1 * t, 0.0f, s2 * 1.0f)));
+			};
+
+		// Edge length of a unit icosahedron is 2/sqrt(phi*sqrt(5)) ~= 1.0515; the
+		// next chord up is ~1.70, so anything under 1.2 is an edge and nothing else.
+		const float edgeLength = 1.2f;
+
+		std::vector<vec3> lines;
+		for (size_t i = 0; i < vertex.size(); i++)
+			for (size_t j = i + 1; j < vertex.size(); j++)
+				if (distance(vertex[i], vertex[j]) < edgeLength)
+				{
+					lines.push_back(vertex[i]);
+					lines.push_back(vertex[j]);
+				};
+
+		return lines;
+	};
+
+	// A flat grid on the XZ plane, for a floor the spinning shapes read against.
+	std::vector<vec3> GridLines(int half, float step)
+	{
+		const float extent = half * step;
+
+		std::vector<vec3> lines;
+		for (int i = -half; i <= half; i++)
+		{
+			const float d = i * step;
+
+			lines.push_back(vec3(d, 0.0f, -extent));
+			lines.push_back(vec3(d, 0.0f, extent));
+
+			lines.push_back(vec3(-extent, 0.0f, d));
+			lines.push_back(vec3(extent, 0.0f, d));
+		};
+
+		return lines;
+	};
 };
 
 #pragma endregion
@@ -314,25 +320,28 @@ private:
 
 // Attach order matters: WireShape writes the geometry the Mesh then draws, and
 // components render in the order they were attached.
-static GameObject* AddWireShape(
-	Scene& scene,
-	const std::string& name,
-	std::vector<vec3> model,
-	Shader* shader,
-	WireShape** out)
+namespace
 {
-	GameObject* object = scene.AddChild(name);
+	GameObject* AddWireShape(
+		Scene& scene,
+		const std::string& name,
+		std::vector<vec3> model,
+		Shader* shader,
+		WireShape** out)
+	{
+		GameObject* object = scene.AddChild(name);
 
-	*out = object->Attach<WireShape>(std::move(model));
+		*out = object->Attach<WireShape>(std::move(model));
 
-	Material* material = object->Attach<Material>();
-	material->shader = shader;
+		Material* material = object->Attach<Material>();
+		material->shader = shader;
 
-	Mesh* mesh = object->Attach<Mesh>(Mesh::Lines);
-	mesh->m_draw_type = Mesh::Dynamic; // rewritten every frame
-	mesh->material = material;
+		Mesh* mesh = object->Attach<Mesh>(Mesh::Lines);
+		mesh->m_draw_type = Mesh::Dynamic; // rewritten every frame
+		mesh->material = material;
 
-	return object;
+		return object;
+	};
 };
 
 

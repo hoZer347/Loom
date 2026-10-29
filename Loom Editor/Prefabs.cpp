@@ -265,7 +265,7 @@ namespace Loom
 		void Isolate(Prefabs::ObjectNode& node, const std::map<std::string, size_t>& inside)
 		{
 			const auto seal =
-				[&](std::vector<Prefabs::Field>& fields)
+				[&inside](std::vector<Prefabs::Field>& fields)
 				{
 					for (Prefabs::Field& field : fields)
 						if (IsGuid(field.value) && !inside.contains(field.value))
@@ -450,7 +450,7 @@ namespace Loom
 		int number = 0;
 
 		const auto fail =
-			[&](const std::string& why)
+			[error, &number](const std::string& why)
 			{
 				if (error)
 					*error = "line " + std::to_string(number) + ": " + why;

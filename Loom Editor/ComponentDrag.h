@@ -23,9 +23,7 @@ namespace Loom
 	*/
 	namespace ComponentDrag
 	{
-		// Held within this many rows of the Inspector's top or bottom, it
-		// scrolls on this many rows a second.
-		constexpr float edge_rows = 2.0f;
+		// Scrolls this many rows a second while held at an edge.
 		constexpr float rows_per_second = 12.0f;
 
 		// Pixels to scroll this frame, and the part of one carried to the next.

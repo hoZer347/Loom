@@ -98,7 +98,7 @@ namespace Loom
 	{
 		Parse();
 
-		const auto found = std::find_if(m_parsedClips.begin(), m_parsedClips.end(), [&](const Clip& each) { return each.name == name; });
+		const auto found = std::find_if(m_parsedClips.begin(), m_parsedClips.end(), [&name](const Clip& each) { return each.name == name; });
 
 		return Play((int)(found - m_parsedClips.begin()));
 	};
@@ -245,7 +245,7 @@ namespace Loom
 		};
 
 		// Only two clip names joined make a transition's name.
-		const auto named = [&](const std::string& name)
+		const auto named = [this](const std::string& name)
 		{
 			for (size_t i = 0; i < m_parsedClips.size(); i++)
 				if (m_parsedClips[i].name == name)
@@ -285,7 +285,7 @@ namespace Loom
 			const auto known = std::find_if(
 				std::begin(PROPERTIES),
 				std::end(PROPERTIES),
-				[&](Property each) { return property == PropertyName(each); });
+				[&property](Property each) { return property == PropertyName(each); });
 
 			if (at >= keys.size() || known == std::end(PROPERTIES))
 				break;
@@ -324,7 +324,7 @@ namespace Loom
 		const size_t stride = 1 + floats;
 		const float* key = m_keys->data() + channel.first;
 
-		const auto value = [&](size_t index) { return key + index * stride + 1; };
+		const auto value = [&key, &stride](size_t index) { return key + index * stride + 1; };
 
 		if (channel.keys == 0)
 			return { };

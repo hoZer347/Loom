@@ -181,7 +181,7 @@ namespace Loom
 			const auto original = std::find_if(
 				m_trackers.begin(),
 				m_trackers.end(),
-				[&](const std::unique_ptr<Tracker>& other)
+				[tracker, &fresh](const std::unique_ptr<Tracker>& other)
 				{
 					return other->guid == tracker->guid && std::find(fresh.begin(), fresh.end(), other.get()) == fresh.end();
 				});
@@ -238,7 +238,7 @@ namespace Loom
 		m_roots.erase(tracker.root);
 		m_copyChanges.erase(&tracker);
 
-		std::erase_if(m_trackers, [&](const std::unique_ptr<Tracker>& kept) { return kept.get() == &tracker; });
+		std::erase_if(m_trackers, [&tracker](const std::unique_ptr<Tracker>& kept) { return kept.get() == &tracker; });
 	};
 
 	void SceneHistory::Note(
@@ -294,7 +294,7 @@ namespace Loom
 		std::unordered_map<Tracker*, std::unordered_map<Guid, LoomObject*>> made{ };
 
 		const auto find =
-			[&](Tracker& tracker, const Guid& guid) -> LoomObject*
+			[&made](Tracker& tracker, const Guid& guid) -> LoomObject*
 			{
 				const std::unordered_map<Guid, LoomObject*>& ours = made[&tracker];
 

@@ -415,7 +415,7 @@ namespace Loom
 			const bool seen = std::any_of(
 				variables.begin(),
 				variables.end(),
-				[&](const ShaderVariable& other) { return other.name == variable.name; });
+				[&variable](const ShaderVariable& other) { return other.name == variable.name; });
 
 			if (seen)
 				continue;

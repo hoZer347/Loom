@@ -52,16 +52,6 @@ namespace Loom
 			return m_fields;
 		};
 
-		/// The attribute declared under that field name, or null.
-		AttributeBase* AttributeNamed(const std::string& name) const
-		{
-			for (const AttributeField& field : Attributes())
-				if (field.Name == name)
-					return field.Attribute;
-
-			return nullptr;
-		};
-
 		/// Drops the built list, so the next read collects again. For a test, or for an
 		/// object whose attributes are held indirectly and have been swapped out.
 		void ForgetAttributes() const
@@ -74,18 +64,22 @@ namespace Loom
 		virtual void CollectAttributes(std::vector<AttributeField>& into) = 0;
 
 	private:
+		/// The attribute declared under that field name, or null.
+		AttributeBase* AttributeNamed(const std::string& name) const
+		{
+			for (const AttributeField& field : Attributes())
+				if (field.Name == name)
+					return field.Attribute;
+
+			return nullptr;
+		};
+
 		mutable std::vector<AttributeField> m_fields{ };
 		mutable bool m_built = false;
 	};
 
 	struct LOOM_API AttributeFields final
 	{
-		/// Every attribute on an owner, in declaration order.
-		static const std::vector<AttributeField>& Of(const AttributeOwner& owner)
-		{
-			return owner.Attributes();
-		};
-
 		/// Copies every numeric attribute's base from one object onto another of the same type.
 		///
 		/// Field by field in declaration order, which is safe precisely because both sides
@@ -127,6 +121,13 @@ namespace Loom
 			std::initializer_list<AttributeBase*> attributes);
 
 		AttributeFields() = delete;
+
+	private:
+		/// Every attribute on an owner, in declaration order.
+		static const std::vector<AttributeField>& Of(const AttributeOwner& owner)
+		{
+			return owner.Attributes();
+		};
 	};
 };
 

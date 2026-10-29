@@ -238,16 +238,16 @@ namespace Loom
 
 		Help(job);
 
-		Await(job.done, [&]() { return job.done == chunks; });
+		Await(job.done, [&job, chunks]() { return job.done == chunks; });
 
 		// The job, on this stack, outlives any worker still inside it.
 		pool.current = nullptr;
-		Await(pool.helping, [&]() { return pool.helping == 0; });
+		Await(pool.helping, [&pool]() { return pool.helping == 0; });
 	};
 
 	void Jobs::WaitFor(const std::atomic<int>& counter, int value)
 	{
-		Await(counter, [&]() { return counter.load(std::memory_order_acquire) >= value; });
+		Await(counter, [&counter, value]() { return counter.load(std::memory_order_acquire) >= value; });
 	};
 
 	#pragma endregion

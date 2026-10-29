@@ -278,7 +278,7 @@ void main()
 				size_t before = seen[component.type]++;
 
 				const auto counterpart = std::find_if(file.components.begin(), file.components.end(),
-					[&](const Prefabs::ComponentNode& other) { return other.type == component.type && before-- == 0; });
+					[&before, &component](const Prefabs::ComponentNode& other) { return other.type == component.type && before-- == 0; });
 
 				if (counterpart == file.components.end())
 				{
@@ -293,12 +293,12 @@ void main()
 
 				for (const std::string& key : keys->second)
 				{
-					const auto value = std::find_if(component.fields.begin(), component.fields.end(), [&](const Prefabs::Field& field) { return field.key == key; });
+					const auto value = std::find_if(component.fields.begin(), component.fields.end(), [&key](const Prefabs::Field& field) { return field.key == key; });
 
 					if (value == component.fields.end())
 						continue;
 
-					const auto into = std::find_if(counterpart->fields.begin(), counterpart->fields.end(), [&](const Prefabs::Field& field) { return field.key == key; });
+					const auto into = std::find_if(counterpart->fields.begin(), counterpart->fields.end(), [&key](const Prefabs::Field& field) { return field.key == key; });
 
 					if (into == counterpart->fields.end())
 						counterpart->fields.push_back(*value);
@@ -642,7 +642,7 @@ void main()
 		// The merge only adds, so what an undone Add a Mesh took off goes here.
 		if (document.parts.empty())
 			std::erase_if(file.components,
-				[&](const Prefabs::ComponentNode& component)
+				[&document](const Prefabs::ComponentNode& component)
 				{
 					return (document.addedMesh && component.guid == document.addedMesh->ToString()) ||
 						(document.addedMaterial && component.guid == document.addedMaterial->ToString());
@@ -1067,7 +1067,7 @@ void main()
 			ImGui::SeparatorText("Shader");
 
 			const std::string& current = materials.front()->GetShaderPath();
-			const bool mixed = std::any_of(materials.begin(), materials.end(), [&](const Material* material) { return material->GetShaderPath() != current; });
+			const bool mixed = std::any_of(materials.begin(), materials.end(), [&current](const Material* material) { return material->GetShaderPath() != current; });
 
 			ImGui::SetNextItemWidth(-FLT_MIN);
 
@@ -1654,7 +1654,7 @@ void main()
 		const bool adding = io.KeyShift;
 		Selection& selection = document.selection;
 
-		const auto toggle = [&](auto& set, const auto& element)
+		const auto toggle = [&adding](auto& set, const auto& element)
 		{
 			if (!adding)
 				set = { element };
@@ -1690,7 +1690,7 @@ void main()
 		const View& view = document.view;
 		const EditableMesh& mesh = document.parts[document.part].editing;
 
-		const auto inside = [&](const glm::vec3& local)
+		const auto inside = [this, &high, &low, &view](const glm::vec3& local)
 		{
 			const std::optional<ImVec2> point = Project(view, glm::vec3(view.world * glm::vec4(local, 1.0f)));
 
@@ -1758,7 +1758,7 @@ void main()
 			if (axis)
 			{
 				// Where along the axis the mouse's ray passes closest to it.
-				const auto along = [&](const glm::vec3& from, const glm::vec3& towards)
+				const auto along = [&centre, &direction](const glm::vec3& from, const glm::vec3& towards)
 				{
 					const float b = glm::dot(direction, towards);
 					const float denominator = 1.0f - b * b;
@@ -1777,7 +1777,7 @@ void main()
 			else
 			{
 				// Across the plane through the middle that faces the eye.
-				const auto onto = [&](const glm::vec3& from, const glm::vec3& towards)
+				const auto onto = [&centre, &direction](const glm::vec3& from, const glm::vec3& towards)
 				{
 					const float facing = glm::dot(towards, direction);
 
@@ -1870,7 +1870,7 @@ void main()
 			(int)document.view.size.x,
 			(int)document.view.size.y,
 			Engine::clearColor,
-			[&]()
+			[this, &document]()
 			{
 				document.scene->Render(&document.camera, { document.scene });
 				DrawOverlay(document);
@@ -1893,7 +1893,7 @@ void main()
 			points.push_back(glm::vec3(view.world * glm::vec4(vertex, 1.0f)));
 
 		// Of any part, so the hovered face lights up on parts not being edited.
-		const auto fill = [&](const Part& part, const std::set<uint32_t>& faces)
+		const auto fill = [](const Part& part, const std::set<uint32_t>& faces)
 		{
 			const glm::mat4 world = part.object->WorldMatrix();
 			std::vector<glm::vec3> triangles{ };
@@ -1911,7 +1911,7 @@ void main()
 		};
 
 		// Strips facing the eye keep their width on screen under any renderer.
-		const auto strip = [&](const glm::vec3& a, const glm::vec3& b, float half_width, std::vector<glm::vec3>& triangles)
+		const auto strip = [&view](const glm::vec3& a, const glm::vec3& b, float half_width, std::vector<glm::vec3>& triangles)
 		{
 			const glm::vec3 side = glm::cross(b - a, view.eye - (a + b) / 2.0f);
 
@@ -1925,7 +1925,7 @@ void main()
 			triangles.insert(triangles.end(), { a - at_a, b - at_b, b + at_b, a - at_a, b + at_b, a + at_a });
 		};
 
-		const auto strips = [&](const std::vector<EditableMesh::Edge>& edges, float half_width)
+		const auto strips = [&points, &strip](const std::vector<EditableMesh::Edge>& edges, float half_width)
 		{
 			std::vector<glm::vec3> triangles{ };
 
@@ -1935,7 +1935,7 @@ void main()
 			return triangles;
 		};
 
-		const auto dots = [&](const std::set<uint32_t>& vertices)
+		const auto dots = [&points, &view](const std::set<uint32_t>& vertices)
 		{
 			std::vector<glm::vec3> triangles{ };
 
@@ -1952,7 +1952,7 @@ void main()
 			return triangles;
 		};
 
-		const auto draw = [&](const std::vector<glm::vec3>& triangles, const glm::vec4& colour)
+		const auto draw = [this, &renderer](const std::vector<glm::vec3>& triangles, const glm::vec4& colour)
 		{
 			if (triangles.empty())
 				return;
@@ -2524,7 +2524,7 @@ void main()
 		std::vector<Material*> materials{ };
 		MaterialsOf(*document.root, materials);
 
-		if (std::none_of(materials.begin(), materials.end(), [&](const Material* material) { return material->GetShaderPath() != path; }))
+		if (std::none_of(materials.begin(), materials.end(), [&path](const Material* material) { return material->GetShaderPath() != path; }))
 			return;
 
 		Remember(document);

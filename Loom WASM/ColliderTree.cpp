@@ -194,7 +194,7 @@ namespace Loom
 		m_measured.resize(m_enlisted.size());
 
 		Jobs::For(m_enlisted.size(), MEASURE_GRAIN,
-			[&](size_t, size_t begin, size_t end)
+			[this](size_t, size_t begin, size_t end)
 			{
 				for (size_t i = begin; i < end; i++)
 				{
@@ -354,7 +354,7 @@ namespace Loom
 		const __m128 across = _mm_setr_ps(inverse.x, inverse.y, inverse.z, 0.0f);
 
 		const auto entering =
-			[&](int node)
+			[this, &from, &across](int node)
 			{
 				const Bounds& bounds = m_nodes[node].bounds;
 				const __m128 toMin = _mm_mul_ps(_mm_sub_ps(_mm_loadu_ps(&bounds.min.x), from), across);
@@ -370,7 +370,7 @@ namespace Loom
 			};
 #else
 		const auto entering =
-			[&](int node)
+			[this, &origin, &inverse](int node)
 			{
 				const Bounds& bounds = m_nodes[node].bounds;
 				const glm::vec3 toMin = (bounds.min - origin) * inverse;
@@ -387,7 +387,7 @@ namespace Loom
 #endif
 
 		const auto within =
-			[&](float entry) { return entry != MISSED && entry <= maxDistance; };
+			[&maxDistance](float entry) { return entry != MISSED && entry <= maxDistance; };
 
 		if (m_root == NONE || !within(entering(m_root)))
 			return;

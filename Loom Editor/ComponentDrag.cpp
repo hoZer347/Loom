@@ -9,6 +9,12 @@
 
 namespace Loom::ComponentDrag
 {
+	namespace
+	{
+		// Held within this many rows of the Inspector's top or bottom, it scrolls.
+		constexpr float edge_rows = 2.0f;
+	};
+
 	ComponentBase* Dragged(const GameObject& gameObject, const Guid& guid)
 	{
 		ComponentBase* component = LoomObject::GetByGuid<ComponentBase>(guid);

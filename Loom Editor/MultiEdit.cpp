@@ -92,7 +92,7 @@ namespace Loom
 			const size_t along = (size_t)std::count_if(
 				own.begin(),
 				own.begin() + i,
-				[&](const ComponentBase* earlier) { return SameKind(*earlier, *own[i]); });
+				[&own, i](const ComponentBase* earlier) { return SameKind(*earlier, *own[i]); });
 
 			std::vector<ComponentBase*> matches{ own[i] };
 
@@ -147,7 +147,7 @@ namespace Loom
 		return std::any_of(
 			objects.begin() + 1,
 			objects.end(),
-			[&](const LoomObject* other) { return other->GetFields()[index].Write() != first; });
+			[&first, index](const LoomObject* other) { return other->GetFields()[index].Write() != first; });
 	};
 
 	MultiEdit::Axes MultiEdit::MixedAxes(const std::vector<LoomObject*>& objects, size_t index)

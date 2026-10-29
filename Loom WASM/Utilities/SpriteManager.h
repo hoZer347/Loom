@@ -107,8 +107,6 @@ namespace Loom
 
 		int ClipCount() const { return int(clipLengths.size()); };
 
-		int MeasuredLengthOf(int index) const;
-
 		#pragma endregion
 
 		#pragma region Draw
@@ -141,10 +139,6 @@ namespace Loom
 		/// The sprite's size in world units -- cell size over pixels per unit, scaled.
 		Float2 WorldSize() const;
 
-		/// The rect the shader stretches the shared quad into: middle in xy, size in zw,
-		/// local units.
-		void QuadVector(float out[4]) const;
-
 		void OnRender() override;
 
 		#pragma endregion
@@ -176,6 +170,20 @@ namespace Loom
 		#pragma region Animation
 
 		void AdoptLength();
+
+		#pragma endregion
+
+		#pragma region Sectioning
+
+		int MeasuredLengthOf(int index) const;
+
+		#pragma endregion
+
+		#pragma region Draw
+
+		/// The rect the shader stretches the shared quad into: middle in xy, size in zw,
+		/// local units.
+		void QuadVector(float out[4]) const;
 
 		#pragma endregion
 

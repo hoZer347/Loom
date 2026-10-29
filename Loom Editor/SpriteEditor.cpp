@@ -328,7 +328,7 @@ namespace Loom
 				? SpriteAsset::For(image)
 				: path;
 
-			const auto relocate = [&](SpriteAsset::Links& links)
+			const auto relocate = [&from, &to](SpriteAsset::Links& links)
 			{
 				links.image = ProjectAssets::Relocate(links.image, from, to);
 				links.palette = ProjectAssets::Relocate(links.palette, from, to);
@@ -338,7 +338,7 @@ namespace Loom
 			relocate(document->savedLinks);
 
 			document->history.Rewrite(
-				[&](Snapshot snapshot)
+				[&relocate](Snapshot snapshot)
 				{
 					relocate(snapshot.links);
 					return snapshot;

@@ -328,7 +328,7 @@ namespace Loom
 		Solver& solver = Solving();
 		std::unique_lock lock(solver.mutex);
 
-		solver.solved.wait(lock, [&]() { return std::ranges::find(solver.queue, this) == solver.queue.end(); });
+		solver.solved.wait(lock, [&solver, this]() { return std::ranges::find(solver.queue, this) == solver.queue.end(); });
 #endif
 	};
 
@@ -507,7 +507,7 @@ namespace Loom
 		const glm::vec3 gravity = Physics::GetGravity();
 
 		Jobs::For(m_bodies.size(), BODY_GRAIN,
-			[&](size_t, size_t begin, size_t end)
+			[this, &gravity, &seconds](size_t, size_t begin, size_t end)
 			{
 				for (size_t i = begin; i < end; i++)
 				{
@@ -552,7 +552,7 @@ namespace Loom
 	{
 		// Every pair readied at once, from velocities before warm starting.
 		Jobs::For(m_groups.size(), 1,
-			[&](size_t, size_t begin, size_t end)
+			[this, &seconds](size_t, size_t begin, size_t end)
 			{
 				for (size_t group = begin; group < end; group++)
 					for (size_t pair : m_groups[group])
@@ -598,7 +598,7 @@ namespace Loom
 		};
 
 		Jobs::For(m_bodies.size(), BODY_GRAIN,
-			[&](size_t, size_t begin, size_t end)
+			[this, &seconds](size_t, size_t begin, size_t end)
 			{
 				for (size_t i = begin; i < end; i++)
 					if (m_bodies[i].object->GetChildren().empty())
@@ -609,7 +609,7 @@ namespace Loom
 		const size_t keeping = Jobs::Chunks(m_pairs.size(), PAIR_GRAIN);
 
 		Jobs::For(1 + keeping, 1,
-			[&](size_t chunk, size_t, size_t)
+			[this, &seconds](size_t chunk, size_t, size_t)
 			{
 				if (chunk == 0)
 				{
@@ -668,12 +668,12 @@ namespace Loom
 			Drop();
 
 		const auto involves =
-			[&](const Key& key) { return key.first == &collider || key.second == &collider; };
+			[&collider](const Key& key) { return key.first == &collider || key.second == &collider; };
 
 		m_candidateSet.EraseIf(involves);
 
 		std::erase_if(m_candidates,
-			[&](const Candidate& candidate)
+			[this, &collider](const Candidate& candidate)
 			{
 				const bool first = candidate.key.first == &collider;
 
@@ -687,7 +687,7 @@ namespace Loom
 				return true;
 			});
 
-		std::erase_if(m_parted, [&](const Candidate& candidate) { return involves(candidate.key); });
+		std::erase_if(m_parted, [&involves](const Candidate& candidate) { return involves(candidate.key); });
 	};
 
 	void Simulation::WakeOwner(const Collider& collider)
@@ -734,7 +734,7 @@ namespace Loom
 		m_found.resize(std::max(m_found.size(), Jobs::Chunks(m_moved.size(), QUERY_GRAIN)));
 
 		Jobs::For(m_moved.size(), QUERY_GRAIN,
-			[&](size_t chunk, size_t begin, size_t end)
+			[this](size_t chunk, size_t begin, size_t end)
 			{
 				std::vector<Key>& found = m_found[chunk];
 				found.clear();
@@ -748,7 +748,7 @@ namespace Loom
 						continue;
 
 					m_tree.Query(*padded,
-						[&](Collider& other)
+						[&collider, &found](Collider& other)
 						{
 							if (&other != collider)
 								found.push_back(Ordered(collider, &other));
@@ -765,7 +765,7 @@ namespace Loom
 		m_fates.resize(m_candidates.size());
 
 		Jobs::For(m_candidates.size(), PRUNE_GRAIN,
-			[&](size_t, size_t begin, size_t end)
+			[this](size_t, size_t begin, size_t end)
 			{
 				for (size_t i = begin; i < end; i++)
 				{
@@ -826,7 +826,7 @@ namespace Loom
 		m_considered.resize(std::max(m_considered.size(), chunks));
 
 		Jobs::For(m_live.size(), CONSIDER_GRAIN,
-			[&](size_t chunk, size_t begin, size_t end)
+			[this](size_t chunk, size_t begin, size_t end)
 			{
 				Considered& out = m_considered[chunk];
 				out.pairs.clear();
@@ -872,7 +872,7 @@ namespace Loom
 		Collider& b = *const_cast<Collider*>(m_candidates[candidate].key.second);
 
 		const auto dynamic =
-			[&](int body) { return body != NONE && m_bodies[body].dynamic; };
+			[this](int body) { return body != NONE && m_bodies[body].dynamic; };
 
 		Pair pair{ };
 		pair.a = &a;
@@ -1153,7 +1153,7 @@ namespace Loom
 
 		// The warm start, then each iteration.
 		const auto run =
-			[&](size_t group, int pass)
+			[this](size_t group, int pass)
 			{
 				for (size_t pair : m_groups[group])
 					if (pass == 0)
@@ -1166,7 +1166,7 @@ namespace Loom
 
 		// Each member keeps its slabs in a fixed order, so results match any thread count.
 		Jobs::For(team, 1,
-			[&](size_t member, size_t, size_t)
+			[this, &aloneDone, &bordersDone, &lonely, &run, &slabs, &slabsDone, &team](size_t member, size_t, size_t)
 			{
 				for (int pass = 0; pass <= ITERATIONS; pass++)
 				{
@@ -1479,7 +1479,7 @@ namespace Loom
 	void Simulation::Report()
 	{
 		const auto rigidbodyOf =
-			[&](int body) { return body == NONE ? nullptr : m_bodies[body].rigidbody; };
+			[this](int body) { return body == NONE ? nullptr : m_bodies[body].rigidbody; };
 
 		// From a copy, since one component may attach another.
 		const auto tell =
@@ -1494,14 +1494,14 @@ namespace Loom
 		enum Phase { ENTERING, STAYING, LEAVING };
 
 		const auto report =
-			[&](Collider& a, Collider& b, bool aListens, bool bListens, int bodyA, int bodyB, bool trigger, const Contact* contacts, size_t count, Phase phase)
+			[this, &rigidbodyOf, &tell](Collider& a, Collider& b, bool aListens, bool bListens, int bodyA, int bodyB, bool trigger, const Contact* contacts, size_t count, Phase phase)
 			{
 				if (trigger)
 				{
 					const auto triggered =
-						[&](Collider& own, Collider& other)
+						[&phase, &tell](Collider& own, Collider& other)
 						{
-							tell(own, [&](ComponentBase& component)
+							tell(own, [&other, &phase](ComponentBase& component)
 								{
 									switch (phase)
 									{
@@ -1523,7 +1523,7 @@ namespace Loom
 
 				// What one side is told of the other: normals out of the other one.
 				const auto collided =
-					[&](Collider& own, int ownBody, Collider& other, int otherBody, float facing)
+					[this, &contacts, &count, &phase, &rigidbodyOf, &tell](Collider& own, int ownBody, Collider& other, int otherBody, float facing)
 					{
 						Collision told{ };
 						told.collider = &other;
@@ -1544,7 +1544,7 @@ namespace Loom
 							told.impulse = contacts[0].normal * facing * pushed;
 						};
 
-						tell(own, [&](ComponentBase& component)
+						tell(own, [&phase, &told](ComponentBase& component)
 							{
 								switch (phase)
 								{
@@ -1568,14 +1568,14 @@ namespace Loom
 				report(*pair.a, *pair.b, pair.aListens, pair.bListens, pair.bodyA, pair.bodyB, pair.trigger, pair.contacts, pair.count, pair.entering ? ENTERING : STAYING);
 
 		const auto awake =
-			[&](const Collider* collider)
+			[this](const Collider* collider)
 			{
 				const int body = BodyOf(*collider);
 				return body != NONE && m_bodies[body].awake;
 			};
 
 		const auto part =
-			[&](Candidate& candidate)
+			[this, &report](Candidate& candidate)
 			{
 				Collider& a = *const_cast<Collider*>(candidate.key.first);
 				Collider& b = *const_cast<Collider*>(candidate.key.second);

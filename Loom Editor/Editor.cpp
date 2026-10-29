@@ -4386,7 +4386,7 @@ namespace Loom
 
 				if (base != std::end(derived) && !m_projectPath.empty())
 					AskForScriptOn(base->second, objects);
-				else ChangeComponents(objects, [&](size_t i) { ComponentRegistry::Create(component, *objects[i]); });
+				else ChangeComponents(objects, [&component, &objects](size_t i) { ComponentRegistry::Create(component, *objects[i]); });
 			};
 
 			if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
@@ -4695,7 +4695,7 @@ namespace Loom
 		// Halfway into the gaps on each side, so neighbours' drop areas meet at the line.
 		constexpr float half = 0.5f;
 		const float gap = ImGui::GetStyle().ItemSpacing.y * half;
-		const auto drop = [&]()
+		const auto drop = [this, &header, &gap, &gameObject, &component]()
 		{
 			const ImRect area(header.Min.x, header.Min.y - gap, header.Max.x, ImGui::GetCursorScreenPos().y - gap);
 
@@ -4711,7 +4711,7 @@ namespace Loom
 		// The remove button rides on the header's own line, Unity-style.
 		ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::GetFrameHeight());
 		if (ImGui::SmallButton("x"))
-			ChangeComponents(objects, [&](size_t i) { objects[i]->DetachComponent(components[i]); });
+			ChangeComponents(objects, [&objects, &components](size_t i) { objects[i]->DetachComponent(components[i]); });
 
 		if (!open)
 		{
@@ -5094,8 +5094,8 @@ namespace Loom
 
 		FolderTree::Hooks hooks{ };
 		hooks.arrange = false;
-		hooks.name = [&](const std::string& key) { return Describe(*candidates.at(key)); };
-		hooks.item = [&](const std::string& key)
+		hooks.name = [&candidates](const std::string& key) { return Describe(*candidates.at(key)); };
+		hooks.item = [this, &candidates, &changed, &field, &target](const std::string& key)
 		{
 			LoomObject* candidate = candidates.at(key);
 
@@ -5365,7 +5365,7 @@ namespace Loom
 			(int)available.x,
 			(int)available.y,
 			Engine::clearColor,
-			[&]()
+			[&camera, &scenes, &seen_through]()
 			{
 				if (!camera)
 					Ui::BeginOverlay();
@@ -5373,7 +5373,7 @@ namespace Loom
 				for (Scene* scene : scenes)
 					scene->Render(seen_through, scenes);
 			},
-			[&]()
+			[this, &camera, &outline, &ringed, &seen_through]()
 			{
 				if (!camera)
 					Ui::DrawOverlay();
