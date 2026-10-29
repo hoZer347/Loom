@@ -1,5 +1,8 @@
 #include "doctest.h"
 
+// Not in the web test build, which has no editor.
+#ifndef __EMSCRIPTEN__
+
 #include "EditorIcons.h"
 #include "EditorTheme.h"
 
@@ -67,3 +70,5 @@ TEST_SUITE("EditorTheme")
 		ImGui::DestroyContext(context);
 	};
 };
+
+#endif

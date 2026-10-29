@@ -144,7 +144,10 @@ namespace Loom
 		if (!glfwInit())
 		{
 			const char* reason = nullptr;
+#ifndef __EMSCRIPTEN__
+			// The web's GLFW has no glfwGetError.
 			glfwGetError(&reason);
+#endif
 			std::cerr << "Engine: GLFW could not start: " << (reason ? reason : "no reason given") << std::endl;
 		};
 
