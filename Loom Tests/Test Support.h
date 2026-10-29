@@ -314,7 +314,7 @@ namespace LoomTests
 		void PushTarget(uint32_t target) override { m_targets.push_back(target); };
 		void PopTarget() override { m_targets.pop_back(); };
 		void Clear(const float* color, bool depth) override { clears.push_back({ color != nullptr, depth }); };
-		void SetDepthBias(float, float) override { };
+		void SetDepthBias(float slope, float constant) override { depthBiases.push_back({ slope, constant }); };
 		void SetColorWrite(bool write) override { colorWrites.push_back(write); };
 		void SetDepthTestEqual(bool equal) override { depthTestsEqual.push_back(equal); };
 
@@ -341,6 +341,9 @@ namespace LoomTests
 
 		std::vector<bool> colorWrites;
 		std::vector<bool> depthTestsEqual;
+
+		// Each depth bias set, as its slope and its constant.
+		std::vector<std::pair<float, float>> depthBiases;
 
 		// What each of drawn was drawn into: a target, or WINDOW.
 		std::vector<uint32_t> drawnInto;

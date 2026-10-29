@@ -137,6 +137,26 @@ TEST_SUITE("Light")
 		CHECK(std::abs(std::abs(edge.x) - 1.0f) < EPSILON);
 	};
 
+	// A slope-scaled bias would light a band of whatever pokes up through a
+	// tilted caster, just under it.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the shadow pass biases depth by a constant alone, and clears it after")
+	{
+		RecordingRenderer renderer;
+
+		Loom::Scene scene("depth bias");
+		Pump();
+
+		Loom::Light* light = scene.Attach<Loom::Light>();
+		Pump();
+
+		light->RenderShadowMap({ &scene.GetRoot() });
+
+		REQUIRE(renderer.depthBiases.size() == 2);
+		CHECK(renderer.depthBiases.front().first == 0.0f);
+		CHECK(renderer.depthBiases.front().second > 0.0f);
+		CHECK(renderer.depthBiases.back() == std::pair<float, float>{ 0.0f, 0.0f });
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a zero direction still gives a usable transform")
 	{
 		Loom::Light light;

@@ -24,9 +24,10 @@ namespace Loom
 	{
 		#pragma region Shadow Map
 
-		// Slope-scaled depth bias, against shadow acne.
-		constexpr float SLOPE_OFFSET = 3.0f;
-		constexpr float CONSTANT_OFFSET = 4.0f;
+		// Depth bias against shadow acne, constant alone: scaled by a caster's
+		// slope it would lift what sits just under the caster into the light.
+		// The slope is taken up by the receiver's normal offset instead.
+		constexpr float CONSTANT_OFFSET = 1.0f;
 
 		// The light sits one extent back from the centre, so the box is two deep.
 		constexpr float DEPTH_EXTENTS = 2.0f;
@@ -83,8 +84,11 @@ uniform float u_shadowTexel;
 
 // How many shadow map texels out along its normal a surface reads its
 // shadow from, clear of the flat faces it is made of, which would otherwise
-// shadow the smooth surface their normals light.
-const float LOOM_NORMAL_OFFSET_TEXELS = 1.5;
+// shadow the smooth surface their normals light. The more a surface slopes
+// away from the light, the further out it reads; read out sideways, a surface
+// tucked under another stays under it.
+const float LOOM_NORMAL_OFFSET_TEXELS = 1.0;
+const float LOOM_SLOPE_OFFSET_TEXELS = 3.0;
 
 vec4 LoomLightSpace(vec4 world)
 {
@@ -100,10 +104,13 @@ vec4 LoomLightSpace(vec4 world, vec3 normal)
 		return LoomLightSpace(world);
 
 	// Depth in the shadow map grows away from the light along this.
-	vec3 fromLight = vec3(u_lightViewProjection[0][2], u_lightViewProjection[1][2], u_lightViewProjection[2][2]);
-	vec3 toLight = dot(normal, fromLight) > 0.0 ? -normal : normal;
+	vec3 fromLight = normalize(vec3(u_lightViewProjection[0][2], u_lightViewProjection[1][2], u_lightViewProjection[2][2]));
+	vec3 unit = normalize(normal);
+	float facing = dot(unit, fromLight);
+	vec3 toLight = facing > 0.0 ? -unit : unit;
+	float slope = sqrt(max(1.0 - facing * facing, 0.0));
 
-	return u_lightViewProjection * (world + vec4(normalize(toLight) * u_shadowTexel * LOOM_NORMAL_OFFSET_TEXELS, 0.0));
+	return u_lightViewProjection * (world + vec4(toLight * u_shadowTexel * (LOOM_NORMAL_OFFSET_TEXELS + LOOM_SLOPE_OFFSET_TEXELS * slope), 0.0));
 }
 )";
 
@@ -232,7 +239,7 @@ vec3 LoomLight(vec3 normal)
 
 		if (castShadows)
 		{
-			renderer->SetDepthBias(SLOPE_OFFSET, CONSTANT_OFFSET);
+			renderer->SetDepthBias(0.0f, CONSTANT_OFFSET);
 
 			MeshBatch batch;
 
