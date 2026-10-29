@@ -142,7 +142,7 @@ namespace Loom
 				return 0;
 			};
 
-			// The OS holds the frame loop while it moves or sizes the window, so frames come from a timer meanwhile.
+			// The OS holds the frame loop while it moves or sizes the window, so frames come from its size changes and a timer meanwhile.
 			if (message == WM_ENTERSIZEMOVE && frame.Redrawing() != nullptr)
 			{
 				s_held = window;
