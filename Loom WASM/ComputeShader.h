@@ -20,7 +20,8 @@ namespace Loom
 	/**
 	* Loom::ComputeShader
 	* - Runs a .loomcompute file on the GPU over a grid of cells, once a frame
-	*   before anything is drawn, while its GameObject is enabled. Each cell
+	*   or Rate times a second of game time, before anything is drawn, while
+	*   its GameObject is enabled. Each cell
 	*   holds up to four layers of a vec4, kept on the GPU in float textures
 	* - The file is GLSL defining vec4 Compute(ivec2 cell, int layer), which
 	*   returns one layer of one cell and reads any cell of the run before
@@ -90,6 +91,9 @@ namespace Loom
 		// Runs a frame, each reading what the one before left.
 		Serial<int, "Steps"> m_steps = 1;
 
+		// Times a second it runs its Steps, or every frame when 0.
+		Serial<float, "Rate"> m_rate = 0.0f;
+
 		// Each layer twice: one read while the other is written, in turn.
 		static constexpr int BUFFERS = 2;
 		uint32_t m_data[BUFFERS][MaxLayers]{ };
@@ -97,6 +101,9 @@ namespace Loom
 		int m_allocated = 0;
 		glm::ivec2 m_size{ 0 };
 		int m_frame = 0;
+
+		// Game time since it last ran, for a Rate.
+		float m_waited = 0.0f;
 
 		// The file's name without its extension, which the samplers reading it use.
 		std::string m_stem;

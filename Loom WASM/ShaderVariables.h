@@ -105,7 +105,7 @@ namespace Loom
 		{ "u_scene", "uniform highp sampler2D u_scene;", "Pixel pass: the view as drawn, or as the pass before this one left it.", true },
 		{ "u_sceneDepth", "uniform highp sampler2D u_sceneDepth;", "Pixel pass: the view's depth, 0 at the near plane and 1 at the far.", true },
 		{ "u_frame", "uniform int u_frame;", "Compute: how many times the ComputeShader has run, 0 the first time, when its data is all zeros.", true },
-		{ "u_deltaTime", "uniform float u_deltaTime;", "Compute: seconds of game time one run covers, the frame's divided by Steps.", true },
+		{ "u_deltaTime", "uniform float u_deltaTime;", "Compute: seconds of game time one run covers, the frame's or a Rate's interval divided by Steps.", true },
 		{ "u_writing", "uniform int u_writing;", "Compute: the layer being written, which Compute is handed as layer.", true },
 		{ "u_layer0", "uniform highp sampler2D u_layer0;", "Compute: the first layer as the run before left it. LoomRead reads any layer.", true },
 		{ "u_layer1", "uniform highp sampler2D u_layer1;", "Compute: the second layer as the run before left it.", true },

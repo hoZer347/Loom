@@ -12,10 +12,13 @@
 #include "Scene.h"
 #include "ShaderVariables.h"
 #include "Shaders.h"
+#include "Utilities/Clock.h"
 
+#include <chrono>
 #include <cstdlib>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 using LoomTests::Pump;
@@ -342,6 +345,63 @@ TEST_SUITE("Compute")
 
 		CHECK(std::abs(colour.r - COUNTED) <= ROUNDING);
 		CHECK(std::abs(colour.g - COUNTED) <= ROUNDING);
+	};
+
+	#pragma endregion
+
+	#pragma region Rate
+
+	// A run of a ComputeShader at a Rate of RATE a second covers two frames held to MAX_DELTA.
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a ComputeShader with a Rate runs its Steps once each interval of game time, each covering its share")
+	{
+		constexpr float RATE = 8.0f;
+		constexpr float MAX_DELTA = 0.0625f;
+		constexpr float DEFAULT_MAX_DELTA = 0.1f;
+		constexpr int STEPS = 2;
+		constexpr int FRAMES = 4;
+		constexpr std::chrono::milliseconds FRAME_LENGTH{ 70 };
+
+		glfwInit();
+		Loom::Utilities::Tick();
+		Loom::Time::SetMaxDelta(MAX_DELTA);
+
+		RecordingRenderer renderer;
+		const std::string path = "Rated.loomcompute";
+
+		REQUIRE(Loom::Material::EditShader(path, COPY).empty());
+
+		Loom::Scene scene("compute rated");
+		Pump();
+
+		Loom::ComputeShader* compute = scene.AddChild("Rated")->Attach<Loom::ComputeShader>();
+		compute->ChangeShader(path);
+
+		for (const Loom::SerializedField& field : compute->GetFields())
+		{
+			if (field.name == "Rate")
+				*(float*)field.data = RATE;
+
+			if (field.name == "Steps")
+				*(int*)field.data = STEPS;
+		};
+
+		Pump();
+
+		std::vector<size_t> drawn;
+
+		for (int frame = 0; frame < FRAMES; frame++)
+		{
+			std::this_thread::sleep_for(FRAME_LENGTH);
+			Loom::Utilities::Tick();
+			Loom::ComputeShader::RunAll();
+			drawn.push_back(renderer.drawnInto.size());
+		};
+
+		CHECK(drawn == std::vector<size_t>{ 0, STEPS, STEPS, 2 * STEPS });
+		CHECK(renderer.floats["u_deltaTime"] == 1.0f / RATE / STEPS);
+
+		Loom::Time::SetMaxDelta(DEFAULT_MAX_DELTA);
+		glfwTerminate();
 	};
 
 	#pragma endregion

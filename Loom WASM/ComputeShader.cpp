@@ -162,9 +162,24 @@ namespace Loom
 		if ((size != m_size || layers != m_allocated) && !Allocate(size, layers))
 			return;
 
+		float covered = Time::DeltaTime();
+
+		if (*m_rate > 0.0f)
+		{
+			const float interval = 1.0f / *m_rate;
+
+			m_waited += covered;
+
+			if (m_waited < interval)
+				return;
+
+			m_waited = std::min(m_waited - interval, interval);
+			covered = interval;
+		};
+
 		const uint32_t program = shader->id;
 		const int steps = std::max(*m_steps, 1);
-		const float delta = Time::DeltaTime() / (float)steps;
+		const float delta = covered / (float)steps;
 		static const UniformValues none;
 
 		renderer->SetUniform(program, "u_time", Time::SinceStart());

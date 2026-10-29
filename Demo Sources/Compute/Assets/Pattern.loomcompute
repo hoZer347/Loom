@@ -16,7 +16,7 @@ const int SEED_CELLS = 8;
 const float SEEDED = 0.04;
 
 // A drop DROP_RADIUS cells in radius every DROP_EVERY runs.
-const int DROP_EVERY = 90;
+const int DROP_EVERY = 480;
 const float DROP_RADIUS = 6.0;
 
 float Hash(vec2 point)
