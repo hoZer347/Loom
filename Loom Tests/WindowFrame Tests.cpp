@@ -10,8 +10,10 @@
 #include <GLFW/glfw3native.h>
 
 #include <windows.h>
+#include <dwmapi.h>
 
 #include <chrono>
+#include <vector>
 
 #endif
 
@@ -179,6 +181,46 @@ TEST_SUITE("WindowFrame")
 		SendMessageW(hwnd, WM_EXITSIZEMOVE, 0, 0);
 		SetWindowPos(hwnd, nullptr, 0, 0, window_width, window_height, size_only);
 		CHECK(s_redraws == 1);
+	};
+
+	std::vector<std::chrono::steady_clock::time_point> s_redrawnAt;
+
+	void Stamp()
+	{
+		s_redrawnAt.push_back(std::chrono::steady_clock::now());
+	};
+
+	TEST_CASE_FIXTURE(HiddenWindow, "a window being sized takes each new size only once the screen is next composed")
+	{
+		constexpr int sizes = 6;
+		constexpr UINT size_only = SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE;
+		constexpr double least_of_period = 0.5;
+
+		DWM_TIMING_INFO timing{ };
+		timing.cbSize = sizeof(timing);
+		REQUIRE(SUCCEEDED(DwmGetCompositionTimingInfo(nullptr, &timing)));
+
+		LARGE_INTEGER frequency{ };
+		QueryPerformanceFrequency(&frequency);
+		REQUIRE(frequency.QuadPart > 0);
+
+		const std::chrono::duration<double> period((double)timing.qpcRefreshPeriod / (double)frequency.QuadPart);
+
+		Loom::WindowFrame frame;
+		frame.Install(window, Stamp);
+		s_redrawnAt.clear();
+
+		SendMessageW(hwnd, WM_ENTERSIZEMOVE, 0, 0);
+
+		for (int size = 1; size <= sizes; size++)
+			SetWindowPos(hwnd, nullptr, 0, 0, window_width, window_height + size, size_only);
+
+		SendMessageW(hwnd, WM_EXITSIZEMOVE, 0, 0);
+
+		REQUIRE(s_redrawnAt.size() == sizes);
+
+		for (size_t redraw = 1; redraw < s_redrawnAt.size(); redraw++)
+			CHECK(s_redrawnAt[redraw] - s_redrawnAt[redraw - 1] > period * least_of_period);
 	};
 
 	TEST_CASE_FIXTURE(HiddenWindow, "a redraw that pumps messages is not redrawn inside itself")

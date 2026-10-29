@@ -10,8 +10,10 @@
 
 #include <windows.h>
 #include <commctrl.h>
+#include <dwmapi.h>
 
 #pragma comment(lib, "comctl32.lib")
+#pragma comment(lib, "dwmapi.lib")
 
 #endif
 
@@ -124,6 +126,10 @@ namespace Loom
 		{
 			const WindowFrame& frame = *(const WindowFrame*)data;
 			const bool framed = (GetWindowLongW(window, GWL_STYLE) & WS_THICKFRAME) != 0;
+
+			// The screen shows a new size as soon as it is taken, so it is taken just after the screen is composed, leaving a whole refresh to draw it in.
+			if (message == WM_NCCALCSIZE && wparam && window == s_held && (((const NCCALCSIZE_PARAMS*)lparam)->lppos->flags & SWP_NOSIZE) == 0)
+				DwmFlush();
 
 			// A maximized window hangs its frame off the monitor's edges.
 			if (message == WM_NCCALCSIZE && wparam && framed)

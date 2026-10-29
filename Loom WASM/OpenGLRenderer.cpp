@@ -352,6 +352,16 @@ namespace Loom
 			GLFWwindow* context = glfwGetCurrentContext();
 			ImGui::UpdatePlatformWindows();
 			ImGui::RenderPlatformWindowsDefault();
+
+			// Each window draws on a context of its own, so each is finished for a held frame, as in EndFrame.
+			if (Engine::IsPolling())
+				for (ImGuiViewport* viewport : ImGui::GetPlatformIO().Viewports)
+					if (viewport != ImGui::GetMainViewport() && viewport->PlatformHandle != nullptr)
+					{
+						glfwMakeContextCurrent((GLFWwindow*)viewport->PlatformHandle);
+						glFinish();
+					};
+
 			glfwMakeContextCurrent(context);
 		};
 
@@ -376,7 +386,20 @@ namespace Loom
 			};
 
 			LOOM_STAGE("glfwSwapBuffers");
+
+			// A frame the OS holds for a new window size has to reach the screen before it is next composed, so it waits on neither the screen nor vsync.
+			const bool held = Engine::IsPolling();
+
+			if (held)
+				glfwSwapInterval(0);
+
 			glfwSwapBuffers(m_window);
+
+			if (held)
+			{
+				glFinish();
+				glfwSwapInterval(Engine::vsync ? 1 : 0);
+			};
 		};
 
 		void Capture(const CaptureHandler& handler) override
