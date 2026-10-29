@@ -264,6 +264,10 @@ TEST_SUITE("WindowFrame")
 	{
 	};
 
+	void Entered(GLFWwindow*, int)
+	{
+	};
+
 	struct HiddenWindow
 	{
 		GLFWwindow* window = nullptr;
@@ -311,6 +315,15 @@ TEST_SUITE("WindowFrame")
 			glfwSetMouseButtonCallback(window, installed);
 			installed(window, GLFW_MOUSE_BUTTON_LEFT, action, 0);
 		};
+
+		// The mouse moving to x, y, as the window would hear of it.
+		void MoveTo(double x, double y)
+		{
+			const GLFWcursorposfun installed = glfwSetCursorPosCallback(window, nullptr);
+
+			glfwSetCursorPosCallback(window, installed);
+			installed(window, x, y);
+		};
 	};
 
 	TEST_CASE_FIXTURE(HiddenWindow, "a frame takes the title bar off")
@@ -334,7 +347,7 @@ TEST_SUITE("WindowFrame")
 		CHECK(s_presses == 1);
 	};
 
-	TEST_CASE_FIXTURE(HiddenWindow, "a press on the drag strip or an edge goes to the window manager")
+	TEST_CASE_FIXTURE(HiddenWindow, "a press on the drag strip or an edge never reaches the editor")
 	{
 		constexpr double inside_strip = 10.0;
 		constexpr double inside_edge = 1.0;
@@ -361,9 +374,76 @@ TEST_SUITE("WindowFrame")
 		CHECK(s_presses == 0);
 	};
 
+	// A release reaches the editor only once the window manager has taken the drag.
+	TEST_CASE_FIXTURE(HiddenWindow, "a press on the drag strip holds the window while the mouse stays near")
+	{
+		constexpr double inside_strip = 10.0;
+		constexpr double short_of_drag = 3.0;
+		const double middle = window_width / 2.0;
+
+		Loom::WindowFrame frame;
+		frame.Install(window, nullptr);
+		frame.SetDragStrip(strip);
+
+		PressAt(middle, inside_strip);
+		MoveTo(middle + short_of_drag, inside_strip);
+		Send(GLFW_RELEASE);
+		CHECK(s_presses == 0);
+	};
+
+	TEST_CASE_FIXTURE(HiddenWindow, "a press on the drag strip moves the window once dragged far enough")
+	{
+		constexpr double inside_strip = 10.0;
+		constexpr double past_drag = 20.0;
+		const double middle = window_width / 2.0;
+
+		Loom::WindowFrame frame;
+		frame.Install(window, nullptr);
+		frame.SetDragStrip(strip);
+
+		PressAt(middle, inside_strip);
+		MoveTo(middle + past_drag, inside_strip);
+		Send(GLFW_RELEASE);
+		CHECK(s_presses == 1);
+	};
+
+	TEST_CASE_FIXTURE(HiddenWindow, "a second click on the drag strip is a double-click, not a drag")
+	{
+		constexpr double inside_strip = 10.0;
+		constexpr double past_drag = 20.0;
+		const double middle = window_width / 2.0;
+
+		Loom::WindowFrame frame;
+		frame.Install(window, nullptr);
+		frame.SetDragStrip(strip);
+
+		PressAt(middle, inside_strip);
+		Send(GLFW_RELEASE);
+		PressAt(middle, inside_strip);
+		MoveTo(middle + past_drag, inside_strip);
+		CHECK(frame.Hovered() == Loom::WindowFrame::Hit::Caption);
+
+		// Nothing is held after a double-click, so its release goes on to the editor.
+		Send(GLFW_RELEASE);
+		CHECK(s_presses == 1);
+	};
+
+	TEST_CASE_FIXTURE(HiddenWindow, "the edge under the mouse is kept from its last move")
+	{
+		constexpr double inside_edge = 1.0;
+
+		Loom::WindowFrame frame;
+		frame.Install(window, nullptr);
+
+		CHECK(frame.Hovered() == Loom::WindowFrame::Hit::Client);
+		MoveTo(inside_edge, window_height / 2.0);
+		CHECK(frame.Hovered() == Loom::WindowFrame::Hit::Left);
+	};
+
 	TEST_CASE_FIXTURE(HiddenWindow, "a frame gives the window its callbacks back when it goes")
 	{
 		glfwSetCursorPosCallback(window, Moved);
+		glfwSetCursorEnterCallback(window, Entered);
 
 		{
 			Loom::WindowFrame frame;
@@ -372,6 +452,7 @@ TEST_SUITE("WindowFrame")
 
 		CHECK(glfwSetMouseButtonCallback(window, nullptr) == Count);
 		CHECK(glfwSetCursorPosCallback(window, nullptr) == Moved);
+		CHECK(glfwSetCursorEnterCallback(window, nullptr) == Entered);
 	};
 };
 

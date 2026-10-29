@@ -272,18 +272,7 @@ namespace Loom
 		constexpr double NEVER = -std::numeric_limits<double>::infinity();
 
 		// _NET_WM_MOVERESIZE's directions.
-		enum Direction : long
-		{
-			SIZE_TOPLEFT = 0,
-			SIZE_TOP = 1,
-			SIZE_TOPRIGHT = 2,
-			SIZE_RIGHT = 3,
-			SIZE_BOTTOMRIGHT = 4,
-			SIZE_BOTTOM = 5,
-			SIZE_BOTTOMLEFT = 6,
-			SIZE_LEFT = 7,
-			MOVE = 8,
-		};
+		enum class Direction : long { SizeTopLeft, SizeTop, SizeTopRight, SizeRight, SizeBottomRight, SizeBottom, SizeBottomLeft, SizeLeft, Move };
 
 		// _NET_WM_MOVERESIZE's mark for a request from an application.
 		constexpr long FROM_APPLICATION = 1;
@@ -293,7 +282,11 @@ namespace Loom
 			const WindowFrame* frame = nullptr;
 			GLFWmousebuttonfun pressed = nullptr;
 			GLFWcursorposfun moved = nullptr;
+			GLFWcursorenterfun entered = nullptr;
 			double caption = NEVER;
+
+			// Kept from the mouse's last move, so a frame asks the X server nothing.
+			WindowFrame::Hit hovered = WindowFrame::Hit::Client;
 
 			// Where the caption was pressed, which drags the window once the mouse goes far enough.
 			bool held = false;
@@ -310,17 +303,14 @@ namespace Loom
 			return scale;
 		};
 
-		WindowFrame::Hit Under(const WindowFrame& frame, GLFWwindow* window)
+		WindowFrame::Hit Under(const WindowFrame& frame, GLFWwindow* window, double x, double y)
 		{
 			if (glfwGetWindowMonitor(window) != nullptr)
 				return WindowFrame::Hit::Client;
 
-			double x = 0.0;
-			double y = 0.0;
 			int width = 0;
 			int height = 0;
 
-			glfwGetCursorPos(window, &x, &y);
 			glfwGetWindowSize(window, &width, &height);
 
 			return WindowFrame::HitTest(
@@ -337,15 +327,15 @@ namespace Loom
 		{
 			switch (hit)
 			{
-			case WindowFrame::Hit::Left: return SIZE_LEFT;
-			case WindowFrame::Hit::Right: return SIZE_RIGHT;
-			case WindowFrame::Hit::Top: return SIZE_TOP;
-			case WindowFrame::Hit::Bottom: return SIZE_BOTTOM;
-			case WindowFrame::Hit::TopLeft: return SIZE_TOPLEFT;
-			case WindowFrame::Hit::TopRight: return SIZE_TOPRIGHT;
-			case WindowFrame::Hit::BottomLeft: return SIZE_BOTTOMLEFT;
-			case WindowFrame::Hit::BottomRight: return SIZE_BOTTOMRIGHT;
-			default: return MOVE;
+			case WindowFrame::Hit::Left: return Direction::SizeLeft;
+			case WindowFrame::Hit::Right: return Direction::SizeRight;
+			case WindowFrame::Hit::Top: return Direction::SizeTop;
+			case WindowFrame::Hit::Bottom: return Direction::SizeBottom;
+			case WindowFrame::Hit::TopLeft: return Direction::SizeTopLeft;
+			case WindowFrame::Hit::TopRight: return Direction::SizeTopRight;
+			case WindowFrame::Hit::BottomLeft: return Direction::SizeBottomLeft;
+			case WindowFrame::Hit::BottomRight: return Direction::SizeBottomRight;
+			default: return Direction::Move;
 			};
 		};
 
@@ -369,7 +359,7 @@ namespace Loom
 			event.xclient.format = 32;
 			event.xclient.data.l[0] = root_x;
 			event.xclient.data.l[1] = root_y;
-			event.xclient.data.l[2] = direction;
+			event.xclient.data.l[2] = (long)direction;
 			event.xclient.data.l[3] = Button1;
 			event.xclient.data.l[4] = FROM_APPLICATION;
 
@@ -394,7 +384,11 @@ namespace Loom
 				return;
 			};
 
-			const WindowFrame::Hit hit = left && action == GLFW_PRESS ? Under(*link.frame, window) : WindowFrame::Hit::Client;
+			double x = 0.0;
+			double y = 0.0;
+			glfwGetCursorPos(window, &x, &y);
+
+			const WindowFrame::Hit hit = left && action == GLFW_PRESS ? Under(*link.frame, window, x, y) : WindowFrame::Hit::Client;
 
 			if (hit == WindowFrame::Hit::Client)
 			{
@@ -403,10 +397,6 @@ namespace Loom
 
 				return;
 			};
-
-			double x = 0.0;
-			double y = 0.0;
-			glfwGetCursorPos(window, &x, &y);
 
 			if (hit != WindowFrame::Hit::Caption)
 			{
@@ -444,13 +434,31 @@ namespace Loom
 			if (link.moved != nullptr)
 				link.moved(window, x, y);
 
+			link.hovered = Under(*link.frame, window, x, y);
+
 			const double threshold = DRAG_THRESHOLD * Scale(window);
 
 			if (!link.held || std::hypot(x - link.held_x, y - link.held_y) < threshold)
 				return;
 
 			link.held = false;
-			MoveResize(window, MOVE, link.held_x, link.held_y);
+			MoveResize(window, Direction::Move, link.held_x, link.held_y);
+		};
+
+		void Enter(GLFWwindow* window, int entered)
+		{
+			const auto found = s_links.find(window);
+
+			if (found == s_links.end())
+				return;
+
+			Link& link = found->second;
+
+			if (link.entered != nullptr)
+				link.entered(window, entered);
+
+			if (!entered)
+				link.hovered = WindowFrame::Hit::Client;
 		};
 	};
 
@@ -463,6 +471,7 @@ namespace Loom
 
 		glfwSetMouseButtonCallback(m_window, found->second.pressed);
 		glfwSetCursorPosCallback(m_window, found->second.moved);
+		glfwSetCursorEnterCallback(m_window, found->second.entered);
 		s_links.erase(found);
 	};
 
@@ -477,6 +486,7 @@ namespace Loom
 		link.frame = this;
 		link.pressed = glfwSetMouseButtonCallback(window, Press);
 		link.moved = glfwSetCursorPosCallback(window, Move);
+		link.entered = glfwSetCursorEnterCallback(window, Enter);
 
 		glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_FALSE);
 	};
@@ -488,10 +498,9 @@ namespace Loom
 
 	WindowFrame::Hit WindowFrame::Hovered() const
 	{
-		if (m_window == nullptr || !glfwGetWindowAttrib(m_window, GLFW_HOVERED))
-			return Hit::Client;
+		const auto found = s_links.find(m_window);
 
-		return Under(*this, m_window);
+		return found == s_links.end() ? Hit::Client : found->second.hovered;
 	};
 };
 
