@@ -84,6 +84,8 @@ namespace Loom
 		// the texture.
 		static EditableMesh Cube(float size);
 		static EditableMesh Plane(float size);
+
+		// Smooth round the side and flat on the caps.
 		static EditableMesh Cylinder(float radius, float height, int segments);
 		static EditableMesh Cone(float radius, float height, int segments);
 
@@ -91,7 +93,8 @@ namespace Loom
 		static EditableMesh Sphere(float radius, int segments, int rings);
 
 		// Height end to end, each round end a half sphere of cap_rings rings.
-		// No shorter than a sphere.
+		// No shorter than a sphere. Smooth, each corner's normal pointing out
+		// from the nearest point on its axis.
 		static EditableMesh Capsule(float radius, float height, int segments, int cap_rings);
 
 		#pragma endregion

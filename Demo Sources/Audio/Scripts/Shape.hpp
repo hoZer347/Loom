@@ -38,6 +38,9 @@ namespace AudioScripts
 
 			mesh->material = m_material;
 			mesh->m_vertices = m_sphere ? Sphere() : Cube();
+
+			if (m_sphere)
+				mesh->m_normals = Normals(*mesh->m_vertices);
 		};
 
 		// Drawn in colour from its next update, and in its own again at the
@@ -67,6 +70,18 @@ namespace AudioScripts
 		static void Add(std::vector<float>& vertices, const glm::vec3& point)
 		{
 			vertices.insert(vertices.end(), { point.x, point.y, point.z });
+		};
+
+		// Each vertex's normal pointing out from the middle, so the sphere
+		// shades smooth.
+		static std::vector<float> Normals(const std::vector<float>& vertices)
+		{
+			std::vector<float> normals{ };
+
+			for (size_t i = 0; i < vertices.size(); i += glm::vec3::length())
+				Add(normals, glm::normalize(glm::vec3(vertices[i], vertices[i + 1], vertices[i + 2])));
+
+			return normals;
 		};
 
 		static void AddQuad(std::vector<float>& vertices, const glm::vec3& a, const glm::vec3& b, const glm::vec3& c, const glm::vec3& d)

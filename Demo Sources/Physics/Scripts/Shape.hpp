@@ -40,6 +40,7 @@ namespace PhysicsScripts
 
 			mesh->material = m_material;
 			mesh->m_vertices = Build(m_kind);
+			mesh->m_normals = Normals(m_kind, *mesh->m_vertices);
 		};
 
 		// For a Shape made by a script, before it is first drawn.
@@ -78,6 +79,27 @@ namespace PhysicsScripts
 		static void Add(std::vector<float>& vertices, const glm::vec3& point)
 		{
 			vertices.insert(vertices.end(), { point.x, point.y, point.z });
+		};
+
+		// Smooth over the round shapes, each vertex's normal pointing out from
+		// the middle of the sphere or of the ring's tube. None for the cube,
+		// which the engine shades flat.
+		static std::vector<float> Normals(Kind kind, const std::vector<float>& vertices)
+		{
+			std::vector<float> normals{ };
+
+			if (kind == Cube)
+				return normals;
+
+			for (size_t i = 0; i < vertices.size(); i += glm::vec3::length())
+			{
+				const glm::vec3 point(vertices[i], vertices[i + 1], vertices[i + 2]);
+				const glm::vec3 middle = kind == Torus ? glm::normalize(glm::vec3(point.x, point.y, 0.0f)) * RING_RADIUS : glm::vec3(0.0f);
+
+				Add(normals, glm::normalize(point - middle));
+			};
+
+			return normals;
 		};
 
 		static void AddQuad(std::vector<float>& vertices, const glm::vec3& a, const glm::vec3& b, const glm::vec3& c, const glm::vec3& d)

@@ -4,6 +4,7 @@
 
 #include "glm/gtc/matrix_transform.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
@@ -185,6 +186,57 @@ TEST_SUITE("EditableMesh")
 
 	#pragma region Primitives
 
+	// Each side corner's normal is the surface's own, so shared edges shade
+	// smooth, while a cap stays flat.
+	TEST_CASE("EditableMesh's round primitives are smooth on the side and flat on the caps")
+	{
+		constexpr float SIZE = 2.0f;
+		constexpr float CAPSULE_HEIGHT = 3.0f * SIZE;
+
+		const auto outward = [](const glm::vec3& point) { return glm::normalize(glm::vec3(point.x, 0.0f, point.z)); };
+
+		const EditableMesh cylinder = EditableMesh::Cylinder(SIZE, SIZE, SEGMENTS);
+
+		for (uint32_t face = 0; face < cylinder.faces.size(); face++)
+			for (const EditableMesh::Corner& corner : cylinder.faces[face].corners)
+				CHECK(Near(corner.normal, cylinder.faces[face].corners.size() == (size_t)SEGMENTS ? cylinder.FaceNormal(face) : outward(cylinder.vertices[corner.vertex])));
+
+		// At 45 degrees, as wide as it is tall.
+		const EditableMesh cone = EditableMesh::Cone(SIZE, SIZE, SEGMENTS);
+		const float tip = cone.vertices.back().y;
+
+		for (uint32_t face = 0; face < cone.faces.size(); face++)
+		{
+			const EditableMesh::Face& sides = cone.faces[face];
+
+			if (sides.corners.size() == (size_t)SEGMENTS)
+			{
+				for (const EditableMesh::Corner& corner : sides.corners)
+					CHECK(Near(corner.normal, cone.FaceNormal(face)));
+
+				continue;
+			};
+
+			for (const EditableMesh::Corner& corner : sides.corners)
+			{
+				const glm::vec3& at = cone.vertices[corner.vertex];
+				const glm::vec3 across = at.y == tip ? outward(cone.FaceNormal(face)) : outward(at);
+
+				CHECK(Near(corner.normal, glm::normalize(across + glm::vec3(0.0f, 1.0f, 0.0f))));
+			};
+		};
+
+		const EditableMesh capsule = EditableMesh::Capsule(SIZE, CAPSULE_HEIGHT, SEGMENTS, RINGS);
+		const float straight = CAPSULE_HEIGHT / 2.0f - SIZE;
+
+		for (const EditableMesh::Face& face : capsule.faces)
+			for (const EditableMesh::Corner& corner : face.corners)
+			{
+				const glm::vec3& at = capsule.vertices[corner.vertex];
+				CHECK(Near(corner.normal, (at - glm::vec3(0.0f, std::clamp(at.y, -straight, straight), 0.0f)) / SIZE));
+			};
+	};
+
 	TEST_CASE("EditableMesh's primitives are closed and face outwards")
 	{
 		constexpr float SIZE = 2.0f;
@@ -201,14 +253,11 @@ TEST_SUITE("EditableMesh")
 			CHECK(Closed(mesh));
 		};
 
-		for (const EditableMesh& mesh : {
-			EditableMesh::Cube(SIZE),
-			EditableMesh::Cylinder(SIZE, SIZE, SEGMENTS),
-			EditableMesh::Cone(SIZE, SIZE, SEGMENTS),
-			EditableMesh::Capsule(SIZE, CAPSULE_HEIGHT, SEGMENTS, RINGS) })
-			for (uint32_t face = 0; face < mesh.faces.size(); face++)
-				for (const EditableMesh::Corner& corner : mesh.faces[face].corners)
-					CHECK(Near(corner.normal, mesh.FaceNormal(face)));
+		const EditableMesh cube = EditableMesh::Cube(SIZE);
+
+		for (uint32_t face = 0; face < cube.faces.size(); face++)
+			for (const EditableMesh::Corner& corner : cube.faces[face].corners)
+				CHECK(Near(corner.normal, cube.FaceNormal(face)));
 
 		const EditableMesh sphere = EditableMesh::Sphere(SIZE, SEGMENTS, RINGS);
 
@@ -216,7 +265,6 @@ TEST_SUITE("EditableMesh")
 			for (const EditableMesh::Corner& corner : face.corners)
 				CHECK(Near(corner.normal, sphere.vertices[corner.vertex] / SIZE));
 
-		const EditableMesh cube = EditableMesh::Cube(SIZE);
 		CHECK(cube.vertices.size() == 8);
 		CHECK(cube.faces.size() == 6);
 		CHECK(Near(cube.Bounds().second, glm::vec3(SIZE / 2.0f)));

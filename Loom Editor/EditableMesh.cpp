@@ -36,6 +36,12 @@ namespace Loom
 			return glm::vec3(radius * std::cos(angle), y, -radius * std::sin(angle));
 		};
 
+		// Straight out from the Y axis, level.
+		glm::vec3 Outward(const glm::vec3& point)
+		{
+			return glm::normalize(glm::vec3(point.x, 0.0f, point.z));
+		};
+
 		// A cap's UV for the same point, the circle filling the texture.
 		glm::vec2 RoundUV(int step, int steps)
 		{
@@ -261,6 +267,10 @@ namespace Loom
 			bottom_uvs.insert(bottom_uvs.begin(), RoundUV(i, segments));
 		};
 
+		for (int i = 0; i < segments; i++)
+			for (Corner& corner : mesh.faces[i].corners)
+				corner.normal = Outward(mesh.vertices[corner.vertex]);
+
 		mesh.AddFace(top, top_uvs);
 		mesh.AddFace(bottom, bottom_uvs);
 
@@ -295,6 +305,12 @@ namespace Loom
 			bottom.insert(bottom.begin(), (uint32_t)i);
 			bottom_uvs.insert(bottom_uvs.begin(), RoundUV(i, segments));
 		};
+
+		const auto slant = [&](const glm::vec3& outward) { return glm::normalize(glm::vec3(outward.x * height, radius, outward.z * height)); };
+
+		for (int i = 0; i < segments; i++)
+			for (Corner& corner : mesh.faces[i].corners)
+				corner.normal = slant(corner.vertex == apex ? Round(1.0f, 0.0f, 2 * i + 1, 2 * segments) : Outward(mesh.vertices[corner.vertex]));
 
 		mesh.AddFace(bottom, bottom_uvs);
 
@@ -386,6 +402,13 @@ namespace Loom
 
 			mesh.AddFace({ south, at(rows - 1, i + 1), at(rows - 1, i) }, { uv(south, i), uv(at(rows - 1, i + 1), i + 1), uv(at(rows - 1, i), i) });
 		};
+
+		for (Face& face : mesh.faces)
+			for (Corner& corner : face.corners)
+			{
+				const glm::vec3& at_vertex = mesh.vertices[corner.vertex];
+				corner.normal = glm::normalize(at_vertex - glm::vec3(0.0f, std::clamp(at_vertex.y, -straight, straight), 0.0f));
+			};
 
 		return mesh;
 	};
