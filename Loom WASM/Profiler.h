@@ -45,11 +45,13 @@ namespace Loom
 		// The recorded frames all of a Row but its trend reaches back over.
 		static constexpr int Window = 100;
 
-		// The recorded frames each point of a Row's trend is the average of.
-		static constexpr int Bucket = 10;
+		// The points a second a Row's trend gains, each the average of the
+		// frames recorded in its share of the second, at any frame rate and
+		// whether or not every frame is.
+		static constexpr int Points = 6;
 
-		// The points a Row's trend holds, so it reaches back Trend * Bucket
-		// recorded frames.
+		// The points a Row's trend holds, so it reaches back Trend / Points
+		// seconds.
 		static constexpr int Trend = 300;
 
 		// The polls a second, the most frames recorded unless SetEveryFrame.
@@ -72,7 +74,7 @@ namespace Loom
 			// Each frame's, oldest first.
 			std::array<double, Window> history;
 
-			// Each whole Bucket's average, oldest first.
+			// Each whole point's average, oldest first.
 			std::array<double, Trend> trend;
 		};
 
@@ -150,9 +152,13 @@ namespace Loom
 		// window.
 		static double FrameLength();
 
-		// In milliseconds from the start of one recorded frame to the next,
-		// averaged over the window.
-		static double Spacing();
+		// How far the point the trend gains next is through its share of a
+		// second, from 0 to 1, so a graph of it can slide along between them.
+		static double TrendProgress();
+
+		// Moves the clock stages and frames are timed by forward, as if that
+		// long had passed: for tests, which cannot wait out the trend.
+		static void Advance(double milliseconds);
 
 		#pragma endregion
 #endif

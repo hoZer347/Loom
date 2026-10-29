@@ -198,14 +198,14 @@ namespace Loom
 		const ImVec2 mouse = ImGui::GetIO().MousePos;
 		ImDrawList* const draw = ImGui::GetWindowDrawList();
 
-		// Each thread's stages stacked per Bucket frames, oldest on the left.
+		// Each thread's stages stacked per point, oldest on the left, sliding
+		// left as the next point comes due.
 		constexpr float graph_lines = 6.0f;
-		constexpr int graph_frames = Profiler::Trend * Profiler::Bucket;
-		constexpr double milliseconds_per_second = 1000.0;
+		constexpr double seconds_per_point = 1.0 / (double)Profiler::Points;
 
-		const double seconds_per_point = Profiler::Spacing() * (double)Profiler::Bucket / milliseconds_per_second;
+		const float progress = (float)Profiler::TrendProgress();
 
-		ImGui::TextDisabled("Milliseconds a frame over the last %d, about %.0f s", graph_frames, seconds_per_point * (double)Profiler::Trend);
+		ImGui::TextDisabled("Milliseconds a frame over the last %d s", Profiler::Trend / Profiler::Points);
 
 		// Stage, Average and Peak.
 		constexpr int columns = 3;
@@ -241,11 +241,13 @@ namespace Loom
 
 			ImGui::InvisibleButton("##graph", size);
 
-			const int pointed = ImGui::IsItemHovered() ? std::clamp((int)std::lround((mouse.x - corner.x) / step), 0, Profiler::Trend - 1) : -1;
+			const float slide = step * progress;
+			const int pointed = ImGui::IsItemHovered() ? std::clamp((int)std::lround((mouse.x - corner.x + slide) / step), 0, Profiler::Trend - 1) : -1;
 			const auto height = [&](double length) { return corner.y + size.y - size.y * (float)(length / highest); };
 			const Profiler::Row* under = nullptr;
 
 			draw->AddRectFilled(corner, ImVec2(corner.x + size.x, corner.y + size.y), ImGui::GetColorU32(ImGuiCol_FrameBg));
+			draw->PushClipRect(corner, ImVec2(corner.x + size.x, corner.y + size.y), true);
 
 			// Antialiasing would show the background through quad seams.
 			const ImDrawListFlags flags = draw->Flags;
@@ -260,7 +262,7 @@ namespace Loom
 
 				for (int age = 0; age + 1 < Profiler::Trend; age++)
 				{
-					const float from = corner.x + step * (float)age;
+					const float from = corner.x + step * (float)age - slide;
 					const float to = from + step;
 
 					draw->AddQuadFilled(
@@ -274,14 +276,21 @@ namespace Loom
 				if (pointed >= 0 && mouse.y <= height(below[pointed]) && mouse.y >= height(below[pointed] + row.trend[pointed]))
 					under = &row;
 
+				// The newest point holds until the next comes due.
+				const float newest = corner.x + size.x - slide;
+				const double last = below.back() + row.trend.back();
+
+				draw->AddRectFilled(ImVec2(newest, height(last)), ImVec2(corner.x + size.x, height(below.back())), fill);
+
 				for (int age = 0; age < Profiler::Trend; age++)
 					below[age] += row.trend[age];
 			};
 
+			draw->PopClipRect();
 			draw->Flags = flags;
 
 			if (under)
-				ImGui::SetTooltip("%s: %.3f ms, about %.1f s ago", under->name.c_str(), under->trend[pointed], seconds_per_point * (double)(Profiler::Trend - 1 - pointed));
+				ImGui::SetTooltip("%s: %.3f ms, about %.1f s ago", under->name.c_str(), under->trend[pointed], seconds_per_point * ((double)(Profiler::Trend - 1 - pointed) + progress));
 
 			if (!ImGui::BeginTable("##stages", columns, ImGuiTableFlags_RowBg))
 			{

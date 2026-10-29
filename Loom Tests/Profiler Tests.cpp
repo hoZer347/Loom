@@ -4,6 +4,7 @@
 #include "Profiler.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstring>
 #include <string>
@@ -31,6 +32,9 @@ namespace
 
 	// From one poll to the next, on average.
 	constexpr auto POLL_FOR = std::chrono::duration<double>(1.0 / Loom::Profiler::Rate);
+
+	// In milliseconds, each point of the trend's share of a second.
+	constexpr double POINT = 1000.0 / (double)Loom::Profiler::Points;
 
 	struct Found
 	{
@@ -172,15 +176,21 @@ TEST_SUITE("Profiler")
 
 	TEST_CASE_FIXTURE(NewFrame, "a point of the trend is its frames' average, a frame missed counting as none")
 	{
-		static_assert(Loom::Profiler::Bucket % 2 == 0, "every other frame of a bucket must be half of it");
+		constexpr int frames = 10;
 
-		for (int frame = 0; frame < 2 * Loom::Profiler::Bucket; frame++)
+		Loom::Profiler::Advance(POINT);
+		Loom::Profiler::EndFrame();
+
+		for (int frame = 0; frame < frames; frame++)
 		{
 			if (frame % 2 == 0)
 			{
 				LOOM_STAGE("Profiler alternate");
 				Busy(BUSY_FOR);
 			};
+
+			if (frame == frames - 1)
+				Loom::Profiler::Advance(POINT);
 
 			Loom::Profiler::EndFrame();
 		};
@@ -193,23 +203,76 @@ TEST_SUITE("Profiler")
 		CHECK(row.trend.back() <= doctest::Approx(row.peak / 2.0));
 	};
 
+	TEST_CASE_FIXTURE(NewFrame, "the trend gains a point each share of a second, however many frames are recorded in it")
+	{
+		Loom::Profiler::Advance(POINT);
+		Loom::Profiler::EndFrame();
+
+		for (int frame = 0; frame < Loom::Profiler::Window; frame++)
+		{
+			{
+				LOOM_STAGE("Profiler many frames");
+			};
+
+			Loom::Profiler::EndFrame();
+		};
+
+		const Found waiting = FindRow("Profiler many frames");
+		REQUIRE(waiting.thread);
+		CHECK(waiting.thread->rows[waiting.row].trend.back() == 0.0);
+
+		Loom::Profiler::Advance(POINT);
+		Loom::Profiler::EndFrame();
+
+		const Found closed = FindRow("Profiler many frames");
+		REQUIRE(closed.thread);
+		CHECK(closed.thread->rows[closed.row].trend.back() > 0.0);
+	};
+
+	TEST_CASE_FIXTURE(NewFrame, "a frame running past several points stands for each of them")
+	{
+		constexpr int points = 3;
+
+		Loom::Profiler::Advance(POINT);
+		Loom::Profiler::EndFrame();
+
+		{
+			LOOM_STAGE("Profiler long frame");
+			Busy(BUSY_FOR);
+		};
+
+		Loom::Profiler::Advance(POINT * points);
+		Loom::Profiler::EndFrame();
+
+		const Found found = FindRow("Profiler long frame");
+		REQUIRE(found.thread);
+
+		const std::array<double, Loom::Profiler::Trend>& trend = found.thread->rows[found.row].trend;
+
+		for (int age = 1; age <= points; age++)
+			CHECK(trend[Loom::Profiler::Trend - age] >= (double)BUSY_FOR.count());
+
+		CHECK(trend[Loom::Profiler::Trend - points - 1] == 0.0);
+	};
+
 	TEST_CASE_FIXTURE(NewFrame, "a stage that has not run for the whole trend is forgotten")
 	{
-		constexpr int SPAN = Loom::Profiler::Trend * Loom::Profiler::Bucket;
-
 		{
 			LOOM_STAGE("Profiler once");
 		};
 
 		Loom::Profiler::EndFrame();
 
-		for (int frame = 1; frame < SPAN; frame++)
+		for (int point = 0; point < Loom::Profiler::Trend; point++)
+		{
+			Loom::Profiler::Advance(POINT);
 			Loom::Profiler::EndFrame();
+		};
 
 		REQUIRE(FindRow("Profiler once").thread);
 
-		for (int frame = 0; frame < Loom::Profiler::Bucket; frame++)
-			Loom::Profiler::EndFrame();
+		Loom::Profiler::Advance(POINT);
+		Loom::Profiler::EndFrame();
 
 		CHECK_FALSE(FindRow("Profiler once").thread);
 	};
@@ -327,10 +390,6 @@ TEST_SUITE("Profiler")
 
 		Loom::Profiler::EndFrame();
 		CHECK(FindRow("Profiler next poll").thread);
-		// The fixture's frame began the poll before, two recorded frames back.
-		constexpr double spaces = 2.0;
-		constexpr double milliseconds_per_second = 1000.0;
-		CHECK(Loom::Profiler::Spacing() * spaces >= milliseconds_per_second / (double)Loom::Profiler::Rate);
 	};
 
 	TEST_CASE_FIXTURE(NewFrame, "a stage of a recorded frame closing in one that is not is dropped")

@@ -25,6 +25,9 @@ namespace Loom
 		// In milliseconds from one poll to the next.
 		constexpr double POLL = 1000.0 / (double)Profiler::Rate;
 
+		// In milliseconds, each point of the trend's share of a second.
+		constexpr double POINT = 1000.0 / (double)Profiler::Points;
+
 		// Polls step by the golden ratio, so fixed-cadence work is not always caught or missed.
 		constexpr double SHORTEST_POLL = 0.5;
 		constexpr double POLL_STEP = 0.618034;
@@ -49,7 +52,7 @@ namespace Loom
 		struct Node
 		{
 			// Reorders parts to their start order this frame.
-			Node& Part(const std::string& name, unsigned long long frame)
+			Node& Part(const std::string& name, unsigned long long frame, unsigned long long point)
 			{
 				const auto found = std::find_if(parts.begin(), parts.end(), [&name](const Node& part) { return part.name == name; });
 				const size_t at = (size_t)(found - parts.begin());
@@ -68,6 +71,7 @@ namespace Loom
 
 				Node& part = parts[placed++];
 				part.last = frame;
+				part.lastPoint = point;
 
 				return part;
 			};
@@ -78,12 +82,13 @@ namespace Loom
 			std::array<double, Profiler::Window> history{ };
 			double sum = 0.0;
 
-			// Each bucket's average in a ring, and the current bucket's running sum.
+			// Each point's average in a ring the point number indexes, and the next one's running sum.
 			std::array<double, Profiler::Trend> trend{ };
 			double gathered = 0.0;
 
 			unsigned long long first = 0;
 			unsigned long long last = 0;
+			unsigned long long lastPoint = 0;
 
 			std::vector<Node> parts{ };
 
@@ -113,11 +118,14 @@ namespace Loom
 			double frameLength = 0.0;
 			unsigned long long frame = 0;
 
-			// Frame starts, the next poll and how many are due.
-			std::array<double, Profiler::Window> frameStarts{ };
-			double spacing = 0.0;
+			// The next poll and how many are due.
 			double due = 0.0;
 			unsigned long long polls = 0;
+
+			// The trend's points closed so far, when the next closes, and the frames recorded towards it.
+			unsigned long long points = 0;
+			double pointEnd = 0.0;
+			int pointFrames = 0;
 
 			std::vector<Profiler::Thread> threads{ };
 		};
@@ -135,12 +143,15 @@ namespace Loom
 		// Whether the frame running now is recorded.
 		std::atomic<bool> s_polled{ false };
 
+		// What Advance has added to the clock.
+		std::atomic<double> s_advanced{ 0.0 };
+
 		thread_local Log* t_log = nullptr;
 		thread_local std::vector<const char*> t_open{ };
 
 		double Now()
 		{
-			return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - Shared().origin).count();
+			return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - Shared().origin).count() + s_advanced.load(std::memory_order_relaxed);
 		};
 
 		Log& ThisThread()
@@ -180,32 +191,37 @@ namespace Loom
 			s_polled.store(next, std::memory_order_relaxed);
 		};
 
-		// Folds this frame into the window and trend, dropping parts idle for the trend.
-		void Close(Node& node, unsigned long long frame)
+		// Folds this frame into the window and the trend's next point.
+		void Fold(Node& node, unsigned long long frame)
 		{
-			const unsigned long long buckets = (frame + 1) / Profiler::Bucket;
-
 			node.history[frame % Profiler::Window] = node.sum;
 			node.gathered += node.sum;
 			node.sum = 0.0;
 			node.placed = 0;
 
-			if ((frame + 1) % Profiler::Bucket == 0)
-			{
-				node.trend[(buckets - 1) % Profiler::Trend] = node.gathered / (double)Profiler::Bucket;
-				node.gathered = 0.0;
-			};
-
-			std::erase_if(node.parts, [buckets](const Node& part) { return part.last / Profiler::Bucket + Profiler::Trend < buckets; });
-
 			for (Node& part : node.parts)
-				Close(part, frame);
+				Fold(part, frame);
 		};
 
-		void List(const Node& node, unsigned long long frame, int depth, std::vector<Profiler::Row>& rows)
+		// Sets the last closing points before after to their frames' average,
+		// dropping parts idle for the trend.
+		void Close(Node& node, unsigned long long after, int closing, int frames)
 		{
-			const unsigned long long buckets = (frame + 1) / Profiler::Bucket;
+			const double average = node.gathered / (double)frames;
 
+			for (int point = 0; point < closing; point++)
+				node.trend[(after - (unsigned long long)closing + (unsigned long long)point) % Profiler::Trend] = average;
+
+			node.gathered = 0.0;
+
+			std::erase_if(node.parts, [after](const Node& part) { return part.lastPoint + Profiler::Trend < after; });
+
+			for (Node& part : node.parts)
+				Close(part, after, closing, frames);
+		};
+
+		void List(const Node& node, unsigned long long frame, unsigned long long points, int depth, std::vector<Profiler::Row>& rows)
+		{
 			for (const Node& part : node.parts)
 			{
 				const unsigned long long counted = std::min<unsigned long long>(frame - part.first + 1, Profiler::Window);
@@ -221,11 +237,11 @@ namespace Loom
 				};
 
 				for (int point = 0; point < Profiler::Trend; point++)
-					row.trend[point] = part.trend[(buckets + point) % Profiler::Trend];
+					row.trend[point] = part.trend[(points + point) % Profiler::Trend];
 
 				row.average /= (double)counted;
 
-				List(part, frame, depth + 1, rows);
+				List(part, frame, points, depth + 1, rows);
 			};
 		};
 
@@ -304,6 +320,8 @@ namespace Loom
 		{
 			shared.frameStart = Now();
 			shared.due = shared.frameStart + POLL;
+			shared.pointEnd = shared.frameStart + POINT;
+			shared.pointFrames = 0;
 			s_polled.store(true, std::memory_order_relaxed);
 			return;
 		};
@@ -311,8 +329,8 @@ namespace Loom
 		shared.threads.clear();
 		shared.frameLengths.fill(0.0);
 		shared.frameLength = 0.0;
-		shared.spacing = 0.0;
 		shared.frame = 0;
+		shared.points = 0;
 	};
 
 	bool Profiler::Recording()
@@ -367,11 +385,19 @@ namespace Loom
 
 		shared.frameLength /= (double)counted;
 
-		shared.frameStarts[shared.frame % Window] = shared.frameStart;
-		shared.spacing =
-			counted > 1
-				? (shared.frameStart - shared.frameStarts[(shared.frame + 1 - counted) % Window]) / (double)(counted - 1)
-				: shared.frameLength;
+		// A frame running past several points' ends stands for each of them.
+		const int frames = ++shared.pointFrames;
+		unsigned long long passed = 0;
+
+		if (now >= shared.pointEnd)
+		{
+			passed = 1 + (unsigned long long)((now - shared.pointEnd) / POINT);
+			shared.pointEnd += POINT * (double)passed;
+			shared.pointFrames = 0;
+		};
+
+		const unsigned long long after = shared.points + passed;
+		const int closing = (int)std::min<unsigned long long>(passed, Trend);
 
 		shared.threads.clear();
 
@@ -408,13 +434,17 @@ namespace Loom
 
 				open.resize(depth);
 
-				Node& node = (depth == 0 ? log->root : *open.back()).Part(span.name, shared.frame);
+				Node& node = (depth == 0 ? log->root : *open.back()).Part(span.name, shared.frame, shared.points);
 				node.sum += length;
 				open.push_back(&node);
 			};
 
-			Close(log->root, shared.frame);
-			List(log->root, shared.frame, 0, thread.rows);
+			Fold(log->root, shared.frame);
+
+			if (closing > 0)
+				Close(log->root, after, closing, frames);
+
+			List(log->root, shared.frame, after, 0, thread.rows);
 
 			if (!thread.rows.empty())
 				listed.emplace_back(order, std::move(thread));
@@ -426,6 +456,7 @@ namespace Loom
 			shared.threads.push_back(std::move(thread));
 
 		shared.frame++;
+		shared.points = after;
 		Poll(shared, now);
 	};
 
@@ -439,9 +470,14 @@ namespace Loom
 		return Shared().frameLength;
 	};
 
-	double Profiler::Spacing()
+	double Profiler::TrendProgress()
 	{
-		return Shared().spacing;
+		return std::clamp(1.0 - (Shared().pointEnd - Now()) / POINT, 0.0, 1.0);
+	};
+
+	void Profiler::Advance(double milliseconds)
+	{
+		s_advanced.store(s_advanced.load(std::memory_order_relaxed) + milliseconds, std::memory_order_relaxed);
 	};
 
 	#pragma endregion
