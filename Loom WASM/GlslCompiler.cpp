@@ -71,10 +71,6 @@ namespace Loom::Glsl
 			shader.setGlobalUniformSet(0);
 			shader.setGlobalUniformBinding(DEFAULT_BLOCK_BINDING);
 
-			// A stage with no loose uniforms of its own would number its samplers from the block's binding.
-			shader.setShiftBinding(glslang::EResTexture, DEFAULT_BLOCK_BINDING + 1);
-			shader.setShiftBinding(glslang::EResSampler, DEFAULT_BLOCK_BINDING + 1);
-
 			const bool stageParsed = shader.parse(GetDefaultResources(), GLSL_VERSION, false, messages);
 
 			program.log += shader.getInfoLog();

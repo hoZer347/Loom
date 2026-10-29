@@ -24,8 +24,9 @@ namespace Loom
 		// Vertex and fragment.
 		constexpr size_t STAGES = 2;
 
-		// Loose uniforms are gathered into one block, at this binding.
-		constexpr uint32_t DEFAULT_BLOCK_BINDING = 0;
+		// Loose uniforms are gathered into one block, at this binding. Samplers are
+		// numbered from zero, so it sits past the sixteen Vulkan promises a stage.
+		constexpr uint32_t DEFAULT_BLOCK_BINDING = 16;
 
 		// The fragment stage's specialisation constant that undoes the window's
 		// flipped viewport for dFdy.
