@@ -260,6 +260,10 @@ TEST_SUITE("WindowFrame")
 		s_presses++;
 	};
 
+	void Moved(GLFWwindow*, double, double)
+	{
+	};
+
 	struct HiddenWindow
 	{
 		GLFWwindow* window = nullptr;
@@ -297,10 +301,15 @@ TEST_SUITE("WindowFrame")
 			REQUIRE(mouse_x == x);
 			REQUIRE(mouse_y == y);
 
+			Send(GLFW_PRESS);
+		};
+
+		void Send(int action)
+		{
 			const GLFWmousebuttonfun installed = glfwSetMouseButtonCallback(window, nullptr);
 
 			glfwSetMouseButtonCallback(window, installed);
-			installed(window, GLFW_MOUSE_BUTTON_LEFT, GLFW_PRESS, 0);
+			installed(window, GLFW_MOUSE_BUTTON_LEFT, action, 0);
 		};
 	};
 
@@ -339,14 +348,30 @@ TEST_SUITE("WindowFrame")
 		CHECK(s_presses == 0);
 	};
 
-	TEST_CASE_FIXTURE(HiddenWindow, "a frame gives the window its callback back when it goes")
+	TEST_CASE_FIXTURE(HiddenWindow, "a click on the drag strip lets go without reaching the editor")
 	{
+		constexpr double inside_strip = 10.0;
+
+		Loom::WindowFrame frame;
+		frame.Install(window, nullptr);
+		frame.SetDragStrip(strip);
+
+		PressAt(window_width / 2.0, inside_strip);
+		Send(GLFW_RELEASE);
+		CHECK(s_presses == 0);
+	};
+
+	TEST_CASE_FIXTURE(HiddenWindow, "a frame gives the window its callbacks back when it goes")
+	{
+		glfwSetCursorPosCallback(window, Moved);
+
 		{
 			Loom::WindowFrame frame;
 			frame.Install(window, nullptr);
 		};
 
 		CHECK(glfwSetMouseButtonCallback(window, nullptr) == Count);
+		CHECK(glfwSetCursorPosCallback(window, nullptr) == Moved);
 	};
 };
 

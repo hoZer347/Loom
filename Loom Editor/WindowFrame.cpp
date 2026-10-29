@@ -22,6 +22,7 @@
 #define GLFW_EXPOSE_NATIVE_X11
 #include <GLFW/glfw3native.h>
 
+#include <cmath>
 #include <limits>
 #include <unordered_map>
 
@@ -264,8 +265,9 @@ namespace Loom
 		// At the content scale, as deep as a window manager's own resizing edges.
 		constexpr float BORDER = 6.0f;
 
-		// GTK's default, which the desktop's own title bars keep.
+		// GTK's defaults, which the desktop's own title bars keep.
 		constexpr double DOUBLE_CLICK = 0.4;
+		constexpr double DRAG_THRESHOLD = 8.0;
 
 		constexpr double NEVER = -std::numeric_limits<double>::infinity();
 
@@ -289,11 +291,24 @@ namespace Loom
 		struct Link
 		{
 			const WindowFrame* frame = nullptr;
-			GLFWmousebuttonfun previous = nullptr;
+			GLFWmousebuttonfun pressed = nullptr;
+			GLFWcursorposfun moved = nullptr;
 			double caption = NEVER;
+
+			// Where the caption was pressed, which drags the window once the mouse goes far enough.
+			bool held = false;
+			double held_x = 0.0;
+			double held_y = 0.0;
 		};
 
 		std::unordered_map<GLFWwindow*, Link> s_links;
+
+		float Scale(GLFWwindow* window)
+		{
+			float scale = 1.0f;
+			glfwGetWindowContentScale(window, &scale, nullptr);
+			return scale;
+		};
 
 		WindowFrame::Hit Under(const WindowFrame& frame, GLFWwindow* window)
 		{
@@ -304,18 +319,16 @@ namespace Loom
 			double y = 0.0;
 			int width = 0;
 			int height = 0;
-			float scale = 1.0f;
 
 			glfwGetCursorPos(window, &x, &y);
 			glfwGetWindowSize(window, &width, &height);
-			glfwGetWindowContentScale(window, &scale, nullptr);
 
 			return WindowFrame::HitTest(
 				(float)x,
 				(float)y,
 				(float)width,
 				(float)height,
-				BORDER * scale,
+				BORDER * Scale(window),
 				glfwGetWindowAttrib(window, GLFW_MAXIMIZED) == GLFW_TRUE,
 				frame.DragStrip());
 		};
@@ -336,20 +349,17 @@ namespace Loom
 			};
 		};
 
-		// The window manager moves or sizes the window from here, as its own title bar would.
-		void MoveResize(GLFWwindow* window, Direction direction)
+		// The window manager moves or sizes the window as its own title bar would, held at x, y.
+		void MoveResize(GLFWwindow* window, Direction direction, double x, double y)
 		{
 			Display* const display = glfwGetX11Display();
 			const ::Window handle = glfwGetX11Window(window);
-			::Window root = 0;
+			const ::Window root = DefaultRootWindow(display);
 			::Window child = 0;
 			int root_x = 0;
 			int root_y = 0;
-			int x = 0;
-			int y = 0;
-			unsigned int buttons = 0;
 
-			XQueryPointer(display, handle, &root, &child, &root_x, &root_y, &x, &y, &buttons);
+			XTranslateCoordinates(display, handle, root, (int)x, (int)y, &root_x, &root_y, &child);
 			XUngrabPointer(display, CurrentTime);
 
 			XEvent event{ };
@@ -375,36 +385,72 @@ namespace Loom
 				return;
 
 			Link& link = found->second;
-			const WindowFrame::Hit hit = button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS
-				? Under(*link.frame, window)
-				: WindowFrame::Hit::Client;
+			const bool left = button == GLFW_MOUSE_BUTTON_LEFT;
+
+			// ImGui never saw the press this lets go of.
+			if (left && action == GLFW_RELEASE && link.held)
+			{
+				link.held = false;
+				return;
+			};
+
+			const WindowFrame::Hit hit = left && action == GLFW_PRESS ? Under(*link.frame, window) : WindowFrame::Hit::Client;
 
 			if (hit == WindowFrame::Hit::Client)
 			{
-				if (link.previous != nullptr)
-					link.previous(window, button, action, mods);
+				if (link.pressed != nullptr)
+					link.pressed(window, button, action, mods);
 
 				return;
 			};
 
-			if (hit == WindowFrame::Hit::Caption)
+			double x = 0.0;
+			double y = 0.0;
+			glfwGetCursorPos(window, &x, &y);
+
+			if (hit != WindowFrame::Hit::Caption)
 			{
-				const double now = glfwGetTime();
-				const bool twice = now - link.caption < DOUBLE_CLICK;
-
-				link.caption = twice ? NEVER : now;
-
-				if (twice)
-				{
-					if (glfwGetWindowAttrib(window, GLFW_MAXIMIZED))
-						glfwRestoreWindow(window);
-					else glfwMaximizeWindow(window);
-
-					return;
-				};
+				MoveResize(window, DirectionOf(hit), x, y);
+				return;
 			};
 
-			MoveResize(window, DirectionOf(hit));
+			const double now = glfwGetTime();
+			const bool twice = now - link.caption < DOUBLE_CLICK;
+
+			link.caption = twice ? NEVER : now;
+			link.held = !twice;
+			link.held_x = x;
+			link.held_y = y;
+
+			if (!twice)
+				return;
+
+			if (glfwGetWindowAttrib(window, GLFW_MAXIMIZED))
+				glfwRestoreWindow(window);
+			else glfwMaximizeWindow(window);
+		};
+
+		// The window manager takes the mouse once it moves the window, so the
+		// move waits for a drag, leaving a click for a double-click.
+		void Move(GLFWwindow* window, double x, double y)
+		{
+			const auto found = s_links.find(window);
+
+			if (found == s_links.end())
+				return;
+
+			Link& link = found->second;
+
+			if (link.moved != nullptr)
+				link.moved(window, x, y);
+
+			const double threshold = DRAG_THRESHOLD * Scale(window);
+
+			if (!link.held || std::hypot(x - link.held_x, y - link.held_y) < threshold)
+				return;
+
+			link.held = false;
+			MoveResize(window, MOVE, link.held_x, link.held_y);
 		};
 	};
 
@@ -415,7 +461,8 @@ namespace Loom
 		if (found == s_links.end())
 			return;
 
-		glfwSetMouseButtonCallback(m_window, found->second.previous);
+		glfwSetMouseButtonCallback(m_window, found->second.pressed);
+		glfwSetCursorPosCallback(m_window, found->second.moved);
 		s_links.erase(found);
 	};
 
@@ -426,7 +473,10 @@ namespace Loom
 
 		m_window = window;
 		m_redraw = redraw;
-		s_links[window] = { this, glfwSetMouseButtonCallback(window, Press) };
+		Link& link = s_links[window];
+		link.frame = this;
+		link.pressed = glfwSetMouseButtonCallback(window, Press);
+		link.moved = glfwSetCursorPosCallback(window, Move);
 
 		glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_FALSE);
 	};
