@@ -338,9 +338,11 @@ int main(int argc, char** argv)
 		ReportCrashesToStderr();
 
 	// Ahead of builds and other busy programs, which otherwise hold up its frames for tens of milliseconds at a time.
-	// A hidden run stays behind, so it never holds up the user's.
+	// A hidden run stays behind, so it never holds up the user's. Linux lets only root raise it.
+#ifdef _WIN32
 	if (Engine::showWindow)
 		SetPriorityClass(GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS);
+#endif
 
 	// Nobody hears an automated run, and its sounds would play over the user.
 	Audio::useDevice = Engine::showWindow;
