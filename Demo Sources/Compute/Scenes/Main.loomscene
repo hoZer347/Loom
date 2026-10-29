@@ -56,7 +56,7 @@ Main(f9984c40-9658-434d-b183-c79c45771ec7):
 					5 = false
 					6 = ""
 				Component UiText(236bff26-9873-4bc7-92f5-f92f2898b13d)
-					0 = "65,536 cells of two chemicals, all on the GPU. One is fed in; the other eats it, grows and spreads. Thirty times a second it runs 8 steps, every cell reading its neighbours from the step before. New drops land now and then."
+					0 = "65,536 cells of two chemicals, all on the GPU. One is fed in; the other eats it, grows and spreads. 30 times a second it runs 8 steps, each cell reading its neighbours from the last. New drops land now and then."
 					1 = "Assets/Fonts/Roboto-Medium.ttf"
 					2 = 18
 					3 = (1, 1, 1, 1)
