@@ -339,9 +339,13 @@ SpinningTriangle is there as a worked example.
 			return filled;
 		};
 
-		// The scene a new one starts as, under the name Main.
-		std::string StarterScene()
+		// A new project's Main scene, built from inside the project so its shader is found.
+		std::string StarterScene(const std::filesystem::path& root)
 		{
+			std::error_code code;
+			const std::filesystem::path launched = std::filesystem::current_path(code);
+			std::filesystem::current_path(root, code);
+
 			Scene* scene = new Scene("Main");
 			Scene::Unlist(scene);
 
@@ -353,6 +357,8 @@ SpinningTriangle is there as a worked example.
 			const std::string text = SceneSerializer::Serialize(*scene);
 
 			Engine::QueueTask([scene]() { delete scene; });
+
+			std::filesystem::current_path(launched, code);
 
 			return text;
 		};
@@ -520,7 +526,7 @@ SpinningTriangle is there as a worked example.
 		const bool written =
 			Write(root / (name + extension), fill(loomproject) + fill(scripts_entries), error) &&
 			Write(root / shader_path, ProjectAssets::defaultShader, error) &&
-			Write(root / scenes_folder / (std::string("Main") + SceneSerializer::extension), StarterScene(), error) &&
+			Write(root / scenes_folder / (std::string("Main") + SceneSerializer::extension), StarterScene(root), error) &&
 			Write(root / "README.txt", fill(readme), error) &&
 			WriteScripts(root, name, error);
 

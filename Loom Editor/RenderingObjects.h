@@ -24,11 +24,14 @@ namespace Loom
 		// A child of parent with a PixelShader naming no file yet.
 		GameObject* AddPixelShader(GameObject& parent);
 
+		// A child of parent with a Light at its defaults.
 		GameObject* AddLight(GameObject& parent);
+
+		// A child of parent with a Camera at its defaults.
 		GameObject* AddCamera(GameObject& parent);
 
 		// What a new scene starts with: a light, and a camera looking down at a
-		// plane drawn with shader.
+		// plane drawn with shader, which may be empty.
 		void AddStarter(GameObject& root, const std::string& shader);
 	};
 };

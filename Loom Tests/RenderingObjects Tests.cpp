@@ -7,14 +7,16 @@
 #include "Camera.h"
 #include "GameObject.h"
 #include "Light.h"
+#include "Material.h"
 #include "Mesh.h"
 #include "ProjectTemplate.h"
 #include "Scene.h"
 
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
-#include <cmath>
+#include <sstream>
 #include <string>
 
 
@@ -89,17 +91,45 @@ TEST_SUITE("RenderingObjects")
 		const glm::vec3 seen = eye + forward * (eye.y / -forward.y);
 
 		CHECK(seen.x == doctest::Approx(plane->transform.position->x).epsilon(CLOSE));
-		CHECK(seen.z == doctest::Approx(0.0f).epsilon(CLOSE));
+		CHECK(seen.z == doctest::Approx(plane->transform.position->z).epsilon(CLOSE));
 		CHECK(plane->transform.scale->x > 1.0f);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a new project's Main scene is the starter scene")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a starter scene with no shader, as when no project is open, has a plane with no shader and says nothing")
+	{
+		Loom::Scene scene("starter without a project");
+		LoomTests::Pump();
+
+		std::ostringstream errors;
+		std::streambuf* const previous = std::cerr.rdbuf(errors.rdbuf());
+
+		RenderingObjects::AddStarter(scene.GetRoot(), "");
+		LoomTests::Pump();
+
+		std::cerr.rdbuf(previous);
+
+		Loom::GameObject* plane = Named(scene.GetRoot(), "Plane");
+
+		REQUIRE(plane != nullptr);
+		REQUIRE(plane->GetComponent<Loom::Material>() != nullptr);
+		CHECK(plane->GetComponent<Loom::Material>()->GetShaderPath().empty());
+		CHECK(errors.str().empty());
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a new project's Main scene is the starter scene, its shader found in the project")
 	{
 		const std::filesystem::path folder = std::filesystem::temp_directory_path() / "loom starter project";
 		std::filesystem::remove_all(folder);
 
+		std::ostringstream errors;
+		std::streambuf* const previous = std::cerr.rdbuf(errors.rdbuf());
+
 		const std::string project = Loom::ProjectTemplate::Create(folder.string(), "Starter");
 		LoomTests::Pump();
+
+		std::cerr.rdbuf(previous);
+
+		CHECK_MESSAGE(errors.str().find("could not open") == std::string::npos, errors.str());
 
 		REQUIRE_FALSE(project.empty());
 

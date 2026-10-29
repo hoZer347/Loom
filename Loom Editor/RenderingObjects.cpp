@@ -14,6 +14,7 @@ namespace Loom
 {
 	namespace
 	{
+		// A starter plane's size, and its camera's pitch in degrees and distance from the plane's middle.
 		constexpr float STARTER_PLANE_SCALE = 10.0f;
 		constexpr float STARTER_CAMERA_PITCH = -45.0f;
 		constexpr float STARTER_CAMERA_DISTANCE = 8.0f;
@@ -34,6 +35,7 @@ namespace Loom
 
 		return gameObject;
 	};
+
 	GameObject* RenderingObjects::AddLight(GameObject& parent)
 	{
 		GameObject* gameObject = parent.AddChild(LightLabel);
