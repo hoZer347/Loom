@@ -1,7 +1,9 @@
 #include "CrashReports.h"
 
-// The editor only runs on Windows, but the web test build compiles this too.
+// The editor runs on Windows and Linux, but the web test build compiles this too.
 #ifndef __EMSCRIPTEN__
+
+#ifdef _WIN32
 
 #include <crtdbg.h>
 #include <cstdlib>
@@ -9,12 +11,15 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#endif
 
 
 namespace Loom
 {
+	// Linux has no crash dialog to keep off the screen.
 	void ReportCrashesToStderr()
 	{
+#ifdef _WIN32
 		SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
 		_set_error_mode(_OUT_TO_STDERR);
 		_set_abort_behavior(0, _CALL_REPORTFAULT);
@@ -24,6 +29,7 @@ namespace Loom
 			_CrtSetReportMode(report, _CRTDBG_MODE_FILE);
 			_CrtSetReportFile(report, _CRTDBG_FILE_STDERR);
 		};
+#endif
 	};
 };
 

@@ -21,16 +21,25 @@
 #include <emscripten.h>
 #else
 #include "CrashReports.h"
+#include "Executable.h"
 
-#include <crtdbg.h>
 #include <cstdlib>
 #include <functional>
 #include <future>
-#include <process.h>
 #include <thread>
+
+#ifdef _WIN32
+#include <crtdbg.h>
+#include <process.h>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#else
+#include <cerrno>
+#include <fcntl.h>
+#include <sys/file.h>
+#include <unistd.h>
+#endif
 #endif
 
 // What holds back the startup clash below is initialised before anything else
@@ -55,10 +64,12 @@ namespace
 	{
 		BuildBanner()
 		{
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__)
 			std::printf("[loom] web build (emscripten / wasm)\n");
-#else
+#elif defined(_WIN32)
 			std::printf("[loom] local build (msvc / x64)\n");
+#else
+			std::printf("[loom] linux build (gcc / x64)\n");
 #endif
 		};
 	} banner;
@@ -67,9 +78,11 @@ namespace
 
 	#pragma region Turns
 
-#ifndef __EMSCRIPTEN__
+#ifdef _WIN32
 	// Runs from any slot share Screenshots and the machine, so each takes this in turn.
 	constexpr wchar_t SUITE_MUTEX[] = L"Global\\LoomTestSuite";
+
+	constexpr const char* SUITE_EXECUTABLE = "Loom Tests.exe";
 
 	// Calls waiting first when another run holds the suite, so a run waiting its
 	// turn does not look hung. False when the wait itself fails.
@@ -86,6 +99,57 @@ namespace
 		return taken != WAIT_FAILED;
 	};
 
+	int ProcessId()
+	{
+		return _getpid();
+	};
+
+	void SetTempFolder(const std::filesystem::path& folder)
+	{
+		_wputenv_s(L"TMP", folder.c_str());
+		_wputenv_s(L"TEMP", folder.c_str());
+	};
+#elif !defined(__EMSCRIPTEN__)
+	// Outside the temp folder the suite moves into, so every run on the machine finds the same file.
+	constexpr const char* SUITE_LOCK = "/tmp/Loom Test Suite.lock";
+	constexpr mode_t LOCK_MODE = 0666;
+
+	constexpr const char* SUITE_EXECUTABLE = "Loom Tests";
+
+	int OpenLock(const std::filesystem::path& file)
+	{
+		return open(file.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, LOCK_MODE);
+	};
+
+	// Calls waiting first when another run holds the suite, so a run waiting its
+	// turn does not look hung. False when the wait itself fails. Each open of the
+	// lock is its own holder, so a process that dies lets go with it.
+	bool TakeTurn(int suite, const std::function<void()>& waiting)
+	{
+		if (flock(suite, LOCK_EX | LOCK_NB) == 0)
+			return true;
+
+		if (errno != EWOULDBLOCK)
+			return false;
+
+		waiting();
+
+		return flock(suite, LOCK_EX) == 0;
+	};
+
+	int ProcessId()
+	{
+		return getpid();
+	};
+
+	void SetTempFolder(const std::filesystem::path& folder)
+	{
+		setenv("TMPDIR", folder.c_str(), 1);
+	};
+#endif
+
+#ifndef __EMSCRIPTEN__
+
 	// Before anything below can crash, so nothing in the suite puts up a dialog.
 	struct CrashesToStderr
 	{
@@ -99,13 +163,12 @@ namespace
 		const std::filesystem::path folder;
 
 		OwnTempFolder()
-			: folder(std::filesystem::temp_directory_path() / ("Loom Tests " + std::to_string(_getpid())))
+			: folder(std::filesystem::temp_directory_path() / ("Loom Tests " + std::to_string(ProcessId())))
 		{
 			// One left by a crashed run whose process id this one now has.
 			std::filesystem::remove_all(folder);
 			std::filesystem::create_directory(folder);
-			_wputenv_s(L"TMP", folder.c_str());
-			_wputenv_s(L"TEMP", folder.c_str());
+			SetTempFolder(folder);
 		};
 
 		~OwnTempFolder()
@@ -222,19 +285,31 @@ namespace
 int main(int argc, char** argv)
 {
 #ifndef __EMSCRIPTEN__
-	// Held until the process ends; a run that crashes abandons it, which hands it on all the same.
-	const HANDLE suite = CreateMutexW(nullptr, FALSE, SUITE_MUTEX);
 	const auto waiting =
 		[]()
 		{
 			std::cerr << "Waiting for another run of the suite to finish" << std::endl;
 		};
 
+#ifdef _WIN32
+	// Held until the process ends; a run that crashes abandons it, which hands it on all the same.
+	const HANDLE suite = CreateMutexW(nullptr, FALSE, SUITE_MUTEX);
+
 	if (!suite || !TakeTurn(suite, waiting))
 	{
 		std::fprintf(stderr, "The suite could not wait for other runs to finish (error %lu)\n", GetLastError());
 		return EXIT_FAILURE;
 	};
+#else
+	// Held until the process ends, when the system closes it.
+	const int suite = OpenLock(SUITE_LOCK);
+
+	if (suite < 0 || !TakeTurn(suite, waiting))
+	{
+		std::fprintf(stderr, "The suite could not wait for other runs to finish (error %d)\n", errno);
+		return EXIT_FAILURE;
+	};
+#endif
 #endif
 
 	LoomTests::StartupClashes() = startup->held;
@@ -267,15 +342,15 @@ int main(int argc, char** argv)
 
 #ifndef __EMSCRIPTEN__
 	// The executable's own path, since argv[0] is only what it was launched as.
-	char* executable = nullptr;
+	const std::filesystem::path executable = Loom::ExecutablePath();
 
-	if (_get_pgmptr(&executable) != 0 || !executable)
+	if (executable.empty())
 	{
 		std::fprintf(stderr, "The suite could not find its own executable to put screenshots beside\n");
 		return EXIT_FAILURE;
 	};
 
-	LoomTests::ScreenshotFolder() = std::filesystem::path(executable).parent_path() / "Screenshots";
+	LoomTests::ScreenshotFolder() = executable.parent_path() / "Screenshots";
 	std::filesystem::remove_all(LoomTests::ScreenshotFolder());
 #endif
 
@@ -325,6 +400,14 @@ TEST_SUITE("Loom Tests")
 		CHECK(std::filesystem::equivalent(std::filesystem::temp_directory_path(), tempFolder.folder));
 	};
 
+	TEST_CASE("the suite's screenshots go in a folder beside it")
+	{
+		CHECK(LoomTests::ScreenshotFolder().is_absolute());
+		CHECK(LoomTests::ScreenshotFolder().filename() == "Screenshots");
+		CHECK(std::filesystem::exists(LoomTests::ScreenshotFolder().parent_path() / SUITE_EXECUTABLE));
+	};
+
+#ifdef _WIN32
 	TEST_CASE("another run waits while this one runs")
 	{
 		const HANDLE other = OpenMutexW(SYNCHRONIZE, FALSE, SUITE_MUTEX);
@@ -389,13 +472,59 @@ TEST_SUITE("Loom Tests")
 		CHECK(_CrtSetReportMode(_CRT_ERROR, _CRTDBG_REPORT_MODE) == _CRTDBG_MODE_FILE);
 	};
 #endif
-
-	TEST_CASE("the suite's screenshots go in a folder beside it")
+#else
+	TEST_CASE("another run waits while this one runs")
 	{
-		CHECK(LoomTests::ScreenshotFolder().is_absolute());
-		CHECK(LoomTests::ScreenshotFolder().filename() == "Screenshots");
-		CHECK(std::filesystem::exists(LoomTests::ScreenshotFolder().parent_path() / "Loom Tests.exe"));
+		const int other = OpenLock(SUITE_LOCK);
+		REQUIRE(other >= 0);
+
+		CHECK(flock(other, LOCK_EX | LOCK_NB) != 0);
+		CHECK(errno == EWOULDBLOCK);
+		close(other);
 	};
+
+	TEST_CASE("a run takes a free turn without saying it waited")
+	{
+		const int turn = OpenLock(tempFolder.folder / "turn.lock");
+		REQUIRE(turn >= 0);
+
+		bool waited = false;
+		CHECK(TakeTurn(turn, [&]() { waited = true; }));
+		CHECK_FALSE(waited);
+
+		close(turn);
+	};
+
+	TEST_CASE("a run says it is waiting, then takes its turn once the other run lets go")
+	{
+		constexpr std::chrono::seconds LET_GO_TIMEOUT{ 5 };
+
+		const std::filesystem::path file = tempFolder.folder / "turn.lock";
+		const int turn = OpenLock(file);
+		REQUIRE(turn >= 0);
+
+		std::promise<void> held;
+		std::promise<void> letGo;
+		std::thread other(
+			[&]()
+			{
+				const int holder = OpenLock(file);
+				flock(holder, LOCK_EX);
+				held.set_value();
+				// Bounded, so a run that never says it waits fails here rather than hanging every run on the machine.
+				letGo.get_future().wait_for(LET_GO_TIMEOUT);
+				close(holder);
+			});
+		held.get_future().wait();
+
+		bool waited = false;
+		CHECK(TakeTurn(turn, [&]() { waited = true; letGo.set_value(); }));
+		CHECK(waited);
+
+		other.join();
+		close(turn);
+	};
+#endif
 #endif
 
 	#pragma endregion

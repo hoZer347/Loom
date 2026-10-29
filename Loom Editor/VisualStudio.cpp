@@ -1,27 +1,34 @@
 #include "VisualStudio.h"
 
-// The editor only runs on Windows, but the web test build compiles this too.
+// The editor runs on Windows and Linux, but the web test build compiles this too.
 #ifndef __EMSCRIPTEN__
 
 #include "HiddenProcess.h"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cstdio>
 #include <iostream>
 #include <span>
 #include <vector>
 
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <shellapi.h>
 #include <objbase.h>
 #include <oleauto.h>
 #include <wrl/client.h>
+#else
+#include <cstdlib>
+#endif
 
 
 namespace Loom
 {
+#ifdef _WIN32
+
 	namespace
 	{
 		#pragma region Automation
@@ -348,11 +355,83 @@ namespace Loom
 
 	#pragma endregion
 
+#else
+
+	namespace
+	{
+		// Quoted for /bin/sh, where nothing inside single quotes is special but the quote itself.
+		std::string Quote(const std::string& argument)
+		{
+			std::string quoted = "'";
+
+			for (const char c : argument)
+				quoted += c == '\'' ? std::string("'\\''") : std::string(1, c);
+
+			return quoted + '\'';
+		};
+
+		// Started and left running, its output dropped.
+		void Detach(const std::string& command)
+		{
+			if (std::system((command + " >/dev/null 2>&1 &").c_str()) != 0)
+				std::cerr << "Could not run " << command << std::endl;
+		};
+
+		// The program's path on PATH, empty when it is not there.
+		std::string OnPath(const char* program)
+		{
+			const char* const path = std::getenv("PATH");
+			std::error_code code;
+
+			for (std::string_view rest = path != nullptr ? path : ""; !rest.empty(); )
+			{
+				const size_t end = rest.find(':');
+				const std::filesystem::path candidate = std::filesystem::path(rest.substr(0, end)) / program;
+
+				if (std::filesystem::is_regular_file(candidate, code))
+					return candidate.string();
+
+				rest = end == std::string_view::npos ? std::string_view() : rest.substr(end + 1);
+			};
+
+			return "";
+		};
+	};
+
+	#pragma region Shell
+
+	void VisualStudio::Shell(const char* file, const std::string& parameters)
+	{
+		Detach(parameters.empty() ? "xdg-open " + Quote(file) : Quote(file) + ' ' + parameters);
+	};
+
+	#pragma endregion
+
+	#pragma region Installation
+
+	// Visual Studio has no Linux build.
+	std::string VisualStudio::Where(const std::string&)
+	{
+		return "";
+	};
+
+	const std::string& VisualStudio::Find()
+	{
+		static const std::string none;
+
+		return none;
+	};
+
+	#pragma endregion
+
+#endif
+
 	#pragma region Opening
 
 	bool VisualStudio::IsHeader(const std::filesystem::path& file)
 	{
-		return _stricmp(file.extension().string().c_str(), header_extension) == 0;
+		return std::ranges::equal(file.extension().string(), std::string_view(header_extension),
+			[](char a, char b) { return tolower((unsigned char)a) == tolower((unsigned char)b); });
 	};
 
 	std::string VisualStudio::SolutionFor(const std::filesystem::path& file)
@@ -377,6 +456,16 @@ namespace Loom
 
 	std::thread VisualStudio::Open(const std::string& solution, const std::string& file, int line, int column)
 	{
+#ifndef _WIN32
+		// Visual Studio Code where it is installed, which takes a line and column too.
+		static const std::string code_editor = OnPath("code");
+
+		if (code_editor.empty())
+			Shell(file.c_str(), "");
+		else Detach(Quote(code_editor) + " --goto " + Quote(file + ':' + std::to_string((std::max)(line, 1)) + ':' + std::to_string((std::max)(column, 1))));
+
+		return { };
+#else
 		std::error_code code;
 		const bool has_solution = !solution.empty() && std::filesystem::exists(solution, code);
 
@@ -401,6 +490,7 @@ namespace Loom
 			Shell(file.c_str(), "");
 
 		return { };
+#endif
 	};
 
 	#pragma endregion

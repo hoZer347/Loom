@@ -10,6 +10,9 @@
     <ClCompile Include="SerializedField.cpp">
       <Filter>Serialization</Filter>
     </ClCompile>
+    <ClCompile Include="Executable.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
     <ClCompile Include="Guid.cpp">
       <Filter>Serialization</Filter>
     </ClCompile>
@@ -286,6 +289,9 @@
     </ClInclude>
     <ClInclude Include="Loom API.h">
       <Filter>Serialization</Filter>
+    </ClInclude>
+    <ClInclude Include="Executable.h">
+      <Filter>Engine</Filter>
     </ClInclude>
     <ClInclude Include="Guid.h">
       <Filter>Serialization</Filter>

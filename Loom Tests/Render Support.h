@@ -19,6 +19,7 @@
 #include "imgui.h"
 #include "stb_image_write.h"
 
+#include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -83,6 +84,7 @@ namespace LoomTests
 	struct RenderFixture : EngineFixture
 	{
 		static constexpr glm::ivec2 DEFAULT_SIZE{ 160, 90 };
+		static constexpr std::chrono::seconds RESIZE_LIMIT{ 5 };
 
 		explicit RenderFixture(glm::ivec2 size = DEFAULT_SIZE, Loom::Backend backend = Loom::Backend::OpenGL)
 		{
@@ -95,7 +97,16 @@ namespace LoomTests
 			// Or ImGui saves imgui.ini into whichever folder the suite runs in.
 			ImGui::GetIO().IniFilename = nullptr;
 			glfwSetWindowSize(Loom::Engine::window, size.x, size.y);
-			glfwPollEvents();
+
+			// X11 resizes it when the server gets to it, where Windows has by the time this returns.
+			const auto deadline = std::chrono::steady_clock::now() + RESIZE_LIMIT;
+			glm::ivec2 framebuffer{ };
+
+			do
+			{
+				glfwGetFramebufferSize(Loom::Engine::window, &framebuffer.x, &framebuffer.y);
+				glfwPollEvents();
+			} while (framebuffer != size && std::chrono::steady_clock::now() < deadline);
 		};
 
 		~RenderFixture()

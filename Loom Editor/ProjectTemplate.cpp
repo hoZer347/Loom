@@ -1,11 +1,12 @@
 #include "ProjectTemplate.h"
 
-// The editor only runs on Windows, but the web test build compiles this too.
+// The editor runs on Windows and Linux, but the web test build compiles this too.
 #ifndef __EMSCRIPTEN__
 
 #include "ProjectAssets.h"
 
 #include "Engine.h"
+#include "Executable.h"
 #include "Guid.h"
 #include "RenderingObjects.h"
 #include "Scene.h"
@@ -16,9 +17,6 @@
 #include <filesystem>
 #include <fstream>
 #include <vector>
-
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
 
 
 namespace Loom
@@ -432,7 +430,8 @@ SpinningTriangle is there as a worked example.
 		{
 			const std::string text = ProjectAssets::ReadText(scripts.string());
 			const std::string target = ProjectAssets::Element(text, "TargetName");
-			const std::string out = ProjectAssets::Element(text, "OutDir");
+			std::string out = ProjectAssets::Element(text, "OutDir");
+			std::ranges::replace(out, '\\', '/');
 
 			const std::filesystem::path folder = out.empty() || out.find("$(") != std::string::npos
 				? root / ProjectTemplate::build_folder
@@ -750,13 +749,8 @@ SpinningTriangle is there as a worked example.
 
 	std::string ProjectTemplate::EngineRoot()
 	{
-		char buffer[MAX_PATH]{ };
-
-		GetModuleFileNameA(nullptr, buffer, MAX_PATH);
-
 		// <engine>/x64/<configuration>/Loom Editor.exe
-		std::filesystem::path root =
-			std::filesystem::path(buffer).parent_path().parent_path().parent_path();
+		std::filesystem::path root = ExecutablePath().parent_path().parent_path().parent_path();
 
 		std::error_code code;
 

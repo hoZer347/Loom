@@ -8,14 +8,28 @@
 #include <fstream>
 #include <future>
 #include <memory>
-#include <process.h>
 #include <string>
 #include <thread>
+
+#ifdef _WIN32
+#include <process.h>
+#else
+#include <unistd.h>
+#endif
 
 using json = nlohmann::json;
 
 namespace
 {
+	int ProcessId()
+	{
+#ifdef _WIN32
+		return _getpid();
+#else
+		return getpid();
+#endif
+	};
+
 	// Away from the editor's own, so that an open editor is not in the test.
 	constexpr unsigned short shared_port = 47899;
 
@@ -187,7 +201,7 @@ TEST_SUITE("McpRelay")
 		const auto editor = Editor("A");
 
 		// This process's id, with a start it did not have.
-		std::ofstream(Registry() / std::to_string(closed_port)) << _getpid() << ' ' << reused_start;
+		std::ofstream(Registry() / std::to_string(closed_port)) << ProcessId() << ' ' << reused_start;
 
 		CHECK(Call("whoami") == "A");
 		CHECK_FALSE(std::filesystem::exists(Registry() / std::to_string(closed_port)));

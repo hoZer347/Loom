@@ -158,6 +158,7 @@
     <ClCompile Include="Engine.cpp" />
     <ClCompile Include="GameObject.cpp" />
     <ClCompile Include="Geo.cpp" />
+    <ClCompile Include="Executable.cpp" />
     <ClCompile Include="Guid.cpp" />
     <ClCompile Include="Input.cpp" />
     <ClCompile Include="InputActions.cpp" />
@@ -232,6 +233,7 @@
     <ClInclude Include="Prefab.h" />
     <ClInclude Include="RenderMath.h" />
     <ClInclude Include="Geo.h" />
+    <ClInclude Include="Executable.h" />
     <ClInclude Include="Guid.h" />
     <ClInclude Include="Input.h" />
     <ClInclude Include="InputActions.h" />

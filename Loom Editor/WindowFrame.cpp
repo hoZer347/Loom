@@ -1,7 +1,7 @@
 #include "WindowFrame.h"
 
-// The editor only runs on Windows, but the web test build compiles this too.
-#ifndef __EMSCRIPTEN__
+// The title bar comes off on Windows. Linux keeps its window manager's, and the web test build compiles this too.
+#ifdef _WIN32
 
 #include "OpenGL.h"
 
@@ -61,7 +61,7 @@ namespace Loom
 	};
 };
 
-#ifndef __EMSCRIPTEN__
+#ifdef _WIN32
 
 namespace Loom
 {
@@ -237,6 +237,21 @@ namespace Loom
 
 		SetWindowLongW(hwnd, GWL_STYLE, fitted);
 		SetWindowPos(hwnd, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+	};
+};
+
+#elif !defined(__EMSCRIPTEN__)
+
+namespace Loom
+{
+	WindowFrame::~WindowFrame() = default;
+
+	void WindowFrame::Install(GLFWwindow*, Redraw)
+	{
+	};
+
+	void WindowFrame::Fit()
+	{
 	};
 };
 

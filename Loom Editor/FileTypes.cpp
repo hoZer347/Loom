@@ -1,7 +1,7 @@
 #include "FileTypes.h"
 
-// The editor only runs on Windows, but the web test build compiles this too.
-#ifndef __EMSCRIPTEN__
+// Explorer's file types, which Linux and the web test build have none of.
+#ifdef _WIN32
 
 #include "InputActions.h"
 #include "Prefab.h"

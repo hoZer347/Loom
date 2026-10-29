@@ -63,7 +63,7 @@ namespace Loom
 			std::tm local{ };
 			char text[sizeof("00:00:00")]{ };
 
-#ifndef __EMSCRIPTEN__
+#ifdef _WIN32
 			localtime_s(&local, &now);
 #else
 			localtime_r(&now, &local);

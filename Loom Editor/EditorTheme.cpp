@@ -5,8 +5,7 @@
 #include <filesystem>
 #include <iostream>
 
-// The editor only runs on Windows, but the web test build compiles this too.
-#ifndef __EMSCRIPTEN__
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <shlobj.h>
@@ -118,7 +117,7 @@ namespace Loom
 		{
 			std::filesystem::path path;
 
-#ifndef __EMSCRIPTEN__
+#ifdef _WIN32
 			constexpr const char* emojiFont = "seguiemj.ttf";
 
 			PWSTR fonts = nullptr;

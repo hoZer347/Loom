@@ -161,6 +161,8 @@ TEST_SUITE("BuildSettings")
 		CHECK(output.parent_path() == std::filesystem::path("C:/Games"));
 	};
 
+#ifdef _WIN32
+	// Windows paths, as games are built only there.
 	TEST_CASE("a folder chosen is taken from the project folder unless it is absolute")
 	{
 		Loom::BuildSettings settings;
@@ -192,6 +194,7 @@ TEST_SUITE("BuildSettings")
 		settings.folder = "D:/Out";
 		CHECK(settings.Program("C:/Games/MyGame", "Space") == std::filesystem::path("D:/Out/Space.exe"));
 	};
+#endif
 
 	TEST_CASE("settings just loaded or saved are not unsaved, and a change to them is")
 	{

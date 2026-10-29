@@ -1,17 +1,9 @@
 #include "FieldNames.h"
 
-// The editor only runs on Windows, but the web test build compiles this too.
+// The editor runs on Windows and Linux, but the web test build compiles this too.
 #ifndef __EMSCRIPTEN__
 
 #include "SerializedField.h"
-
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-
-// For dbghelp.h's own copy of the symbol tags, there being no cvconst.h here.
-#define _NO_CVCONST_H
-#include <dbghelp.h>
-#include <oaidl.h>
 
 #include <cctype>
 #include <map>
@@ -21,13 +13,67 @@
 #include <utility>
 #include <vector>
 
+#ifdef _WIN32
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+// For dbghelp.h's own copy of the symbol tags, there being no cvconst.h here.
+#define _NO_CVCONST_H
+#include <dbghelp.h>
+#include <oaidl.h>
+
 #pragma comment(lib, "dbghelp.lib")
+
+#else
+
+#include <algorithm>
+#include <cstdlib>
+#include <memory>
+
+#include <cxxabi.h>
+#include <dlfcn.h>
+#include <dwarf.h>
+#include <elfutils/libdw.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#endif
 
 
 namespace Loom
 {
 	namespace
 	{
+		struct Member final
+		{
+			std::string label;
+			std::vector<FieldNames::Enumerator> enumerators;
+		};
+
+		// A member by its offset in the complete object.
+		typedef std::map<ptrdiff_t, Member> Members;
+
+		// One per field, null for a field none of the members is at.
+		std::vector<const Member*> Match(const LoomObject& object, const Members& found)
+		{
+			const char* const complete = (const char*)dynamic_cast<const void*>(&object);
+
+			std::vector<const Member*> members;
+
+			for (const SerializedField& field : object.GetFields())
+			{
+				const auto member = found.find((const char*)field.data - complete);
+
+				members.push_back(member != found.end() ? &member->second : nullptr);
+			};
+
+			return members;
+		};
+
+#ifdef _WIN32
+
 		#pragma region Symbols
 
 		// DbgHelp takes any unique value as a session, keeping this apart from other users of it.
@@ -114,15 +160,6 @@ namespace Loom
 
 		// cvconst.h's DataIsMember, which dbghelp.h leaves out.
 		constexpr DWORD data_is_member = 7;
-
-		struct Member final
-		{
-			std::string label;
-			std::vector<FieldNames::Enumerator> enumerators;
-		};
-
-		// A member by its offset in the complete object.
-		typedef std::map<ptrdiff_t, Member> Members;
 
 		std::vector<FieldNames::Enumerator> Enumerators(DWORD64 base, ULONG serial)
 		{
@@ -301,21 +338,302 @@ namespace Loom
 			if (found == types.end())
 				found = types.emplace(key, headers ? Read(type, module, *headers) : Members{ }).first;
 
-			const char* const complete = (const char*)dynamic_cast<const void*>(&object);
+			return Match(object, found->second);
+		};
 
-			std::vector<const Member*> members;
+		#pragma endregion
 
-			for (const SerializedField& field : object.GetFields())
+#else
+
+		#pragma region Debug info
+
+		// How a Serial member's type is named in the debug info, up to its argument.
+		constexpr std::string_view serial_type = "Serial<";
+
+		// Namespaces whose types never hold a Serial, left out of the index.
+		constexpr std::string_view unindexed[] = { "std", "__gnu_cxx", "__cxxabiv1" };
+
+		std::string_view Name(Dwarf_Die& die)
+		{
+			const char* name = dwarf_diename(&die);
+
+			return name != nullptr ? name : "";
+		};
+
+		// Through typedefs and qualifiers to the type itself.
+		bool TypeOf(Dwarf_Die& die, Dwarf_Die& type)
+		{
+			Dwarf_Attribute attribute;
+
+			if (dwarf_attr_integrate(&die, DW_AT_type, &attribute) == nullptr || dwarf_formref_die(&attribute, &type) == nullptr)
+				return false;
+
+			for (int tag = dwarf_tag(&type); tag == DW_TAG_typedef || tag == DW_TAG_const_type || tag == DW_TAG_volatile_type; tag = dwarf_tag(&type))
+				if (dwarf_attr_integrate(&type, DW_AT_type, &attribute) == nullptr || dwarf_formref_die(&attribute, &type) == nullptr)
+					return false;
+
+			return true;
+		};
+
+		bool IsRecord(Dwarf_Die& die)
+		{
+			const int tag = dwarf_tag(&die);
+
+			return tag == DW_TAG_structure_type || tag == DW_TAG_class_type;
+		};
+
+		// A virtual base's offset is an expression rather than a constant, so it has none here.
+		bool Offset(Dwarf_Die& die, Dwarf_Word& offset)
+		{
+			Dwarf_Attribute attribute;
+
+			return dwarf_attr(&die, DW_AT_data_member_location, &attribute) != nullptr && dwarf_formudata(&attribute, &offset) == 0;
+		};
+
+		// Its enumerators' values are stored with no sign of their own, so this tells how to read them.
+		bool IsUnsigned(Dwarf_Die& enumeration)
+		{
+			Dwarf_Die underlying;
+			Dwarf_Attribute attribute;
+			Dwarf_Word encoding = 0;
+
+			return TypeOf(enumeration, underlying) &&
+				dwarf_attr(&underlying, DW_AT_encoding, &attribute) != nullptr &&
+				dwarf_formudata(&attribute, &encoding) == 0 &&
+				(encoding == DW_ATE_unsigned || encoding == DW_ATE_unsigned_char || encoding == DW_ATE_boolean);
+		};
+
+		bool Value(Dwarf_Die& enumerator, bool is_unsigned, long long& value)
+		{
+			Dwarf_Attribute attribute;
+
+			if (dwarf_attr(&enumerator, DW_AT_const_value, &attribute) == nullptr)
+				return false;
+
+			Dwarf_Word unsigned_value = 0;
+			Dwarf_Sword signed_value = 0;
+
+			if (is_unsigned ? dwarf_formudata(&attribute, &unsigned_value) != 0 : dwarf_formsdata(&attribute, &signed_value) != 0)
+				return false;
+
+			value = is_unsigned ? (long long)unsigned_value : (long long)signed_value;
+
+			return true;
+		};
+
+		// A module's debug info, with each struct or class it defines by its qualified name.
+		struct Module final
+		{
+			int file = -1;
+			Dwarf* dwarf = nullptr;
+			std::map<std::string, Dwarf_Off, std::less<>> types;
+
+			explicit Module(const std::string& path)
 			{
-				const auto member = found->second.find((const char*)field.data - complete);
+				file = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+				dwarf = file >= 0 ? dwarf_begin(file, DWARF_C_READ) : nullptr;
 
-				members.push_back(member != found->second.end() ? &member->second : nullptr);
+				if (dwarf == nullptr)
+					return;
+
+				Dwarf_CU* unit = nullptr;
+				Dwarf_Die root;
+
+				while (dwarf_get_units(dwarf, unit, &unit, nullptr, nullptr, &root, nullptr) == 0)
+					Index(root, "");
 			};
+
+			~Module()
+			{
+				if (dwarf != nullptr)
+					dwarf_end(dwarf);
+
+				if (file >= 0)
+					close(file);
+			};
+
+			Module(const Module&) = delete;
+			Module& operator=(const Module&) = delete;
+
+			// Named as the demangler names them, so typeid finds them.
+			void Index(Dwarf_Die& scope, const std::string& prefix)
+			{
+				Dwarf_Die child;
+
+				if (dwarf_child(&scope, &child) != 0)
+					return;
+
+				do
+				{
+					const std::string_view name = Name(child);
+
+					if (dwarf_tag(&child) == DW_TAG_namespace)
+					{
+						if (prefix.empty() && std::ranges::find(unindexed, name) != std::end(unindexed))
+							continue;
+
+						Index(child, prefix + std::string(name.empty() ? "(anonymous namespace)" : name) + "::");
+					}
+					else if (IsRecord(child) && !name.empty())
+					{
+						const std::string qualified = prefix + std::string(name);
+
+						if (!dwarf_hasattr(&child, DW_AT_declaration))
+							types.try_emplace(qualified, dwarf_dieoffset(&child));
+
+						Index(child, qualified + "::");
+					};
+				}
+				while (dwarf_siblingof(&child, &child) == 0);
+			};
+		};
+
+		#pragma endregion
+
+		#pragma region Members
+
+		std::vector<FieldNames::Enumerator> Enumerators(Dwarf_Die& serial)
+		{
+			std::vector<FieldNames::Enumerator> enumerators;
+			Dwarf_Die member;
+
+			if (dwarf_child(&serial, &member) != 0)
+				return enumerators;
+
+			do
+			{
+				Dwarf_Die value_type;
+				Dwarf_Die enumerator;
+
+				if (dwarf_tag(&member) != DW_TAG_member ||
+					dwarf_hasattr(&member, DW_AT_declaration) ||
+					!TypeOf(member, value_type) ||
+					dwarf_tag(&value_type) != DW_TAG_enumeration_type ||
+					dwarf_child(&value_type, &enumerator) != 0)
+					continue;
+
+				const bool is_unsigned = IsUnsigned(value_type);
+
+				do
+				{
+					long long value = 0;
+
+					if (dwarf_tag(&enumerator) == DW_TAG_enumerator && Value(enumerator, is_unsigned, value))
+						enumerators.push_back({ NameFromIdentifier(std::string(Name(enumerator)).c_str()), value });
+				}
+				while (dwarf_siblingof(&enumerator, &enumerator) == 0);
+			}
+			while (dwarf_siblingof(&member, &member) == 0);
+
+			return enumerators;
+		};
+
+		// Of the type and its non-virtual bases, offset as in a complete object.
+		void Collect(Dwarf_Die& type, ptrdiff_t offset, Members& members)
+		{
+			Dwarf_Die child;
+
+			if (dwarf_child(&type, &child) != 0)
+				return;
+
+			do
+			{
+				const int tag = dwarf_tag(&child);
+				Dwarf_Die child_type;
+				Dwarf_Word child_offset = 0;
+
+				if ((tag != DW_TAG_inheritance && tag != DW_TAG_member) ||
+					!Offset(child, child_offset) ||
+					!TypeOf(child, child_type) ||
+					!IsRecord(child_type))
+					continue;
+
+				const ptrdiff_t at = offset + (ptrdiff_t)child_offset;
+
+				// A struct member's own Serials belong to this object too.
+				if (tag == DW_TAG_member && Name(child_type).starts_with(serial_type))
+					members[at] = { NameFromIdentifier(std::string(Name(child)).c_str()), Enumerators(child_type) };
+				else Collect(child_type, at, members);
+			}
+			while (dwarf_siblingof(&child, &child) == 0);
+		};
+
+		#pragma endregion
+
+		#pragma region Lookup
+
+		// typeid gives the mangled name, and the debug info spells it as the demangler does.
+		std::string Demangled(const char* mangled)
+		{
+			int status = 0;
+			const std::unique_ptr<char, decltype(&free)> name{ abi::__cxa_demangle(mangled, nullptr, nullptr, &status), &free };
+
+			return name ? std::string(name.get()) : std::string(mangled);
+		};
+
+		Members Read(const std::type_info& type, Module& module)
+		{
+			Members members;
+			const auto found = module.types.find(Demangled(type.name()));
+			Dwarf_Die die;
+
+			if (found != module.types.end() && dwarf_offdie(module.dwarf, found->second, &die) != nullptr)
+				Collect(die, 0, members);
 
 			return members;
 		};
 
+		// Null where the debug info says nothing.
+		std::vector<const Member*> Lookup(const LoomObject& object)
+		{
+			static std::mutex mutex;
+			static std::map<std::pair<const std::type_info*, std::string>, Members> types;
+			static std::unique_ptr<Module> executable;
+
+			const std::type_info& type = typeid(object);
+
+			// The type's RTTI lives in the module that built its vtable.
+			Dl_info module{ };
+			Dl_info self{ };
+
+			dladdr(&type, &module);
+			dladdr(reinterpret_cast<void*>(&FieldNames::Of), &self);
+
+			// The executable's own name comes as it was started, which may be relative.
+			const bool is_executable = module.dli_fname == nullptr || module.dli_fbase == self.dli_fbase;
+			const std::string path = is_executable ? "/proc/self/exe" : module.dli_fname;
+
+			// A reloaded library can put a new layout where the old RTTI was.
+			struct stat status{ };
+			stat(path.c_str(), &status);
+
+			const auto key = std::make_pair(&type, path + '@' + std::to_string(status.st_mtim.tv_sec) + '.' + std::to_string(status.st_mtim.tv_nsec));
+
+			std::lock_guard lock{ mutex };
+
+			auto found = types.find(key);
+
+			if (found == types.end())
+			{
+				if (is_executable && !executable)
+					executable = std::make_unique<Module>(path);
+
+				if (is_executable)
+					found = types.emplace(key, Read(type, *executable)).first;
+				else
+				{
+					// Only the executable's index is kept, since every script build is a new library.
+					Module library{ path };
+					found = types.emplace(key, Read(type, library)).first;
+				};
+			};
+
+			return Match(object, found->second);
+		};
+
 		#pragma endregion
+
+#endif
 	};
 
 	std::vector<std::string> FieldNames::Of(const LoomObject& object)

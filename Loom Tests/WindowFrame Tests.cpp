@@ -2,7 +2,7 @@
 
 #include "WindowFrame.h"
 
-#ifndef __EMSCRIPTEN__
+#ifdef _WIN32
 
 #include "OpenGL.h"
 
@@ -65,7 +65,7 @@ TEST_SUITE("WindowFrame")
 	};
 };
 
-#ifndef __EMSCRIPTEN__
+#ifdef _WIN32
 
 TEST_SUITE("WindowFrame")
 {

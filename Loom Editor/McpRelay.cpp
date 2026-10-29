@@ -1,8 +1,19 @@
+#ifdef _WIN32
 // Before windows.h, which would otherwise pull in the old winsock.h.
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <winsock2.h>
 #include <ws2tcpip.h>
+
+#pragma comment(lib, "ws2_32.lib")
+#else
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <signal.h>
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#endif
 
 #include "McpRelay.h"
 
@@ -13,8 +24,6 @@
 #include <sstream>
 #include <string_view>
 
-#pragma comment(lib, "ws2_32.lib")
-
 using json = nlohmann::json;
 
 
@@ -22,6 +31,42 @@ namespace Loom
 {
 	namespace
 	{
+		#pragma region Platform
+
+#ifdef _WIN32
+		using AddressSize = int;
+
+		// Windows sockets never raise a signal on a closed peer.
+		constexpr int SEND_FLAGS = 0;
+#else
+		using SOCKET = int;
+		using AddressSize = socklen_t;
+
+		constexpr SOCKET INVALID_SOCKET = -1;
+		constexpr int SD_BOTH = SHUT_RDWR;
+		constexpr int SEND_FLAGS = MSG_NOSIGNAL;
+
+		constexpr int MS_PER_SECOND = 1000;
+		constexpr int US_PER_MS = 1000;
+
+		int closesocket(SOCKET socket)
+		{
+			return close(socket);
+		};
+#endif
+
+		void SetReceiveTimeout(SOCKET socket, int milliseconds)
+		{
+#ifdef _WIN32
+			const DWORD timeout = milliseconds;
+#else
+			const timeval timeout{ milliseconds / MS_PER_SECOND, (milliseconds % MS_PER_SECOND) * US_PER_MS };
+#endif
+			setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout));
+		};
+
+		#pragma endregion
+
 		#pragma region Constants
 
 		constexpr const char* ENDPOINT = "/mcp";
@@ -29,14 +74,14 @@ namespace Loom
 		constexpr size_t MAX_REQUEST_BYTES = 1 << 20;
 		constexpr size_t RECEIVE_BUFFER_BYTES = 4096;
 		constexpr std::string_view HEADER_END = "\r\n\r\n";
-		constexpr DWORD RECEIVE_TIMEOUT_MS = 5000;
+		constexpr int RECEIVE_TIMEOUT_MS = 5000;
 		constexpr int LISTEN_BACKLOG = 8;
 
 		// Port 0 asks for any free one.
 		constexpr unsigned short ANY_PORT = 0;
 
 		// Past EditorMcp's own five minutes for a call, so that it answers first.
-		constexpr DWORD RELAY_TIMEOUT_MS = 6 * 60 * 1000;
+		constexpr int RELAY_TIMEOUT_MS = 6 * 60 * 1000;
 
 		// How often an editor without the shared port tries to take it.
 		constexpr long TAKE_OVER_SECONDS = 1;
@@ -60,6 +105,15 @@ namespace Loom
 			address.sin_port = htons(port);
 			address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
+#ifndef _WIN32
+			// Connections it answered before still wait out their close, which Windows binds over
+			// without this. Linux still lets only one socket listen on the port.
+			constexpr int REUSE = 1;
+
+			if (listener != INVALID_SOCKET)
+				setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &REUSE, sizeof(REUSE));
+#endif
+
 			if (listener == INVALID_SOCKET ||
 				bind(listener, (const sockaddr*)&address, sizeof(address)) != 0 ||
 				listen(listener, LISTEN_BACKLOG) != 0)
@@ -76,7 +130,7 @@ namespace Loom
 		unsigned short PortOf(SOCKET listener)
 		{
 			sockaddr_in address{ };
-			int size = sizeof(address);
+			AddressSize size = sizeof(address);
 
 			getsockname(listener, (sockaddr*)&address, &size);
 
@@ -107,7 +161,7 @@ namespace Loom
 
 			while (sent < data.size())
 			{
-				const int count = send(to, data.data() + sent, (int)(data.size() - sent), 0);
+				const int count = send(to, data.data() + sent, (int)(data.size() - sent), SEND_FLAGS);
 
 				if (count <= 0)
 					return false;
@@ -140,7 +194,7 @@ namespace Loom
 		// A POST of body over a connected socket, answered with the response's body.
 		std::string Exchange(SOCKET server, const std::string& body)
 		{
-			setsockopt(server, SOL_SOCKET, SO_RCVTIMEO, (const char*)&RELAY_TIMEOUT_MS, sizeof(RELAY_TIMEOUT_MS));
+			SetReceiveTimeout(server, RELAY_TIMEOUT_MS);
 
 			const std::string request =
 				std::string("POST ") + ENDPOINT + " HTTP/1.1\r\n"
@@ -170,6 +224,7 @@ namespace Loom
 
 		#pragma region Registry
 
+#ifdef _WIN32
 		// When a process started, which tells it from a later one given its id.
 		uint64_t StartOf(HANDLE process)
 		{
@@ -208,6 +263,55 @@ namespace Loom
 
 			return running;
 		};
+#else
+		// The fields of /proc/<id>/stat between the parenthesised name and the start time.
+		constexpr int FIELDS_BEFORE_START = 19;
+
+		// When a process started, which tells it from a later one given its id.
+		uint64_t StartOf(pid_t process_id)
+		{
+			std::ifstream stat("/proc/" + std::to_string(process_id) + "/stat");
+			std::string line{ };
+
+			if (!std::getline(stat, line))
+				return 0;
+
+			const size_t name_end = line.rfind(')');
+
+			if (name_end == std::string::npos)
+				return 0;
+
+			std::istringstream fields(line.substr(name_end + 1));
+			std::string field{ };
+
+			for (int index = 0; index < FIELDS_BEFORE_START && fields >> field; index++);
+
+			uint64_t start = 0;
+			fields >> start;
+
+			return start;
+		};
+
+		// One file per editor, named by its own port and holding its process's id and start.
+		bool Note(const std::filesystem::path& file)
+		{
+			std::ofstream out(file);
+			out << getpid() << ' ' << StartOf(getpid());
+
+			return (bool)out;
+		};
+
+		bool Running(const std::filesystem::path& file)
+		{
+			pid_t process_id = 0;
+			uint64_t start = 0;
+
+			if (!(std::ifstream(file) >> process_id >> start))
+				return false;
+
+			return process_id > 0 && kill(process_id, 0) == 0 && StartOf(process_id) == start;
+		};
+#endif
 
 		#pragma endregion
 	};
@@ -258,8 +362,10 @@ namespace Loom
 			std::filesystem::remove(m_registry / std::to_string(m_ownPort), error);
 		};
 
+#ifdef _WIN32
 		if (m_started)
 			WSACleanup();
+#endif
 	};
 
 	#pragma endregion
@@ -268,6 +374,7 @@ namespace Loom
 
 	bool McpRelay::Listen(unsigned short shared_port)
 	{
+#ifdef _WIN32
 		WSADATA data{ };
 
 		if (WSAStartup(MAKEWORD(2, 2), &data) != 0)
@@ -275,6 +382,7 @@ namespace Loom
 			std::cerr << "The MCP server could not start Windows Sockets" << std::endl;
 			return false;
 		};
+#endif
 
 		m_started = true;
 
@@ -338,7 +446,8 @@ namespace Loom
 				FD_SET(shared, &ready);
 
 			timeval wait{ TAKE_OVER_SECONDS, 0 };
-			const int count = select(0, &ready, nullptr, nullptr, &wait);
+			// Windows ignores the count of descriptors that POSIX wants.
+			const int count = select((int)(shared == INVALID_SOCKET ? own : (std::max)(own, shared)) + 1, &ready, nullptr, nullptr, &wait);
 
 			if (m_stopping)
 				return;
@@ -398,7 +507,7 @@ namespace Loom
 	{
 		const SOCKET client = connection;
 
-		setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, (const char*)&RECEIVE_TIMEOUT_MS, sizeof(RECEIVE_TIMEOUT_MS));
+		SetReceiveTimeout(client, RECEIVE_TIMEOUT_MS);
 
 		std::string request{ };
 		size_t head_size = std::string::npos;

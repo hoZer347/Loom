@@ -1,9 +1,10 @@
 #include "HiddenProcess.h"
 
-// The editor only runs on Windows, but the web test build compiles this too.
-#ifndef __EMSCRIPTEN__
-
 #include <array>
+
+// The editor runs on Windows and Linux, but the web test build compiles this too.
+#ifdef _WIN32
+
 #include <vector>
 
 #define WIN32_LEAN_AND_MEAN
@@ -132,7 +133,118 @@ namespace Loom
 
 		return exit_code;
 	};
+};
 
+#elif !defined(__EMSCRIPTEN__)
+
+#include <cstdint>
+
+#include <fcntl.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+
+namespace Loom
+{
+	namespace
+	{
+		constexpr size_t read_size = 4096;
+		constexpr int exec_failed = 127;
+
+		void* FromInt(intptr_t value)
+		{
+			return reinterpret_cast<void*>(value);
+		};
+
+		intptr_t ToInt(void* value)
+		{
+			return reinterpret_cast<intptr_t>(value);
+		};
+	};
+
+	// The child leads a process group of its own, so the job's owner can stop everything it started at once.
+	bool HiddenProcess::Start(std::string command_line, void*)
+	{
+		int pipe_ends[2];
+
+		if (pipe2(pipe_ends, O_CLOEXEC) != 0)
+			return false;
+
+		const pid_t child = fork();
+
+		if (child < 0)
+		{
+			close(pipe_ends[0]);
+			close(pipe_ends[1]);
+			return false;
+		};
+
+		if (child == 0)
+		{
+			setpgid(0, 0);
+			dup2(pipe_ends[1], STDOUT_FILENO);
+			dup2(pipe_ends[1], STDERR_FILENO);
+			execl("/bin/sh", "sh", "-c", command_line.c_str(), nullptr);
+			_exit(exec_failed);
+		};
+
+		close(pipe_ends[1]);
+
+		process = FromInt(child);
+		output = FromInt(pipe_ends[0]);
+
+		return true;
+	};
+
+	void HiddenProcess::ReadLines(const std::function<void(const std::string&)>& on_line)
+	{
+		std::array<char, read_size> buffer{ };
+		std::string line;
+		ssize_t count = 0;
+		const int fd = static_cast<int>(ToInt(output));
+
+		while ((count = read(fd, buffer.data(), read_size)) > 0)
+			for (ssize_t i = 0; i < count; i++)
+			{
+				const char c = buffer[i];
+
+				if (c == '\r')
+					continue;
+
+				if (c != '\n')
+				{
+					line += c;
+					continue;
+				};
+
+				on_line(line);
+				line.clear();
+			};
+
+		if (!line.empty())
+			on_line(line);
+
+		close(fd);
+		output = nullptr;
+	};
+
+	unsigned long HiddenProcess::Finish()
+	{
+		int status = 0;
+
+		waitpid(static_cast<pid_t>(ToInt(process)), &status, 0);
+		process = nullptr;
+
+		return WIFEXITED(status) ? WEXITSTATUS(status) : 1;
+	};
+};
+
+#endif
+
+#ifndef __EMSCRIPTEN__
+
+namespace Loom
+{
 	bool HiddenProcess::Run(const std::string& command_line, const std::function<void(const std::string&)>& on_line)
 	{
 		HiddenProcess hidden;

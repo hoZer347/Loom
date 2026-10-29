@@ -9,7 +9,7 @@
 #include <thread>
 #include <vector>
 
-#ifndef __EMSCRIPTEN__
+#ifdef _WIN32
 
 #include "OpenGL.h"
 
@@ -249,7 +249,7 @@ TEST_SUITE("Engine")
 		CHECK_FALSE(Loom::Engine::IsPolling());
 	};
 
-#ifndef __EMSCRIPTEN__
+#ifdef _WIN32
 
 	constexpr int poll_window_size = 64;
 	constexpr WPARAM typed = 'a';
