@@ -721,24 +721,24 @@ namespace Loom
 
 		const uint64_t key = Mixed(Mixed(mesh.m_geometry, program), *std::as_const(mesh.primitive_id));
 		const auto [first, last] = m_byKey.equal_range(key);
+		const bool mirrored = glm::determinant(glm::mat3(mesh.m_gameObject->WorldMatrix())) < 0.0f;
 
 		for (auto found = first; found != last; ++found)
-			if (Alike(m_lots[found->second], mesh, program))
+			if (Alike(m_lots[found->second], mesh, program, mirrored))
 			{
 				m_lots[found->second].meshes.push_back(&mesh);
 				return true;
 			};
 
 		m_byKey.emplace(key, m_lots.size());
-		m_lots.push_back({ program, instanced, { &mesh } });
+		m_lots.push_back({ program, instanced, mirrored, { &mesh } });
 
 		return true;
 	};
 
-	bool MeshBatch::Alike(const Lot& lot, const Mesh& mesh, uint32_t program)
+	bool MeshBatch::Alike(const Lot& lot, const Mesh& mesh, uint32_t program, bool mirrored)
 	{
 		const Mesh& first = *lot.meshes.front();
-		const bool mirrored = glm::determinant(glm::mat3(first.m_gameObject->WorldMatrix())) < 0.0f;
 		const Material& a = **first.material;
 		const Material& b = **mesh.material;
 
@@ -748,7 +748,7 @@ namespace Loom
 		return lot.program == program &&
 			first.m_geometry == mesh.m_geometry &&
 			*first.primitive_id == *mesh.primitive_id &&
-			mirrored == glm::determinant(glm::mat3(mesh.m_gameObject->WorldMatrix())) < 0.0f &&
+			lot.mirrored == mirrored &&
 			materials &&
 			*first.variables == *mesh.variables;
 	};

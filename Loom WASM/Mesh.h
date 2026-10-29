@@ -304,16 +304,18 @@ namespace Loom
 		void Draw(const Ready& ready);
 
 	private:
-		// Meshes drawn together: alone with program, or as instances with instanced.
+		// Meshes drawn together: alone with program, or as instances with
+		// instanced. Mirrored when their world matrices turn their winding over.
 		struct Lot
 		{
 			uint32_t program;
 			uint32_t instanced;
+			bool mirrored;
 			std::vector<Mesh*> meshes;
 		};
 
-		// Whether the mesh can be drawn as one of the lot.
-		static bool Alike(const Lot& lot, const Mesh& mesh, uint32_t program);
+		// Whether the mesh, mirrored or not, can be drawn as one of the lot.
+		static bool Alike(const Lot& lot, const Mesh& mesh, uint32_t program, bool mirrored);
 
 		// In the order their first meshes joined.
 		std::vector<Lot> m_lots;
