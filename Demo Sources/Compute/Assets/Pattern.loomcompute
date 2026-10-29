@@ -13,7 +13,7 @@ const float CORNER = 0.05;
 
 // Squares SEED_CELLS across, of which SEEDED in a hundred start with the eater.
 const int SEED_CELLS = 8;
-const float SEEDED = 0.04;
+const float SEEDED = 0.12;
 
 // A drop DROP_RADIUS cells in radius every DROP_EVERY runs.
 const int DROP_EVERY = 480;

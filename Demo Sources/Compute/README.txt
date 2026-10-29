@@ -8,7 +8,7 @@ A Loom project showing a ComputeShader running on the GPU.
     Assets/Pattern.shader          what the plane draws with
     Assets/Fonts                   the explanation's font and its licence
 
-The Pattern GameObject's ComputeShader runs Pattern.loomcompute eight steps
+The Pattern GameObject's ComputeShader runs Pattern.loomcompute sixteen steps
 at a time, thirty times a second, each cell reading its neighbours from the
 step before, and drops more of the eater in somewhere new every 480 runs.
 The plane's shader reads the cells through "uniform highp sampler2D
