@@ -4,6 +4,7 @@
 #ifndef __EMSCRIPTEN__
 
 #include "OpenGL.h"
+#include "imgui_internal.h"
 
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
@@ -126,6 +127,28 @@ namespace Loom
 				return 0;
 			};
 
+			// The OS holds the frame loop while it moves or sizes the window, so frames come from a timer meanwhile.
+			if (message == WM_ENTERSIZEMOVE && frame.Redrawing() != nullptr)
+				SetTimer(window, SUBCLASS_ID, USER_TIMER_MINIMUM, nullptr);
+
+			if (message == WM_EXITSIZEMOVE)
+				KillTimer(window, SUBCLASS_ID);
+
+			if (message == WM_TIMER && wparam == SUBCLASS_ID)
+			{
+				static bool redrawing = false;
+
+				// Not from a dialog's own loop inside a frame.
+				if (!redrawing && GImGui != nullptr && !GImGui->WithinFrameScope)
+				{
+					redrawing = true;
+					frame.Redrawing()();
+					redrawing = false;
+				};
+
+				return 0;
+			};
+
 			if (message == WM_NCHITTEST && framed)
 			{
 				POINT point = { (short)LOWORD(lparam), (short)HIWORD(lparam) };
@@ -156,7 +179,7 @@ namespace Loom
 			RemoveWindowSubclass(glfwGetWin32Window(m_window), Procedure, SUBCLASS_ID);
 	};
 
-	void WindowFrame::Install(GLFWwindow* window)
+	void WindowFrame::Install(GLFWwindow* window, Redraw redraw)
 	{
 		if (window == nullptr || m_window != nullptr)
 			return;
@@ -165,6 +188,7 @@ namespace Loom
 			return;
 
 		m_window = window;
+		m_redraw = redraw;
 
 		// The whole window is client area, so GLFW sizes it as frameless.
 		glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_FALSE);

@@ -12,6 +12,8 @@ namespace Loom
 	* - The window's edges still resize it, and a strip the caller names each
 	*   frame drags it, snaps it and maximizes it on a double-click, as a
 	*   title bar does
+	* - Redraws on a timer while the OS moves or sizes it, which holds the
+	*   frame loop until let go
 	* - A window over a whole monitor has neither
 	*/
 	struct WindowFrame final
@@ -31,8 +33,10 @@ namespace Loom
 		WindowFrame& operator=(const WindowFrame&) = delete;
 		~WindowFrame();
 
+		using Redraw = void(*)();
+
 		// Takes the title bar off window, keeping its client area the size it was.
-		void Install(GLFWwindow* window);
+		void Install(GLFWwindow* window, Redraw redraw);
 
 		// Puts the frame back after the window has gone over a monitor or
 		// come back from one, which resets its style.
@@ -44,6 +48,8 @@ namespace Loom
 		void SetDragStrip(const Rect& strip) { m_strip = strip; };
 		const Rect& DragStrip() const { return m_strip; };
 
+		Redraw Redrawing() const { return m_redraw; };
+
 		// What a point in a client area of width by height is over, with
 		// border the depth of its resizing edges, which a maximized window has none of.
 		static Hit HitTest(float x, float y, float width, float height, float border, bool maximized, const Rect& strip);
@@ -51,5 +57,6 @@ namespace Loom
 	private:
 		GLFWwindow* m_window = nullptr;
 		Rect m_strip{ };
+		Redraw m_redraw = nullptr;
 	};
 };

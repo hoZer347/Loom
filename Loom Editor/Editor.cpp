@@ -794,7 +794,7 @@ namespace Loom
 		ImGui::GetPlatformIO().Platform_OpenInShellFn = OpenInShell;
 		ImGui::GetPlatformIO().Platform_OpenInShellUserData = this;
 
-		m_windowFrame.Install(Engine::window);
+		m_windowFrame.Install(Engine::window, Engine::renderFrame);
 
 		window_editor = this;
 
@@ -2777,7 +2777,7 @@ namespace Loom
 		if (frame == nullptr)
 		{
 			frame = std::make_unique<WindowFrame>();
-			frame->Install(window);
+			frame->Install(window, Engine::renderFrame);
 		};
 
 		if (!DrawWindowButtons(window, *frame) && !viewport->PlatformRequestClose)
