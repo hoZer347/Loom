@@ -142,7 +142,11 @@ namespace Loom
 	Engine::Engine()
 	{
 		if (!glfwInit())
-			std::cerr << "Engine: GLFW could not start" << std::endl;
+		{
+			const char* reason = nullptr;
+			glfwGetError(&reason);
+			std::cerr << "Engine: GLFW could not start: " << (reason ? reason : "no reason given") << std::endl;
+		};
 
 		window = OpenWindow(backend);
 
