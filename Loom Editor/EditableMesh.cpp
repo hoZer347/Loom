@@ -334,6 +334,10 @@ namespace Loom
 			mesh.AddFace({ south, at(rings - 1, i + 1), at(rings - 1, i) }, { uv(rings, i), uv(rings - 1, i + 1), uv(rings - 1, i) });
 		};
 
+		for (Face& face : mesh.faces)
+			for (Corner& corner : face.corners)
+				corner.normal = glm::normalize(mesh.vertices[corner.vertex]);
+
 		return mesh;
 	};
 

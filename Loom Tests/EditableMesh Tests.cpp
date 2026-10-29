@@ -199,11 +199,22 @@ TEST_SUITE("EditableMesh")
 		{
 			CHECK(FacesOut(mesh));
 			CHECK(Closed(mesh));
+		};
 
+		for (const EditableMesh& mesh : {
+			EditableMesh::Cube(SIZE),
+			EditableMesh::Cylinder(SIZE, SIZE, SEGMENTS),
+			EditableMesh::Cone(SIZE, SIZE, SEGMENTS),
+			EditableMesh::Capsule(SIZE, CAPSULE_HEIGHT, SEGMENTS, RINGS) })
 			for (uint32_t face = 0; face < mesh.faces.size(); face++)
 				for (const EditableMesh::Corner& corner : mesh.faces[face].corners)
 					CHECK(Near(corner.normal, mesh.FaceNormal(face)));
-		};
+
+		const EditableMesh sphere = EditableMesh::Sphere(SIZE, SEGMENTS, RINGS);
+
+		for (const EditableMesh::Face& face : sphere.faces)
+			for (const EditableMesh::Corner& corner : face.corners)
+				CHECK(Near(corner.normal, sphere.vertices[corner.vertex] / SIZE));
 
 		const EditableMesh cube = EditableMesh::Cube(SIZE);
 		CHECK(cube.vertices.size() == 8);

@@ -86,6 +86,8 @@ namespace Loom
 		static EditableMesh Plane(float size);
 		static EditableMesh Cylinder(float radius, float height, int segments);
 		static EditableMesh Cone(float radius, float height, int segments);
+
+		// Smooth, each corner's normal pointing out from the centre.
 		static EditableMesh Sphere(float radius, int segments, int rings);
 
 		// Height end to end, each round end a half sphere of cap_rings rings.
