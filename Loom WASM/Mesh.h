@@ -83,8 +83,9 @@ namespace Loom
 		// view: those its world matrix turns outward. None for an open mesh.
 		CullFace FarSide();
 
-		// Gives the program the mesh's material and the scene's view, as its
-		// own pass does before drawing it.
+		// Gives the program the mesh's material, the scene's view and the faces
+		// its material culls, which the caller sets back to none after drawing,
+		// as its own pass does before drawing it.
 		static void Ready(Mesh& mesh, uint32_t program);
 
 		// Draws the meshes farthest from Camera::current first, writing no

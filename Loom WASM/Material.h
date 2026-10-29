@@ -117,7 +117,7 @@ namespace Loom
 			Nearest,
 		};
 
-		// Last, so the fields before it keep their places in scenes saved
+		// After variables, so the fields before it keep their places in scenes saved
 		// without it.
 		Serial<Sampling> sampling = AsShader;
 
@@ -130,7 +130,7 @@ namespace Loom
 			Back,
 		};
 
-		// After sampling, for the same reason.
+		// Last, for the same reason.
 		Serial<Sides> sides = Both;
 
 		// What the renderer culls for sides, drawn with a world matrix that

@@ -287,8 +287,10 @@ namespace Loom
 		Ready(*this, program);
 		Draw(program);
 
-		if (material->sides != Material::Both)
-			Renderer::Get()->SetCullFace(CullFace::None);
+		Renderer* renderer = Renderer::Get();
+
+		if (renderer && material->sides != Material::Both)
+			renderer->SetCullFace(CullFace::None);
 	};
 
 	void Mesh::Ready(Mesh& mesh, uint32_t program)
@@ -296,8 +298,13 @@ namespace Loom
 		mesh.material->Apply(program, &*std::as_const(mesh.variables));
 		Scene::ApplyView(program);
 
-		if (Renderer* renderer = Renderer::Get())
-			renderer->SetCullFace(mesh.material->Culled(glm::determinant(glm::mat3(mesh.m_gameObject->WorldMatrix())) < 0.0f));
+		Renderer* renderer = Renderer::Get();
+
+		if (!renderer)
+			return;
+
+		const bool mirrored = mesh.material->sides != Material::Both && glm::determinant(glm::mat3(mesh.m_gameObject->WorldMatrix())) < 0.0f;
+		renderer->SetCullFace(mesh.material->Culled(mirrored));
 	};
 
 	void Mesh::Draw(uint32_t program)
