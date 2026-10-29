@@ -1074,7 +1074,7 @@ namespace Loom
 			if (open_scene && !m_scripts.IsBuilding())
 			{
 				const auto open = std::find_if(m_scenePaths.begin(), m_scenePaths.end(),
-					[&](const auto& entry) { return entry.second == m_startupScene; });
+					[this](const auto& entry) { return entry.second == m_startupScene; });
 
 				if (open != m_scenePaths.end())
 					SetActiveScene(open->first);
@@ -1779,7 +1779,7 @@ namespace Loom
 
 		std::vector<GameObject*> rows{ };
 
-		const auto add = [&](GameObject& parent)
+		const auto add = [&rows, &open](GameObject& parent)
 		{
 			const std::vector<GameObject*> under = MultiEdit::Rows(parent, open);
 
@@ -1943,7 +1943,7 @@ namespace Loom
 		if (m_activeScene == nullptr && !scenes.empty())
 			m_activeScene = scenes.front();
 
-		const auto gone = [&](uint64_t id)
+		const auto gone = [this, &scenes](uint64_t id)
 		{
 			const GameObject* gameObject = dynamic_cast<const GameObject*>(LoomObject::GetByID(id));
 
@@ -4175,7 +4175,7 @@ namespace Loom
 
 		bool made = false;
 
-		ChangeComponents(*gameObject, [&]() { made = ComponentRegistry::Create(name, *gameObject) != nullptr; });
+		ChangeComponents(*gameObject, [&made, &name, gameObject]() { made = ComponentRegistry::Create(name, *gameObject) != nullptr; });
 
 		if (!made)
 		{

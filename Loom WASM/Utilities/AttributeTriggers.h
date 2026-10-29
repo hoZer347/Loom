@@ -22,6 +22,7 @@ namespace Loom
 				onInvalidate();
 		};
 
+	private:
 		std::function<void()> onInvalidate{ };
 	};
 
@@ -38,6 +39,7 @@ namespace Loom
 				target->Invalidate();
 		};
 
+	private:
 		AttributeBase* target = nullptr;
 	};
 
@@ -51,6 +53,7 @@ namespace Loom
 			std::cout << "[Attribute] " << label << " invalidated" << std::endl;
 		};
 
+	private:
 		std::string label{ };
 	};
 };

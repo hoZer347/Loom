@@ -176,8 +176,8 @@ namespace Loom
 	bool FolderTree::Shows(const VirtualFolders::Node& node, const Hooks& hooks) const
 	{
 		return m_search.Matches(node.name) ||
-			std::ranges::any_of(node.items, [&](const std::string& item) { return Shows(item, hooks); }) ||
-			std::ranges::any_of(node.children, [&](const VirtualFolders::Node& child) { return Shows(child, hooks); });
+			std::ranges::any_of(node.items, [this, &hooks](const std::string& item) { return Shows(item, hooks); }) ||
+			std::ranges::any_of(node.children, [this, &hooks](const VirtualFolders::Node& child) { return Shows(child, hooks); });
 	};
 
 	bool FolderTree::Shows(const std::string& item, const Hooks& hooks) const

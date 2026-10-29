@@ -248,7 +248,7 @@ namespace Loom
 			bool Read(int depth, const std::string& content)
 			{
 				const auto fail =
-					[&](const std::string& reason)
+					[this](const std::string& reason)
 					{
 						error = reason;
 						return false;
@@ -740,7 +740,7 @@ namespace Loom
 		reader.levels.assign(1, Level{ });
 
 		reader.top_level =
-			[&](const std::string& name)
+			[&built, &parent](const std::string& name)
 			{
 				built.push_back(parent.AddChild(name));
 				return built.back();
@@ -752,7 +752,7 @@ namespace Loom
 		ReadLines(
 			text,
 			line_number,
-			[&](int, const std::string& content)
+			[&reader](int, const std::string& content)
 			{
 				for (const char* keyword : { gameobject_keyword, component_keyword })
 				{
@@ -770,7 +770,7 @@ namespace Loom
 		const bool read = ReadLines(
 			text,
 			line_number,
-			[&](int depth, const std::string& content)
+			[&reader](int depth, const std::string& content)
 			{
 				return reader.Read(depth + 1, content);
 			});
@@ -836,7 +836,7 @@ namespace Loom
 		const bool read = ReadLines(
 			text,
 			line_number,
-			[&](int depth, const std::string& content)
+			[&components, &fields, &name, &guid, &started](int depth, const std::string& content)
 			{
 				if (!started)
 				{
@@ -920,7 +920,7 @@ namespace Loom
 		return ReadLines(
 			text,
 			line_number,
-			[&](int depth, const std::string& content)
+			[&scene, &pending, &started](int depth, const std::string& content)
 			{
 				if (started)
 				{

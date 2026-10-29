@@ -314,7 +314,7 @@ namespace Loom
 			std::vector<std::string> lines{ };
 
 			EditorLog::Get().ForEach(
-				[&](size_t id, const EditorLog::Line& line)
+				[&lines, first_id, errors_only](size_t id, const EditorLog::Line& line)
 				{
 					if (id >= first_id && (line.is_error || !errors_only))
 						lines.push_back(std::to_string(id) + (line.is_error ? "\terror\t" : "\t\t") + line.text);
@@ -1022,7 +1022,7 @@ namespace Loom
 
 		m_calls.push_back(call);
 
-		m_answered.wait_for(lock, call_timeout, [&]() { return call->done || m_stopping; });
+		m_answered.wait_for(lock, call_timeout, [this, &call]() { return call->done || m_stopping; });
 
 		if (call->done)
 			return call->result;

@@ -23,9 +23,6 @@ namespace Loom
 			const wchar_t* description;
 		};
 
-		// Where Explorer reads the current user's file types, under HKEY_CURRENT_USER.
-		static constexpr const wchar_t* UserClasses = L"Software\\Classes";
-
 		// Every file of the editor's own, each with a type of its own.
 		static std::span<const Type> All();
 
@@ -42,5 +39,9 @@ namespace Loom
 		// The command a file with that extension opens with under classes,
 		// empty when there is none.
 		static std::wstring OpenCommand(const char* extension, const std::wstring& classes = UserClasses);
+
+	private:
+		// Where Explorer reads the current user's file types, under HKEY_CURRENT_USER.
+		static constexpr const wchar_t* UserClasses = L"Software\\Classes";
 	};
 };

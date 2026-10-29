@@ -148,7 +148,7 @@ namespace Loom
 
 		// Outside the lock, since compiling asks CodeFor.
 		Material::ReloadShaders(
-			[&](const std::string& shader)
+			[&previous, &next](const std::string& shader)
 			{
 				const std::string key = ShaderKey(shader);
 

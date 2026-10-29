@@ -132,7 +132,7 @@ namespace Loom
 			PreVertex::ReloadIfChanged();
 		else
 			ReloadShaders(
-				[&](const std::string& shader)
+				[&edited](const std::string& shader)
 				{
 					return Shader::SourceKey(shader) == edited;
 				});

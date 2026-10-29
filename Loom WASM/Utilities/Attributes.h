@@ -65,6 +65,7 @@ namespace Loom
 
 		~Subscription() { Release(); };
 
+	private:
 		void Release()
 		{
 			if (m_release)
@@ -74,7 +75,6 @@ namespace Loom
 			};
 		};
 
-	private:
 		std::function<void()> m_release;
 	};
 

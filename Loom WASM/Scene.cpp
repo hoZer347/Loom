@@ -353,7 +353,7 @@ namespace Loom
 		const std::shared_lock asking(ColliderTree::guard);
 
 		colliders.Raycast(*ray, maxDistance,
-			[&](const RaycastHit& nearer, float)
+			[&hit, &found](const RaycastHit& nearer, float)
 			{
 				hit = nearer;
 				found = true;
@@ -375,7 +375,7 @@ namespace Loom
 		const std::shared_lock asking(ColliderTree::guard);
 
 		colliders.Raycast(*ray, maxDistance,
-			[&](const RaycastHit& hit, float within)
+			[&hits](const RaycastHit& hit, float within)
 			{
 				hits.push_back(hit);
 

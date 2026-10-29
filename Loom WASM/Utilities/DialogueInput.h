@@ -19,20 +19,6 @@ namespace Loom
 	/// found here once per frame by Tick.
 	struct LOOM_API DialogueInput final
 	{
-		/// Whether a lettered face button went down this frame -- A, B, X or Y, whatever
-		/// the pad calls them. GLFW names them by position, so the same four buttons are
-		/// meant on every controller.
-		///
-		/// All four, deliberately. This is "carry on", not a choice, and nobody holding a
-		/// pad reads a box of text and then hunts for which button was nominated -- every
-		/// one that falls under the thumb has to work, which is the same reasoning that
-		/// already has both the mouse and the spacebar doing it.
-		///
-		/// The face buttons only. The shoulders and the stick clicks are not where a thumb
-		/// rests, and Start belongs to a pause menu -- spending it on dismissing a line
-		/// would mean the pause button sometimes does not pause.
-		static bool Continued();
-
 		/// The same question of a keyboard: the spacebar, or any of 1, 2 and 3.
 		///
 		/// The digits are here for the same reason all four face buttons are. A player
@@ -50,6 +36,20 @@ namespace Loom
 		static bool Clicked();
 
 	private:
+		/// Whether a lettered face button went down this frame -- A, B, X or Y, whatever
+		/// the pad calls them. GLFW names them by position, so the same four buttons are
+		/// meant on every controller.
+		///
+		/// All four, deliberately. This is "carry on", not a choice, and nobody holding a
+		/// pad reads a box of text and then hunts for which button was nominated -- every
+		/// one that falls under the thumb has to work, which is the same reasoning that
+		/// already has both the mouse and the spacebar doing it.
+		///
+		/// The face buttons only. The shoulders and the stick clicks are not where a thumb
+		/// rests, and Start belongs to a pause menu -- spending it on dismissing a line
+		/// would mean the pause button sometimes does not pause.
+		static bool Continued();
+
 		friend struct Utilities;
 
 		/// Samples every key and button once, and works out which of them went down since

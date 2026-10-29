@@ -49,7 +49,7 @@ namespace Loom
 			[this, run](HiddenProcess hidden, const std::atomic<bool>& stopping)
 			{
 				hidden.ReadLines(
-					[&](const std::string& line)
+					[&stopping](const std::string& line)
 					{
 						if (!stopping && !line.empty())
 							std::cerr << "[build] " << line << std::endl;

@@ -89,7 +89,7 @@ namespace Loom
 		// Changed outside the editor, so the file is what shows from now on.
 		if (loaded != m_prefabs.end())
 		{
-			std::erase_if(m_linkedInstances, [&](const auto& link) { return link.second == path; });
+			std::erase_if(m_linkedInstances, [&path](const auto& link) { return link.second == path; });
 			m_reshowPrefab = m_reshowPrefab || path == m_prefabPath;
 		};
 
@@ -569,7 +569,7 @@ namespace Loom
 		{
 			// Every step of the panel carries the instance's edit, so none takes it back.
 			m_prefabHistory.Rewrite(
-				[&](const std::string& text)
+				[&carried_from, &carried_to, &keys](const std::string& text)
 				{
 					Prefabs::ObjectNode step;
 					return Prefabs::Parse(text, step) ? Prefabs::Write(Prefabs::Merge(carried_from, step, carried_to, keys)) : text;

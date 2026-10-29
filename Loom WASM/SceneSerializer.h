@@ -44,10 +44,6 @@ namespace Loom
 		static constexpr const char* gameobject_keyword = "GameObject ";
 		static constexpr const char* component_keyword = "Component ";
 
-		// Tabs are what the format uses; four spaces are accepted as one so a
-		// file that has been through an editor that expands tabs still loads.
-		static constexpr int spaces_per_tab = 4;
-
 		// A line's depth, and where what follows its indent starts.
 		static int DepthOf(const std::string& line, size_t& content_start);
 
@@ -172,6 +168,15 @@ namespace Loom
 
 		// As ReadOwn, what SerializeHeader wrote back onto scene.
 		static bool ReadHeader(Scene& scene, const std::string& text, PendingReferences& pending);
+
+		#pragma endregion
+
+	private:
+		#pragma region Format
+
+		// Tabs are what the format uses; four spaces are accepted as one so a
+		// file that has been through an editor that expands tabs still loads.
+		static constexpr int spaces_per_tab = 4;
 
 		#pragma endregion
 	};

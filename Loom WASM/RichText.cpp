@@ -136,7 +136,7 @@ namespace Loom
 		std::vector<float> sizes{ size };
 		std::string run{ };
 
-		const auto flush = [&]()
+		const auto flush = [&spans, &run, &colors, &sizes]()
 		{
 			if (!run.empty())
 				spans.push_back({ std::move(run), colors.back(), sizes.back() });

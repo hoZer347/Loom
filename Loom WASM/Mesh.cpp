@@ -222,7 +222,7 @@ namespace Loom
 			std::optional<std::pair<size_t, size_t>> at;
 			size_t end = 0;
 
-			EachLayer(words, [&](uint32_t other, uint32_t, size_t first, size_t last)
+			EachLayer(words, [&at, &end, id](uint32_t other, uint32_t, size_t first, size_t last)
 			{
 				if (!at && other >= id)
 					at = { first - LAYER_HEADER, other == id ? last : first - LAYER_HEADER };
@@ -501,7 +501,7 @@ namespace Loom
 			const std::vector<unsigned int>& words = *std::as_const(m_uvLayers);
 			std::vector<Drawn> layers;
 
-			EachLayer(words, [&](uint32_t id, uint32_t perVertex, size_t first, size_t last)
+			EachLayer(words, [&count, &layers, &layout, &words](uint32_t id, uint32_t perVertex, size_t first, size_t last)
 			{
 				if (id != Skin::UV_LAYER && perVertex && last - first == count * perVertex)
 				{
@@ -659,7 +659,7 @@ namespace Loom
 		const std::vector<unsigned int>& words = *std::as_const(m_uvLayers);
 		std::vector<UVLayer> layers;
 
-		EachLayer(words, [&](uint32_t id, uint32_t perVertex, size_t first, size_t last)
+		EachLayer(words, [&layers, &words](uint32_t id, uint32_t perVertex, size_t first, size_t last)
 		{
 			if (perVertex)
 				layers.push_back({ id, perVertex, { words.begin() + first, words.begin() + last } });

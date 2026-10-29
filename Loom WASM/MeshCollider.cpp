@@ -99,7 +99,7 @@ namespace Loom
 
 		float nearest = maxDistance;
 		glm::vec3 normal(0.0f);
-		const bool found = Nearest(m_triangles, [&](uint32_t node) -> const Bounds& { return m_nodes[node].bounds; }, local, nearest, normal);
+		const bool found = Nearest(m_triangles, [this](uint32_t node) -> const Bounds& { return m_nodes[node].bounds; }, local, nearest, normal);
 
 		if (!found)
 			return false;
@@ -191,7 +191,7 @@ namespace Loom
 		float nearest = maxDistance;
 		glm::vec3 normal(0.0f);
 
-		if (m_posedBounds.empty() || !Nearest(m_posed, [&](uint32_t node) -> const Bounds& { return m_posedBounds[node]; }, ray, nearest, normal))
+		if (m_posedBounds.empty() || !Nearest(m_posed, [this](uint32_t node) -> const Bounds& { return m_posedBounds[node]; }, ray, nearest, normal))
 			return false;
 
 		const float length = glm::length(normal);
@@ -226,20 +226,20 @@ namespace Loom
 		const size_t points = m_indices.empty() ? vertices : m_indices.size();
 
 		const auto vertex =
-			[&](size_t corner)
+			[this](size_t corner)
 			{
 				return m_indices.empty() ? corner : (size_t)m_indices[corner];
 			};
 
 		const auto point =
-			[&](size_t i)
+			[this](size_t i)
 			{
 				return glm::vec3(m_source[i * COMPONENTS], m_source[i * COMPONENTS + 1], m_source[i * COMPONENTS + 2]);
 			};
 
 		// An index past the vertices leaves its triangle out.
 		const auto add =
-			[&](size_t a, size_t b, size_t c)
+			[this, &vertex, &point, vertices](size_t a, size_t b, size_t c)
 			{
 				const size_t corners[] = { vertex(a), vertex(b), vertex(c) };
 
