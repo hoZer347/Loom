@@ -40,6 +40,9 @@ namespace
 	};
 };
 
+// A starter plane's Material reads its shader, which the web build fetches, and node
+// cannot; the editor's project template is not in the web build at all.
+#ifndef __EMSCRIPTEN__
 TEST_SUITE("RenderingObjects")
 {
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the Rendering menu's Light and Camera are children with a Light and a Camera")
@@ -149,3 +152,4 @@ TEST_SUITE("RenderingObjects")
 		std::filesystem::remove_all(folder);
 	};
 };
+#endif
