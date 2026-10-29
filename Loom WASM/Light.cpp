@@ -24,9 +24,7 @@ namespace Loom
 	{
 		#pragma region Shadow Map
 
-		// Depth bias against shadow acne, constant alone: scaled by a caster's
-		// slope it would lift what sits just under the caster into the light.
-		// The slope is taken up by the receiver's normal offset instead.
+		// Constant alone: a slope-scaled bias lights what sits just under a tilted caster.
 		constexpr float CONSTANT_OFFSET = 1.0f;
 
 		// The light sits one extent back from the centre, so the box is two deep.
@@ -84,10 +82,9 @@ uniform float u_shadowTexel;
 
 // How many shadow map texels out along its normal a surface reads its
 // shadow from, clear of the flat faces it is made of, which would otherwise
-// shadow the smooth surface their normals light. The more a surface slopes
-// away from the light, the further out it reads; read out sideways, a surface
-// tucked under another stays under it.
+// shadow the smooth surface their normals light.
 const float LOOM_NORMAL_OFFSET_TEXELS = 1.0;
+// Texels more at a surface edge-on to the light, past the PCF kernel's reach.
 const float LOOM_SLOPE_OFFSET_TEXELS = 3.0;
 
 vec4 LoomLightSpace(vec4 world)

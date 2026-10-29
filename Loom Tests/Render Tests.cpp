@@ -5,13 +5,16 @@
 #ifndef __EMSCRIPTEN__
 
 #include "Camera.h"
+#include "EditableMesh.h"
 #include "GameObject.h"
+#include "Light.h"
 #include "Material.h"
 #include "Mesh.h"
 #include "Scene.h"
 #include "Shaders.h"
 #include "Skin.h"
 
+#include <cmath>
 #include <fstream>
 #include <iterator>
 #include <sstream>
@@ -179,6 +182,134 @@ namespace
 		return image;
 	};
 
+	// The starter scene's shader: white, lit and shadowed.
+	const std::string LIT =
+		"// ===SETTINGS===\n"
+		"shading = on\n"
+		"shadows = on\n"
+		"// ===VERTEX===\n"
+		"layout(location = 0) in vec3 aPos;\n"
+		"uniform mat4 u_model;\n"
+		"uniform mat4 u_viewProjection;\n"
+		"void main() { gl_Position = u_viewProjection * u_model * vec4(aPos, 1.0); }\n"
+		"// ===FRAGMENT===\n"
+		"uniform vec3 u_color;\n"
+		"out vec4 FragColor;\n"
+		"void main() { FragColor = vec4(u_color, 1.0); }\n";
+
+	// Big enough that a shadow map texel spans a few pixels at the contact.
+	constexpr glm::ivec2 CONTACT_SIZE{ 640, 360 };
+
+	// The starter scene's plane and sphere, the sphere at the origin half
+	// through the plane, under the default light.
+	constexpr float CONTACT_PLANE_SIZE = 4.0f;
+	constexpr float CONTACT_RADIUS = 0.5f;
+	constexpr int CONTACT_SEGMENTS = 16;
+	constexpr int CONTACT_RINGS = 8;
+
+	// Where a world point lands in a frame the camera drew, from its top left.
+	glm::ivec2 PixelOf(const Loom::Camera& camera, const Image& image, const glm::vec3& world)
+	{
+		const glm::vec4 clip = camera.ViewProjection((float)image.width / image.height) * glm::vec4(world, 1.0f);
+		const glm::vec2 ndc = glm::vec2(clip) / clip.w;
+
+		return glm::ivec2((ndc.x + 1.0f) * 0.5f * image.width, (1.0f - ndc.y) * 0.5f * image.height);
+	};
+
+	// The sphere half through the plane, seen by a camera at position turned
+	// by rotation, for as long as it lives.
+	struct Contact
+	{
+		Contact(const std::string& name, const glm::vec3& position, const glm::vec3& rotation) :
+			m_source(LIT),
+			m_shader(name, m_source),
+			m_scene(name)
+		{
+			Pump();
+
+			light = m_scene.Attach<Loom::Light>();
+			Loom::GameObject* eye = m_scene.AddChild("Camera");
+			Loom::GameObject* plane = m_scene.AddChild("Plane");
+			Loom::GameObject* sphere = m_scene.AddChild("Sphere");
+			Pump();
+
+			camera = eye->Attach<Loom::Camera>();
+			eye->transform.position = position;
+			eye->transform.rotation = rotation;
+
+			plane->Attach<Loom::Material>()->shader = &m_shader;
+			Loom::EditableMesh::Plane(CONTACT_PLANE_SIZE).WriteTo(*plane->Attach<Loom::Mesh>());
+
+			sphere->Attach<Loom::Material>()->shader = &m_shader;
+			Loom::EditableMesh::Sphere(CONTACT_RADIUS, CONTACT_SEGMENTS, CONTACT_RINGS).WriteTo(*sphere->Attach<Loom::Mesh>());
+			Pump();
+		};
+
+		Loom::Light* light = nullptr;
+		Loom::Camera* camera = nullptr;
+
+	private:
+		std::istringstream m_source;
+		Loom::Shader m_shader;
+		Loom::Scene m_scene;
+	};
+
+	struct ContactFixture : RenderFixture
+	{
+		ContactFixture() : RenderFixture(CONTACT_SIZE) { };
+	};
+
+	struct VulkanContactFixture : RenderFixture
+	{
+		VulkanContactFixture() : RenderFixture(CONTACT_SIZE, Loom::Backend::Vulkan) { };
+	};
+
+	// Seen from under the plane, the sphere is in the plane's shadow right up
+	// to it; seen from above, the open plane is lit through, with no acne.
+	void CheckContact(RenderFixture& fixture, const std::string& backend)
+	{
+		const ClearedTo cleared(CLEAR);
+
+		constexpr glm::vec3 UNDER_POSITION(0.0f, -0.4f, 2.0f);
+		constexpr glm::vec3 UNDER_ROTATION(12.0f, 0.0f, 0.0f);
+		constexpr glm::vec3 ABOVE_POSITION(0.0f, 2.0f, 2.0f);
+		constexpr glm::vec3 ABOVE_ROTATION(-45.0f, 0.0f, 0.0f);
+
+		// How many shadow map texels below the plane the sphere is read, and
+		// the map spans its extent either side of its centre.
+		constexpr float TEXELS_BELOW = 1.0f;
+		constexpr float ACROSS_EXTENTS = 2.0f;
+
+		// The ambient light alone, and a little over for rounding.
+		constexpr int SHADED_TOLERANCE = 8;
+
+		// Well clear of the sphere's shadow, which falls the light's way.
+		const glm::vec3 open(1.0f, 0.0f, 1.0f);
+
+		{
+			Contact contact("Render - shadow at a contact from under, on " + backend, UNDER_POSITION, UNDER_ROTATION);
+			const Image image = fixture.Frame();
+			image.Save("Render - shadow at a contact from under, on " + backend);
+
+			// On the side of the sphere facing both the camera and the light.
+			const float below = TEXELS_BELOW * ACROSS_EXTENTS * contact.light->shadowExtent / contact.light->shadowResolution;
+			const glm::vec3 tucked(0.0f, -below, std::sqrt(CONTACT_RADIUS * CONTACT_RADIUS - below * below));
+			const int shaded = (int)(contact.light->ambient * UINT8_MAX) + SHADED_TOLERANCE;
+
+			const glm::ivec2 pixel = PixelOf(*contact.camera, image, tucked);
+			CHECK(image.At(pixel.x, pixel.y).r <= shaded);
+		};
+
+		{
+			Contact contact("Render - shadow at a contact from above, on " + backend, ABOVE_POSITION, ABOVE_ROTATION);
+			const Image image = fixture.Frame();
+			image.Save("Render - shadow at a contact from above, on " + backend);
+
+			const glm::ivec2 pixel = PixelOf(*contact.camera, image, open);
+			CHECK(image.At(pixel.x, pixel.y) == WHITE);
+		};
+	};
+
 	uint32_t BigEndian(const std::vector<char>& bytes, size_t at)
 	{
 		constexpr int BYTE = 8;
@@ -334,6 +465,22 @@ TEST_SUITE("Render")
 
 		CHECK(image.At(image.width / 4, middle) == CLEARED);
 		CHECK(image.At(image.width * 3 / 4, middle) == WHITE);
+	};
+
+	#pragma endregion
+
+	#pragma region Shadows
+
+	TEST_CASE_FIXTURE(ContactFixture, "a shadow reaches right up to the caster a surface pokes through, with no acne on the open caster, on OpenGL")
+	{
+		CheckContact(*this, "OpenGL");
+	};
+
+	TEST_CASE_FIXTURE(VulkanContactFixture, "a shadow reaches right up to the caster a surface pokes through, with no acne on the open caster, on Vulkan")
+	{
+		REQUIRE(Loom::Engine::backend == Loom::Backend::Vulkan);
+
+		CheckContact(*this, "Vulkan");
 	};
 
 	#pragma endregion

@@ -137,8 +137,6 @@ TEST_SUITE("Light")
 		CHECK(std::abs(std::abs(edge.x) - 1.0f) < EPSILON);
 	};
 
-	// A slope-scaled bias would light a band of whatever pokes up through a
-	// tilted caster, just under it.
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the shadow pass biases depth by a constant alone, and clears it after")
 	{
 		RecordingRenderer renderer;
