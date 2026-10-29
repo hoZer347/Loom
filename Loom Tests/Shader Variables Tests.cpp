@@ -690,6 +690,34 @@ TEST_SUITE("Shader variables")
 		CHECK(renderer.floats["u_shadowsOff"] == 1.0f);
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the shadow pass draws a closed caster's far side and an open one's both, and culls nothing after")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream source("// ===SETTINGS===\nshadows = on\n" + STAGES);
+		Loom::Shader shader("far side casters", source);
+
+		Loom::Scene scene("far side casters");
+		Pump();
+
+		Loom::Light* light = scene.Attach<Loom::Light>();
+
+		const std::vector<float> triangle = { 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
+
+		for (const std::vector<float>* vertices : { &LoomTests::TETRAHEDRON, &triangle })
+		{
+			Loom::GameObject* object = scene.AddChild("Caster");
+			object->Attach<Loom::Material>()->shader = &shader;
+			object->Attach<Loom::Mesh>()->m_vertices = *vertices;
+		};
+
+		Pump();
+
+		light->RenderShadowMap({ &scene.GetRoot() });
+
+		CHECK(renderer.culls == std::vector<Loom::CullFace>{ Loom::CullFace::Front, Loom::CullFace::None, Loom::CullFace::None });
+	};
+
 	// The web's clock is the browser's, which cannot be stepped here.
 #ifndef __EMSCRIPTEN__
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a material hands its program the game time")

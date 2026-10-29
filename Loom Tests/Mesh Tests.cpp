@@ -9,6 +9,7 @@
 #include "Shaders.h"
 #include "Skin.h"
 
+#include <algorithm>
 #include <bit>
 #include <optional>
 #include <sstream>
@@ -651,6 +652,54 @@ TEST_SUITE("Mesh")
 		CHECK(Loom::SourceOf(layout, { 12, 1 }).words == 2);
 		CHECK(Loom::SourceOf(layout, { 12, 2 }).words == 0);
 		CHECK(Loom::SourceOf(layout, { 7, 0 }).words == 0);
+	};
+
+	#pragma endregion
+
+	#pragma region Far Side
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a closed mesh's far side is drawn by culling the faces it turns outward, and an open mesh culls none")
+	{
+		constexpr size_t TRIANGLE_FLOATS = 9;
+		constexpr size_t CORNER_FLOATS = 3;
+
+		Loom::Scene scene("far side");
+		Loom::GameObject* holder = scene.AddChild("Shape");
+		Pump();
+
+		Loom::Mesh* mesh = holder->Attach<Loom::Mesh>();
+		Pump();
+
+		mesh->m_vertices = LoomTests::TETRAHEDRON;
+		CHECK(mesh->FarSide() == Loom::CullFace::Front);
+
+		std::vector<float> reversed = LoomTests::TETRAHEDRON;
+
+		for (size_t first = 0; first < reversed.size(); first += TRIANGLE_FLOATS)
+			std::swap_ranges(reversed.begin() + first + CORNER_FLOATS, reversed.begin() + first + 2 * CORNER_FLOATS, reversed.begin() + first + 2 * CORNER_FLOATS);
+
+		mesh->m_vertices = reversed;
+		CHECK(mesh->FarSide() == Loom::CullFace::Back);
+
+		// A mirror turns the winding over.
+		holder->transform.scale = glm::vec3(-1.0f, 1.0f, 1.0f);
+		CHECK(mesh->FarSide() == Loom::CullFace::Front);
+		holder->transform.scale = glm::vec3(1.0f);
+
+		// One face wound against its neighbours.
+		std::vector<float> flipped = LoomTests::TETRAHEDRON;
+		std::swap_ranges(flipped.begin() + CORNER_FLOATS, flipped.begin() + 2 * CORNER_FLOATS, flipped.begin() + 2 * CORNER_FLOATS);
+		mesh->m_vertices = flipped;
+		CHECK(mesh->FarSide() == Loom::CullFace::None);
+
+		// One face short.
+		mesh->m_vertices = std::vector<float>(LoomTests::TETRAHEDRON.begin(), LoomTests::TETRAHEDRON.end() - TRIANGLE_FLOATS);
+		CHECK(mesh->FarSide() == Loom::CullFace::None);
+
+		// Not triangles.
+		mesh->m_vertices = LoomTests::TETRAHEDRON;
+		mesh->primitive_id = Loom::Mesh::Lines;
+		CHECK(mesh->FarSide() == Loom::CullFace::None);
 	};
 
 	#pragma endregion

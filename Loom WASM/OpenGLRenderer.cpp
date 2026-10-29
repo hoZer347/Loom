@@ -1043,6 +1043,18 @@ namespace Loom
 			glDepthFunc(equal ? GL_LEQUAL : GL_LESS);
 		};
 
+		void SetCullFace(CullFace cull) override
+		{
+			if (cull == CullFace::None)
+			{
+				glDisable(GL_CULL_FACE);
+				return;
+			};
+
+			glEnable(GL_CULL_FACE);
+			glCullFace(cull == CullFace::Front ? GL_FRONT : GL_BACK);
+		};
+
 		glm::ivec2 TargetSize() const override
 		{
 			GLint viewport[VIEWPORT_SIZE]{ };

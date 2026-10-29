@@ -305,7 +305,10 @@ namespace
 
 		// Sphere points lit at least this much and facing the camera at least
 		// this much, so the light grazes some and none sits on the silhouette.
+		// From above, points the light only just reaches count too, since a
+		// closed caster must not shadow its own lit side however steep.
 		constexpr float LIT_AT_LEAST = 0.3f;
+		constexpr float GRAZED_AT_LEAST = 0.05f;
 		constexpr float FACING_AT_LEAST = 0.4f;
 		constexpr int STEPS = 24;
 		constexpr float TURN = glm::two_pi<float>();
@@ -377,7 +380,7 @@ namespace
 							const glm::vec3 normal(std::sin(polar) * std::cos(azimuth), std::cos(polar), std::sin(polar) * std::sin(azimuth));
 							const glm::vec3 point = normal * CONTACT_RADIUS;
 
-							if (glm::dot(normal, toLight) >= LIT_AT_LEAST && glm::dot(normal, glm::normalize(ABOVE_POSITION - point)) >= FACING_AT_LEAST)
+							if (glm::dot(normal, toLight) >= GRAZED_AT_LEAST && glm::dot(normal, glm::normalize(ABOVE_POSITION - point)) >= FACING_AT_LEAST)
 								lit.push_back(point);
 						};
 

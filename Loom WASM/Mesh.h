@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <unordered_map>
@@ -17,6 +18,7 @@
 
 namespace Loom
 {
+	enum class CullFace;
 	struct Material;
 	struct MeshBatch;
 	struct Renderer;
@@ -75,6 +77,11 @@ namespace Loom
 		// Of a shader's program and its skinned twin, the one to draw this
 		// mesh with: the twin while a Skin bends it on the GPU.
 		uint32_t ProgramFor(uint32_t program, uint32_t skinned);
+
+		// The faces to leave out to draw only the far side of a closed mesh,
+		// whose every edge two of its triangles share wound alike, from any
+		// view: those its world matrix turns outward. None for an open mesh.
+		CullFace FarSide();
 
 		// Gives the program the mesh's material and the scene's view, as its
 		// own pass does before drawing it.
@@ -261,6 +268,15 @@ namespace Loom
 		// be. Only the hashes are compared, so two meshes whose vertices differ
 		// but hash alike, a chance in 2^64, would draw as one.
 		uint64_t m_geometry = 0;
+
+		#pragma endregion
+
+		#pragma region Far Side
+
+		// What FarSide answers before the world matrix, and the sum of the
+		// versions of m_vertices and primitive_id it was found for.
+		CullFace m_farSide{ };
+		std::optional<unsigned long long> m_farSideVersion;
 
 		#pragma endregion
 	};

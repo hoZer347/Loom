@@ -33,6 +33,13 @@ namespace LoomTests
 	// How far a computed float may drift from the value the math gives.
 	constexpr float EPSILON = 1e-4f;
 
+	// A closed mesh's vertices: a tetrahedron, each face wound counter-clockwise seen from outside.
+	inline const std::vector<float> TETRAHEDRON = {
+		0.0f, 0.0f, 0.0f,  0.0f, 1.0f, 0.0f,  1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f,  1.0f, 0.0f, 0.0f,  0.0f, 0.0f, 1.0f,
+		0.0f, 0.0f, 0.0f,  0.0f, 0.0f, 1.0f,  0.0f, 1.0f, 0.0f,
+		1.0f, 0.0f, 0.0f,  0.0f, 1.0f, 0.0f,  0.0f, 0.0f, 1.0f };
+
 	#pragma region Pumping and Fixtures
 
 	// GameObject, Scene and LoomObject all defer their real work through
@@ -318,6 +325,7 @@ namespace LoomTests
 		void SetDepthBias(float slope, float constant, float clamp) override { depthBiases.push_back({ slope, constant, clamp }); };
 		void SetColorWrite(bool write) override { colorWrites.push_back(write); };
 		void SetDepthTestEqual(bool equal) override { depthTestsEqual.push_back(equal); };
+		void SetCullFace(Loom::CullFace cull) override { culls.push_back(cull); };
 
 		glm::ivec2 TargetSize() const override
 		{
@@ -342,6 +350,7 @@ namespace LoomTests
 
 		std::vector<bool> colorWrites;
 		std::vector<bool> depthTestsEqual;
+		std::vector<Loom::CullFace> culls;
 
 		// Each depth bias set, as its slope, its constant and its clamp.
 		std::vector<std::tuple<float, float, float>> depthBiases;

@@ -1146,6 +1146,14 @@ namespace Loom
 				vkCmdSetDepthCompareOp(Command(), m_depthCompare);
 		};
 
+		void SetCullFace(CullFace cull) override
+		{
+			m_cullMode = cull == CullFace::None ? VK_CULL_MODE_NONE : cull == CullFace::Front ? VK_CULL_MODE_FRONT_BIT : VK_CULL_MODE_BACK_BIT;
+
+			if (m_rendering)
+				vkCmdSetCullMode(Command(), m_cullMode);
+		};
+
 		#pragma endregion
 
 		#pragma region Queries
@@ -1820,6 +1828,7 @@ namespace Loom
 			vkCmdSetScissor(command, 0, 1, &scissor);
 			vkCmdSetDepthBias(command, m_biasConstant, m_biasClamp, m_biasSlope);
 			vkCmdSetDepthCompareOp(command, m_depthCompare);
+			vkCmdSetCullMode(command, m_cullMode);
 		};
 
 		void EndRendering()
@@ -2032,11 +2041,12 @@ namespace Loom
 			viewport.viewportCount = 1;
 			viewport.scissorCount = 1;
 
-			// The flipped viewport turns GL's counter-clockwise front faces clockwise.
+			// Vulkan winds faces in rows counted down, which turns GL's counter-clockwise
+			// front faces clockwise unless the viewport is flipped to right GL's rows.
 			VkPipelineRasterizationStateCreateInfo raster{ VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
 			raster.polygonMode = VK_POLYGON_MODE_FILL;
 			raster.cullMode = VK_CULL_MODE_NONE;
-			raster.frontFace = flipped ? VK_FRONT_FACE_CLOCKWISE : VK_FRONT_FACE_COUNTER_CLOCKWISE;
+			raster.frontFace = flipped ? VK_FRONT_FACE_COUNTER_CLOCKWISE : VK_FRONT_FACE_CLOCKWISE;
 			raster.depthBiasEnable = VK_TRUE;
 			raster.lineWidth = 1.0f;
 
@@ -2064,7 +2074,7 @@ namespace Loom
 			blend.attachmentCount = hasColor ? 1 : 0;
 			blend.pAttachments = &blendAttachment;
 
-			const VkDynamicState dynamics[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_DEPTH_BIAS, VK_DYNAMIC_STATE_DEPTH_COMPARE_OP };
+			const VkDynamicState dynamics[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_DEPTH_BIAS, VK_DYNAMIC_STATE_DEPTH_COMPARE_OP, VK_DYNAMIC_STATE_CULL_MODE };
 
 			VkPipelineDynamicStateCreateInfo dynamic{ VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
 			dynamic.dynamicStateCount = (uint32_t)std::size(dynamics);
@@ -2652,6 +2662,7 @@ namespace Loom
 		bool m_biasClamps = false;
 		bool m_colorWrite = true;
 		VkCompareOp m_depthCompare = VK_COMPARE_OP_LESS;
+		VkCullModeFlags m_cullMode = VK_CULL_MODE_NONE;
 
 		CaptureHandler m_capture;
 

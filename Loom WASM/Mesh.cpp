@@ -16,11 +16,13 @@
 #include "glm/gtc/type_ptr.hpp"
 
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <climits>
 #include <cstring>
 #include <iostream>
 #include <optional>
+#include <unordered_set>
 #include <utility>
 
 
@@ -101,6 +103,81 @@ namespace Loom
 				hash = Mixed(hash, std::bit_cast<uint32_t>(value));
 
 			return hash;
+		};
+
+		#pragma endregion
+
+		#pragma region Far Side
+
+		constexpr size_t TRIANGLE_CORNERS = 3;
+		constexpr int EDGE_SHIFT = 32;
+
+		typedef std::array<uint32_t, POSITION_COMPONENTS> Position;
+
+		struct PositionHash
+		{
+			size_t operator()(const Position& position) const
+			{
+				uint64_t hash = FNV_OFFSET_BASIS;
+
+				for (const uint32_t bits : position)
+					hash = Mixed(hash, bits);
+
+				return (size_t)hash;
+			};
+		};
+
+		// The faces a triangle list turns outward when every edge is shared by
+		// two of its triangles wound alike, by the sign of the volume they
+		// enclose, or None when one is not or they enclose nothing.
+		CullFace Outward(const std::vector<float>& vertices)
+		{
+			const size_t corners = vertices.size() / POSITION_COMPONENTS;
+
+			if (!corners || corners % TRIANGLE_CORNERS || vertices.size() % POSITION_COMPONENTS)
+				return CullFace::None;
+
+			std::unordered_map<Position, uint32_t, PositionHash> indices;
+			std::vector<uint32_t> corner(corners);
+
+			for (size_t i = 0; i < corners; i++)
+			{
+				Position position;
+
+				// Adding zero turns -0 into 0, so the two meet.
+				for (size_t axis = 0; axis < POSITION_COMPONENTS; axis++)
+					position[axis] = std::bit_cast<uint32_t>(vertices[i * POSITION_COMPONENTS + axis] + 0.0f);
+
+				corner[i] = indices.try_emplace(position, (uint32_t)indices.size()).first->second;
+			};
+
+			std::unordered_set<uint64_t> edges;
+			edges.reserve(corners);
+			double volume = 0.0;
+
+			for (size_t first = 0; first < corners; first += TRIANGLE_CORNERS)
+			{
+				for (size_t i = 0; i < TRIANGLE_CORNERS; i++)
+				{
+					const uint64_t from = corner[first + i];
+					const uint64_t to = corner[first + (i + 1) % TRIANGLE_CORNERS];
+
+					if (!edges.insert(from << EDGE_SHIFT | to).second)
+						return CullFace::None;
+				};
+
+				const glm::dvec3 a = glm::make_vec3(&vertices[first * POSITION_COMPONENTS]);
+				const glm::dvec3 b = glm::make_vec3(&vertices[(first + 1) * POSITION_COMPONENTS]);
+				const glm::dvec3 c = glm::make_vec3(&vertices[(first + 2) * POSITION_COMPONENTS]);
+
+				volume += glm::dot(a, glm::cross(b, c));
+			};
+
+			for (const uint64_t edge : edges)
+				if (!edges.contains(edge << EDGE_SHIFT | edge >> EDGE_SHIFT))
+					return CullFace::None;
+
+			return volume > 0.0 ? CullFace::Front : volume < 0.0 ? CullFace::Back : CullFace::None;
 		};
 
 		#pragma endregion
@@ -236,6 +313,23 @@ namespace Loom
 	uint32_t Mesh::ProgramFor(uint32_t program, uint32_t skinned)
 	{
 		return GpuSkin() ? skinned : program;
+	};
+
+	CullFace Mesh::FarSide()
+	{
+		const unsigned long long version = m_vertices.Version() + primitive_id.Version();
+
+		if (m_farSideVersion != version)
+		{
+			m_farSide = *std::as_const(primitive_id) == Triangles ? Outward(*std::as_const(m_vertices)) : CullFace::None;
+			m_farSideVersion = version;
+		};
+
+		// A world matrix that mirrors the mesh turns its winding over.
+		if (m_farSide == CullFace::None || glm::determinant(glm::mat3(m_gameObject->WorldMatrix())) >= 0.0f)
+			return m_farSide;
+
+		return m_farSide == CullFace::Front ? CullFace::Back : CullFace::Front;
 	};
 
 	Skin* Mesh::GpuSkin()
@@ -644,6 +738,7 @@ namespace Loom
 	bool MeshBatch::Alike(const Lot& lot, const Mesh& mesh, uint32_t program)
 	{
 		const Mesh& first = *lot.meshes.front();
+		const bool mirrored = glm::determinant(glm::mat3(first.m_gameObject->WorldMatrix())) < 0.0f;
 		const Material& a = **first.material;
 		const Material& b = **mesh.material;
 
@@ -653,6 +748,7 @@ namespace Loom
 		return lot.program == program &&
 			first.m_geometry == mesh.m_geometry &&
 			*first.primitive_id == *mesh.primitive_id &&
+			mirrored == glm::determinant(glm::mat3(mesh.m_gameObject->WorldMatrix())) < 0.0f &&
 			materials &&
 			*first.variables == *mesh.variables;
 	};

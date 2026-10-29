@@ -22,6 +22,10 @@ namespace Loom
 {
 	enum class Backend { OpenGL, Vulkan };
 
+	// Which faces a draw leaves out: those wound counter-clockwise on screen
+	// (Front), or clockwise (Back).
+	enum class CullFace { None, Front, Back };
+
 	#pragma region Vertex Layout
 
 	// What each vertex handed to Renderer::Draw holds, its floats one after
@@ -290,6 +294,9 @@ namespace Loom
 		// already there as well as nearer, so a second draw of a mesh lands on
 		// the depth its first left.
 		virtual void SetDepthTestEqual(bool equal) = 0;
+
+		// Which faces what is drawn next leaves out.
+		virtual void SetCullFace(CullFace cull) = 0;
 
 		// The size of what is being drawn into.
 		virtual glm::ivec2 TargetSize() const = 0;

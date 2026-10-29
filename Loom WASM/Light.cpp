@@ -252,6 +252,7 @@ vec3 LoomLight(vec3 normal)
 			batch.Draw([this](Mesh& mesh, uint32_t program) { ReadyCaster(mesh, program); });
 
 			renderer->SetDepthBias(0.0f, 0.0f, 0.0f);
+			renderer->SetCullFace(CullFace::None);
 		};
 
 		renderer->PopTarget();
@@ -290,6 +291,8 @@ vec3 LoomLight(vec3 normal)
 
 		// The light's view-projection stands in for the camera's.
 		mesh.material->Apply(program, &*std::as_const(mesh.variables));
+		// A closed mesh casts from its far side, which its lit near side then never falls behind.
+		renderer.SetCullFace(mesh.FarSide());
 		renderer.SetUniform(program, "u_viewProjection", m_view_projection);
 		// A transparent shader's pass runs its fragment stage, which may call LoomShadow.
 		if (mesh.material->shader->settings.transparency)
@@ -321,7 +324,10 @@ vec3 LoomLight(vec3 normal)
 				mesh->Draw(program);
 			}
 			else if (strcmp(component->GetTypeName(), typeid(Sprite).name()) == 0)
+			{
+				Renderer::Get()->SetCullFace(CullFace::None);
 				((Sprite*)component)->DrawShadow(m_view_projection);
+			};
 
 		for (GameObject* child : gameObject.GetChildren())
 			DrawCasters(*child, batch);
