@@ -11,7 +11,7 @@ const float DIFFUSE_EATER = 0.5;
 const float SIDE = 0.2;
 const float CORNER = 0.05;
 
-// Squares SEED_CELLS across, of which SEEDED in a hundred start with the eater.
+// Squares SEED_CELLS across, a SEEDED share of which start with the eater.
 const int SEED_CELLS = 8;
 const float SEEDED = 0.12;
 
