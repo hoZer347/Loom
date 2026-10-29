@@ -47,7 +47,7 @@ Derived from settled files: Loom WASM/Camera.h, Camera.cpp, Audio.h, Audio.cpp, 
 - `const` after the parameter list, `override` last: `void OnFieldChanged(const SerializedField& field) override;`
 - `override` only, never `virtual` on overrides. `[[nodiscard]]` leads the declaration.
 - Public API first with no label; one `private:` at the struct's own indent, then private types, helpers, members last.
-- Least access: a member is `private:` unless something outside the struct uses it, a local is declared in the narrowest block that uses it, and a lambda names its captures (`[this, &scene]`) rather than `[&]` or `[=]`. Engine `Serial` fields stay public for the inspector.
+- Least access: a member is `private:` unless something outside the struct uses it, a local is declared in the narrowest block that uses it, and a lambda names its captures (`[this, &scene]`) rather than `[&]` or `[=]`. Engine `Serial` fields stay public for the inspector, and what a game's scripts call stays public, since scripts import it from the executable by its decorated name.
 - File-local helpers and constants go in an anonymous `namespace` inside `namespace Loom` (Utilities uses file `static`).
 - A file or struct past about 200 lines, or holding several concerns, is cut into one `#pragma region Name` / `#pragma endregion` per concern within each of the public API, the private helpers and the members, indented with the code, a blank line inside each end: `#pragma region Default Bindings` (DialogueManager.cpp). Regions follow the braces, never straddle an `#if`, and a header and its .cpp name matching concerns alike.
 - C-style casts: `(float)size.x`. `nullptr`; engine tests `if (!ptr)`, scripts `if (ptr == nullptr)`.
