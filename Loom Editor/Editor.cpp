@@ -9,6 +9,7 @@
 #include "ComputeShader.h"
 #include "EditorGui.h"
 #include "Engine.h"
+#include "Executable.h"
 #include "GameObject.h"
 #include "Input.h"
 #include "Jobs.h"
@@ -68,9 +69,13 @@
 #include <string>
 #include <unordered_map>
 
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <shlobj.h>
+#else
+#include <cstdlib>
+#endif
 
 
 namespace Loom
@@ -234,11 +239,7 @@ namespace Loom
 		// Beside the executable, since opening a project moves the working directory.
 		std::filesystem::path BesideExecutable(const char* file)
 		{
-			char buffer[MAX_PATH]{ };
-
-			GetModuleFileNameA(nullptr, buffer, MAX_PATH);
-
-			return std::filesystem::path(buffer).parent_path() / file;
+			return ExecutablePath().parent_path() / file;
 		};
 
 		std::filesystem::path LayoutsFolder()
@@ -254,15 +255,25 @@ namespace Loom
 		// Where new projects go until the user points somewhere else.
 		std::string DesktopPath()
 		{
-			PWSTR wide = nullptr;
 			std::filesystem::path desktop;
+			std::error_code code;
+
+#ifdef _WIN32
+			PWSTR wide = nullptr;
 
 			if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Desktop, KF_FLAG_DEFAULT, nullptr, &wide)))
 				desktop = wide;
 
 			CoTaskMemFree(wide);
+#else
+			if (const char* home = std::getenv("HOME"))
+			{
+				desktop = std::filesystem::path(home) / "Desktop";
 
-			std::error_code code;
+				if (!std::filesystem::is_directory(desktop, code))
+					desktop = home;
+			};
+#endif
 
 			return desktop.empty()
 				? std::filesystem::current_path(code).string()

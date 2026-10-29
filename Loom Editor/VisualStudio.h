@@ -24,6 +24,11 @@ namespace Loom
 		// Opens file with parameters as Explorer would, reporting a failure.
 		static void Shell(const char* file, const std::string& parameters);
 
+#ifndef _WIN32
+		// The program's path on PATH, empty when it is not there.
+		static std::string OnPath(const char* program);
+#endif
+
 		// The first path that exists among vswhere's answers for the newest
 		// Visual Studio, empty when there is none.
 		static std::string Where(const std::string& arguments);

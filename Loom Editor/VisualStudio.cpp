@@ -376,26 +376,25 @@ namespace Loom
 			if (std::system((command + " >/dev/null 2>&1 &").c_str()) != 0)
 				std::cerr << "Could not run " << command << std::endl;
 		};
+	};
 
-		// The program's path on PATH, empty when it is not there.
-		std::string OnPath(const char* program)
+	std::string VisualStudio::OnPath(const char* program)
+	{
+		const char* const path = std::getenv("PATH");
+		std::error_code code;
+
+		for (std::string_view rest = path != nullptr ? path : ""; !rest.empty(); )
 		{
-			const char* const path = std::getenv("PATH");
-			std::error_code code;
+			const size_t end = rest.find(':');
+			const std::filesystem::path candidate = std::filesystem::path(rest.substr(0, end)) / program;
 
-			for (std::string_view rest = path != nullptr ? path : ""; !rest.empty(); )
-			{
-				const size_t end = rest.find(':');
-				const std::filesystem::path candidate = std::filesystem::path(rest.substr(0, end)) / program;
+			if (std::filesystem::is_regular_file(candidate, code))
+				return candidate.string();
 
-				if (std::filesystem::is_regular_file(candidate, code))
-					return candidate.string();
-
-				rest = end == std::string_view::npos ? std::string_view() : rest.substr(end + 1);
-			};
-
-			return "";
+			rest = end == std::string_view::npos ? std::string_view() : rest.substr(end + 1);
 		};
+
+		return "";
 	};
 
 	#pragma region Shell

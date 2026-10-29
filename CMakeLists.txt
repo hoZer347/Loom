@@ -77,3 +77,15 @@ target_include_directories(LoomTests PRIVATE "Loom Tests" "Loom Editor")
 target_compile_definitions(LoomTests PRIVATE DOCTEST_CONFIG_USE_STD_HEADERS)
 target_link_libraries(LoomTests PRIVATE LoomEngine assimp::assimp dw)
 set_target_properties(LoomTests PROPERTIES OUTPUT_NAME "Loom Tests")
+
+vcxproj_sources("${CMAKE_SOURCE_DIR}/Loom Editor/Loom Editor.vcxproj" EDITOR_SOURCES)
+add_executable(LoomEditor ${EDITOR_SOURCES})
+target_include_directories(LoomEditor PRIVATE "Loom Editor")
+# Whole, so a script finds every engine function, not just the ones the editor calls.
+target_link_libraries(LoomEditor PRIVATE "$<LINK_LIBRARY:WHOLE_ARCHIVE,LoomEngine>" assimp::assimp dw)
+# Scripts load as shared libraries that call back into the engine linked here.
+set_target_properties(LoomEditor PROPERTIES OUTPUT_NAME "Loom Editor" ENABLE_EXPORTS ON)
+
+add_executable(LoomPlayer "Loom Player/Player.cpp")
+target_link_libraries(LoomPlayer PRIVATE LoomEngine)
+set_target_properties(LoomPlayer PROPERTIES OUTPUT_NAME "Loom Player")

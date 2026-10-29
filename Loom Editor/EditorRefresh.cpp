@@ -1,37 +1,33 @@
 #include "EditorRefresh.h"
 
+#include "Executable.h"
 #include "HiddenProcess.h"
 #include "ProjectTemplate.h"
 #include "ScriptLibrary.h"
 
 #include <iostream>
 
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#else
+#include <unistd.h>
+#endif
 
 
 namespace Loom
 {
 	namespace
 	{
+#ifdef _WIN32
 		constexpr const char* solution = "Loom.sln";
 		constexpr const char* target = "Loom Editor";
+		constexpr const char* builder_name = "MSBuild";
 
 		// <file>.<pid>.old, so two editors run from one build each move their own.
 		constexpr const char* moved_aside_extension = ".old";
 
 		constexpr const char* symbols_extension = ".pdb";
-
-		std::filesystem::path Executable()
-		{
-			wchar_t buffer[MAX_PATH]{ };
-
-			const DWORD length = GetModuleFileNameW(nullptr, buffer, MAX_PATH);
-
-			return length == 0 || length == MAX_PATH
-				? std::filesystem::path()
-				: std::filesystem::path(buffer);
-		};
 
 		// What an editor still has open is locked, and left.
 		void SweepMovedAside(const std::filesystem::path& file)
@@ -45,6 +41,12 @@ namespace Loom
 					entry.path().extension() == moved_aside_extension)
 					std::filesystem::remove(entry.path(), code);
 		};
+#else
+		// Where CMakeLists.txt says to configure it, and the build an editor built there has.
+		constexpr const char* solution = "build/CMakeCache.txt";
+		constexpr const char* target = "LoomEditor";
+		constexpr const char* builder_name = "CMake";
+#endif
 	};
 
 	#pragma region Lifetime
@@ -69,7 +71,7 @@ namespace Loom
 
 		m_current = std::make_shared<Build>();
 		m_succeeded = false;
-		m_executable = Executable();
+		m_executable = ExecutablePath();
 		m_movedAside.clear();
 
 		const auto finish = [this](bool succeeded)
@@ -93,13 +95,14 @@ namespace Loom
 		{
 			std::cout
 				<< "Full refresh: "
-				<< (msbuild.empty() ? "no MSBuild to build the editor with" : "no engine sources beside this editor")
+				<< (msbuild.empty() ? std::string("no ") + builder_name + " to build the editor with" : "no engine sources beside this editor")
 				<< ", so it restarts as it is." << std::endl;
 
 			finish(true);
 			return;
 		};
 
+#ifdef _WIN32
 		std::filesystem::path symbols = m_executable;
 		symbols.replace_extension(symbols_extension);
 
@@ -137,6 +140,11 @@ namespace Loom
 			'"' + msbuild + "\" \"" + sources.string() + "\" \"-t:" + target + '"' +
 			" -p:Configuration=" + ScriptLibrary::Configuration() +
 			" -p:Platform=x64 -nologo -v:m -m -clp:ErrorsOnly";
+#else
+		// The linker writes a new file in place of a running one, so nothing is moved aside.
+		const std::string command =
+			msbuild + " --build \"" + sources.parent_path().string() + "\" --target " + target;
+#endif
 
 		std::cout << "Full refresh: building the editor (" << ScriptLibrary::Configuration() << ")..." << std::endl;
 
@@ -168,11 +176,13 @@ namespace Loom
 		m_succeeded = m_current->succeeded;
 		m_current.reset();
 
+#ifdef _WIN32
 		// Renaming them back is allowed, as moving them aside was.
 		if (!m_succeeded)
 			for (const auto& [file, aside] : m_movedAside)
 				if (!MoveFileExW(aside.c_str(), file.c_str(), MOVEFILE_REPLACE_EXISTING))
 					std::cerr << "Full refresh: could not put " << file.string() << " back" << std::endl;
+#endif
 
 		m_movedAside.clear();
 
@@ -185,6 +195,21 @@ namespace Loom
 
 	bool EditorRefresh::Relaunch(const std::filesystem::path& executable, const std::string& arguments)
 	{
+#ifndef _WIN32
+		const pid_t child = fork();
+
+		if (child == 0)
+		{
+			setsid();
+			execl("/bin/sh", "sh", "-c", ("exec \"" + executable.string() + "\" " + arguments).c_str(), nullptr);
+			_exit(1);
+		};
+
+		if (child < 0)
+			std::cerr << "Full refresh: could not start " << executable.string() << " again" << std::endl;
+
+		return child > 0;
+#else
 		const int length = MultiByteToWideChar(CP_ACP, 0, arguments.c_str(), -1, nullptr, 0);
 
 		std::wstring wide(length, L'\0');
@@ -206,6 +231,7 @@ namespace Loom
 		CloseHandle(process.hProcess);
 
 		return true;
+#endif
 	};
 
 	#pragma endregion

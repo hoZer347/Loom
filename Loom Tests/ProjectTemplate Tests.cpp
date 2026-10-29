@@ -1,6 +1,6 @@
 #include "doctest.h"
 
-// The editor only runs on Windows, but the web test build compiles this too.
+// The editor runs on Windows and Linux, but the web test build compiles this too.
 #ifndef __EMSCRIPTEN__
 
 #include "ProjectTemplate.h"
@@ -400,6 +400,7 @@ TEST_SUITE("ProjectTemplate")
 		CHECK(Loom::ProjectTemplate::BuildLine("   ").empty());
 	};
 
+#ifdef _WIN32
 	TEST_CASE("a scripts build names its project and configuration, and keeps quiet about building in the temporary folder")
 	{
 		const std::string msbuild = "C:\\MSBuild.exe";
@@ -413,6 +414,23 @@ TEST_SUITE("ProjectTemplate")
 		CHECK(build.find("-t:Rebuild") == std::string::npos);
 		CHECK(rebuild.find("-t:Rebuild") != std::string::npos);
 	};
+#else
+	TEST_CASE("a scripts build configures the engine's scripts project for the shared object beside the Windows library")
+	{
+		const std::string cmake = "/usr/bin/cmake";
+		const std::string project = "/games/Raycasts/Scripts/RaycastsScripts.vcxproj";
+		const std::string build = Loom::ProjectTemplate::BuildCommand(cmake, project, "Release", false);
+		const std::string rebuild = Loom::ProjectTemplate::BuildCommand(cmake, project, "Release", true);
+
+		CHECK(build.starts_with("\"" + cmake + "\" -S \""));
+		CHECK(build.find("Linux Scripts\"") != std::string::npos);
+		CHECK(build.find("\"-DLOOM_SCRIPTS=/games/Raycasts/Scripts\"") != std::string::npos);
+		CHECK(build.find("\"-DLOOM_LIBRARY=/games/Raycasts/Build/RaycastsScripts.so\"") != std::string::npos);
+		CHECK(build.find("-DCMAKE_BUILD_TYPE=Release") != std::string::npos);
+		CHECK(build.find("--clean-first") == std::string::npos);
+		CHECK(rebuild.ends_with("--clean-first"));
+	};
+#endif
 
 	#pragma endregion
 };

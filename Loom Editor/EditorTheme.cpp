@@ -112,7 +112,7 @@ namespace Loom
 			return atlas.AddFontDefault();
 		};
 
-		// Windows' own, for EditorIcons, or an empty path where there is none.
+		// Windows' own for EditorIcons, Symbola from fonts-symbola elsewhere, since colour emoji fonts have no outlines to draw.
 		std::filesystem::path EmojiFont()
 		{
 			std::filesystem::path path;
@@ -126,6 +126,8 @@ namespace Loom
 				path = std::filesystem::path(fonts) / emojiFont;
 
 			CoTaskMemFree(fonts);
+#else
+			path = "/usr/share/fonts/truetype/ancient-scripts/Symbola_hint.ttf";
 #endif
 
 			return path;

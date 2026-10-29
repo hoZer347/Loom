@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 
@@ -29,7 +30,12 @@ namespace Loom
 		bool Changed();
 
 	private:
+#ifdef _WIN32
 		void* m_handle = nullptr;
+#else
+		int m_descriptor = -1;
+		uint32_t m_mask = 0;
+#endif
 		std::string m_folder{ };
 	};
 };

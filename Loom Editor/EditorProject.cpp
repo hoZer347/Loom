@@ -34,12 +34,18 @@
 #include <thread>
 #include <utility>
 
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <shellapi.h>
 #include <shlwapi.h>
 
 #pragma comment(lib, "shlwapi.lib")
+#else
+#include <strings.h>
+
+#define _stricmp strcasecmp
+#endif
 
 
 namespace Loom
@@ -361,6 +367,7 @@ namespace Loom
 
 		#pragma region Shell
 
+#ifdef _WIN32
 		void ShowInExplorer(const std::string& path)
 		{
 			VisualStudio::Shell("explorer.exe", "/select,\"" + path + '"');
@@ -395,6 +402,18 @@ namespace Loom
 			else
 				OpenAsText(path);
 		};
+#else
+		// The file manager opens on its folder, as there is no one way to pick out a file in it.
+		void ShowInExplorer(const std::string& path)
+		{
+			VisualStudio::Shell(std::filesystem::path(path).parent_path().c_str(), "");
+		};
+
+		void OpenFile(const std::string& path)
+		{
+			VisualStudio::Shell(path.c_str(), "");
+		};
+#endif
 
 		#pragma endregion
 

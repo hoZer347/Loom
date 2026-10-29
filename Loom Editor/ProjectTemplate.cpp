@@ -25,6 +25,11 @@ namespace Loom
 	{
 		#pragma region Templates
 
+#ifndef _WIN32
+		// The CMake project that builds a project's scripts off Windows, under the engine's root.
+		const char* const linux_scripts_folder = "Loom Editor/Linux Scripts";
+#endif
+
 		const char* const loomproject = R"(name={NAME}
 )";
 
@@ -736,11 +741,27 @@ SpinningTriangle is there as a worked example.
 
 	std::string ProjectTemplate::BuildCommand(const std::string& msbuild, const std::string& project, const std::string& configuration, bool rebuild)
 	{
+#ifdef _WIN32
 		return
 			'"' + msbuild + "\" \"" + project + "\"" +
 			(rebuild ? " -t:Rebuild" : "") +
 			" -p:Configuration=" + configuration +
 			" -p:Platform=x64 -p:IgnoreWarnIntDirInTempDetected=true -nologo -v:m -m \"-clp:ErrorsOnly;WarningsOnly\"";
+#else
+		// The engine's CMake project builds the headers beside the vcxproj into the library it names.
+		const std::filesystem::path scripts(project);
+		const std::filesystem::path library = LibraryOf(scripts.parent_path().parent_path(), scripts).replace_extension(".so");
+		const std::string intermediate = '"' + (library.parent_path() / "Intermediate" / "Linux").string() + '"';
+		const std::string cmake = '"' + msbuild + '"';
+
+		return
+			cmake + " -S \"" + (std::filesystem::path(EngineRoot()) / linux_scripts_folder).string() + "\" -B " + intermediate +
+			" -DCMAKE_BUILD_TYPE=" + configuration +
+			" \"-DLOOM_ROOT=" + EngineRoot() + "\"" +
+			" \"-DLOOM_SCRIPTS=" + scripts.parent_path().string() + "\"" +
+			" \"-DLOOM_LIBRARY=" + library.string() + "\" >/dev/null && " +
+			cmake + " --build " + intermediate + " --parallel" + (rebuild ? " --clean-first" : "");
+#endif
 	};
 
 	#pragma endregion

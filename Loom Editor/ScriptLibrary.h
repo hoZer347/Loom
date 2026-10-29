@@ -96,7 +96,7 @@ namespace Loom
 
 		#pragma region Tools
 
-		// The MSBuild this machine has. Empty when none is found.
+		// The MSBuild this machine has, or CMake off Windows. Empty when none is found.
 		static std::string FindMSBuild();
 
 		// The configuration this editor was built in, which is the one anything

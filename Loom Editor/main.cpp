@@ -1,8 +1,10 @@
+#ifdef _WIN32
 // Before GLFW, which defines APIENTRY itself when windows.h has not been seen.
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <dwmapi.h>
 #include <objbase.h>
+#endif
 
 #include "CrashReports.h"
 #include "Editor.h"
@@ -32,10 +34,14 @@
 #include <utility>
 #include <vector>
 
+#ifdef _WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
 
 #pragma comment(lib, "dwmapi.lib")
+#else
+#include <GLFW/glfw3.h>
+#endif
 
 using namespace Loom;
 
@@ -44,6 +50,7 @@ namespace
 {
 	#pragma region Desktop
 
+#ifdef _WIN32
 	// shobjidl.h only declares it for a Windows 10 target; the engine targets Windows 7.
 	MIDL_INTERFACE("a5cd92ff-29be-454c-8d04-d82879fb3f1b")
 	DesktopManager : public IUnknown
@@ -100,14 +107,23 @@ namespace
 
 		return true;
 	};
+#else
+	// Virtual desktops by id are the Windows shell's.
+	bool ShowOnDesktop(GLFWwindow*, const std::string&)
+	{
+		std::cerr << "--desktop: virtual desktops are only on Windows" << std::endl;
+		return false;
+	};
+#endif
 
 	#pragma endregion
 
 	#pragma region File Types
 
-	// False when this is not the main checkout's editor.
+	// False when this is not the main checkout's editor, or there is no Explorer to claim them in.
 	bool ClaimFileTypes()
 	{
+#ifdef _WIN32
 		wchar_t executable[MAX_PATH]{ };
 
 		const DWORD length = GetModuleFileNameW(nullptr, executable, MAX_PATH);
@@ -116,6 +132,9 @@ namespace
 			return false;
 
 		return FileTypes::Claim(executable);
+#else
+		return false;
+#endif
 	};
 
 	#pragma endregion
@@ -221,6 +240,7 @@ namespace
 
 int main(int argc, char** argv)
 {
+#ifdef _WIN32
 	// A Windows program has no console; started from a terminal it writes there too.
 	if ((_fileno(stdout) < 0 || _fileno(stderr) < 0) && AttachConsole(ATTACH_PARENT_PROCESS))
 	{
@@ -232,6 +252,7 @@ int main(int argc, char** argv)
 		if (_fileno(stderr) < 0)
 			freopen_s(&reopened, "CONOUT$", "w", stderr);
 	};
+#endif
 
 	// Visual Studio's Add > Loom Script runs this before there is an engine or window.
 	for (int i = 1; i < argc; i++)
@@ -277,7 +298,9 @@ int main(int argc, char** argv)
 			return 0;
 
 		std::cerr << errors.str();
+#ifdef _WIN32
 		MessageBoxA(nullptr, errors.str().c_str(), "Loom", MB_OK | MB_ICONERROR);
+#endif
 
 		return 1;
 	};

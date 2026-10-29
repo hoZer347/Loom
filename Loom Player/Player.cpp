@@ -14,15 +14,18 @@
 
 #include "Audio.h"
 #include "Engine.h"
+#include "Executable.h"
 #include "InputActions.h"
 #include "SceneSerializer.h"
 #include "StageTiming.h"
 
 #include "imgui.h"
 
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
+#endif
 
 #include <GLFW/glfw3.h>
 
@@ -42,16 +45,6 @@ static constexpr int default_frames = 240;
 // Beside the program, naming the scene a build starts on.
 static constexpr const char* game_extension = ".loomgame";
 
-
-static std::filesystem::path Program()
-{
-	std::wstring path(MAX_PATH, L'\0');
-
-	while (GetModuleFileNameW(nullptr, path.data(), (DWORD)path.size()) == path.size())
-		path.resize(path.size() * 2);
-
-	return std::filesystem::path(path.c_str());
-};
 
 // The scene a build starts on, which build-game.ps1 writes beside the program.
 static std::string StartScene(const std::filesystem::path& program)
@@ -85,19 +78,21 @@ static std::string InputActionsFile()
 	return "";
 };
 
-static int Fail(const std::filesystem::path& program, const std::string& message, bool shown)
+static int Fail([[maybe_unused]] const std::filesystem::path& program, const std::string& message, [[maybe_unused]] bool shown)
 {
 	std::cerr << "Loom Player: " << message << std::endl;
 
+#ifdef _WIN32
 	if (shown)
 		MessageBoxW(nullptr, std::filesystem::path(message).wstring().c_str(), program.stem().wstring().c_str(), MB_OK | MB_ICONERROR);
+#endif
 
 	return EXIT_FAILURE;
 };
 
 int main(int argc, char** argv)
 {
-	const std::filesystem::path program = Program();
+	const std::filesystem::path program = ExecutablePath();
 	const bool given = argc > 1 && !std::string_view(argv[1]).starts_with("--");
 	std::string scene = given ? argv[1] : "";
 

@@ -1,6 +1,7 @@
 #include "ScriptLibrary.h"
 
 #include "ComponentRegistry.h"
+#include "Executable.h"
 #include "HiddenProcess.h"
 #include "LoadProgress.h"
 #include "ProjectTemplate.h"
@@ -16,8 +17,13 @@
 #include <iostream>
 #include <iterator>
 
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#else
+#include <dlfcn.h>
+#include <unistd.h>
+#endif
 
 
 namespace Loom
@@ -32,16 +38,18 @@ namespace Loom
 		const char* const configuration = "Release";
 #endif
 
+#ifdef _WIN32
+		const char* const builder = "MSBuild";
+#else
+		const char* const builder = "CMake";
+#endif
+
 		// An older library baked in class layouts that may have moved, which corrupts the heap silently.
 		std::filesystem::file_time_type EditorBuildTime()
 		{
-			char buffer[MAX_PATH]{ };
-
-			GetModuleFileNameA(nullptr, buffer, MAX_PATH);
-
 			std::error_code code;
 
-			return std::filesystem::last_write_time(buffer, code);
+			return std::filesystem::last_write_time(ExecutablePath(), code);
 		};
 	};
 
@@ -71,6 +79,11 @@ namespace Loom
 
 		m_project = project;
 		m_library = library;
+
+#ifndef _WIN32
+		// Projects name the Windows library, which builds here as a shared object beside it.
+		m_library = std::filesystem::path(library).replace_extension(".so").string();
+#endif
 
 		// The cached answer belonged to the project being left.
 		m_staleCheckedAt = { };
@@ -167,9 +180,9 @@ namespace Loom
 
 		if (msbuild.empty())
 		{
-			m_status = "No MSBuild found.";
+			m_status = std::string("No ") + builder + " found.";
 			std::cerr
-				<< "Cannot compile scripts: no Visual Studio build tools found."
+				<< "Cannot compile scripts: no " << builder << " found."
 				<< std::endl;
 
 			return false;
@@ -328,7 +341,11 @@ namespace Loom
 
 		std::filesystem::path copy(m_library);
 		copy.replace_extension("");
+#ifdef _WIN32
 		copy += ".loaded." + std::to_string(GetCurrentProcessId()) + ".dll";
+#else
+		copy += ".loaded." + std::to_string(getpid()) + ".so";
+#endif
 
 		std::filesystem::copy_file(
 			m_library,
@@ -367,7 +384,11 @@ namespace Loom
 		const std::vector<std::string> states_before = StateRegistry::Names();
 		m_testsBefore = ScriptTests::All().size();
 
-		HMODULE module = LoadLibraryA(copy.string().c_str());
+#ifdef _WIN32
+		void* module = LoadLibraryA(copy.string().c_str());
+#else
+		void* module = dlopen(copy.c_str(), RTLD_NOW | RTLD_LOCAL);
+#endif
 
 		m_types.clear();
 		m_before.clear();
@@ -387,11 +408,15 @@ namespace Loom
 		// A library whose initialisation threw may have registered some types already.
 		if (module == nullptr)
 		{
-			const DWORD error = GetLastError();
+#ifdef _WIN32
+			const std::string error = "error " + std::to_string(GetLastError());
+#else
+			const std::string error = dlerror();
+#endif
 
 			RestoreRegistry();
 
-			m_status = "Could not load the library (error " + std::to_string(error) + ").";
+			m_status = "Could not load the library (" + error + ").";
 			std::cerr << m_status << std::endl;
 			return false;
 		};
@@ -414,7 +439,11 @@ namespace Loom
 
 		RestoreRegistry();
 
+#ifdef _WIN32
 		FreeLibrary((HMODULE)m_module);
+#else
+		dlclose(m_module);
+#endif
 		m_module = nullptr;
 
 		std::error_code code;
@@ -443,7 +472,7 @@ namespace Loom
 		{
 			const std::filesystem::path& copy = entry.path();
 
-			if (copy.extension() != ".dll" ||
+			if (copy.extension() != path.extension() ||
 				copy.filename().string().rfind(prefix, 0) != 0)
 				continue;
 
@@ -481,6 +510,9 @@ namespace Loom
 
 	std::string ScriptLibrary::FindMSBuild()
 	{
+#ifndef _WIN32
+		return VisualStudio::OnPath("cmake");
+#else
 		const std::string found = VisualStudio::Where(
 			"-requires Microsoft.Component.MSBuild "
 			"-find MSBuild\\**\\Bin\\MSBuild.exe");
@@ -502,6 +534,7 @@ namespace Loom
 				return fallback;
 
 		return "";
+#endif
 	};
 
 	const char* ScriptLibrary::Configuration()
