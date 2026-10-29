@@ -282,6 +282,9 @@ int main(int argc, char** argv)
 		return 1;
 	};
 
+	// Ahead of builds and other busy programs, which otherwise hold up its frames for tens of milliseconds at a time.
+	SetPriorityClass(GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS);
+
 	// Automated runs and runs on another desktop start hidden; read before the Engine opens the window.
 	std::string desktop;
 
