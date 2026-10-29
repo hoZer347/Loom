@@ -307,7 +307,7 @@ TEST_SUITE("Material")
 
 		Loom::Scene scene("edited pre vertex");
 		Loom::PreVertex* preVertex = scene.Attach<Loom::PreVertex>();
-		preVertex->file = file;
+		preVertex->asset = file;
 		preVertex->everything = false;
 		preVertex->shaders = { shader };
 		Loom::PreVertex::ReloadIfChanged();

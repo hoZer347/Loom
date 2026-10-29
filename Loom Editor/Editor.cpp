@@ -3926,7 +3926,7 @@ namespace Loom
 				if (preVertex == nullptr)
 					preVertex = gameObject->Attach<PreVertex>();
 
-				preVertex->file = path;
+				preVertex->asset = path;
 				PreVertex::ReloadIfChanged();
 			});
 

@@ -97,7 +97,7 @@ namespace Loom
 		{
 			const PreVertex& last = *s_attached.back();
 
-			next.file = std::filesystem::path((const std::string&)*last.file).lexically_normal().generic_string();
+			next.file = std::filesystem::path((const std::string&)*last.asset).lexically_normal().generic_string();
 			next.everything = last.everything;
 
 			for (const std::string& shader : *last.shaders)

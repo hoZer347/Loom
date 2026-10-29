@@ -249,6 +249,9 @@
     <ClInclude Include="ProjectAssets.h">
       <Filter>Scripts</Filter>
     </ClInclude>
+    <ClInclude Include="AssetKind.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
     <ClInclude Include="EditorFileDialogs.h">
       <Filter>Panels</Filter>
     </ClInclude>

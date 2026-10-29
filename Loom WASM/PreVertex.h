@@ -67,7 +67,7 @@ namespace Loom
 		#pragma region Fields
 
 		// Relative to the project folder, as a Material's shader is.
-		Serial<Asset<extension>> file;
+		Serial<Asset<extension>> asset;
 
 		// Off, only the shaders listed run it.
 		Serial<bool> everything = true;

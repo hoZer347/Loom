@@ -1,5 +1,6 @@
 #include "doctest.h"
 
+#include "AssetKind.h"
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
 #include "Shaders.h"
@@ -594,6 +595,33 @@ TEST_SUITE("ProjectAssets")
 		CHECK(Loom::ProjectAssets::CreatePixelShader(root.string(), "Inked").empty());
 
 		std::filesystem::remove_all(root);
+	};
+
+	#pragma endregion
+
+	#pragma region Asset Kinds
+
+	TEST_CASE("a field taking a pre-vertex file offers New for a pre-vertex")
+	{
+		CHECK(Loom::AssetKinds::Making({ Loom::ProjectAssets::preVertexExtension }) == Loom::AssetKind::PreVertex);
+		CHECK(Loom::AssetKinds::Making({ Loom::ProjectAssets::shaderExtension }) == Loom::AssetKind::Shader);
+	};
+
+	TEST_CASE("a field taking only files the editor cannot make offers no New")
+	{
+		CHECK_FALSE(Loom::AssetKinds::Making({ ".wav", ".ogg" }).has_value());
+		CHECK_FALSE(Loom::AssetKinds::Making({ }).has_value());
+	};
+
+	TEST_CASE("every kind New makes is written with the extension it is offered for")
+	{
+		for (const auto& [kind, extension] : Loom::AssetKinds::extensions)
+		{
+			CHECK(Loom::AssetKinds::Making({ extension }) == kind);
+			CHECK(std::string(Loom::AssetKinds::ExtensionOf(kind)) == extension);
+		};
+
+		CHECK(std::string(Loom::AssetKinds::ExtensionOf(Loom::AssetKind::Folder)).empty());
 	};
 
 	#pragma endregion

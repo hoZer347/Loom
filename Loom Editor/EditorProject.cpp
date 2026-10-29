@@ -857,6 +857,7 @@ namespace Loom
 		m_newAssetFolder = folder;
 		m_newScriptFolder.clear();
 		m_newScriptFor.clear();
+		m_newAssetFor = nullptr;
 
 		for (FileTab& tab : m_fileTabs)
 			tab.newFolder.clear();
@@ -904,17 +905,7 @@ namespace Loom
 		if (IsScript(m_newAssetKind))
 			return (folder / (name + ".hpp")).string();
 
-		switch (m_newAssetKind)
-		{
-		case AssetKind::Scene:		return (folder / (name + SceneSerializer::extension)).string();
-		case AssetKind::Prefab:		return (folder / (name + Prefab::extension)).string();
-		case AssetKind::Shader:		return (folder / (name + ProjectAssets::shaderExtension)).string();
-		case AssetKind::PixelShader:	return (folder / (name + ProjectAssets::pixelShaderExtension)).string();
-		case AssetKind::Dialogue:	return (folder / (name + ProjectAssets::dialogueExtension)).string();
-		case AssetKind::PreVertex:	return (folder / (name + ProjectAssets::preVertexExtension)).string();
-		case AssetKind::Texture:	return (folder / (name + ProjectAssets::textureExtension)).string();
-		default:					return (folder / name).string();
-		};
+		return (folder / (name + AssetKinds::ExtensionOf(m_newAssetKind))).string();
 	};
 
 	std::string Editor::NewAssetProblem() const
@@ -940,6 +931,7 @@ namespace Loom
 		m_newAssetFolder = m_projectPath;
 		m_newScriptFolder.clear();
 		m_newScriptFor.clear();
+		m_newAssetFor = nullptr;
 		snprintf(m_newAssetName, sizeof(m_newAssetName), "%s", name.c_str());
 
 		CreateAsset();
@@ -1044,6 +1036,9 @@ namespace Loom
 		};
 
 		m_askForAsset = false;
+
+		if (m_newAssetFor != nullptr)
+			m_newAssetMade = ProjectAssets::RelativeTo(path, m_projectPath);
 
 		if (IsScript(m_newAssetKind) && !m_newScriptFor.empty())
 		{
@@ -2082,6 +2077,13 @@ namespace Loom
 
 		bool changed = false;
 
+		if (field.data == m_newAssetFor && !m_newAssetMade.empty())
+		{
+			path = std::exchange(m_newAssetMade, { });
+			m_newAssetFor = nullptr;
+			changed = true;
+		};
+
 		if (ImGui::BeginDragDropTarget())
 		{
 			const ImGuiPayload* dragged = ImGui::GetDragDropPayload();
@@ -2119,6 +2121,13 @@ namespace Loom
 		};
 
 		row("", "None");
+
+		if (const std::optional<AssetKind> made = AssetKinds::Making(field.extensions); made && !m_projectPath.empty())
+			if (PickerRow("new", "New", false, EditorIcons::New, "Creates one and picks it"))
+			{
+				AskForAsset(*made, m_projectPath);
+				m_newAssetFor = field.data;
+			};
 
 		if (listed)
 		{

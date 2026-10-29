@@ -1,5 +1,6 @@
 #pragma once
 
+#include "AssetKind.h"
 #include "ColliderGizmos.h"
 #include "ComponentMenu.h"
 #include "DialogueEditor.h"
@@ -81,24 +82,6 @@ namespace Loom
 
 		// A file's, as the scan found it.
 		const char* icon = nullptr;
-	};
-
-	enum class AssetKind
-	{
-		Folder,
-		Scene,
-		Prefab,
-		Script,
-		State,
-		StateMachine,
-		DialogueManager,
-		Test,
-		Shader,
-		PixelShader,
-		Dialogue,
-		Texture,
-		Palette,
-		PreVertex,
 	};
 
 	// What the Scripts tab lists.
@@ -1602,6 +1585,10 @@ namespace Loom
 		std::string m_newAssetFolder{ };
 		char m_newAssetName[128]{ };
 		std::string m_newAssetProblem{ };
+
+		// An asset field's New, and what it made, which the field takes up when next drawn.
+		void* m_newAssetFor = nullptr;
+		std::string m_newAssetMade{ };
 
 		// Add Component's StateMachine and DialogueManager make a script of that kind
 		// for the object rather than attaching one, and the script attaches to it

@@ -36,6 +36,7 @@ namespace Loom
 		constexpr const char* Bindings = "⌨";
 		constexpr const char* Build = "🔨";
 		constexpr const char* File = "📄";
+		constexpr const char* New = "➕";
 
 		// What the Project panel's tabs show beside a file, models
 		// aside, which only ModelImporter can tell.

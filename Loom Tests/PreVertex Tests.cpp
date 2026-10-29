@@ -215,7 +215,7 @@ TEST_SUITE("PreVertex")
 
 		Loom::Scene scene("pre vertex everything");
 		Loom::PreVertex* preVertex = scene.Attach<Loom::PreVertex>();
-		preVertex->file = file.Path();
+		preVertex->asset = file.Path();
 		Pump();
 
 		CHECK(Loom::PreVertex::CodeFor("Assets/Lit.shader") == WAVE);
@@ -234,7 +234,7 @@ TEST_SUITE("PreVertex")
 		const TempFile file("loom pre vertex carried.loomprevertex", WAVE);
 
 		Loom::Scene scene("pre vertex carried");
-		scene.Attach<Loom::PreVertex>()->file = file.Path();
+		scene.Attach<Loom::PreVertex>()->asset = file.Path();
 		Pump();
 
 		REQUIRE(Loom::PreVertex::CodeFor("loom pre vertex carried") == WAVE);
@@ -252,7 +252,7 @@ TEST_SUITE("PreVertex")
 
 		Loom::Scene scene("pre vertex listed");
 		Loom::PreVertex* preVertex = scene.Attach<Loom::PreVertex>();
-		preVertex->file = file.Path();
+		preVertex->asset = file.Path();
 		preVertex->everything = false;
 		preVertex->shaders = { "Assets/./Lit.shader", "Assets/Water" };
 		Pump();
@@ -274,10 +274,10 @@ TEST_SUITE("PreVertex")
 		Loom::Scene scene("pre vertex last");
 
 		Loom::PreVertex* older = scene.Attach<Loom::PreVertex>();
-		older->file = first.Path();
+		older->asset = first.Path();
 
 		Loom::PreVertex* newer = scene.GetRoot().AddChild("Newer")->Attach<Loom::PreVertex>();
-		newer->file = second.Path();
+		newer->asset = second.Path();
 		Pump();
 
 		CHECK(Loom::PreVertex::CodeFor("Assets/Lit.shader") == "vec3 PreVertex(vec3 world) { return world; }\n");
@@ -297,7 +297,7 @@ TEST_SUITE("PreVertex")
 
 		{
 			Loom::Scene scene("pre vertex unloaded");
-			scene.Attach<Loom::PreVertex>()->file = file.Path();
+			scene.Attach<Loom::PreVertex>()->asset = file.Path();
 			Pump();
 
 			CHECK(Loom::PreVertex::CodeFor("Assets/Lit.shader") == WAVE);
@@ -326,7 +326,7 @@ TEST_SUITE("PreVertex")
 		const Loom::PreVertex* preVertex = made->GetComponent<Loom::PreVertex>();
 
 		REQUIRE(preVertex != nullptr);
-		CHECK((const std::string&)*preVertex->file == file.Path());
+		CHECK((const std::string&)*preVertex->asset == file.Path());
 		CHECK(Loom::PreVertex::CodeFor("Assets/Lit.shader") == WAVE);
 
 		scene.GetRoot().RemoveChild(made);
@@ -343,10 +343,10 @@ TEST_SUITE("PreVertex")
 
 		CHECK(shaders.type == Loom::FieldType::AssetList);
 		CHECK(shaders.extensions == std::vector<std::string>{ Loom::Shader::extension });
-		CHECK(FieldOf(preVertex, &*preVertex.file).extensions == std::vector<std::string>{ Loom::PreVertex::extension });
+		CHECK(FieldOf(preVertex, &*preVertex.asset).extensions == std::vector<std::string>{ Loom::PreVertex::extension });
 
 		CHECK_FALSE(preVertex.IsShown(shaders));
-		CHECK(preVertex.IsShown(FieldOf(preVertex, &*preVertex.file)));
+		CHECK(preVertex.IsShown(FieldOf(preVertex, &*preVertex.asset)));
 
 		preVertex.everything = false;
 
@@ -382,7 +382,7 @@ TEST_SUITE("PreVertex")
 		CHECK(covered() == 0);
 
 		Loom::PreVertex* preVertex = scene.GetRoot().AddChild("Wave")->Attach<Loom::PreVertex>();
-		preVertex->file = file.Path();
+		preVertex->asset = file.Path();
 		Pump();
 
 		// The program, and its instanced and skinned twins.
@@ -406,7 +406,7 @@ TEST_SUITE("PreVertex")
 
 		Loom::Scene scene("pre vertex rewritten");
 		Loom::PreVertex* preVertex = scene.Attach<Loom::PreVertex>();
-		preVertex->file = file.Path();
+		preVertex->asset = file.Path();
 		Loom::PreVertex::ReloadIfChanged();
 
 		scene.GetRoot().AddChild("Mesh")->Attach<Loom::Material>()->SetShaderPath(shader.Path());
