@@ -279,8 +279,9 @@ namespace Loom
 		virtual void Clear(const float* color, bool depth) = 0;
 
 		// Pushes the depth of what is drawn next back by its slope, the way
-		// glPolygonOffset does. Zeroes turn it off.
-		virtual void SetDepthBias(float slope, float constant) = 0;
+		// glPolygonOffset does, the whole held to clamp unless that is zero. A
+		// backend that cannot clamp leaves the slope out then. Zeroes turn it off.
+		virtual void SetDepthBias(float slope, float constant, float clamp) = 0;
 
 		// Whether what is drawn next writes colour. Off, it only lays down depth.
 		virtual void SetColorWrite(bool write) = 0;

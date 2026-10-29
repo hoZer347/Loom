@@ -1,7 +1,9 @@
 #pragma once
 
 #ifdef __EMSCRIPTEN__
+#define GL_GLEXT_PROTOTYPES
 #include <GLES3/gl3.h>
+#include <GLES2/gl2ext.h>
 #include <emscripten.h>
 #include <emscripten/html5.h>
 #else

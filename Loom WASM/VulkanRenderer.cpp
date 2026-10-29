@@ -1123,13 +1123,14 @@ namespace Loom
 
 		#pragma region Render State
 
-		void SetDepthBias(float slope, float constant) override
+		void SetDepthBias(float slope, float constant, float clamp) override
 		{
-			m_biasSlope = slope;
+			m_biasSlope = clamp != 0.0f && !m_biasClamps ? 0.0f : slope;
 			m_biasConstant = constant;
+			m_biasClamp = m_biasClamps ? clamp : 0.0f;
 
 			if (m_rendering)
-				vkCmdSetDepthBias(Command(), m_biasConstant, 0.0f, m_biasSlope);
+				vkCmdSetDepthBias(Command(), m_biasConstant, m_biasClamp, m_biasSlope);
 		};
 
 		void SetColorWrite(bool write) override
@@ -1461,8 +1462,16 @@ namespace Loom
 			features13.dynamicRendering = VK_TRUE;
 			features13.pNext = &depthClip;
 
+			VkPhysicalDeviceFeatures supported{};
+			vkGetPhysicalDeviceFeatures(m_physicalDevice, &supported);
+
+			VkPhysicalDeviceFeatures enabled{};
+			enabled.depthBiasClamp = supported.depthBiasClamp;
+			m_biasClamps = supported.depthBiasClamp;
+
 			VkDeviceCreateInfo info{ VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
 			info.pNext = &features13;
+			info.pEnabledFeatures = &enabled;
 			info.queueCreateInfoCount = 1;
 			info.pQueueCreateInfos = &queue;
 			info.enabledExtensionCount = (uint32_t)extensions.size();
@@ -1809,7 +1818,7 @@ namespace Loom
 
 			vkCmdSetViewport(command, 0, 1, &viewport);
 			vkCmdSetScissor(command, 0, 1, &scissor);
-			vkCmdSetDepthBias(command, m_biasConstant, 0.0f, m_biasSlope);
+			vkCmdSetDepthBias(command, m_biasConstant, m_biasClamp, m_biasSlope);
 			vkCmdSetDepthCompareOp(command, m_depthCompare);
 		};
 
@@ -2639,6 +2648,8 @@ namespace Loom
 
 		float m_biasSlope = 0.0f;
 		float m_biasConstant = 0.0f;
+		float m_biasClamp = 0.0f;
+		bool m_biasClamps = false;
 		bool m_colorWrite = true;
 		VkCompareOp m_depthCompare = VK_COMPARE_OP_LESS;
 

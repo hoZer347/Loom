@@ -137,7 +137,7 @@ TEST_SUITE("Light")
 		CHECK(std::abs(std::abs(edge.x) - 1.0f) < EPSILON);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the shadow pass biases depth by a constant alone, and clears it after")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the shadow pass pulls casters toward the light by their slope up to a limit, pushed back by a constant, and clears it after")
 	{
 		RecordingRenderer renderer;
 
@@ -150,9 +150,12 @@ TEST_SUITE("Light")
 		light->RenderShadowMap({ &scene.GetRoot() });
 
 		REQUIRE(renderer.depthBiases.size() == 2);
-		CHECK(renderer.depthBiases.front().first == 0.0f);
-		CHECK(renderer.depthBiases.front().second > 0.0f);
-		CHECK(renderer.depthBiases.back() == std::pair<float, float>{ 0.0f, 0.0f });
+
+		const auto [slope, constant, clamp] = renderer.depthBiases.front();
+		CHECK(slope < 0.0f);
+		CHECK(constant > 0.0f);
+		CHECK(clamp < 0.0f);
+		CHECK(renderer.depthBiases.back() == std::tuple<float, float, float>{ 0.0f, 0.0f, 0.0f });
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a zero direction still gives a usable transform")

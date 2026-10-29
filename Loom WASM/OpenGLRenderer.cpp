@@ -224,6 +224,8 @@ namespace Loom
 				return false;
 			};
 
+			m_biasClamps = GLEW_VERSION_4_6 || GLEW_ARB_polygon_offset_clamp || GLEW_EXT_polygon_offset_clamp;
+
 			glfwSwapInterval(Engine::vsync ? 1 : 0);
 
 			glfwSetFramebufferSizeCallback(
@@ -233,6 +235,8 @@ namespace Loom
 					glViewport(0, 0, width, height);
 				});
 #else
+			m_biasClamps = emscripten_webgl_enable_EXT_polygon_offset_clamp(emscripten_webgl_get_current_context());
+
 			WatchCanvas();
 #endif
 
@@ -1002,8 +1006,11 @@ namespace Loom
 			glUseProgram((GLuint)program);
 		};
 
-		void SetDepthBias(float slope, float constant) override
+		void SetDepthBias(float slope, float constant, float clamp) override
 		{
+			if (clamp != 0.0f && !m_biasClamps)
+				slope = 0.0f;
+
 			if (slope == 0.0f && constant == 0.0f)
 			{
 				glDisable(GL_POLYGON_OFFSET_FILL);
@@ -1011,7 +1018,18 @@ namespace Loom
 			};
 
 			glEnable(GL_POLYGON_OFFSET_FILL);
-			glPolygonOffset(slope, constant);
+
+			if (clamp == 0.0f)
+				glPolygonOffset(slope, constant);
+#ifdef __EMSCRIPTEN__
+			else
+				glPolygonOffsetClampEXT(slope, constant, clamp);
+#else
+			else if (GLEW_EXT_polygon_offset_clamp)
+				glPolygonOffsetClampEXT(slope, constant, clamp);
+			else
+				glPolygonOffsetClamp(slope, constant, clamp);
+#endif
 		};
 
 		void SetColorWrite(bool write) override
@@ -1121,6 +1139,9 @@ namespace Loom
 
 		GLFWwindow* m_window = nullptr;
 		const char* m_glslVersion = nullptr;
+
+		// Whether glPolygonOffset can be held to a clamp.
+		bool m_biasClamps = false;
 
 		CaptureHandler m_capture;
 

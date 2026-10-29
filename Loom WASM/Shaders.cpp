@@ -79,11 +79,10 @@ void main()
 }
 )";
 
-		// The depth the vertex stage puts out, pulled toward the light on a slope, is all the shadow map needs.
+		// The depth the vertex stage puts out is all the shadow map needs.
 		constexpr const char* SHADOW_FRAGMENT = R"(
 void main()
 {
-	gl_FragDepth = LoomCasterDepth();
 }
 )";
 
@@ -195,8 +194,7 @@ bool LoomDitheredOut(float alpha)
 			if (shadows)
 				shaded += "in vec4 loom_LightSpace;\n";
 
-			// Screen-space slope gives a flat normal facing the camera; mesh normals light smoothly instead.
-			// Without them, the shadow is read out along that flat normal, as the vertex stage could not.
+			// Screen-space slope gives a flat normal, which a mesh without normals also reads its shadow along.
 			const std::string lightSpace = "\tvec4 loom_lightSpace = dot(loom_Normal, loom_Normal) > 0.0 ? loom_LightSpace : LoomLightSpace(vec4(loom_World, 1.0), loom_face);\n";
 
 			return shaded +
@@ -226,8 +224,7 @@ bool LoomDitheredOut(float alpha)
 				"\nvoid main()\n{\n"
 				"\tloom_main();\n\n"
 				"\tif (LoomDitheredOut(" + color[1].str() + ".a))\n"
-				"\t\tdiscard;\n\n"
-				"\tgl_FragDepth = LoomCasterDepth();\n"
+				"\t\tdiscard;\n"
 				"}\n";
 		};
 

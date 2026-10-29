@@ -295,9 +295,7 @@ namespace
 		constexpr glm::vec3 ABOVE_POSITION(0.0f, 2.0f, 2.0f);
 		constexpr glm::vec3 ABOVE_ROTATION(-45.0f, 0.0f, 0.0f);
 
-		// How many shadow map texels below the plane, the PCF kernel's reach,
-		// the sphere is read down to, in how many steps, and the map spans its
-		// extent either side of its centre.
+		// The sphere is read down to the PCF kernel's reach below the plane.
 		constexpr float TEXELS_BELOW = 2.0f;
 		constexpr int DOWN_STEPS = 8;
 		constexpr float ACROSS_EXTENTS = 2.0f;
@@ -313,9 +311,7 @@ namespace
 		constexpr float TURN = glm::two_pi<float>();
 		constexpr float HALF_TURN = glm::pi<float>();
 
-		// The default light first, whose frames are saved, then a lower sun and a
-		// lower one still, steeper across the plane than the casters' pull is capped at.
-		// Each with mesh normals first, then with none, which shade by the face.
+		// The default light, whose frames are saved, then two lower suns past the pull's slope limit.
 		const glm::vec3 LIGHTS[] = { Loom::Light().direction, { -0.8f, -1.0f, -0.45f }, { -1.0f, -0.5f, -0.3f } };
 
 		for (const glm::vec3& direction : LIGHTS)
