@@ -386,20 +386,11 @@ namespace Loom
 			};
 
 			LOOM_STAGE("glfwSwapBuffers");
-
-			// A frame the OS holds for a new window size has to reach the screen before it is next composed, so it waits on neither the screen nor vsync.
-			const bool held = Engine::IsPolling();
-
-			if (held)
-				glfwSwapInterval(0);
-
 			glfwSwapBuffers(m_window);
 
-			if (held)
-			{
+			// A frame the OS holds for a new window size has to reach the screen before it is next composed.
+			if (Engine::IsPolling())
 				glFinish();
-				glfwSwapInterval(Engine::vsync ? 1 : 0);
-			};
 		};
 
 		void Capture(const CaptureHandler& handler) override
