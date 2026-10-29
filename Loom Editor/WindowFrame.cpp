@@ -127,7 +127,7 @@ namespace Loom
 			const WindowFrame& frame = *(const WindowFrame*)data;
 			const bool framed = (GetWindowLongW(window, GWL_STYLE) & WS_THICKFRAME) != 0;
 
-			// The screen shows a new size as soon as it is taken, so it is taken just after the screen is composed, giving it the most time to be drawn before the next.
+			// Taken just after a composition, leaving the most time to draw the new size.
 			if (message == WM_NCCALCSIZE && wparam && window == s_held && (((const NCCALCSIZE_PARAMS*)lparam)->lppos->flags & SWP_NOSIZE) == 0)
 				DwmFlush();
 
