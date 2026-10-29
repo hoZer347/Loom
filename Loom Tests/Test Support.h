@@ -343,7 +343,7 @@ namespace LoomTests
 		std::vector<bool> colorWrites;
 		std::vector<bool> depthTestsEqual;
 
-		// Each depth bias set, as its slope and its constant.
+		// Each depth bias set, as its slope, its constant and its clamp.
 		std::vector<std::tuple<float, float, float>> depthBiases;
 
 		// What each of drawn was drawn into: a target, or WINDOW.
