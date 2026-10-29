@@ -75,6 +75,10 @@ namespace Loom
 
 		static void renderFrame();
 
+		// Whether renderFrame is in its event poll, which the OS may hold in a
+		// loop of its own, as while it moves or sizes a window.
+		static bool IsPolling();
+
 		static inline bool isRunning;
 
 		#pragma endregion

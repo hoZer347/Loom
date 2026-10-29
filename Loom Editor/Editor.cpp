@@ -403,6 +403,13 @@ namespace Loom
 			window_editor->Quit();
 		};
 
+		// Only from the event poll, the one place a frame may run inside another.
+		void RedrawWhileHeld()
+		{
+			if (Engine::IsPolling())
+				Engine::renderFrame();
+		};
+
 		void OnDrop(GLFWwindow* window, int count, const char** paths)
 		{
 			// The OS swallows mouse moves while dragging; with viewports, ImGui works in screen space.
@@ -794,7 +801,7 @@ namespace Loom
 		ImGui::GetPlatformIO().Platform_OpenInShellFn = OpenInShell;
 		ImGui::GetPlatformIO().Platform_OpenInShellUserData = this;
 
-		m_windowFrame.Install(Engine::window, Engine::renderFrame);
+		m_windowFrame.Install(Engine::window, RedrawWhileHeld);
 
 		window_editor = this;
 
@@ -2777,7 +2784,7 @@ namespace Loom
 		if (frame == nullptr)
 		{
 			frame = std::make_unique<WindowFrame>();
-			frame->Install(window, Engine::renderFrame);
+			frame->Install(window, RedrawWhileHeld);
 		};
 
 		if (!DrawWindowButtons(window, *frame) && !viewport->PlatformRequestClose)

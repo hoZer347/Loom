@@ -24,6 +24,11 @@ TEST_SUITE("Engine")
 		CHECK(Loom::Engine::window == nullptr);
 	};
 
+	TEST_CASE("the engine is not in its event poll outside a frame")
+	{
+		CHECK_FALSE(Loom::Engine::IsPolling());
+	};
+
 	TEST_CASE("GetUniqueID never hands out the same ID twice")
 	{
 		std::set<size_t> seen;

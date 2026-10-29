@@ -4,7 +4,6 @@
 #ifndef __EMSCRIPTEN__
 
 #include "OpenGL.h"
-#include "imgui_internal.h"
 
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
@@ -138,8 +137,7 @@ namespace Loom
 			{
 				static bool redrawing = false;
 
-				// Not from a dialog's own loop inside a frame.
-				if (!redrawing && GImGui != nullptr && !GImGui->WithinFrameScope)
+				if (!redrawing)
 				{
 					redrawing = true;
 					frame.Redrawing()();

@@ -2,6 +2,19 @@
 
 #include "WindowFrame.h"
 
+#ifndef __EMSCRIPTEN__
+
+#include "OpenGL.h"
+
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+
+#include <windows.h>
+
+#include <chrono>
+
+#endif
+
 
 TEST_SUITE("WindowFrame")
 {
@@ -50,3 +63,130 @@ TEST_SUITE("WindowFrame")
 		CHECK(Loom::WindowFrame::HitTest(1000.0f, 10.0f, width, height, border, false, { }) == Hit::Client);
 	};
 };
+
+#ifndef __EMSCRIPTEN__
+
+TEST_SUITE("WindowFrame")
+{
+	constexpr int window_width = 320;
+	constexpr int window_height = 240;
+	constexpr std::chrono::milliseconds held_for{ 200 };
+	constexpr std::chrono::milliseconds nested_for{ 50 };
+
+	int s_redraws = 0;
+	int s_depth = 0;
+	int s_deepest = 0;
+	int s_nestedTimers = 0;
+	HWND s_window = nullptr;
+
+	// Messages for window until length has passed, as the OS's own loop dispatches them.
+	int Pump(HWND window, std::chrono::milliseconds length)
+	{
+		int timers = 0;
+		const auto end = std::chrono::steady_clock::now() + length;
+
+		while (std::chrono::steady_clock::now() < end)
+		{
+			MSG message;
+
+			while (PeekMessageW(&message, window, 0, 0, PM_REMOVE))
+			{
+				if (message.message == WM_TIMER)
+					timers++;
+
+				DispatchMessageW(&message);
+			};
+
+			Sleep(1);
+		};
+
+		return timers;
+	};
+
+	void Count()
+	{
+		s_redraws++;
+	};
+
+	struct HiddenWindow
+	{
+		GLFWwindow* window = nullptr;
+		HWND hwnd = nullptr;
+
+		HiddenWindow()
+		{
+			glfwInit();
+			glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+			glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+			window = glfwCreateWindow(window_width, window_height, "WindowFrame", nullptr, nullptr);
+			hwnd = glfwGetWin32Window(window);
+			s_window = hwnd;
+			s_redraws = 0;
+			s_depth = 0;
+			s_deepest = 0;
+			s_nestedTimers = 0;
+		};
+
+		~HiddenWindow()
+		{
+			glfwDefaultWindowHints();
+			glfwDestroyWindow(window);
+			glfwTerminate();
+		};
+	};
+
+	void PumpingRedraw()
+	{
+		s_depth++;
+		s_deepest = s_depth > s_deepest ? s_depth : s_deepest;
+		s_redraws++;
+		s_nestedTimers += Pump(s_window, nested_for);
+		s_depth--;
+	};
+
+	TEST_CASE_FIXTURE(HiddenWindow, "a window being sized redraws on a timer until let go")
+	{
+		Loom::WindowFrame frame;
+		frame.Install(window, Count);
+
+		SendMessageW(hwnd, WM_ENTERSIZEMOVE, 0, 0);
+		Pump(hwnd, held_for);
+		CHECK(s_redraws > 0);
+
+		SendMessageW(hwnd, WM_EXITSIZEMOVE, 0, 0);
+		Pump(hwnd, nested_for);
+		const int redraws = s_redraws;
+		Pump(hwnd, held_for);
+		CHECK(s_redraws == redraws);
+	};
+
+	TEST_CASE_FIXTURE(HiddenWindow, "a redraw that pumps messages is not redrawn inside itself")
+	{
+		Loom::WindowFrame frame;
+		frame.Install(window, PumpingRedraw);
+
+		SendMessageW(hwnd, WM_ENTERSIZEMOVE, 0, 0);
+		Pump(hwnd, held_for);
+		SendMessageW(hwnd, WM_EXITSIZEMOVE, 0, 0);
+
+		CHECK(s_redraws > 0);
+		CHECK(s_nestedTimers > 0);
+		CHECK(s_deepest == 1);
+	};
+
+	TEST_CASE_FIXTURE(HiddenWindow, "no timer is set for a frame given no redraw")
+	{
+		Loom::WindowFrame frame;
+		frame.Install(window, nullptr);
+
+		SendMessageW(hwnd, WM_ENTERSIZEMOVE, 0, 0);
+		Sleep((DWORD)nested_for.count());
+
+		MSG message;
+		CHECK_FALSE(PeekMessageW(&message, hwnd, WM_TIMER, WM_TIMER, PM_NOREMOVE));
+
+		SendMessageW(hwnd, WM_EXITSIZEMOVE, 0, 0);
+	};
+};
+
+#endif

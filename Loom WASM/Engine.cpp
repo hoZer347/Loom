@@ -37,6 +37,8 @@ namespace Loom
 		// Frame time the physics steps have not covered yet.
 		float s_physicsTime = 0.0f;
 
+		bool s_polling = false;
+
 		std::unique_ptr<Renderer> renderer;
 
 		// Scenes draw here while a pixel pass needs to read them back.
@@ -237,6 +239,11 @@ namespace Loom
 			glfwSetWindowShouldClose(window, true);
 	}
 
+	bool Engine::IsPolling()
+	{
+		return s_polling;
+	};
+
 	void Engine::SetUpdateFunction(const Task& task)
 	{
 		std::lock_guard<std::recursive_mutex> lock(mutex);
@@ -247,7 +254,11 @@ namespace Loom
 	{
 		{
 			LOOM_STAGE("glfwPollEvents");
+
+			const bool polling = s_polling;
+			s_polling = true;
 			glfwPollEvents();
+			s_polling = polling;
 		};
 
 		{
