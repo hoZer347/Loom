@@ -229,6 +229,50 @@ TEST_SUITE("Mesh")
 		CHECK(renderer.drawnVertices.back() == other);
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a one-sided material culls the other side, turned over by a mirroring transform, alone or as instances, and culls nothing after")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream source(
+			"// ===VERTEX===\nuniform mat4 u_model;\nuniform vec3 u_color;\nvoid main() { }\n"
+			"// ===FRAGMENT===\nuniform vec3 u_color;\nvoid main() { }\n");
+		Loom::Shader shader("one-sided meshes", source);
+
+		Loom::Scene scene("one-sided");
+		Pump();
+
+		const std::vector<float> triangle = { 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
+		const glm::vec3 mirroring(-1.0f, 1.0f, 1.0f);
+
+		const auto add = [&scene, &shader, &triangle](Loom::Material::Sides sides, const glm::vec3& scale, Loom::Mesh::DrawType drawType)
+		{
+			Loom::GameObject* holder = scene.AddChild("Side");
+			holder->transform.scale = scale;
+
+			Loom::Material* material = holder->Attach<Loom::Material>();
+			material->shader = &shader;
+			material->sides = sides;
+
+			Loom::Mesh* mesh = holder->Attach<Loom::Mesh>(Loom::Mesh::Triangles);
+			mesh->m_vertices = triangle;
+			mesh->m_draw_type = drawType;
+		};
+
+		add(Loom::Material::Front, mirroring, Loom::Mesh::Dynamic);
+		add(Loom::Material::Front, glm::vec3(1.0f), Loom::Mesh::Static);
+		add(Loom::Material::Front, glm::vec3(1.0f), Loom::Mesh::Static);
+		add(Loom::Material::Back, glm::vec3(1.0f), Loom::Mesh::Static);
+		add(Loom::Material::Both, glm::vec3(1.0f), Loom::Mesh::Static);
+		Pump();
+
+		scene.Render();
+
+		// The dynamic one as it is found, then the two front-only as instances, then the rest alone.
+		using Loom::CullFace;
+		CHECK(renderer.culls == std::vector<CullFace>{ CullFace::Front, CullFace::None, CullFace::Back, CullFace::Front, CullFace::None, CullFace::None });
+		CHECK(renderer.instanceCounts == std::vector<size_t>{ 2 });
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "each GameObject has a seed of its own from its guid, drawn alone or as an instance")
 	{
 		RecordingRenderer renderer;

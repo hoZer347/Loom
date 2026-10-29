@@ -13,6 +13,8 @@
 
 namespace Loom
 {
+	enum class CullFace;
+
 	struct LOOM_API Material : Component<Material, "Rendering">
 	{
 		#pragma region Shader
@@ -118,6 +120,22 @@ namespace Loom
 		// Last, so the fields before it keep their places in scenes saved
 		// without it.
 		Serial<Sampling> sampling = AsShader;
+
+		// Which faces it draws: both, or only those facing the camera (Front)
+		// or away from it (Back). Shadows are cast as before, whichever it is.
+		enum Sides : uint32_t
+		{
+			Both,
+			Front,
+			Back,
+		};
+
+		// After sampling, for the same reason.
+		Serial<Sides> sides = Both;
+
+		// What the renderer culls for sides, drawn with a world matrix that
+		// mirrors or not.
+		CullFace Culled(bool mirrored) const;
 
 		#pragma endregion
 

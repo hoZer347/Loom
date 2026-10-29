@@ -19,10 +19,10 @@ using LoomTests::Pump;
 
 namespace
 {
-	// Path, colour, shadows, variables, sampling.
-	constexpr size_t FIELDS = 5;
+	// Path, colour, shadows, variables, sampling, sides.
+	constexpr size_t FIELDS = 6;
 
-	enum { PATH, COLOR, SHADOWS, VARIABLES, SAMPLING };
+	enum { PATH, COLOR, SHADOWS, VARIABLES, SAMPLING, SIDES };
 
 	const std::string VERTEX =
 		"// ===VERTEX===\n"
@@ -168,6 +168,23 @@ TEST_SUITE("Material")
 
 		REQUIRE(read.GetFields()[SAMPLING].Read(written));
 		CHECK(read.sampling == Loom::Material::Nearest);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a material draws both sides until told otherwise, and saves that last")
+	{
+		Loom::Material material;
+		Pump();
+
+		CHECK(material.sides == Loom::Material::Both);
+
+		material.sides = Loom::Material::Back;
+		const std::string written = material.GetFields()[SIDES].Write();
+
+		Loom::Material read;
+		Pump();
+
+		REQUIRE(read.GetFields()[SIDES].Read(written));
+		CHECK(read.sides == Loom::Material::Back);
 	};
 
 	#pragma endregion

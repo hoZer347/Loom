@@ -229,6 +229,15 @@ namespace Loom
 		ApplyShaderVariables(program, shader->variables, variables, instance);
 	};
 
+	CullFace Material::Culled(bool mirrored) const
+	{
+		if (sides == Both)
+			return CullFace::None;
+
+		// A mirrored world matrix turns which faces are wound to the front.
+		return (sides == Front) != mirrored ? CullFace::Back : CullFace::Front;
+	};
+
 	#pragma endregion
 
 	#pragma region Editor

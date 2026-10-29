@@ -221,6 +221,9 @@ namespace Loom
 		{
 			LOOM_STAGE("MeshBatch::Draw");
 			batch.Draw(Mesh::Ready);
+
+			if (Renderer* renderer = Renderer::Get())
+				renderer->SetCullFace(CullFace::None);
 		};
 
 		{

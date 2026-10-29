@@ -286,12 +286,18 @@ namespace Loom
 
 		Ready(*this, program);
 		Draw(program);
+
+		if (material->sides != Material::Both)
+			Renderer::Get()->SetCullFace(CullFace::None);
 	};
 
 	void Mesh::Ready(Mesh& mesh, uint32_t program)
 	{
 		mesh.material->Apply(program, &*std::as_const(mesh.variables));
 		Scene::ApplyView(program);
+
+		if (Renderer* renderer = Renderer::Get())
+			renderer->SetCullFace(mesh.material->Culled(glm::determinant(glm::mat3(mesh.m_gameObject->WorldMatrix())) < 0.0f));
 	};
 
 	void Mesh::Draw(uint32_t program)
@@ -742,8 +748,8 @@ namespace Loom
 		const Material& a = **first.material;
 		const Material& b = **mesh.material;
 
-		// All Material::Apply sets but the colour, which each instance has its own of.
-		const bool materials = &a == &b || (*a.shadows == *b.shadows && *a.sampling == *b.sampling && *a.variables == *b.variables);
+		// All Material::Apply sets but the colour, which each instance has its own of, and the faces Mesh::Ready culls.
+		const bool materials = &a == &b || (*a.shadows == *b.shadows && *a.sampling == *b.sampling && *a.variables == *b.variables && *a.sides == *b.sides);
 
 		return lot.program == program &&
 			first.m_geometry == mesh.m_geometry &&
