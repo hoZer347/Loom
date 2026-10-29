@@ -290,9 +290,11 @@ namespace
 		constexpr glm::vec3 ABOVE_POSITION(0.0f, 2.0f, 2.0f);
 		constexpr glm::vec3 ABOVE_ROTATION(-45.0f, 0.0f, 0.0f);
 
-		// How many shadow map texels below the plane the sphere is read, and
-		// the map spans its extent either side of its centre.
-		constexpr float TEXELS_BELOW = 1.0f;
+		// How many shadow map texels below the plane, the PCF kernel's reach,
+		// the sphere is read down to, in how many steps, and the map spans its
+		// extent either side of its centre.
+		constexpr float TEXELS_BELOW = 2.0f;
+		constexpr int DOWN_STEPS = 8;
 		constexpr float ACROSS_EXTENTS = 2.0f;
 
 		// Off rounding, and a pixel landing a little off the point.
@@ -311,13 +313,27 @@ namespace
 			const Image image = fixture.Frame();
 			image.Save("Render - shadow at a contact from under, on " + backend);
 
-			// On the side of the sphere facing both the camera and the light.
-			const float below = TEXELS_BELOW * ACROSS_EXTENTS * contact.light->shadowExtent / contact.light->shadowResolution;
-			const glm::vec3 tucked(0.0f, -below, std::sqrt(CONTACT_RADIUS * CONTACT_RADIUS - below * below));
-			const int shaded = (int)(contact.light->ambient * UINT8_MAX) + TOLERANCE;
+			const glm::vec3 toLight = -glm::normalize((glm::vec3)contact.light->direction);
+			const float texel = ACROSS_EXTENTS * contact.light->shadowExtent / contact.light->shadowResolution;
+			int brightest = 0;
 
-			const glm::ivec2 pixel = PixelOf(*contact.camera, image, tucked);
-			CHECK(image.At(pixel.x, pixel.y).r <= shaded);
+			// Along the crease where the sphere faces both the camera and the light.
+			for (int around = 0; around < STEPS; around++)
+				for (int down = 0; down <= DOWN_STEPS; down++)
+				{
+					const float azimuth = TURN * around / STEPS;
+					const glm::vec3 outward(std::cos(azimuth), 0.0f, std::sin(azimuth));
+					const float below = TEXELS_BELOW * texel * down / DOWN_STEPS;
+					const glm::vec3 point = outward * std::sqrt(CONTACT_RADIUS * CONTACT_RADIUS - below * below) - glm::vec3(0.0f, below, 0.0f);
+
+					if (glm::dot(outward, toLight) >= LIT_AT_LEAST && glm::dot(outward, glm::normalize(UNDER_POSITION - point)) >= FACING_AT_LEAST)
+					{
+						const glm::ivec2 pixel = PixelOf(*contact.camera, image, point);
+						brightest = std::max(brightest, (int)image.At(pixel.x, pixel.y).r);
+					};
+				};
+
+			CHECK(brightest <= (int)(contact.light->ambient * UINT8_MAX) + TOLERANCE);
 		};
 
 		{

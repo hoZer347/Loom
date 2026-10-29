@@ -27,6 +27,10 @@ namespace Loom
 		// Constant alone: a slope-scaled bias lights what sits just under a tilted caster.
 		constexpr float CONSTANT_OFFSET = 1.0f;
 
+		// The steepest slope, rise over run, LoomCasterDepth pulls a caster toward the light by;
+		// steeper, the pull would shadow the caster's own lit side.
+		constexpr float PULL_SLOPE_LIMIT = 1.0f;
+
 		// The light sits one extent back from the centre, so the box is two deep.
 		constexpr float DEPTH_EXTENTS = 2.0f;
 
@@ -82,8 +86,8 @@ uniform float u_shadowTexel;
 
 // How many shadow map texels out along its normal a surface reads its
 // shadow from, clear of the flat faces it is made of, which would otherwise
-// shadow the smooth surface their normals light.
-const float LOOM_NORMAL_OFFSET_TEXELS = 1.0;
+// shadow the smooth surface their normals light, and past the casters' pull.
+const float LOOM_NORMAL_OFFSET_TEXELS = 1.5;
 // Texels more at a surface edge-on to the light, past the PCF kernel's reach.
 const float LOOM_SLOPE_OFFSET_TEXELS = 3.0;
 
@@ -108,6 +112,23 @@ vec4 LoomLightSpace(vec4 world, vec3 normal)
 	float slope = sqrt(max(1.0 - facing * facing, 0.0));
 
 	return u_lightViewProjection * (world + vec4(toLight * u_shadowTexel * (LOOM_NORMAL_OFFSET_TEXELS + LOOM_SLOPE_OFFSET_TEXELS * slope), 0.0));
+}
+)";
+
+		const char* const CASTER_LIBRARY = R"(
+// In depth per texel; zero pulls nothing.
+uniform float u_shadowSlopeLimit;
+
+// Texels across which a caster is pulled toward the light by its own slope:
+// the farthest PCF tap and the texel its comparison filters with, so what
+// sits just under the caster is not read past it.
+const float LOOM_CASTER_PULL_TEXELS = 2.5;
+
+float LoomCasterDepth()
+{
+	vec2 slope = abs(vec2(dFdx(gl_FragCoord.z), dFdy(gl_FragCoord.z)));
+
+	return gl_FragCoord.z - min(max(slope.x, slope.y), u_shadowSlopeLimit) * LOOM_CASTER_PULL_TEXELS;
 }
 )";
 
@@ -289,6 +310,7 @@ vec3 LoomLight(vec3 normal)
 		if (mesh.material->shader->settings.transparency)
 			renderer.SetTexture(program, "u_shadowMap", NothingInShadow(renderer));
 		renderer.SetUniform(program, "u_lightViewProjection", m_view_projection);
+		renderer.SetUniform(program, "u_shadowSlopeLimit", PULL_SLOPE_LIMIT * ACROSS_EXTENTS / (DEPTH_EXTENTS * m_allocated_resolution));
 	};
 
 	void Light::DrawCasters(GameObject& gameObject, MeshBatch& batch) const
@@ -361,7 +383,8 @@ vec3 LoomLight(vec3 normal)
 
 	std::string Light::FragmentLibrary(const std::string& source)
 	{
-		return Calls(source, { "LoomShadow", "LoomLight" }) ? FRAGMENT_LIBRARY : "";
+		return std::string(Calls(source, { "LoomShadow", "LoomLight" }) ? FRAGMENT_LIBRARY : "") +
+			(Calls(source, { "LoomCasterDepth" }) ? CASTER_LIBRARY : "");
 	};
 
 	#pragma endregion

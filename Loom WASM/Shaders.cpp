@@ -79,10 +79,11 @@ void main()
 }
 )";
 
-		// The depth the vertex stage puts out is all the shadow map needs.
+		// The depth the vertex stage puts out, pulled toward the light on a slope, is all the shadow map needs.
 		constexpr const char* SHADOW_FRAGMENT = R"(
 void main()
 {
+	gl_FragDepth = LoomCasterDepth();
 }
 )";
 
@@ -221,7 +222,8 @@ bool LoomDitheredOut(float alpha)
 				"\nvoid main()\n{\n"
 				"\tloom_main();\n\n"
 				"\tif (LoomDitheredOut(" + color[1].str() + ".a))\n"
-				"\t\tdiscard;\n"
+				"\t\tdiscard;\n\n"
+				"\tgl_FragDepth = LoomCasterDepth();\n"
 				"}\n";
 		};
 
