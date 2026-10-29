@@ -598,9 +598,19 @@ namespace Loom
 		for (const uint32_t vertex : moved)
 			vertices[vertex] = glm::vec3(matrix * glm::vec4(vertices[vertex], 1.0f));
 
+		const glm::mat3 turn = glm::transpose(glm::inverse(glm::mat3(matrix)));
+		const auto is_moved = [&](const Corner& corner) { return moved.contains(corner.vertex); };
+
 		for (uint32_t face = 0; face < faces.size(); face++)
-			if (std::any_of(faces[face].corners.begin(), faces[face].corners.end(), [&](const Corner& corner) { return moved.contains(corner.vertex); }))
+		{
+			std::vector<Corner>& corners = faces[face].corners;
+
+			if (std::all_of(corners.begin(), corners.end(), is_moved))
+				for (Corner& corner : corners)
+					corner.normal = glm::normalize(turn * corner.normal);
+			else if (std::any_of(corners.begin(), corners.end(), is_moved))
 				Flatten(face);
+		};
 	};
 
 	bool EditableMesh::Extrude(const std::set<uint32_t>& selected, float distance)

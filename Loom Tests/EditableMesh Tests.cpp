@@ -280,6 +280,36 @@ TEST_SUITE("EditableMesh")
 
 	#pragma region Editing
 
+	TEST_CASE("EditableMesh turns the normals of a face moved whole with it")
+	{
+		constexpr float SIZE = 2.0f;
+		constexpr float QUARTER_TURN = 90.0f;
+
+		EditableMesh mesh = EditableMesh::Cylinder(SIZE, SIZE, SEGMENTS);
+		const EditableMesh before = mesh;
+
+		std::set<uint32_t> all{ };
+
+		for (uint32_t vertex = 0; vertex < mesh.vertices.size(); vertex++)
+			all.insert(vertex);
+
+		const glm::mat4 turn = glm::rotate(glm::mat4(1.0f), glm::radians(QUARTER_TURN), glm::vec3(1.0f, 0.0f, 0.0f));
+		mesh.Transform(all, glm::translate(glm::mat4(1.0f), glm::vec3(SIZE)) * turn);
+
+		for (uint32_t face = 0; face < mesh.faces.size(); face++)
+			for (uint32_t corner = 0; corner < mesh.faces[face].corners.size(); corner++)
+				CHECK(Near(mesh.faces[face].corners[corner].normal, glm::mat3(turn) * before.faces[face].corners[corner].normal));
+
+		// The bottom ring's first vertex, in the first side and the bottom cap.
+		mesh = before;
+		mesh.Transform({ 0 }, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -SIZE, 0.0f)));
+
+		for (const EditableMesh::Corner& corner : mesh.faces[0].corners)
+			CHECK(Near(corner.normal, mesh.FaceNormal(0)));
+
+		CHECK(Near(mesh.faces[1].corners[0].normal, before.faces[1].corners[0].normal));
+	};
+
 	TEST_CASE("EditableMesh moves a vertex in every face it is part of and flattens them")
 	{
 		EditableMesh mesh = EditableMesh::Cube(2.0f);

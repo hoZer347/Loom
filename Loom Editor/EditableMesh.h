@@ -85,7 +85,7 @@ namespace Loom
 		static EditableMesh Cube(float size);
 		static EditableMesh Plane(float size);
 
-		// Smooth round the side and flat on the caps.
+		// Centred on the origin, smooth round the side and flat on the caps.
 		static EditableMesh Cylinder(float radius, float height, int segments);
 		static EditableMesh Cone(float radius, float height, int segments);
 
@@ -133,8 +133,8 @@ namespace Loom
 
 		#pragma region Editing
 
-		// Moves the vertices by the matrix, and flattens the normals of every
-		// face they are in.
+		// Moves the vertices by the matrix. A face moved whole keeps its
+		// normals, turned with it, and one moved in part is flattened.
 		void Transform(const std::set<uint32_t>& vertices, const glm::mat4& matrix);
 
 		// Lifts the faces off the rest of the mesh by distance along their

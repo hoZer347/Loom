@@ -108,7 +108,9 @@ namespace ProfilingScripts
 			for (size_t i = 0; i < vertices.size(); i += glm::vec3::length())
 			{
 				const glm::vec3 point(vertices[i], vertices[i + 1], vertices[i + 2]);
-				const glm::vec3 middle = kind == Torus ? glm::normalize(glm::vec3(point.x, point.y, 0.0f)) * RING_RADIUS : glm::vec3(0.0f);
+				const glm::vec3 middle = kind == Torus
+					? glm::normalize(glm::vec3(point.x, point.y, 0.0f)) * RING_RADIUS
+					: glm::vec3(0.0f);
 
 				Add(normals, glm::normalize(point - middle));
 			};
