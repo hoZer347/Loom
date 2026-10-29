@@ -597,6 +597,29 @@ TEST_SUITE("ProjectAssets")
 		std::filesystem::remove_all(root);
 	};
 
+	TEST_CASE("a new compute shader is a .loomcompute file that compiles")
+	{
+		const std::filesystem::path root = std::filesystem::temp_directory_path() / "loom project assets compute shader";
+		std::filesystem::remove_all(root);
+		std::filesystem::create_directories(root);
+
+		const std::string path = Loom::ProjectAssets::CreateComputeShader(root.string(), "Swarm");
+
+		REQUIRE(path == (root / "Swarm.loomcompute").string());
+
+		std::ifstream file(path);
+		const std::string text(std::istreambuf_iterator<char>(file), { });
+		file.close();
+
+		CHECK(text.find("vec4 Compute(ivec2 cell, int layer)") != std::string::npos);
+#ifndef __EMSCRIPTEN__
+		CHECK(Loom::Shader::CheckCompute(text).empty());
+#endif
+		CHECK(Loom::ProjectAssets::CreateComputeShader(root.string(), "Swarm").empty());
+
+		std::filesystem::remove_all(root);
+	};
+
 	#pragma endregion
 
 	#pragma region Asset Kinds

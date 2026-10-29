@@ -60,8 +60,16 @@ TEST_SUITE("Compute")
 		CHECK(stages.fragment.find("loom_Out = Compute(") > stages.fragment.find(COPY));
 
 		CHECK_THROWS_AS(Loom::Shader::AssembleCompute("vec4 Other(ivec2 cell, int layer) { return vec4(0.0); }\n"), std::runtime_error);
-		CHECK_FALSE(Loom::Shader::CheckCompute("void main() { }\n").empty());
 	};
+
+#ifndef __EMSCRIPTEN__
+	TEST_CASE("checking a compute file names a missing Compute, and passes one that compiles")
+	{
+		CHECK_FALSE(Loom::Shader::CheckCompute("void main() { }\n").empty());
+		CHECK(Loom::Shader::CheckCompute(COPY).empty());
+		CHECK_FALSE(Loom::Shader::CheckCompute("vec4 Compute(ivec2 cell, int layer) { return undeclared; }\n").empty());
+	};
+#endif
 
 	TEST_CASE("a compute file is known by its extension in any case, and is not a pixel shader")
 	{
