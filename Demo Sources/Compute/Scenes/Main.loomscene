@@ -32,3 +32,33 @@ Main(f9984c40-9658-434d-b183-c79c45771ec7):
 				1 = 4
 				2 = 35044
 				3 = [-5, 0, -5, 5, 0, -5, 5, 0, 5, -5, 0, -5, 5, 0, 5, -5, 0, 5]
+		GameObject Explanation(dff96859-1b8a-4740-9c39-debd1e5f320d)
+			0 = 0
+			1 = false
+			Component UiRect(5b66803b-e0ab-492a-99e0-e3f73efbdeec)
+				0 = (0, 1)
+				1 = (0, 1)
+				2 = (16, -16)
+				3 = (520, 96)
+				4 = (0, 0, 0, 0.6)
+				5 = false
+				6 = ""
+			GameObject Text(3b89bac0-0f17-4dbf-a59d-427327468af3)
+				0 = 0
+				1 = false
+				Component UiRect(8172c6f8-db89-42df-ae02-15de143b9699)
+					0 = (0.5, 0.5)
+					1 = (0.5, 0.5)
+					2 = (0, 0)
+					3 = (488, 80)
+					4 = (0, 0, 0, 0)
+					5 = false
+					6 = ""
+				Component UiText(236bff26-9873-4bc7-92f5-f92f2898b13d)
+					0 = "65,536 cells of two chemicals, all on the GPU. One is fed in; the other eats it, grows and spreads. Each frame runs 8 steps, every cell reading its neighbours from the step before. New drops land now and then."
+					1 = "Assets/Fonts/Roboto-Medium.ttf"
+					2 = 18
+					3 = (1, 1, 1, 1)
+					4 = 0
+					5 = true
+					6 = 0

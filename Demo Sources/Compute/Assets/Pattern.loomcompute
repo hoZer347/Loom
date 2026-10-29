@@ -1,8 +1,9 @@
 // Gray-Scott reaction and diffusion: x is the chemical fed in, y the one
-// that eats it. Seeded with squares of y, which grow into spots and stripes.
+// that eats it. FEED and KILL sit where the eater never settles, and a drop
+// of it lands somewhere new every so often to stir it up again.
 
-const float FEED = 0.037;
-const float KILL = 0.06;
+const float FEED = 0.014;
+const float KILL = 0.045;
 const float DIFFUSE_FED = 1.0;
 const float DIFFUSE_EATER = 0.5;
 
@@ -13,6 +14,10 @@ const float CORNER = 0.05;
 // Squares SEED_CELLS across, of which SEEDED in a hundred start with the eater.
 const int SEED_CELLS = 8;
 const float SEEDED = 0.04;
+
+// A drop DROP_RADIUS cells wide every DROP_EVERY runs.
+const int DROP_EVERY = 90;
+const float DROP_RADIUS = 6.0;
 
 float Hash(vec2 point)
 {
@@ -37,6 +42,15 @@ vec4 Compute(ivec2 cell, int layer)
 	float reaction = here.x * here.y * here.y;
 	float fed = here.x + DIFFUSE_FED * laplacian.x - reaction + FEED * (1.0 - here.x);
 	float eater = here.y + DIFFUSE_EATER * laplacian.y + reaction - (KILL + FEED) * here.y;
+
+	if (u_frame % DROP_EVERY == 0)
+	{
+		float drop = float(u_frame / DROP_EVERY);
+		vec2 centre = vec2(Hash(vec2(drop, 1.0)), Hash(vec2(drop, 2.0))) * vec2(LoomSize());
+
+		if (distance(vec2(cell), centre) < DROP_RADIUS)
+			eater = 1.0;
+	}
 
 	return vec4(clamp(fed, 0.0, 1.0), clamp(eater, 0.0, 1.0), 0.0, 1.0);
 }

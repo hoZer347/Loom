@@ -55,9 +55,25 @@
         margin-bottom: 6px;
       }
 
+      #gpu-notice p {
+        margin: 0 0 8px;
+      }
+
       #gpu-notice ol {
         margin: 0 0 10px;
         padding-left: 20px;
+      }
+
+      #gpu-address[hidden] {
+        display: none;
+      }
+
+      #gpu-address code {
+        margin-right: 8px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: #0f172a;
+        user-select: all;
       }
 
       #gpu-notice button {
@@ -76,6 +92,8 @@
 
     <div id="gpu-notice" role="alert" hidden>
       <strong id="gpu-title">Hardware acceleration is off</strong>
+      <p id="gpu-why"></p>
+      <p id="gpu-address" hidden><code></code><button type="button" id="gpu-copy" title="Copies the settings address">Copy</button></p>
       <ol id="gpu-steps"></ol>
       <button type="button" id="gpu-dismiss">Dismiss</button>
     </div>
@@ -162,26 +180,46 @@
         if (drawable && probe)
           return;
 
-        if (probe) {
-          document.getElementById("gpu-title").textContent = "This GPU cannot run compute shaders";
-          document.getElementById("gpu-steps").replaceChildren();
+        const show = (title, why, address, steps) => {
+          document.getElementById("gpu-title").textContent = title;
+          document.getElementById("gpu-why").textContent = why;
+          document.getElementById("gpu-address").hidden = !address;
+          document.querySelector("#gpu-address code").textContent = address;
+          document.getElementById("gpu-steps").replaceChildren(
+            ...steps.map((step) => Object.assign(document.createElement("li"), { textContent: step })));
           document.getElementById("gpu-notice").hidden = false;
+        };
+
+        if (probe) {
+          show("This GPU cannot run compute shaders", "Its WebGL cannot draw into float textures, which hold this page's simulation, so the simulation is not running.", "", []);
           return;
         }
 
+        // Pages cannot open a browser's own settings, so the address is copied
+        // for the address bar instead.
+        const why = "This page simulates on the graphics card, and the browser has switched it off, so the simulation is not running.";
         const agent = navigator.userAgent;
-        const steps = agent.includes("Firefox")
-          ? ["Open Settings > General > Performance", "Untick Use recommended performance settings", "Tick Use hardware acceleration when available", "Restart Firefox"]
-          : agent.includes("Edg/")
-            ? ["Open edge://settings/system", "Turn on Use graphics acceleration when available", "Restart Edge"]
-            : agent.includes("Chrome")
-              ? ["Open chrome://settings/system", "Turn on Use graphics acceleration when available", "Relaunch Chrome"]
-              : ["Turn on hardware or graphics acceleration in the browser's settings", "Restart the browser"];
 
-        document.getElementById("gpu-steps").replaceChildren(
-          ...steps.map((step) => Object.assign(document.createElement("li"), { textContent: step })));
-        document.getElementById("gpu-notice").hidden = false;
+        if (agent.includes("Firefox"))
+          show("Hardware acceleration is off", why, "about:preferences#general", ["Paste it into the address bar", "Under Performance, untick Use recommended performance settings", "Tick Use hardware acceleration when available", "Restart Firefox"]);
+        else if (agent.includes("Edg/"))
+          show("Hardware acceleration is off", why, "edge://settings/system", ["Paste it into the address bar", "Turn on Use graphics acceleration when available", "Restart Edge"]);
+        else if (agent.includes("Chrome"))
+          show("Hardware acceleration is off", why, "chrome://settings/system", ["Paste it into the address bar", "Turn on Use graphics acceleration when available", "Relaunch Chrome"]);
+        else
+          show("Hardware acceleration is off", why, "", ["Turn on hardware or graphics acceleration in the browser's settings", "Restart the browser"]);
       };
+
+      document.getElementById("gpu-copy").addEventListener("click", async () => {
+        const button = document.getElementById("gpu-copy");
+
+        try {
+          await navigator.clipboard.writeText(document.querySelector("#gpu-address code").textContent);
+          button.textContent = "Copied";
+        } catch {
+          button.textContent = "Select and copy it";
+        }
+      });
 
       document.getElementById("gpu-dismiss").addEventListener("click", () => {
         document.getElementById("gpu-notice").hidden = true;
