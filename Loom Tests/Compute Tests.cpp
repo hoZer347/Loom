@@ -42,6 +42,7 @@ namespace
 		"}\n";
 
 	constexpr int SIZE = 256;
+	constexpr int RUNS_TRIED = 3;
 };
 
 #pragma endregion
@@ -161,6 +162,61 @@ TEST_SUITE("Compute")
 
 		CHECK(renderer.drawnInto.size() == draws);
 		CHECK(Loom::ComputeShader::Output("Hidden") == 0);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a ComputeShader the GPU cannot make data for tries once, draws nothing and has no output")
+	{
+		RecordingRenderer renderer;
+		renderer.dataTargets = false;
+		const std::string path = "Undrawable.loomcompute";
+
+		REQUIRE(Loom::Material::EditShader(path, COPY).empty());
+
+		Loom::Scene scene("compute undrawable");
+		Pump();
+
+		Loom::ComputeShader* compute = scene.AddChild("Undrawable")->Attach<Loom::ComputeShader>();
+		compute->ChangeShader(path);
+		Pump();
+
+		for (int run = 0; run < RUNS_TRIED; run++)
+			Loom::ComputeShader::RunAll();
+
+		CHECK(renderer.dataTargetsAsked == 1);
+		CHECK(renderer.drawnInto.empty());
+		CHECK(Loom::ComputeShader::Output("Undrawable") == 0);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a ComputeShader given another file starts it on new data")
+	{
+		RecordingRenderer renderer;
+		const std::string first = "First.loomcompute";
+		const std::string second = "Second.loomcompute";
+
+		REQUIRE(Loom::Material::EditShader(first, COPY).empty());
+		REQUIRE(Loom::Material::EditShader(second, COPY).empty());
+
+		Loom::Scene scene("compute changed");
+		Pump();
+
+		Loom::ComputeShader* compute = scene.AddChild("Changed")->Attach<Loom::ComputeShader>();
+		compute->ChangeShader(first);
+		Pump();
+
+		Loom::ComputeShader::RunAll();
+		const uint32_t old = Loom::ComputeShader::Output("First");
+		REQUIRE(old != 0);
+
+		compute->ChangeShader(second);
+
+		CHECK(Loom::ComputeShader::Output("First") == 0);
+		CHECK(Loom::ComputeShader::Output("Second") == 0);
+
+		const int asked = renderer.dataTargetsAsked;
+		Loom::ComputeShader::RunAll();
+
+		CHECK(renderer.dataTargetsAsked > asked);
+		CHECK(Loom::ComputeShader::Output("Second") != 0);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the Rendering menu's Compute Shader is a child with a ComputeShader naming no file, which never runs")

@@ -1,10 +1,10 @@
 #include "RenderingObjects.h"
 
 #include "Camera.h"
+#include "ComputeShader.h"
 #include "GameObject.h"
 #include "Light.h"
 #include "PixelShader.h"
-#include "ComputeShader.h"
 #include "PreVertex.h"
 #include "Shapes.h"
 

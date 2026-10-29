@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 
@@ -56,12 +57,12 @@ namespace Loom
 
 		// The texture holding the layer a sampler named name reads, or 0 when
 		// no enabled one is named so.
-		static uint32_t Output(const std::string& name);
+		static uint32_t Output(std::string_view name);
 
 		// Gives back every texture, for before the renderer goes.
 		static void ReleaseAll();
 
-		static constexpr int MAX_LAYERS = 4;
+		static constexpr int MaxLayers = 4;
 
 		#pragma endregion
 
@@ -76,7 +77,7 @@ namespace Loom
 		bool Enabled() const;
 
 		// The layer of this one's data a sampler named name reads, or -1.
-		int LayerNamed(const std::string& name) const;
+		int LayerNamed(std::string_view name) const;
 
 		#pragma endregion
 
@@ -91,11 +92,18 @@ namespace Loom
 
 		// Each layer twice: one read while the other is written, in turn.
 		static constexpr int BUFFERS = 2;
-		uint32_t m_data[BUFFERS][MAX_LAYERS]{ };
+		uint32_t m_data[BUFFERS][MaxLayers]{ };
 		int m_reading = 0;
 		int m_allocated = 0;
 		glm::ivec2 m_size{ 0 };
 		int m_frame = 0;
+
+		// The file's name without its extension, which the samplers reading it use.
+		std::string m_stem;
+
+		// What the GPU could not make, which is not tried again.
+		glm::ivec2 m_failed_size{ 0 };
+		int m_failed_layers = 0;
 
 		static inline std::recursive_mutex s_mutex;
 		static inline std::vector<ComputeShader*> s_all;

@@ -75,7 +75,7 @@
     <canvas id="canvas" tabindex="0"></canvas>
 
     <div id="gpu-notice" role="alert" hidden>
-      <strong>Hardware acceleration is off</strong>
+      <strong id="gpu-title">Hardware acceleration is off</strong>
       <ol id="gpu-steps"></ol>
       <button type="button" id="gpu-dismiss">Dismiss</button>
     </div>
@@ -161,6 +161,13 @@
 
         if (drawable && probe)
           return;
+
+        if (probe) {
+          document.getElementById("gpu-title").textContent = "This GPU cannot run compute shaders";
+          document.getElementById("gpu-steps").replaceChildren();
+          document.getElementById("gpu-notice").hidden = false;
+          return;
+        }
 
         const agent = navigator.userAgent;
         const steps = agent.includes("Firefox")

@@ -2,6 +2,7 @@
 
 #include "Material.h"
 #include "Mesh.h"
+#include "PixelPass.h"
 #include "Renderer.h"
 #include "ShaderVariables.h"
 #include "Utilities/Clock.h"
@@ -9,7 +10,6 @@
 #include <algorithm>
 #include <filesystem>
 #include <iostream>
-#include <iterator>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -20,22 +20,7 @@ namespace Loom
 {
 	namespace
 	{
-		constexpr uint32_t STATIC_DRAW = 0x88E4;	// GL_STATIC_DRAW
-
-		// Two triangles over the whole of what is drawn into.
-		constexpr float QUAD[] =
-		{
-			-1.0f, -1.0f, 0.0f,
-			1.0f, -1.0f, 0.0f,
-			1.0f, 1.0f, 0.0f,
-			-1.0f, -1.0f, 0.0f,
-			1.0f, 1.0f, 0.0f,
-			-1.0f, 1.0f, 0.0f,
-		};
-		constexpr size_t FLOATS_PER_VERTEX = 3;
-		constexpr size_t QUAD_VERTICES = std::size(QUAD) / FLOATS_PER_VERTEX;
-
-		constexpr const char* LAYER_UNIFORMS[ComputeShader::MAX_LAYERS] = { "u_layer0", "u_layer1", "u_layer2", "u_layer3" };
+		constexpr const char* LAYER_UNIFORMS[ComputeShader::MaxLayers] = { "u_layer0", "u_layer1", "u_layer2", "u_layer3" };
 		constexpr float ZEROS[] = { 0.0f, 0.0f, 0.0f, 0.0f };
 
 #ifdef __EMSCRIPTEN__
@@ -84,13 +69,17 @@ namespace Loom
 
 	void ComputeShader::ChangeShader(const std::string& path)
 	{
+		Release();
 		m_shader_path = path;
+		m_stem = std::filesystem::path(path).stem().string();
 		shader = path.empty() ? nullptr : Material::SharedShader(path);
 		m_frame = 0;
 	};
 
 	void ComputeShader::OnAttach()
 	{
+		m_stem = std::filesystem::path(GetShaderPath()).stem().string();
+
 		if (shader == nullptr && !m_shader_path->empty())
 			shader = Material::SharedShader(m_shader_path);
 	};
@@ -118,7 +107,7 @@ namespace Loom
 			compute->Run();
 	};
 
-	uint32_t ComputeShader::Output(const std::string& name)
+	uint32_t ComputeShader::Output(std::string_view name)
 	{
 		std::scoped_lock lock{ s_mutex };
 
@@ -165,7 +154,10 @@ namespace Loom
 
 		const int most = renderer->MaxTextureSize();
 		const glm::ivec2 size(std::clamp(*m_width, 1, most), std::clamp(*m_height, 1, most));
-		const int layers = std::clamp(*m_layers, 1, MAX_LAYERS);
+		const int layers = std::clamp(*m_layers, 1, MaxLayers);
+
+		if (size == m_failed_size && layers == m_failed_layers)
+			return;
 
 		if ((size != m_size || layers != m_allocated) && !Allocate(size, layers))
 			return;
@@ -186,14 +178,14 @@ namespace Loom
 			ApplyShaderVariables(program, shader->variables, none, nullptr);
 
 			// A layer the data lacks reads the first.
-			for (int layer = 0; layer < MAX_LAYERS; layer++)
+			for (int layer = 0; layer < MaxLayers; layer++)
 				renderer->SetTexture(program, LAYER_UNIFORMS[layer], m_data[m_reading][std::min(layer, layers - 1)]);
 
 			for (int layer = 0; layer < layers; layer++)
 			{
 				renderer->PushTarget(m_data[writing][layer]);
 				renderer->SetUniform(program, "u_writing", UniformType::Int, &layer);
-				renderer->Draw(program, Mesh::Triangles, QUAD, QUAD_VERTICES, STATIC_DRAW, VertexFormat::Position);
+				renderer->Draw(program, Mesh::Triangles, PixelPass::Quad, PixelPass::QuadVertices, Mesh::Static, VertexFormat::Position);
 				renderer->PopTarget();
 			};
 
@@ -215,6 +207,8 @@ namespace Loom
 				if (!buffer[layer])
 				{
 					Release();
+					m_failed_size = size;
+					m_failed_layers = layers;
 					CheckGpu(false);
 					return false;
 				};
@@ -262,17 +256,12 @@ namespace Loom
 		return true;
 	};
 
-	int ComputeShader::LayerNamed(const std::string& name) const
+	int ComputeShader::LayerNamed(std::string_view name) const
 	{
-		if (!m_allocated || m_shader_path->empty())
+		if (!m_allocated || m_stem.empty() || !name.starts_with(m_stem))
 			return -1;
 
-		const std::string stem = std::filesystem::path(GetShaderPath()).stem().string();
-
-		if (!name.starts_with(stem))
-			return -1;
-
-		const std::string after = name.substr(stem.size());
+		const std::string_view after = name.substr(m_stem.size());
 
 		if (after.empty())
 			return 0;

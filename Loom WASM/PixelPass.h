@@ -5,6 +5,7 @@
 #include "glm/glm.hpp"
 
 #include <cstdint>
+#include <iterator>
 #include <vector>
 
 
@@ -48,6 +49,19 @@ namespace Loom
 
 		// Gives back what it holds, for before the renderer goes.
 		void Release();
+
+		// Two triangles over the whole of what is drawn into.
+		static constexpr float Quad[] =
+		{
+			-1.0f, -1.0f, 0.0f,
+			1.0f, -1.0f, 0.0f,
+			1.0f, 1.0f, 0.0f,
+			-1.0f, -1.0f, 0.0f,
+			1.0f, 1.0f, 0.0f,
+			-1.0f, 1.0f, 0.0f,
+		};
+		static constexpr size_t FloatsPerVertex = 3;
+		static constexpr size_t QuadVertices = std::size(Quad) / FloatsPerVertex;
 
 		#pragma endregion
 

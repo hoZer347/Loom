@@ -5,28 +5,12 @@
 #include "Scene.h"
 
 #include <algorithm>
-#include <iterator>
 
 
 namespace Loom
 {
 	namespace
 	{
-		constexpr uint32_t STATIC_DRAW = 0x88E4;	// GL_STATIC_DRAW
-
-		// Two triangles over the whole of what is drawn into.
-		constexpr float QUAD[] =
-		{
-			-1.0f, -1.0f, 0.0f,
-			1.0f, -1.0f, 0.0f,
-			1.0f, 1.0f, 0.0f,
-			-1.0f, -1.0f, 0.0f,
-			1.0f, 1.0f, 0.0f,
-			-1.0f, 1.0f, 0.0f,
-		};
-		constexpr size_t FLOATS_PER_VERTEX = 3;
-		constexpr size_t QUAD_VERTICES = std::size(QUAD) / FLOATS_PER_VERTEX;
-
 		constexpr const char* COPY_PROGRAM = "Pixel pass copy";
 
 		constexpr const char* COPY_VERTEX = R"(
@@ -112,7 +96,7 @@ void main()
 
 			renderer->SetTexture(m_copy, "u_scene", target);
 			renderer->Clear(nullptr, true);
-			renderer->Draw(m_copy, Mesh::Triangles, QUAD, QUAD_VERTICES, STATIC_DRAW, VertexFormat::Position);
+			renderer->Draw(m_copy, Mesh::Triangles, Quad, QuadVertices, Mesh::Static, VertexFormat::Position);
 			return;
 		};
 
@@ -133,7 +117,7 @@ void main()
 			renderer->Clear(nullptr, true);
 			renderer->SetTexture(m_noted[i], "u_scene", source);
 			renderer->SetTexture(m_noted[i], "u_sceneDepth", depth);
-			renderer->Draw(m_noted[i], Mesh::Triangles, QUAD, QUAD_VERTICES, STATIC_DRAW, VertexFormat::Position);
+			renderer->Draw(m_noted[i], Mesh::Triangles, Quad, QuadVertices, Mesh::Static, VertexFormat::Position);
 
 			if (into)
 				renderer->PopTarget();

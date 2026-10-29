@@ -92,13 +92,22 @@ namespace Loom
 			return changed;
 		};
 
-		bool ScopeCombo(UniformScope& scope)
+		// Compute is offered only to a sampler, the one type a ComputeShader fills.
+		bool ScopeCombo(UniformScope& scope, UniformType type)
 		{
 			bool changed = false;
 
+			if (type != UniformType::Sampler2D && scope == UniformScope::Compute)
+			{
+				scope = UniformScope::Material;
+				changed = true;
+			};
+
+			const int offered = type == UniformType::Sampler2D ? (int)std::size(SCOPE_NAMES) : (int)UniformScope::Compute;
+
 			if (ImGui::BeginCombo("##scope", SCOPE_NAMES[(int)scope]))
 			{
-				for (int i = 0; i < (int)std::size(SCOPE_NAMES); i++)
+				for (int i = 0; i < offered; i++)
 					if (ImGui::Selectable(SCOPE_NAMES[i], i == (int)scope))
 					{
 						changed = i != (int)scope;
@@ -327,7 +336,7 @@ namespace Loom
 
 				ImGui::TableNextColumn();
 				ImGui::SetNextItemWidth(-FLT_MIN);
-				const bool rescoped = ScopeCombo(changed.scope);
+				const bool rescoped = ScopeCombo(changed.scope, changed.type);
 
 				if (retyped || rescoped)
 					Edited(DeclareShaderVariable(shader->file_path, variable.name, changed, error), error);
@@ -356,7 +365,7 @@ namespace Loom
 
 			ImGui::TableNextColumn();
 			ImGui::SetNextItemWidth(-FLT_MIN);
-			ScopeCombo(m_new_variable.scope);
+			ScopeCombo(m_new_variable.scope, m_new_variable.type);
 
 			ImGui::TableNextColumn();
 			ImGui::BeginDisabled(m_new_variable.name.empty());

@@ -291,6 +291,11 @@ namespace LoomTests
 		};
 		uint32_t CreateDataTarget(int width, int height) override
 		{
+			dataTargetsAsked++;
+
+			if (!dataTargets)
+				return 0;
+
 			++m_handles;
 			targetSizes[m_handles] = glm::ivec2(width, height);
 			return m_handles;
@@ -382,6 +387,10 @@ namespace LoomTests
 		std::map<std::string, std::string> vertices;
 		std::map<std::string, std::string> fragments;
 		std::map<uint32_t, glm::ivec2> targetSizes;
+
+		// Whether CreateDataTarget makes one, as a GPU without float targets does not.
+		bool dataTargets = true;
+		int dataTargetsAsked = 0;
 		std::map<uint32_t, uint32_t> targetDepths;
 		glm::ivec2 windowSize = glm::ivec2(1);
 
