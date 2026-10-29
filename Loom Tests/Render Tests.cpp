@@ -264,8 +264,23 @@ namespace
 		VulkanContactFixture() : RenderFixture(CONTACT_SIZE, Loom::Backend::Vulkan) { };
 	};
 
+	// The largest difference in red between the two frames at the points.
+	int Furthest(const Loom::Camera& camera, const Image& shadowed, const Image& unshadowed, const std::vector<glm::vec3>& points)
+	{
+		int furthest = 0;
+
+		for (const glm::vec3& point : points)
+		{
+			const glm::ivec2 pixel = PixelOf(camera, shadowed, point);
+			furthest = std::max(furthest, std::abs(shadowed.At(pixel.x, pixel.y).r - unshadowed.At(pixel.x, pixel.y).r));
+		};
+
+		return furthest;
+	};
+
 	// Seen from under the plane, the sphere is in the plane's shadow right up
-	// to it; seen from above, the open plane is lit through, with no acne.
+	// to it; seen from above, what nothing stands between and the light is lit
+	// just as with no shadows at all, with no acne.
 	void CheckContact(RenderFixture& fixture, const std::string& backend)
 	{
 		const ClearedTo cleared(CLEAR);
@@ -280,11 +295,16 @@ namespace
 		constexpr float TEXELS_BELOW = 1.0f;
 		constexpr float ACROSS_EXTENTS = 2.0f;
 
-		// The ambient light alone, and a little over for rounding.
-		constexpr int SHADED_TOLERANCE = 8;
+		// Off rounding, and a pixel landing a little off the point.
+		constexpr int TOLERANCE = 8;
 
-		// Well clear of the sphere's shadow, which falls the light's way.
-		const glm::vec3 open(1.0f, 0.0f, 1.0f);
+		// Sphere points lit at least this much and facing the camera at least
+		// this much, so the light grazes some and none sits on the silhouette.
+		constexpr float LIT_AT_LEAST = 0.3f;
+		constexpr float FACING_AT_LEAST = 0.4f;
+		constexpr int STEPS = 24;
+		constexpr float TURN = glm::two_pi<float>();
+		constexpr float HALF_TURN = glm::pi<float>();
 
 		{
 			Contact contact("Render - shadow at a contact from under, on " + backend, UNDER_POSITION, UNDER_ROTATION);
@@ -294,7 +314,7 @@ namespace
 			// On the side of the sphere facing both the camera and the light.
 			const float below = TEXELS_BELOW * ACROSS_EXTENTS * contact.light->shadowExtent / contact.light->shadowResolution;
 			const glm::vec3 tucked(0.0f, -below, std::sqrt(CONTACT_RADIUS * CONTACT_RADIUS - below * below));
-			const int shaded = (int)(contact.light->ambient * UINT8_MAX) + SHADED_TOLERANCE;
+			const int shaded = (int)(contact.light->ambient * UINT8_MAX) + TOLERANCE;
 
 			const glm::ivec2 pixel = PixelOf(*contact.camera, image, tucked);
 			CHECK(image.At(pixel.x, pixel.y).r <= shaded);
@@ -302,11 +322,35 @@ namespace
 
 		{
 			Contact contact("Render - shadow at a contact from above, on " + backend, ABOVE_POSITION, ABOVE_ROTATION);
-			const Image image = fixture.Frame();
-			image.Save("Render - shadow at a contact from above, on " + backend);
 
-			const glm::ivec2 pixel = PixelOf(*contact.camera, image, open);
-			CHECK(image.At(pixel.x, pixel.y) == WHITE);
+			// No ambient, so nothing lit reaches white and hides acne.
+			contact.light->ambient = 0.0f;
+
+			const Image shadowed = fixture.Frame();
+			shadowed.Save("Render - shadow at a contact from above, on " + backend);
+
+			contact.light->castShadows = false;
+			const Image unshadowed = fixture.Frame();
+
+			const glm::vec3 toLight = -glm::normalize((glm::vec3)contact.light->direction);
+			std::vector<glm::vec3> lit;
+
+			for (int around = 0; around < STEPS; around++)
+				for (int up = 1; up < STEPS / 2; up++)
+				{
+					const float azimuth = TURN * around / STEPS;
+					const float polar = HALF_TURN * up / STEPS;
+					const glm::vec3 normal(std::sin(polar) * std::cos(azimuth), std::cos(polar), std::sin(polar) * std::sin(azimuth));
+					const glm::vec3 point = normal * CONTACT_RADIUS;
+
+					if (glm::dot(normal, toLight) >= LIT_AT_LEAST && glm::dot(normal, glm::normalize(ABOVE_POSITION - point)) >= FACING_AT_LEAST)
+						lit.push_back(point);
+				};
+
+			// Well clear of the sphere's shadow, which falls the light's way.
+			lit.push_back(glm::vec3(1.0f, 0.0f, 1.0f));
+
+			CHECK(Furthest(*contact.camera, shadowed, unshadowed, lit) <= TOLERANCE);
 		};
 	};
 
