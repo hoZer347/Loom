@@ -39,26 +39,29 @@ namespace Loom
 		constexpr float ZEROS[] = { 0.0f, 0.0f, 0.0f, 0.0f };
 
 #ifdef __EMSCRIPTEN__
-		// The page's notice, which Player.html defines.
-		EM_JS(void, ShowGpuNotice, (), {
-			if (Module.loomShowGpuNotice)
-				Module.loomShowGpuNotice();
+		// The page's notice, which Player.html defines, shown when the GPU
+		// cannot run compute shaders or the browser draws without it.
+		EM_JS(void, CheckPageGpu, (bool drawable), {
+			if (Module.loomCheckGpu)
+				Module.loomCheckGpu(drawable);
 		});
 #endif
 
-		// Once a run, rather than every frame it cannot run.
-		void ReportUnsupported()
+		// Once a run, as the first ComputeShader takes its textures.
+		void CheckGpu(bool drawable)
 		{
-			static bool reported = false;
+			static bool checked = false;
 
-			if (reported)
+			if (checked)
 				return;
 
-			reported = true;
-			std::cerr << "ComputeShader: this GPU cannot draw into float textures, so compute shaders do not run" << std::endl;
+			checked = true;
+
+			if (!drawable)
+				std::cerr << "ComputeShader: this GPU cannot draw into float textures, so compute shaders do not run" << std::endl;
 
 #ifdef __EMSCRIPTEN__
-			ShowGpuNotice();
+			CheckPageGpu(drawable);
 #endif
 		};
 	};
@@ -212,7 +215,7 @@ namespace Loom
 				if (!buffer[layer])
 				{
 					Release();
-					ReportUnsupported();
+					CheckGpu(false);
 					return false;
 				};
 
@@ -225,6 +228,7 @@ namespace Loom
 		m_allocated = layers;
 		m_reading = 0;
 		m_frame = 0;
+		CheckGpu(true);
 
 		return true;
 	};

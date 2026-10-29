@@ -30,10 +30,55 @@
         outline: none;
         touch-action: none;
       }
+
+      #gpu-notice {
+        position: fixed;
+        top: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: min(480px, calc(100% - 32px));
+        box-sizing: border-box;
+        padding: 14px 16px;
+        border-radius: 8px;
+        background: #1e293b;
+        color: #e2e8f0;
+        font: 14px/1.5 system-ui, sans-serif;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      }
+
+      #gpu-notice[hidden] {
+        display: none;
+      }
+
+      #gpu-notice strong {
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      #gpu-notice ol {
+        margin: 0 0 10px;
+        padding-left: 20px;
+      }
+
+      #gpu-notice button {
+        padding: 4px 12px;
+        border: 0;
+        border-radius: 4px;
+        background: #334155;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+      }
     </style>
   </head>
   <body>
     <canvas id="canvas" tabindex="0"></canvas>
+
+    <div id="gpu-notice" role="alert" hidden>
+      <strong>Hardware acceleration is off</strong>
+      <ol id="gpu-steps"></ol>
+      <button type="button" id="gpu-dismiss">Dismiss</button>
+    </div>
 
     <script>
       // The scene is fetched into the virtual file system before main runs,
@@ -107,6 +152,34 @@
           return addModule.call(this, new URL(url, folder).href, options);
         };
       })();
+
+      // A ComputeShader calls in as it first runs, drawable false when the GPU
+      // cannot draw into float textures. A context that fails with
+      // failIfMajorPerformanceCaveat is one the browser draws in software.
+      Module.loomCheckGpu = (drawable) => {
+        const probe = document.createElement("canvas").getContext("webgl2", { failIfMajorPerformanceCaveat: true });
+
+        if (drawable && probe)
+          return;
+
+        const agent = navigator.userAgent;
+        const steps = agent.includes("Firefox")
+          ? ["Open Settings > General > Performance", "Untick Use recommended performance settings", "Tick Use hardware acceleration when available", "Restart Firefox"]
+          : agent.includes("Edg/")
+            ? ["Open edge://settings/system", "Turn on Use graphics acceleration when available", "Restart Edge"]
+            : agent.includes("Chrome")
+              ? ["Open chrome://settings/system", "Turn on Use graphics acceleration when available", "Relaunch Chrome"]
+              : ["Turn on hardware or graphics acceleration in the browser's settings", "Restart the browser"];
+
+        document.getElementById("gpu-steps").replaceChildren(
+          ...steps.map((step) => Object.assign(document.createElement("li"), { textContent: step })));
+        document.getElementById("gpu-notice").hidden = false;
+      };
+
+      document.getElementById("gpu-dismiss").addEventListener("click", () => {
+        document.getElementById("gpu-notice").hidden = true;
+        Module.canvas.focus();
+      });
 
       Module.canvas.addEventListener("click", () => Module.canvas.focus());
       Module.canvas.addEventListener("contextmenu", (e) => e.preventDefault());

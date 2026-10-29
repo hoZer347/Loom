@@ -27,8 +27,9 @@ namespace Loom
 	* - A shader reads the data through a sampler2D tagged "// compute" and
 	*   named for the file, Swarm for Swarm.loomcompute, with a digit after
 	*   the name for the second layer on, Swarm1 and the rest
-	* - Where the GPU cannot draw into float textures it does not run, and a
-	*   web page says how to turn the browser's hardware acceleration on
+	* - Where the GPU cannot draw into float textures it does not run. A web
+	*   page where it cannot, or where the browser draws without the GPU,
+	*   says how to turn the browser's hardware acceleration on
 	*/
 	struct LOOM_API ComputeShader final : Component<ComputeShader, "Rendering">
 	{

@@ -1,0 +1,42 @@
+// Gray-Scott reaction and diffusion: x is the chemical fed in, y the one
+// that eats it. Seeded with squares of y, which grow into spots and stripes.
+
+const float FEED = 0.037;
+const float KILL = 0.06;
+const float DIFFUSE_FED = 1.0;
+const float DIFFUSE_EATER = 0.5;
+
+// Laplacian weights: the four sides, then the four corners.
+const float SIDE = 0.2;
+const float CORNER = 0.05;
+
+// Squares SEED_CELLS across, of which SEEDED in a hundred start with the eater.
+const int SEED_CELLS = 8;
+const float SEEDED = 0.04;
+
+float Hash(vec2 point)
+{
+	return fract(sin(dot(point, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+vec4 Compute(ivec2 cell, int layer)
+{
+	if (u_frame == 0)
+	{
+		float eater = Hash(vec2(cell / SEED_CELLS)) < SEEDED ? 1.0 : 0.0;
+		return vec4(1.0, eater, 0.0, 1.0);
+	}
+
+	vec2 here = LoomRead(cell, 0).xy;
+	vec2 sides = LoomRead(cell + ivec2(1, 0), 0).xy + LoomRead(cell - ivec2(1, 0), 0).xy
+		+ LoomRead(cell + ivec2(0, 1), 0).xy + LoomRead(cell - ivec2(0, 1), 0).xy;
+	vec2 corners = LoomRead(cell + ivec2(1, 1), 0).xy + LoomRead(cell - ivec2(1, 1), 0).xy
+		+ LoomRead(cell + ivec2(1, -1), 0).xy + LoomRead(cell - ivec2(1, -1), 0).xy;
+	vec2 laplacian = sides * SIDE + corners * CORNER - here;
+
+	float reaction = here.x * here.y * here.y;
+	float fed = here.x + DIFFUSE_FED * laplacian.x - reaction + FEED * (1.0 - here.x);
+	float eater = here.y + DIFFUSE_EATER * laplacian.y + reaction - (KILL + FEED) * here.y;
+
+	return vec4(clamp(fed, 0.0, 1.0), clamp(eater, 0.0, 1.0), 0.0, 1.0);
+}

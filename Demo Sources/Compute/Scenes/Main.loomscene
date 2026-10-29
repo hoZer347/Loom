@@ -1,0 +1,34 @@
+Main(f9984c40-9658-434d-b183-c79c45771ec7):
+	GameObject Root(1c99efe9-26c7-42b2-a39c-6c32625d5f6b)
+		0 = 0
+		1 = false
+		GameObject Camera(ba28f020-8c7c-4c31-9738-29f2454e0dbd)
+			0 = 0
+			1 = false
+			2 = (0, 12, 8)
+			Component Camera(cefc501b-7ee9-45d8-af73-46f3146a98ba)
+				0 = true
+				1 = (0, 0, 0.8)
+				2 = 45
+				3 = 0.1
+				4 = 100
+		GameObject Pattern(fe28c94a-3524-4885-be33-ccb9f6d8d856)
+			0 = 0
+			1 = false
+			Component ComputeShader(05af30f2-4411-4d47-a295-8b84e4617dac)
+				0 = "Assets/Pattern.loomcompute"
+				1 = 256
+				2 = 256
+				3 = 1
+				4 = 8
+		GameObject Plane(3120a3b2-875c-432d-884f-25f821d62d42)
+			0 = 0
+			1 = false
+			Component Material(9b10fe1c-c1dd-4e53-bc28-d0b8426057b3)
+				0 = "Assets/Pattern.shader"
+				1 = (1, 1, 1)
+			Component Mesh(2b183650-7a16-45cd-9afd-9644aad5a15a)
+				0 = 9b10fe1c-c1dd-4e53-bc28-d0b8426057b3
+				1 = 4
+				2 = 35044
+				3 = [-5, 0, -5, 5, 0, -5, 5, 0, 5, -5, 0, -5, 5, 0, 5, -5, 0, 5]
