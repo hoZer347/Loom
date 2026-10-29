@@ -109,6 +109,22 @@ namespace Loom
 		constexpr ImU32 close_pressed = IM_COL32(148, 32, 21, 255);
 		constexpr ImU32 close_glyph = IM_COL32(255, 255, 255, 255);
 
+		ImGuiMouseCursor ResizeCursor(WindowFrame::Hit hit)
+		{
+			switch (hit)
+			{
+			case WindowFrame::Hit::Left:
+			case WindowFrame::Hit::Right: return ImGuiMouseCursor_ResizeEW;
+			case WindowFrame::Hit::Top:
+			case WindowFrame::Hit::Bottom: return ImGuiMouseCursor_ResizeNS;
+			case WindowFrame::Hit::TopLeft:
+			case WindowFrame::Hit::BottomRight: return ImGuiMouseCursor_ResizeNWSE;
+			case WindowFrame::Hit::TopRight:
+			case WindowFrame::Hit::BottomLeft: return ImGuiMouseCursor_ResizeNESW;
+			default: return ImGuiMouseCursor_None;
+			};
+		};
+
 		#pragma endregion
 
 		#pragma region Field Groups
@@ -2724,6 +2740,9 @@ namespace Loom
 		frame.SetDragStrip(ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId)
 			? WindowFrame::Rect{ }
 			: WindowFrame::Rect{ strip_left - origin.x, bar_min.y - origin.y, buttons_left - origin.x, bar_max.y - origin.y });
+
+		if (const ImGuiMouseCursor cursor = ResizeCursor(frame.Hovered()); cursor != ImGuiMouseCursor_None)
+			ImGui::SetMouseCursor(cursor);
 
 		constexpr float centred = 0.5f;
 

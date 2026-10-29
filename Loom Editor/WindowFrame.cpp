@@ -1,6 +1,6 @@
 #include "WindowFrame.h"
 
-// The title bar comes off on Windows. Linux keeps its window manager's, and the web test build compiles this too.
+// The title bar comes off on Windows and X11. Wayland keeps its compositor's, and the web test build compiles this too.
 #ifdef _WIN32
 
 #include "OpenGL.h"
@@ -14,6 +14,16 @@
 
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "dwmapi.lib")
+
+#elif !defined(__EMSCRIPTEN__)
+
+#include "OpenGL.h"
+
+#define GLFW_EXPOSE_NATIVE_X11
+#include <GLFW/glfw3native.h>
+
+#include <limits>
+#include <unordered_map>
 
 #endif
 
@@ -207,6 +217,11 @@ namespace Loom
 			RemoveWindowSubclass(glfwGetWin32Window(m_window), Procedure, SUBCLASS_ID);
 	};
 
+	WindowFrame::Hit WindowFrame::Hovered() const
+	{
+		return Hit::Client;
+	};
+
 	void WindowFrame::Install(GLFWwindow* window, Redraw redraw)
 	{
 		if (window == nullptr || m_window != nullptr)
@@ -244,14 +259,189 @@ namespace Loom
 
 namespace Loom
 {
-	WindowFrame::~WindowFrame() = default;
+	namespace
+	{
+		// At the content scale, as deep as a window manager's own resizing edges.
+		constexpr float BORDER = 6.0f;
 
-	void WindowFrame::Install(GLFWwindow*, Redraw)
+		// GTK's default, which the desktop's own title bars keep.
+		constexpr double DOUBLE_CLICK = 0.4;
+
+		constexpr double NEVER = -std::numeric_limits<double>::infinity();
+
+		// _NET_WM_MOVERESIZE's directions.
+		enum Direction : long
+		{
+			SIZE_TOPLEFT = 0,
+			SIZE_TOP = 1,
+			SIZE_TOPRIGHT = 2,
+			SIZE_RIGHT = 3,
+			SIZE_BOTTOMRIGHT = 4,
+			SIZE_BOTTOM = 5,
+			SIZE_BOTTOMLEFT = 6,
+			SIZE_LEFT = 7,
+			MOVE = 8,
+		};
+
+		// _NET_WM_MOVERESIZE's mark for a request from an application.
+		constexpr long FROM_APPLICATION = 1;
+
+		struct Link
+		{
+			const WindowFrame* frame = nullptr;
+			GLFWmousebuttonfun previous = nullptr;
+			double caption = NEVER;
+		};
+
+		std::unordered_map<GLFWwindow*, Link> s_links;
+
+		WindowFrame::Hit Under(const WindowFrame& frame, GLFWwindow* window)
+		{
+			if (glfwGetWindowMonitor(window) != nullptr)
+				return WindowFrame::Hit::Client;
+
+			double x = 0.0;
+			double y = 0.0;
+			int width = 0;
+			int height = 0;
+			float scale = 1.0f;
+
+			glfwGetCursorPos(window, &x, &y);
+			glfwGetWindowSize(window, &width, &height);
+			glfwGetWindowContentScale(window, &scale, nullptr);
+
+			return WindowFrame::HitTest(
+				(float)x,
+				(float)y,
+				(float)width,
+				(float)height,
+				BORDER * scale,
+				glfwGetWindowAttrib(window, GLFW_MAXIMIZED) == GLFW_TRUE,
+				frame.DragStrip());
+		};
+
+		Direction DirectionOf(WindowFrame::Hit hit)
+		{
+			switch (hit)
+			{
+			case WindowFrame::Hit::Left: return SIZE_LEFT;
+			case WindowFrame::Hit::Right: return SIZE_RIGHT;
+			case WindowFrame::Hit::Top: return SIZE_TOP;
+			case WindowFrame::Hit::Bottom: return SIZE_BOTTOM;
+			case WindowFrame::Hit::TopLeft: return SIZE_TOPLEFT;
+			case WindowFrame::Hit::TopRight: return SIZE_TOPRIGHT;
+			case WindowFrame::Hit::BottomLeft: return SIZE_BOTTOMLEFT;
+			case WindowFrame::Hit::BottomRight: return SIZE_BOTTOMRIGHT;
+			default: return MOVE;
+			};
+		};
+
+		// The window manager moves or sizes the window from here, as its own title bar would.
+		void MoveResize(GLFWwindow* window, Direction direction)
+		{
+			Display* const display = glfwGetX11Display();
+			const ::Window handle = glfwGetX11Window(window);
+			::Window root = 0;
+			::Window child = 0;
+			int root_x = 0;
+			int root_y = 0;
+			int x = 0;
+			int y = 0;
+			unsigned int buttons = 0;
+
+			XQueryPointer(display, handle, &root, &child, &root_x, &root_y, &x, &y, &buttons);
+			XUngrabPointer(display, CurrentTime);
+
+			XEvent event{ };
+			event.xclient.type = ClientMessage;
+			event.xclient.window = handle;
+			event.xclient.message_type = XInternAtom(display, "_NET_WM_MOVERESIZE", False);
+			event.xclient.format = 32;
+			event.xclient.data.l[0] = root_x;
+			event.xclient.data.l[1] = root_y;
+			event.xclient.data.l[2] = direction;
+			event.xclient.data.l[3] = Button1;
+			event.xclient.data.l[4] = FROM_APPLICATION;
+
+			XSendEvent(display, root, False, SubstructureRedirectMask | SubstructureNotifyMask, &event);
+			XFlush(display);
+		};
+
+		void Press(GLFWwindow* window, int button, int action, int mods)
+		{
+			const auto found = s_links.find(window);
+
+			if (found == s_links.end())
+				return;
+
+			Link& link = found->second;
+			const WindowFrame::Hit hit = button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS
+				? Under(*link.frame, window)
+				: WindowFrame::Hit::Client;
+
+			if (hit == WindowFrame::Hit::Client)
+			{
+				if (link.previous != nullptr)
+					link.previous(window, button, action, mods);
+
+				return;
+			};
+
+			if (hit == WindowFrame::Hit::Caption)
+			{
+				const double now = glfwGetTime();
+				const bool twice = now - link.caption < DOUBLE_CLICK;
+
+				link.caption = twice ? NEVER : now;
+
+				if (twice)
+				{
+					if (glfwGetWindowAttrib(window, GLFW_MAXIMIZED))
+						glfwRestoreWindow(window);
+					else glfwMaximizeWindow(window);
+
+					return;
+				};
+			};
+
+			MoveResize(window, DirectionOf(hit));
+		};
+	};
+
+	WindowFrame::~WindowFrame()
+	{
+		const auto found = s_links.find(m_window);
+
+		if (found == s_links.end())
+			return;
+
+		glfwSetMouseButtonCallback(m_window, found->second.previous);
+		s_links.erase(found);
+	};
+
+	void WindowFrame::Install(GLFWwindow* window, Redraw redraw)
+	{
+		if (window == nullptr || m_window != nullptr || glfwGetPlatform() != GLFW_PLATFORM_X11)
+			return;
+
+		m_window = window;
+		m_redraw = redraw;
+		s_links[window] = { this, glfwSetMouseButtonCallback(window, Press) };
+
+		glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_FALSE);
+	};
+
+	// GLFW keeps the window undecorated over a monitor and back.
+	void WindowFrame::Fit()
 	{
 	};
 
-	void WindowFrame::Fit()
+	WindowFrame::Hit WindowFrame::Hovered() const
 	{
+		if (m_window == nullptr || !glfwGetWindowAttrib(m_window, GLFW_HOVERED))
+			return Hit::Client;
+
+		return Under(*this, m_window);
 	};
 };
 

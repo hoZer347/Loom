@@ -14,6 +14,10 @@
 #include <chrono>
 #include <vector>
 
+#elif !defined(__EMSCRIPTEN__)
+
+#include "OpenGL.h"
+
 #endif
 
 
@@ -238,6 +242,111 @@ TEST_SUITE("WindowFrame")
 		CHECK_FALSE(PeekMessageW(&message, hwnd, WM_TIMER, WM_TIMER, PM_NOREMOVE));
 
 		SendMessageW(hwnd, WM_EXITSIZEMOVE, 0, 0);
+	};
+};
+
+#elif !defined(__EMSCRIPTEN__)
+
+TEST_SUITE("WindowFrame")
+{
+	constexpr int window_width = 320;
+	constexpr int window_height = 240;
+	constexpr Loom::WindowFrame::Rect strip = { 0.0f, 0.0f, 320.0f, 20.0f };
+
+	int s_presses = 0;
+
+	void Count(GLFWwindow*, int, int, int)
+	{
+		s_presses++;
+	};
+
+	struct HiddenWindow
+	{
+		GLFWwindow* window = nullptr;
+
+		HiddenWindow()
+		{
+			glfwInit();
+			glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+			glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+			window = glfwCreateWindow(window_width, window_height, "WindowFrame", nullptr, nullptr);
+			glfwSetMouseButtonCallback(window, Count);
+			s_presses = 0;
+		};
+
+		~HiddenWindow()
+		{
+			glfwDefaultWindowHints();
+			glfwDestroyWindow(window);
+			glfwTerminate();
+		};
+
+		// A left press with the mouse at x, y, as the window would get it. GLFW
+		// moves the mouse only in a focused window, so the window moves instead.
+		void PressAt(double x, double y)
+		{
+			double mouse_x = 0.0;
+			double mouse_y = 0.0;
+			int left = 0;
+			int top = 0;
+
+			glfwGetCursorPos(window, &mouse_x, &mouse_y);
+			glfwGetWindowPos(window, &left, &top);
+			glfwSetWindowPos(window, left + (int)(mouse_x - x), top + (int)(mouse_y - y));
+			glfwGetCursorPos(window, &mouse_x, &mouse_y);
+			REQUIRE(mouse_x == x);
+			REQUIRE(mouse_y == y);
+
+			const GLFWmousebuttonfun installed = glfwSetMouseButtonCallback(window, nullptr);
+
+			glfwSetMouseButtonCallback(window, installed);
+			installed(window, GLFW_MOUSE_BUTTON_LEFT, GLFW_PRESS, 0);
+		};
+	};
+
+	TEST_CASE_FIXTURE(HiddenWindow, "a frame takes the title bar off")
+	{
+		REQUIRE(glfwGetPlatform() == GLFW_PLATFORM_X11);
+
+		Loom::WindowFrame frame;
+		frame.Install(window, nullptr);
+
+		CHECK(frame.IsInstalled());
+		CHECK(glfwGetWindowAttrib(window, GLFW_DECORATED) == GLFW_FALSE);
+	};
+
+	TEST_CASE_FIXTURE(HiddenWindow, "a press on the editor reaches the callback before the frame's")
+	{
+		Loom::WindowFrame frame;
+		frame.Install(window, nullptr);
+		frame.SetDragStrip(strip);
+
+		PressAt(window_width / 2.0, window_height / 2.0);
+		CHECK(s_presses == 1);
+	};
+
+	TEST_CASE_FIXTURE(HiddenWindow, "a press on the drag strip or an edge goes to the window manager")
+	{
+		constexpr double inside_strip = 10.0;
+		constexpr double inside_edge = 1.0;
+
+		Loom::WindowFrame frame;
+		frame.Install(window, nullptr);
+		frame.SetDragStrip(strip);
+
+		PressAt(window_width / 2.0, inside_strip);
+		PressAt(inside_edge, window_height / 2.0);
+		CHECK(s_presses == 0);
+	};
+
+	TEST_CASE_FIXTURE(HiddenWindow, "a frame gives the window its callback back when it goes")
+	{
+		{
+			Loom::WindowFrame frame;
+			frame.Install(window, nullptr);
+		};
+
+		CHECK(glfwSetMouseButtonCallback(window, nullptr) == Count);
 	};
 };
 

@@ -30,6 +30,7 @@ find_package(Vulkan REQUIRED)
 find_package(glslang REQUIRED)
 find_package(assimp REQUIRED)
 find_package(Threads REQUIRED)
+find_package(X11 REQUIRED)
 
 set(LIBS "${CMAKE_SOURCE_DIR}/External Libraries")
 
@@ -77,14 +78,14 @@ vcxproj_sources("${CMAKE_SOURCE_DIR}/Loom Tests/Loom Tests.vcxproj" TEST_SOURCES
 add_executable(LoomTests ${TEST_SOURCES})
 target_include_directories(LoomTests PRIVATE "Loom Tests" "Loom Editor")
 target_compile_definitions(LoomTests PRIVATE DOCTEST_CONFIG_USE_STD_HEADERS)
-target_link_libraries(LoomTests PRIVATE LoomEngine assimp::assimp dw)
+target_link_libraries(LoomTests PRIVATE LoomEngine assimp::assimp dw X11::X11)
 set_target_properties(LoomTests PROPERTIES OUTPUT_NAME "Loom Tests")
 
 vcxproj_sources("${CMAKE_SOURCE_DIR}/Loom Editor/Loom Editor.vcxproj" EDITOR_SOURCES)
 add_executable(LoomEditor ${EDITOR_SOURCES})
 target_include_directories(LoomEditor PRIVATE "Loom Editor")
 # Whole, so a script finds every engine function, not just the ones the editor calls.
-target_link_libraries(LoomEditor PRIVATE "$<LINK_LIBRARY:WHOLE_ARCHIVE,LoomEngine>" assimp::assimp dw)
+target_link_libraries(LoomEditor PRIVATE "$<LINK_LIBRARY:WHOLE_ARCHIVE,LoomEngine>" assimp::assimp dw X11::X11)
 # Scripts load as shared libraries that call back into the engine linked here.
 set_target_properties(LoomEditor PROPERTIES OUTPUT_NAME "Loom Editor" ENABLE_EXPORTS ON)
 

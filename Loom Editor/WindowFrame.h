@@ -12,8 +12,8 @@ namespace Loom
 	* - The window's edges still resize it, and a strip the caller names each
 	*   frame drags it, snaps it and maximizes it on a double-click, as a
 	*   title bar does
-	* - Redraws at each new size, and on a timer, while the OS moves or sizes
-	*   it, which holds the frame loop until let go
+	* - Redraws at each new size, and on a timer, while Windows moves or
+	*   sizes it, which holds the frame loop until let go
 	* - A window over a whole monitor has neither
 	*/
 	struct WindowFrame final
@@ -49,6 +49,10 @@ namespace Loom
 		const Rect& DragStrip() const { return m_strip; };
 
 		Redraw Redrawing() const { return m_redraw; };
+
+		// The edge or corner under the mouse, for the caller to show its
+		// resizing cursor, which Windows shows by itself.
+		Hit Hovered() const;
 
 		// What a point in a client area of width by height is over, with
 		// border the depth of its resizing edges, which a maximized window has none of.
