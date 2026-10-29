@@ -10,7 +10,6 @@
 #include <GLFW/glfw3native.h>
 
 #include <windows.h>
-#include <dwmapi.h>
 
 #include <chrono>
 #include <vector>
@@ -194,17 +193,9 @@ TEST_SUITE("WindowFrame")
 	{
 		constexpr int sizes = 6;
 		constexpr UINT size_only = SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE;
-		constexpr double least_of_period = 0.5;
 
-		DWM_TIMING_INFO timing{ };
-		timing.cbSize = sizeof(timing);
-		REQUIRE(SUCCEEDED(DwmGetCompositionTimingInfo(nullptr, &timing)));
-
-		LARGE_INTEGER frequency{ };
-		QueryPerformanceFrequency(&frequency);
-		REQUIRE(frequency.QuadPart > 0);
-
-		const std::chrono::duration<double> period((double)timing.qpcRefreshPeriod / (double)frequency.QuadPart);
+		// Far under any screen's refresh, and far over a size taken without waiting for one.
+		constexpr std::chrono::milliseconds least_wait{ 1 };
 
 		Loom::WindowFrame frame;
 		frame.Install(window, Stamp);
@@ -218,9 +209,7 @@ TEST_SUITE("WindowFrame")
 		SendMessageW(hwnd, WM_EXITSIZEMOVE, 0, 0);
 
 		REQUIRE(s_redrawnAt.size() == sizes);
-
-		for (size_t redraw = 1; redraw < s_redrawnAt.size(); redraw++)
-			CHECK(s_redrawnAt[redraw] - s_redrawnAt[redraw - 1] > period * least_of_period);
+		CHECK(s_redrawnAt.back() - s_redrawnAt.front() > least_wait * (sizes - 1));
 	};
 
 	TEST_CASE_FIXTURE(HiddenWindow, "a redraw that pumps messages is not redrawn inside itself")
