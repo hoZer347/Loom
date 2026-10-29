@@ -1229,6 +1229,10 @@ namespace Loom
 	Scene* Editor::CreateScene(const std::string& name)
 	{
 		Scene* scene = new Scene(name);
+		RenderingObjects::AddStarter(scene->GetRoot(), ShapeShader());
+
+		// Children join their parents through the queue, and a new scene asset is saved straight away.
+		Engine::DoTasks();
 
 		m_ownedScenes.push_back(scene);
 		m_scenePaths[scene] = "";
@@ -3519,6 +3523,12 @@ namespace Loom
 
 		if (ImGui::MenuItem(RenderingObjects::PixelShaderLabel))
 			Select(RenderingObjects::AddPixelShader(*parent));
+
+		if (ImGui::MenuItem(RenderingObjects::LightLabel))
+			Select(RenderingObjects::AddLight(*parent));
+
+		if (ImGui::MenuItem(RenderingObjects::CameraLabel))
+			Select(RenderingObjects::AddCamera(*parent));
 
 		ImGui::EndMenu();
 	};

@@ -177,6 +177,7 @@
     <ClCompile Include="Cutscenes Tests.cpp" />
     <ClCompile Include="RichText Tests.cpp" />
     <ClCompile Include="DialogueManager Tests.cpp" />
+    <ClCompile Include="RenderingObjects Tests.cpp" />
     <ClCompile Include="Shapes Tests.cpp" />
     <ClCompile Include="SpriteAsset Tests.cpp" />
     <ClCompile Include="SpriteEditor Tests.cpp" />

@@ -5,7 +5,10 @@
 
 #include "ProjectAssets.h"
 
+#include "Engine.h"
 #include "Guid.h"
+#include "RenderingObjects.h"
+#include "Scene.h"
 #include "SceneSerializer.h"
 
 #include <algorithm>
@@ -265,22 +268,6 @@ Global
 EndGlobal
 )";
 
-		// Tabs and newlines are the scene format's syntax, so they are spelled out.
-		const char* const starter_scene =
-			"Main({SCENE_GUID}):\n"
-			"\tGameObject Root({ROOT_GUID})\n"
-			"\t\t0 = 0\n"
-			"\t\t1 = false\n"
-			"\t\tGameObject Triangle({TRIANGLE_GUID})\n"
-			"\t\t\t0 = 0\n"
-			"\t\t\t1 = false\n"
-			"\t\t\tComponent SpinningTriangle({SCRIPT_GUID})\n"
-			"\t\t\t\t0 = 0.02\n"
-			"\t\t\t\t1 = 0.6\n"
-			"\t\t\t\t2 = 0\n"
-			"\t\t\t\t3 = true\n"
-			"\t\t\t\t4 = \"Assets/Shader.shader\"\n";
-
 		const char* const readme = R"({NAME}
 {UNDERLINE}
 
@@ -348,12 +335,26 @@ SpinningTriangle is there as a worked example.
 			filled = ProjectAssets::Replace(filled, "{PROJECT_GUID}", project_guid);
 			filled = ProjectAssets::Replace(filled, "{SCENE_EXTENSION}", SceneSerializer::extension);
 			filled = ProjectAssets::Replace(filled, "{UNDERLINE}", std::string(name.size(), '='));
-			filled = ProjectAssets::Replace(filled, "{SCENE_GUID}", Guid::New().ToString());
-			filled = ProjectAssets::Replace(filled, "{ROOT_GUID}", Guid::New().ToString());
-			filled = ProjectAssets::Replace(filled, "{TRIANGLE_GUID}", Guid::New().ToString());
-			filled = ProjectAssets::Replace(filled, "{SCRIPT_GUID}", Guid::New().ToString());
 
 			return filled;
+		};
+
+		// The scene a new one starts as, under the name Main.
+		std::string StarterScene()
+		{
+			Scene* scene = new Scene("Main");
+			Scene::Unlist(scene);
+
+			RenderingObjects::AddStarter(scene->GetRoot(), ProjectTemplate::shader_path);
+
+			// Children join their parents through the queue.
+			Engine::DoTasks();
+
+			const std::string text = SceneSerializer::Serialize(*scene);
+
+			Engine::QueueTask([scene]() { delete scene; });
+
+			return text;
 		};
 
 		#pragma endregion
@@ -519,7 +520,7 @@ SpinningTriangle is there as a worked example.
 		const bool written =
 			Write(root / (name + extension), fill(loomproject) + fill(scripts_entries), error) &&
 			Write(root / shader_path, ProjectAssets::defaultShader, error) &&
-			Write(root / scenes_folder / (std::string("Main") + SceneSerializer::extension), fill(starter_scene), error) &&
+			Write(root / scenes_folder / (std::string("Main") + SceneSerializer::extension), StarterScene(), error) &&
 			Write(root / "README.txt", fill(readme), error) &&
 			WriteScripts(root, name, error);
 
