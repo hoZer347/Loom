@@ -256,6 +256,10 @@ namespace Loom
 		// An RGBA colour texture with a depth buffer behind it.
 		virtual uint32_t CreateColorTarget(int width, int height) = 0;
 
+		// Four 32 bit floats a texel and no depth, sampled nearest, which
+		// nothing blends into. 0 where the GPU cannot draw into float textures.
+		virtual uint32_t CreateDataTarget(int width, int height) = 0;
+
 		// The depth behind a colour target, as a texture a sampler2D reads: 0 at
 		// the near plane, 1 at the far. It goes when the target does.
 		virtual uint32_t TargetDepth(uint32_t target) = 0;

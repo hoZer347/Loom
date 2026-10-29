@@ -20,6 +20,7 @@ namespace Loom
 		constexpr const char* Prefab = "📦";
 		constexpr const char* Shader = "✨";
 		constexpr const char* PixelShader = "🖥";
+		constexpr const char* ComputeShader = "🧮";
 		constexpr const char* PreVertex = "🌊";
 		constexpr const char* Texture = "🖼";
 		constexpr const char* TwoD = "🎨";

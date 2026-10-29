@@ -60,7 +60,7 @@ namespace Loom
 			Prefab::extension,
 		};
 
-		constexpr std::string_view shaderExtensions[] = { ProjectAssets::shaderExtension, ProjectAssets::pixelShaderExtension };
+		constexpr std::string_view shaderExtensions[] = { ProjectAssets::shaderExtension, ProjectAssets::pixelShaderExtension, ProjectAssets::computeShaderExtension };
 		constexpr std::string_view dialogueExtensions[] = { ProjectAssets::dialogueExtension };
 		constexpr std::string_view preVertexExtensions[] = { ProjectAssets::preVertexExtension };
 
@@ -522,6 +522,16 @@ namespace {NAMESPACE}
 		return path.string();
 	};
 
+	std::string ProjectAssets::CreateComputeShader(const std::string& folder, const std::string& name, std::string* error)
+	{
+		const std::filesystem::path path = std::filesystem::path(folder) / (name + computeShaderExtension);
+
+		if (!IsValidName(name) || !WriteNew(path, defaultComputeShader, error))
+			return "";
+
+		return path.string();
+	};
+
 	std::string ProjectAssets::CreateDialogue(const std::string& folder, const std::string& name, std::string* error)
 	{
 		const std::filesystem::path path = std::filesystem::path(folder) / (name + dialogueExtension);
@@ -976,6 +986,13 @@ out vec4 FragColor;
 void main()
 {
 	FragColor = LoomScenePixel(LoomScreenPixel());
+}
+)";
+
+	const char* const ProjectAssets::defaultComputeShader = R"(
+vec4 Compute(ivec2 cell, int layer)
+{
+	return LoomRead(cell, layer) + vec4(u_deltaTime);
 }
 )";
 

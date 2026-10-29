@@ -86,6 +86,7 @@ TEST_SUITE("FileTypes")
 			Loom::FileTabs::Fonts.extension,
 			Loom::InputActions::extension,
 			Loom::Shader::pixel_extension,
+			Loom::Shader::compute_extension,
 			Loom::PreVertex::extension,
 			Loom::VisualStudio::header_extension,
 		};

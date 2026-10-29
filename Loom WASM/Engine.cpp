@@ -3,6 +3,7 @@
 #include "imgui.h"
 
 #include "Audio.h"
+#include "ComputeShader.h"
 #include "OpenGL.h"
 #include "Renderer.h"
 #include "Scene.h"
@@ -198,6 +199,7 @@ namespace Loom
 		if (renderer)
 		{
 			ReleaseFrame();
+			ComputeShader::ReleaseAll();
 			renderer->ShutdownImGui();
 			ImGui::DestroyContext();
 
@@ -290,6 +292,12 @@ namespace Loom
 		{
 			LOOM_STAGE("Engine::onUpdate");
 			onUpdate();
+		};
+
+		// Before anything is drawn, so every view this frame sees the same data.
+		{
+			LOOM_STAGE("ComputeShader::RunAll");
+			ComputeShader::RunAll();
 		};
 
 		if (updateScenes)

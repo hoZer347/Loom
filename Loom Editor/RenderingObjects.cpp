@@ -4,6 +4,7 @@
 #include "GameObject.h"
 #include "Light.h"
 #include "PixelShader.h"
+#include "ComputeShader.h"
 #include "PreVertex.h"
 #include "Shapes.h"
 
@@ -65,5 +66,13 @@ namespace Loom
 
 		GameObject* plane = Shapes::Add(root, Shapes::Shape::Plane, shader);
 		plane->transform.scale = glm::vec3(STARTER_PLANE_SCALE);
+	};
+
+	GameObject* RenderingObjects::AddComputeShader(GameObject& parent)
+	{
+		GameObject* gameObject = parent.AddChild(ComputeShaderLabel);
+		gameObject->Attach<ComputeShader>();
+
+		return gameObject;
 	};
 };

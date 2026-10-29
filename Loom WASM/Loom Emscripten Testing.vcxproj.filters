@@ -46,6 +46,9 @@
     <ClCompile Include="PixelShader.cpp">
       <Filter>Shaders</Filter>
     </ClCompile>
+    <ClCompile Include="ComputeShader.cpp">
+      <Filter>Shaders</Filter>
+    </ClCompile>
     <ClCompile Include="ShaderVariables.cpp">
       <Filter>Shaders</Filter>
     </ClCompile>
@@ -318,6 +321,9 @@
       <Filter>Shaders</Filter>
     </ClInclude>
     <ClInclude Include="PixelShader.h">
+      <Filter>Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="ComputeShader.h">
       <Filter>Shaders</Filter>
     </ClInclude>
     <ClInclude Include="ShaderVariables.h">

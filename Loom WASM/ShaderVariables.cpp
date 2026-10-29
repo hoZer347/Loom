@@ -1,5 +1,6 @@
 #include "ShaderVariables.h"
 
+#include "ComputeShader.h"
 #include "EditorGui.h"
 #include "Renderer.h"
 #include "Textures.h"
@@ -25,6 +26,17 @@ namespace Loom
 
 		constexpr const char* INSTANCE_TAG = "instance";
 		constexpr const char* MATERIAL_TAG = "material";
+		constexpr const char* COMPUTE_TAG = "compute";
+
+		const char* TagOf(UniformScope scope)
+		{
+			switch (scope)
+			{
+			case UniformScope::Instance:	return INSTANCE_TAG;
+			case UniformScope::Compute:		return COMPUTE_TAG;
+			default:						return MATERIAL_TAG;
+			};
+		};
 
 		// GLSL keeps gl_ for itself.
 		constexpr std::string_view RESERVED_PREFIX = "gl_";
@@ -54,8 +66,7 @@ namespace Loom
 		std::string Declaration(const ShaderVariable& variable)
 		{
 			return
-				std::string("uniform ") + InfoOf(variable.type).glsl + ' ' + variable.name + "; // " +
-				(variable.scope == UniformScope::Instance ? INSTANCE_TAG : MATERIAL_TAG);
+				std::string("uniform ") + InfoOf(variable.type).glsl + ' ' + variable.name + "; // " + TagOf(variable.scope);
 		};
 
 		bool IsIdentifier(const std::string& name)
@@ -479,7 +490,10 @@ namespace Loom
 			if (seen)
 				continue;
 
-			variable.scope = match[TAG_MATCH] == INSTANCE_TAG ? UniformScope::Instance : UniformScope::Material;
+			variable.scope =
+				match[TAG_MATCH] == INSTANCE_TAG ? UniformScope::Instance :
+				match[TAG_MATCH] == COMPUTE_TAG ? UniformScope::Compute :
+				UniformScope::Material;
 
 			variables.push_back(variable);
 		};
@@ -674,7 +688,8 @@ namespace Loom
 
 			if (info.kind == UniformKind::Texture)
 			{
-				renderer->SetTexture(program, variable.name.c_str(), TextureFor(*renderer, value));
+				const uint32_t computed = variable.scope == UniformScope::Compute ? ComputeShader::Output(variable.name) : 0;
+				renderer->SetTexture(program, variable.name.c_str(), computed ? computed : TextureFor(*renderer, value));
 				continue;
 			};
 

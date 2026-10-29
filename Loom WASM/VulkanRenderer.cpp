@@ -78,6 +78,9 @@ namespace Loom
 		#pragma region Resources
 
 		constexpr VkFormat COLOR_TARGET_FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
+
+		// Every device draws into and samples it, though none need blend or filter it.
+		constexpr VkFormat DATA_TARGET_FORMAT = VK_FORMAT_R32G32B32A32_SFLOAT;
 		constexpr VkFormat DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
 
 		// Host-visible chunks, reused once their frame finishes on the GPU.
@@ -1005,6 +1008,32 @@ namespace Loom
 			return Add(std::move(texture));
 		};
 
+		uint32_t CreateDataTarget(int width, int height) override
+		{
+			Texture texture;
+			texture.width = width;
+			texture.height = height;
+
+			if (!CreateAttachment(texture.color, DATA_TARGET_FORMAT, width, height,
+				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT))
+			{
+				std::cerr << "Vulkan: a " << width << 'x' << height << " data target could not be allocated" << std::endl;
+				DestroyTextureNow(texture);
+				return 0;
+			};
+
+			texture.sampler = CreateSampler(false, VK_FILTER_NEAREST);
+
+			Immediately([&](VkCommandBuffer command)
+			{
+				Transition(command, texture.color.image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			});
+
+			texture.color.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+			return Add(std::move(texture));
+		};
+
 		uint32_t TargetDepth(uint32_t target) override
 		{
 			const auto found = m_textures.find(target);
@@ -1762,7 +1791,7 @@ namespace Loom
 			m_rendering = true;
 			m_renderingTarget = target;
 			m_renderingDepth = depth != nullptr;
-			m_renderingFormat = colorImage ? (target == WINDOW ? m_swapFormat : COLOR_TARGET_FORMAT) : VK_FORMAT_UNDEFINED;
+			m_renderingFormat = colorImage ? (target == WINDOW ? m_swapFormat : color->format) : VK_FORMAT_UNDEFINED;
 			m_boundPipeline = VK_NULL_HANDLE;
 
 			// The window draws flipped to right GL's rows; textures read back bottom row first.
@@ -2011,7 +2040,7 @@ namespace Loom
 			depth.depthCompareOp = VK_COMPARE_OP_LESS;
 
 			VkPipelineColorBlendAttachmentState blendAttachment{ };
-			blendAttachment.blendEnable = VK_TRUE;
+			blendAttachment.blendEnable = m_renderingFormat != DATA_TARGET_FORMAT;
 			blendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
 			blendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
 			blendAttachment.colorBlendOp = VK_BLEND_OP_ADD;

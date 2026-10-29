@@ -73,6 +73,11 @@ namespace Loom
 		// writes no colour.
 		static PixelStages AssemblePixel(const std::string& source);
 
+		// What a compute shader file compiles to: one quad over its data, and
+		// the file behind the compute library, its Compute called once a texel.
+		// Throws std::runtime_error at a file with no Compute.
+		static PixelStages AssembleCompute(const std::string& source);
+
 		#pragma endregion
 
 		#pragma region Loading
@@ -81,6 +86,9 @@ namespace Loom
 
 		// A pixel shader's file, which compiles to its pixel pass alone, as id.
 		static constexpr char pixel_extension[] = ".loompixel";
+
+		// A compute shader's file, run by a ComputeShader over its data.
+		static constexpr char compute_extension[] = ".loomcompute";
 
 		// Compiles the file again, for after it has been edited, and swaps the
 		// new program in. A file that no longer compiles keeps the old program
@@ -108,6 +116,7 @@ namespace Loom
 		#pragma region Queries
 
 		static bool IsPixel(const std::string& file_path);
+		static bool IsCompute(const std::string& file_path);
 
 		#pragma endregion
 
@@ -120,6 +129,9 @@ namespace Loom
 
 		// The same for the text of a pixel shader file.
 		static std::vector<ShaderMessage> CheckPixel(const std::string& text);
+
+		// The same for the text of a compute shader file.
+		static std::vector<ShaderMessage> CheckCompute(const std::string& text);
 
 		// Compiles a PreVertex's code in front of the engine's own vertex
 		// stage, with what is wrong on the code's own lines.

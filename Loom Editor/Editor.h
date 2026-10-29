@@ -91,6 +91,7 @@ namespace Loom
 		State,
 		Shader,
 		PixelShader,
+		ComputeShader,
 		Dialogue,
 		PreVertex,
 	};
@@ -949,6 +950,9 @@ namespace Loom
 
 		// Gives the GameObject the pixel shader, on its PixelShader or a new one.
 		void DropPixelShader(GameObject* gameObject, const std::string& path);
+
+		// Gives the GameObject the compute shader, on its ComputeShader or a new one.
+		void DropComputeShader(GameObject* gameObject, const std::string& path);
 
 		// Gives the GameObject the pre-vertex file, on its PreVertex or a new one.
 		void DropPreVertex(GameObject* gameObject, const std::string& path);

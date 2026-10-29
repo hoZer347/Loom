@@ -15,6 +15,7 @@
 #include "LoomObject.h"
 #include "Material.h"
 #include "PixelShader.h"
+#include "ComputeShader.h"
 #include "MissingComponent.h"
 #include "Prefab.h"
 #include "PreVertex.h"
@@ -1011,6 +1012,7 @@ namespace Loom
 			file.extension() == Palette::extension ||
 			file.extension() == BuildSettings::extension ||
 			file.extension() == Shader::pixel_extension ||
+			file.extension() == Shader::compute_extension ||
 			file.extension() == PreVertex::extension) &&
 			std::filesystem::is_regular_file(file, code))
 		{
@@ -3530,6 +3532,9 @@ namespace Loom
 		if (ImGui::MenuItem(RenderingObjects::CameraLabel))
 			Select(RenderingObjects::AddCamera(*parent));
 
+		if (ImGui::MenuItem(RenderingObjects::ComputeShaderLabel))
+			Select(RenderingObjects::AddComputeShader(*parent));
+
 		ImGui::EndMenu();
 	};
 
@@ -3934,6 +3939,24 @@ namespace Loom
 		m_historyDirty = true;
 	};
 
+	void Editor::DropComputeShader(GameObject* gameObject, const std::string& path)
+	{
+		ChangeComponents(
+			*gameObject,
+			[gameObject, &path]()
+			{
+				ComputeShader* compute = gameObject->GetComponent<ComputeShader>();
+
+				if (compute == nullptr)
+					compute = gameObject->Attach<ComputeShader>();
+
+				compute->ChangeShader(path);
+			});
+
+		Select(gameObject);
+		m_historyDirty = true;
+	};
+
 	void Editor::DropPreVertex(GameObject* gameObject, const std::string& path)
 	{
 		ChangeComponents(
@@ -3979,6 +4002,14 @@ namespace Loom
 		{
 			if (ImGui::AcceptDragDropPayload(script_payload))
 				DropPixelShader(gameObject, name);
+
+			return true;
+		};
+
+		if (entry != m_scriptEntries.end() && entry->second.kind == ScriptEntryKind::ComputeShader)
+		{
+			if (ImGui::AcceptDragDropPayload(script_payload))
+				DropComputeShader(gameObject, name);
 
 			return true;
 		};

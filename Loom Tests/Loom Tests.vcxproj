@@ -213,6 +213,7 @@
     <ClCompile Include="Shader Variables Tests.cpp" />
     <ClCompile Include="Shaders Tests.cpp" />
     <ClCompile Include="PreVertex Tests.cpp" />
+    <ClCompile Include="Compute Tests.cpp" />
     <ClCompile Include="PixelPass Tests.cpp" />
     <ClCompile Include="Textures Tests.cpp" />
     <ClCompile Include="Collider Tests.cpp" />

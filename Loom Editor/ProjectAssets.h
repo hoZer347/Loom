@@ -26,6 +26,7 @@ namespace Loom
 
 		static constexpr const char* shaderExtension = Shader::extension;
 		static constexpr const char* pixelShaderExtension = Shader::pixel_extension;
+		static constexpr const char* computeShaderExtension = Shader::compute_extension;
 		static constexpr const char* dialogueExtension = DialogueManagerBase::extension;
 		static constexpr const char* preVertexExtension = PreVertex::extension;
 		static constexpr const char* textureExtension = TextureAsset::fileExtensions.front();
@@ -90,6 +91,7 @@ namespace Loom
 		static std::string CreateFolder(const std::string& folder, const std::string& name, std::string* error = nullptr);
 		static std::string CreateShader(const std::string& folder, const std::string& name, std::string* error = nullptr);
 		static std::string CreatePixelShader(const std::string& folder, const std::string& name, std::string* error = nullptr);
+		static std::string CreateComputeShader(const std::string& folder, const std::string& name, std::string* error = nullptr);
 		static std::string CreateDialogue(const std::string& folder, const std::string& name, std::string* error = nullptr);
 		static std::string CreatePreVertex(const std::string& folder, const std::string& name, std::string* error = nullptr);
 		static std::string CreateTexture(const std::string& folder, const std::string& name, std::string* error = nullptr);
@@ -178,6 +180,9 @@ namespace Loom
 
 		// The pixel shader every new one starts from: the view as it was drawn.
 		static const char* const defaultPixelShader;
+
+		// The compute shader every new one starts from: each cell counts the seconds.
+		static const char* const defaultComputeShader;
 		static const char* const defaultDialogue;
 
 		// What a new .loomprevertex file holds: a wave along world X.

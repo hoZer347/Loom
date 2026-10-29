@@ -36,6 +36,19 @@ namespace Loom
 	{
 		#pragma region Engine Code
 
+		std::string LowerExtension(const std::string& file_path)
+		{
+			std::string extension = std::filesystem::path(file_path).extension().string();
+
+			std::transform(
+				extension.begin(),
+				extension.end(),
+				extension.begin(),
+				[](unsigned char c) { return (char)std::tolower(c); });
+
+			return extension;
+		};
+
 		// The file is source 0, the engine's GLSL 1 and a PreVertex's file 2, so messages land on the right one.
 		constexpr int FILE_SOURCE = 0;
 		constexpr int LIBRARY_SOURCE = 1;
@@ -408,6 +421,88 @@ void main()
 				std::regex_replace(moved, MainPattern(), "$1loom_pre_vertex_main$2") +
 				LineDirective(1, PRE_VERTEX_SOURCE) + own + "\n" +
 				EngineCode(PRE_VERTEX_MAIN);
+		};
+
+		#pragma endregion
+
+		#pragma region Compute
+
+		// The layers are four samplers, since ES 3.00 indexes a sampler array by constants alone.
+		constexpr const char* COMPUTE_LIBRARY = R"(
+precision highp float;
+precision highp int;
+
+uniform highp sampler2D u_layer0;
+uniform highp sampler2D u_layer1;
+uniform highp sampler2D u_layer2;
+uniform highp sampler2D u_layer3;
+uniform int u_frame;
+uniform int u_writing;
+uniform float u_time;
+uniform float u_deltaTime;
+
+out vec4 loom_Out;
+
+ivec2 LoomSize()
+{
+	return textureSize(u_layer0, 0);
+}
+
+int LoomCount()
+{
+	return LoomSize().x * LoomSize().y;
+}
+
+int LoomIndex(ivec2 cell)
+{
+	return cell.y * LoomSize().x + cell.x;
+}
+
+ivec2 LoomCell(int index)
+{
+	return ivec2(index % LoomSize().x, index / LoomSize().x);
+}
+
+vec4 LoomRead(ivec2 cell, int layer)
+{
+	ivec2 wrapped = (cell % LoomSize() + LoomSize()) % LoomSize();
+
+	switch (layer)
+	{
+	case 1:		return texelFetch(u_layer1, wrapped, 0);
+	case 2:		return texelFetch(u_layer2, wrapped, 0);
+	case 3:		return texelFetch(u_layer3, wrapped, 0);
+	default:	return texelFetch(u_layer0, wrapped, 0);
+	}
+}
+
+vec4 LoomRead(int index, int layer)
+{
+	return LoomRead(LoomCell(index), layer);
+}
+)";
+
+		constexpr const char* COMPUTE_VERTEX = R"(
+layout(location = 0) in vec3 aPos;
+
+void main()
+{
+	gl_Position = vec4(aPos.xy, 0.0, 1.0);
+}
+)";
+
+		constexpr const char* COMPUTE_MAIN = R"(
+void main()
+{
+	loom_Out = Compute(ivec2(gl_FragCoord.xy), u_writing);
+}
+)";
+
+		const std::regex& ComputePattern()
+		{
+			static const std::regex pattern(R"(\bvec4\s+Compute\s*\()");
+
+			return pattern;
 		};
 
 		#pragma endregion
@@ -825,7 +920,7 @@ vec3 LoomSceneNormal(ivec2 pixel)
 	{ };
 
 	Shader::Shader(const std::string& file_path) :
-		file_path(file_path.ends_with(extension) || IsPixel(file_path) ?
+		file_path(file_path.ends_with(extension) || IsPixel(file_path) || IsCompute(file_path) ?
 			file_path :
 			file_path + extension),
 		id(CompileSource(file_path))
@@ -1244,6 +1339,14 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		return { EngineCode(PIXEL_PASS_VERTEX), PixelPassFragment(LineDirective(1, FILE_SOURCE) + source) };
 	};
 
+	Shader::PixelStages Shader::AssembleCompute(const std::string& source)
+	{
+		if (!std::regex_search(source, ComputePattern()))
+			throw std::runtime_error("A compute shader defines vec4 Compute(ivec2 cell, int layer)");
+
+		return { EngineCode(COMPUTE_VERTEX), EngineCode(COMPUTE_LIBRARY) + LineDirective(1, FILE_SOURCE) + source + '\n' + EngineCode(COMPUTE_MAIN) };
+	};
+
 	uint32_t Shader::Build(const std::string& name, std::istream& source, const std::string& preVertex)
 	{
 		const std::string text(std::istreambuf_iterator<char>(source), { });
@@ -1253,12 +1356,13 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		if (!renderer)
 			throw std::runtime_error("No renderer to compile " + name + " with");
 
-		if (IsPixel(name))
+		if (IsPixel(name) || IsCompute(name))
 		{
-			const PixelStages pixel = AssemblePixel(text);
+			const PixelStages pass = IsPixel(name) ? AssemblePixel(text) : AssembleCompute(text);
 
 			Programs programs;
-			programs.id = renderer->CreateProgram(name, pixel.vertex, pixel.fragment);
+			programs.id = renderer->CreateProgram(name, pass.vertex, pass.fragment);
+			variables = ParseShaderVariables(text);
 			shaders[name] = programs;
 
 			return Cached(programs);
@@ -1346,6 +1450,22 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		return ParseMessages(Glsl::Compile(stages.vertex, stages.fragment).log);
 	};
 
+	std::vector<ShaderMessage> Shader::CheckCompute(const std::string& text)
+	{
+		PixelStages stages;
+
+		try
+		{
+			stages = AssembleCompute(text);
+		}
+		catch (const std::runtime_error& e)
+		{
+			return { ShaderMessage{ 0, true, e.what() } };
+		};
+
+		return ParseMessages(Glsl::Compile(stages.vertex, stages.fragment).log);
+	};
+
 	std::vector<ShaderMessage> Shader::CheckPreVertex(const std::string& text)
 	{
 		const Stages stages = Assemble(PRE_VERTEX_CHECK, text);
@@ -1360,15 +1480,12 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 	bool Shader::IsPixel(const std::string& file_path)
 	{
-		std::string extension = std::filesystem::path(file_path).extension().string();
+		return LowerExtension(file_path) == pixel_extension;
+	};
 
-		std::transform(
-			extension.begin(),
-			extension.end(),
-			extension.begin(),
-			[](unsigned char c) { return (char)std::tolower(c); });
-
-		return extension == pixel_extension;
+	bool Shader::IsCompute(const std::string& file_path)
+	{
+		return LowerExtension(file_path) == compute_extension;
 	};
 
 	#pragma endregion

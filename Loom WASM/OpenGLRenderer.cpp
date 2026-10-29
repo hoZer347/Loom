@@ -882,6 +882,26 @@ namespace Loom
 			return Complete(target, width, height, previous);
 		};
 
+		uint32_t CreateDataTarget(int width, int height) override
+		{
+			const GLuint previous = BoundFramebuffer();
+			const GLuint bound = BoundTexture();
+			Target target;
+			target.data = true;
+
+			glGenTextures(1, &target.texture);
+			glBindTexture(GL_TEXTURE_2D, target.texture);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+			SetDepthSampling();
+			glBindTexture(GL_TEXTURE_2D, bound);
+
+			glGenFramebuffers(1, &target.framebuffer);
+			glBindFramebuffer(GL_FRAMEBUFFER, target.framebuffer);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, target.texture, 0);
+
+			return Complete(target, width, height, previous);
+		};
+
 		uint32_t TargetDepth(uint32_t target) override
 		{
 			const auto found = m_targets.find(target);
@@ -911,11 +931,16 @@ namespace Loom
 			Saved saved;
 			glGetIntegerv(GL_FRAMEBUFFER_BINDING, &saved.framebuffer);
 			glGetIntegerv(GL_VIEWPORT, saved.viewport);
+			saved.blend = glIsEnabled(GL_BLEND);
 			m_saved.push_back(saved);
 
 			const Target& target = m_targets.at(texture);
 			glBindFramebuffer(GL_FRAMEBUFFER, target.framebuffer);
 			glViewport(0, 0, target.width, target.height);
+
+			// WebGL2 refuses to blend into float textures without EXT_float_blend.
+			if (target.data)
+				glDisable(GL_BLEND);
 		};
 
 		void PopTarget() override
@@ -924,6 +949,11 @@ namespace Loom
 			m_saved.pop_back();
 
 			glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)saved.framebuffer);
+
+			if (saved.blend)
+				glEnable(GL_BLEND);
+			else glDisable(GL_BLEND);
+
 			glViewport(
 				saved.viewport[VIEWPORT_X],
 				saved.viewport[VIEWPORT_Y],
@@ -1002,6 +1032,9 @@ namespace Loom
 
 			// A shadow map, sampled by comparing.
 			bool compare = false;
+
+			// CreateDataTarget's floats.
+			bool data = false;
 			GLsizei width = 0;
 			GLsizei height = 0;
 		};
@@ -1010,6 +1043,7 @@ namespace Loom
 		{
 			GLint framebuffer = 0;
 			GLint viewport[VIEWPORT_SIZE]{ };
+			GLboolean blend = GL_TRUE;
 		};
 
 		// GL names a texture anew once it is gone, so no program may still bind it.

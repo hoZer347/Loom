@@ -17,6 +17,7 @@ namespace Loom
 		constexpr const char* PixelShaderLabel = "Pixel Shader";
 		constexpr const char* LightLabel = "Light";
 		constexpr const char* CameraLabel = "Camera";
+		constexpr const char* ComputeShaderLabel = "Compute Shader";
 
 		// A child of parent with a PreVertex running file, which may be empty.
 		GameObject* AddPreVertex(GameObject& parent, const std::string& file);
@@ -33,5 +34,8 @@ namespace Loom
 		// What a new scene starts with: a light, and a camera looking down at a
 		// plane drawn with shader, which may be empty.
 		void AddStarter(GameObject& root, const std::string& shader);
+
+		// A child of parent with a ComputeShader naming no file yet.
+		GameObject* AddComputeShader(GameObject& parent);
 	};
 };

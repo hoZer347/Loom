@@ -104,6 +104,19 @@ namespace Loom
 		{ "LoomLight", "vec3 LoomLight(vec3 normal, vec4 lightSpace)\nvec3 LoomLight(vec3 normal)", "Fragment stage: the ambient light plus the Light's colour on a world space normal, shadowed when given where it falls in the shadow map." },
 		{ "u_scene", "uniform highp sampler2D u_scene;", "Pixel pass: the view as drawn, or as the pass before this one left it.", true },
 		{ "u_sceneDepth", "uniform highp sampler2D u_sceneDepth;", "Pixel pass: the view's depth, 0 at the near plane and 1 at the far.", true },
+		{ "u_frame", "uniform int u_frame;", "Compute: how many times the ComputeShader has run, 0 the first time, when its data is all zeros.", true },
+		{ "u_deltaTime", "uniform float u_deltaTime;", "Compute: seconds of game time since the frame before.", true },
+		{ "u_writing", "uniform int u_writing;", "Compute: the layer being written, which Compute is handed as layer.", true },
+		{ "u_layer0", "uniform highp sampler2D u_layer0;", "Compute: the first layer as the run before left it. LoomRead reads any layer.", true },
+		{ "u_layer1", "uniform highp sampler2D u_layer1;", "Compute: the second layer as the run before left it.", true },
+		{ "u_layer2", "uniform highp sampler2D u_layer2;", "Compute: the third layer as the run before left it.", true },
+		{ "u_layer3", "uniform highp sampler2D u_layer3;", "Compute: the fourth layer as the run before left it.", true },
+		{ "Compute", "vec4 Compute(ivec2 cell, int layer)", "Compute: defined by the file, the new value of one layer of one cell, run once for each." },
+		{ "LoomRead", "vec4 LoomRead(ivec2 cell, int layer)\nvec4 LoomRead(int index, int layer)", "Compute: a cell's layer as the run before left it, wrapping around the edges." },
+		{ "LoomSize", "ivec2 LoomSize()", "Compute: how many cells across and up the data is." },
+		{ "LoomCount", "int LoomCount()", "Compute: how many cells the data holds." },
+		{ "LoomIndex", "int LoomIndex(ivec2 cell)", "Compute: a cell's place counting along each row from the first." },
+		{ "LoomCell", "ivec2 LoomCell(int index)", "Compute: the cell at a place counting along each row from the first." },
 		{ "LoomScreenPixel", "ivec2 LoomScreenPixel()", "Pixel pass: the pixel being drawn." },
 		{ "LoomScenePixel", "vec4 LoomScenePixel(ivec2 pixel)", "Pixel pass: the view's colour at a pixel." },
 		{ "LoomSceneDepth", "float LoomSceneDepth(ivec2 pixel)", "Pixel pass: the view's depth at a pixel, 0 at the near plane and 1 at the far or where nothing was drawn." },
@@ -114,9 +127,10 @@ namespace Loom
 		{ "NormalKernel", "NormalKernel_3x3 name;", "Pixel pass: as PixelKernel, with the world space normals of the pixels as name.normals." },
 	};
 
-	// Whether a variable is filled in once on the Material, or on each Mesh
-	// drawn with it.
-	enum class UniformScope { Material, Instance };
+	// Whether a variable is filled in once on the Material, on each Mesh
+	// drawn with it, or, for a sampler2D, by the ComputeShader whose file it
+	// is named for, a digit after the name for a layer past the first.
+	enum class UniformScope { Material, Instance, Compute };
 
 	/**
 	* Loom::ShaderVariable
@@ -125,7 +139,8 @@ namespace Loom
 	* - The shader file is where they live: each is a line such as
 	*     uniform vec3 u_tint; // instance
 	*   which the editor writes into the file's COMMON section. Without the
-	*   comment, or with "// material", it is per material
+	*   comment, or with "// material", it is per material, and with
+	*   "// compute" it is a compute shader's data
 	*/
 	struct ShaderVariable
 	{

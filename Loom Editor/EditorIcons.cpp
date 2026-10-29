@@ -39,6 +39,9 @@ namespace Loom
 		if (extension == ProjectAssets::pixelShaderExtension)
 			return PixelShader;
 
+		if (extension == ProjectAssets::computeShaderExtension)
+			return ComputeShader;
+
 		if (extension == ProjectAssets::dialogueExtension)
 			return Dialogue;
 

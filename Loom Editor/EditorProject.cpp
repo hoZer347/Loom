@@ -126,6 +126,7 @@ namespace Loom
 			{ AssetKind::Test, EditorIcons::Test, "Test", "NewTests", ProjectAssets::ScriptKind::Test, "the Tests panel" },
 			{ AssetKind::Shader, EditorIcons::Shader, "Shader", "NewShader" },
 			{ AssetKind::PixelShader, EditorIcons::PixelShader, "Pixel Shader", "NewPixelShader" },
+			{ AssetKind::ComputeShader, EditorIcons::ComputeShader, "Compute Shader", "NewComputeShader" },
 			{ AssetKind::PreVertex, EditorIcons::PreVertex, "Pre-Vertex", "NewPreVertex" },
 			{ AssetKind::Dialogue, EditorIcons::Dialogue, "Dialogue", "NewDialogue" },
 			{ AssetKind::Texture, EditorIcons::Texture, "Texture", "NewTexture" },
@@ -161,7 +162,7 @@ namespace Loom
 
 		bool IsScriptsPanels(AssetKind kind)
 		{
-			return IsScript(kind) || kind == AssetKind::Shader || kind == AssetKind::PixelShader || kind == AssetKind::PreVertex || kind == AssetKind::Dialogue;
+			return IsScript(kind) || kind == AssetKind::Shader || kind == AssetKind::PixelShader || kind == AssetKind::ComputeShader || kind == AssetKind::PreVertex || kind == AssetKind::Dialogue;
 		};
 
 		const FileTabKind* TabMaking(AssetKind kind)
@@ -204,6 +205,7 @@ namespace Loom
 			{ EditorIcons::State, "States" },
 			{ EditorIcons::Shader, "Shaders" },
 			{ EditorIcons::PixelShader, "Pixel Shaders" },
+			{ EditorIcons::ComputeShader, "Compute Shaders" },
 			{ EditorIcons::PreVertex, "Pre-Vertices" },
 			{ EditorIcons::Dialogue, "Dialogues" },
 		};
@@ -220,6 +222,9 @@ namespace Loom
 
 			case ScriptEntryKind::PixelShader:
 				return EditorIcons::PixelShader;
+
+			case ScriptEntryKind::ComputeShader:
+				return EditorIcons::ComputeShader;
 
 			case ScriptEntryKind::Dialogue:
 				return EditorIcons::Dialogue;
@@ -1014,6 +1019,10 @@ namespace Loom
 			path = ProjectAssets::CreatePixelShader(folder, name, &error);
 			break;
 
+		case AssetKind::ComputeShader:
+			path = ProjectAssets::CreateComputeShader(folder, name, &error);
+			break;
+
 		case AssetKind::Dialogue:
 			path = ProjectAssets::CreateDialogue(folder, name, &error);
 			break;
@@ -1688,7 +1697,7 @@ namespace Loom
 				ScriptEntry{
 					shader,
 					std::filesystem::path(shader).stem().string(),
-					Shader::IsPixel(shader) ? ScriptEntryKind::PixelShader : ScriptEntryKind::Shader,
+					Shader::IsPixel(shader) ? ScriptEntryKind::PixelShader : Shader::IsCompute(shader) ? ScriptEntryKind::ComputeShader : ScriptEntryKind::Shader,
 					true });
 
 		for (const std::string& dialogue : m_projectDialogues)
@@ -2083,6 +2092,8 @@ namespace Loom
 			? std::optional(ScriptEntryKind::Shader)
 			: extension == ProjectAssets::pixelShaderExtension
 				? std::optional(ScriptEntryKind::PixelShader)
+			: extension == ProjectAssets::computeShaderExtension
+				? std::optional(ScriptEntryKind::ComputeShader)
 				: extension == ProjectAssets::dialogueExtension
 					? std::optional(ScriptEntryKind::Dialogue)
 					: extension == ProjectAssets::preVertexExtension

@@ -160,6 +160,9 @@
     <ClCompile Include="PreVertex Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="Compute Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="PixelPass Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

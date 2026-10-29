@@ -71,7 +71,7 @@ namespace Loom
 
 		#pragma region Editor
 
-		constexpr const char* SCOPE_NAMES[] = { "Material", "Instance" };
+		constexpr const char* SCOPE_NAMES[] = { "Material", "Instance", "Compute" };
 
 		bool TypeCombo(UniformType& type)
 		{

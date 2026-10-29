@@ -289,6 +289,12 @@ namespace LoomTests
 			targetSizes[m_handles] = glm::ivec2(width, height);
 			return m_handles;
 		};
+		uint32_t CreateDataTarget(int width, int height) override
+		{
+			++m_handles;
+			targetSizes[m_handles] = glm::ivec2(width, height);
+			return m_handles;
+		};
 		uint32_t TargetDepth(uint32_t target) override
 		{
 			const auto found = targetDepths.find(target);

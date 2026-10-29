@@ -43,6 +43,7 @@ namespace Loom
 			{ FileTabs::Fonts.extension, L"Loom.FontFolders", L"Loom Font Folders" },
 			{ InputActions::extension, L"Loom.InputActions", L"Loom Key Bindings" },
 			{ Shader::pixel_extension, L"Loom.PixelShader", L"Loom Pixel Shader" },
+			{ Shader::compute_extension, L"Loom.ComputeShader", L"Loom Compute Shader" },
 			{ PreVertex::extension, L"Loom.PreVertex", L"Loom Pre-Vertex Shader" },
 			{ VisualStudio::header_extension, L"Loom.Header", L"C++ Header" },
 		};
