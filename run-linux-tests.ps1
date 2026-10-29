@@ -35,11 +35,11 @@ $root = $PSScriptRoot
 
 #region Guest script
 
-# Arguments: base commit, targets, deleted files, test arguments, whether to
-# test, timeout in minutes. Lists arrive base64 encoded, '-' when empty.
+# Arguments: base commit, files sent, targets, deleted files, test arguments,
+# whether to test, timeout in minutes. Lists arrive base64 encoded, '-' when empty.
 $guestScript = @'
 set -e
-base=$1; targets=$2; deleted=$3; testargs=$4; test=$5; minutes=$6
+base=$1; count=$2; targets=$3; deleted=$4; testargs=$5; test=$6; minutes=$7
 here=$(dirname "$0")
 stage=$here/stage
 mkdir -p "$stage"
@@ -51,6 +51,8 @@ flock 9
 cd ~/loom
 
 (cd "$stage" && find . -type f -printf '%P\n') > "$here/sent"
+received=$(wc -l < "$here/sent")
+if [ "$received" -ne "$count" ]; then echo "Received $received of $count files"; rm -rf "$here"; exit 1; fi
 decode "$deleted" > "$here/deleted"
 { git diff --name-only "$base" 2>/dev/null; git ls-files -o --exclude-standard -- . ':!build'; } | sort -u > "$here/changed"
 sort -u "$here/sent" "$here/deleted" | comm -23 "$here/changed" - | while IFS= read -r f; do
@@ -116,12 +118,14 @@ try
 
     $script = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($guestScript.Replace("`r`n", "`n")))
     $test = if ($NoTests) { 0 } else { 1 }
-    $remote = "s=`$(mktemp -d) && echo $script | base64 -d > `$s/run.sh && bash `$s/run.sh $base '$($Targets -join ' ')' $(ConvertTo-Base64 $deleted) $(ConvertTo-Base64 $TestArgs) $test $TimeoutMinutes"
+    $remote = "s=`$(mktemp -d) && echo $script | base64 -d > `$s/run.sh && bash `$s/run.sh $base $($present.Count) '$($Targets -join ' ')' $(ConvertTo-Base64 $deleted) $(ConvertTo-Base64 $TestArgs) $test $TimeoutMinutes"
 
     Write-Host "Building $($Targets -join ', ') on $Guest from $($present.Count) changed files"
 
-    # Through cmd, since a PowerShell pipe would re-encode the tar as text.
-    cmd /c "tar -cf - -C `"$root`" -T `"$($list.FullName)`" | ssh -i `"$Key`" -o BatchMode=yes $Guest `"$remote`""
+    # Through cmd, since a PowerShell pipe would re-encode the tar as text, and with
+    # Windows' own tar, since another on the path reads a drive letter as a host.
+    $tar = Join-Path $env:SystemRoot 'System32\tar.exe'
+    cmd /c "$tar -cf - -C `"$root`" -T `"$($list.FullName)`" | ssh -i `"$Key`" -o BatchMode=yes $Guest `"$remote`""
     exit $LASTEXITCODE
 }
 finally
