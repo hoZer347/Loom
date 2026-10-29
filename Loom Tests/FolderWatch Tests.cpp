@@ -55,7 +55,8 @@ namespace
 				return true;
 
 			std::this_thread::sleep_for(FRAME);
-		} while (std::chrono::steady_clock::now() < deadline);
+		}
+		while (std::chrono::steady_clock::now() < deadline);
 
 		return false;
 	};

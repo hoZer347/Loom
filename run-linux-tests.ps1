@@ -41,6 +41,7 @@ $guestScript = @'
 set -e
 base=$1; count=$2; targets=$3; deleted=$4; testargs=$5; test=$6; minutes=$7
 here=$(dirname "$0")
+trap 'rm -rf "$here"' EXIT
 stage=$here/stage
 mkdir -p "$stage"
 tar -xf - -C "$stage"
@@ -52,7 +53,7 @@ cd ~/loom
 
 (cd "$stage" && find . -type f -printf '%P\n') > "$here/sent"
 received=$(wc -l < "$here/sent")
-if [ "$received" -ne "$count" ]; then echo "Received $received of $count files"; rm -rf "$here"; exit 1; fi
+if [ "$received" -ne "$count" ]; then echo "Received $received of $count files"; exit 1; fi
 decode "$deleted" > "$here/deleted"
 { git diff --name-only "$base" 2>/dev/null; git ls-files -o --exclude-standard -- . ':!build'; } | sort -u > "$here/changed"
 sort -u "$here/sent" "$here/deleted" | comm -23 "$here/changed" - | while IFS= read -r f; do
@@ -62,7 +63,6 @@ while IFS= read -r f; do
     if ! cmp -s "$stage/$f" "$f"; then mkdir -p "$(dirname "$f")"; cp "$stage/$f" "$f"; fi
 done < "$here/sent"
 while IFS= read -r f; do rm -f "$f"; done < "$here/deleted"
-rm -rf "$here"
 
 [ -f build/build.ninja ] || cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++-14 -DCMAKE_C_COMPILER=gcc-14 > /dev/null
 ninja --quiet -C build $targets

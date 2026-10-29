@@ -2699,8 +2699,11 @@ namespace Loom
 		if (ImGui::MenuItem("Stop", nullptr, false, IsPlaying()))
 			Stop();
 
-		if (ImGui::MenuItem("Play Web", nullptr, false, m_activeScene != nullptr && !m_projectPath.empty()))
+		if (ImGui::MenuItem("Play Web", nullptr, false, ScriptRun::Available && m_activeScene != nullptr && !m_projectPath.empty()))
 			PlayWeb();
+
+		if (!ScriptRun::Available)
+			ImGui::SetItemTooltip("Windows only");
 	};
 
 	bool Editor::DrawWindowButtons(GLFWwindow* window, WindowFrame& frame)

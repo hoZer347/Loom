@@ -1,6 +1,6 @@
 #include "BuildSettings.h"
 
-// The editor only runs on Windows, but the web test build compiles this too.
+// Not in the web test build, which has no editor.
 #ifndef __EMSCRIPTEN__
 
 #include "EditorIcons.h"
@@ -226,15 +226,21 @@ namespace Loom
 
 		ImGui::Separator();
 
-		ImGui::BeginDisabled(building || scene.empty());
+		ImGui::BeginDisabled(building || scene.empty() || !ScriptRun::Available);
 
 		if (ImGui::Button("Build"))
 			action = Action::Build;
+
+		if (!ScriptRun::Available)
+			ImGui::SetItemTooltip("Windows only");
 
 		ImGui::SameLine();
 
 		if (ImGui::Button("Build and Run"))
 			action = Action::BuildAndRun;
+
+		if (!ScriptRun::Available)
+			ImGui::SetItemTooltip("Windows only");
 
 		ImGui::EndDisabled();
 		ImGui::EndDisabled();

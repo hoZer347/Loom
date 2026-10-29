@@ -106,7 +106,8 @@ namespace LoomTests
 			{
 				glfwGetFramebufferSize(Loom::Engine::window, &framebuffer.x, &framebuffer.y);
 				glfwPollEvents();
-			} while (framebuffer != size && std::chrono::steady_clock::now() < deadline);
+			}
+			while (framebuffer != size && std::chrono::steady_clock::now() < deadline);
 		};
 
 		~RenderFixture()

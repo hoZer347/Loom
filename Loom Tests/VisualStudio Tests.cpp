@@ -1,6 +1,6 @@
 #include "doctest.h"
 
-// The editor only runs on Windows, but the web test build compiles this too.
+// Not in the web test build, which has no editor.
 #ifndef __EMSCRIPTEN__
 
 #include "VisualStudio.h"

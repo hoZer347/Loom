@@ -61,6 +61,8 @@ target_link_libraries(LoomEngine PUBLIC LoomImGui glslang::glslang glslang::SPIR
 
 function(vcxproj_sources project out)
 	get_filename_component(dir "${project}" DIRECTORY)
+	# So adding a file to the project reconfigures the build.
+	set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${project}")
 	file(STRINGS "${project}" lines REGEX "<ClCompile Include=\"[^\"*$]+\"")
 	set(sources)
 	foreach(line IN LISTS lines)

@@ -21,7 +21,6 @@ namespace Loom
 	{
 #ifdef _WIN32
 		constexpr const char* solution = "Loom.sln";
-		constexpr const char* target = "Loom Editor";
 		constexpr const char* builder_name = "MSBuild";
 
 		// <file>.<pid>.old, so two editors run from one build each move their own.
@@ -44,7 +43,6 @@ namespace Loom
 #else
 		// Where CMakeLists.txt says to configure it, and the build an editor built there has.
 		constexpr const char* solution = "build/CMakeCache.txt";
-		constexpr const char* target = "LoomEditor";
 		constexpr const char* builder_name = "CMake";
 #endif
 	};
@@ -102,6 +100,7 @@ namespace Loom
 			return;
 		};
 
+		// Elsewhere the linker writes a new file in place of a running one, so nothing is moved aside.
 #ifdef _WIN32
 		std::filesystem::path symbols = m_executable;
 		symbols.replace_extension(symbols_extension);
@@ -136,15 +135,9 @@ namespace Loom
 			};
 		};
 
-		const std::string command =
-			'"' + msbuild + "\" \"" + sources.string() + "\" \"-t:" + target + '"' +
-			" -p:Configuration=" + ScriptLibrary::Configuration() +
-			" -p:Platform=x64 -nologo -v:m -m -clp:ErrorsOnly";
-#else
-		// The linker writes a new file in place of a running one, so nothing is moved aside.
-		const std::string command =
-			msbuild + " --build \"" + sources.parent_path().string() + "\" --target " + target;
 #endif
+
+		const std::string command = Command(msbuild, sources, ScriptLibrary::Configuration());
 
 		std::cout << "Full refresh: building the editor (" << ScriptLibrary::Configuration() << ")..." << std::endl;
 
@@ -196,12 +189,15 @@ namespace Loom
 	bool EditorRefresh::Relaunch(const std::filesystem::path& executable, const std::string& arguments)
 	{
 #ifndef _WIN32
+		// Before the fork, since the child of a process with threads may not allocate.
+		const std::string command = "exec \"" + executable.string() + "\" " + arguments;
+
 		const pid_t child = fork();
 
 		if (child == 0)
 		{
 			setsid();
-			execl("/bin/sh", "sh", "-c", ("exec \"" + executable.string() + "\" " + arguments).c_str(), nullptr);
+			execl("/bin/sh", "sh", "-c", command.c_str(), nullptr);
 			_exit(1);
 		};
 

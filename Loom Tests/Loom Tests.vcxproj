@@ -155,6 +155,8 @@
     <ClCompile Include="PlayHistory Tests.cpp" />
     <ClCompile Include="EditorSettings Tests.cpp" />
     <ClCompile Include="EditorIcons Tests.cpp" />
+    <ClCompile Include="EditorRefresh Tests.cpp" />
+    <ClCompile Include="EditorTheme Tests.cpp" />
     <ClCompile Include="ProjectAssets Tests.cpp" />
     <ClCompile Include="FileTypes Tests.cpp" />
     <ClCompile Include="FolderWatch Tests.cpp" />

@@ -55,6 +55,12 @@
     <ClCompile Include="EditorIcons Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="EditorRefresh Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorTheme Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="ProjectAssets Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

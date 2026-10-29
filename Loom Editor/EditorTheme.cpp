@@ -112,46 +112,24 @@ namespace Loom
 			return atlas.AddFontDefault();
 		};
 
-		// Windows' own for EditorIcons, Symbola from fonts-symbola elsewhere, since colour emoji fonts have no outlines to draw.
-		std::filesystem::path EmojiFont()
-		{
-			std::filesystem::path path;
-
-#ifdef _WIN32
-			constexpr const char* emojiFont = "seguiemj.ttf";
-
-			PWSTR fonts = nullptr;
-
-			if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Fonts, 0, nullptr, &fonts)))
-				path = std::filesystem::path(fonts) / emojiFont;
-
-			CoTaskMemFree(fonts);
-#else
-			path = "/usr/share/fonts/truetype/ancient-scripts/Symbola_hint.ttf";
-#endif
-
-			return path;
-		};
-
-		// Without FreeType ImGui has no colour glyphs.
+		// Without FreeType ImGui has no colour glyphs. Where two fonts have a glyph, the first draws it.
 		void AddEmoji(float size)
 		{
-			const std::filesystem::path path = EmojiFont();
-			std::error_code code;
-
-			if (path.empty())
-				return;
-
-			if (!std::filesystem::exists(path, code))
+			for (const std::filesystem::path& path : EditorTheme::EmojiFonts())
 			{
-				std::cerr << "EditorTheme: no emoji font at " << path.string() << std::endl;
-				return;
+				std::error_code code;
+
+				if (!std::filesystem::exists(path, code))
+				{
+					std::cerr << "EditorTheme: no emoji font at " << path.string() << std::endl;
+					continue;
+				};
+
+				ImFontConfig config;
+				config.MergeMode = true;
+
+				ImGui::GetIO().Fonts->AddFontFromFileTTF(path.string().c_str(), size, &config);
 			};
-
-			ImFontConfig config;
-			config.MergeMode = true;
-
-			ImGui::GetIO().Fonts->AddFontFromFileTTF(path.string().c_str(), size, &config);
 		};
 
 		#pragma endregion
@@ -169,6 +147,29 @@ namespace Loom
 				fonts.push_back(entry.path().filename().string());
 
 		return fonts;
+	};
+
+	std::vector<std::filesystem::path> EditorTheme::EmojiFonts()
+	{
+		std::vector<std::filesystem::path> paths;
+
+#ifdef _WIN32
+		constexpr const char* emojiFont = "seguiemj.ttf";
+
+		PWSTR fonts = nullptr;
+
+		if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Fonts, 0, nullptr, &fonts)))
+			paths.push_back(std::filesystem::path(fonts) / emojiFont);
+
+		CoTaskMemFree(fonts);
+#else
+		constexpr const char* symbolaFont = "/usr/share/fonts/truetype/ancient-scripts/Symbola_hint.ttf";
+		constexpr const char* unifontFont = "/usr/share/fonts/opentype/unifont/unifont_upper.otf";
+
+		paths = { symbolaFont, unifontFont };
+#endif
+
+		return paths;
 	};
 
 	void EditorTheme::LoadFont(const std::string& file, float size)

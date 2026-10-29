@@ -53,6 +53,21 @@ namespace Loom
 
 		bool Succeeded() const { return m_succeeded; };
 
+		// What builds the editor from the engine's sources with the builder found.
+		static std::string Command(const std::string& builder, const std::filesystem::path& sources, const std::string& configuration)
+		{
+#ifdef _WIN32
+			return '"' + builder + "\" \"" + sources.string() + "\" \"-t:Loom Editor\"" +
+				" -p:Configuration=" + configuration +
+				" -p:Platform=x64 -nologo -v:m -m -clp:ErrorsOnly";
+#else
+			// The build folder is configured for one configuration only.
+			(void)configuration;
+
+			return builder + " --build \"" + sources.parent_path().string() + "\" --target LoomEditor";
+#endif
+		};
+
 		#pragma endregion
 
 		#pragma region Relaunch

@@ -21,6 +21,13 @@ namespace Loom
 	*/
 	struct ScriptRun final
 	{
+		// The scripts are Windows PowerShell's, and the builds they run MSBuild's.
+#ifdef _WIN32
+		static constexpr bool Available = true;
+#else
+		static constexpr bool Available = false;
+#endif
+
 		using Reader = std::function<void(HiddenProcess, const std::atomic<bool>& stopping)>;
 
 		ScriptRun() = default;

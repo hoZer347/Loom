@@ -2,6 +2,7 @@
 
 #include "imgui.h"
 
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -20,6 +21,12 @@ namespace Loom
 
 		// The fonts vendored with ImGui, by file name.
 		std::vector<std::string> Fonts();
+
+		// What draws EditorIcons, merged into the UI font in this order: Windows'
+		// own, and elsewhere Symbola from fonts-symbola then GNU Unifont from
+		// fonts-unifont for the emoji newer than Symbola, since colour emoji
+		// fonts have no outlines to draw.
+		std::vector<std::filesystem::path> EmojiFonts();
 
 		// Makes the named font the atlas's first, so the one ImGui draws with,
 		// and the code font the only other. ImGui's built-in ProggyClean stands

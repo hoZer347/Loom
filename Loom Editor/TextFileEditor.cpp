@@ -1,6 +1,6 @@
 #include "TextFileEditor.h"
 
-// The editor only runs on Windows, and the web test build has no TextEditor.
+// Not in the web test build, which has no TextEditor.
 #ifndef __EMSCRIPTEN__
 
 #include "EditorTheme.h"

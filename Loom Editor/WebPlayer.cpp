@@ -8,20 +8,18 @@
 #include <windows.h>
 #include <objbase.h>
 #include <shellapi.h>
-#else
-#include "VisualStudio.h"
 #endif
 
 
 namespace Loom
 {
+#ifdef _WIN32
 	namespace
 	{
 		const char* const prefix = "[web] ";
 
 		void OpenInBrowser(const std::string& url)
 		{
-#ifdef _WIN32
 			// ShellExecute may hand the work to a shell extension, which wants COM.
 			const HRESULT com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 
@@ -33,9 +31,6 @@ namespace Loom
 
 			if (SUCCEEDED(com))
 				CoUninitialize();
-#else
-			VisualStudio::Shell(url.c_str(), "");
-#endif
 		};
 
 		// Returns when everything holding the pipe has exited.
@@ -75,4 +70,10 @@ namespace Loom
 
 		return started;
 	};
+#else
+	bool WebPlayer::Launch(const std::string&, const std::string&)
+	{
+		return false;
+	};
+#endif
 };
