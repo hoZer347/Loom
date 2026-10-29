@@ -9,6 +9,17 @@
 #include <thread>
 #include <vector>
 
+#ifndef __EMSCRIPTEN__
+
+#include "OpenGL.h"
+
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+
+#include <windows.h>
+
+#endif
+
 using LoomTests::Pump;
 
 
@@ -22,11 +33,6 @@ TEST_SUITE("Engine")
 	{
 		CHECK_FALSE(Loom::Engine::isRunning);
 		CHECK(Loom::Engine::window == nullptr);
-	};
-
-	TEST_CASE("the engine is not in its event poll outside a frame")
-	{
-		CHECK_FALSE(Loom::Engine::IsPolling());
 	};
 
 	TEST_CASE("GetUniqueID never hands out the same ID twice")
@@ -233,6 +239,63 @@ TEST_SUITE("Engine")
 		CHECK(Loom::Engine::Crop({ width, 0, 1, 1 }, cutWidth, cutHeight, rgb).empty());
 		CHECK(cutWidth == 0);
 	};
+
+	#pragma endregion
+
+	#pragma region Event Poll
+
+	TEST_CASE("the engine is not in its event poll outside a frame")
+	{
+		CHECK_FALSE(Loom::Engine::IsPolling());
+	};
+
+#ifndef __EMSCRIPTEN__
+
+	constexpr int poll_window_size = 64;
+	constexpr WPARAM typed = 'a';
+
+	int s_typed = 0;
+	bool s_pollingInside = false;
+	bool s_leftQueued = false;
+
+	// Stands in for the OS's own loop, which a poll from inside it must leave its messages to.
+	void TypeInsidePoll(GLFWwindow* window, unsigned int)
+	{
+		if (s_typed++ > 0)
+			return;
+
+		const HWND hwnd = glfwGetWin32Window(window);
+		s_pollingInside = Loom::Engine::IsPolling();
+
+		PostMessageW(hwnd, WM_CHAR, typed, 0);
+		Loom::Engine::PollEvents();
+
+		MSG message;
+		s_leftQueued = PeekMessageW(&message, hwnd, WM_CHAR, WM_CHAR, PM_NOREMOVE);
+	};
+
+	TEST_CASE("a poll from inside the poll leaves the events to the outer one")
+	{
+		glfwInit();
+		glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+		GLFWwindow* window = glfwCreateWindow(poll_window_size, poll_window_size, "Engine", nullptr, nullptr);
+		glfwDefaultWindowHints();
+		glfwSetCharCallback(window, TypeInsidePoll);
+
+		PostMessageW(glfwGetWin32Window(window), WM_CHAR, typed, 0);
+		Loom::Engine::PollEvents();
+
+		CHECK(s_pollingInside);
+		CHECK(s_leftQueued);
+		CHECK(s_typed == 2);
+		CHECK_FALSE(Loom::Engine::IsPolling());
+
+		glfwDestroyWindow(window);
+		glfwTerminate();
+	};
+
+#endif
 
 	#pragma endregion
 };

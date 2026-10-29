@@ -79,6 +79,10 @@ namespace Loom
 		// loop of its own, as while it moves or sizes a window.
 		static bool IsPolling();
 
+		// Takes the windows' events, unless called from inside the poll, where
+		// they are the OS's loop's to take.
+		static void PollEvents();
+
 		static inline bool isRunning;
 
 		#pragma endregion

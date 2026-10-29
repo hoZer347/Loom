@@ -246,6 +246,16 @@ namespace Loom
 		return s_polling;
 	};
 
+	void Engine::PollEvents()
+	{
+		if (s_polling)
+			return;
+
+		s_polling = true;
+		glfwPollEvents();
+		s_polling = false;
+	};
+
 	void Engine::SetUpdateFunction(const Task& task)
 	{
 		std::lock_guard<std::recursive_mutex> lock(mutex);
@@ -256,11 +266,7 @@ namespace Loom
 	{
 		{
 			LOOM_STAGE("glfwPollEvents");
-
-			const bool polling = s_polling;
-			s_polling = true;
-			glfwPollEvents();
-			s_polling = polling;
+			PollEvents();
 		};
 
 		{
