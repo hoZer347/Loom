@@ -197,17 +197,18 @@
 
         // Pages cannot open a browser's own settings, so the address is copied
         // for the address bar instead.
+        const title = "Hardware acceleration is off";
         const why = "This page simulates on the graphics card, and the browser has switched it off, so the simulation is not running.";
         const agent = navigator.userAgent;
 
         if (agent.includes("Firefox"))
-          show("Hardware acceleration is off", why, "about:preferences#general", ["Paste it into the address bar", "Under Performance, untick Use recommended performance settings", "Tick Use hardware acceleration when available", "Restart Firefox"]);
+          show(title, why, "about:preferences#general", ["Paste it into the address bar", "Under Performance, untick Use recommended performance settings", "Tick Use hardware acceleration when available", "Restart Firefox"]);
         else if (agent.includes("Edg/"))
-          show("Hardware acceleration is off", why, "edge://settings/system", ["Paste it into the address bar", "Turn on Use graphics acceleration when available", "Restart Edge"]);
+          show(title, why, "edge://settings/system", ["Paste it into the address bar", "Turn on Use graphics acceleration when available", "Restart Edge"]);
         else if (agent.includes("Chrome"))
-          show("Hardware acceleration is off", why, "chrome://settings/system", ["Paste it into the address bar", "Turn on Use graphics acceleration when available", "Relaunch Chrome"]);
+          show(title, why, "chrome://settings/system", ["Paste it into the address bar", "Turn on Use graphics acceleration when available", "Relaunch Chrome"]);
         else
-          show("Hardware acceleration is off", why, "", ["Turn on hardware or graphics acceleration in the browser's settings", "Restart the browser"]);
+          show(title, why, "", ["Turn on hardware or graphics acceleration in the browser's settings", "Restart the browser"]);
       };
 
       document.getElementById("gpu-copy").addEventListener("click", async () => {

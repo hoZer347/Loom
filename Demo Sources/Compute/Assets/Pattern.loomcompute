@@ -15,7 +15,7 @@ const float CORNER = 0.05;
 const int SEED_CELLS = 8;
 const float SEEDED = 0.04;
 
-// A drop DROP_RADIUS cells wide every DROP_EVERY runs.
+// A drop DROP_RADIUS cells in radius every DROP_EVERY runs.
 const int DROP_EVERY = 90;
 const float DROP_RADIUS = 6.0;
 

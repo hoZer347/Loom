@@ -68,6 +68,10 @@ served cross-origin isolated, so the threads are the browser's own. Chrome runs
 with a profile of its own and never shows a window. Beyond emsdk and node, it
 needs Chrome or Edge installed.
 
+`Browser/player.mjs` runs after it, on `Loom Web/Player.html` with no engine,
+and checks the GPU notice a ComputeShader raises: hidden on a GPU that runs it,
+its title, address and steps for each browser, and the Copy button.
+
 ## Suites
 
 | Suite | Covers |

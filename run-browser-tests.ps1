@@ -12,6 +12,7 @@
     Loom Tests\Browser\run.mjs serves the build, drives Chrome over the
     DevTools protocol, and answers each case's request for input. Chrome runs
     headless with a profile of its own, so nothing shows on screen.
+    Loom Tests\Browser\player.mjs then checks Player.html's GPU notice.
 
 .EXAMPLE
     .\run-browser-tests.ps1
@@ -101,4 +102,11 @@ if ($LASTEXITCODE -ne 0)
 Copy-Item -LiteralPath (Join-Path $browser 'index.html') -Destination $output
 
 & $node.Source (Join-Path $browser 'run.mjs') $output $chrome
+
+if ($LASTEXITCODE -ne 0)
+{
+    exit $LASTEXITCODE
+}
+
+& $node.Source (Join-Path $browser 'player.mjs') $output $chrome
 exit $LASTEXITCODE
