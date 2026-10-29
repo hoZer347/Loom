@@ -196,13 +196,17 @@ bool LoomDitheredOut(float alpha)
 				shaded += "in vec4 loom_LightSpace;\n";
 
 			// Screen-space slope gives a flat normal facing the camera; mesh normals light smoothly instead.
+			// Without them, the shadow is read out along that flat normal, as the vertex stage could not.
+			const std::string lightSpace = "\tvec4 loom_lightSpace = dot(loom_Normal, loom_Normal) > 0.0 ? loom_LightSpace : LoomLightSpace(vec4(loom_World, 1.0), loom_face);\n";
+
 			return shaded +
 				"\nvoid main()\n{\n"
 				"\tloom_main();\n\n"
 				"\tvec3 loom_face = normalize(cross(dFdx(loom_World), dFdy(loom_World)));\n"
 				"\tvec3 loom_normal = dot(loom_Normal, loom_Normal) > 0.0 ? normalize(loom_Normal) : loom_face;\n"
-				"\tloom_normal = dot(loom_normal, loom_face) < 0.0 ? -loom_normal : loom_normal;\n\n"
-				"\t" + color[1].str() + ".rgb *= LoomLight(loom_normal" + (shadows ? ", loom_LightSpace" : "") + ");\n"
+				"\tloom_normal = dot(loom_normal, loom_face) < 0.0 ? -loom_normal : loom_normal;\n\n" +
+				(shadows ? lightSpace : "") +
+				"\t" + color[1].str() + ".rgb *= LoomLight(loom_normal" + (shadows ? ", loom_lightSpace" : "") + ");\n"
 				"}\n";
 		};
 

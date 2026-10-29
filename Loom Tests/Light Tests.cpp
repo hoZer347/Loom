@@ -193,8 +193,9 @@ TEST_SUITE("Light")
 			CHECK(fragment.find("u_shadowMap") != std::string::npos);
 		};
 
-		// Each stage only answers to its own functions.
-		CHECK(Loom::Light::FragmentLibrary("v = LoomLightSpace(world);").empty());
+		// A vertex stage never shades, while a fragment stage may read its own light space.
+		CHECK(Loom::Light::VertexLibrary("c = LoomLight(n, l);").empty());
+		CHECK(Loom::Light::FragmentLibrary("v = LoomLightSpace(world);").find("vec4 LoomLightSpace(") != std::string::npos);
 	};
 
 	// What counts is a call to that exact name, however it is spaced.

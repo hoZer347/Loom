@@ -77,7 +77,8 @@ namespace Loom
 
 		// The GLSL to put in front of a stage's source: the library above when
 		// the source calls into it, otherwise nothing, so a shader that never
-		// lights itself carries no shadow sampler.
+		// lights itself carries no shadow sampler. A fragment stage may call
+		// LoomLightSpace too.
 		static std::string VertexLibrary(const std::string& source);
 		static std::string FragmentLibrary(const std::string& source);
 

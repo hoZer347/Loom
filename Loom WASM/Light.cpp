@@ -29,7 +29,7 @@ namespace Loom
 
 		// The steepest slope, rise over run, LoomCasterDepth pulls a caster toward the light by;
 		// steeper, the pull would shadow the caster's own lit side.
-		constexpr float PULL_SLOPE_LIMIT = 1.0f;
+		constexpr float PULL_SLOPE_LIMIT = 2.0f;
 
 		// The light sits one extent back from the centre, so the box is two deep.
 		constexpr float DEPTH_EXTENTS = 2.0f;
@@ -78,7 +78,7 @@ namespace Loom
 
 		#pragma region Library
 
-		const char* const VERTEX_LIBRARY = R"(
+		const char* const LIGHT_SPACE_LIBRARY = R"(
 uniform mat4 u_lightViewProjection;
 
 // World units across one texel of the shadow map.
@@ -89,7 +89,7 @@ uniform float u_shadowTexel;
 // shadow the smooth surface their normals light, and past the casters' pull.
 const float LOOM_NORMAL_OFFSET_TEXELS = 1.5;
 // Texels more at a surface edge-on to the light, past the PCF kernel's reach.
-const float LOOM_SLOPE_OFFSET_TEXELS = 3.0;
+const float LOOM_SLOPE_OFFSET_TEXELS = 5.0;
 
 vec4 LoomLightSpace(vec4 world)
 {
@@ -378,12 +378,13 @@ vec3 LoomLight(vec3 normal)
 
 	std::string Light::VertexLibrary(const std::string& source)
 	{
-		return Calls(source, { "LoomLightSpace" }) ? VERTEX_LIBRARY : "";
+		return Calls(source, { "LoomLightSpace" }) ? LIGHT_SPACE_LIBRARY : "";
 	};
 
 	std::string Light::FragmentLibrary(const std::string& source)
 	{
-		return std::string(Calls(source, { "LoomShadow", "LoomLight" }) ? FRAGMENT_LIBRARY : "") +
+		return VertexLibrary(source) +
+			(Calls(source, { "LoomShadow", "LoomLight" }) ? FRAGMENT_LIBRARY : "") +
 			(Calls(source, { "LoomCasterDepth" }) ? CASTER_LIBRARY : "");
 	};
 

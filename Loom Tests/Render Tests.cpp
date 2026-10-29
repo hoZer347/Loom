@@ -217,10 +217,10 @@ namespace
 	};
 
 	// The sphere half through the plane, seen by a camera at position turned
-	// by rotation, for as long as it lives.
+	// by rotation, for as long as it lives, with or without mesh normals.
 	struct Contact
 	{
-		Contact(const std::string& name, const glm::vec3& position, const glm::vec3& rotation) :
+		Contact(const std::string& name, const glm::vec3& position, const glm::vec3& rotation, bool normals) :
 			m_source(LIT),
 			m_shader(name, m_source),
 			m_scene(name)
@@ -242,6 +242,11 @@ namespace
 
 			sphere->Attach<Loom::Material>()->shader = &m_shader;
 			Loom::EditableMesh::Sphere(CONTACT_RADIUS, CONTACT_SEGMENTS, CONTACT_RINGS).WriteTo(*sphere->Attach<Loom::Mesh>());
+
+			if (!normals)
+				for (Loom::GameObject* shape : { plane, sphere })
+					shape->GetComponent<Loom::Mesh>()->m_normals = std::vector<float>();
+
 			Pump();
 		};
 
@@ -308,66 +313,84 @@ namespace
 		constexpr float TURN = glm::two_pi<float>();
 		constexpr float HALF_TURN = glm::pi<float>();
 
-		{
-			Contact contact("Render - shadow at a contact from under, on " + backend, UNDER_POSITION, UNDER_ROTATION);
-			const Image image = fixture.Frame();
-			image.Save("Render - shadow at a contact from under, on " + backend);
+		// The default light first, whose frames are saved, then a lower sun and a
+		// lower one still, steeper across the plane than the casters' pull is capped at.
+		// Each with mesh normals first, then with none, which shade by the face.
+		const glm::vec3 LIGHTS[] = { Loom::Light().direction, { -0.8f, -1.0f, -0.45f }, { -1.0f, -0.5f, -0.3f } };
 
-			const glm::vec3 toLight = -glm::normalize((glm::vec3)contact.light->direction);
-			const float texel = ACROSS_EXTENTS * contact.light->shadowExtent / contact.light->shadowResolution;
-			int brightest = 0;
+		for (const glm::vec3& direction : LIGHTS)
+			for (bool normals : { true, false })
+			{
+				INFO("light direction ", direction.x, ", ", direction.y, ", ", direction.z, std::string(normals ? " with normals" : " without normals"));
+				const bool saved = &direction == LIGHTS && normals;
 
-			// Along the crease where the sphere faces both the camera and the light.
-			for (int around = 0; around < STEPS; around++)
-				for (int down = 0; down <= DOWN_STEPS; down++)
 				{
-					const float azimuth = TURN * around / STEPS;
-					const glm::vec3 outward(std::cos(azimuth), 0.0f, std::sin(azimuth));
-					const float below = TEXELS_BELOW * texel * down / DOWN_STEPS;
-					const glm::vec3 point = outward * std::sqrt(CONTACT_RADIUS * CONTACT_RADIUS - below * below) - glm::vec3(0.0f, below, 0.0f);
+					Contact contact("Render - shadow at a contact from under, on " + backend, UNDER_POSITION, UNDER_ROTATION, normals);
+					contact.light->direction = direction;
+					const Image image = fixture.Frame();
 
-					if (glm::dot(outward, toLight) >= LIT_AT_LEAST && glm::dot(outward, glm::normalize(UNDER_POSITION - point)) >= FACING_AT_LEAST)
-					{
-						const glm::ivec2 pixel = PixelOf(*contact.camera, image, point);
-						brightest = std::max(brightest, (int)image.At(pixel.x, pixel.y).r);
-					};
+					if (saved)
+						image.Save("Render - shadow at a contact from under, on " + backend);
+
+					const glm::vec3 toLight = -glm::normalize((glm::vec3)contact.light->direction);
+					const float texel = ACROSS_EXTENTS * contact.light->shadowExtent / contact.light->shadowResolution;
+					int brightest = 0;
+
+					// Along the crease where the sphere faces both the camera and the light.
+					for (int around = 0; around < STEPS; around++)
+						for (int down = 0; down <= DOWN_STEPS; down++)
+						{
+							const float azimuth = TURN * around / STEPS;
+							const glm::vec3 outward(std::cos(azimuth), 0.0f, std::sin(azimuth));
+							const float below = TEXELS_BELOW * texel * down / DOWN_STEPS;
+							const glm::vec3 point = outward * std::sqrt(CONTACT_RADIUS * CONTACT_RADIUS - below * below) - glm::vec3(0.0f, below, 0.0f);
+
+							if (glm::dot(outward, toLight) >= LIT_AT_LEAST && glm::dot(outward, glm::normalize(UNDER_POSITION - point)) >= FACING_AT_LEAST)
+							{
+								const glm::ivec2 pixel = PixelOf(*contact.camera, image, point);
+								brightest = std::max(brightest, (int)image.At(pixel.x, pixel.y).r);
+							};
+						};
+
+					CHECK(brightest <= (int)(contact.light->ambient * UINT8_MAX) + TOLERANCE);
 				};
 
-			CHECK(brightest <= (int)(contact.light->ambient * UINT8_MAX) + TOLERANCE);
-		};
-
-		{
-			Contact contact("Render - shadow at a contact from above, on " + backend, ABOVE_POSITION, ABOVE_ROTATION);
-
-			// No ambient, so nothing lit reaches white and hides acne.
-			contact.light->ambient = 0.0f;
-
-			const Image shadowed = fixture.Frame();
-			shadowed.Save("Render - shadow at a contact from above, on " + backend);
-
-			contact.light->castShadows = false;
-			const Image unshadowed = fixture.Frame();
-
-			const glm::vec3 toLight = -glm::normalize((glm::vec3)contact.light->direction);
-			std::vector<glm::vec3> lit;
-
-			for (int around = 0; around < STEPS; around++)
-				for (int up = 1; up < STEPS / 2; up++)
 				{
-					const float azimuth = TURN * around / STEPS;
-					const float polar = HALF_TURN * up / STEPS;
-					const glm::vec3 normal(std::sin(polar) * std::cos(azimuth), std::cos(polar), std::sin(polar) * std::sin(azimuth));
-					const glm::vec3 point = normal * CONTACT_RADIUS;
+					Contact contact("Render - shadow at a contact from above, on " + backend, ABOVE_POSITION, ABOVE_ROTATION, normals);
 
-					if (glm::dot(normal, toLight) >= LIT_AT_LEAST && glm::dot(normal, glm::normalize(ABOVE_POSITION - point)) >= FACING_AT_LEAST)
-						lit.push_back(point);
+					contact.light->direction = direction;
+					// No ambient, so nothing lit reaches white and hides acne.
+					contact.light->ambient = 0.0f;
+
+					const Image shadowed = fixture.Frame();
+
+					if (saved)
+						shadowed.Save("Render - shadow at a contact from above, on " + backend);
+
+					contact.light->castShadows = false;
+					const Image unshadowed = fixture.Frame();
+
+					const glm::vec3 toLight = -glm::normalize((glm::vec3)contact.light->direction);
+					std::vector<glm::vec3> lit;
+
+					for (int around = 0; around < STEPS; around++)
+						for (int up = 1; up < STEPS / 2; up++)
+						{
+							const float azimuth = TURN * around / STEPS;
+							const float polar = HALF_TURN * up / STEPS;
+							const glm::vec3 normal(std::sin(polar) * std::cos(azimuth), std::cos(polar), std::sin(polar) * std::sin(azimuth));
+							const glm::vec3 point = normal * CONTACT_RADIUS;
+
+							if (glm::dot(normal, toLight) >= LIT_AT_LEAST && glm::dot(normal, glm::normalize(ABOVE_POSITION - point)) >= FACING_AT_LEAST)
+								lit.push_back(point);
+						};
+
+					// Well clear of the sphere's shadow, which falls the light's way.
+					lit.push_back(glm::vec3(1.0f, 0.0f, 1.0f));
+
+					CHECK(Furthest(*contact.camera, shadowed, unshadowed, lit) <= TOLERANCE);
 				};
-
-			// Well clear of the sphere's shadow, which falls the light's way.
-			lit.push_back(glm::vec3(1.0f, 0.0f, 1.0f));
-
-			CHECK(Furthest(*contact.camera, shadowed, unshadowed, lit) <= TOLERANCE);
-		};
+			};
 	};
 
 	uint32_t BigEndian(const std::vector<char>& bytes, size_t at)

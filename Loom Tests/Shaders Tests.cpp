@@ -305,7 +305,10 @@ TEST_SUITE("Shader")
 
 		CHECK(stages.vertex.find("loom_LightSpace = LoomLightSpace(loom_world, loom_Normal);") != std::string::npos);
 		CHECK(stages.vertex.find("uniform mat4 u_lightViewProjection;") != std::string::npos);
-		CHECK(stages.fragment.find("FragColor.rgb *= LoomLight(loom_normal, loom_LightSpace);") != std::string::npos);
+		CHECK(stages.fragment.find("FragColor.rgb *= LoomLight(loom_normal, loom_lightSpace);") != std::string::npos);
+		// A mesh without normals reads its shadow out along the face instead.
+		CHECK(stages.fragment.find(": LoomLightSpace(vec4(loom_World, 1.0), loom_face);") != std::string::npos);
+		CHECK(stages.fragment.find("uniform mat4 u_lightViewProjection;") != std::string::npos);
 
 		// The pass is the vertex stage as it was before shading wrapped it.
 		CHECK(stages.shadowVertex.find("void main()\n{\n\tgl_Position = u_viewProjection * u_model") != std::string::npos);
