@@ -71,6 +71,22 @@ namespace Loom
 		// Snapping, the maximize animation and the shadow all go with a bare popup.
 		constexpr LONG FRAMED_STYLE = WS_CAPTION | WS_THICKFRAME | WS_MAXIMIZEBOX;
 
+		// The one window the OS is moving or sizing, which a thread has at most one of.
+		HWND s_held = nullptr;
+
+		// Not inside another redraw, as one that pumps messages would be.
+		void RedrawOnce(const WindowFrame& frame)
+		{
+			static bool redrawing = false;
+
+			if (redrawing)
+				return;
+
+			redrawing = true;
+			frame.Redrawing()();
+			redrawing = false;
+		};
+
 		LRESULT HitCode(WindowFrame::Hit hit)
 		{
 			switch (hit)
@@ -128,22 +144,30 @@ namespace Loom
 
 			// The OS holds the frame loop while it moves or sizes the window, so frames come from a timer meanwhile.
 			if (message == WM_ENTERSIZEMOVE && frame.Redrawing() != nullptr)
+			{
+				s_held = window;
 				SetTimer(window, SUBCLASS_ID, USER_TIMER_MINIMUM, nullptr);
+			};
 
 			if (message == WM_EXITSIZEMOVE)
+			{
+				if (s_held == window)
+					s_held = nullptr;
+
 				KillTimer(window, SUBCLASS_ID);
+			};
+
+			// The timer only comes once the mouse is still, so each new size is drawn before the OS takes the next.
+			if (message == WM_WINDOWPOSCHANGED && window == s_held && (((const WINDOWPOS*)lparam)->flags & SWP_NOSIZE) == 0)
+			{
+				const LRESULT result = DefSubclassProc(window, message, wparam, lparam);
+				RedrawOnce(frame);
+				return result;
+			};
 
 			if (message == WM_TIMER && wparam == SUBCLASS_ID)
 			{
-				static bool redrawing = false;
-
-				if (!redrawing)
-				{
-					redrawing = true;
-					frame.Redrawing()();
-					redrawing = false;
-				};
-
+				RedrawOnce(frame);
 				return 0;
 			};
 

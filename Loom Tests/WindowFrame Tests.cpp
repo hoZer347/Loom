@@ -160,6 +160,27 @@ TEST_SUITE("WindowFrame")
 		CHECK(s_redraws == redraws);
 	};
 
+	TEST_CASE_FIXTURE(HiddenWindow, "a window being sized redraws at each new size before the OS goes on")
+	{
+		constexpr int grown = 16;
+		constexpr UINT size_only = SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE;
+		constexpr UINT move_only = SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE;
+
+		Loom::WindowFrame frame;
+		frame.Install(window, Count);
+
+		SendMessageW(hwnd, WM_ENTERSIZEMOVE, 0, 0);
+		SetWindowPos(hwnd, nullptr, 0, 0, window_width, window_height + grown, size_only);
+		CHECK(s_redraws == 1);
+
+		SetWindowPos(hwnd, nullptr, grown, grown, 0, 0, move_only);
+		CHECK(s_redraws == 1);
+
+		SendMessageW(hwnd, WM_EXITSIZEMOVE, 0, 0);
+		SetWindowPos(hwnd, nullptr, 0, 0, window_width, window_height, size_only);
+		CHECK(s_redraws == 1);
+	};
+
 	TEST_CASE_FIXTURE(HiddenWindow, "a redraw that pumps messages is not redrawn inside itself")
 	{
 		Loom::WindowFrame frame;
