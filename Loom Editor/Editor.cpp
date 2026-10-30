@@ -1270,7 +1270,6 @@ namespace Loom
 			(m_updateSaveFailed && !UnsavedWork().empty()) ||
 			ImGui::IsAnyItemActive() || ImGui::IsAnyMouseDown();
 
-		// The update saves for itself, so a question about saving never holds it.
 		if (!busy)
 			DropSaveQuestions();
 

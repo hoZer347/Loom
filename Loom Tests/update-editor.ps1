@@ -10,8 +10,8 @@
     an update takes it back and saves, an open menu holds the update and the
     edit made under it is saved, a save that fails keeps the update
     waiting with no question and a close then still asks, a scripts update
-    takes back a question, stops a run and compiles over unsaved work
-    without a restart, a restart waits out a game being built, and an editor
+    stops a run and compiles over unsaved work without a restart, and takes
+    back a question, a restart waits out a game being built, and an editor
     with nothing to take is told nothing. Throws naming what failed.
     A slot only: the user's Loom refuses, since its settings hold what they
     left open.
@@ -224,6 +224,8 @@ try
     Set-ItemProperty -LiteralPath $scene -Name IsReadOnly -Value $true
     $beforeRefused = $latest
     Invoke-Tool 'ui' @{ script = $AskToSave } | Out-Null
+    Start-Sleep -Seconds $SettleSeconds
+    if (-not (Test-Asking)) { throw 'Closing before a failed save did not ask.' }
     Invoke-Update | Out-Null
     Start-Sleep -Seconds $SettleSeconds
     if (Test-Asking) { throw 'A failed save left the question up.' }
@@ -249,18 +251,28 @@ try
 
     Invoke-Tool 'command' @{ command = 'play' } | Out-Null
     Wait-Running
-    Invoke-Tool 'ui' @{ script = $AskToSave } | Out-Null
 
     $scripts = Invoke-Update '-ScriptsOnly'
     if ($scripts -notmatch 'told to update-scripts') { throw "The editor was not told to update its scripts: $scripts" }
 
     Start-Sleep -Seconds $SettleSeconds
-    if (Test-Asking) { throw 'A scripts update left the question up.' }
     if ((Get-Pid) -ne $latest) { throw 'A scripts update restarted the editor.' }
     Wait-Compiled
     if ((Invoke-Tool 'state') -notmatch 'Play: stopped') { throw 'A scripts update left the run going.' }
     if ((Invoke-Tool 'hierarchy') -notmatch 'UnsavedAgain') { throw 'The compile dropped the unsaved object.' }
     if ((Get-Content -LiteralPath $scene -Raw) -match 'UnsavedAgain') { throw 'The compile saved the unsaved object.' }
+
+    Invoke-Tool 'ui' @{ script = $AskToSave } | Out-Null
+    Start-Sleep -Seconds $SettleSeconds
+    if (-not (Test-Asking)) { throw 'Closing before a scripts update did not ask.' }
+    Set-Content -LiteralPath (Join-Path $scriptsFolder 'Changed.hpp') -Value '#pragma once // again' -Encoding ascii
+    Start-Sleep -Seconds $SettleSeconds
+    Invoke-Update '-ScriptsOnly' | Out-Null
+    Start-Sleep -Seconds $SettleSeconds
+    if (Test-Asking) { throw 'A scripts update left the question up.' }
+    if ((Get-Pid) -ne $latest) { throw 'A scripts update over a question closed the editor.' }
+    Wait-Compiled
+    if ((Invoke-Tool 'hierarchy') -notmatch 'UnsavedAgain') { throw 'A scripts update over a question dropped the unsaved object.' }
 
     Invoke-Tool 'command' @{ command = 'save' } | Out-Null
     Invoke-Tool 'ui' @{ script = $OpenBuildAndBuild } | Out-Null
