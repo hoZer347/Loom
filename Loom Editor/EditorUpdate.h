@@ -12,13 +12,13 @@ namespace Loom
 	*   left open, held until it can run: its scripts built again, or a restart
 	*   on the executable on disk
 	* - Nothing runs through a run of the game or while the editor is busy, and
-	*   a restart waits for everything to be saved, as it saves nothing itself.
-	*   The scripts' build keeps unsaved work, so it does not wait for that
+	*   a restart also waits for whatever it would lose, as it saves nothing
+	*   itself. The scripts' build keeps all of that, so it does not wait for it
 	*/
 	struct EditorUpdate final
 	{
 		// The larger comes last, since a restart builds the scripts too.
-		enum struct Kind { None, Scripts, Restart };
+		enum class Kind { None, Scripts, Restart };
 
 		// Keeps the larger of it and what already waits.
 		void Request(Kind kind) { m_waiting = std::max(m_waiting, kind); };
@@ -26,9 +26,9 @@ namespace Loom
 		Kind Waiting() const { return m_waiting; };
 
 		// Called once a frame: hands over what waits once it can run.
-		Kind Due(bool playing, bool busy, bool unsaved)
+		Kind Due(bool playing, bool busy, bool restart_loses_work)
 		{
-			if (playing || busy || (m_waiting == Kind::Restart && unsaved))
+			if (playing || busy || (m_waiting == Kind::Restart && restart_loses_work))
 				return Kind::None;
 
 			return std::exchange(m_waiting, Kind::None);

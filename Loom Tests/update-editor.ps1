@@ -24,6 +24,7 @@ $Root = Split-Path $PSScriptRoot
 $Script = Join-Path $Root 'update-editor.ps1'
 $Editor = Join-Path $Root 'x64\Release\Loom Editor.exe'
 $DeadlineSeconds = 60
+$CompileSeconds = 240
 $PollMilliseconds = 250
 $SettleSeconds = 3
 
@@ -32,7 +33,7 @@ if ([IO.Path]::GetFullPath((Split-Path $common -Parent)) -eq [IO.Path]::GetFullP
 
 if (-not $Desktop)
 {
-    & (Join-Path $Root 'run-on-agent-desktop.ps1') -Exe 'powershell.exe' -TimeoutSeconds 300 -- -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -Desktop '{desktop}'
+    & (Join-Path $Root 'run-on-agent-desktop.ps1') -Exe 'powershell.exe' -TimeoutSeconds 600 -- -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -Desktop '{desktop}'
     exit $LASTEXITCODE
 }
 
@@ -43,7 +44,8 @@ $listener.Stop()
 
 $project = Join-Path ([IO.Path]::GetTempPath()) "loom-update-test-$port"
 New-Item -ItemType Directory $project | Out-Null
-Set-Content -LiteralPath (Join-Path $project 'Scratch.loomproject') -Value 'name=Scratch' -Encoding ascii
+$projectFile = Join-Path $project 'Scratch.loomproject'
+Set-Content -LiteralPath $projectFile -Value 'name=Scratch' -Encoding ascii
 $scene = Join-Path $project 'Scratch.loomscene'
 New-Item -ItemType File $scene | Out-Null
 
@@ -73,6 +75,19 @@ function Wait-Pid([scriptblock] $Until, [string] $What)
     throw "No $What within $DeadlineSeconds seconds."
 }
 
+function Wait-Compiled
+{
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    while ($clock.Elapsed.TotalSeconds -lt $CompileSeconds)
+    {
+        $state = Invoke-Tool 'state'
+        if ($state -match 'Compile failed') { throw "The scripts failed to compile: $state" }
+        if ($state -match 'Scripts: Loaded' -and $state -notmatch 'changed since') { return }
+        Start-Sleep -Milliseconds $PollMilliseconds
+    }
+    throw "No compile within $CompileSeconds seconds: $state"
+}
+
 function Invoke-Update([string[]] $Flags = @())
 {
     $line = "& '$Script' -Port $port -Project '$project' $($Flags -join ' ')"
@@ -80,12 +95,13 @@ function Invoke-Update([string[]] $Flags = @())
     if ($LASTEXITCODE -ne 0) { throw "update-editor.ps1 failed." }
 }
 
-$first = Start-Process -FilePath $Editor -ArgumentList "--desktop $Desktop --mcp $port `"$project`"" -WorkingDirectory $project -PassThru
+$first = Start-Process -FilePath $Editor -ArgumentList "--desktop $Desktop --mcp $port `"$projectFile`"" -WorkingDirectory $project -PassThru
 $latest = $first.Id
 
 try
 {
     Wait-Pid { param($id) $id -eq $first.Id } 'editor answering' | Out-Null
+    Wait-Compiled
 
     $idle = & powershell -NoProfile -ExecutionPolicy Bypass -Command "& '$Script' -Port $port"
     if ($idle -match 'told') { throw "An editor with nothing to take was told: $idle" }
@@ -94,7 +110,7 @@ try
     Invoke-Tool 'add_object' @{ name = 'Unsaved' } | Out-Null
 
     $told = Invoke-Update
-    if ($told -notmatch 'told to update, waiting') { throw "The update did not wait for unsaved work: $told" }
+    if ($told -notmatch 'told to update') { throw "The editor was not told to update: $told" }
 
     Start-Sleep -Seconds $SettleSeconds
     if ((Get-Pid) -ne $first.Id) { throw 'The editor restarted over unsaved work.' }
@@ -110,20 +126,29 @@ try
     if ((Get-Content -LiteralPath $scene -Raw) -notmatch 'Unsaved') { throw 'The saved scene did not keep the object.' }
     if ((Invoke-Tool 'hierarchy') -notmatch 'Unsaved') { throw 'The restarted editor did not reopen the scene.' }
 
+    Wait-Compiled
+
     Invoke-Tool 'add_object' @{ name = 'UnsavedAgain' } | Out-Null
+
+    $scriptsFolder = Split-Path (Get-ChildItem -LiteralPath $project -Filter '*.vcxproj' -Recurse | Select-Object -First 1).FullName
+    Set-Content -LiteralPath (Join-Path $scriptsFolder 'Changed.hpp') -Value '#pragma once' -Encoding ascii
+    Start-Sleep -Seconds $SettleSeconds
+    if ((Invoke-Tool 'state') -notmatch 'changed since') { throw 'The scripts did not go stale.' }
 
     $scripts = Invoke-Update '-ScriptsOnly'
     if ($scripts -notmatch 'told to update-scripts') { throw "The editor was not told to update its scripts: $scripts" }
 
     Start-Sleep -Seconds $SettleSeconds
     if ((Get-Pid) -ne $latest) { throw 'A scripts update restarted the editor.' }
-    if ((Invoke-Tool 'state') -match 'Update: waiting') { throw 'A scripts update waited on unsaved work.' }
+    Wait-Compiled
+    if ((Invoke-Tool 'hierarchy') -notmatch 'UnsavedAgain') { throw 'The compile dropped the unsaved object.' }
+    if ((Get-Content -LiteralPath $scene -Raw) -match 'UnsavedAgain') { throw 'The compile saved the unsaved object.' }
 
     Write-Output 'update-editor passed.'
 }
 finally
 {
-    Get-CimInstance Win32_Process -Filter "Name LIKE 'Loom Editor.exe%'" |
+    Get-CimInstance Win32_Process -Filter "Name = 'Loom Editor.exe'" |
         Where-Object { $_.CommandLine -like "*--desktop $Desktop*" } |
         ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     Start-Sleep -Seconds 1

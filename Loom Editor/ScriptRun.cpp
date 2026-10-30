@@ -70,4 +70,18 @@ namespace Loom
 
 		m_stopping = false;
 	};
+
+	bool ScriptRun::IsRunning() const
+	{
+#ifdef _WIN32
+		JOBOBJECT_BASIC_ACCOUNTING_INFORMATION accounting{ };
+
+		return
+			m_job != nullptr &&
+			QueryInformationJobObject(m_job, JobObjectBasicAccountingInformation, &accounting, sizeof(accounting), nullptr) &&
+			accounting.ActiveProcesses > 0;
+#else
+		return false;
+#endif
+	};
 };

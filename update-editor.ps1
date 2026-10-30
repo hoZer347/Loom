@@ -9,8 +9,8 @@
     refresh does. One run at a time; a second waits, then checks again.
 
     Each editor open from this copy is then told over MCP what to do: update,
-    which restarts it on the new build once its run has stopped and everything
-    is saved, or update-scripts, which compiles over unsaved work. Saving is
+    which restarts it on the new build once its run has stopped, everything
+    is saved and nothing closing it would end is going, or update-scripts, which compiles over unsaved work. Saving is
     left to the user, so nothing unsaved is ever lost or written. An editor on
     -Project is told whatever -ScriptsOnly says, and any other only when the
     build is newer than it. Demos and hidden runs are left alone.
@@ -120,12 +120,11 @@ function Invoke-EditorTool([string] $Tool, [hashtable] $Arguments = @{})
     $reply.result.content[0].text
 }
 
-# A moved-aside editor keeps running under the name the rename gave it.
 function Get-OpenEditors
 {
-    Get-CimInstance Win32_Process -Filter "Name LIKE 'Loom Editor.exe%'" | Where-Object {
+    Get-CimInstance Win32_Process -Filter "Name = 'Loom Editor.exe'" | Where-Object {
         $line = $_.CommandLine
-        $_.ExecutablePath -and $_.ExecutablePath.StartsWith($Editor, [StringComparison]::OrdinalIgnoreCase) -and
+        $_.ExecutablePath -eq $Editor -and
             -not ($AutomatedFlags | Where-Object { $line -like "*$_*" })
     }
 }
@@ -155,9 +154,8 @@ function Send-Updates
         $command = if ($stale -or ($onProject -and -not $ScriptsOnly)) { 'update' } elseif ($onProject) { 'update-scripts' }
         if (-not $command) { continue }
 
-        $state = Invoke-EditorTool 'command' @{ command = $command; editor = $id }
-        $when = if ($state -match 'Update: waiting') { ', waiting until it can' } else { '' }
-        Write-Output "Editor $($process.ProcessId) told to $command$when."
+        Invoke-EditorTool 'command' @{ command = $command; editor = $id } | Out-Null
+        Write-Output "Editor $($process.ProcessId) told to $command."
     }
 }
 

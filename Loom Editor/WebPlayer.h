@@ -90,6 +90,9 @@ namespace Loom
 			bool m_serving = false;
 		};
 
+		// Whether the page is still being built or served.
+		bool IsRunning() const { return m_run.IsRunning(); };
+
 	private:
 		ScriptRun m_run{ };
 	};

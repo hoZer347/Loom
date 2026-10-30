@@ -15,7 +15,7 @@ TEST_SUITE("EditorUpdate")
 		CHECK(update.Due(false, false, false) == Kind::None);
 	};
 
-	TEST_CASE("a restart waits for the run, the busy editor and anything unsaved")
+	TEST_CASE("a restart waits for the run, the busy editor and anything it would lose")
 	{
 		Loom::EditorUpdate update;
 		update.Request(Kind::Restart);

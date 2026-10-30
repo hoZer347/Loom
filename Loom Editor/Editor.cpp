@@ -1264,7 +1264,12 @@ namespace Loom
 			ImGui::IsAnyItemActive() || ImGui::IsAnyMouseDown() ||
 			ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId);
 
-		switch (m_update.Due(IsPlaying(), busy, !UnsavedWork().empty()))
+		// A game being built, a page being served and a queued test all end with the editor.
+		const bool restartLosesWork =
+			!UnsavedWork().empty() || m_gameBuilder.GetStatus() == GameBuilder::Status::Building ||
+			m_webPlayer.IsRunning() || m_tests.HasQueued();
+
+		switch (m_update.Due(IsPlaying(), busy, restartLosesWork))
 		{
 		case EditorUpdate::Kind::Scripts:
 			CompileScripts();
@@ -2587,7 +2592,7 @@ namespace Loom
 		if (m_update.Waiting() == EditorUpdate::Kind::Restart)
 		{
 			ImGui::TextDisabled("Update waiting");
-			ImGui::SetItemTooltip("Restarts once everything is saved");
+			ImGui::SetItemTooltip("Restarts once saved and idle");
 		};
 
 		if (DrawWindowButtons(Engine::window, m_windowFrame))
