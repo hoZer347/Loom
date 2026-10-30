@@ -981,6 +981,31 @@ TEST_SUITE("SerializedField")
 		CHECK(sizeof(Loom::Serial<Loom::LoomObject*>) == sizeof(Loom::LoomObject*));
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a number is counted while changes are watched, or written through its field")
+	{
+		struct Number final : Loom::LoomObject
+		{
+			Loom::Serial<float> value;
+		};
+
+		Number number;
+		Pump();
+
+		const unsigned long long fresh = number.VersionOf(&number.value);
+
+		number.value = 1.0f;
+		CHECK(number.VersionOf(&number.value) == fresh);
+
+		Field(number, 0).Changed();
+		CHECK(number.VersionOf(&number.value) == fresh + 1);
+
+		Loom::LoomObject::Watch(true);
+		number.value = 2.0f;
+		Loom::LoomObject::Watch(false);
+
+		CHECK(number.VersionOf(&number.value) == fresh + 2);
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a field counts its changes, and looking at it through const is not one")
 	{
 		Counted counted;
