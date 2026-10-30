@@ -467,8 +467,23 @@ namespace Loom
 		// The file or folder picked in the Project panel's tab in front, or none.
 		std::string SelectedProjectEntry() const;
 
-		// Takes it out of the project, a step Ctrl+Z puts back from the panel.
+		// The script picked in the Scripts tab in front, or none.
+		std::string SelectedProjectScript() const;
+
+		// Takes it out of the project, a step Ctrl+Z puts back from the panel,
+		// once DrawDeleteQuestion has its answer if the project still uses it.
 		void DeleteSelectedEntry();
+		void TakeEntries(const std::vector<std::string>& paths, bool compile);
+		void DrawDeleteQuestion();
+
+		// Each script named script, or declared in a header of paths.
+		std::vector<std::string> ScriptsIn(const std::vector<std::string>& paths, const std::string& script) const;
+
+		// Whether a path is a script or a folder in the scripts project.
+		bool HoldsScripts(const std::vector<std::string>& paths) const;
+
+		// Rebuilds now, or after the build running, unless a game is running.
+		void CompileForEntries();
 
 		// Whether the paths can go: none holds the project or an open scene, and
 		// no tab on them has unsaved changes, or the console says which.
@@ -1519,6 +1534,17 @@ namespace Loom
 
 		// What the Project panel deleted, while Ctrl+Z can still put it back.
 		AssetTrash m_assetTrash;
+
+		// A delete waiting on the answer to who still uses it.
+		struct DeleteQuestion
+		{
+			std::string name;
+			std::vector<std::string> paths;
+			std::vector<std::string> users;
+			bool compile = false;
+		};
+
+		std::optional<DeleteQuestion> m_deleteQuestion{ };
 
 		// The Project panel's tab in front, and the one to bring forward on
 		// the next frame, or none: each one of ProjectTabs.

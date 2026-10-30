@@ -2393,6 +2393,7 @@ namespace Loom
 		DrawCreateAssetPrompt();
 		DrawFileDialogs();
 		DrawSaveQuestion();
+		DrawDeleteQuestion();
 
 		if (m_flyingView)
 			return;

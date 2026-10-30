@@ -135,6 +135,15 @@ namespace Loom
 		// name the files they use.
 		static std::string RelativeTo(const std::string& path, const std::string& folder);
 
+		// Each game or script file in root, from root, that names a file or
+		// folder of paths or says one of names, leaving out paths themselves and
+		// the folder skip.
+		static std::vector<std::string> UsersOf(
+			const std::string& root,
+			const std::vector<std::string>& paths,
+			const std::vector<std::string>& names,
+			const std::string& skip);
+
 		#pragma endregion
 
 		#pragma region Scripts

@@ -549,6 +549,57 @@ TEST_SUITE("ProjectAssets")
 
 	#pragma endregion
 
+	#pragma region Users
+
+	TEST_CASE("what uses a file, a folder or a script is found by the whole name, outside what goes")
+	{
+		const std::filesystem::path root = std::filesystem::temp_directory_path() / "loom project assets users";
+
+		std::filesystem::remove_all(root);
+		std::filesystem::create_directories(root / "Assets" / "Sub");
+		std::filesystem::create_directories(root / "Build");
+		std::filesystem::create_directories(root / "Scenes");
+		std::filesystem::create_directories(root / "Scripts" / ".vs");
+
+		const auto write = [&root](const char* file, const char* text)
+		{
+			std::ofstream(root / file, std::ios::binary) << text;
+		};
+
+		write("Assets/Hero.png", "pixels");
+		write("Assets/Sub/Inner.png", "pixels");
+		write("Scenes/Main.loomscene", "0 = \"Assets/Hero.png\"\nComponent Spinner(guid)\n");
+		write("Scenes/Other.loomscene", "0 = \"MyAssets/Hero.png\"\n0 = \"Assets/Hero.png.bak\"\nComponent SpinnerTwo(guid)\n");
+		write("Scenes/Inner.loomscene", "0 = \"Assets/Sub/Inner.png\"\n");
+		write("Scripts/Spinner.hpp", "struct Spinner { };\n");
+		write("Scripts/Uses.hpp", "GetComponent<Spinner>();\n");
+		write("Scripts/.vs/Index.hpp", "Spinner\n");
+		write("Scripts/Notes.txt", "Spinner\n");
+		write("Build/Stale.hpp", "Spinner\n");
+
+		const std::string skip = (root / "Build").string();
+		const auto users = [&root, &skip](std::vector<std::string> paths, std::vector<std::string> names)
+		{
+			for (std::string& path : paths)
+				path = (root / path).lexically_normal().string();
+
+			return Loom::ProjectAssets::UsersOf(root.string(), paths, names, skip);
+		};
+
+		using Users = std::vector<std::string>;
+
+		CHECK(users({ "Assets/Hero.png" }, { }) == Users{ "Scenes/Main.loomscene" });
+		CHECK(users({ "Assets/Sub" }, { }) == Users{ "Scenes/Inner.loomscene" });
+		CHECK(users({ "Assets/Sub/Inner.png", "Scenes/Inner.loomscene" }, { }).empty());
+		CHECK(users({ "Scripts/Spinner.hpp" }, { "Spinner" }) == Users{ "Scenes/Main.loomscene", "Scripts/Uses.hpp" });
+		CHECK(users({ }, { "Spinner" }) == Users{ "Scenes/Main.loomscene", "Scripts/Spinner.hpp", "Scripts/Uses.hpp" });
+		CHECK(users({ }, { "Nothing" }).empty());
+
+		std::filesystem::remove_all(root);
+	};
+
+	#pragma endregion
+
 	#pragma region Shaders
 
 	TEST_CASE("a project draws with a new project's shader while it has one, or else its first")

@@ -59,6 +59,7 @@ namespace Loom
 
 		constexpr float NAME_PROMPT_WIDTH = 320.0f;
 		constexpr float PROMPT_BUTTON_WIDTH = 120.0f;
+		constexpr float DELETE_USERS_MAX_HEIGHT = 240.0f;
 
 		// Long enough that reading takes the time, short enough that the bar still moves.
 		constexpr double OPENING_SLICE_SECONDS = 1.0 / 15.0;
@@ -151,6 +152,11 @@ namespace Loom
 		bool IsScript(AssetKind kind)
 		{
 			return InfoOf(kind).appearsIn != nullptr;
+		};
+
+		bool IsCodeScript(ScriptEntryKind kind)
+		{
+			return kind == ScriptEntryKind::Script || kind == ScriptEntryKind::State;
 		};
 
 		// New Folder, or the first free New Folder1..., renamed in place.
@@ -673,30 +679,161 @@ namespace Loom
 		return selected.empty() ? selected : (std::filesystem::path(m_projectPath) / selected).lexically_normal().string();
 	};
 
+	std::string Editor::SelectedProjectScript() const
+	{
+		if (m_projectTab != ProjectTabs::Scripts)
+			return { };
+
+		const auto entry = m_scriptEntries.find(m_selectedScript);
+
+		return entry != m_scriptEntries.end() && IsCodeScript(entry->second.kind) ? m_selectedScript : std::string();
+	};
+
 	void Editor::DeleteSelectedEntry()
 	{
 		const std::string selected = SelectedProjectEntry();
+		const std::string script = SelectedProjectScript();
 		std::error_code code;
 
-		if (selected.empty() || !std::filesystem::exists(selected, code))
-			return;
+		std::vector<std::string> paths{ };
 
-		std::vector<std::string> paths{ selected };
-
-		// An image and its sprite go together, as they move.
-		if (const std::string companion = SpriteAsset::Companion(selected); !companion.empty() && std::filesystem::exists(companion, code))
-			paths.push_back(std::filesystem::path(companion).lexically_normal().string());
-
-		if (!CanDeleteEntries(paths))
-			return;
-
-		if (std::string error; !m_assetTrash.Delete(paths, &error))
+		if (!selected.empty() && std::filesystem::exists(selected, code))
 		{
-			std::cerr << "Project: " << error << std::endl;
+			paths.push_back(selected);
+
+			// An image and its sprite go together, as they move.
+			if (const std::string companion = SpriteAsset::Companion(selected); !companion.empty() && std::filesystem::exists(companion, code))
+				paths.push_back(std::filesystem::path(companion).lexically_normal().string());
+		};
+
+		// A script its library still holds has no file left to take, only the build.
+		if ((paths.empty() && script.empty()) || !CanDeleteEntries(paths))
+			return;
+
+		const bool compile = !script.empty() || HoldsScripts(paths);
+
+		const std::string skip = m_scripts.HasProject()
+			? std::filesystem::path(m_scripts.GetLibrary()).parent_path().string()
+			: std::string();
+
+		std::vector<std::string> users = ProjectAssets::UsersOf(m_projectPath, paths, ScriptsIn(paths, script), skip);
+
+		if (users.empty())
+		{
+			TakeEntries(paths, compile);
 			return;
 		};
 
-		ForgetEntries(paths);
+		const std::string name = paths.empty() ? script : std::filesystem::path(paths.front()).filename().string();
+
+		m_deleteQuestion = DeleteQuestion{ name, std::move(paths), std::move(users), compile };
+	};
+
+	void Editor::TakeEntries(const std::vector<std::string>& paths, bool compile)
+	{
+		if (!paths.empty())
+		{
+			if (std::string error; !m_assetTrash.Delete(paths, &error))
+			{
+				std::cerr << "Project: " << error << std::endl;
+				return;
+			};
+
+			ForgetEntries(paths);
+		};
+
+		if (compile)
+			CompileForEntries();
+	};
+
+	void Editor::DrawDeleteQuestion()
+	{
+		constexpr const char* popup = "Delete";
+
+		if (m_deleteQuestion && !ImGui::IsPopupOpen(popup))
+			ImGui::OpenPopup(popup);
+
+		if (!ImGui::BeginPopupModal(popup, nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+			return;
+
+		if (!m_deleteQuestion)
+		{
+			ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+			return;
+		};
+
+		ImGui::Text("%s is used by:", m_deleteQuestion->name.c_str());
+
+		const ImGuiStyle& style = ImGui::GetStyle();
+		const float height = (float)m_deleteQuestion->users.size() * ImGui::GetTextLineHeightWithSpacing() + style.WindowPadding.y * 2.0f;
+
+		ImGui::BeginChild("##users", ImVec2(NAME_PROMPT_WIDTH, ImMin(height, DELETE_USERS_MAX_HEIGHT)), ImGuiChildFlags_Borders);
+
+		for (const std::string& user : m_deleteQuestion->users)
+			ImGui::BulletText("%s", user.c_str());
+
+		ImGui::EndChild();
+
+		const bool take = ImGui::Button("Delete");
+		ImGui::SameLine();
+		const bool cancel = ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape);
+
+		if (take || cancel)
+		{
+			const DeleteQuestion question = std::move(*std::exchange(m_deleteQuestion, std::nullopt));
+
+			ImGui::CloseCurrentPopup();
+
+			if (take)
+				TakeEntries(question.paths, question.compile);
+		};
+
+		ImGui::EndPopup();
+	};
+
+	std::vector<std::string> Editor::ScriptsIn(const std::vector<std::string>& paths, const std::string& script) const
+	{
+		std::vector<std::string> scripts{ };
+
+		for (const auto& [name, entry] : m_scriptEntries)
+		{
+			const auto holds = [&file = entry.file](const std::string& path)
+			{
+				return !file.empty() && ProjectAssets::IsUnder(std::filesystem::path(file).lexically_normal().string(), path);
+			};
+
+			if (IsCodeScript(entry.kind) && (name == script || std::ranges::any_of(paths, holds)))
+				scripts.push_back(name);
+		};
+
+		return scripts;
+	};
+
+	bool Editor::HoldsScripts(const std::vector<std::string>& paths) const
+	{
+		if (!m_scripts.HasProject())
+			return false;
+
+		const std::string root = std::filesystem::path(m_scripts.GetProject()).parent_path().lexically_normal().string();
+
+		return std::ranges::any_of(paths, [&root](const std::string& path)
+		{
+			std::error_code code;
+
+			return ProjectAssets::IsUnder(path, root) &&
+				(ProjectAssets::IsScriptFile(std::filesystem::path(path).filename().string()) || std::filesystem::is_directory(path, code));
+		});
+	};
+
+	void Editor::CompileForEntries()
+	{
+		if (!m_scripts.HasProject() || IsPlaying())
+			return;
+
+		if (m_scripts.IsBuilding())
+			m_compileAfterBuild = true;
+		else CompileScripts();
 	};
 
 	bool Editor::CanDeleteEntries(const std::vector<std::string>& paths) const
@@ -764,6 +901,8 @@ namespace Loom
 		if (!undo && !CanDeleteEntries(paths))
 			return;
 
+		const bool taken_scripts = !undo && HoldsScripts(paths);
+
 		if (std::string error; !m_assetTrash.Step(undo, &error))
 		{
 			std::cerr << "Project: " << error << std::endl;
@@ -773,10 +912,17 @@ namespace Loom
 		if (!undo)
 		{
 			ForgetEntries(paths);
+
+			if (taken_scripts)
+				CompileForEntries();
+
 			return;
 		};
 
 		RefreshProjectAssets();
+
+		if (HoldsScripts(paths))
+			CompileForEntries();
 
 		if (RevealFile(paths.front()))
 			return;

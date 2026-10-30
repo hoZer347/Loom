@@ -752,6 +752,84 @@ namespace {NAMESPACE}
 
 	#pragma endregion
 
+	#pragma region Users
+
+	namespace
+	{
+		bool PartOfWord(char letter)
+		{
+			return std::isalnum((unsigned char)letter) || letter == '_' || letter == '.' || letter == '/' || letter == '-';
+		};
+
+		// A token ending in / opens a folder, so only its start has to stand alone.
+		bool Mentions(std::string_view text, std::string_view token)
+		{
+			for (size_t at = text.find(token); at != std::string_view::npos; at = text.find(token, at + 1))
+			{
+				const size_t end = at + token.size();
+
+				if ((at == 0 || !PartOfWord(text[at - 1])) &&
+					(token.back() == '/' || end == text.size() || !PartOfWord(text[end])))
+					return true;
+			};
+
+			return false;
+		};
+	};
+
+	std::vector<std::string> ProjectAssets::UsersOf(
+		const std::string& root,
+		const std::vector<std::string>& paths,
+		const std::vector<std::string>& names,
+		const std::string& skip)
+	{
+		const std::string folder = std::filesystem::path(root).lexically_normal().string();
+		const std::string skipped = skip.empty() ? skip : std::filesystem::path(skip).lexically_normal().string();
+
+		std::vector<std::string> tokens = names;
+		std::error_code code;
+
+		for (const std::string& path : paths)
+			tokens.push_back(RelativeTo(path, folder) + (std::filesystem::is_directory(path, code) ? "/" : ""));
+
+		const auto gone = [&paths](const std::string& path)
+		{
+			return std::ranges::any_of(paths, [&path](const std::string& taken) { return IsUnder(path, taken); });
+		};
+
+		std::vector<std::string> users{ };
+
+		for (auto entry = std::filesystem::recursive_directory_iterator(folder, code);
+			entry != std::filesystem::recursive_directory_iterator();
+			entry.increment(code))
+		{
+			const std::string path = entry->path().lexically_normal().string();
+			const std::string name = entry->path().filename().string();
+
+			if (entry->is_directory(code))
+			{
+				if (name.front() == '.' || path == skipped || gone(path))
+					entry.disable_recursion_pending();
+
+				continue;
+			};
+
+			if (gone(path) || !(IsGameFile(name) || IsScriptFile(name)))
+				continue;
+
+			const std::string text = ReadText(path);
+
+			if (std::ranges::any_of(tokens, [&text](const std::string& token) { return Mentions(text, token); }))
+				users.push_back(RelativeTo(path, folder));
+		};
+
+		std::sort(users.begin(), users.end());
+
+		return users;
+	};
+
+	#pragma endregion
+
 	#pragma region Scripts
 
 	std::string ProjectAssets::ScriptNameProblem(const std::string& scripts_project, const std::string& name)
