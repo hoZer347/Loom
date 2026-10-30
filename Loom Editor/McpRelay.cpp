@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -46,24 +47,11 @@ namespace Loom
 		constexpr int SD_BOTH = SHUT_RDWR;
 		constexpr int SEND_FLAGS = MSG_NOSIGNAL;
 
-		constexpr int MS_PER_SECOND = 1000;
-		constexpr int US_PER_MS = 1000;
-
 		int closesocket(SOCKET socket)
 		{
 			return close(socket);
 		};
 #endif
-
-		void SetReceiveTimeout(SOCKET socket, int milliseconds)
-		{
-#ifdef _WIN32
-			const DWORD timeout = milliseconds;
-#else
-			const timeval timeout{ milliseconds / MS_PER_SECOND, (milliseconds % MS_PER_SECOND) * US_PER_MS };
-#endif
-			setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout));
-		};
 
 		#pragma endregion
 
@@ -82,6 +70,10 @@ namespace Loom
 
 		// Past EditorMcp's own five minutes for a call, so that it answers first.
 		constexpr int RELAY_TIMEOUT_MS = 6 * 60 * 1000;
+
+		// How often a wait for data looks to see whether the relay is stopping.
+		constexpr int STOP_POLL_MS = 50;
+		constexpr int US_PER_MS = 1000;
 
 		// How often an editor without the shared port tries to take it.
 		constexpr long TAKE_OVER_SECONDS = 1;
@@ -155,6 +147,29 @@ namespace Loom
 			return INVALID_SOCKET;
 		};
 
+		// Whether from has data or has closed. Waits here, not in recv, since a recv
+		// blocked on Windows outlasts shutdown until the peer closes or two minutes pass.
+		bool Readable(SOCKET from, const std::atomic<bool>& stopping, int timeout_ms)
+		{
+			const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+
+			while (!stopping && std::chrono::steady_clock::now() < deadline)
+			{
+				fd_set ready{ };
+				FD_ZERO(&ready);
+				FD_SET(from, &ready);
+
+				timeval wait{ 0, STOP_POLL_MS * US_PER_MS };
+				// Windows ignores the count of descriptors that POSIX wants.
+				const int count = select((int)from + 1, &ready, nullptr, nullptr, &wait);
+
+				if (count != 0)
+					return count > 0;
+			};
+
+			return false;
+		};
+
 		bool SendAll(SOCKET to, const std::string& data)
 		{
 			size_t sent = 0;
@@ -192,10 +207,8 @@ namespace Loom
 		};
 
 		// A POST of body over a connected socket, answered with the response's body.
-		std::string Exchange(SOCKET server, const std::string& body)
+		std::string Exchange(SOCKET server, const std::string& body, const std::atomic<bool>& stopping)
 		{
-			SetReceiveTimeout(server, RELAY_TIMEOUT_MS);
-
 			const std::string request =
 				std::string("POST ") + ENDPOINT + " HTTP/1.1\r\n"
 				"Host: 127.0.0.1\r\n"
@@ -211,7 +224,7 @@ namespace Loom
 				char buffer[RECEIVE_BUFFER_BYTES];
 				int count = 0;
 
-				while ((count = recv(server, buffer, sizeof(buffer), 0)) > 0)
+				while (Readable(server, stopping, RELAY_TIMEOUT_MS) && (count = recv(server, buffer, sizeof(buffer), 0)) > 0)
 					response.append(buffer, count);
 			};
 
@@ -425,7 +438,8 @@ namespace Loom
 		if (server == INVALID_SOCKET)
 			return "";
 
-		const std::string response = Exchange(server, body);
+		const std::atomic<bool> never_stopping = false;
+		const std::string response = Exchange(server, body, never_stopping);
 		closesocket(server);
 
 		return response;
@@ -507,15 +521,13 @@ namespace Loom
 	{
 		const SOCKET client = connection;
 
-		SetReceiveTimeout(client, RECEIVE_TIMEOUT_MS);
-
 		std::string request{ };
 		size_t head_size = std::string::npos;
 		char buffer[RECEIVE_BUFFER_BYTES];
 
 		while ((head_size = request.find(HEADER_END)) == std::string::npos)
 		{
-			const int count = recv(client, buffer, sizeof(buffer), 0);
+			const int count = Readable(client, m_stopping, RECEIVE_TIMEOUT_MS) ? recv(client, buffer, sizeof(buffer), 0) : 0;
 
 			if (count <= 0)
 				return;
@@ -571,7 +583,7 @@ namespace Loom
 
 		while (body.size() < content_length)
 		{
-			const int count = recv(client, buffer, sizeof(buffer), 0);
+			const int count = Readable(client, m_stopping, RECEIVE_TIMEOUT_MS) ? recv(client, buffer, sizeof(buffer), 0) : 0;
 
 			if (count <= 0)
 				return;
@@ -599,7 +611,7 @@ namespace Loom
 		if (server == INVALID_SOCKET || !Track(server))
 			return "";
 
-		const std::string response = Exchange(server, body);
+		const std::string response = Exchange(server, body, m_stopping);
 		Untrack(server);
 
 		return response;

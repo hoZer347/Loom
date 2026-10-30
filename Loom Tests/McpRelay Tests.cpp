@@ -47,21 +47,27 @@ namespace
 	constexpr std::chrono::seconds held_limit{ 3 };
 
 	// An editor whose tools, whoami and its state, answer with its name.
-	// whoami waits on hold first, when given one.
-	std::unique_ptr<Loom::McpRelay> Editor(const std::string& name, std::shared_future<void> hold = { })
+	// whoami says it is held, then waits on hold, when given one.
+	std::unique_ptr<Loom::McpRelay> Editor(
+		const std::string& name,
+		std::shared_future<void> hold = { },
+		std::shared_ptr<std::promise<void>> holding = nullptr)
 	{
 		const json tools = json::array({ {
 			{ "name", "whoami" },
 			{ "inputSchema", { { "type", "object" }, { "properties", json::object() } } } } });
 
 		auto relay = std::make_unique<Loom::McpRelay>(tools, "Instructions", "whoami",
-			[name, hold](const std::string& tool, const json& arguments) -> std::optional<json>
+			[name, hold, holding](const std::string& tool, const json& arguments) -> std::optional<json>
 			{
 				if (tool != "whoami")
 					return std::nullopt;
 
 				if (hold.valid() && arguments.contains("held"))
+				{
+					holding->set_value();
 					hold.wait();
+				};
 
 				return Loom::McpProtocol::Text(name + (arguments.empty() ? "" : " " + arguments.dump()));
 			});
@@ -162,8 +168,9 @@ TEST_SUITE("McpRelay")
 	TEST_CASE("a call held up in one editor holds up no other, nor the hub's closing")
 	{
 		std::promise<void> release{ };
+		const auto holding = std::make_shared<std::promise<void>>();
 		auto hub = Editor("A");
-		const auto slow = Editor("B", release.get_future().share());
+		const auto slow = Editor("B", release.get_future().share(), holding);
 		const std::string slow_id = std::to_string(slow->OwnPort());
 
 		auto held = std::async(std::launch::async,
@@ -173,6 +180,8 @@ TEST_SUITE("McpRelay")
 					{ "jsonrpc", "2.0" }, { "id", 1 }, { "method", "tools/call" },
 					{ "params", { { "name", "whoami" }, { "arguments", { { "editor", slow_id }, { "held", true } } } } } }.dump());
 			});
+
+		holding->get_future().wait();
 
 		const auto start = std::chrono::steady_clock::now();
 
