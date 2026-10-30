@@ -42,9 +42,6 @@ namespace Loom
 
 		void Stop();
 
-		// Whether anything it started is still going.
-		bool IsRunning() const;
-
 		// Quoted for a command line. A trailing backslash would escape the
 		// closing quote, and a folder means the same without one.
 		static std::string Quote(std::string argument)

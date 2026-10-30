@@ -2,6 +2,7 @@
 
 #include "ScriptRun.h"
 
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -74,6 +75,8 @@ namespace Loom
 				return url;
 			};
 
+			bool Serving() const { return m_serving; };
+
 			// What to print once the script has ended: nothing if it served
 			// the page or was stopped, and otherwise everything it said.
 			std::vector<std::string> Ended(bool stopped) const
@@ -90,10 +93,11 @@ namespace Loom
 			bool m_serving = false;
 		};
 
-		// Whether the page is still being built or served.
-		bool IsRunning() const { return m_run.IsRunning(); };
+		// From a launch until the page is served or the script gives up.
+		bool IsBuilding() const { return m_building; };
 
 	private:
+		std::atomic<bool> m_building = false;
 		ScriptRun m_run{ };
 	};
 };

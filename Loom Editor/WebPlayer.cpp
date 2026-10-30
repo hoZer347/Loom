@@ -35,7 +35,7 @@ namespace Loom
 		};
 
 		// Returns when everything holding the pipe has exited.
-		void Read(HiddenProcess hidden, const std::string& page, const std::atomic<bool>& stopping)
+		void Read(HiddenProcess hidden, const std::string& page, std::atomic<bool>& building, const std::atomic<bool>& stopping)
 		{
 			WebPlayer::Output output(page);
 
@@ -44,9 +44,12 @@ namespace Loom
 				{
 					if (const std::string url = output.Hear(line); !url.empty())
 						OpenInBrowser(url);
+
+					building = !output.Serving();
 				});
 
 			hidden.Finish();
+			building = false;
 
 			for (const std::string& line : output.Ended(stopping))
 				std::cout << prefix << line << std::endl;
@@ -59,16 +62,20 @@ namespace Loom
 		const std::string page =
 			'/' + (std::filesystem::path(scene).parent_path().lexically_relative(project) / "index.html").generic_string();
 
+		// Before the start, which stops the last run, so only this one's reader writes it.
+		m_building = true;
+
 		const bool started = m_run.Start("play-web.ps1",
 			"-Project " + ScriptRun::Quote(project) + " -Scene " + ScriptRun::Quote(scene) +
 				" -FixedRate " + std::format("{}", fixed_rate),
-			[page](HiddenProcess hidden, const std::atomic<bool>& stopping)
+			[this, page](HiddenProcess hidden, const std::atomic<bool>& stopping)
 			{
-				Read(hidden, page, stopping);
+				Read(hidden, page, m_building, stopping);
 			});
 
 		if (started)
 			std::cout << prefix << "Building " << project << " for the web" << std::endl;
+		else m_building = false;
 
 		return started;
 	};

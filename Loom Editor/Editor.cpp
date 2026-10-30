@@ -1264,12 +1264,12 @@ namespace Loom
 			ImGui::IsAnyItemActive() || ImGui::IsAnyMouseDown() ||
 			ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId);
 
-		// A game being built, a page being served and a queued test all end with the editor.
-		const bool restartLosesWork =
+		// A game or page being built and a queued test all end with the editor.
+		const bool restart_loses_work =
 			!UnsavedWork().empty() || m_gameBuilder.GetStatus() == GameBuilder::Status::Building ||
-			m_webPlayer.IsRunning() || m_tests.HasQueued();
+			m_webPlayer.IsBuilding() || m_tests.HasQueued();
 
-		switch (m_update.Due(IsPlaying(), busy, restartLosesWork))
+		switch (m_update.Due(IsPlaying(), busy, restart_loses_work))
 		{
 		case EditorUpdate::Kind::Scripts:
 			CompileScripts();

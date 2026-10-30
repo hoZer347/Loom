@@ -6,8 +6,8 @@
     Opens this slot's Release editor on a hidden desktop, on a scratch project,
     and runs update-editor.ps1 at it: an update waits while a scene is unsaved
     and restarts the editor once it is saved, a scripts update goes in over
-    unsaved work without a restart, and an editor with nothing to take is told
-    nothing. Throws naming what failed. A slot only: the user's
+    unsaved work without a restart, a restart waits out a game being built, and
+    an editor with nothing to take is told nothing. Throws naming what failed. A slot only: the user's
     Loom refuses, since its settings hold what they left open.
 
 .EXAMPLE
@@ -27,6 +27,11 @@ $DeadlineSeconds = 60
 $CompileSeconds = 240
 $PollMilliseconds = 250
 $SettleSeconds = 3
+$OpenBuildAndBuild = @'
+click "##MainMenuBar" "File"
+click "##Menu_00" "Build Settings..."
+click "Build Settings" "Build"
+'@
 
 $common = & git -C $Root rev-parse --path-format=absolute --git-common-dir
 if ([IO.Path]::GetFullPath((Split-Path $common -Parent)) -eq [IO.Path]::GetFullPath($Root)) { throw "$Root is the user's Loom. Run a slot's copy." }
@@ -63,16 +68,16 @@ function Get-Pid
     if ($state -match 'Process: (\d+)') { [int] $Matches[1] }
 }
 
-function Wait-Pid([scriptblock] $Until, [string] $What)
+function Wait-Pid([scriptblock] $Until, [string] $What, [int] $Seconds = $DeadlineSeconds)
 {
     $clock = [Diagnostics.Stopwatch]::StartNew()
-    while ($clock.Elapsed.TotalSeconds -lt $DeadlineSeconds)
+    while ($clock.Elapsed.TotalSeconds -lt $Seconds)
     {
         $found = Get-Pid
         if ($found -and (& $Until $found)) { return $found }
         Start-Sleep -Milliseconds $PollMilliseconds
     }
-    throw "No $What within $DeadlineSeconds seconds."
+    throw "No $What within $Seconds seconds."
 }
 
 function Wait-Compiled
@@ -143,6 +148,17 @@ try
     Wait-Compiled
     if ((Invoke-Tool 'hierarchy') -notmatch 'UnsavedAgain') { throw 'The compile dropped the unsaved object.' }
     if ((Get-Content -LiteralPath $scene -Raw) -match 'UnsavedAgain') { throw 'The compile saved the unsaved object.' }
+
+    Invoke-Tool 'command' @{ command = 'save' } | Out-Null
+    Invoke-Tool 'ui' @{ script = $OpenBuildAndBuild } | Out-Null
+
+    Invoke-Update | Out-Null
+    Start-Sleep -Seconds $SettleSeconds
+    if ((Get-Pid) -ne $latest) { throw 'The editor restarted over a game being built.' }
+    if ((Invoke-Tool 'state') -notmatch 'Update: waiting') { throw 'State does not say an update waits for the build.' }
+
+    $beforeBuild = $latest
+    $latest = Wait-Pid { param($id) $id -ne $beforeBuild } 'restart once built' $CompileSeconds
 
     Write-Output 'update-editor passed.'
 }

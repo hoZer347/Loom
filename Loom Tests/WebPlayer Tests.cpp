@@ -37,6 +37,20 @@ TEST_SUITE("WebPlayer")
 		CHECK(output.Ended(false).empty());
 	};
 
+	TEST_CASE("the page counts as served from the line saying so, and not before")
+	{
+		Loom::WebPlayer::Output output("/index.html");
+
+		output.Hear("Linking 1 script file(s)");
+		CHECK_FALSE(output.Serving());
+
+		output.Hear("Now listening at http://127.0.0.1:53125/");
+		CHECK(output.Serving());
+
+		output.Hear("Sending the page");
+		CHECK(output.Serving());
+	};
+
 	TEST_CASE("a script that ends before serving leaves everything it said to print")
 	{
 		Loom::WebPlayer::Output output("/index.html");
