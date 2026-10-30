@@ -1268,10 +1268,13 @@ namespace Loom
 			!m_scripts.IsIdle() || IsRefreshing() || m_opening || m_projectLoad ||
 			m_gameBuilder.GetStatus() == GameBuilder::Status::Building || m_webPlayer.IsBuilding() || m_tests.HasQueued() ||
 			(m_updateSaveFailed && !UnsavedWork().empty()) ||
-			ImGui::IsAnyItemActive() || ImGui::IsAnyMouseDown() ||
-			ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId);
+			ImGui::IsAnyItemActive() || ImGui::IsAnyMouseDown();
 
-		const EditorUpdate::Kind due = m_update.Due(busy);
+		// The update saves for itself, so a question about saving never holds it.
+		if (!busy)
+			DropSaveQuestions();
+
+		const EditorUpdate::Kind due = m_update.Due(busy || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId));
 
 		if (due == EditorUpdate::Kind::None)
 			return;
@@ -1296,6 +1299,16 @@ namespace Loom
 		m_refresh.NoteExecutable();
 		m_relaunch = true;
 		Engine::Stop();
+	};
+
+	void Editor::DropSaveQuestions()
+	{
+		m_saveQuestion.reset();
+		m_prefabNext.reset();
+		m_shaders.DropCloseQuestion();
+		m_dialogues.DropCloseQuestion();
+		m_sprites.DropCloseQuestion();
+		m_models.DropCloseQuestion();
 	};
 
 	#pragma endregion

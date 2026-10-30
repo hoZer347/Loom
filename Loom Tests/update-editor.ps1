@@ -6,9 +6,11 @@
     Opens this slot's Release editor on a hidden desktop, on a scratch project,
     and runs update-editor.ps1 at it: an update saves a scene left unsaved,
     stops a run and restarts at once, a clean scene takes what a merge wrote to
-    its file and to a prefab it holds, an open menu holds the update and the
+    its file and to a prefab it holds, a question about saving stays up until
+    an update takes it back and saves, an open menu holds the update and the
     edit made under it is saved, a save that fails keeps the update
-    waiting, a scripts update stops a run and compiles over unsaved work
+    waiting with no question and a close then still asks, a scripts update
+    takes back a question, stops a run and compiles over unsaved work
     without a restart, a restart waits out a game being built, and an editor
     with nothing to take is told nothing. Throws naming what failed.
     A slot only: the user's Loom refuses, since its settings hold what they
@@ -36,6 +38,12 @@ click "##MainMenuBar" "File"
 click "##Menu_00" "Build Settings..."
 click "Build Settings" "Build"
 '@
+$AskToSave = @'
+click "##MainMenuBar" "File"
+click "##Menu_00" "Exit"
+wait 5
+'@
+$Answer = 'click "Unsaved Changes" "Cancel"'
 
 $common = & git -C $Root rev-parse --path-format=absolute --git-common-dir
 if ([IO.Path]::GetFullPath((Split-Path $common -Parent)) -eq [IO.Path]::GetFullPath($Root)) { throw "$Root is the user's Loom. Run a slot's copy." }
@@ -116,6 +124,11 @@ function Invoke-Restart([string] $What)
     Wait-Compiled
 }
 
+function Test-Asking
+{
+    (Invoke-Tool 'ui_items') -match "Don't Save"
+}
+
 function Invoke-Update([string[]] $Flags = @())
 {
     $line = "& '$Script' -Port $port -Project '$project' $($Flags -join ' ')"
@@ -184,6 +197,18 @@ try
     if ((Get-Content -LiteralPath $scene -Raw) -notmatch 'MergedBit') { throw 'A prefab the merge changed wrote its clean scene over the merge.' }
     if ((Invoke-Tool 'hierarchy') -notmatch 'InnerMerged') { throw 'The restarted editor did not take the merged prefab.' }
 
+    Invoke-Tool 'add_object' @{ name = 'Asked' } | Out-Null
+    Invoke-Tool 'ui' @{ script = $AskToSave } | Out-Null
+    Start-Sleep -Seconds $SettleSeconds
+    if (-not (Test-Asking)) { throw 'Closing with unsaved work did not ask.' }
+    if ((Get-Pid) -ne $latest) { throw 'A close with no update did not wait for its question.' }
+    $beforeAsked = $latest
+    Invoke-Update | Out-Null
+    $latest = Wait-Pid { param($id) $id -ne $beforeAsked } 'restart over a question about saving'
+    Wait-Compiled
+    if (Test-Asking) { throw 'The restarted editor asked about saving.' }
+    if ((Get-Content -LiteralPath $scene -Raw) -notmatch 'Asked') { throw 'The update did not save what the question asked about.' }
+
     Invoke-Tool 'ui' @{ script = 'click "##MainMenuBar" "File"' } | Out-Null
     Invoke-Tool 'add_object' @{ name = 'HeldEdit' } | Out-Null
     $beforeHeld = $latest
@@ -198,8 +223,14 @@ try
     Invoke-Tool 'add_object' @{ name = 'CannotSave' } | Out-Null
     Set-ItemProperty -LiteralPath $scene -Name IsReadOnly -Value $true
     $beforeRefused = $latest
+    Invoke-Tool 'ui' @{ script = $AskToSave } | Out-Null
     Invoke-Update | Out-Null
     Start-Sleep -Seconds $SettleSeconds
+    if (Test-Asking) { throw 'A failed save left the question up.' }
+    Invoke-Tool 'ui' @{ script = $AskToSave } | Out-Null
+    Start-Sleep -Seconds $SettleSeconds
+    if (-not (Test-Asking)) { throw 'A close after a failed save did not ask.' }
+    Invoke-Tool 'ui' @{ script = $Answer } | Out-Null
     Set-ItemProperty -LiteralPath $scene -Name IsReadOnly -Value $false
     if ((Get-Pid) -ne $beforeRefused) { throw 'The editor restarted over a save that failed.' }
     if ((Invoke-Tool 'state') -notmatch 'Update: waiting') { throw 'A failed save lost the update.' }
@@ -218,11 +249,13 @@ try
 
     Invoke-Tool 'command' @{ command = 'play' } | Out-Null
     Wait-Running
+    Invoke-Tool 'ui' @{ script = $AskToSave } | Out-Null
 
     $scripts = Invoke-Update '-ScriptsOnly'
     if ($scripts -notmatch 'told to update-scripts') { throw "The editor was not told to update its scripts: $scripts" }
 
     Start-Sleep -Seconds $SettleSeconds
+    if (Test-Asking) { throw 'A scripts update left the question up.' }
     if ((Get-Pid) -ne $latest) { throw 'A scripts update restarted the editor.' }
     Wait-Compiled
     if ((Invoke-Tool 'state') -notmatch 'Play: stopped') { throw 'A scripts update left the run going.' }

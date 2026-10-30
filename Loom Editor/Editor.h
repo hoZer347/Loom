@@ -1038,6 +1038,9 @@ namespace Loom
 		// Runs the update that waits, once it is due.
 		void ApplyUpdate();
 
+		// Takes back every question about saving, with what is unsaved kept.
+		void DropSaveQuestions();
+
 		// Every unsaved scene, shader and sprite, to its file. False when
 		// something could not be saved.
 		bool SaveProject();

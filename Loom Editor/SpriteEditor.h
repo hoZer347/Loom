@@ -117,6 +117,9 @@ namespace Loom
 		// The names of the sprites and palettes with unsaved changes.
 		std::vector<std::string> UnsavedFiles() const;
 
+		// Takes back the question about closing a tab, leaving the tab open.
+		void DropCloseQuestion() { m_closing = nullptr; };
+
 		#pragma endregion
 
 	private:

@@ -39,6 +39,9 @@ namespace Loom
 		// The names of the files with unsaved changes.
 		std::vector<std::string> UnsavedFiles() const;
 
+		// Takes back the question about closing a tab, leaving the tab open.
+		void DropCloseQuestion() { m_closing = nullptr; };
+
 		#pragma endregion
 
 		#pragma region Drawing

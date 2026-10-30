@@ -108,6 +108,9 @@ namespace Loom
 		// The names of the prefabs with unsaved changes.
 		std::vector<std::string> UnsavedFiles() const;
 
+		// Takes back the question about closing a tab, leaving the tab open.
+		void DropCloseQuestion() { m_closing = nullptr; };
+
 		// The prefabs saved since the last call.
 		std::vector<std::string> TakeSaved();
 
