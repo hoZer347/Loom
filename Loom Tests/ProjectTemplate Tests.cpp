@@ -11,6 +11,7 @@
 #include <iterator>
 #include <sstream>
 #include <string>
+#include <utility>
 
 
 #pragma region Helpers
@@ -471,6 +472,35 @@ TEST_SUITE("ProjectTemplate")
 		CHECK(rebuild.ends_with("--clean-first"));
 	};
 #endif
+
+	#pragma endregion
+
+	#pragma region Engine Projects
+
+	TEST_CASE("the engine's Release projects link with full LTCG and no object file")
+	{
+		const std::string release = "<ItemDefinitionGroup Condition=\"'$(Configuration)|$(Platform)'=='Release|x64'\">";
+		const std::string not_debug = "<ItemDefinitionGroup Condition=\"'$(Configuration)'!='Debug'\">";
+		const std::pair<std::string, std::string> projects[] = { { "Loom Editor", release }, { "Loom Player", not_debug }, { "Loom Tests", release } };
+
+		for (const auto& entry : projects)
+		{
+			const std::string& project = entry.first;
+
+			CAPTURE(project);
+
+			const std::string vcxproj = ReadAll(std::filesystem::path(Loom::ProjectTemplate::EngineRoot()) / project / (project + ".vcxproj"));
+			const size_t start = vcxproj.find(entry.second);
+
+			REQUIRE(start != std::string::npos);
+
+			const std::string group = vcxproj.substr(start, vcxproj.find("</ItemDefinitionGroup>", start) - start);
+
+			CHECK(group.find("<LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>") != std::string::npos);
+			CHECK(group.find("<LinkTimeCodeGenerationObjectFile />") != std::string::npos);
+			CHECK(group.find("UseFastLinkTimeCodeGeneration") == std::string::npos);
+		}
+	};
 
 	#pragma endregion
 };
