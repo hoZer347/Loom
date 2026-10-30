@@ -84,7 +84,8 @@ namespace Loom
 		CullFace FarSide();
 
 		// Gives the program the mesh's material, the scene's view and the faces
-		// its material culls, as its own pass does before drawing it.
+		// its material culls, as its own pass does before drawing it. The caller
+		// sets it back to none after drawing.
 		static void Ready(Mesh& mesh, uint32_t program);
 
 		// Culls the faces its material leaves out, seen through its world
