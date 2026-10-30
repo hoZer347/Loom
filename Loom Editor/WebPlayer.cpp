@@ -53,7 +53,7 @@ namespace Loom
 		};
 	};
 
-	bool WebPlayer::Launch(const std::string& project, const std::string& scene, float fixedRate)
+	bool WebPlayer::Launch(const std::string& project, const std::string& scene, float fixed_rate)
 	{
 		// Where play-web.ps1 writes the page: beside the scene, served from the project.
 		const std::string page =
@@ -61,7 +61,7 @@ namespace Loom
 
 		const bool started = m_run.Start("play-web.ps1",
 			"-Project " + ScriptRun::Quote(project) + " -Scene " + ScriptRun::Quote(scene) +
-				" -FixedRate " + std::format("{}", fixedRate),
+				" -FixedRate " + std::format("{}", fixed_rate),
 			[page](HiddenProcess hidden, const std::atomic<bool>& stopping)
 			{
 				Read(hidden, page, stopping);

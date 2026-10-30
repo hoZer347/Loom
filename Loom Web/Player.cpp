@@ -4,9 +4,9 @@
 // an entry point that loads one scene file and runs it. The page preloads the
 // scene and names its path as the first argument and the fixed rate as the
 // second, and preloads the project's key bindings, when it has any, at
-// input_actions. A page that holds the
-// player can edit a shader by calling loom_edit_shader, and hears whether it
-// compiled from a "loomshader" event on its window.
+// input_actions. A page that holds the player can edit a shader by calling
+// loom_edit_shader, and hears whether it compiled from a "loomshader" event on
+// its window.
 
 #include "Engine.h"
 #include "InputActions.h"

@@ -120,9 +120,6 @@ namespace Loom
 
 		#pragma region Physics
 
-		// A scene's own, as an OnFixedUpdate may step another.
-		std::vector<ComponentBase*> fixedUpdates{ };
-
 		// Runs the hierarchy's OnFixedUpdate, then walks its OnPhysics into the
 		// collider tree and the simulation, ready for a step of either kind.
 		void Sync();
@@ -130,6 +127,9 @@ namespace Loom
 		#pragma endregion
 
 		#pragma region State
+
+		// A scene's own, as an OnFixedUpdate may step another.
+		std::vector<ComponentBase*> fixedUpdates{ };
 
 		int thread_id;
 

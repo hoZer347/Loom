@@ -629,7 +629,7 @@ namespace Loom
 
 		const GameBuilder::Status status = m_gameBuilder.GetStatus();
 
-		const float fixedRate = m_buildSettings.fixedRate;
+		const float fixed_rate = m_buildSettings.fixedRate;
 
 		const BuildSettings::Action action = m_buildSettings.Draw(
 			&m_showBuildSettings,
@@ -639,7 +639,7 @@ namespace Loom
 			GameBuilder::Label(status),
 			status == GameBuilder::Status::Building);
 
-		if (m_buildSettings.fixedRate != fixedRate)
+		if (m_buildSettings.fixedRate != fixed_rate)
 			Physics::SetFixedDeltaTime(m_buildSettings.FixedDeltaTime());
 
 		switch (action)
