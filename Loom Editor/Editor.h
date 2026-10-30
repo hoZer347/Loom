@@ -645,6 +645,9 @@ namespace Loom
 		void ScrollWhileReordering();
 		void DrawComponentMenu(const std::vector<GameObject*>& objects, const ComponentMenu::Node& node);
 
+		// The name prompt for a script of kind that goes on objects once it builds.
+		void AskForScriptOn(AssetKind kind, const std::vector<GameObject*>& objects);
+
 		// Right-click on a component in the Add Component menu: the category it
 		// is filed under in this project.
 		void DrawCategoryPopup(const std::string& component);
@@ -1599,8 +1602,8 @@ namespace Loom
 		void* m_newAssetFor = nullptr;
 		std::string m_newAssetMade{ };
 
-		// Add Component's StateMachine and DialogueManager make a script of that kind
-		// for the object rather than attaching one, and the script attaches to it
+		// Add Component's New makes a script for the object, as do StateMachine and
+		// DialogueManager rather than attaching one, and the script attaches to it
 		// once the compile that follows has loaded it.
 		std::vector<Guid> m_newScriptFor{ };
 		std::vector<Guid> m_attachAfterBuildTo{ };

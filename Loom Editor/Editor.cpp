@@ -4230,6 +4230,14 @@ namespace Loom
 
 				if (ImGui::BeginPopup("##add_component"))
 				{
+					if (!m_projectPath.empty())
+					{
+						if (ImGui::MenuItem((std::string(EditorIcons::New) + " New").c_str()))
+							AskForScriptOn(AssetKind::Script, objects);
+
+						ImGui::Separator();
+					};
+
 					if (ComponentRegistry::All().empty())
 						ImGui::TextDisabled("Nothing registered.");
 
@@ -4246,6 +4254,14 @@ namespace Loom
 	#pragma endregion
 
 	#pragma region Add Component
+
+	void Editor::AskForScriptOn(AssetKind kind, const std::vector<GameObject*>& objects)
+	{
+		AskForAsset(kind, m_projectPath);
+
+		for (const GameObject* gameObject : objects)
+			m_newScriptFor.push_back(gameObject->GetGuid());
+	};
 
 	void Editor::DrawComponentMenu(const std::vector<GameObject*>& objects, const ComponentMenu::Node& node)
 	{
@@ -4273,13 +4289,7 @@ namespace Loom
 				const auto base = std::find_if(std::begin(derived), std::end(derived), [&component](const auto& kind) { return kind.first == component; });
 
 				if (base != std::end(derived) && !m_projectPath.empty())
-				{
-					AskForAsset(base->second, m_projectPath);
-					m_newScriptFor.clear();
-
-					for (const GameObject* gameObject : objects)
-						m_newScriptFor.push_back(gameObject->GetGuid());
-				}
+					AskForScriptOn(base->second, objects);
 				else ChangeComponents(objects, [&](size_t i) { ComponentRegistry::Create(component, *objects[i]); });
 			};
 
