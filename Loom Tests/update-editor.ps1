@@ -7,8 +7,9 @@
     and runs update-editor.ps1 at it: an update waits while a scene is unsaved
     and restarts the editor once it is saved, a scripts update goes in over
     unsaved work without a restart, a restart waits out a game being built, and
-    an editor with nothing to take is told nothing. Throws naming what failed. A slot only: the user's
-    Loom refuses, since its settings hold what they left open.
+    an editor with nothing to take is told nothing. Throws naming what failed.
+    A slot only: the user's Loom refuses, since its settings hold what they
+    left open.
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File 'C:\Users\3hoze\Desktop\Loom 1\Loom Tests\update-editor.ps1'

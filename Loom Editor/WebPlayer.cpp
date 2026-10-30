@@ -62,7 +62,7 @@ namespace Loom
 		const std::string page =
 			'/' + (std::filesystem::path(scene).parent_path().lexically_relative(project) / "index.html").generic_string();
 
-		// Before the start, which stops the last run, so only this one's reader writes it.
+		m_run.Stop();
 		m_building = true;
 
 		const bool started = m_run.Start("play-web.ps1",
