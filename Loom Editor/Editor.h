@@ -20,6 +20,7 @@
 #include "EditorSettings.h"
 #include "ShaderEditor.h"
 #include "TestsPanel.h"
+#include "ExtensionLibrary.h"
 #include "Shapes.h"
 #include "BuildSettings.h"
 #include "GameBuilder.h"
@@ -400,6 +401,10 @@ namespace Loom
 		// Prints each scripts project it opens, for a launcher that checks which
 		// one a run built. Set before construction, which opens the last project.
 		static inline bool logScriptsProject = false;
+
+		// Where extensions load from, for a run that must not use the user's.
+		// Set before construction.
+		static inline std::filesystem::path extensionsFolder{ };
 
 		#pragma endregion
 
@@ -1614,6 +1619,8 @@ namespace Loom
 		SpriteEditor m_sprites;
 		ModelEditor m_models;
 		TestsPanel m_tests;
+
+		ExtensionLibrary m_extensions;
 
 		#pragma endregion
 

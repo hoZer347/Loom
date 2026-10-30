@@ -34,6 +34,12 @@
     <ClCompile Include="ScriptLibrary.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
+    <ClCompile Include="ExtensionLibrary.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
+    <ClCompile Include="ExtensionRegistry.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
     <ClCompile Include="VisualStudio.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
@@ -214,6 +220,12 @@
       <Filter>Scripts</Filter>
     </ClInclude>
     <ClInclude Include="ScriptLibrary.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="ExtensionLibrary.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="ExtensionRegistry.h">
       <Filter>Scripts</Filter>
     </ClInclude>
     <ClInclude Include="FileTab.h">

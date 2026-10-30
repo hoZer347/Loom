@@ -184,6 +184,7 @@ namespace
 			<< "                                 or test\n"
 			<< "  --compile                      build the project's scripts on startup\n"
 			<< "  --log-scripts-project          print each scripts project opened\n"
+			<< "  --extensions <folder>          load extensions from this folder, not the user's\n"
 			<< "  --claim-file-types             make this editor what opens .loom files in\n"
 			<< "                                 Explorer, as showing its window does, and\n"
 			<< "                                 exit; fails for a worktree's editor\n"
@@ -332,6 +333,9 @@ int main(int argc, char** argv)
 
 		if (argument == "--log-scripts-project")
 			Editor::logScriptsProject = true;
+
+		if (argument == "--extensions" && i + 1 < argc)
+			Editor::extensionsFolder = argv[i + 1];
 	};
 
 	if (!Engine::showWindow)
@@ -549,6 +553,8 @@ int main(int argc, char** argv)
 			}
 			else if (argument == "--vulkan" || argument == "--opengl" || argument == "--log-scripts-project")
 				continue;
+			else if (argument == "--extensions")
+				i++;
 			else if (argument == "--compile")
 				compile = true;
 			else if (argument == "--play")

@@ -2,6 +2,7 @@
 
 #include "EditorLog.h"
 #include "EditorTheme.h"
+#include "ExtensionRegistry.h"
 
 #include "Audio.h"
 #include "Component.h"
@@ -816,6 +817,7 @@ namespace Loom
 		// Read now, so the saved layout does not close panels a file opened from the command line shows.
 		static const std::string layout = BesideExecutable("LoomEditor.layout.ini").string();
 		ImGui::GetIO().IniFilename = layout.c_str();
+		m_extensions.Load(extensionsFolder.empty() ? ExtensionLibrary::UserFolder() : extensionsFolder);
 		AddPanelSettings();
 		m_tornWindows.AddSettings();
 		ImGui::LoadIniSettingsFromDisk(layout.c_str());
@@ -856,6 +858,7 @@ namespace Loom
 		io.IniFilename = nullptr;
 		ImGui::RemoveSettingsHandler(panel_settings);
 		m_tornWindows.RemoveSettings();
+		m_extensions.Unload();
 
 		SetDropCallback(nullptr);
 
@@ -2433,6 +2436,20 @@ namespace Loom
 		if (m_showBuildSettings)
 			DrawBuildSettings();
 
+		for (ExtensionRegistry::Panel& panel : ExtensionRegistry::Panels())
+		{
+			if (!panel.shown)
+				continue;
+
+			if (const ImGuiWindow* inspector = ImGui::FindWindowByName(EditorPanels::Inspector); inspector != nullptr)
+				ImGui::SetNextWindowDockID(inspector->DockId, ImGuiCond_FirstUseEver);
+
+			if (ImGui::Begin(panel.title.c_str(), &panel.shown))
+				panel.draw(m_projectPath);
+
+			ImGui::End();
+		};
+
 		m_tornWindows.Prune();
 	};
 
@@ -2901,6 +2918,9 @@ namespace Loom
 		ImGui::DockBuilderDockWindow(EditorPanels::BuildSettings, bottom);
 		ImGui::DockBuilderDockWindow(EditorPanels::Tests, bottom);
 
+		for (const ExtensionRegistry::Panel& panel : ExtensionRegistry::Panels())
+			ImGui::DockBuilderDockWindow(panel.title.c_str(), right);
+
 		for (const char* window : centre_windows)
 			ImGui::DockBuilderDockWindow(window, centre);
 
@@ -2909,7 +2929,7 @@ namespace Loom
 
 	std::vector<Editor::Panel> Editor::Panels()
 	{
-		return {
+		std::vector<Panel> panels = {
 			{ EditorPanels::Hierarchy, &m_showHierarchy, true },
 			{ EditorPanels::Project, &m_showProject, true },
 			{ EditorPanels::Inspector, &m_showInspector, true },
@@ -2926,6 +2946,11 @@ namespace Loom
 			{ EditorPanels::KeyBindings, &m_showKeyBindings, true },
 			{ EditorPanels::BuildSettings, &m_showBuildSettings, true },
 			{ EditorPanels::Tests, &m_showTests, true } };
+
+		for (ExtensionRegistry::Panel& panel : ExtensionRegistry::Panels())
+			panels.push_back({ panel.title.c_str(), &panel.shown, false });
+
+		return panels;
 	};
 
 	void Editor::AddPanelSettings()

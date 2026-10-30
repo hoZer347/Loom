@@ -28,6 +28,15 @@
 //#define IMGUI_API __declspec(dllimport)                   // MSVC Windows: DLL import
 //#define IMGUI_API __attribute__((visibility("default")))  // GCC/Clang: override visibility when set is hidden
 
+// Exported from whatever executable links it, as the engine is, so editor extensions draw into the editor's context.
+#if defined(_WIN32) && !defined(__EMSCRIPTEN__)
+#ifdef LOOM_SCRIPT_MODULE
+#define IMGUI_API __declspec(dllimport)
+#else
+#define IMGUI_API __declspec(dllexport)
+#endif
+#endif
+
 //---- Don't define obsolete functions/enums/behaviors. Consider enabling from time to time after updating to clean your code of obsolete function/names.
 //#define IMGUI_DISABLE_OBSOLETE_FUNCTIONS
 
