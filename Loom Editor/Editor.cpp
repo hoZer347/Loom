@@ -1205,12 +1205,14 @@ namespace Loom
 	{
 		// AddChild defers, so the scenes are only whole once the queue has run.
 		Engine::DoTasks();
-		RecordHistory();
+
+		// Taken before the prefabs sync, which marks a scene their change reached.
+		m_history.Collect(m_ownedScenes);
+		const std::vector<Scene*> unsaved = UnsavedScenes();
 
 		bool saved = true;
 
-		// A clean scene stays as its file is, which a merge may have moved on.
-		for (Scene* scene : UnsavedScenes())
+		for (Scene* scene : unsaved)
 			saved = SaveToProject(scene) && saved;
 
 		saved = m_shaders.SaveAll() && saved;
@@ -1264,6 +1266,7 @@ namespace Loom
 		const bool busy =
 			!m_scripts.IsIdle() || IsRefreshing() || m_opening || m_projectLoad ||
 			m_gameBuilder.GetStatus() == GameBuilder::Status::Building || m_webPlayer.IsBuilding() || m_tests.HasQueued() ||
+			(m_updateSaveFailed && !UnsavedWork().empty()) ||
 			ImGui::IsAnyItemActive() || ImGui::IsAnyMouseDown() ||
 			ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId);
 
@@ -1280,9 +1283,12 @@ namespace Loom
 			return;
 		};
 
-		if (!SaveProject())
+		m_updateSaveFailed = !SaveProject();
+
+		if (m_updateSaveFailed)
 		{
-			std::cerr << "Update: not everything saved, so this editor stays up rather than lose it." << std::endl;
+			std::cerr << "Update: not everything saved, so this editor stays up until it is." << std::endl;
+			m_update.Request(due);
 			return;
 		};
 
@@ -2596,10 +2602,10 @@ namespace Loom
 
 		DrawMenus();
 
-		if (m_update.Waiting() == EditorUpdate::Kind::Restart)
+		if (m_update.Waiting() != EditorUpdate::Kind::None)
 		{
 			ImGui::TextDisabled("Update waiting");
-			ImGui::SetItemTooltip("Saves and restarts once idle");
+			ImGui::SetItemTooltip("Applies once idle");
 		};
 
 		if (DrawWindowButtons(Engine::window, m_windowFrame))

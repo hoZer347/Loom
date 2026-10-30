@@ -1038,7 +1038,7 @@ namespace Loom
 		// Runs the update that waits, once it is due.
 		void ApplyUpdate();
 
-		// Every owned scene, open shader and sprite, to its file. False when
+		// Every unsaved scene, shader and sprite, to its file. False when
 		// something could not be saved.
 		bool SaveProject();
 
@@ -1283,6 +1283,7 @@ namespace Loom
 		ScriptLibrary m_scripts;
 		EditorRefresh m_refresh;
 		EditorUpdate m_update{ };
+		bool m_updateSaveFailed = false;
 		bool m_relaunch = false;
 		WebPlayer m_webPlayer;
 		GameBuilder m_gameBuilder;

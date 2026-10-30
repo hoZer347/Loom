@@ -10,10 +10,10 @@
 
     Each editor open from this copy is then told over MCP what to do: update,
     which stops its run, saves what is unsaved and restarts it on the new build
-    once no game or page is building, or update-scripts, which stops its run
-    and compiles over unsaved work. An editor on -Project is told whatever -ScriptsOnly says,
-    and any other only when the build is newer than it. Demos and hidden runs
-    are left alone.
+    once no game or page is building and no test is queued, or update-scripts,
+    which stops its run and compiles over unsaved work. An editor on -Project
+    is told whatever -ScriptsOnly says, and any other only when the build is
+    newer than it. Demos and hidden runs are left alone.
 
     Exits non-zero if the build fails or an open editor cannot be reached.
 

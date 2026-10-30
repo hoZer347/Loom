@@ -6,7 +6,8 @@
     Opens this slot's Release editor on a hidden desktop, on a scratch project,
     and runs update-editor.ps1 at it: an update saves a scene left unsaved,
     stops a run and restarts at once, a clean scene takes what a merge wrote to
-    its file, a scripts update stops a run and compiles over unsaved work
+    its file and to a prefab it holds, a save that fails keeps the update
+    waiting, a scripts update stops a run and compiles over unsaved work
     without a restart, a restart waits out a game being built, and an editor
     with nothing to take is told nothing. Throws naming what failed.
     A slot only: the user's Loom refuses, since its settings hold what they
@@ -95,6 +96,25 @@ function Wait-Compiled
     throw "No compile within $CompileSeconds seconds: $state"
 }
 
+function Wait-Running
+{
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    while ($clock.Elapsed.TotalSeconds -lt $DeadlineSeconds)
+    {
+        if ((Invoke-Tool 'state') -match 'Play: running') { return }
+        Start-Sleep -Milliseconds $PollMilliseconds
+    }
+    throw "No run within $DeadlineSeconds seconds."
+}
+
+function Invoke-Restart([string] $What)
+{
+    $before = $latest
+    Invoke-Update | Out-Null
+    $script:latest = Wait-Pid { param($id) $id -ne $before } $What
+    Wait-Compiled
+}
+
 function Invoke-Update([string[]] $Flags = @())
 {
     $line = "& '$Script' -Port $port -Project '$project' $($Flags -join ' ')"
@@ -133,15 +153,49 @@ try
     Set-Content -LiteralPath $scene -Value ($saved -replace 'Unsaved', 'Merged') -NoNewline -Encoding utf8
     Start-Sleep -Seconds $SettleSeconds
 
-    Invoke-Tool 'command' @{ command = 'play' } | Out-Null
-    $beforeMerge = $latest
-    Invoke-Update | Out-Null
-    $latest = Wait-Pid { param($id) $id -ne $beforeMerge } 'restart over a run'
-    Wait-Compiled
+    Invoke-Restart 'restart on a merged scene'
 
     if ((Get-Content -LiteralPath $scene -Raw) -notmatch 'Merged') { throw 'The restart wrote a clean scene over what a merge left in its file.' }
     if ((Invoke-Tool 'hierarchy') -notmatch 'Merged') { throw 'The restarted editor did not take what a merge left in the scene.' }
+
+    Invoke-Tool 'add_object' @{ name = 'Holder' } | Out-Null
+    Invoke-Tool 'command' @{ command = 'play' } | Out-Null
+    Wait-Running
+    Invoke-Restart 'restart over a run'
+
+    if ((Get-Content -LiteralPath $scene -Raw) -notmatch 'Holder') { throw 'The restart over a run did not save the object.' }
     if ((Invoke-Tool 'state') -notmatch 'Play: stopped') { throw 'The restarted editor came back playing.' }
+
+    $prefab = Join-Path $project 'Thing.loomprefab'
+    Set-Content -LiteralPath $prefab -Encoding ascii -Value "GameObject Thing($([guid]::NewGuid()))`n`tGameObject Inner($([guid]::NewGuid()))"
+    $held = (Get-Content -LiteralPath $scene -Raw) -replace '(?m)^(\t*)(GameObject Holder\(.*\r?\n(?:\t+\d+ = .*\r?\n)*)', "`$1`$2`$1`tComponent Prefab($([guid]::NewGuid()))`n`$1`t`t0 = `"Thing.loomprefab`"`n"
+    Set-Content -LiteralPath $scene -Value $held -NoNewline -Encoding utf8
+    Invoke-Restart 'restart on a prefab instance'
+    if ((Invoke-Tool 'hierarchy') -notmatch 'Inner') { throw 'The restarted editor did not load the prefab.' }
+    Invoke-Tool 'command' @{ command = 'save' } | Out-Null
+
+    $text = (Get-Content -LiteralPath $prefab -Raw) -replace 'Inner', 'InnerMerged'
+    Set-Content -LiteralPath $prefab -Value $text -NoNewline -Encoding ascii
+    $text = (Get-Content -LiteralPath $scene -Raw) -replace 'GameObject Merged', 'GameObject MergedBit'
+    Set-Content -LiteralPath $scene -Value $text -NoNewline -Encoding utf8
+    Invoke-Restart 'restart on a merged prefab'
+
+    if ((Get-Content -LiteralPath $scene -Raw) -notmatch 'MergedBit') { throw 'A prefab the merge changed wrote its clean scene over the merge.' }
+    if ((Invoke-Tool 'hierarchy') -notmatch 'InnerMerged') { throw 'The restarted editor did not take the merged prefab.' }
+
+    Invoke-Tool 'add_object' @{ name = 'CannotSave' } | Out-Null
+    Set-ItemProperty -LiteralPath $scene -Name IsReadOnly -Value $true
+    $beforeRefused = $latest
+    Invoke-Update | Out-Null
+    Start-Sleep -Seconds $SettleSeconds
+    Set-ItemProperty -LiteralPath $scene -Name IsReadOnly -Value $false
+    if ((Get-Pid) -ne $beforeRefused) { throw 'The editor restarted over a save that failed.' }
+    if ((Invoke-Tool 'state') -notmatch 'Update: waiting') { throw 'A failed save lost the update.' }
+
+    Invoke-Tool 'command' @{ command = 'save' } | Out-Null
+    $latest = Wait-Pid { param($id) $id -ne $beforeRefused } 'restart once the failed save went through'
+    Wait-Compiled
+    if ((Get-Content -LiteralPath $scene -Raw) -notmatch 'CannotSave') { throw 'The object held back by the failed save was not written.' }
 
     Invoke-Tool 'add_object' @{ name = 'UnsavedAgain' } | Out-Null
 
@@ -151,6 +205,7 @@ try
     if ((Invoke-Tool 'state') -notmatch 'changed since') { throw 'The scripts did not go stale.' }
 
     Invoke-Tool 'command' @{ command = 'play' } | Out-Null
+    Wait-Running
 
     $scripts = Invoke-Update '-ScriptsOnly'
     if ($scripts -notmatch 'told to update-scripts') { throw "The editor was not told to update its scripts: $scripts" }

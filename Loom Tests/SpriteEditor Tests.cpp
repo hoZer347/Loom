@@ -604,6 +604,29 @@ TEST_SUITE("SpriteEditor")
 
 	#pragma region Palette Prompt
 
+	TEST_CASE("saving everything leaves a palette with no changes as its file is")
+	{
+		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
+		sprite.layers[0].cels[0].Set(0, 0, RED);
+
+		Driven driven("loom sprite clean palette.tga", &sprite);
+
+		driven.Run("click \"Sprites\" \"Open Palette\"\nwait 2\nclick \"Palette\" \"New\"\nwait 2\nkey ctrl+s\nwait 2\n");
+
+		const std::string palette = std::filesystem::path(driven.path).replace_extension(Loom::Palette::extension).string();
+		REQUIRE(std::filesystem::exists(palette));
+
+		const std::string merged = "written by a merge";
+		std::ofstream(palette, std::ios::binary) << merged;
+
+		CHECK(driven.editor.SaveAll());
+
+		std::string text;
+		std::getline(std::ifstream(palette, std::ios::binary), text);
+
+		CHECK(text == merged);
+	};
+
 	TEST_CASE("a sprite with the Palette panel shut offers to open it, New there makes a palette of the sprite's colours written on save, and Ctrl+Z takes the choice back")
 	{
 		SpriteAsset sprite = SpriteAsset::FromImage(SpriteAsset::Image::Blank(Driven::side, Driven::side));
