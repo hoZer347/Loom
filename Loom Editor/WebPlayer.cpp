@@ -1,6 +1,7 @@
 #include "WebPlayer.h"
 
 #include <filesystem>
+#include <format>
 #include <iostream>
 
 #ifdef _WIN32
@@ -52,14 +53,15 @@ namespace Loom
 		};
 	};
 
-	bool WebPlayer::Launch(const std::string& project, const std::string& scene)
+	bool WebPlayer::Launch(const std::string& project, const std::string& scene, float fixedRate)
 	{
 		// Where play-web.ps1 writes the page: beside the scene, served from the project.
 		const std::string page =
 			'/' + (std::filesystem::path(scene).parent_path().lexically_relative(project) / "index.html").generic_string();
 
 		const bool started = m_run.Start("play-web.ps1",
-			"-Project " + ScriptRun::Quote(project) + " -Scene " + ScriptRun::Quote(scene),
+			"-Project " + ScriptRun::Quote(project) + " -Scene " + ScriptRun::Quote(scene) +
+				" -FixedRate " + std::format("{}", fixedRate),
 			[page](HiddenProcess hidden, const std::atomic<bool>& stopping)
 			{
 				Read(hidden, page, stopping);
@@ -71,7 +73,7 @@ namespace Loom
 		return started;
 	};
 #else
-	bool WebPlayer::Launch(const std::string&, const std::string&)
+	bool WebPlayer::Launch(const std::string&, const std::string&, float)
 	{
 		return false;
 	};

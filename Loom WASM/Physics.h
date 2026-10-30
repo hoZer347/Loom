@@ -104,8 +104,10 @@ namespace Loom
 	*   scene's own Scene::Raycast keeps to that scene
 	* - The engine steps every scene's physics at a fixed rate, as Unity's
 	*   FixedUpdate does: as many steps of FixedDeltaTime as the frame's time
-	*   covers, each after its OnFixedUpdate and before OnUpdate. The last of them is solved on a thread of its
-	*   own while the GUI is drawn. Scene::Physics takes one step by hand
+	*   covers, up to a few sixtieths of a second's worth, each after its
+	*   OnFixedUpdate and before OnUpdate. The last of them is solved on a
+	*   thread of its own while the GUI is drawn. Scene::Physics takes one
+	*   step by hand
 	* - A collider is where the scene's last physics step left it, so one
 	*   moved in OnUpdate is found where it went after the next step
 	* - Any thread may raycast, or ask a collider where it is, while others do
@@ -122,6 +124,10 @@ namespace Loom
 		// is refused.
 		LOOM_API float FixedDeltaTime();
 		LOOM_API void SetFixedDeltaTime(float seconds);
+
+		// The whole steps seconds covers, taken off it, within what keeps a slow
+		// frame from leaving the next further behind. No more than a step is left.
+		LOOM_API int TakeSteps(float& seconds);
 
 		#pragma endregion
 

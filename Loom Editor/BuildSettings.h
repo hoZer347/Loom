@@ -17,7 +17,8 @@ namespace Loom
 	* Loom::BuildSettings
 	* - How the project is built into a game of its own: the configuration,
 	*   the scene it starts on and the folder it goes in, away from the
-	*   project's own Build folder that the editor builds its scripts into
+	*   project's own Build folder that the editor builds its scripts into,
+	*   and the fixed rate it steps at, which the editor steps at too
 	* - Kept as key=value lines beside the project file, and changed in the
 	*   Build Settings tab, whose buttons hand build-game.ps1 its command line
 	*/

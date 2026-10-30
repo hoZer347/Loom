@@ -37,7 +37,7 @@ namespace Loom
 		constexpr virtual void OnPhysics()	{ };
 
 		// Once for each of the scene's physics steps, ahead of it, however
-		// many of them the frame's time covers.
+		// many of them the frame takes; see Loom::Physics.
 		constexpr virtual void OnFixedUpdate()	{ };
 
 		virtual ~ComponentBase() { };

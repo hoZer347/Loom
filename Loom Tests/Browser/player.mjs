@@ -18,6 +18,7 @@ const browserPath = process.argv[3];
 const PLAYER = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "Loom Web", "Player.html");
 const TIMEOUT_MS = 60000;
 const COPY_SETTLE_MS = 500;
+const FIXED_RATE = "120";
 
 const AGENTS = {
   chrome: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
@@ -32,7 +33,8 @@ const page = (await readFile(PLAYER, "utf8"))
   .replaceAll("{SCRIPT}", "player.js")
   .replace("{SCENE}", "scene.loomscene")
   .replace("{FILES}", "[]")
-  .replace("{INPUT}", "");
+  .replace("{INPUT}", "")
+  .replace("{FIXED_RATE}", FIXED_RATE);
 
 const server = createServer((request, response) => {
   if (new URL(request.url, "http://x").pathname !== "/index.html") {
@@ -145,6 +147,8 @@ expect("Edge", await check("edge", true, true), { hidden: false, title: "Hardwar
 expect("Firefox", await check("firefox", true, true), { hidden: false, address: "about:preferences#general", steps: 4 });
 expect("another browser", await check("other", true, true), { hidden: false, address: "", steps: 2 });
 expect("Chrome", await check("chrome", true, true), { hidden: false, address: "chrome://settings/system", steps: 3 });
+
+expect("the fixed rate", await evaluate("({ rate: Module.arguments[1] })"), { rate: FIXED_RATE });
 
 await evaluate("document.getElementById('gpu-copy').click()");
 await new Promise((resolve) => setTimeout(resolve, COPY_SETTLE_MS));

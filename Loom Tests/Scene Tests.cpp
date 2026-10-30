@@ -10,6 +10,7 @@
 #include "Sprite.h"
 
 #include <algorithm>
+#include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -317,8 +318,55 @@ TEST_SUITE("Scene")
 		CHECK(probe->Count("fixed") == 0);
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an Unprocessed object gets no OnFixedUpdate, and its children still do")
+	{
+		Loom::Scene scene("Scene fixed unprocessed");
+		Pump();
+
+		Loom::GameObject* parent = scene.AddChild("Parent");
+		Loom::GameObject* child = parent->AddChild("Child");
+		Pump();
+
+		Probe<>* own = parent->Attach<Probe<>>();
+		Probe<>* under = child->Attach<Probe<>>();
+		Pump();
+
+		parent->SetThreadID(Loom::GameObject::Unprocessed);
+		child->SetThreadID(0);
+		scene.Physics();
+
+		CHECK(own->Count("fixed") == 0);
+		CHECK(under->Count("fixed") == 1);
+	};
+
+	struct SceneStepper final : Loom::Component<SceneStepper>
+	{
+		Loom::Scene* other = nullptr;
+
+		void OnFixedUpdate() override { other->Physics(); };
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an OnFixedUpdate that steps another scene leaves the rest of its own theirs")
+	{
+		Loom::Scene scene("Scene fixed stepping");
+		Loom::Scene other("Scene fixed stepped");
+		Pump();
+
+		SceneStepper* stepper = scene.AddChild("Stepper")->Attach<SceneStepper>();
+		Probe<>* probe = scene.AddChild("Probe")->Attach<Probe<>>();
+		Probe<>* stepped = other.AddChild("Stepped")->Attach<Probe<>>();
+		Pump();
+
+		stepper->other = &other;
+		scene.Physics();
+
+		CHECK(probe->Count("fixed") == 1);
+		CHECK(stepped->Count("fixed") == 1);
+	};
+
 	struct FixedThrower final : Loom::Component<FixedThrower>
 	{
+		void OnUpdate() override { throw std::runtime_error("every frame"); };
 		void OnFixedUpdate() override { throw std::runtime_error("fixed"); };
 	};
 
@@ -334,6 +382,25 @@ TEST_SUITE("Scene")
 		scene.Physics();
 
 		CHECK(probe->Count("fixed") == 1);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "one component's throws are reported once for each callback")
+	{
+		const LoomTests::Captured captured(std::cerr);
+
+		Loom::Scene scene("Scene fixed reported");
+		Pump();
+
+		scene.AddChild("Thrower")->Attach<FixedThrower>();
+		Pump();
+
+		scene.Physics();
+		scene.Physics();
+		scene.Update();
+		scene.Update();
+
+		CHECK(captured.Count("OnFixedUpdate threw: fixed") == 1);
+		CHECK(captured.Count("OnUpdate threw: every frame") == 1);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "ticking an empty scene does nothing")

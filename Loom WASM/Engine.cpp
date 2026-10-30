@@ -315,17 +315,9 @@ namespace Loom
 
 		if (updateScenes)
 		{
-			// At most a few fixed steps, so a slow frame does not leave the next further behind.
-			constexpr int MOST_STEPS = 4;
-
 			s_physicsTime += Time::DeltaTime();
 
-			int steps = 0;
-
-			for (; steps < MOST_STEPS && s_physicsTime >= Physics::FixedDeltaTime(); steps++)
-				s_physicsTime -= Physics::FixedDeltaTime();
-
-			s_physicsTime = std::min(s_physicsTime, Physics::FixedDeltaTime());
+			const int steps = Physics::TakeSteps(s_physicsTime);
 
 			// The last step solves on its own thread while the GUI is built.
 			for (int step = 1; step < steps; step++)

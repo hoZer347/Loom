@@ -17,7 +17,9 @@
 #include <memory>
 #include <mutex>
 #include <optional>
-#include <unordered_set>
+#include <set>
+#include <string_view>
+#include <utility>
 #include <vector>
 #include <string>
 
@@ -56,21 +58,18 @@ namespace Loom
 		// Each lane's updates, 0 the caller, kept so gathering does not allocate.
 		std::vector<std::vector<ComponentBase*>> s_updates(1);
 
-		// Each fixed step's, kept the same way.
-		std::vector<ComponentBase*> s_fixedUpdates{ };
-
 		// Lane n at index n - 1, made on first use.
 		std::vector<std::unique_ptr<Lane>> s_lanes{ };
 
-		// Components that threw, reported once, under a lock so lines do not interleave.
+		// Components that threw, reported once per callback, under a lock so lines do not interleave.
 		std::mutex s_threwMutex;
-		std::unordered_set<uint64_t> s_threw;
+		std::set<std::pair<uint64_t, std::string_view>> s_threw;
 
 		void ReportThrow(const ComponentBase& component, const char* callback, const std::string& what)
 		{
 			std::lock_guard lock(s_threwMutex);
 
-			if (s_threw.insert(component.m_ID).second)
+			if (s_threw.emplace(component.m_ID, callback).second)
 				std::cerr << ComponentRegistry::NameOf(component) << ' ' << callback << " threw" << what << std::endl;
 		};
 
@@ -298,10 +297,10 @@ namespace Loom
 		{
 			LOOM_STAGE("Scene::FixedUpdate");
 
-			s_fixedUpdates.clear();
-			root.GatherFixedUpdates(s_fixedUpdates);
+			fixedUpdates.clear();
+			root.GatherFixedUpdates(fixedUpdates);
 
-			Run(s_fixedUpdates, &ComponentBase::OnFixedUpdate, "OnFixedUpdate");
+			Run(fixedUpdates, &ComponentBase::OnFixedUpdate, "OnFixedUpdate");
 		};
 
 		ColliderTree::current = &colliders;

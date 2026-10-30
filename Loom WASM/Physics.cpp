@@ -74,6 +74,23 @@ namespace Loom
 				s_fixedDeltaTime = seconds;
 		};
 
+		int TakeSteps(float& seconds)
+		{
+			constexpr int FEWEST_MOST_STEPS = 4;
+			constexpr float MOST_SECONDS = 4.0f / 60.0f;
+
+			const int mostSteps = std::max(FEWEST_MOST_STEPS, (int)(MOST_SECONDS / s_fixedDeltaTime));
+
+			int steps = 0;
+
+			for (; steps < mostSteps && seconds >= s_fixedDeltaTime; steps++)
+				seconds -= s_fixedDeltaTime;
+
+			seconds = std::min(seconds, s_fixedDeltaTime);
+
+			return steps;
+		};
+
 		#pragma endregion
 
 		#pragma region Raycasts

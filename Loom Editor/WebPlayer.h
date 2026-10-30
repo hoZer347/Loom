@@ -22,7 +22,7 @@ namespace Loom
 	{
 		// Both absolute, and the scene under the project folder, which is what
 		// the page is served from. Stops whatever an earlier launch left running.
-		bool Launch(const std::string& project, const std::string& scene);
+		bool Launch(const std::string& project, const std::string& scene, float fixedRate);
 
 		// Where the page is, given a line of the script's output: empty unless
 		// it is the one emrun prints once it is listening,

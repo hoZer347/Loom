@@ -564,7 +564,7 @@ namespace Loom
 
 		out.close();
 
-		m_webPlayer.Launch(m_projectPath, scene.string());
+		m_webPlayer.Launch(m_projectPath, scene.string(), m_buildSettings.fixedRate);
 	};
 
 	#pragma endregion
@@ -629,6 +629,8 @@ namespace Loom
 
 		const GameBuilder::Status status = m_gameBuilder.GetStatus();
 
+		const float fixedRate = m_buildSettings.fixedRate;
+
 		const BuildSettings::Action action = m_buildSettings.Draw(
 			&m_showBuildSettings,
 			m_projectPath,
@@ -637,7 +639,8 @@ namespace Loom
 			GameBuilder::Label(status),
 			status == GameBuilder::Status::Building);
 
-		Physics::SetFixedDeltaTime(m_buildSettings.FixedDeltaTime());
+		if (m_buildSettings.fixedRate != fixedRate)
+			Physics::SetFixedDeltaTime(m_buildSettings.FixedDeltaTime());
 
 		switch (action)
 		{

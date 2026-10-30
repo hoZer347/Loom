@@ -174,6 +174,29 @@ TEST_SUITE("Rigidbody")
 
 	#pragma endregion
 
+	TEST_CASE("a frame's steps keep up with a high rate, and catch up by no more than a few sixtieths")
+	{
+		constexpr float high_rate = 1000.0f;
+		const float was = Loom::Physics::FixedDeltaTime();
+
+		Loom::Physics::SetFixedDeltaTime(1.0f / 60.0f);
+		float seconds = 1.0f;
+
+		CHECK(Loom::Physics::TakeSteps(seconds) == 4);
+		CHECK(seconds <= Loom::Physics::FixedDeltaTime());
+
+		Loom::Physics::SetFixedDeltaTime(1.0f / high_rate);
+		seconds = 0.016f;
+
+		CHECK(Loom::Physics::TakeSteps(seconds) >= 15);
+
+		seconds = 1.0f;
+
+		CHECK(Loom::Physics::TakeSteps(seconds) == 66);
+
+		Loom::Physics::SetFixedDeltaTime(was);
+	};
+
 	#pragma region Falling and Resting
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a body falls under gravity, and a kinematic one does not")

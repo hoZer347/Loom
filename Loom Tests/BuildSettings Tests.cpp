@@ -106,6 +106,7 @@ namespace
 	constexpr const char* drawn = "wait 2\n";
 
 	constexpr const char* typed_folder = "click \"Build Settings\" \"##Folder\"\ntype D:/Out\nkey enter\n";
+	constexpr const char* typed_fixed_rate = "doubleclick \"Build Settings\" \"Fixed Rate\"\nwait 2\nkey ctrl+a\ntype 120\nkey enter\n";
 };
 
 
@@ -198,7 +199,7 @@ TEST_SUITE("BuildSettings")
 		CHECK(settings.Output("C:/Games/MyGame", "Space") == std::filesystem::path("D:/Out/Space"));
 	};
 
-	TEST_CASE("the script is told the project, the scene from it, the configuration and the folder, quoted whole")
+	TEST_CASE("the script is told the project, the scene from it, the configuration, the folder and the fixed rate, paths quoted whole")
 	{
 		Loom::BuildSettings settings;
 		settings.configuration = "Debug";
@@ -277,6 +278,35 @@ TEST_SUITE("BuildSettings")
 		CHECK_FALSE(driven.script->Failed());
 		CHECK_FALSE(driven.settings.Unsaved());
 		CHECK(driven.OnDisk().find("folder=D:/Out") != std::string::npos);
+	};
+
+	TEST_CASE("a fixed rate typed is held until Ctrl+S, and Ctrl+Z and Ctrl+Y step it")
+	{
+		Driven driven(std::string(drawn) + typed_fixed_rate + drawn);
+		const std::string loaded = driven.OnDisk();
+
+		CHECK(driven.Run() == 0);
+		CHECK(driven.settings.fixedRate == 120.0f);
+		CHECK(driven.settings.Unsaved());
+		CHECK(driven.OnDisk() == loaded);
+
+		driven.Next("key ctrl+z\n" + std::string(drawn));
+		driven.Run();
+
+		CHECK(driven.settings.fixedRate == Loom::BuildSettings::default_fixed_rate);
+		CHECK_FALSE(driven.settings.Unsaved());
+
+		driven.Next("key ctrl+y\n" + std::string(drawn));
+		driven.Run();
+
+		CHECK(driven.settings.fixedRate == 120.0f);
+
+		driven.Next("key ctrl+s\n" + std::string(drawn));
+
+		CHECK(driven.Run() == 1);
+		CHECK_FALSE(driven.script->Failed());
+		CHECK_FALSE(driven.settings.Unsaved());
+		CHECK(driven.OnDisk().find("fixed_rate=120") != std::string::npos);
 	};
 
 	TEST_CASE("only the player's own configurations are ones to build")

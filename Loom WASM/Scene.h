@@ -74,9 +74,10 @@ namespace Loom
 
 		#pragma region Physics
 
-		// One physics step: runs OnFixedUpdate, then OnPhysics, through the hierarchy, which syncs
-		// every enabled collider into this scene's collider tree and gathers
-		// its rigid bodies, then moves them by FixedDeltaTime.
+		// One physics step: runs OnFixedUpdate through the hierarchy, then
+		// OnPhysics, which syncs every enabled collider into this scene's
+		// collider tree and gathers its rigid bodies, then moves them by
+		// FixedDeltaTime.
 		void Physics();
 
 		// The same, left solving on the simulation's own thread for
@@ -119,8 +120,11 @@ namespace Loom
 
 		#pragma region Physics
 
-		// Walks the hierarchy's OnPhysics into the collider tree and the
-		// simulation, ready for a step of either kind.
+		// A scene's own, as an OnFixedUpdate may step another.
+		std::vector<ComponentBase*> fixedUpdates{ };
+
+		// Runs the hierarchy's OnFixedUpdate, then walks its OnPhysics into the
+		// collider tree and the simulation, ready for a step of either kind.
 		void Sync();
 
 		#pragma endregion

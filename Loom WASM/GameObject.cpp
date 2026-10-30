@@ -287,7 +287,8 @@ namespace Loom
 		if (m_disabled)
 			return;
 
-		updates.insert(updates.end(), m_fixedUpdateables.begin(), m_fixedUpdateables.end());
+		if (m_threadID > Unprocessed)
+			updates.insert(updates.end(), m_fixedUpdateables.begin(), m_fixedUpdateables.end());
 
 		for (GameObject* child : m_children)
 			child->GatherFixedUpdates(updates);

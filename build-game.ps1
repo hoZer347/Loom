@@ -9,7 +9,7 @@
     The program and what it needs to run go in the output folder, beside a
     copy of the project's files that leaves out its scripts, its Build folder
     and what only the editor reads, and a <Game>.loomgame naming the scene it
-    starts on. The build says nothing unless it fails.
+    starts on and its fixed rate. The build says nothing unless it fails.
 
     The output folder is mirrored, so whatever else is in it goes. A folder
     that is not empty and holds no earlier build is left alone, and so is
@@ -34,6 +34,7 @@ param(
     [string] $Output,
 
     # Fixed updates a second, which the player reads from the .loomgame.
+    [ValidateRange(1.0, 1000.0)]
     [double] $FixedRate = 60
 )
 

@@ -2,8 +2,9 @@
 // ---------------
 // What the editor's Play Web builds: the engine and a project's scripts behind
 // an entry point that loads one scene file and runs it. The page preloads the
-// scene and names its path as the first argument, and preloads the project's
-// key bindings, when it has any, at input_actions. A page that holds the
+// scene and names its path as the first argument and the fixed rate as the
+// second, and preloads the project's key bindings, when it has any, at
+// input_actions. A page that holds the
 // player can edit a shader by calling loom_edit_shader, and hears whether it
 // compiled from a "loomshader" event on its window.
 
