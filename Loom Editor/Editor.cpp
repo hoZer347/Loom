@@ -1254,6 +1254,31 @@ namespace Loom
 		Engine::Stop();
 	};
 
+	void Editor::ApplyUpdate()
+	{
+		if (m_update.Waiting() == EditorUpdate::Kind::None)
+			return;
+
+		const bool busy =
+			!m_scripts.IsIdle() || IsRefreshing() || m_opening || m_projectLoad ||
+			ImGui::IsAnyItemActive() || ImGui::IsAnyMouseDown() ||
+			ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId);
+
+		switch (m_update.Due(IsPlaying(), busy, !UnsavedWork().empty()))
+		{
+		case EditorUpdate::Kind::Scripts:
+			CompileScripts();
+			break;
+		case EditorUpdate::Kind::Restart:
+			m_refresh.NoteExecutable();
+			m_relaunch = true;
+			Engine::Stop();
+			break;
+		default:
+			break;
+		};
+	};
+
 	#pragma endregion
 
 	#pragma region Scenes
@@ -2286,6 +2311,7 @@ namespace Loom
 		RunQueuedTests();
 		StepOpening();
 		PollRefresh();
+		ApplyUpdate();
 
 		// The renderer reads the window back after drawing, so the bitmap is the whole editor.
 		if (!m_screenshotPath.empty() && ++m_frame >= m_screenshotFrame)
@@ -2557,6 +2583,12 @@ namespace Loom
 		};
 
 		DrawMenus();
+
+		if (m_update.Waiting() == EditorUpdate::Kind::Restart)
+		{
+			ImGui::TextDisabled("Update waiting");
+			ImGui::SetItemTooltip("Restarts once everything is saved");
+		};
 
 		if (DrawWindowButtons(Engine::window, m_windowFrame))
 			Quit();

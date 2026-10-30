@@ -23,6 +23,12 @@
 #include <stdexcept>
 #include <vector>
 
+#ifdef _WIN32
+#include <process.h>
+#else
+#include <unistd.h>
+#endif
+
 using json = nlohmann::json;
 
 
@@ -242,7 +248,16 @@ namespace Loom
 
 			const ScriptLibrary& scripts = editor.GetScripts();
 
+#ifdef _WIN32
+			out << "Process: " << _getpid() << '\n';
+#else
+			out << "Process: " << getpid() << '\n';
+#endif
+
 			out << "Project: " << (editor.GetProjectPath().empty() ? "none" : editor.GetProjectPath()) << '\n';
+
+			if (editor.UpdateWaiting() != EditorUpdate::Kind::None)
+				out << "Update: waiting\n";
 
 			out << "Play: " <<
 				(!editor.IsPlaying() ? "stopped" :
@@ -616,6 +631,10 @@ namespace Loom
 				editor.Redo();
 			else if (command == "refresh")
 				editor.FullRefresh();
+			else if (command == "update")
+				editor.RequestUpdate(EditorUpdate::Kind::Restart);
+			else if (command == "update-scripts")
+				editor.RequestUpdate(EditorUpdate::Kind::Scripts);
 			else
 				throw ToolError(command + " is not a command");
 
@@ -863,10 +882,12 @@ namespace Loom
 				"command",
 				"One of the editor's commands: play, pause, stop, compile (the scripts), save (the active scene), undo, redo or refresh "
 				"(Ctrl+Shift+R: rebuild the editor from the engine's sources, save the project and restart on it, after which it is back "
-				"under a new id, which editors lists; a failed build says so in the console and the editor carries on). Answers with the state after.",
+				"under a new id, which editors lists; a failed build says so in the console and the editor carries on), update (restart on "
+				"the executable on disk, saving nothing: it waits for the run to stop and everything to be saved) or update-scripts (compile "
+				"once the run stops). Answers with the state after.",
 				R"({
 					"type": "object",
-					"properties": { "command": { "type": "string", "enum": [ "play", "pause", "stop", "compile", "save", "undo", "redo", "refresh" ] } },
+					"properties": { "command": { "type": "string", "enum": [ "play", "pause", "stop", "compile", "save", "undo", "redo", "refresh", "update", "update-scripts" ] } },
 					"required": [ "command" ] })",
 				Command,
 			},

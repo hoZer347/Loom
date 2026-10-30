@@ -6,8 +6,9 @@
 .DESCRIPTION
     Creates a virtual desktop without switching to it, starts the program with
     `--desktop <id>` added to its arguments (Loom Editor moves its window there
-    before showing it), waits for it to exit, then closes every window still on
-    that desktop and removes the desktop.
+    before showing it), or the id in place of a `{desktop}` among them, waits
+    for it to exit, then closes every window still on that desktop and removes
+    the desktop.
 
     A dialog the program puts up, such as a runtime abort() or assert box,
     appears on the current desktop whatever --desktop says. The script prints
@@ -384,11 +385,12 @@ if ($Cleanup)
 $desktop = [LoomAgentDesktop.Desktops]::Create("$namePrefix $PID")
 $process = $null
 $dialogExitCode = 0
+$DesktopPlaceholder = '{desktop}'
 
 try
 {
-    $arguments = @('--desktop', $desktop.ToString()) + $ExeArgs |
-        ForEach-Object { if ($_ -match '\s') { "`"$_`"" } else { $_ } }
+    $arguments = if ($ExeArgs -contains $DesktopPlaceholder) { $ExeArgs -replace [regex]::Escape($DesktopPlaceholder), $desktop.ToString() } else { @('--desktop', $desktop.ToString()) + $ExeArgs }
+    $arguments = $arguments | ForEach-Object { if ($_ -match '\s') { "`"$_`"" } else { $_ } }
 
     $process = Start-Process -FilePath $Exe -ArgumentList $arguments -NoNewWindow -PassThru
 

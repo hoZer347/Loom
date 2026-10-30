@@ -10,6 +10,7 @@
 #include "KeyBindings.h"
 #include "EditorLayouts.h"
 #include "EditorRefresh.h"
+#include "EditorUpdate.h"
 #include "EditorViewport.h"
 #include "FolderWatch.h"
 #include "KindFilter.h"
@@ -214,6 +215,10 @@ namespace Loom
 		// editor running.
 		void FullRefresh();
 		bool IsRefreshing() const { return m_refresh.IsRunning() || m_relaunch; };
+
+		// Asks for what a merge calls for, for ApplyUpdate to run when it can.
+		void RequestUpdate(EditorUpdate::Kind kind) { m_update.Request(kind); };
+		EditorUpdate::Kind UpdateWaiting() const { return m_update.Waiting(); };
 
 		// Whether the editor closed to be started again, from which executable
 		// and on what: the scene that was active, or the project when none was.
@@ -1030,6 +1035,9 @@ namespace Loom
 		// once it has, unless it failed.
 		void PollRefresh();
 
+		// Runs the update that waits, once it is due.
+		void ApplyUpdate();
+
 		// Every owned scene, open shader and sprite, to its file. False when
 		// something could not be saved.
 		bool SaveProject();
@@ -1274,6 +1282,7 @@ namespace Loom
 
 		ScriptLibrary m_scripts;
 		EditorRefresh m_refresh;
+		EditorUpdate m_update{ };
 		bool m_relaunch = false;
 		WebPlayer m_webPlayer;
 		GameBuilder m_gameBuilder;

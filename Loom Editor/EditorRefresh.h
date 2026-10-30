@@ -76,6 +76,9 @@ namespace Loom
 		// have replaced.
 		const std::filesystem::path& GetExecutable() const { return m_executable; };
 
+		// For a relaunch no build came before.
+		void NoteExecutable();
+
 		// Starts it with those arguments after it.
 		static bool Relaunch(const std::filesystem::path& executable, const std::string& arguments);
 

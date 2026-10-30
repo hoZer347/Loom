@@ -19,6 +19,7 @@ the other shows up as a failure rather than as a surprise in the browser.
 .\run-web-tests.ps1 -Configuration Release
 
 .\run-browser-tests.ps1                  # the cases that need a real page, in headless Chrome
+& '.\Loom Tests\update-editor.ps1'       # update-editor.ps1 against an open Release editor, in a slot
 ```
 
 The first two scripts take `-NoBuild` to run the last binary as-is, and pass

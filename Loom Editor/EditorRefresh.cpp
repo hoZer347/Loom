@@ -186,6 +186,11 @@ namespace Loom
 
 	#pragma region Relaunch
 
+	void EditorRefresh::NoteExecutable()
+	{
+		m_executable = ExecutablePath();
+	};
+
 	bool EditorRefresh::Relaunch(const std::filesystem::path& executable, const std::string& arguments)
 	{
 #ifndef _WIN32

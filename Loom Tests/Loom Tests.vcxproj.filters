@@ -58,6 +58,9 @@
     <ClCompile Include="EditorRefresh Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="EditorUpdate Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="EditorTheme Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

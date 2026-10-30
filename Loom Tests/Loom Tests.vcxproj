@@ -158,6 +158,7 @@
     <ClCompile Include="EditorSettings Tests.cpp" />
     <ClCompile Include="EditorIcons Tests.cpp" />
     <ClCompile Include="EditorRefresh Tests.cpp" />
+    <ClCompile Include="EditorUpdate Tests.cpp" />
     <ClCompile Include="EditorTheme Tests.cpp" />
     <ClCompile Include="ProjectAssets Tests.cpp" />
     <ClCompile Include="FileTypes Tests.cpp" />

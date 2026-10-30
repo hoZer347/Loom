@@ -250,6 +250,7 @@
     <ClInclude Include="ComponentMenu.h" />
     <ClInclude Include="EditorLayouts.h" />
     <ClInclude Include="EditorRefresh.h" />
+    <ClInclude Include="EditorUpdate.h" />
     <ClInclude Include="TextFileEditor.h" />
     <ClInclude Include="ShaderEditor.h" />
     <ClInclude Include="DialogueEditor.h" />
