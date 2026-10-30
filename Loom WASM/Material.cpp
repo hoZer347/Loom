@@ -1,5 +1,6 @@
 #include "Material.h"
 
+#include "BuiltInShaders.h"
 #include "PreVertex.h"
 #include "RenderMath.h"
 #include "Renderer.h"
@@ -195,16 +196,24 @@ namespace Loom
 		if (relative.empty())
 			return;
 
-		// Absolute, so the link's tooltip says which file it opens.
-		std::error_code code;
-		const std::string path = std::filesystem::absolute(relative, code).string();
+		const bool built_in = BuiltInShaders::SourceOf(relative) != nullptr;
 
-		ImGui::TextLinkOpenURL(("Edit " + relative).c_str(), path.c_str());
+		if (!built_in)
+		{
+			// Absolute, so the link's tooltip says which file it opens.
+			std::error_code code;
+			const std::string path = std::filesystem::absolute(relative, code).string();
+
+			ImGui::TextLinkOpenURL(("Edit " + relative).c_str(), path.c_str());
+		};
 
 		if (shader == nullptr)
 			return;
 
+		ImGui::BeginDisabled(built_in);
 		DrawSettings();
+		ImGui::EndDisabled();
+
 		UniformValues values = variables;
 
 		if (DrawShaderVariables(shader->variables, UniformScope::Material, values))
@@ -223,6 +232,7 @@ namespace Loom
 		std::error_code code;
 
 		if (m_shader_path->empty() ||
+			BuiltInShaders::SourceOf(m_shader_path) ||
 			(m_shader_path->ends_with(Shader::extension) && std::filesystem::is_regular_file(GetShaderPath(), code)))
 			ChangeShader(m_shader_path);
 	};

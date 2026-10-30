@@ -69,6 +69,7 @@ namespace Loom
 		// Above the tree, where the panel has room for it.
 		void DrawSearch() { m_search.Draw(); };
 		void ClearSearch() { m_search.Clear(); };
+		bool Matches(std::string_view name) const { return m_search.Matches(name); };
 
 		// The folders and items at the top, as the search leaves them.
 		void Draw(VirtualFolders& folders, const VirtualFolders::Node& top, const Hooks& hooks);

@@ -176,6 +176,9 @@
     <ClCompile Include="Animation Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="BuiltInShaders Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="Material Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

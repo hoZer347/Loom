@@ -53,6 +53,9 @@
     <ClCompile Include="ComputeShader.cpp">
       <Filter>Shaders</Filter>
     </ClCompile>
+    <ClCompile Include="BuiltInShaders.cpp">
+      <Filter>Shaders</Filter>
+    </ClCompile>
     <ClCompile Include="ShaderVariables.cpp">
       <Filter>Shaders</Filter>
     </ClCompile>
@@ -331,6 +334,9 @@
       <Filter>Shaders</Filter>
     </ClInclude>
     <ClInclude Include="ComputeShader.h">
+      <Filter>Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="BuiltInShaders.h">
       <Filter>Shaders</Filter>
     </ClInclude>
     <ClInclude Include="ShaderVariables.h">

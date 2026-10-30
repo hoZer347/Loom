@@ -1,5 +1,6 @@
 #include "Shaders.h"
 
+#include "BuiltInShaders.h"
 #include "GlslCompiler.h"
 #include "Light.h"
 #include "PreVertex.h"
@@ -970,6 +971,9 @@ vec3 LoomSceneNormal(ivec2 pixel)
 	{
 		if (std::optional<std::string> source = SourceFor(file_path))
 			return *source;
+
+		if (const char* builtIn = BuiltInShaders::SourceOf(file_path))
+			return builtIn;
 
 #if __EMSCRIPTEN__
 		std::string source;

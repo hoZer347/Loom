@@ -84,7 +84,8 @@ namespace Loom
 
 		// A link that opens the shader file, its settings and the values of its
 		// per-material variables. Settings written here go into the file, and
-		// variables are declared there.
+		// variables are declared there, so a built-in shader, which has no file,
+		// shows its settings greyed out with no link.
 		void OnGui() override;
 
 		void OnFieldChanged(const SerializedField& field) override;

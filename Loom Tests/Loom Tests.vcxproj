@@ -221,6 +221,7 @@
     <ClCompile Include="Ui Tests.cpp" />
     <ClCompile Include="SelectionOutline Tests.cpp" />
     <ClCompile Include="MultiEdit Tests.cpp" />
+    <ClCompile Include="BuiltInShaders Tests.cpp" />
     <ClCompile Include="Render Tests.cpp" />
     <ClCompile Include="Mesh Tests.cpp" />
     <ClCompile Include="Animation Tests.cpp" />

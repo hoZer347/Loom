@@ -28,7 +28,7 @@ Main(092e01df-cc3b-4ce4-89ed-651983170b00):
 			0 = 0
 			1 = false
 			Component Material(d70ae451-975e-470c-960b-839f8d13c7c9)
-				0 = "Assets/Lit.shader"
+				0 = "Loom/Lit.shader"
 				1 = (0.82, 0.8, 0.76)
 			Component Mesh(f17fd117-a07f-4016-8fc7-ecae7f08e722)
 				0 = d70ae451-975e-470c-960b-839f8d13c7c9
@@ -39,7 +39,7 @@ Main(092e01df-cc3b-4ce4-89ed-651983170b00):
 			0 = 0
 			1 = false
 			Component Material(56afa6ae-52ce-494d-866c-e81d311c4dce)
-				0 = "Assets/Lit.shader"
+				0 = "Loom/Lit.shader"
 				1 = (0.85, 0.35, 0.25)
 			Component Mesh(c150a71f-c787-43ea-bf3c-be20d4ade920)
 				0 = 56afa6ae-52ce-494d-866c-e81d311c4dce

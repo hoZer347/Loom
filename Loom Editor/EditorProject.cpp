@@ -1,5 +1,6 @@
 #include "Editor.h"
 
+#include "BuiltInShaders.h"
 #include "EditorFileDialogs.h"
 #include "EditorGui.h"
 #include "EditorIcons.h"
@@ -2465,6 +2466,11 @@ namespace Loom
 				AskForAsset(*made, m_projectPath);
 				m_newAssetFor = field.data;
 			};
+
+		if (extension == ProjectAssets::shaderExtension)
+			for (const std::string& file : BuiltInShaders::Paths())
+				if (m_fieldPicker.Matches(file))
+					row(file, file);
 
 		if (listed)
 		{
