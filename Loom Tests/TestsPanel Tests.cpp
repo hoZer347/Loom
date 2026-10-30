@@ -40,6 +40,13 @@ namespace
 		};
 	};
 
+	// One call of RunQueued stops at its time budget, wherever a slow machine has got to.
+	void Finish(Loom::TestsPanel& panel)
+	{
+		while (panel.HasQueued())
+			panel.RunQueued();
+	};
+
 	std::vector<std::string> Names(const std::vector<const Loom::ScriptTests::Case*>& cases)
 	{
 		std::vector<std::string> names;
@@ -82,7 +89,7 @@ TEST_SUITE("TestsPanel")
 		CHECK(suite.laser_runs == 0);
 		CHECK(panel.ResultOf("TestsPanel laser misses") == nullptr);
 
-		panel.RunQueued();
+		Finish(panel);
 
 		CHECK(suite.laser_runs == 2);
 		CHECK(suite.door_runs == 0);
@@ -158,7 +165,7 @@ TEST_SUITE("TestsPanel")
 
 		panel.SetFilter("TestsPanel");
 		panel.QueueShown();
-		panel.RunQueued();
+		Finish(panel);
 
 		const Loom::TestsPanel::Callbacks callbacks{
 			[&created] { ++created; },
@@ -223,7 +230,7 @@ TEST_SUITE("TestsPanel")
 		REQUIRE(panel.HasQueued());
 		CHECK(created > 0);
 		created = 0;
-		panel.RunQueued();
+		Finish(panel);
 
 		// A clicked run names its cases, and is timed from its first case all the same.
 		CHECK_FALSE(panel.HasQueued());
@@ -299,7 +306,7 @@ TEST_SUITE("TestsPanel")
 
 		click(run.y, ImGuiKey_None, run.x);
 		CHECK(panel.HasQueued());
-		panel.RunQueued();
+		Finish(panel);
 
 		CHECK(suite.laser_runs == laser_runs + 1);
 		CHECK(suite.door_runs == door_runs + 1);
