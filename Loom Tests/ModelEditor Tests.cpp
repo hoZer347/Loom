@@ -795,6 +795,8 @@ TEST_SUITE("ModelEditor")
 		std::ofstream(project / "Model.loomproject") << "name=Model\n";
 		std::ofstream(project / "Assets" / "Lit.shader") << "";
 		std::ofstream(project / "Assets" / "Model.shader") << "";
+		std::filesystem::create_directories(project / "Loom");
+		std::ofstream(project / "Loom" / "Lit.shader") << "";
 		std::ofstream(prefab, std::ios::binary) << ReadFile(WritePrefab("model_shaders_source", &cube, &cube));
 
 		{

@@ -196,9 +196,9 @@ namespace Loom
 		if (relative.empty())
 			return;
 
-		const bool built_in = BuiltInShaders::SourceOf(relative) != nullptr;
+		const bool builtIn = BuiltInShaders::SourceOf(relative) != nullptr;
 
-		if (!built_in)
+		if (!builtIn)
 		{
 			// Absolute, so the link's tooltip says which file it opens.
 			std::error_code code;
@@ -210,7 +210,7 @@ namespace Loom
 		if (shader == nullptr)
 			return;
 
-		ImGui::BeginDisabled(built_in);
+		ImGui::BeginDisabled(builtIn);
 		DrawSettings();
 		ImGui::EndDisabled();
 

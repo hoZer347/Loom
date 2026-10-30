@@ -2493,7 +2493,7 @@ namespace Loom
 			std::vector<std::string> files{ };
 
 			for (const std::string& file : tab->files)
-				if (field.AcceptsFile(file))
+				if (field.AcceptsFile(file) && !BuiltInShaders::SourceOf(file))
 					files.push_back(file);
 
 			FolderTree::Hooks hooks = FileFolderHooks(*tab);

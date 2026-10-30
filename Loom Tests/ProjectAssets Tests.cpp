@@ -619,8 +619,8 @@ TEST_SUITE("ProjectAssets")
 		std::filesystem::remove_all(root);
 		std::filesystem::create_directories(root / "Assets" / "Units");
 
-		CHECK(Loom::ProjectAssets::ProjectShader("") == Loom::BuiltInShaders::lit);
-		CHECK(Loom::ProjectAssets::ProjectShader(root.string()) == Loom::BuiltInShaders::lit);
+		CHECK(Loom::ProjectAssets::ProjectShader("") == Loom::BuiltInShaders::Lit);
+		CHECK(Loom::ProjectAssets::ProjectShader(root.string()) == Loom::BuiltInShaders::Lit);
 
 		std::ofstream(root / "Assets" / "Units" / "Tank.shader") << "tank";
 		std::ofstream(root / "Assets" / "Terrain.shader") << "terrain";
@@ -638,7 +638,7 @@ TEST_SUITE("ProjectAssets")
 
 	TEST_CASE("a new shader is shaded and shadowed by the scene's light")
 	{
-		const Loom::Shader::Stages stages = Loom::Shader::Assemble(Loom::BuiltInShaders::SourceOf(Loom::BuiltInShaders::lit));
+		const Loom::Shader::Stages stages = Loom::Shader::Assemble(Loom::BuiltInShaders::SourceOf(Loom::BuiltInShaders::Lit));
 
 		CHECK(stages.settings.shading);
 		CHECK(stages.settings.shadows);

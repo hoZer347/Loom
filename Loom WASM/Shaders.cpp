@@ -1019,6 +1019,9 @@ vec3 LoomSceneNormal(ivec2 pixel)
 
 	void Shader::ReloadIfChanged()
 	{
+		if (BuiltInShaders::SourceOf(file_path))
+			return;
+
 		std::error_code code;
 		const std::filesystem::file_time_type written = std::filesystem::last_write_time(file_path, code);
 

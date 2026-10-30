@@ -185,8 +185,8 @@ namespace Loom
 
 		#pragma region Shaders
 
-		// The shaders the front tab's project has, relative to it, and which
-		// one every material of its prefab draws with.
+		// The shaders the front tab's project has, relative to it, then the
+		// built-in ones, and which one every material of its prefab draws with.
 		std::vector<std::string> Shaders() const;
 		void SetShader(const std::string& path);
 

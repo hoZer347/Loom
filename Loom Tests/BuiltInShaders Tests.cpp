@@ -1,6 +1,7 @@
 #include "doctest.h"
 
 #include "Render Support.h"
+#include "Test Support.h"
 
 #include "BuiltInShaders.h"
 #include "ShaderVariables.h"
@@ -17,10 +18,17 @@
 #include "Material.h"
 #include "Mesh.h"
 #include "Scene.h"
+#include "Shaders.h"
+#include "UiScript.h"
+
+#include <imgui.h>
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <iostream>
 #include <iterator>
+#include <sstream>
 
 using LoomTests::Image;
 using LoomTests::Pump;
@@ -157,6 +165,87 @@ namespace
 		CHECK(lit_textured.g > 0);
 		CHECK(lit_textured.r == 0);
 	};
+
+	// Runs a UiScript of text over the material's inspector, in a context of its
+	// own, and gives back the items it drew.
+	std::string InspectorItems(Loom::Material& material, const std::string& text)
+	{
+		constexpr float WIDTH = 800.0f;
+		constexpr float HEIGHT = 600.0f;
+		constexpr float FRAME_TIME = 1.0f / 60.0f;
+		constexpr int MOST_FRAMES = 600;
+
+		ImGuiContext* previous = ImGui::GetCurrentContext();
+		ImGuiContext* context = ImGui::CreateContext();
+
+		ImGuiIO& io = ImGui::GetIO();
+		io.IniFilename = nullptr;
+		io.DisplaySize = ImVec2(WIDTH, HEIGHT);
+		io.DeltaTime = FRAME_TIME;
+		io.ConfigInputTrickleEventQueue = false;
+
+		unsigned char* pixels = nullptr;
+		int atlas_width = 0;
+		int atlas_height = 0;
+		io.Fonts->GetTexDataAsRGBA32(&pixels, &atlas_width, &atlas_height);
+
+		std::ostringstream items;
+
+		{
+			Loom::UiScript script{ std::filesystem::path() };
+			script.LoadText(text);
+
+			for (int frame = 0; frame < MOST_FRAMES && !script.Finished(); frame++)
+			{
+				script.Step();
+
+				ImGui::NewFrame();
+				ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+				ImGui::SetNextWindowSize(ImVec2(WIDTH, HEIGHT));
+				ImGui::Begin("Inspector");
+				material.OnGui();
+				ImGui::End();
+				ImGui::EndFrame();
+			};
+
+			CHECK(script.Finished());
+			CHECK_FALSE(script.Failed());
+
+			script.WriteItems(items);
+		};
+
+		ImGui::DestroyContext(context);
+		ImGui::SetCurrentContext(previous);
+
+		return items.str();
+	};
+
+	// A project's folder as the working directory, with its own file at a
+	// built-in shader's path, gone once it ends.
+	struct ProjectWithLit
+	{
+		ProjectWithLit() :
+			m_previous(std::filesystem::current_path()),
+			m_folder(std::filesystem::temp_directory_path() / "loom built-in shader file")
+		{
+			std::filesystem::remove_all(m_folder);
+			std::filesystem::create_directories(m_folder / "Loom");
+			std::ofstream(m_folder / "Loom" / "Lit.shader") << "not a shader";
+			std::filesystem::current_path(m_folder);
+		};
+
+		~ProjectWithLit()
+		{
+			std::filesystem::current_path(m_previous);
+
+			std::error_code code;
+			std::filesystem::remove_all(m_folder, code);
+		};
+
+	private:
+		std::filesystem::path m_previous;
+		std::filesystem::path m_folder;
+	};
 };
 
 #pragma endregion
@@ -173,6 +262,70 @@ TEST_SUITE("BuiltInShaders")
 	TEST_CASE_FIXTURE(VulkanRenderFixture, "every built-in shader draws from the engine with no file on disk, on Vulkan")
 	{
 		CheckDraws(*this, "./Loom/", "Vulkan");
+	};
+
+	#pragma endregion
+
+	#pragma region Files
+
+	TEST_CASE_FIXTURE(RenderFixture, "a project's own file at a built-in shader's path is never read or reloaded")
+	{
+		const ProjectWithLit project;
+
+		Loom::Shader* shader = Loom::Material::SharedShader("Loom/../Loom/Lit.shader");
+
+		REQUIRE(shader != nullptr);
+
+		const uint32_t program = shader->id;
+
+		shader->ReloadIfChanged();
+
+		CHECK(shader->id == program);
+	};
+
+	#pragma endregion
+
+	#pragma region Inspector
+
+	TEST_CASE_FIXTURE(RenderFixture, "a built-in shader written into a material's path field is the one it uses")
+	{
+		Loom::Scene scene("built-in shader field");
+		Pump();
+
+		Loom::Material* material = scene.Attach<Loom::Material>();
+		Pump();
+
+		const Loom::SerializedField& path = material->GetFields().front();
+
+		*(std::string*)path.data = "Loom/Unlit.shader";
+		material->OnFieldChanged(path);
+
+		REQUIRE(material->shader != nullptr);
+		CHECK(material->shader == Loom::Material::SharedShader("Loom/Unlit.shader"));
+	};
+
+	TEST_CASE_FIXTURE(RenderFixture, "a built-in shader's inspector has no Edit link, and clicking its settings writes nothing")
+	{
+		Loom::Scene scene("built-in shader inspector");
+		Pump();
+
+		Loom::Material* material = scene.Attach<Loom::Material>();
+		Pump();
+
+		material->ChangeShader(Loom::BuiltInShaders::Lit);
+
+		{
+			const LoomTests::Captured captured(std::cerr);
+			const std::string items = InspectorItems(*material, "click \"Inspector\" \"Shading\"\nwait 2\n");
+
+			CHECK(items.find("Shading") != std::string::npos);
+			CHECK(items.find("Edit ") == std::string::npos);
+			CHECK_FALSE(captured.Says("Material:"));
+		};
+
+		*(std::string*)material->GetFields().front().data = "Assets/Own.shader";
+
+		CHECK(InspectorItems(*material, "wait 2\n").find("Edit Assets/Own.shader") != std::string::npos);
 	};
 
 	#pragma endregion

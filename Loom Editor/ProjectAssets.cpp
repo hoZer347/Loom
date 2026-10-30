@@ -508,7 +508,7 @@ namespace {NAMESPACE}
 	{
 		const std::filesystem::path path = std::filesystem::path(folder) / (name + shaderExtension);
 
-		if (!IsValidName(name) || !WriteNew(path, BuiltInShaders::SourceOf(BuiltInShaders::lit), error))
+		if (!IsValidName(name) || !WriteNew(path, BuiltInShaders::SourceOf(BuiltInShaders::Lit), error))
 			return "";
 
 		return path.string();
@@ -1132,7 +1132,7 @@ vec3 PreVertex(vec3 world)
 
 		const std::vector<std::string> shaders = ShadersIn(folder);
 
-		return shaders.empty() ? BuiltInShaders::lit : shaders.front();
+		return shaders.empty() ? BuiltInShaders::Lit : shaders.front();
 	};
 
 	#pragma endregion

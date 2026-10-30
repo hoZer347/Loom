@@ -366,9 +366,9 @@ void main()
 		std::vector<std::string> ProjectShaders(const std::string& prefab)
 		{
 			std::vector<std::string> shaders = ProjectAssets::ShadersIn(ProjectFolder(prefab).string());
-			const std::vector<std::string>& built_in = BuiltInShaders::Paths();
 
-			shaders.insert(shaders.end(), built_in.begin(), built_in.end());
+			std::erase_if(shaders, [](const std::string& shader) { return BuiltInShaders::SourceOf(shader) != nullptr; });
+			shaders.insert(shaders.end(), BuiltInShaders::Paths().begin(), BuiltInShaders::Paths().end());
 
 			return shaders;
 		};

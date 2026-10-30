@@ -22,7 +22,7 @@ namespace Loom
 	{
 		// What a project with no shader of its own draws with, and what a new
 		// shader file starts from.
-		static constexpr const char* lit = "Loom/Lit.shader";
+		static constexpr const char* Lit = "Loom/Lit.shader";
 
 		// Every one's path, for a list to pick from.
 		static const std::vector<std::string>& Paths();
