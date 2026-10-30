@@ -182,9 +182,6 @@ namespace Loom
 
 		#pragma region Shaders
 
-		// The shader every new one starts from: the mesh through the camera,
-		// in the material's colour, shaded and shadowed by the scene's light.
-		static const char* const defaultShader;
 
 		// What a new .loomprevertex file holds: a wave along world X.
 		static const char* const defaultPreVertex;

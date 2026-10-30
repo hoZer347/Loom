@@ -2,6 +2,7 @@
 
 #include "Test Support.h"
 
+#include "BuiltInShaders.h"
 #include "ModelEditor.h"
 #include "Prefabs.h"
 #include "UiScript.h"
@@ -800,7 +801,11 @@ TEST_SUITE("ModelEditor")
 			// The shaders are empty, so they do not compile.
 			const LoomTests::Captured captured(std::cerr);
 			Driven driven("model_shaders", nullptr, prefab.string());
-			CHECK(driven.editor.Shaders() == std::vector<std::string>{ "Assets/Lit.shader", "Assets/Model.shader" });
+
+			std::vector<std::string> shaders{ "Assets/Lit.shader", "Assets/Model.shader" };
+			shaders.insert(shaders.end(), Loom::BuiltInShaders::Paths().begin(), Loom::BuiltInShaders::Paths().end());
+
+			CHECK(driven.editor.Shaders() == shaders);
 
 			Loom::Prefabs::ObjectNode before;
 			REQUIRE(Loom::Prefabs::Parse(ReadFile(prefab.string()), before));

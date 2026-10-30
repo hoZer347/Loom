@@ -2,6 +2,7 @@
 
 #include "Audio.h"
 #include "BuildSettings.h"
+#include "BuiltInShaders.h"
 #include "ComponentRegistry.h"
 #include "Prefab.h"
 #include "ProjectTemplate.h"
@@ -507,7 +508,7 @@ namespace {NAMESPACE}
 	{
 		const std::filesystem::path path = std::filesystem::path(folder) / (name + shaderExtension);
 
-		if (!IsValidName(name) || !WriteNew(path, defaultShader, error))
+		if (!IsValidName(name) || !WriteNew(path, BuiltInShaders::SourceOf(BuiltInShaders::lit), error))
 			return "";
 
 		return path.string();
@@ -1075,36 +1076,6 @@ namespace {NAMESPACE}
 
 	#pragma region Shaders
 
-	const char* const ProjectAssets::defaultShader = R"(
-// ===SETTINGS===
-
-shading = on
-shadows = on
-
-// ===VERTEX===
-
-layout(location = 0) in vec3 aPos;
-
-uniform mat4 u_model;
-uniform mat4 u_viewProjection;
-
-void main()
-{
-	gl_Position = u_viewProjection * u_model * vec4(aPos, 1.0);
-}
-
-// ===FRAGMENT===
-
-uniform vec3 u_color;
-
-out vec4 FragColor;
-
-void main()
-{
-	FragColor = vec4(u_color, 1.0);
-}
-)";
-
 	const char* const ProjectAssets::defaultPixelShader = R"(
 out vec4 FragColor;
 
@@ -1156,12 +1127,12 @@ vec3 PreVertex(vec3 world)
 	{
 		std::error_code code;
 
-		if (folder.empty() || std::filesystem::exists(std::filesystem::path(folder) / ProjectTemplate::shader_path, code))
+		if (!folder.empty() && std::filesystem::exists(std::filesystem::path(folder) / ProjectTemplate::shader_path, code))
 			return ProjectTemplate::shader_path;
 
 		const std::vector<std::string> shaders = ShadersIn(folder);
 
-		return shaders.empty() ? ProjectTemplate::shader_path : shaders.front();
+		return shaders.empty() ? BuiltInShaders::lit : shaders.front();
 	};
 
 	#pragma endregion

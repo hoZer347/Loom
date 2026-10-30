@@ -1,6 +1,7 @@
 #include "doctest.h"
 
 #include "AssetKind.h"
+#include "BuiltInShaders.h"
 #include "ProjectAssets.h"
 #include "ProjectTemplate.h"
 #include "Shaders.h"
@@ -612,14 +613,14 @@ TEST_SUITE("ProjectAssets")
 
 	#pragma region Shaders
 
-	TEST_CASE("a project draws with a new project's shader while it has one, or else its first")
+	TEST_CASE("a project draws with a new project's shader while it has one, or else its first, or else the built-in Lit")
 	{
 		const std::filesystem::path root = std::filesystem::temp_directory_path() / "loom project assets shader";
 		std::filesystem::remove_all(root);
 		std::filesystem::create_directories(root / "Assets" / "Units");
 
-		CHECK(Loom::ProjectAssets::ProjectShader("") == Loom::ProjectTemplate::shader_path);
-		CHECK(Loom::ProjectAssets::ProjectShader(root.string()) == Loom::ProjectTemplate::shader_path);
+		CHECK(Loom::ProjectAssets::ProjectShader("") == Loom::BuiltInShaders::lit);
+		CHECK(Loom::ProjectAssets::ProjectShader(root.string()) == Loom::BuiltInShaders::lit);
 
 		std::ofstream(root / "Assets" / "Units" / "Tank.shader") << "tank";
 		std::ofstream(root / "Assets" / "Terrain.shader") << "terrain";
@@ -637,7 +638,7 @@ TEST_SUITE("ProjectAssets")
 
 	TEST_CASE("a new shader is shaded and shadowed by the scene's light")
 	{
-		const Loom::Shader::Stages stages = Loom::Shader::Assemble(Loom::ProjectAssets::defaultShader);
+		const Loom::Shader::Stages stages = Loom::Shader::Assemble(Loom::BuiltInShaders::SourceOf(Loom::BuiltInShaders::lit));
 
 		CHECK(stages.settings.shading);
 		CHECK(stages.settings.shadows);

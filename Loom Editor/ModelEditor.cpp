@@ -1,5 +1,6 @@
 #include "ModelEditor.h"
 
+#include "BuiltInShaders.h"
 #include "EditorIcons.h"
 #include "Prefabs.h"
 #include "ProjectAssets.h"
@@ -361,10 +362,15 @@ void main()
 			return { };
 		};
 
-		// Every shader the project of the prefab has, relative to the project, in order.
+		// Every shader the project of the prefab has, relative to the project, in order, then the built-in ones.
 		std::vector<std::string> ProjectShaders(const std::string& prefab)
 		{
-			return ProjectAssets::ShadersIn(ProjectFolder(prefab).string());
+			std::vector<std::string> shaders = ProjectAssets::ShadersIn(ProjectFolder(prefab).string());
+			const std::vector<std::string>& built_in = BuiltInShaders::Paths();
+
+			shaders.insert(shaders.end(), built_in.begin(), built_in.end());
+
+			return shaders;
 		};
 
 		std::string ShaderOf(GameObject& object)

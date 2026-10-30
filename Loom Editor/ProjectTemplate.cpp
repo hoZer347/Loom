@@ -5,6 +5,7 @@
 
 #include "ProjectAssets.h"
 
+#include "BuiltInShaders.h"
 #include "Engine.h"
 #include "Executable.h"
 #include "Guid.h"
@@ -544,7 +545,7 @@ SpinningTriangle is there as a worked example.
 
 		const bool written =
 			Write(root / (name + extension), fill(loomproject) + fill(scripts_entries), error) &&
-			Write(root / shader_path, ProjectAssets::defaultShader, error) &&
+			Write(root / shader_path, BuiltInShaders::SourceOf(BuiltInShaders::lit), error) &&
 			Write(root / scenes_folder / (std::string("Main") + SceneSerializer::extension), StarterScene(root), error) &&
 			Write(root / "README.txt", fill(readme), error) &&
 			WriteScripts(root, name, error);
