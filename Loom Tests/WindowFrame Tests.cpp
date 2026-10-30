@@ -211,8 +211,6 @@ TEST_SUITE("WindowFrame")
 
 	TEST_CASE_FIXTURE(HiddenWindow, "a window held with a message always waiting leaves its frames to the timer")
 	{
-		s_window = hwnd;
-
 		Loom::WindowFrame frame;
 		frame.Install(window, CountAndPost);
 
@@ -232,7 +230,7 @@ TEST_SUITE("WindowFrame")
 		s_doomed.reset();
 	};
 
-	TEST_CASE_FIXTURE(HiddenWindow, "a window's frame taken away by a redraw while held stops the redraws")
+	TEST_CASE_FIXTURE(HiddenWindow, "a window's frame taken away by a redraw while held lets the window go")
 	{
 		s_doomed = std::make_unique<Loom::WindowFrame>();
 		s_doomed->Install(window, CountThenDestroy);
@@ -240,7 +238,14 @@ TEST_SUITE("WindowFrame")
 		SendMessageW(hwnd, WM_ENTERSIZEMOVE, 0, 0);
 		Pump(hwnd, held_for);
 
+		constexpr UINT move_only = SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE;
+
 		CHECK(s_doomed == nullptr);
+		CHECK(s_redraws == 1);
+
+		Loom::WindowFrame next;
+		next.Install(window, Count);
+		SetWindowPos(hwnd, nullptr, 1, 1, 0, 0, move_only);
 		CHECK(s_redraws == 1);
 	};
 
