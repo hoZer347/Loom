@@ -237,7 +237,8 @@ namespace
 			eye->transform.position = position;
 			eye->transform.rotation = rotation;
 
-			plane->Attach<Loom::Material>()->shader = &m_shader;
+			plane_material = plane->Attach<Loom::Material>();
+			plane_material->shader = &m_shader;
 			Loom::EditableMesh::Plane(CONTACT_PLANE_SIZE).WriteTo(*plane->Attach<Loom::Mesh>());
 
 			sphere->Attach<Loom::Material>()->shader = &m_shader;
@@ -252,6 +253,7 @@ namespace
 
 		Loom::Light* light = nullptr;
 		Loom::Camera* camera = nullptr;
+		Loom::Material* plane_material = nullptr;
 
 	private:
 		std::istringstream m_source;
@@ -281,6 +283,42 @@ namespace
 		};
 
 		return furthest;
+	};
+
+	// A plane lit from above shadows the sphere under it only when it draws
+	// the face the light meets.
+	void CheckOneSidedCaster(RenderFixture& fixture, const std::string& backend)
+	{
+		const ClearedTo cleared(CLEAR);
+
+		constexpr glm::vec3 POSITION(0.0f, -0.4f, 2.0f);
+		constexpr glm::vec3 ROTATION(12.0f, 0.0f, 0.0f);
+		constexpr glm::vec3 DIRECTION(0.0f, -1.0f, -1.0f);
+		constexpr float BELOW = 0.1f;
+		constexpr int TOLERANCE = 8;
+
+		const glm::vec3 point(0.0f, -BELOW, std::sqrt(CONTACT_RADIUS * CONTACT_RADIUS - BELOW * BELOW));
+
+		for (const Loom::Material::Sides sides : { Loom::Material::Front, Loom::Material::Back })
+		{
+			INFO("the plane draws its ", sides == Loom::Material::Front ? "top" : "underside");
+
+			Contact contact("Render - one-sided caster on " + backend, POSITION, ROTATION, true);
+			contact.light->direction = DIRECTION;
+			contact.plane_material->sides = sides;
+
+			const Image shadowed = fixture.Frame();
+			const glm::ivec2 pixel = PixelOf(*contact.camera, shadowed, point);
+
+			contact.light->castShadows = false;
+			const Image unshadowed = fixture.Frame();
+			const int lit = std::abs(shadowed.At(pixel.x, pixel.y).r - unshadowed.At(pixel.x, pixel.y).r);
+
+			if (sides == Loom::Material::Front)
+				CHECK(lit > TOLERANCE);
+			else
+				CHECK(lit <= TOLERANCE);
+		};
 	};
 
 	// Seen from under the plane, the sphere is in the plane's shadow right up
@@ -563,6 +601,18 @@ TEST_SUITE("Render")
 		REQUIRE(Loom::Engine::backend == Loom::Backend::Vulkan);
 
 		CheckContact(*this, "Vulkan");
+	};
+
+	TEST_CASE_FIXTURE(ContactFixture, "a one-sided plane casts from the side it draws and lets light through the side it hides, on OpenGL")
+	{
+		CheckOneSidedCaster(*this, "OpenGL");
+	};
+
+	TEST_CASE_FIXTURE(VulkanContactFixture, "a one-sided plane casts from the side it draws and lets light through the side it hides, on Vulkan")
+	{
+		REQUIRE(Loom::Engine::backend == Loom::Backend::Vulkan);
+
+		CheckOneSidedCaster(*this, "Vulkan");
 	};
 
 	#pragma endregion

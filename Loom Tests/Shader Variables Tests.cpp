@@ -718,6 +718,43 @@ TEST_SUITE("Shader variables")
 		CHECK(renderer.culls == std::vector<Loom::CullFace>{ Loom::CullFace::Front, Loom::CullFace::None, Loom::CullFace::None });
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the shadow pass leaves out the faces an open caster's material hides, turned over by a mirroring transform, and keeps a closed caster's far side")
+	{
+		RecordingRenderer renderer;
+
+		std::istringstream source("// ===SETTINGS===\nshadows = on\n" + STAGES);
+		Loom::Shader shader("one-sided casters", source);
+
+		Loom::Scene scene("one-sided casters");
+		Pump();
+
+		Loom::Light* light = scene.Attach<Loom::Light>();
+
+		const std::vector<float> triangle = { 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
+
+		const auto add = [&scene, &shader](const std::vector<float>& vertices, Loom::Material::Sides sides)
+		{
+			Loom::GameObject* object = scene.AddChild("Caster");
+			Loom::Material* material = object->Attach<Loom::Material>();
+			material->shader = &shader;
+			material->sides = sides;
+			object->Attach<Loom::Mesh>()->m_vertices = vertices;
+
+			return object;
+		};
+
+		add(triangle, Loom::Material::Front);
+		add(triangle, Loom::Material::Back);
+		add(triangle, Loom::Material::Front)->transform.scale = glm::vec3(-1.0f, 1.0f, 1.0f);
+		add(LoomTests::TETRAHEDRON, Loom::Material::Front);
+
+		Pump();
+
+		light->RenderShadowMap({ &scene.GetRoot() });
+
+		CHECK(renderer.culls == std::vector<Loom::CullFace>{ Loom::CullFace::Back, Loom::CullFace::Front, Loom::CullFace::Front, Loom::CullFace::Front, Loom::CullFace::None });
+	};
+
 	// The web's clock is the browser's, which cannot be stepped here.
 #ifndef __EMSCRIPTEN__
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a material hands its program the game time")

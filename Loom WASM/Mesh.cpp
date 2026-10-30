@@ -307,8 +307,14 @@ namespace Loom
 		if (!renderer)
 			return;
 
+		renderer->SetCullFace(HiddenSide());
+	};
+
+	CullFace Mesh::HiddenSide()
+	{
 		const bool mirrored = material->sides != Material::Both && glm::determinant(glm::mat3(m_gameObject->WorldMatrix())) < 0.0f;
-		renderer->SetCullFace(material->Culled(mirrored));
+
+		return material->Culled(mirrored);
 	};
 
 	void Mesh::Draw(uint32_t program)
@@ -347,6 +353,13 @@ namespace Loom
 			return m_farSide;
 
 		return m_farSide == CullFace::Front ? CullFace::Back : CullFace::Front;
+	};
+
+	CullFace Mesh::ShadowCull()
+	{
+		const CullFace farSide = FarSide();
+
+		return farSide != CullFace::None ? farSide : HiddenSide();
 	};
 
 	Skin* Mesh::GpuSkin()
