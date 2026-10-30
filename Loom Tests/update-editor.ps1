@@ -4,10 +4,11 @@
 
 .DESCRIPTION
     Opens this slot's Release editor on a hidden desktop, on a scratch project,
-    and runs update-editor.ps1 at it: an update waits while a scene is unsaved
-    and restarts the editor once it is saved, a scripts update goes in over
-    unsaved work without a restart, a restart waits out a game being built, and
-    an editor with nothing to take is told nothing. Throws naming what failed.
+    and runs update-editor.ps1 at it: an update saves a scene left unsaved,
+    stops a run and restarts at once, a clean scene takes what a merge wrote to
+    its file, a scripts update stops a run and compiles over unsaved work
+    without a restart, a restart waits out a game being built, and an editor
+    with nothing to take is told nothing. Throws naming what failed.
     A slot only: the user's Loom refuses, since its settings hold what they
     left open.
 
@@ -118,13 +119,7 @@ try
     $told = Invoke-Update
     if ($told -notmatch 'told to update') { throw "The editor was not told to update: $told" }
 
-    Start-Sleep -Seconds $SettleSeconds
-    if ((Get-Pid) -ne $first.Id) { throw 'The editor restarted over unsaved work.' }
-    if ((Invoke-Tool 'state') -notmatch 'Update: waiting') { throw 'State does not say an update waits.' }
-
-    Invoke-Tool 'command' @{ command = 'save' } | Out-Null
-
-    $latest = Wait-Pid { param($id) $id -ne $first.Id } 'restart once saved'
+    $latest = Wait-Pid { param($id) $id -ne $first.Id } 'restart over unsaved work'
 
     if (-not $first.WaitForExit($DeadlineSeconds * 1000)) { throw 'The first editor stayed up after the restart.' }
     if ((Invoke-Tool 'state') -match 'Update: waiting') { throw 'The restarted editor still has an update waiting.' }
@@ -134,6 +129,20 @@ try
 
     Wait-Compiled
 
+    $saved = Get-Content -LiteralPath $scene -Raw
+    Set-Content -LiteralPath $scene -Value ($saved -replace 'Unsaved', 'Merged') -NoNewline -Encoding utf8
+    Start-Sleep -Seconds $SettleSeconds
+
+    Invoke-Tool 'command' @{ command = 'play' } | Out-Null
+    $beforeMerge = $latest
+    Invoke-Update | Out-Null
+    $latest = Wait-Pid { param($id) $id -ne $beforeMerge } 'restart over a run'
+    Wait-Compiled
+
+    if ((Get-Content -LiteralPath $scene -Raw) -notmatch 'Merged') { throw 'The restart wrote a clean scene over what a merge left in its file.' }
+    if ((Invoke-Tool 'hierarchy') -notmatch 'Merged') { throw 'The restarted editor did not take what a merge left in the scene.' }
+    if ((Invoke-Tool 'state') -notmatch 'Play: stopped') { throw 'The restarted editor came back playing.' }
+
     Invoke-Tool 'add_object' @{ name = 'UnsavedAgain' } | Out-Null
 
     $scriptsFolder = Split-Path (Get-ChildItem -LiteralPath $project -Filter '*.vcxproj' -Recurse | Select-Object -First 1).FullName
@@ -141,12 +150,15 @@ try
     Start-Sleep -Seconds $SettleSeconds
     if ((Invoke-Tool 'state') -notmatch 'changed since') { throw 'The scripts did not go stale.' }
 
+    Invoke-Tool 'command' @{ command = 'play' } | Out-Null
+
     $scripts = Invoke-Update '-ScriptsOnly'
     if ($scripts -notmatch 'told to update-scripts') { throw "The editor was not told to update its scripts: $scripts" }
 
     Start-Sleep -Seconds $SettleSeconds
     if ((Get-Pid) -ne $latest) { throw 'A scripts update restarted the editor.' }
     Wait-Compiled
+    if ((Invoke-Tool 'state') -notmatch 'Play: stopped') { throw 'A scripts update left the run going.' }
     if ((Invoke-Tool 'hierarchy') -notmatch 'UnsavedAgain') { throw 'The compile dropped the unsaved object.' }
     if ((Get-Content -LiteralPath $scene -Raw) -match 'UnsavedAgain') { throw 'The compile saved the unsaved object.' }
 

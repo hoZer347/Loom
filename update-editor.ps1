@@ -9,10 +9,9 @@
     refresh does. One run at a time; a second waits, then checks again.
 
     Each editor open from this copy is then told over MCP what to do: update,
-    which restarts it on the new build once its run has stopped, everything
-    is saved and no game or page is building, or update-scripts, which compiles
-    over unsaved work. Saving is left to the user, so nothing unsaved is ever
-    lost or written. An editor on -Project is told whatever -ScriptsOnly says,
+    which stops its run, saves what is unsaved and restarts it on the new build
+    once no game or page is building, or update-scripts, which stops its run
+    and compiles over unsaved work. An editor on -Project is told whatever -ScriptsOnly says,
     and any other only when the build is newer than it. Demos and hidden runs
     are left alone.
 

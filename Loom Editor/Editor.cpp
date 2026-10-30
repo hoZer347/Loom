@@ -1205,10 +1205,12 @@ namespace Loom
 	{
 		// AddChild defers, so the scenes are only whole once the queue has run.
 		Engine::DoTasks();
+		RecordHistory();
 
 		bool saved = true;
 
-		for (Scene* scene : m_ownedScenes)
+		// A clean scene stays as its file is, which a merge may have moved on.
+		for (Scene* scene : UnsavedScenes())
 			saved = SaveToProject(scene) && saved;
 
 		saved = m_shaders.SaveAll() && saved;
@@ -1261,27 +1263,32 @@ namespace Loom
 
 		const bool busy =
 			!m_scripts.IsIdle() || IsRefreshing() || m_opening || m_projectLoad ||
+			m_gameBuilder.GetStatus() == GameBuilder::Status::Building || m_webPlayer.IsBuilding() || m_tests.HasQueued() ||
 			ImGui::IsAnyItemActive() || ImGui::IsAnyMouseDown() ||
 			ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId);
 
-		// A game or page being built and a queued test all end with the editor.
-		const bool restart_loses_work =
-			!UnsavedWork().empty() || m_gameBuilder.GetStatus() == GameBuilder::Status::Building ||
-			m_webPlayer.IsBuilding() || m_tests.HasQueued();
+		const EditorUpdate::Kind due = m_update.Due(busy);
 
-		switch (m_update.Due(IsPlaying(), busy, restart_loses_work))
+		if (due == EditorUpdate::Kind::None)
+			return;
+
+		Stop();
+
+		if (due == EditorUpdate::Kind::Scripts)
 		{
-		case EditorUpdate::Kind::Scripts:
 			CompileScripts();
-			break;
-		case EditorUpdate::Kind::Restart:
-			m_refresh.NoteExecutable();
-			m_relaunch = true;
-			Engine::Stop();
-			break;
-		default:
-			break;
+			return;
 		};
+
+		if (!SaveProject())
+		{
+			std::cerr << "Update: not everything saved, so this editor stays up rather than lose it." << std::endl;
+			return;
+		};
+
+		m_refresh.NoteExecutable();
+		m_relaunch = true;
+		Engine::Stop();
 	};
 
 	#pragma endregion
@@ -2592,7 +2599,7 @@ namespace Loom
 		if (m_update.Waiting() == EditorUpdate::Kind::Restart)
 		{
 			ImGui::TextDisabled("Update waiting");
-			ImGui::SetItemTooltip("Restarts once saved and idle");
+			ImGui::SetItemTooltip("Saves and restarts once idle");
 		};
 
 		if (DrawWindowButtons(Engine::window, m_windowFrame))

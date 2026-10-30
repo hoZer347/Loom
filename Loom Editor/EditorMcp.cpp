@@ -883,8 +883,8 @@ namespace Loom
 				"One of the editor's commands: play, pause, stop, compile (the scripts), save (the active scene), undo, redo or refresh "
 				"(Ctrl+Shift+R: rebuild the editor from the engine's sources, save the project and restart on it, after which it is back "
 				"under a new id, which editors lists; a failed build says so in the console and the editor carries on), update (restart on "
-				"the executable on disk, saving nothing: it waits for the run to stop and everything to be saved) or update-scripts (compile "
-				"once the run stops). Answers with the state after.",
+				"the executable on disk: it stops the run and saves what is unsaved, once any game or page build and queued test is done) or "
+				"update-scripts (stop the run and compile, keeping what is unsaved). Answers with the state after.",
 				R"({
 					"type": "object",
 					"properties": { "command": { "type": "string", "enum": [ "play", "pause", "stop", "compile", "save", "undo", "redo", "refresh", "update", "update-scripts" ] } },

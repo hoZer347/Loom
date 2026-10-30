@@ -12,31 +12,28 @@ TEST_SUITE("EditorUpdate")
 		Loom::EditorUpdate update;
 
 		CHECK(update.Waiting() == Kind::None);
-		CHECK(update.Due(false, false, false) == Kind::None);
+		CHECK(update.Due(false) == Kind::None);
 	};
 
-	TEST_CASE("a restart waits for the run, the busy editor and anything it would lose")
+	TEST_CASE("an update waits only for the busy editor")
 	{
 		Loom::EditorUpdate update;
 		update.Request(Kind::Restart);
 
-		CHECK(update.Due(true, false, false) == Kind::None);
-		CHECK(update.Due(false, true, false) == Kind::None);
-		CHECK(update.Due(false, false, true) == Kind::None);
+		CHECK(update.Due(true) == Kind::None);
 		CHECK(update.Waiting() == Kind::Restart);
 
-		CHECK(update.Due(false, false, false) == Kind::Restart);
+		CHECK(update.Due(false) == Kind::Restart);
 		CHECK(update.Waiting() == Kind::None);
 	};
 
-	TEST_CASE("the scripts build over unsaved work, which their compile keeps")
+	TEST_CASE("the scripts wait for the busy editor the same way")
 	{
 		Loom::EditorUpdate update;
 		update.Request(Kind::Scripts);
 
-		CHECK(update.Due(true, false, true) == Kind::None);
-		CHECK(update.Due(false, true, true) == Kind::None);
-		CHECK(update.Due(false, false, true) == Kind::Scripts);
+		CHECK(update.Due(true) == Kind::None);
+		CHECK(update.Due(false) == Kind::Scripts);
 	};
 
 	TEST_CASE("a restart asked for outranks the scripts, whichever came first")

@@ -2138,7 +2138,7 @@ namespace Loom
 				saved = SaveDocument(*document) && saved;
 
 		for (const auto& [path, file] : m_palettes)
-			if (Kept(path))
+			if (file.Unsaved() && Kept(path))
 				saved = SavePalette(path) && saved;
 
 		return saved;

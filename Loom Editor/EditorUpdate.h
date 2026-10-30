@@ -9,11 +9,10 @@ namespace Loom
 	/**
 	* Loom::EditorUpdate
 	* - What a change merged to the engine or the project asks of an editor
-	*   left open, held until it can run: its scripts built again, or a restart
-	*   on the executable on disk
-	* - Nothing runs through a run of the game or while the editor is busy, and
-	*   a restart also waits for whatever it would lose, as it saves nothing
-	*   itself. The scripts' build keeps all of that, so it does not wait for it
+	*   left open, held only while the editor is busy: its scripts built again,
+	*   or a restart on the executable on disk
+	* - The editor stops any run for either, and saves for a restart, so neither
+	*   waits for the user
 	*/
 	struct EditorUpdate final
 	{
@@ -26,12 +25,9 @@ namespace Loom
 		Kind Waiting() const { return m_waiting; };
 
 		// Called once a frame: hands over what waits once it can run.
-		Kind Due(bool playing, bool busy, bool restart_loses_work)
+		Kind Due(bool busy)
 		{
-			if (playing || busy || (m_waiting == Kind::Restart && restart_loses_work))
-				return Kind::None;
-
-			return std::exchange(m_waiting, Kind::None);
+			return busy ? Kind::None : std::exchange(m_waiting, Kind::None);
 		};
 
 	private:
