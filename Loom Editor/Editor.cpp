@@ -1209,6 +1209,7 @@ namespace Loom
 		// Taken before the prefabs sync, which marks a scene their change reached.
 		m_history.Collect(m_ownedScenes);
 		const std::vector<Scene*> unsaved = UnsavedScenes();
+		RecordHistory();
 
 		bool saved = true;
 

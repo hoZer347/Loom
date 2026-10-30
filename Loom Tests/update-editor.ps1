@@ -6,7 +6,8 @@
     Opens this slot's Release editor on a hidden desktop, on a scratch project,
     and runs update-editor.ps1 at it: an update saves a scene left unsaved,
     stops a run and restarts at once, a clean scene takes what a merge wrote to
-    its file and to a prefab it holds, a save that fails keeps the update
+    its file and to a prefab it holds, an open menu holds the update and the
+    edit made under it is saved, a save that fails keeps the update
     waiting, a scripts update stops a run and compiles over unsaved work
     without a restart, a restart waits out a game being built, and an editor
     with nothing to take is told nothing. Throws naming what failed.
@@ -182,6 +183,17 @@ try
 
     if ((Get-Content -LiteralPath $scene -Raw) -notmatch 'MergedBit') { throw 'A prefab the merge changed wrote its clean scene over the merge.' }
     if ((Invoke-Tool 'hierarchy') -notmatch 'InnerMerged') { throw 'The restarted editor did not take the merged prefab.' }
+
+    Invoke-Tool 'ui' @{ script = 'click "##MainMenuBar" "File"' } | Out-Null
+    Invoke-Tool 'add_object' @{ name = 'HeldEdit' } | Out-Null
+    $beforeHeld = $latest
+    Invoke-Update | Out-Null
+    Start-Sleep -Seconds $SettleSeconds
+    if ((Get-Pid) -ne $beforeHeld) { throw 'The editor restarted through an open menu.' }
+    try { Invoke-Tool 'ui' @{ script = 'key escape' } | Out-Null } catch [Net.WebException] { }
+    $latest = Wait-Pid { param($id) $id -ne $beforeHeld } 'restart once the menu shut'
+    Wait-Compiled
+    if ((Get-Content -LiteralPath $scene -Raw) -notmatch 'HeldEdit') { throw 'The restart lost an edit made under an open menu.' }
 
     Invoke-Tool 'add_object' @{ name = 'CannotSave' } | Out-Null
     Set-ItemProperty -LiteralPath $scene -Name IsReadOnly -Value $true
