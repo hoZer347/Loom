@@ -1074,6 +1074,7 @@ namespace Loom
 		{
 			m_attachAfterBuildTo = std::exchange(m_newScriptFor, { });
 			m_attachAfterBuild = name;
+			HoldPrefabAttachTargets();
 			CompileScripts();
 		}
 		else if (const char* appearsIn = InfoOf(m_newAssetKind).appearsIn)

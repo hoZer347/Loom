@@ -199,6 +199,7 @@ namespace Loom
 		{
 			m_attachAfterBuild.clear();
 			m_attachAfterBuildTo.clear();
+			m_attachAfterBuildInPrefab.clear();
 			RestoreAfterBuild();
 		};
 	};
@@ -254,6 +255,41 @@ namespace Loom
 			CompileScripts();
 	};
 
+	void Editor::HoldPrefabAttachTargets()
+	{
+		m_attachAfterBuildInPrefab.clear();
+		m_attachAfterBuildPrefab = m_prefabPath;
+
+		const GameObject* root = GetPrefabRoot();
+
+		if (root == nullptr)
+			return;
+
+		std::erase_if(
+			m_attachAfterBuildTo,
+			[this, root](const Guid& guid)
+			{
+				const GameObject* object = LoomObject::GetByGuid<GameObject>(guid);
+
+				if (object == nullptr || !Hierarchy::Contains(*root, object))
+					return false;
+
+				std::vector<size_t> indices{ };
+
+				for (; object != root; object = object->GetParent())
+				{
+					const std::vector<GameObject*>& siblings = object->GetParent()->GetChildren();
+					const size_t index = std::distance(siblings.begin(), std::ranges::find(siblings, object));
+
+					indices.insert(indices.begin(), index);
+				};
+
+				m_attachAfterBuildInPrefab.push_back(std::move(indices));
+
+				return true;
+			});
+	};
+
 	void Editor::AttachAfterBuild()
 	{
 		const std::string name = std::exchange(m_attachAfterBuild, { });
@@ -263,8 +299,34 @@ namespace Loom
 			if (GameObject* object = LoomObject::GetByGuid<GameObject>(guid))
 				objects.push_back(object);
 
-		if (name.empty() || objects.empty())
+		Engine::DoTasks();
+
+		const bool in_prefab = !m_attachAfterBuildInPrefab.empty();
+
+		for (const std::vector<size_t>& indices : std::exchange(m_attachAfterBuildInPrefab, { }))
+		{
+			GameObject* object = m_attachAfterBuildPrefab == m_prefabPath ? GetPrefabRoot() : nullptr;
+
+			for (const size_t index : indices)
+				object = object != nullptr && index < object->GetChildren().size()
+					? object->GetChildren()[index]
+					: nullptr;
+
+			if (object != nullptr)
+				objects.push_back(object);
+		};
+
+		if (name.empty())
 			return;
+
+		if (objects.empty())
+		{
+			std::cerr << name << " compiled, but what it was made for is gone, so it is on nothing." << std::endl;
+			return;
+		};
+
+		// So the scenes the build restored are what an undo goes back to.
+		RecordHistory();
 
 		std::vector<GameObject*> missed{ };
 
@@ -275,6 +337,12 @@ namespace Loom
 				if (ComponentRegistry::Create(name, *objects[i]) == nullptr)
 					missed.push_back(objects[i]);
 			});
+
+		m_historyDirty = true;
+
+		// Reopening the prefab dropped its objects from the selection.
+		if (in_prefab)
+			SetSelection(objects);
 
 		for (GameObject* object : missed)
 			std::cerr << name << " did not compile, so it is not on " << object->GetName() << " yet." << std::endl;

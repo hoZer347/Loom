@@ -841,6 +841,9 @@ namespace Loom
 		// found them or as they were opened while it ran.
 		void RestoreAfterBuild();
 
+		// Moves the targets inside the open prefab over to m_attachAfterBuildInPrefab.
+		void HoldPrefabAttachTargets();
+
 		// The script Add Component made for an object, put on it.
 		void AttachAfterBuild();
 
@@ -1607,6 +1610,11 @@ namespace Loom
 		// once the compile that follows has loaded it.
 		std::vector<Guid> m_newScriptFor{ };
 		std::vector<Guid> m_attachAfterBuildTo{ };
+
+		// A reopened prefab has new guids, so its targets are child indices from its root.
+		std::vector<std::vector<size_t>> m_attachAfterBuildInPrefab{ };
+		std::string m_attachAfterBuildPrefab{ };
+
 		std::string m_attachAfterBuild{ };
 		bool m_compileAfterBuild = false;
 
