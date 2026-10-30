@@ -40,6 +40,8 @@ namespace Loom
 		// whatever an earlier one left running.
 		bool Start(const std::string& script, const std::string& arguments, const Reader& read);
 
+		void Stop();
+
 		// Quoted for a command line. A trailing backslash would escape the
 		// closing quote, and a folder means the same without one.
 		static std::string Quote(std::string argument)
@@ -49,8 +51,6 @@ namespace Loom
 
 			return '"' + argument + '"';
 		};
-
-		void Stop();
 
 	private:
 		void* m_job = nullptr;

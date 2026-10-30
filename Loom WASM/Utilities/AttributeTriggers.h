@@ -14,16 +14,16 @@ namespace Loom
 	struct Tr_Callback final : AttributeTrigger
 	{
 		Tr_Callback() = default;
-		Tr_Callback(std::function<void()> onInvalidate) : onInvalidate(std::move(onInvalidate)) { };
+		Tr_Callback(std::function<void()> onInvalidate) : m_onInvalidate(std::move(onInvalidate)) { };
 
 		void Execute() override
 		{
-			if (onInvalidate)
-				onInvalidate();
+			if (m_onInvalidate)
+				m_onInvalidate();
 		};
 
 	private:
-		std::function<void()> onInvalidate{ };
+		std::function<void()> m_onInvalidate{ };
 	};
 
 	/// Invalidates another attribute -- how a derived stat is kept in step with the one it
@@ -31,29 +31,29 @@ namespace Loom
 	struct Tr_Invalidate final : AttributeTrigger
 	{
 		Tr_Invalidate() = default;
-		Tr_Invalidate(AttributeBase* target) : target(target) { };
+		Tr_Invalidate(AttributeBase* target) : m_target(target) { };
 
 		void Execute() override
 		{
-			if (target)
-				target->Invalidate();
+			if (m_target)
+				m_target->Invalidate();
 		};
 
 	private:
-		AttributeBase* target = nullptr;
+		AttributeBase* m_target = nullptr;
 	};
 
 	struct Tr_Log final : AttributeTrigger
 	{
 		Tr_Log() = default;
-		Tr_Log(std::string label) : label(std::move(label)) { };
+		Tr_Log(std::string label) : m_label(std::move(label)) { };
 
 		void Execute() override
 		{
-			std::cout << "[Attribute] " << label << " invalidated" << std::endl;
+			std::cout << "[Attribute] " << m_label << " invalidated" << std::endl;
 		};
 
 	private:
-		std::string label{ };
+		std::string m_label{ };
 	};
 };

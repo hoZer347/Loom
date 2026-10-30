@@ -32,7 +32,7 @@ namespace Loom
 		static bool Run(const std::string& command_line, const std::function<void(const std::string&)>& on_line);
 
 	private:
-		void* process = nullptr;
-		void* output = nullptr;
+		void* m_process = nullptr;
+		void* m_output = nullptr;
 	};
 };

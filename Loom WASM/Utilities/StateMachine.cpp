@@ -13,15 +13,12 @@ namespace Loom
 {
 	#pragma region StateRegistry
 
-	namespace
+	static std::map<std::string, std::function<std::shared_ptr<StateBase>()>>& Registry()
 	{
-		std::map<std::string, std::function<std::shared_ptr<StateBase>()>>& Registry()
-		{
-			// Function-local, so a static initialiser elsewhere cannot run before it.
-			static std::map<std::string, std::function<std::shared_ptr<StateBase>()>> registry;
+		// Function-local, so a static initialiser elsewhere cannot run before it.
+		static std::map<std::string, std::function<std::shared_ptr<StateBase>()>> registry;
 
-			return registry;
-		};
+		return registry;
 	};
 
 	void StateRegistry::Register(const std::string& name, std::function<std::shared_ptr<StateBase>()> create)

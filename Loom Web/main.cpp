@@ -318,10 +318,10 @@ private:
 
 #pragma region Scene Assembly
 
-// Attach order matters: WireShape writes the geometry the Mesh then draws, and
-// components render in the order they were attached.
 namespace
 {
+	// Attach order matters: WireShape writes the geometry the Mesh then draws, and
+	// components render in the order they were attached.
 	GameObject* AddWireShape(
 		Scene& scene,
 		const std::string& name,

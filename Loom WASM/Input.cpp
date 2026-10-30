@@ -488,75 +488,75 @@ namespace Loom
 	namespace
 	{
 #if __EMSCRIPTEN__
-	EM_BOOL mouse_move_callback(int eventType, const EmscriptenMouseEvent* e, void* userData)
-	{
-		if (eventType == EMSCRIPTEN_EVENT_MOUSEMOVE)
+		EM_BOOL mouse_move_callback(int eventType, const EmscriptenMouseEvent* e, void* userData)
 		{
-			// In the canvas's own pixels, more than the page's on a dense screen.
-			int width = 0;
-			int height = 0;
-			double cssWidth = 0.0;
-			double cssHeight = 0.0;
+			if (eventType == EMSCRIPTEN_EVENT_MOUSEMOVE)
+			{
+				// In the canvas's own pixels, more than the page's on a dense screen.
+				int width = 0;
+				int height = 0;
+				double cssWidth = 0.0;
+				double cssHeight = 0.0;
 
-			// Asked on every move, so a failure is left to the next.
-			if (emscripten_get_canvas_element_size("#canvas", &width, &height) != EMSCRIPTEN_RESULT_SUCCESS ||
-				emscripten_get_element_css_size("#canvas", &cssWidth, &cssHeight) != EMSCRIPTEN_RESULT_SUCCESS ||
-				cssWidth <= 0.0 || cssHeight <= 0.0)
-				return EM_FALSE;
+				// Asked on every move, so a failure is left to the next.
+				if (emscripten_get_canvas_element_size("#canvas", &width, &height) != EMSCRIPTEN_RESULT_SUCCESS ||
+					emscripten_get_element_css_size("#canvas", &cssWidth, &cssHeight) != EMSCRIPTEN_RESULT_SUCCESS ||
+					cssWidth <= 0.0 || cssHeight <= 0.0)
+					return EM_FALSE;
 
-			Input::OnMouseMove((int)(e->clientX * width / cssWidth), (int)(e->clientY * height / cssHeight), width, height);
+				Input::OnMouseMove((int)(e->clientX * width / cssWidth), (int)(e->clientY * height / cssHeight), width, height);
+			};
+
+			return EM_TRUE;
 		};
 
-		return EM_TRUE;
-	};
-
-	EM_BOOL mouse_leave_callback(int, const EmscriptenMouseEvent*, void*)
-	{
-		Input::OnMouseLeave();
-
-		return EM_TRUE;
-	};
-
-	// The DOM's own wheel event, since GLFW's port rounds each up to a whole notch.
-	EM_BOOL wheel_callback(int, const EmscriptenWheelEvent* e, void*)
-	{
-		// As SDL and ImGui's GLFW backend count it.
-		constexpr double pixels_per_notch = 100.0;
-		constexpr double lines_per_notch = 3.0;
-		constexpr double notches_per_page = 80.0;
-
-		const double notches =
-			e->deltaMode == DOM_DELTA_PIXEL ? e->deltaY / pixels_per_notch :
-			e->deltaMode == DOM_DELTA_LINE ? e->deltaY / lines_per_notch :
-			e->deltaY * notches_per_page;
-
-		// The DOM's is positive towards the person.
-		Input::OnMouseWheel((float)-notches);
-
-		return EM_TRUE;
-	};
-#else
-	void mouse_move_callback(
-		GLFWwindow* window,
-		double xpos,
-		double ypos)
-	{
-		int width, height;
-		glfwGetWindowSize(window, &width, &height);
-
-		Input::OnMouseMove((int)xpos, (int)ypos, width, height);
-	};
-
-	void cursor_enter_callback(GLFWwindow*, int entered)
-	{
-		if (!entered)
+		EM_BOOL mouse_leave_callback(int, const EmscriptenMouseEvent*, void*)
+		{
 			Input::OnMouseLeave();
-	};
 
-	void scroll_callback(GLFWwindow*, double, double notches)
-	{
-		Input::OnMouseWheel((float)notches);
-	};
+			return EM_TRUE;
+		};
+
+		// The DOM's own wheel event, since GLFW's port rounds each up to a whole notch.
+		EM_BOOL wheel_callback(int, const EmscriptenWheelEvent* e, void*)
+		{
+			// As SDL and ImGui's GLFW backend count it.
+			constexpr double pixels_per_notch = 100.0;
+			constexpr double lines_per_notch = 3.0;
+			constexpr double notches_per_page = 80.0;
+
+			const double notches =
+				e->deltaMode == DOM_DELTA_PIXEL ? e->deltaY / pixels_per_notch :
+				e->deltaMode == DOM_DELTA_LINE ? e->deltaY / lines_per_notch :
+				e->deltaY * notches_per_page;
+
+			// The DOM's is positive towards the person.
+			Input::OnMouseWheel((float)-notches);
+
+			return EM_TRUE;
+		};
+#else
+		void mouse_move_callback(
+			GLFWwindow* window,
+			double xpos,
+			double ypos)
+		{
+			int width, height;
+			glfwGetWindowSize(window, &width, &height);
+
+			Input::OnMouseMove((int)xpos, (int)ypos, width, height);
+		};
+
+		void cursor_enter_callback(GLFWwindow*, int entered)
+		{
+			if (!entered)
+				Input::OnMouseLeave();
+		};
+
+		void scroll_callback(GLFWwindow*, double, double notches)
+		{
+			Input::OnMouseWheel((float)notches);
+		};
 #endif
 	};
 

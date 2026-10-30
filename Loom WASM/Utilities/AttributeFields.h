@@ -64,16 +64,6 @@ namespace Loom
 		virtual void CollectAttributes(std::vector<AttributeField>& into) = 0;
 
 	private:
-		/// The attribute declared under that field name, or null.
-		AttributeBase* AttributeNamed(const std::string& name) const
-		{
-			for (const AttributeField& field : Attributes())
-				if (field.Name == name)
-					return field.Attribute;
-
-			return nullptr;
-		};
-
 		mutable std::vector<AttributeField> m_fields{ };
 		mutable bool m_built = false;
 	};
@@ -121,13 +111,6 @@ namespace Loom
 			std::initializer_list<AttributeBase*> attributes);
 
 		AttributeFields() = delete;
-
-	private:
-		/// Every attribute on an owner, in declaration order.
-		static const std::vector<AttributeField>& Of(const AttributeOwner& owner)
-		{
-			return owner.Attributes();
-		};
 	};
 };
 

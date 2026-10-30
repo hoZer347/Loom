@@ -85,8 +85,8 @@ namespace Loom
 
 		CloseHandle(started.hThread);
 
-		process = started.hProcess;
-		output = read;
+		m_process = started.hProcess;
+		m_output = read;
 
 		return true;
 	};
@@ -97,7 +97,7 @@ namespace Loom
 		std::string line;
 		DWORD count = 0;
 
-		while (ReadFile(output, buffer.data(), read_size, &count, nullptr) && count > 0)
+		while (ReadFile(m_output, buffer.data(), read_size, &count, nullptr) && count > 0)
 			for (DWORD i = 0; i < count; i++)
 			{
 				const char c = buffer[i];
@@ -118,18 +118,18 @@ namespace Loom
 		if (!line.empty())
 			on_line(line);
 
-		CloseHandle(output);
-		output = nullptr;
+		CloseHandle(m_output);
+		m_output = nullptr;
 	};
 
 	unsigned long HiddenProcess::Finish()
 	{
 		DWORD exit_code = 1;
 
-		WaitForSingleObject(process, INFINITE);
-		GetExitCodeProcess(process, &exit_code);
-		CloseHandle(process);
-		process = nullptr;
+		WaitForSingleObject(m_process, INFINITE);
+		GetExitCodeProcess(m_process, &exit_code);
+		CloseHandle(m_process);
+		m_process = nullptr;
 
 		return exit_code;
 	};
@@ -190,8 +190,8 @@ namespace Loom
 
 		close(pipe_ends[1]);
 
-		process = FromInt(child);
-		output = FromInt(pipe_ends[0]);
+		m_process = FromInt(child);
+		m_output = FromInt(pipe_ends[0]);
 
 		return true;
 	};
@@ -201,7 +201,7 @@ namespace Loom
 		std::array<char, read_size> buffer{ };
 		std::string line;
 		ssize_t count = 0;
-		const int fd = static_cast<int>(ToInt(output));
+		const int fd = static_cast<int>(ToInt(m_output));
 
 		while ((count = read(fd, buffer.data(), read_size)) > 0)
 			for (ssize_t i = 0; i < count; i++)
@@ -225,15 +225,15 @@ namespace Loom
 			on_line(line);
 
 		close(fd);
-		output = nullptr;
+		m_output = nullptr;
 	};
 
 	unsigned long HiddenProcess::Finish()
 	{
 		int status = 0;
 
-		waitpid(static_cast<pid_t>(ToInt(process)), &status, 0);
-		process = nullptr;
+		waitpid(static_cast<pid_t>(ToInt(m_process)), &status, 0);
+		m_process = nullptr;
 
 		return WIFEXITED(status) ? WEXITSTATUS(status) : 1;
 	};

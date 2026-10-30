@@ -134,6 +134,10 @@ namespace Loom
 
 		Scene* OpenScene(const std::string& path);
 
+		// What the Hierarchy drags: a GameObject's guid rather than its address,
+		// so a drop resolves against what still exists when the mouse comes up.
+		static constexpr const char* object_payload = "LoomObject";
+
 		bool IsOwned(Scene* scene) const;
 
 		// The file an owned scene was opened from or saved to, empty for one
@@ -149,6 +153,10 @@ namespace Loom
 		// the project's scenes folder. Refused while playing, when the scene
 		// holds what the run has done to it.
 		void SaveActiveScene();
+
+		// File > Exit, the window's close button and Alt+F4: stops any run,
+		// then closes once the question about anything unsaved is answered.
+		void Quit();
 
 		#pragma endregion
 
@@ -385,22 +393,6 @@ namespace Loom
 		// An edit made other than through the panels, recorded for undo like
 		// theirs once nothing is held down.
 		void MarkEdited() { m_historyDirty = true; };
-
-		#pragma endregion
-
-		#pragma region Window
-
-		// File > Exit, the window's close button and Alt+F4: stops any run,
-		// then closes once the question about anything unsaved is answered.
-		void Quit();
-
-		#pragma endregion
-
-		#pragma region Hierarchy
-
-		// What the Hierarchy drags: a GameObject's guid rather than its address,
-		// so a drop resolves against what still exists when the mouse comes up.
-		static constexpr const char* object_payload = "LoomObject";
 
 		#pragma endregion
 
