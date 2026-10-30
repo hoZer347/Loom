@@ -10,7 +10,7 @@
 
 namespace Loom
 {
-	EditCommand EditCommands::FromShortcut(bool hierarchy_focused)
+	EditCommand EditCommands::FromShortcut(bool takes_delete)
 	{
 		if (ImGui::GetIO().WantTextInput)
 			return EditCommand::None;
@@ -34,7 +34,7 @@ namespace Loom
 		if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S))
 			return EditCommand::Save;
 
-		if (hierarchy_focused && ImGui::IsKeyChordPressed(ImGuiKey_Delete))
+		if (takes_delete && ImGui::IsKeyChordPressed(ImGuiKey_Delete))
 			return EditCommand::Delete;
 
 		return EditCommand::None;

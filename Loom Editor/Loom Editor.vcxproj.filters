@@ -25,6 +25,9 @@
     <ClCompile Include="ProjectAssets.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
+    <ClCompile Include="AssetTrash.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
     <ClCompile Include="EditorProject.cpp">
       <Filter>Panels</Filter>
     </ClCompile>
@@ -262,6 +265,9 @@
       <Filter>Scripts</Filter>
     </ClInclude>
     <ClInclude Include="ProjectAssets.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetTrash.h">
       <Filter>Scripts</Filter>
     </ClInclude>
     <ClInclude Include="AssetKind.h">

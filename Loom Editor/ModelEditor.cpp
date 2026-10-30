@@ -548,6 +548,26 @@ void main()
 			document->path = ProjectAssets::Relocate(document->path, from, to);
 	};
 
+	bool ModelEditor::HasUnsaved(const std::string& path) const
+	{
+		return std::ranges::any_of(m_documents, [&path](const std::unique_ptr<Document>& document)
+		{
+			return document->unsaved && ProjectAssets::IsUnder(document->path, path);
+		});
+	};
+
+	void ModelEditor::CloseUnder(const std::string& path)
+	{
+		std::vector<const Document*> closing{ };
+
+		for (const std::unique_ptr<Document>& document : m_documents)
+			if (ProjectAssets::IsUnder(document->path, path))
+				closing.push_back(document.get());
+
+		for (const Document* document : closing)
+			Close(document);
+	};
+
 	std::vector<std::string> ModelEditor::TakeSaved()
 	{
 		return std::exchange(m_saved, { });

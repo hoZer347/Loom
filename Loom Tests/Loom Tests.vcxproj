@@ -160,6 +160,7 @@
     <ClCompile Include="EditorRefresh Tests.cpp" />
     <ClCompile Include="EditorUpdate Tests.cpp" />
     <ClCompile Include="EditorTheme Tests.cpp" />
+    <ClCompile Include="AssetTrash Tests.cpp" />
     <ClCompile Include="ProjectAssets Tests.cpp" />
     <ClCompile Include="FileTypes Tests.cpp" />
     <ClCompile Include="FolderWatch Tests.cpp" />
@@ -279,6 +280,7 @@
     <ClCompile Include="..\Loom Editor\EditorSettings.cpp" />
     <ClCompile Include="..\Loom Editor\EditorIcons.cpp" />
     <ClCompile Include="..\Loom Editor\ProjectAssets.cpp" />
+    <ClCompile Include="..\Loom Editor\AssetTrash.cpp" />
     <ClCompile Include="..\Loom Editor\ProjectTemplate.cpp" />
     <ClCompile Include="..\Loom Editor\FileTypes.cpp" />
     <ClCompile Include="..\Loom Editor\FolderWatch.cpp" />

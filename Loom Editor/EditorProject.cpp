@@ -505,15 +505,22 @@ namespace Loom
 
 	void Editor::DrawProject()
 	{
-		if (m_focusProject)
+		if (m_focusProject || (m_previewingFile && !m_sprites.IsTakingFocus()))
 		{
 			ImGui::SetNextWindowFocus();
 			m_focusProject = false;
+			m_previewingFile = false;
 		};
 
 		ImGui::SetNextWindowSizeConstraints(ImVec2(m_projectMinWidth, 0.0f), ImVec2(FLT_MAX, FLT_MAX));
 
-		if (ImGui::Begin(EditorPanels::Project, &m_showProject))
+		const bool shown = ImGui::Begin(EditorPanels::Project, &m_showProject);
+
+		// An open menu has the focus, and Edit's Undo is still about this panel.
+		if (!ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel))
+			m_projectFocused = shown && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+
+		if (shown)
 		{
 			if (m_projectPath.empty())
 			{
@@ -632,6 +639,139 @@ namespace Loom
 		m_showProject = true;
 		m_focusProject = true;
 		m_projectTabToShow = tab;
+	};
+
+	#pragma endregion
+
+	#pragma region Deleting Entries
+
+	std::string Editor::SelectedProjectEntry() const
+	{
+		std::string selected{ };
+
+		if (m_projectTab == ProjectTabs::Scenes)
+			selected = m_selectedAsset;
+		else if (m_projectTab == ProjectTabs::Scripts)
+		{
+			if (const auto entry = m_scriptEntries.find(m_selectedScript); entry != m_scriptEntries.end())
+				selected = entry->second.file;
+		}
+		else if (const auto tab = std::ranges::find_if(m_fileTabs, [this](const FileTab& open) { return open.kind.title == m_projectTab; }); tab != m_fileTabs.end())
+			selected = tab->selected;
+
+		return selected.empty() ? selected : (std::filesystem::path(m_projectPath) / selected).lexically_normal().string();
+	};
+
+	void Editor::DeleteSelectedEntry()
+	{
+		const std::string selected = SelectedProjectEntry();
+		std::error_code code;
+
+		if (selected.empty() || !std::filesystem::exists(selected, code))
+			return;
+
+		std::vector<std::string> paths{ selected };
+
+		// An image and its sprite go together, as they move.
+		if (const std::string companion = SpriteAsset::Companion(selected); !companion.empty() && std::filesystem::exists(companion, code))
+			paths.push_back(std::filesystem::path(companion).lexically_normal().string());
+
+		if (!CanDeleteEntries(paths))
+			return;
+
+		if (std::string error; !m_assetTrash.Delete(paths, &error))
+		{
+			std::cerr << "Project: " << error << std::endl;
+			return;
+		};
+
+		ForgetEntries(paths);
+	};
+
+	bool Editor::CanDeleteEntries(const std::vector<std::string>& paths) const
+	{
+		const auto refuse = [](const std::string& path, const char* why)
+		{
+			std::cerr << "Project: " << path << " " << why << std::endl;
+			return false;
+		};
+
+		const std::string scripts = m_scripts.HasProject()
+			? std::filesystem::path(m_scripts.GetProject()).lexically_normal().string()
+			: std::string();
+
+		std::error_code code;
+		const std::string prefab = m_prefabPath.empty()
+			? m_prefabPath
+			: std::filesystem::absolute(m_prefabPath, code).lexically_normal().string();
+
+		for (const std::string& path : paths)
+		{
+			if ((!m_projectFile.empty() && ProjectAssets::IsUnder(m_projectFile, path)) ||
+				(!scripts.empty() && ProjectAssets::IsUnder(scripts, path)))
+				return refuse(path, "holds the project");
+
+			for (const auto& [scene, scene_path] : m_scenePaths)
+				if (!scene_path.empty() && ProjectAssets::IsUnder(std::filesystem::absolute(scene_path, code).lexically_normal().string(), path))
+					return refuse(path, "holds a scene that is open");
+
+			if (!prefab.empty() && ProjectAssets::IsUnder(prefab, path))
+				return refuse(path, "holds the prefab that is open");
+
+			if (m_shaders.HasUnsaved(path) || m_dialogues.HasUnsaved(path) || m_sprites.HasUnsaved(path) || m_models.HasUnsaved(path))
+				return refuse(path, "has unsaved changes");
+		};
+
+		return true;
+	};
+
+	void Editor::ForgetEntries(const std::vector<std::string>& paths)
+	{
+		for (const std::string& path : paths)
+		{
+			m_shaders.CloseUnder(path);
+			m_dialogues.CloseUnder(path);
+			m_sprites.CloseUnder(path);
+			m_models.CloseUnder(path);
+
+			if (!m_selectedModel.empty() && ProjectAssets::IsUnder(m_selectedModel, path))
+				m_selectedModel.clear();
+		};
+
+		RefreshProjectAssets();
+	};
+
+	bool Editor::ProjectTakesStep(bool undo) const
+	{
+		return m_showProject && m_projectFocused && (undo ? m_assetTrash.CanUndo() : m_assetTrash.CanRedo());
+	};
+
+	void Editor::StepEntries(bool undo)
+	{
+		const std::vector<std::string> paths = m_assetTrash.Next(undo);
+
+		if (!undo && !CanDeleteEntries(paths))
+			return;
+
+		if (std::string error; !m_assetTrash.Step(undo, &error))
+		{
+			std::cerr << "Project: " << error << std::endl;
+			return;
+		};
+
+		if (!undo)
+		{
+			ForgetEntries(paths);
+			return;
+		};
+
+		RefreshProjectAssets();
+
+		if (RevealFile(paths.front()))
+			return;
+
+		m_selectedAsset = paths.front();
+		m_revealSelectedAsset = true;
 	};
 
 	#pragma endregion
@@ -2375,7 +2515,10 @@ namespace Loom
 		if (double_clicked)
 			OpenAsset(node.path);
 		else if (released && ProjectAssets::IsTwoDFile(node.path))
+		{
 			OpenAsset(node.path, true);
+			m_previewingFile = true;
+		};
 
 		ImGui::SetItemTooltip("%s", file.c_str());
 

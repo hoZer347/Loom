@@ -75,6 +75,17 @@ namespace Loom
 		// Keeps the tabs of files that were moved saving to where they are now.
 		void Relocate(const std::string& from, const std::string& to);
 
+		// Whether a tab or palette on path, or on a file inside it, has unsaved
+		// changes.
+		bool HasUnsaved(const std::string& path) const;
+
+		// Closes the tabs and palettes on path or on files inside it, for files
+		// that have gone.
+		void CloseUnder(const std::string& path);
+
+		// Whether the panel is still coming forward from an Open.
+		bool IsTakingFocus() const { return m_focusFrames > 0; };
+
 		// The images saved since the last call.
 		std::vector<std::string> TakeSaved();
 

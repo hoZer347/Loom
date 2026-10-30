@@ -122,6 +122,22 @@ namespace Loom
 			document->path = ProjectAssets::Relocate(document->path, from, to);
 	};
 
+	bool TextFileEditor::HasUnsaved(const std::string& path) const
+	{
+		return std::ranges::any_of(m_documents, [&path](const std::unique_ptr<Document>& document)
+		{
+			return document->unsaved && ProjectAssets::IsUnder(document->path, path);
+		});
+	};
+
+	void TextFileEditor::CloseUnder(const std::string& path)
+	{
+		std::erase_if(m_documents, [&path](const std::unique_ptr<Document>& document)
+		{
+			return ProjectAssets::IsUnder(document->path, path);
+		});
+	};
+
 	bool TextFileEditor::SaveAll()
 	{
 		bool saved = true;

@@ -1128,6 +1128,8 @@ namespace Loom
 		m_instances.clear();
 		m_linkedInstances.clear();
 
+		m_assetTrash.Empty();
+
 		m_projectPath = resolved;
 		EditorLog::Get().SetProject(m_projectPath);
 
@@ -2036,6 +2038,12 @@ namespace Loom
 
 	void Editor::Undo()
 	{
+		if (ProjectTakesStep(true))
+		{
+			StepEntries(true);
+			return;
+		};
+
 		if (m_playing)
 		{
 			RecordPlayEdit();
@@ -2053,6 +2061,12 @@ namespace Loom
 
 	void Editor::Redo()
 	{
+		if (ProjectTakesStep(false))
+		{
+			StepEntries(false);
+			return;
+		};
+
 		if (m_playing)
 		{
 			RecordPlayEdit();
@@ -2110,6 +2124,9 @@ namespace Loom
 
 	bool Editor::CanUndo() const
 	{
+		if (ProjectTakesStep(true))
+			return true;
+
 		return m_playing
 			? m_playHistory.CanUndo()
 			: CanStepHistory() && (PrefabHasKeyboard() ? m_prefabHistory.CanUndo() : m_history.CanUndo());
@@ -2117,6 +2134,9 @@ namespace Loom
 
 	bool Editor::CanRedo() const
 	{
+		if (ProjectTakesStep(false))
+			return true;
+
 		return m_playing
 			? m_playHistory.CanRedo()
 			: CanStepHistory() && (PrefabHasKeyboard() ? m_prefabHistory.CanRedo() : m_history.CanRedo());
@@ -2242,14 +2262,21 @@ namespace Loom
 		if ((m_showShaders && m_shaders.IsFocused()) || (m_showDialogues && m_dialogues.IsFocused()))
 			return;
 
-		switch (EditCommands::FromShortcut(m_showHierarchy && m_hierarchyFocused))
+		const bool project_focused = m_showProject && m_projectFocused;
+
+		switch (EditCommands::FromShortcut((m_showHierarchy && m_hierarchyFocused) || project_focused))
 		{
 		case EditCommand::Undo:		Undo();				break;
 		case EditCommand::Redo:		Redo();				break;
 		case EditCommand::Cut:		Cut();				break;
 		case EditCommand::Copy:		Copy();				break;
 		case EditCommand::Paste:	Paste();			break;
-		case EditCommand::Delete:	DeleteSelected();	break;
+		case EditCommand::Delete:
+			if (project_focused)
+				DeleteSelectedEntry();
+			else DeleteSelected();
+
+			break;
 		case EditCommand::None:							break;
 		case EditCommand::Save:
 			if (PrefabHasKeyboard())

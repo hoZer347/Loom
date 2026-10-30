@@ -23,9 +23,9 @@ namespace Loom
 	namespace EditCommands
 	{
 		// The edit the keys pressed this ImGui frame ask for. Nothing while a
-		// text box has the keyboard, and Delete only while the Hierarchy has
-		// focus, since everywhere else it means something else or nothing.
-		EditCommand FromShortcut(bool hierarchy_focused);
+		// text box has the keyboard, and Delete only while a panel that takes it
+		// has focus, since everywhere else it means something else or nothing.
+		EditCommand FromShortcut(bool takes_delete);
 
 		// A scene's root is not the user's to cut, copy or delete.
 		bool CanTake(const GameObject* selected);

@@ -2144,6 +2144,35 @@ namespace Loom
 		return saved;
 	};
 
+	bool SpriteEditor::HasUnsaved(const std::string& path) const
+	{
+		const bool sprite = std::ranges::any_of(m_documents, [&path](const std::unique_ptr<Document>& document)
+		{
+			return document->unsaved && (ProjectAssets::IsUnder(document->path, path) || ProjectAssets::IsUnder(document->links.image, path));
+		});
+
+		return sprite || std::ranges::any_of(m_palettes, [this, &path](const auto& palette)
+		{
+			return palette.second.Unsaved() && Kept(palette.first) && ProjectAssets::IsUnder(palette.first, path);
+		});
+	};
+
+	void SpriteEditor::CloseUnder(const std::string& path)
+	{
+		if (m_active != nullptr && (ProjectAssets::IsUnder(m_active->path, path) || ProjectAssets::IsUnder(m_active->links.image, path)))
+			m_active = nullptr;
+
+		std::erase_if(m_documents, [&path](const std::unique_ptr<Document>& document)
+		{
+			return ProjectAssets::IsUnder(document->path, path) || ProjectAssets::IsUnder(document->links.image, path);
+		});
+
+		if (!m_loosePalette.empty() && ProjectAssets::IsUnder(m_loosePalette, path))
+			m_loosePalette.clear();
+
+		std::erase_if(m_palettes, [&path](const auto& palette) { return ProjectAssets::IsUnder(palette.first, path); });
+	};
+
 	std::vector<std::string> SpriteEditor::UnsavedFiles() const
 	{
 		std::vector<std::string> unsaved{ };

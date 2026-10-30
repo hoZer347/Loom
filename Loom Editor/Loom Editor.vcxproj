@@ -169,6 +169,7 @@
     <ClCompile Include="EditorProject.cpp" />
     <ClCompile Include="EditorRefresh.cpp" />
     <ClCompile Include="ProjectAssets.cpp" />
+    <ClCompile Include="AssetTrash.cpp" />
     <ClCompile Include="EditorLog.cpp" />
     <ClCompile Include="EditorMcp.cpp" />
     <ClCompile Include="McpProtocol.cpp" />
@@ -229,6 +230,7 @@
     <ClInclude Include="TextFit.h" />
     <ClInclude Include="KindFilter.h" />
     <ClInclude Include="AssetKind.h" />
+    <ClInclude Include="AssetTrash.h" />
     <ClInclude Include="Hierarchy.h" />
     <ClInclude Include="ComponentDrag.h" />
     <ClInclude Include="FolderWatch.h" />

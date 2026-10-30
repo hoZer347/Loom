@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AssetKind.h"
+#include "AssetTrash.h"
 #include "ColliderGizmos.h"
 #include "ComponentMenu.h"
 #include "DialogueEditor.h"
@@ -462,6 +463,23 @@ namespace Loom
 
 		// Brings the Project panel forward with one of ProjectTabs in front.
 		void ShowProjectTab(std::string_view tab);
+
+		// The file or folder picked in the Project panel's tab in front, or none.
+		std::string SelectedProjectEntry() const;
+
+		// Takes it out of the project, a step Ctrl+Z puts back from the panel.
+		void DeleteSelectedEntry();
+
+		// Whether the paths can go: none holds the project or an open scene, and
+		// no tab on them has unsaved changes, or the console says which.
+		bool CanDeleteEntries(const std::vector<std::string>& paths) const;
+
+		// Closes what was showing the paths, now they have gone.
+		void ForgetEntries(const std::vector<std::string>& paths);
+
+		// Whether Ctrl+Z or Ctrl+Y is the Project panel's, and the step itself.
+		bool ProjectTakesStep(bool undo) const;
+		void StepEntries(bool undo);
 
 		// The project's scenes and prefabs, in the folders they are in.
 		void DrawScenes();
@@ -1493,6 +1511,14 @@ namespace Loom
 
 		bool m_showProject = true;
 		bool m_focusProject = false;
+		bool m_projectFocused = false;
+
+		// A 2D file's preview brought the Sprites panel forward: the keyboard
+		// comes back to the list once it has.
+		bool m_previewingFile = false;
+
+		// What the Project panel deleted, while Ctrl+Z can still put it back.
+		AssetTrash m_assetTrash;
 
 		// The Project panel's tab in front, and the one to bring forward on
 		// the next frame, or none: each one of ProjectTabs.

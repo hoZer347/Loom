@@ -32,6 +32,12 @@ namespace Loom
 		// Keeps the tabs of files that were moved saving to where they are now.
 		void Relocate(const std::string& from, const std::string& to);
 
+		// Whether a tab on path, or on a file inside it, has unsaved changes.
+		bool HasUnsaved(const std::string& path) const;
+
+		// Closes the tabs on path or on files inside it, for files that have gone.
+		void CloseUnder(const std::string& path);
+
 		// Every tab with unsaved changes, to its file. False when one could not
 		// be written.
 		bool SaveAll();
