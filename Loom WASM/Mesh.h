@@ -84,9 +84,12 @@ namespace Loom
 		CullFace FarSide();
 
 		// Gives the program the mesh's material, the scene's view and the faces
-		// its material culls, which the caller sets back to none after drawing,
-		// as its own pass does before drawing it.
+		// its material culls, as its own pass does before drawing it.
 		static void Ready(Mesh& mesh, uint32_t program);
+
+		// Culls the faces its material leaves out, seen through its world
+		// matrix. The caller sets it back to none after drawing.
+		void CullHiddenSide();
 
 		// Draws the meshes farthest from Camera::current first, writing no
 		// depth, so each blends over everything behind it.

@@ -125,6 +125,34 @@ TEST_SUITE("SelectionOutline")
 		CHECK(renderer.drawnInto == std::vector<uint32_t>{ mask, mask, RecordingRenderer::WINDOW });
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a one-sided mesh's mask culls the side it hides, turned over by a mirroring transform, and culls nothing after")
+	{
+		RecordingRenderer renderer;
+		renderer.windowSize = VIEW;
+
+		std::istringstream source(STAGES);
+		Loom::Shader shader("selection outline one-sided", source);
+
+		Loom::Scene scene("selection outline one-sided");
+		Pump();
+
+		Loom::Camera* camera = scene.Attach<Loom::Camera>();
+		Loom::GameObject* selected = scene.AddChild("One-Sided");
+		selected->transform.scale = glm::vec3(-1.0f, 1.0f, 1.0f);
+		Pump();
+
+		Loom::Material* material = selected->Attach<Loom::Material>();
+		material->shader = &shader;
+		material->sides = Loom::Material::Front;
+		selected->Attach<Loom::Mesh>()->m_vertices = TRIANGLE;
+		Pump();
+
+		Loom::SelectionOutline outline;
+		outline.Draw(*selected, *camera);
+
+		CHECK(renderer.culls == std::vector<Loom::CullFace>{ Loom::CullFace::Front, Loom::CullFace::None });
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a mesh's mask is drawn with its own shader's vertex stage, so a shader that places it in clip space is ringed where it shows")
 	{
 		RecordingRenderer renderer;

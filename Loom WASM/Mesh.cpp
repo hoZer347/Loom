@@ -297,14 +297,18 @@ namespace Loom
 	{
 		mesh.material->Apply(program, &*std::as_const(mesh.variables));
 		Scene::ApplyView(program);
+		mesh.CullHiddenSide();
+	};
 
+	void Mesh::CullHiddenSide()
+	{
 		Renderer* renderer = Renderer::Get();
 
 		if (!renderer)
 			return;
 
-		const bool mirrored = mesh.material->sides != Material::Both && glm::determinant(glm::mat3(mesh.m_gameObject->WorldMatrix())) < 0.0f;
-		renderer->SetCullFace(mesh.material->Culled(mirrored));
+		const bool mirrored = material->sides != Material::Both && glm::determinant(glm::mat3(m_gameObject->WorldMatrix())) < 0.0f;
+		renderer->SetCullFace(material->Culled(mirrored));
 	};
 
 	void Mesh::Draw(uint32_t program)

@@ -292,7 +292,9 @@ void main()
 
 				mesh->material->Apply(program, &*std::as_const(mesh->variables));
 				camera.Apply(program);
+				mesh->CullHiddenSide();
 				mesh->Draw(program);
+				Renderer::Get()->SetCullFace(CullFace::None);
 				drew = true;
 			}
 			else if (strcmp(component->GetTypeName(), typeid(Sprite).name()) == 0)
