@@ -247,7 +247,10 @@ namespace {NAME}Scripts
 )";
 
 		const char* const read_only = R"props(<Project>
-  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" Condition="'$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))' != ''" />
+  <PropertyGroup>
+    <ParentBuildProps>$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))</ParentBuildProps>
+  </PropertyGroup>
+  <Import Project="$(ParentBuildProps)" Condition="'$(ParentBuildProps)' != ''" />
   <PropertyGroup>
     <ReadOnlyProject>true</ReadOnlyProject>
   </PropertyGroup>

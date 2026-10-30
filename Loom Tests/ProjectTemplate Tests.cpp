@@ -317,7 +317,7 @@ TEST_SUITE("ProjectTemplate")
 		const std::string written = ReadBytes(props);
 
 		CHECK(Count(written, "<ReadOnlyProject>true</ReadOnlyProject>") == 1);
-		CHECK(written.find("<Import Project=\"$([MSBuild]::GetPathOfFileAbove('Directory.Build.props'") < written.find("<ReadOnlyProject>"));
+		CHECK(written.find("<Import Project=\"$(ParentBuildProps)\"") < written.find("<ReadOnlyProject>"));
 
 		const std::string own = "<Project />";
 
