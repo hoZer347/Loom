@@ -12,6 +12,7 @@
 #include <windows.h>
 
 #include <chrono>
+#include <memory>
 #include <vector>
 
 #elif !defined(__EMSCRIPTEN__)
@@ -206,6 +207,26 @@ TEST_SUITE("WindowFrame")
 
 		REQUIRE(timers > 0);
 		CHECK(s_redraws >= timers * redraws_between_messages);
+	};
+
+	std::unique_ptr<Loom::WindowFrame> s_doomed;
+
+	void CountThenDestroy()
+	{
+		s_redraws++;
+		s_doomed.reset();
+	};
+
+	TEST_CASE_FIXTURE(HiddenWindow, "a window's frame taken away by a redraw while held stops the redraws")
+	{
+		s_doomed = std::make_unique<Loom::WindowFrame>();
+		s_doomed->Install(window, CountThenDestroy);
+
+		SendMessageW(hwnd, WM_ENTERSIZEMOVE, 0, 0);
+		Pump(hwnd, held_for);
+
+		CHECK(s_doomed == nullptr);
+		CHECK(s_redraws == 1);
 	};
 
 	std::vector<std::chrono::steady_clock::time_point> s_redrawnAt;

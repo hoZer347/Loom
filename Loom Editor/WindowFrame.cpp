@@ -232,8 +232,15 @@ namespace Loom
 
 	WindowFrame::~WindowFrame()
 	{
-		if (m_window != nullptr)
-			RemoveWindowSubclass(glfwGetWin32Window(m_window), Procedure, SUBCLASS_ID);
+		if (m_window == nullptr)
+			return;
+
+		const HWND window = glfwGetWin32Window(m_window);
+
+		if (window == s_held)
+			s_held = nullptr;
+
+		RemoveWindowSubclass(window, Procedure, SUBCLASS_ID);
 	};
 
 	WindowFrame::Hit WindowFrame::Hovered() const
