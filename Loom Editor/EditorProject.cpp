@@ -881,6 +881,7 @@ namespace Loom
 		m_newAssetFolder = folder;
 		m_newScriptFolder.clear();
 		m_newScriptFor.clear();
+		m_attachAfterBuildInPrefab.clear();
 		m_newAssetFor = nullptr;
 		m_newAssetMade.clear();
 
@@ -956,6 +957,7 @@ namespace Loom
 		m_newAssetFolder = m_projectPath;
 		m_newScriptFolder.clear();
 		m_newScriptFor.clear();
+		m_attachAfterBuildInPrefab.clear();
 		m_newAssetFor = nullptr;
 		m_newAssetMade.clear();
 		snprintf(m_newAssetName, sizeof(m_newAssetName), "%s", name.c_str());
@@ -1012,6 +1014,9 @@ namespace Loom
 		case AssetKind::DialogueManager:
 		case AssetKind::Test:
 		{
+			// Loading a first scripts project compiles, which reopens the prefab.
+			HoldPrefabAttachTargets();
+
 			if (!m_scripts.HasProject())
 			{
 				if (ProjectTemplate::AddScripts(m_projectPath, m_projectName, &error).empty())
@@ -1070,11 +1075,10 @@ namespace Loom
 		if (m_newAssetFor != nullptr)
 			m_newAssetMade = ProjectAssets::RelativeTo(path, m_projectPath);
 
-		if (IsScript(m_newAssetKind) && !m_newScriptFor.empty())
+		if (IsScript(m_newAssetKind) && !(m_newScriptFor.empty() && m_attachAfterBuildInPrefab.empty()))
 		{
 			m_attachAfterBuildTo = std::exchange(m_newScriptFor, { });
 			m_attachAfterBuild = name;
-			HoldPrefabAttachTargets();
 			CompileScripts();
 		}
 		else if (const char* appearsIn = InfoOf(m_newAssetKind).appearsIn)

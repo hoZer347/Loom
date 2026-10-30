@@ -257,16 +257,15 @@ namespace Loom
 
 	void Editor::HoldPrefabAttachTargets()
 	{
-		m_attachAfterBuildInPrefab.clear();
-		m_attachAfterBuildPrefab = m_prefabPath;
-
 		const GameObject* root = GetPrefabRoot();
 
 		if (root == nullptr)
 			return;
 
+		m_attachAfterBuildPrefab = m_prefabPath;
+
 		std::erase_if(
-			m_attachAfterBuildTo,
+			m_newScriptFor,
 			[this, root](const Guid& guid)
 			{
 				const GameObject* object = LoomObject::GetByGuid<GameObject>(guid);
