@@ -147,8 +147,7 @@ namespace Loom
 			return INVALID_SOCKET;
 		};
 
-		// Whether from has data or has closed. Waits here, not in recv, since a recv
-		// blocked on Windows outlasts shutdown until the peer closes or two minutes pass.
+		// A recv blocked on Windows outlasts shutdown, so the wait is here.
 		bool Readable(SOCKET from, const std::atomic<bool>& stopping, int timeout_ms)
 		{
 			const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
@@ -160,7 +159,6 @@ namespace Loom
 				FD_SET(from, &ready);
 
 				timeval wait{ 0, STOP_POLL_MS * US_PER_MS };
-				// Windows ignores the count of descriptors that POSIX wants.
 				const int count = select((int)from + 1, &ready, nullptr, nullptr, &wait);
 
 				if (count != 0)

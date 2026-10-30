@@ -181,7 +181,15 @@ TEST_SUITE("McpRelay")
 					{ "params", { { "name", "whoami" }, { "arguments", { { "editor", slow_id }, { "held", true } } } } } }.dump());
 			});
 
-		holding->get_future().wait();
+		// Ahead of held's end, which waits on the call a failed REQUIRE would leave held.
+		const struct Releasing
+		{
+			std::promise<void>& release;
+
+			~Releasing() { release.set_value(); };
+		} releasing{ release };
+
+		REQUIRE(holding->get_future().wait_for(held_limit) == std::future_status::ready);
 
 		const auto start = std::chrono::steady_clock::now();
 
@@ -191,8 +199,6 @@ TEST_SUITE("McpRelay")
 
 		CHECK(std::chrono::steady_clock::now() - start < held_limit);
 		CHECK(held.get().empty());
-
-		release.set_value();
 	};
 
 	TEST_CASE("an editor whose process has ended is forgotten")
