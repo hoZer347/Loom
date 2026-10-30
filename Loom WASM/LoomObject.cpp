@@ -4,6 +4,8 @@
 
 #include <array>
 #include <atomic>
+#include <bit>
+#include <cstdint>
 #include <mutex>
 #include <shared_mutex>
 #include <string>
@@ -34,11 +36,14 @@ namespace Loom
 
 		constexpr size_t SERIAL_SHARDS = 64;
 
+		// Nearly every Serial is aligned to at least this, so these say little.
+		constexpr int SERIAL_ALIGNMENT_BITS = 2;
+
 		std::array<SerialShard, SERIAL_SHARDS> serial_shards{ };
 
 		SerialShard& ShardOf(const void* data)
 		{
-			return serial_shards[std::hash<const void*>{ }(data) % SERIAL_SHARDS];
+			return serial_shards[(std::bit_cast<uintptr_t>(data) >> SERIAL_ALIGNMENT_BITS) % SERIAL_SHARDS];
 		};
 	};
 
@@ -341,6 +346,7 @@ namespace Loom
 		if (owner == nullptr)
 			return;
 
+		owner->m_changes.fetch_add(1, std::memory_order_relaxed);
 		owner->Touch();
 
 		if (reference)

@@ -981,6 +981,29 @@ TEST_SUITE("SerializedField")
 		CHECK(sizeof(Loom::Serial<Loom::LoomObject*>) == sizeof(Loom::LoomObject*));
 	};
 
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an object counts every change to its fields, and looking at one is not a change")
+	{
+		struct Numbers final : Loom::LoomObject
+		{
+			Loom::Serial<std::vector<float>> first;
+			Loom::Serial<std::vector<float>> second;
+		};
+
+		Numbers numbers;
+		Pump();
+
+		const unsigned long long fresh = numbers.Changes();
+
+		CHECK(std::as_const(numbers.first)->empty());
+		CHECK(numbers.Changes() == fresh);
+
+		numbers.first = { 1.0f };
+		CHECK(numbers.Changes() == fresh + 1);
+
+		Field(numbers, 1).Changed();
+		CHECK(numbers.Changes() == fresh + 2);
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a number is counted while changes are watched, or written through its field")
 	{
 		struct Number final : Loom::LoomObject

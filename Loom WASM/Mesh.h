@@ -246,10 +246,8 @@ namespace Loom
 		// held still is not handed to the renderer again.
 		unsigned long long m_deformedVersion = 0;
 
-		// What the renderer was last handed, by the versions of the fields it
-		// was made from, whether the Skin bent them and into which pose, and
-		// while the GPU bends them, the influences and joints they were packed by.
-		struct Handed
+		// The versions of the fields the renderer's vertices are made from.
+		struct FieldVersions
 		{
 			unsigned long long vertices = 0;
 			unsigned long long textureCoordinates = 0;
@@ -257,6 +255,24 @@ namespace Loom
 			unsigned long long colors = 0;
 			unsigned long long uvLayers = 0;
 			unsigned long long drawType = 0;
+			unsigned long long primitive = 0;
+
+			bool operator==(const FieldVersions&) const = default;
+		};
+
+		// Each frame asks for them for every mesh, so they are only looked up
+		// again once something of this mesh has changed.
+		const FieldVersions& Versions();
+
+		FieldVersions m_versions;
+		std::optional<unsigned long long> m_versionsChanges;
+
+		// What the renderer was last handed, by the versions of the fields it
+		// was made from, whether the Skin bent them and into which pose, and
+		// while the GPU bends them, the influences and joints they were packed by.
+		struct Handed
+		{
+			FieldVersions fields;
 			bool deformed = false;
 			unsigned long long deformedVersion = 0;
 			bool skinned = false;

@@ -338,9 +338,31 @@ namespace Loom
 		return GpuSkin() ? skinned : program;
 	};
 
+	const Mesh::FieldVersions& Mesh::Versions()
+	{
+		const unsigned long long changes = Changes();
+
+		if (m_versionsChanges != changes)
+		{
+			m_versions = {
+				VersionOf(&m_vertices),
+				VersionOf(&m_textureCoordinates),
+				VersionOf(&m_normals),
+				VersionOf(&m_colors),
+				VersionOf(&m_uvLayers),
+				VersionOf(&m_draw_type),
+				VersionOf(&primitive_id) };
+
+			m_versionsChanges = changes;
+		};
+
+		return m_versions;
+	};
+
 	CullFace Mesh::FarSide()
 	{
-		const unsigned long long version = VersionOf(&m_vertices) + VersionOf(&primitive_id);
+		const FieldVersions& versions = Versions();
+		const unsigned long long version = versions.vertices + versions.primitive;
 
 		if (m_farSideVersion != version)
 		{
@@ -432,12 +454,7 @@ namespace Loom
 		const bool deformed = m_deformed.size() == vertices.size();
 
 		const Handed handed{
-			VersionOf(&m_vertices),
-			VersionOf(&m_textureCoordinates),
-			VersionOf(&m_normals),
-			VersionOf(&m_colors),
-			VersionOf(&m_uvLayers),
-			VersionOf(&m_draw_type),
+			Versions(),
 			deformed,
 			deformed ? m_deformedVersion : 0,
 			gpuSkin != nullptr,

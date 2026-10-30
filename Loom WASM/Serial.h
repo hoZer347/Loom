@@ -42,9 +42,8 @@ namespace Loom
 	#pragma region Registration
 
 	// Hands a field to the last LoomObject whose constructor started on this
-	// thread, and returns that object. A Serial member is built as part of its
-	// owner, before that constructor has finished, which is what makes that
-	// object the right one.
+	// thread. A Serial member is built as part of its owner, before that
+	// constructor has finished, which is what makes that object the right one.
 	LOOM_API void RegisterSerialField(
 		FieldType type,
 		void* data,
@@ -223,7 +222,7 @@ namespace Loom
 
 		// Read like the plain member it replaces, without counting as a change
 		// however it is held. Changing it in place takes *, -> or one of the
-		// operators above, each of which counts.
+		// operators above, each of which counts as LoomObject::VersionOf says.
 		operator const T& () const { return m_value; };
 
 		T& operator*() requires (!std::is_pointer_v<T>) { Changed(); return m_value; };

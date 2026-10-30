@@ -118,9 +118,13 @@ namespace Loom
 		// as a mesh's vertices on the GPU, need not be made again. It starts
 		// where no other field's has, so a field made where another one was
 		// never passes for it. Reach in through a const Serial to look without
-		// counting. A number or a vector is only counted while changes are
+		// counting. A number or a glm vector is only counted while changes are
 		// watched, or when written through its SerializedField.
 		unsigned long long VersionOf(const void* serial) const;
+
+		// The count of every counted change to this object's Serials. While it
+		// holds still, so does every VersionOf, without looking any of them up.
+		unsigned long long Changes() const { return m_changes.load(std::memory_order_relaxed); };
 
 		#pragma endregion
 
@@ -212,6 +216,7 @@ namespace Loom
 		static constexpr unsigned char touched_placed = 2;
 		std::atomic<unsigned char> m_touched = 0;
 		size_t m_journalAt = 0;
+		std::atomic<unsigned long long> m_changes = 0;
 
 		#pragma endregion
 
