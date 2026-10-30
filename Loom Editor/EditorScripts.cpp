@@ -128,6 +128,9 @@ namespace Loom
 		if (std::string error; !ProjectTemplate::CatchCrashes(project, &error))
 			std::cerr << error << std::endl;
 
+		if (std::string error; !ProjectTemplate::ReadOnly(project, &error))
+			std::cerr << error << std::endl;
+
 		m_scripts.SetProject(project, library);
 
 		if (logScriptsProject)

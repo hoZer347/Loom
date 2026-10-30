@@ -69,6 +69,11 @@ namespace Loom
 		// sets its own is left alone.
 		static bool CatchCrashes(const std::string& scripts, std::string* error = nullptr);
 
+		// Gives a scripts project a Directory.Build.props that marks it
+		// read-only, which is what keeps Visual Studio from warning about its
+		// wildcard. A folder with one of its own is left alone.
+		static bool ReadOnly(const std::string& scripts, std::string* error = nullptr);
+
 		// EnsureScripts for the project in folder, writing it a .loomproject
 		// named after name first if it has none. Returns the .vcxproj, or an
 		// empty string with the reason in error.

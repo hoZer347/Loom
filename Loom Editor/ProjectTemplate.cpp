@@ -246,6 +246,14 @@ namespace {NAME}Scripts
 </Project>
 )";
 
+		// Visual Studio warns about the wildcard in a project it could edit.
+		const char* const read_only = R"(<Project>
+  <PropertyGroup>
+    <ReadOnlyProject>true</ReadOnlyProject>
+  </PropertyGroup>
+</Project>
+)";
+
 		const char* const solution = R"(
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
@@ -401,6 +409,8 @@ SpinningTriangle is there as a worked example.
 			return '{' + text + '}';
 		};
 
+		constexpr std::string_view props_file = "Directory.Build.props";
+
 		bool WriteScripts(const std::filesystem::path& root, const std::string& name, std::string* error)
 		{
 			const std::string project = root.lexically_normal().string();
@@ -417,6 +427,7 @@ SpinningTriangle is there as a worked example.
 				Write(folder / "SpinningTriangle.hpp", fill(script), error) &&
 				Write(folder / (name + "Scripts.vcxproj"), fill(vcxproj), error) &&
 				Write(folder / (name + "Scripts.vcxproj.filters"), fill(filters), error) &&
+				ProjectTemplate::ReadOnly((folder / (name + "Scripts.vcxproj")).string(), error) &&
 				Write(folder / (name + "Scripts.sln"), fill(solution), error);
 		};
 
@@ -687,6 +698,15 @@ SpinningTriangle is there as a worked example.
 		text.insert(LineStart(text, defines), ProjectAssets::Replace(std::string(async_line), "\n", newline));
 
 		return Write(scripts, text, error);
+	};
+
+	bool ProjectTemplate::ReadOnly(const std::string& scripts, std::string* error)
+	{
+		const std::filesystem::path props = std::filesystem::path(scripts).parent_path() / props_file;
+
+		std::error_code code;
+
+		return std::filesystem::exists(props, code) || Write(props, read_only, error);
 	};
 
 	std::string ProjectTemplate::AddScripts(

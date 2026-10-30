@@ -154,6 +154,7 @@ TEST_SUITE("ProjectTemplate")
 		CHECK(vcxproj.find("<Import Project=\"" + Loom::ProjectTemplate::EngineRoot() + "\\Property Files\\Final.props\"") != std::string::npos);
 		CHECK(ReadAll(project.path / "Scripts" / "MyGameScripts.sln").find("Final|x64 = Final|x64") != std::string::npos);
 		CHECK(ReadAll(project.path / "Scripts" / "SpinningTriangle.hpp").find("#include \"Loom.h\"") != std::string::npos);
+		CHECK(ReadAll(project.path / "Scripts" / "Directory.Build.props").find("<ReadOnlyProject>true</ReadOnlyProject>") != std::string::npos);
 
 		const std::string file = ReadAll(project.path / "MyGame.loomproject");
 
@@ -301,6 +302,25 @@ TEST_SUITE("ProjectTemplate")
 		REQUIRE(Loom::ProjectTemplate::CatchCrashes(scripts.string()));
 
 		CHECK(ReadBytes(scripts) == own);
+	};
+
+	TEST_CASE("a scripts project is marked read-only, and a props file of its own is kept")
+	{
+		const Folder project("loom template read only");
+		const std::filesystem::path scripts = project.path / "Game.vcxproj";
+		const std::filesystem::path props = project.path / "Directory.Build.props";
+
+		REQUIRE(Loom::ProjectTemplate::ReadOnly(scripts.string()));
+
+		CHECK(Count(ReadBytes(props), "<ReadOnlyProject>true</ReadOnlyProject>") == 1);
+
+		const std::string own = "<Project />";
+
+		std::ofstream(props, std::ios::binary) << own;
+
+		REQUIRE(Loom::ProjectTemplate::ReadOnly(scripts.string()));
+
+		CHECK(ReadBytes(props) == own);
 	};
 
 	TEST_CASE("a scripts project changed past recognising is not precompiled")
