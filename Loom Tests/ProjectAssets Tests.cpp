@@ -560,6 +560,7 @@ TEST_SUITE("ProjectAssets")
 		std::filesystem::create_directories(root / "Build");
 		std::filesystem::create_directories(root / "Scenes");
 		std::filesystem::create_directories(root / "Scripts" / ".vs");
+		std::filesystem::create_directories(root / "Scripts" / "Lib");
 
 		const auto write = [&root](const char* file, const char* text)
 		{
@@ -576,6 +577,12 @@ TEST_SUITE("ProjectAssets")
 		write("Scripts/.vs/Index.hpp", "Spinner\n");
 		write("Scripts/Notes.txt", "Spinner\n");
 		write("Build/Stale.hpp", "Spinner\n");
+		write("Scripts/Lib/Helper.hpp", "struct Helper { };\n");
+		write("Scripts/Includes.hpp", "#include \"Lib/Helper.hpp\"\n");
+		write("Scripts/NotHelper.hpp", "// MyHelper.hpp and Helper.hpp, read in passing\n");
+		write("Game.loombuild", "scene=Scenes/Start.loomscene\n");
+		write("Scenes/Start.loomscene", "\n");
+		write("Assets/Named.png", "Spinner");
 
 		const std::string skip = (root / "Build").string();
 		const auto users = [&root, &skip](std::vector<std::string> paths, std::vector<std::string> names)
@@ -594,6 +601,9 @@ TEST_SUITE("ProjectAssets")
 		CHECK(users({ "Scripts/Spinner.hpp" }, { "Spinner" }) == Users{ "Scenes/Main.loomscene", "Scripts/Uses.hpp" });
 		CHECK(users({ }, { "Spinner" }) == Users{ "Scenes/Main.loomscene", "Scripts/Spinner.hpp", "Scripts/Uses.hpp" });
 		CHECK(users({ }, { "Nothing" }).empty());
+		CHECK(users({ "Scripts/Lib/Helper.hpp" }, { }) == Users{ "Scripts/Includes.hpp" });
+		CHECK(users({ "Scripts/Lib" }, { }) == Users{ "Scripts/Includes.hpp" });
+		CHECK(users({ "Scenes/Start.loomscene" }, { }) == Users{ "Game.loombuild" });
 
 		std::filesystem::remove_all(root);
 	};

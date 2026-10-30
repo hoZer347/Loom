@@ -1,6 +1,7 @@
 #include "ProjectAssets.h"
 
 #include "Audio.h"
+#include "BuildSettings.h"
 #include "ComponentRegistry.h"
 #include "Prefab.h"
 #include "ProjectTemplate.h"
@@ -775,6 +776,26 @@ namespace {NAMESPACE}
 
 			return false;
 		};
+
+		bool Includes(std::string_view text, std::string_view file)
+		{
+			constexpr std::string_view opening = "\"</\\";
+			constexpr std::string_view closing = "\">";
+
+			for (size_t at = text.find(file); at != std::string_view::npos; at = text.find(file, at + 1))
+			{
+				const size_t end = at + file.size();
+
+				if (at > 0 && end < text.size() &&
+					opening.find(text[at - 1]) != std::string_view::npos &&
+					closing.find(text[end]) != std::string_view::npos)
+					return true;
+			};
+
+			return false;
+		};
+
+		constexpr std::string_view buildExtensions[] = { BuildSettings::extension };
 	};
 
 	std::vector<std::string> ProjectAssets::UsersOf(
@@ -787,10 +808,28 @@ namespace {NAMESPACE}
 		const std::string skipped = skip.empty() ? skip : std::filesystem::path(skip).lexically_normal().string();
 
 		std::vector<std::string> tokens = names;
+		std::vector<std::string> headers{ };
 		std::error_code code;
 
+		const auto add_header = [&headers](const std::filesystem::path& path)
+		{
+			if (const std::string name = path.filename().string(); IsScriptFile(name))
+				headers.push_back(name);
+		};
+
 		for (const std::string& path : paths)
-			tokens.push_back(RelativeTo(path, folder) + (std::filesystem::is_directory(path, code) ? "/" : ""));
+		{
+			const bool directory = std::filesystem::is_directory(path, code);
+
+			tokens.push_back(RelativeTo(path, folder) + (directory ? "/" : ""));
+			add_header(path);
+
+			if (directory)
+				for (auto entry = std::filesystem::recursive_directory_iterator(path, code);
+					entry != std::filesystem::recursive_directory_iterator();
+					entry.increment(code))
+					add_header(entry->path());
+		};
 
 		const auto gone = [&paths](const std::string& path)
 		{
@@ -814,12 +853,15 @@ namespace {NAMESPACE}
 				continue;
 			};
 
-			if (gone(path) || !(IsGameFile(name) || IsScriptFile(name)))
+			const bool binary = IsTextureFile(name) || IsSoundFile(name) || IsFontFile(name);
+
+			if (gone(path) || !((IsGameFile(name) && !binary) || IsScriptFile(name) || HasExtension(name, buildExtensions)))
 				continue;
 
 			const std::string text = ReadText(path);
 
-			if (std::ranges::any_of(tokens, [&text](const std::string& token) { return Mentions(text, token); }))
+			if (std::ranges::any_of(tokens, [&text](const std::string& token) { return Mentions(text, token); }) ||
+				std::ranges::any_of(headers, [&text](const std::string& header) { return Includes(text, header); }))
 				users.push_back(RelativeTo(path, folder));
 		};
 

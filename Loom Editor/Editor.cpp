@@ -1129,6 +1129,7 @@ namespace Loom
 		m_linkedInstances.clear();
 
 		m_assetTrash.Empty();
+		m_deleteQuestion.reset();
 
 		m_projectPath = resolved;
 		EditorLog::Get().SetProject(m_projectPath);
