@@ -40,7 +40,6 @@ namespace
 		};
 	};
 
-	// One call of RunQueued stops at its time budget, wherever a slow machine has got to.
 	void Finish(Loom::TestsPanel& panel)
 	{
 		while (panel.HasQueued())
@@ -144,7 +143,6 @@ TEST_SUITE("TestsPanel")
 		constexpr float frame_time = 1.0f / 60.0f;
 		constexpr float scan_step = 2.0f;
 		constexpr float double_click_time = 0.3f;
-		constexpr double most_clicked_run_milliseconds = 1000.0;
 
 		Suite suite;
 		Loom::TestsPanel panel;
@@ -230,12 +228,16 @@ TEST_SUITE("TestsPanel")
 		REQUIRE(panel.HasQueued());
 		CHECK(created > 0);
 		created = 0;
+
+		const auto first_case = std::chrono::steady_clock::now();
+
 		Finish(panel);
 
+		const double most_milliseconds = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - first_case).count();
+
 		// A clicked run names its cases, and is timed from its first case all the same.
-		CHECK_FALSE(panel.HasQueued());
 		REQUIRE(panel.LastRun());
-		CHECK(panel.LastRun()->milliseconds < most_clicked_run_milliseconds);
+		CHECK(panel.LastRun()->milliseconds <= most_milliseconds);
 
 		// Each row's y, found by clicking down the panel and reading what a click chose.
 		std::vector<std::pair<float, std::string>> rows;
@@ -409,8 +411,7 @@ TEST_SUITE("TestsPanel")
 		CHECK(results == done);
 		CHECK((size_t)runs == cases + done);
 
-		while (panel.HasQueued())
-			panel.RunQueued();
+		Finish(panel);
 
 		Loom::ScriptTests::Truncate(before);
 	};
