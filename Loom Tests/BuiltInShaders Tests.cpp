@@ -109,8 +109,9 @@ namespace
 		return Drawn(fixture, path, lit, [](Loom::Material&) { });
 	};
 
-	// A green texture written beside the screenshots, for as long as a run.
-	std::string GreenTexture()
+	// A green texture written beside the screenshots. Textures too are kept by
+	// path for the process, so each backend has its own.
+	std::string GreenTexture(const std::string& backend)
 	{
 		constexpr int SIDE = 2;
 
@@ -119,12 +120,12 @@ namespace
 		for (int pixel = 0; pixel < SIDE * SIDE; pixel++)
 			image.rgb.insert(image.rgb.end(), { 0, 255, 0 });
 
-		return image.Save("BuiltInShaders - green").string();
+		return image.Save("BuiltInShaders - green on " + backend).string();
 	};
 
 	// Compiled shaders are kept by path for the process, past the Engine closing,
 	// so each backend names them from a folder spelled its own way.
-	void CheckDraws(RenderFixture& fixture, const std::string& folder)
+	void CheckDraws(RenderFixture& fixture, const std::string& folder, const std::string& backend)
 	{
 		CHECK(Drawn(fixture, folder + "Unlit.shader") == glm::u8vec3(255, 0, 0));
 
@@ -142,7 +143,7 @@ namespace
 		CHECK(Drawn(fixture, folder + "Lit.shader", true,
 			[&folder](Loom::Material& material) { material.ChangeShader(folder + "Unlit.shader"); }) == glm::u8vec3(255, 0, 0));
 
-		const std::string green = GreenTexture();
+		const std::string green = GreenTexture(backend);
 		const auto textured = [&green](Loom::Material& material)
 			{
 				material.color = glm::vec3(1.0f);
@@ -166,12 +167,12 @@ TEST_SUITE("BuiltInShaders")
 
 	TEST_CASE_FIXTURE(RenderFixture, "every built-in shader draws from the engine with no file on disk, on OpenGL")
 	{
-		CheckDraws(*this, "Loom/");
+		CheckDraws(*this, "Loom/", "OpenGL");
 	};
 
 	TEST_CASE_FIXTURE(VulkanRenderFixture, "every built-in shader draws from the engine with no file on disk, on Vulkan")
 	{
-		CheckDraws(*this, "./Loom/");
+		CheckDraws(*this, "./Loom/", "Vulkan");
 	};
 
 	#pragma endregion
