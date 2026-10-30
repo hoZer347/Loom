@@ -484,7 +484,7 @@ void main()
 
 		GameObject* light = scene->AddChild(model_light);
 		light->Attach<Light>();
-		light->transform.rotation = Light::RotationAlong(Light::DEFAULT_DIRECTION);
+		light->transform.rotation = Light::RotationAlong(Light::DefaultDirection);
 
 		// Children join through the queue, so the meshes are found once it has run.
 		Engine::DoTasks();

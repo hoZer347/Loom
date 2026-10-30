@@ -151,7 +151,10 @@ namespace Loom
 			if (field.type == FieldType::Reference && Guid::TryParse(value, guid))
 				pending.emplace_back(&field, guid);
 			else if (field.Read(value))
+			{
+				object.OnFieldRead(field);
 				object.OnFieldChanged(field);
+			};
 		};
 
 		// A component has no name, so its type identifies it in messages.
@@ -363,7 +366,10 @@ namespace Loom
 					value = Identity(guid).ToString();
 
 				if (field->Read(value))
+				{
+					parent.object->OnFieldRead(*field);
 					return true;
+				};
 
 				// Unresolved is not bad, since the target may be further down.
 				if (names_guid)

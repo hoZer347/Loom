@@ -353,7 +353,7 @@ namespace
 		constexpr float HALF_TURN = glm::pi<float>();
 
 		// The default light, whose frames are saved, then two lower suns past the pull's slope limit.
-		const glm::vec3 LIGHTS[] = { Loom::Light::DEFAULT_DIRECTION, { -0.8f, -1.0f, -0.45f }, { -1.0f, -0.5f, -0.3f } };
+		const glm::vec3 LIGHTS[] = { Loom::Light::DefaultDirection, { -0.8f, -1.0f, -0.45f }, { -1.0f, -0.5f, -0.3f } };
 
 		for (const glm::vec3& direction : LIGHTS)
 			for (bool normals : { true, false })

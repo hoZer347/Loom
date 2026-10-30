@@ -41,7 +41,7 @@ namespace Loom
 	{
 		GameObject* gameObject = parent.AddChild(LightLabel);
 		gameObject->Attach<Light>();
-		gameObject->transform.rotation = Light::RotationAlong(Light::DEFAULT_DIRECTION);
+		gameObject->transform.rotation = Light::RotationAlong(Light::DefaultDirection);
 
 		return gameObject;
 	};

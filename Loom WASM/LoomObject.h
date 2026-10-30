@@ -84,6 +84,10 @@ namespace Loom
 		// state has to follow it.
 		virtual void OnFieldChanged(const SerializedField& field) { };
 
+		// After a file's text sets one of those fields, as soon as its line is
+		// read, for an object that files older than it wrote differently.
+		virtual void OnFieldRead(const SerializedField& field) { };
+
 		// A Button this object declared: its name, as a Serial's, what pressing
 		// it runs, and how many fields were declared before it.
 		struct FieldButton

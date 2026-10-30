@@ -10,11 +10,12 @@
 
 #include "glm/glm.hpp"
 
-#include <algorithm>
 #include <cmath>
-#include <iterator>
+#include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
+#include <string_view>
 
 using LoomTests::Pump;
 using LoomTests::RecordingRenderer;
@@ -29,6 +30,28 @@ namespace
 		void OnRender() override { seen = Loom::Light::current; };
 
 		Loom::Light* seen = nullptr;
+	};
+
+	// A scene with a Light as files wrote it when it had a direction at place
+	// 0, straight down, and an ambient of 0.5.
+	std::string OlderFile()
+	{
+		constexpr std::string_view DIRECTION_LINE = "\t\t\t\t0 = (0, -1, 0)\n";
+
+		Loom::Scene scene("older file");
+		Pump();
+
+		Loom::Light* written = scene.AddChild("Sun")->Attach<Loom::Light>();
+		written->ambient = 0.5f;
+		Pump();
+
+		std::string text = Loom::SceneSerializer::Serialize(scene);
+		const size_t light_line = text.find("Component Light");
+		REQUIRE(light_line != std::string::npos);
+
+		text.insert(text.find('\n', light_line) + 1, DIRECTION_LINE);
+
+		return text;
 	};
 };
 
@@ -196,7 +219,7 @@ TEST_SUITE("Light")
 
 		const glm::vec3 DIRECTIONS[] =
 		{
-			Loom::Light::DEFAULT_DIRECTION,
+			Loom::Light::DefaultDirection,
 			{ 0.0f, -1.0f, 0.0f },
 			{ 0.0f, 1.0f, 0.0f },
 			{ 1.0f, 0.0f, 0.0f },
@@ -214,21 +237,7 @@ TEST_SUITE("Light")
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a direction saved by an older file becomes the rotation, and the rest keep their places")
 	{
-		Loom::Scene scene("older file");
-		Pump();
-
-		Loom::Light* written = scene.AddChild("Sun")->Attach<Loom::Light>();
-		written->ambient = 0.5f;
-		Pump();
-
-		std::string text = Loom::SceneSerializer::Serialize(scene);
-		const size_t light_line = text.find("Component Light");
-		REQUIRE(light_line != std::string::npos);
-
-		const std::string::iterator line_end = std::find(text.begin() + light_line, text.end(), '\n');
-		text.insert(line_end + 1, std::begin("\t\t\t\t0 = (0, -1, 0)\n"), std::end("\t\t\t\t0 = (0, -1, 0)\n") - 1);
-
-		const std::unique_ptr<Loom::Scene> loaded(Loom::SceneSerializer::Deserialize(text));
+		const std::unique_ptr<Loom::Scene> loaded(Loom::SceneSerializer::Deserialize(OlderFile()));
 		Pump();
 
 		REQUIRE(loaded);
@@ -241,6 +250,28 @@ TEST_SUITE("Light")
 		const std::string saved = Loom::SceneSerializer::Serialize(*loaded);
 		const size_t saved_line = saved.find("Component Light");
 		CHECK(saved.find("\t0 = (0, -1, 0)", saved_line) == std::string::npos);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a direction read a line at a time with frames between still becomes the rotation")
+	{
+		const std::filesystem::path path = std::filesystem::temp_directory_path() / "Loom older light.loomscene";
+		std::ofstream(path, std::ios::binary) << OlderFile();
+
+		const std::unique_ptr<Loom::SceneSerializer::Loading> loading = Loom::SceneSerializer::BeginLoadFromFile(path.string());
+		REQUIRE(loading);
+
+		while (loading->Step(0.0))
+			Pump();
+
+		const std::unique_ptr<Loom::Scene> loaded(loading->Finish());
+		Pump();
+		std::filesystem::remove(path);
+
+		REQUIRE(loaded);
+		const Loom::Light* light = loaded->GetRoot().FindComponent<Loom::Light>();
+		REQUIRE(light != nullptr);
+
+		CHECK(glm::length(light->Direction() - glm::vec3(0.0f, -1.0f, 0.0f)) < EPSILON);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a transform scaled to nothing still gives a usable shadow map")

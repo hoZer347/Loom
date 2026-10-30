@@ -93,7 +93,7 @@ namespace Loom
 		#pragma region Light
 
 		// A sun's slant, for a new Light that nothing has aimed yet.
-		static constexpr glm::vec3 DEFAULT_DIRECTION = glm::vec3(-0.4f, -1.0f, -0.3f);
+		static constexpr glm::vec3 DefaultDirection = glm::vec3(-0.4f, -1.0f, -0.3f);
 
 		// The rotation that shines a Light along direction.
 		static glm::vec3 RotationAlong(const glm::vec3& direction);
@@ -101,13 +101,13 @@ namespace Loom
 		// The way the light shines, in world space.
 		glm::vec3 Direction() const;
 
-		void OnAttach() override;
+		void OnFieldRead(const SerializedField& field) override;
 		bool IsSaved(const SerializedField& field) const override;
 		bool IsShown(const SerializedField& field) const override;
 
 	private:
 		// Fields are saved by place: this keeps place 0, where older files have
-		// a direction, which OnAttach turns into the Transform's rotation.
+		// a direction, which OnFieldRead turns into the Transform's rotation.
 		Serial<glm::vec3> m_savedDirection;
 
 	public:

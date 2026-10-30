@@ -62,6 +62,7 @@ TEST_SUITE("RenderingObjects")
 		CHECK(camera->GetParent() == &scene.GetRoot());
 		CHECK(light->GetComponent<Loom::Light>() != nullptr);
 		CHECK(camera->GetComponent<Loom::Camera>() != nullptr);
+		CHECK(glm::length(light->GetComponent<Loom::Light>()->Direction() - glm::normalize(Loom::Light::DefaultDirection)) < CLOSE);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a starter scene has a light, and a camera looking down at 45 degrees at the middle of a plane")

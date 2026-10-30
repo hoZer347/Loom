@@ -223,13 +223,10 @@ vec3 LoomLight(vec3 normal)
 		return Normalised(m_gameObject ? -glm::vec3(m_gameObject->WorldMatrix()[2]) : glm::vec3());
 	};
 
-	void Light::OnAttach()
+	void Light::OnFieldRead(const SerializedField& field)
 	{
-		if (*m_savedDirection == glm::vec3())
-			return;
-
-		m_gameObject->transform.rotation = RotationAlong(*m_savedDirection);
-		m_savedDirection = glm::vec3();
+		if (field.data == &*m_savedDirection)
+			m_gameObject->transform.rotation = RotationAlong(*m_savedDirection);
 	};
 
 	bool Light::IsSaved(const SerializedField& field) const

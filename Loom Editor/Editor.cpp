@@ -1622,7 +1622,7 @@ namespace Loom
 
 		GameObject* light = m_prefabScene->AddChild(prefab_light);
 		light->Attach<Light>();
-		light->transform.rotation = Light::RotationAlong(Light::DEFAULT_DIRECTION);
+		light->transform.rotation = Light::RotationAlong(Light::DefaultDirection);
 
 		m_prefabRoot = root->GetGuid();
 		m_prefabPath = opening;
