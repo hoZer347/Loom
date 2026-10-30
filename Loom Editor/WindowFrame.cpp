@@ -108,7 +108,7 @@ namespace Loom
 		// One frame to a message, so the OS's loop always has the window back between frames, and its timer resumes them after whatever else waits.
 		void RedrawHeld(HWND window, const WindowFrame& frame)
 		{
-			if (RedrawOnce(frame) && window == s_held && HIWORD(GetQueueStatus(QS_INPUT | QS_PAINT | QS_TIMER)) == 0)
+			if (RedrawOnce(frame) && window == s_held && HIWORD(GetQueueStatus(QS_ALLINPUT)) == 0)
 				PostMessageW(window, REDRAW_AGAIN, 0, 0);
 		};
 

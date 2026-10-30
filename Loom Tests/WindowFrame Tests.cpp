@@ -203,6 +203,27 @@ TEST_SUITE("WindowFrame")
 		CHECK(s_redraws >= timers * redraws_to_a_timer);
 	};
 
+	void CountAndPost()
+	{
+		s_redraws++;
+		PostMessageW(s_window, WM_NULL, 0, 0);
+	};
+
+	TEST_CASE_FIXTURE(HiddenWindow, "a window held with a message always waiting leaves its frames to the timer")
+	{
+		s_window = hwnd;
+
+		Loom::WindowFrame frame;
+		frame.Install(window, CountAndPost);
+
+		SendMessageW(hwnd, WM_ENTERSIZEMOVE, 0, 0);
+		const int timers = Pump(hwnd, held_for);
+		SendMessageW(hwnd, WM_EXITSIZEMOVE, 0, 0);
+
+		REQUIRE(timers > 0);
+		CHECK(s_redraws <= timers + 1);
+	};
+
 	std::unique_ptr<Loom::WindowFrame> s_doomed;
 
 	void CountThenDestroy()
