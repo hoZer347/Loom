@@ -149,7 +149,7 @@ namespace Loom
 		/// Called every frame the state is current.
 		virtual void OnUpdate() { };
 
-		/// Called from the machine's physics step.
+		/// Called once a frame from the machine's Step, ahead of OnUpdate.
 		virtual void OnPhysics() { };
 
 		/// Called ahead of each of the engine's physics steps the state is current for,

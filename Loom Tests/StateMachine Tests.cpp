@@ -1,9 +1,12 @@
 #include "doctest.h"
 
+#include "Render Support.h"
 #include "Test Support.h"
 
 #include "ComponentRegistry.h"
+#include "Engine.h"
 #include "GameObject.h"
+#include "Physics.h"
 #include "Scene.h"
 #include "SceneSerializer.h"
 #include "SerializedField.h"
@@ -13,8 +16,10 @@
 #include "Utilities/StateMachine.h"
 #include "Utilities/StaticStateMachine.h"
 
+#include <chrono>
 #include <memory>
 #include <string>
+#include <thread>
 
 using LoomTests::Pump;
 
@@ -309,7 +314,7 @@ TEST_SUITE("StateMachine")
 
 	#pragma region Fixed updates
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the current state gets one fixed update for each physics step")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the current state gets one fixed update for each call")
 	{
 		constexpr int physics_steps = 3;
 
@@ -395,6 +400,54 @@ TEST_SUITE("StateMachine")
 
 		Loom::StaticStateMachine::Destroy();
 	};
+
+#ifndef __EMSCRIPTEN__
+	TEST_CASE_FIXTURE(LoomTests::RenderFixture, "the engine gives a state a fixed update for each physics step, and none while the scenes are held")
+	{
+		constexpr float rate = 1000.0f;
+		constexpr int frames = 8;
+		constexpr std::chrono::milliseconds frame_time{ 2 };
+
+		const float was = Loom::Physics::FixedDeltaTime();
+		Loom::Physics::SetFixedDeltaTime(1.0f / rate);
+
+		Machine patrol;
+		patrol.machine->m_start = Loom::StateReference::Named("StateTestFixed");
+
+		LoomTests::Probe<>* probe = patrol.object->Attach<LoomTests::Probe<>>();
+		Pump();
+
+		// The machine starts at the end of this one, after its steps.
+		Frame();
+
+		const int steps = StateTestFixed::steps;
+		const size_t probed = probe->Count("fixed");
+
+		for (int frame = 0; frame < frames; frame++)
+		{
+			std::this_thread::sleep_for(frame_time);
+			Frame();
+		};
+
+		const int taken = (int)(probe->Count("fixed") - probed);
+
+		CHECK(taken > 0);
+		CHECK(StateTestFixed::steps - steps == taken);
+
+		const int before_hold = StateTestFixed::steps;
+
+		Loom::Engine::updateScenes = false;
+
+		std::this_thread::sleep_for(frame_time);
+		Frame();
+
+		Loom::Engine::updateScenes = true;
+
+		CHECK(StateTestFixed::steps == before_hold);
+
+		Loom::Physics::SetFixedDeltaTime(was);
+	};
+#endif
 
 	#pragma endregion
 };
