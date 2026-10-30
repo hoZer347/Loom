@@ -36,6 +36,10 @@ namespace Loom
 		constexpr virtual void OnRender()	{ };
 		constexpr virtual void OnPhysics()	{ };
 
+		// Once for each of the scene's physics steps, ahead of it, however
+		// many of them the frame's time covers.
+		constexpr virtual void OnFixedUpdate()	{ };
+
 		virtual ~ComponentBase() { };
 
 		#pragma endregion

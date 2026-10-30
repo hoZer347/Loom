@@ -11,6 +11,8 @@
 #include "imgui_internal.h"
 
 #include <cstdio>
+#include <cstdlib>
+#include <format>
 #include <fstream>
 
 
@@ -21,6 +23,9 @@ namespace Loom
 		const char* const configuration_key = "configuration";
 		const char* const scene_key = "scene";
 		const char* const folder_key = "folder";
+		const char* const fixed_rate_key = "fixed_rate";
+
+		constexpr float fixed_rate_speed = 1.0f;
 
 		// Beside the project folder, as "<game> Build".
 		const char* const folder_suffix = " Build";
@@ -50,6 +55,9 @@ namespace Loom
 
 			if (const std::string value = ProjectTemplate::ValueOf(line, folder_key); !value.empty())
 				folder = value;
+
+			if (const float value = std::strtof(ProjectTemplate::ValueOf(line, fixed_rate_key).c_str(), nullptr); IsFixedRate(value))
+				fixedRate = value;
 		};
 
 		m_history.Reset(Current());
@@ -66,6 +74,8 @@ namespace Loom
 
 		if (!folder.empty())
 			out << folder_key << '=' << folder << '\n';
+
+		out << fixed_rate_key << '=' << fixedRate << '\n';
 
 		if (!out)
 			return false;
@@ -96,6 +106,7 @@ namespace Loom
 				configuration = settings.configuration;
 				scene = settings.scene;
 				folder = settings.folder;
+				fixedRate = settings.fixedRate;
 			};
 
 		return ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_S);
@@ -134,7 +145,8 @@ namespace Loom
 		return "-Project " + ScriptRun::Quote(project) +
 			" -Scene " + ScriptRun::Quote(start.lexically_normal().string()) +
 			" -Configuration " + configuration +
-			" -Output " + ScriptRun::Quote(Output(project, name).string());
+			" -Output " + ScriptRun::Quote(Output(project, name).string()) +
+			" -FixedRate " + std::format("{}", fixedRate);
 	};
 
 	#pragma endregion
@@ -223,6 +235,12 @@ namespace Loom
 
 		ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
 		ImGui::TextUnformatted("Folder");
+
+		ImGui::DragFloat("Fixed Rate", &fixedRate, fixed_rate_speed, min_fixed_rate, max_fixed_rate, "%g", ImGuiSliderFlags_AlwaysClamp);
+		ImGui::SetItemTooltip("Fixed updates a second");
+
+		if (ImGui::IsItemDeactivatedAfterEdit())
+			Keep();
 
 		ImGui::Separator();
 

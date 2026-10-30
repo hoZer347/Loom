@@ -98,6 +98,7 @@ namespace LoomTests
 		void OnUpdate()  override { calls.emplace_back("update");  };
 		void OnRender()  override { calls.emplace_back("render");  };
 		void OnPhysics() override { calls.emplace_back("physics"); };
+		void OnFixedUpdate() override { calls.emplace_back("fixed"); };
 
 		size_t Count(const std::string& call) const
 		{

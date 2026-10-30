@@ -119,6 +119,7 @@ TEST_SUITE("BuildSettings")
 		saved.configuration = "Final";
 		saved.scene = "Scenes/Start Here.loomscene";
 		saved.folder = "C:/Games/My Game Build";
+		saved.fixedRate = 120.0f;
 
 		REQUIRE(saved.Save(path));
 
@@ -128,8 +129,31 @@ TEST_SUITE("BuildSettings")
 		CHECK(loaded.configuration == saved.configuration);
 		CHECK(loaded.scene == saved.scene);
 		CHECK(loaded.folder == saved.folder);
+		CHECK(loaded.fixedRate == saved.fixedRate);
 
 		std::filesystem::remove(path);
+	};
+
+	TEST_CASE("a fixed rate outside the limits keeps the default")
+	{
+		const std::string path = (std::filesystem::temp_directory_path() / "Loom BuildSettings Fixed Rate.loombuild").string();
+
+		for (const char* rate : { "0", "-30", "5000", "fast", "nan" })
+		{
+			std::ofstream(path, std::ios::binary) << "fixed_rate=" << rate << '\n';
+
+			Loom::BuildSettings loaded;
+			loaded.Load(path);
+
+			CHECK(loaded.fixedRate == Loom::BuildSettings::default_fixed_rate);
+		};
+
+		std::filesystem::remove(path);
+	};
+
+	TEST_CASE("a project's first fixed rate is what physics has always stepped at")
+	{
+		CHECK(Loom::BuildSettings{ }.FixedDeltaTime() == 1.0f / 60.0f);
 	};
 
 	TEST_CASE("a file with nothing in it, or a configuration there is none of, keeps the defaults")
@@ -182,7 +206,7 @@ TEST_SUITE("BuildSettings")
 
 		CHECK(
 			settings.Arguments("C:\\My Game", "Space") ==
-			"-Project \"C:\\My Game\" -Scene \"C:\\My Game\\Scenes\\Start.loomscene\" -Configuration Debug -Output \"C:\\Space Build\"");
+			"-Project \"C:\\My Game\" -Scene \"C:\\My Game\\Scenes\\Start.loomscene\" -Configuration Debug -Output \"C:\\Space Build\" -FixedRate 60");
 	};
 
 	TEST_CASE("the game is the program named after it in the folder it is built in")

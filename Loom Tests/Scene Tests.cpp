@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 
 using LoomTests::Pump;
@@ -277,6 +278,62 @@ TEST_SUITE("Scene")
 		scene.Physics();
 
 		CHECK(probe->Count("physics") == 1);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "each physics step runs OnFixedUpdate once, ahead of OnPhysics")
+	{
+		Loom::Scene scene("Scene fixed");
+		Pump();
+
+		Probe<>* probe = scene.Attach<Probe<>>();
+		Pump();
+
+		scene.Physics();
+		scene.Physics();
+
+		CHECK(probe->Count("fixed") == 2);
+
+		const auto fixed = std::find(probe->calls.begin(), probe->calls.end(), "fixed");
+		const auto physics = std::find(probe->calls.begin(), probe->calls.end(), "physics");
+
+		CHECK(fixed < physics);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a disabled object gets no OnFixedUpdate")
+	{
+		Loom::Scene scene("Scene fixed disabled");
+		Pump();
+
+		Loom::GameObject* parent = scene.AddChild("Parent");
+		Loom::GameObject* child = parent->AddChild("Child");
+		Pump();
+
+		Probe<>* probe = child->Attach<Probe<>>();
+		Pump();
+
+		parent->SetDisabled(true);
+		scene.Physics();
+
+		CHECK(probe->Count("fixed") == 0);
+	};
+
+	struct FixedThrower final : Loom::Component<FixedThrower>
+	{
+		void OnFixedUpdate() override { throw std::runtime_error("fixed"); };
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a throw in OnFixedUpdate leaves the rest theirs")
+	{
+		Loom::Scene scene("Scene fixed throw");
+		Pump();
+
+		scene.AddChild("Thrower")->Attach<FixedThrower>();
+		Probe<>* probe = scene.AddChild("Probe")->Attach<Probe<>>();
+		Pump();
+
+		scene.Physics();
+
+		CHECK(probe->Count("fixed") == 1);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "ticking an empty scene does nothing")

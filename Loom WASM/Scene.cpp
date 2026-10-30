@@ -56,6 +56,9 @@ namespace Loom
 		// Each lane's updates, 0 the caller, kept so gathering does not allocate.
 		std::vector<std::vector<ComponentBase*>> s_updates(1);
 
+		// Each fixed step's, kept the same way.
+		std::vector<ComponentBase*> s_fixedUpdates{ };
+
 		// Lane n at index n - 1, made on first use.
 		std::vector<std::unique_ptr<Lane>> s_lanes{ };
 
@@ -63,29 +66,34 @@ namespace Loom
 		std::mutex s_threwMutex;
 		std::unordered_set<uint64_t> s_threw;
 
-		void ReportThrow(const ComponentBase& component, const std::string& what)
+		void ReportThrow(const ComponentBase& component, const char* callback, const std::string& what)
 		{
 			std::lock_guard lock(s_threwMutex);
 
 			if (s_threw.insert(component.m_ID).second)
-				std::cerr << ComponentRegistry::NameOf(component) << " OnUpdate threw" << what << std::endl;
+				std::cerr << ComponentRegistry::NameOf(component) << ' ' << callback << " threw" << what << std::endl;
+		};
+
+		void Run(const std::vector<ComponentBase*>& updates, void (ComponentBase::*update)(), const char* callback)
+		{
+			// A throw stays with its script; the rest still update.
+			for (ComponentBase* updateable : updates)
+				try { (updateable->*update)(); }
+				catch (const std::exception& e)
+				{
+					ReportThrow(*updateable, callback, std::string(": ") + e.what());
+				}
+				catch (...)
+				{
+					ReportThrow(*updateable, callback, " an unknown exception");
+				};
 		};
 
 		void RunUpdates(const std::vector<ComponentBase*>& updates)
 		{
 			LOOM_STAGE("Scene::Update");
 
-			// A throw stays with its script; the rest still update.
-			for (ComponentBase* updateable : updates)
-				try { updateable->OnUpdate(); }
-				catch (const std::exception& e)
-				{
-					ReportThrow(*updateable, std::string(": ") + e.what());
-				}
-				catch (...)
-				{
-					ReportThrow(*updateable, " an unknown exception");
-				};
+			Run(updates, &ComponentBase::OnUpdate, "OnUpdate");
 		};
 
 		#pragma endregion
@@ -286,6 +294,15 @@ namespace Loom
 	{
 		// The walk changes the tree, which a step still solving reads.
 		simulation.End();
+
+		{
+			LOOM_STAGE("Scene::FixedUpdate");
+
+			s_fixedUpdates.clear();
+			root.GatherFixedUpdates(s_fixedUpdates);
+
+			Run(s_fixedUpdates, &ComponentBase::OnFixedUpdate, "OnFixedUpdate");
+		};
 
 		ColliderTree::current = &colliders;
 		Simulation::current = &simulation;

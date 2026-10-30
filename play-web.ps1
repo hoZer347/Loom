@@ -264,13 +264,22 @@ $preloaded = @(Get-ChildItem -LiteralPath $served -Recurse -File |
 $bindings = if ($projectFile) { [IO.Path]::ChangeExtension($projectFile.FullName, '.loominput') } else { $null }
 $bindingsUrl = if ($bindings -and (Test-Path -LiteralPath (Join-Path $served (Get-UrlPath $bindings)))) { Get-UrlPath $bindings } else { '' }
 
+# The project's fixed rate, from its build settings, or the default.
+$buildSettings = if ($projectFile) { [IO.Path]::ChangeExtension($projectFile.FullName, '.loombuild') } else { $null }
+$fixedRate = if ($buildSettings -and (Test-Path -LiteralPath $buildSettings))
+{
+    Get-Content -LiteralPath $buildSettings | Where-Object { $_ -like 'fixed_rate=*' } |
+        ForEach-Object { $_.Substring('fixed_rate='.Length) } | Select-Object -First 1
+}
+
 (Get-Content -LiteralPath (Join-Path $root 'Loom Web\Player.html') -Raw).
     Replace('{TITLE}', (Split-Path -Leaf $Project)).
     Replace('{BASE}', $base).
     Replace('{SCRIPT}', $script).
     Replace('{SCENE}', (Get-UrlPath $Scene)).
     Replace('{FILES}', (ConvertTo-Json -InputObject $preloaded -Compress)).
-    Replace('{INPUT}', $bindingsUrl) |
+    Replace('{INPUT}', $bindingsUrl).
+    Replace('{FIXED_RATE}', $(if ($fixedRate) { $fixedRate } else { '60' })) |
     Set-Content -LiteralPath $page -Encoding UTF8 -NoNewline
 
 if ($Output)

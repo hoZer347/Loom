@@ -34,6 +34,16 @@ namespace Loom
 
 		#pragma endregion
 
+		#pragma region Fixed Rate
+
+		static constexpr float default_fixed_rate = 60.0f;
+		static constexpr float min_fixed_rate = 1.0f;
+		static constexpr float max_fixed_rate = 1000.0f;
+
+		static bool IsFixedRate(float rate) { return rate >= min_fixed_rate && rate <= max_fixed_rate; };
+
+		#pragma endregion
+
 		BuildSettings() { m_history.Reset(Current()); };
 
 		std::string configuration = std::string(configurations[1]);
@@ -41,6 +51,11 @@ namespace Loom
 		// Relative to the project folder, or absolute.
 		std::string scene;
 		std::string folder;
+
+		// Fixed updates and physics steps a second, in the editor and the game.
+		float fixedRate = default_fixed_rate;
+
+		float FixedDeltaTime() const { return 1.0f / fixedRate; };
 
 		#pragma region File
 
@@ -116,11 +131,12 @@ namespace Loom
 			std::string configuration;
 			std::string scene;
 			std::string folder;
+			float fixedRate = default_fixed_rate;
 
 			bool operator==(const Settings&) const = default;
 		};
 
-		Settings Current() const { return { configuration, scene, folder }; };
+		Settings Current() const { return { configuration, scene, folder, fixedRate }; };
 
 		// Ctrl+Z and Ctrl+Y, and whether Ctrl+S was pressed.
 		bool Shortcuts();

@@ -16,6 +16,7 @@
 #include "Engine.h"
 #include "Executable.h"
 #include "InputActions.h"
+#include "Physics.h"
 #include "SceneSerializer.h"
 #include "StageTiming.h"
 
@@ -42,15 +43,13 @@ using namespace Loom;
 // Enough for a scene to have loaded and been ticked before it is captured.
 static constexpr int default_frames = 240;
 
-// Beside the program, naming the scene a build starts on.
+// Beside the program, naming the scene a build starts on and its fixed rate.
 static constexpr const char* game_extension = ".loomgame";
 
 
-// The scene a build starts on, which build-game.ps1 writes beside the program.
-static std::string StartScene(const std::filesystem::path& program)
+// A value build-game.ps1 writes beside the program.
+static std::string GameValue(const std::filesystem::path& program, std::string_view key)
 {
-	constexpr std::string_view scene_key = "scene=";
-
 	std::ifstream in(std::filesystem::path(program).replace_extension(game_extension));
 	std::string line;
 
@@ -59,8 +58,8 @@ static std::string StartScene(const std::filesystem::path& program)
 		while (!line.empty() && line.back() == '\r')
 			line.pop_back();
 
-		if (line.starts_with(scene_key))
-			return line.substr(scene_key.size());
+		if (line.starts_with(key))
+			return line.substr(key.size());
 	};
 
 	return "";
@@ -127,7 +126,7 @@ int main(int argc, char** argv)
 		std::error_code code;
 		std::filesystem::current_path(program.parent_path(), code);
 
-		scene = StartScene(program);
+		scene = GameValue(program, "scene=");
 	};
 
 	if (scene.empty())
@@ -146,6 +145,9 @@ int main(int argc, char** argv)
 	ImGui::GetIO().IniFilename = nullptr;
 
 	InputActions::Load(InputActionsFile());
+
+	// Refused, leaving the default, for a build from before the setting.
+	Physics::SetFixedDeltaTime(1.0f / std::strtof(GameValue(program, "fixed_rate=").c_str(), nullptr));
 
 	std::string error;
 

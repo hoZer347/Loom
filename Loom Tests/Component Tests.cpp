@@ -43,9 +43,10 @@ TEST_SUITE("Component")
 		inert.OnUpdate();
 		inert.OnRender();
 		inert.OnPhysics();
+		inert.OnFixedUpdate();
 		inert.OnGui();
 
-		CHECK(true); // Calling all six with no GameObject and no GL context is the assertion.
+		CHECK(true); // Calling all seven with no GameObject and no GL context is the assertion.
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "an overriding component receives its callbacks through the base interface")

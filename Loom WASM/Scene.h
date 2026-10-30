@@ -74,7 +74,7 @@ namespace Loom
 
 		#pragma region Physics
 
-		// One physics step: runs OnPhysics through the hierarchy, which syncs
+		// One physics step: runs OnFixedUpdate, then OnPhysics, through the hierarchy, which syncs
 		// every enabled collider into this scene's collider tree and gathers
 		// its rigid bodies, then moves them by FixedDeltaTime.
 		void Physics();

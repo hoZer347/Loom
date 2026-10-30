@@ -62,6 +62,13 @@ namespace Loom
 		has_method<T, void>::value &&
 		!std::is_same_v<decltype(&T::OnPhysics), decltype(&ComponentBase::OnPhysics)>> { };
 
+	// Detect override of OnFixedUpdate
+	template <typename T>
+	struct overrides_on_fixed_update
+		: std::integral_constant<bool,
+		has_method<T, void>::value &&
+		!std::is_same_v<decltype(&T::OnFixedUpdate), decltype(&ComponentBase::OnFixedUpdate)>> { };
+
 	// Detect override of any collision or trigger callback
 	template <typename T>
 	struct overrides_contacts
@@ -114,6 +121,9 @@ namespace Loom
 
 					if constexpr (overrides_on_physics<T>::value)
 						m_physicsables.emplace_back(component);
+
+					if constexpr (overrides_on_fixed_update<T>::value)
+						m_fixedUpdateables.emplace_back(component);
 
 					if constexpr (overrides_on_attach<T>::value)
 						component->OnAttach();
@@ -293,6 +303,7 @@ namespace Loom
 		std::vector<ComponentBase*> m_updateables{ };
 		std::vector<ComponentBase*> m_renderables{ };
 		std::vector<ComponentBase*> m_physicsables{ };
+		std::vector<ComponentBase*> m_fixedUpdateables{ };
 
 		#pragma endregion
 
@@ -309,6 +320,10 @@ namespace Loom
 		// Adds the OnUpdate of this object and those under it to byLane, at
 		// the lane each one's thread ID falls to among lanes, 0 for the caller.
 		void Gather(std::vector<std::vector<ComponentBase*>>& byLane, size_t lanes);
+
+		// Adds the OnFixedUpdate of this object and those under it to updates.
+		void GatherFixedUpdates(std::vector<ComponentBase*>& updates);
+
 		void Render();
 		void Physics();
 

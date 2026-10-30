@@ -7,6 +7,7 @@
 #include "Audio.h"
 #include "Engine.h"
 #include "GameObject.h"
+#include "Physics.h"
 #include "Scene.h"
 #include "SceneSerializer.h"
 
@@ -82,6 +83,7 @@ namespace Loom
 			InputActions::Set({ });
 			m_keyBindings.Loaded();
 			m_buildSettings = BuildSettings{ };
+			Physics::SetFixedDeltaTime(m_buildSettings.FixedDeltaTime());
 		};
 
 		if (m_projectFile.empty())
@@ -97,6 +99,7 @@ namespace Loom
 			InputActions::Load(InputActionsFile());
 			m_keyBindings.Loaded();
 			m_buildSettings.Load(BuildSettingsFile());
+			Physics::SetFixedDeltaTime(m_buildSettings.FixedDeltaTime());
 		};
 
 		std::ifstream in(m_projectFile);
@@ -633,6 +636,8 @@ namespace Loom
 			[this]() { return BuildScenes(); },
 			GameBuilder::Label(status),
 			status == GameBuilder::Status::Building);
+
+		Physics::SetFixedDeltaTime(m_buildSettings.FixedDeltaTime());
 
 		switch (action)
 		{

@@ -31,7 +31,10 @@ param(
     [string] $Configuration = 'Release',
 
     [Parameter(Mandatory = $true)]
-    [string] $Output
+    [string] $Output,
+
+    # Fixed updates a second, which the player reads from the .loomgame.
+    [double] $FixedRate = 60
 )
 
 # Native commands are judged by their exit codes: MSBuild's stderr would
@@ -156,7 +159,8 @@ try
 
     # The player reads it as key=value lines, so a path with a space keeps it.
     $start = $Scene.Substring($Project.Length + 1).Replace('\', '/')
-    [System.IO.File]::WriteAllText($marker, "scene=$start`n")
+    $rate = $FixedRate.ToString([System.Globalization.CultureInfo]::InvariantCulture)
+    [System.IO.File]::WriteAllText($marker, "scene=$start`nfixed_rate=$rate`n")
 }
 catch
 {

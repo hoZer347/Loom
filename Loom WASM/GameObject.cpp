@@ -70,7 +70,7 @@ namespace Loom
 					return;
 
 				for (std::vector<ComponentBase*>* list :
-					{ &m_components, &m_updateables, &m_renderables, &m_physicsables })
+					{ &m_components, &m_updateables, &m_renderables, &m_physicsables, &m_fixedUpdateables })
 					list->erase(
 						std::remove(
 							list->begin(),
@@ -280,6 +280,17 @@ namespace Loom
 
 		for (GameObject* child : m_children)
 			child->Gather(byLane, lanes);
+	};
+
+	void GameObject::GatherFixedUpdates(std::vector<ComponentBase*>& updates)
+	{
+		if (m_disabled)
+			return;
+
+		updates.insert(updates.end(), m_fixedUpdateables.begin(), m_fixedUpdateables.end());
+
+		for (GameObject* child : m_children)
+			child->GatherFixedUpdates(updates);
 	};
 
 	void GameObject::Render()

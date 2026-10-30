@@ -10,6 +10,7 @@
 #include "Engine.h"
 #include "InputActions.h"
 #include "Material.h"
+#include "Physics.h"
 #include "SceneSerializer.h"
 
 #include <emscripten.h>
@@ -52,6 +53,9 @@ int main(int argc, char** argv)
 	Engine engine;
 
 	InputActions::Load(input_actions);
+
+	if (argc > 2)
+		Physics::SetFixedDeltaTime(1.0f / std::strtof(argv[2], nullptr));
 
 	std::string error;
 
