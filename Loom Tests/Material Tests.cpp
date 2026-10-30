@@ -35,6 +35,13 @@ namespace
 	{
 		return "// ===FRAGMENT===\nout vec4 FragColor;\nvoid main() { FragColor = " + colour + "; }\n";
 	};
+
+	struct Paint final : Loom::Component<Paint>
+	{
+		Loom::Serial<float> wear = 0.5f;
+		Loom::Serial<glm::vec3, "Colours/Tint"> tint = glm::vec3(1.0f, 0.5f, 0.25f);
+		Loom::Serial<std::string> image = "Assets/grain.png";
+	};
 };
 
 #pragma endregion
@@ -423,6 +430,63 @@ TEST_SUITE("Material")
 
 		CHECK(tint == glm::vec3(1.0f, 0.5f, 0.25f));
 		CHECK(material->variables->values.count("u_speed") == 0);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a value set on an integer or bool variable is held as the shader takes it, read back and saved alike")
+	{
+		LoomTests::RecordingRenderer renderer;
+		const std::string path = "Variables/held.shader";
+		const std::string declarations = "uniform int u_count;\nuniform uint u_mask;\nuniform bool u_flag;\nuniform ivec2 u_cell;\n";
+
+		REQUIRE(Loom::Material::EditShader(path, VERTEX + declarations + Fragment("vec4(1.0)")).empty());
+
+		Loom::Scene scene("held");
+		Loom::Material* material = scene.Attach<Loom::Material>();
+		material->SetShaderPath(path);
+		Pump();
+
+		REQUIRE(material->shader != nullptr);
+
+		material->Set<"u_count">(1.5f);
+		material->Set<"u_mask">(-1);
+		material->Set<"u_flag">(0.5f);
+		material->Set<"u_cell">(glm::vec2(-1.5f, 2.5f));
+
+		constexpr uint32_t ALL_BITS = 0xFFFFFFFF;
+
+		const float count = material->Get<"u_count">();
+		const uint32_t mask = material->Get<"u_mask">();
+		const float flag = material->Get<"u_flag">();
+		const glm::ivec2 cell = material->Get<"u_cell">();
+
+		CHECK(count == 1.0f);
+		CHECK(mask == ALL_BITS);
+		CHECK(flag == 1.0f);
+		CHECK(cell == glm::ivec2(-1, 2));
+
+		Loom::UniformValues saved;
+		saved.Read(material->variables->Write());
+
+		CHECK(saved == *material->variables);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a script sets a variable straight from its own fields")
+	{
+		Loom::Material material;
+		const Paint paint;
+		Pump();
+
+		material.Set<"u_wear">(paint.wear);
+		material.Set<"u_tint">(paint.tint);
+		material.Set<"u_grain">(paint.image);
+
+		const float wear = material.Get<"u_wear">();
+		const glm::vec3 tint = material.Get<"u_tint">();
+		const std::string grain = material.Get<"u_grain">();
+
+		CHECK(wear == 0.5f);
+		CHECK(tint == glm::vec3(1.0f, 0.5f, 0.25f));
+		CHECK(grain == "Assets/grain.png");
 	};
 
 	#pragma endregion

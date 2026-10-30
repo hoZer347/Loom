@@ -324,6 +324,26 @@ namespace Loom
 		};
 	};
 
+	// A value as a variable of the type holds it: what the renderer takes from
+	// it, which is also what saves and reads back.
+	inline UniformValue HeldAs(UniformValue uniform, UniformType type)
+	{
+		const UniformTypeInfo& info = InfoOf(type);
+
+		for (int i = 0; i < info.columns * info.rows; ++i)
+			switch (info.kind)
+			{
+			case UniformKind::Int:	uniform.components[i] = (int32_t)uniform.components[i];				break;
+			case UniformKind::UInt:	uniform.components[i] = (uint32_t)(int64_t)uniform.components[i];	break;
+			case UniformKind::Bool:	uniform.components[i] = uniform.components[i] != 0.0;				break;
+			default:																					break;
+			};
+
+		uniform.type = type;
+
+		return uniform;
+	};
+
 	// A variable's value, read as whatever it is assigned to: zero, the
 	// identity or no image when it has none.
 	struct UniformRead

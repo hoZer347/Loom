@@ -131,10 +131,16 @@ namespace Loom
 						(declared.kind == UniformKind::Texture) != (given.kind == UniformKind::Texture))
 						return;
 
-					uniform.type = variable.type;
+					uniform = HeldAs(uniform, variable.type);
 				};
 
 			variables->values[name.value] = uniform;
+		};
+
+		template <Str name, AUniform T, Str field>
+		void Set(const Serial<T, field>& value)
+		{
+			Set<name>((const T&)value);
 		};
 
 		// A per-material variable's value, as the type it is assigned to:
