@@ -291,7 +291,6 @@ vec3 LoomLight(vec3 normal)
 
 		// The light's view-projection stands in for the camera's.
 		mesh.material->Apply(program, &*std::as_const(mesh.variables));
-		// A closed mesh casts from its far side, which its lit near side then never falls behind.
 		renderer.SetCullFace(mesh.ShadowCull());
 		renderer.SetUniform(program, "u_viewProjection", m_view_projection);
 		// A transparent shader's pass runs its fragment stage, which may call LoomShadow.

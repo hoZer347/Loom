@@ -122,7 +122,8 @@ namespace Loom
 		Serial<Sampling> sampling = AsShader;
 
 		// Which faces it draws: both, or only those facing the camera (Front)
-		// or away from it (Back). Shadows are cast as before, whichever it is.
+		// or away from it (Back). Light passes through the faces an open mesh
+		// hides; a closed mesh casts from its far side whichever it is.
 		enum Sides : uint32_t
 		{
 			Both,

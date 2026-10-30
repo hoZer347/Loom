@@ -285,8 +285,6 @@ namespace
 		return furthest;
 	};
 
-	// A plane lit from above shadows the sphere under it only when it draws
-	// the face the light meets.
 	void CheckOneSidedCaster(RenderFixture& fixture, const std::string& backend)
 	{
 		const ClearedTo cleared(CLEAR);
@@ -312,12 +310,12 @@ namespace
 
 			contact.light->castShadows = false;
 			const Image unshadowed = fixture.Frame();
-			const int lit = std::abs(shadowed.At(pixel.x, pixel.y).r - unshadowed.At(pixel.x, pixel.y).r);
+			const int darkened = std::abs(shadowed.At(pixel.x, pixel.y).r - unshadowed.At(pixel.x, pixel.y).r);
 
 			if (sides == Loom::Material::Front)
-				CHECK(lit > TOLERANCE);
+				CHECK(darkened > TOLERANCE);
 			else
-				CHECK(lit <= TOLERANCE);
+				CHECK(darkened <= TOLERANCE);
 		};
 	};
 

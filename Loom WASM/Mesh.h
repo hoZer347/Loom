@@ -83,9 +83,9 @@ namespace Loom
 		// view: those its world matrix turns outward. None for an open mesh.
 		CullFace FarSide();
 
-		// The faces to leave out of a light's shadow map: the far side of a
-		// closed mesh, or of an open one those its material hides, which light
-		// passes through.
+		// The faces to leave out of a light's shadow map. A closed mesh casts
+		// from its far side, which its lit near side then never falls behind.
+		// An open one leaves out those its material hides, so light passes them.
 		CullFace ShadowCull();
 
 		// Gives the program the mesh's material, the scene's view and the faces
@@ -225,10 +225,10 @@ namespace Loom
 		// The Skin bending this mesh on the GPU, or null when none does: the
 		// mesh has none, it does not fit the GPU, or the material's shader has
 		// no skinned twin for its program or its shadow program.
+		Skin* GpuSkin();
+
 		// The faces its material leaves out, seen through its world matrix.
 		CullFace HiddenSide();
-
-		Skin* GpuSkin();
 
 		#pragma endregion
 
