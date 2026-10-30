@@ -151,6 +151,7 @@
     <ClCompile Include="VirtualFolders.cpp" />
     <ClCompile Include="FolderTree.cpp" />
     <ClCompile Include="SearchBar.cpp" />
+    <ClCompile Include="TabHistory.cpp" />
     <ClCompile Include="TestsPanel.cpp" />
     <ClCompile Include="TextFit.cpp" />
     <ClCompile Include="KindFilter.cpp" />
@@ -223,6 +224,7 @@
     <ClInclude Include="VirtualFolders.h" />
     <ClInclude Include="FolderTree.h" />
     <ClInclude Include="SearchBar.h" />
+    <ClInclude Include="TabHistory.h" />
     <ClInclude Include="TestsPanel.h" />
     <ClInclude Include="TextFit.h" />
     <ClInclude Include="KindFilter.h" />

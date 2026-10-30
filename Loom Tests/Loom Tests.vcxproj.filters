@@ -238,6 +238,9 @@
     <ClCompile Include="Clock Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="TabHistory Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="GameFocus Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

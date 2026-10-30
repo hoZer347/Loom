@@ -175,6 +175,9 @@
     <ClCompile Include="MultiEdit.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
+    <ClCompile Include="TabHistory.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
     <ClCompile Include="GameFocus.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
@@ -379,6 +382,9 @@
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="MultiEdit.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="TabHistory.h">
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="GameFocus.h">

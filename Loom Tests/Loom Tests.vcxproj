@@ -239,6 +239,7 @@
     <ClCompile Include="Rigidbody Tests.cpp" />
     <ClCompile Include="Input Tests.cpp" />
     <ClCompile Include="Clock Tests.cpp" />
+    <ClCompile Include="TabHistory Tests.cpp" />
     <ClCompile Include="GameFocus Tests.cpp" />
     <ClCompile Include="LoadProgress Tests.cpp" />
     <ClCompile Include="WindowFrame Tests.cpp" />
@@ -317,6 +318,7 @@
     <ClCompile Include="..\Loom Editor\ColliderGizmos.cpp" />
     <ClCompile Include="..\Loom Editor\SelectionOutline.cpp" />
     <ClCompile Include="..\Loom Editor\MultiEdit.cpp" />
+    <ClCompile Include="..\Loom Editor\TabHistory.cpp" />
     <ClCompile Include="..\Loom Editor\GameFocus.cpp" />
     <ClCompile Include="..\Loom Editor\LoadProgress.cpp" />
     <ClCompile Include="..\Loom Editor\WindowFrame.cpp" />

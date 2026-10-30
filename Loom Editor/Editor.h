@@ -37,6 +37,7 @@
 #include "FolderTree.h"
 #include "ScriptFolders.h"
 #include "ScriptLibrary.h"
+#include "TabHistory.h"
 #include "TornWindows.h"
 #include "WebPlayer.h"
 #include "WindowFrame.h"
@@ -1497,6 +1498,7 @@ namespace Loom
 		bool m_gamePanelFocused = false;
 		bool m_gamePanelHovered = false;
 		GameFocus m_gameFocus;
+		TabHistory m_tabHistory;
 		std::optional<View> m_fullscreen;
 		View m_lastView = View::Game;
 		WindowFullscreen m_windowFullscreen;

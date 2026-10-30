@@ -4,6 +4,7 @@
 #include "Input.h"
 #include "OpenGL.h"
 #include "Profiler.h"
+#include "TabHistory.h"
 
 #include <algorithm>
 #include <atomic>
@@ -426,12 +427,20 @@ namespace Loom
 		}
 		else if (verb == "move")
 			return aim_only();
-		else if (verb == "click" || verb == "rightclick" || verb == "doubleclick")
+		else if (verb == "click" || verb == "rightclick" || verb == "doubleclick" || verb == "backclick" || verb == "forwardclick")
 		{
 			if (!aim_only())
 				return false;
 
-			const ImGuiMouseButton button = verb == "rightclick" ? ImGuiMouseButton_Right : ImGuiMouseButton_Left;
+			ImGuiMouseButton button = ImGuiMouseButton_Left;
+
+			if (verb == "rightclick")
+				button = ImGuiMouseButton_Right;
+			else if (verb == "backclick")
+				button = TabHistory::back_button;
+			else if (verb == "forwardclick")
+				button = TabHistory::forward_button;
+
 			const int clicks = verb == "doubleclick" ? 2 : 1;
 
 			for (int click = 0; click < clicks; click++)

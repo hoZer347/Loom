@@ -27,6 +27,8 @@ namespace Loom
 	*     wait <frames>
 	*     move <target>
 	*     click <target>, rightclick <target>, doubleclick <target>
+	*     backclick <target>, forwardclick <target>
+	*                          the mouse's side buttons
 	*     drag <target> to <target>
 	*     key <chord>          ImGui's key names joined by +: ctrl+z, enter, f2
 	*     hold <chord>         presses it and leaves it down, for a click with ctrl
