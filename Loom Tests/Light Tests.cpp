@@ -250,6 +250,16 @@ TEST_SUITE("Light")
 		const std::string saved = Loom::SceneSerializer::Serialize(*loaded);
 		const size_t saved_line = saved.find("Component Light");
 		CHECK(saved.find("\t0 = (0, -1, 0)", saved_line) == std::string::npos);
+
+		const std::unique_ptr<Loom::Scene> reloaded(Loom::SceneSerializer::Deserialize(saved));
+		Pump();
+
+		REQUIRE(reloaded);
+		const Loom::Light* resaved = reloaded->GetRoot().FindComponent<Loom::Light>();
+		REQUIRE(resaved != nullptr);
+
+		CHECK(glm::length(resaved->Direction() - glm::vec3(0.0f, -1.0f, 0.0f)) < EPSILON);
+		CHECK(resaved->ambient == 0.5f);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a direction read a line at a time with frames between still becomes the rotation")

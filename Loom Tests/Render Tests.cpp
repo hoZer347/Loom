@@ -304,7 +304,7 @@ namespace
 			INFO("the plane draws its ", sides == Loom::Material::Front ? "top" : "underside");
 
 			Contact contact("Render - one-sided caster on " + backend, POSITION, ROTATION, true);
-			contact.light->direction = DIRECTION;
+			contact.sun->transform.rotation = Loom::Light::RotationAlong(DIRECTION);
 			contact.plane_material->sides = sides;
 
 			const Image shadowed = fixture.Frame();

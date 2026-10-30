@@ -82,8 +82,9 @@ TEST_SUITE("RenderingObjects")
 		REQUIRE(light != nullptr);
 		REQUIRE(camera != nullptr);
 		REQUIRE(plane != nullptr);
-		CHECK(light->GetComponent<Loom::Light>() != nullptr);
+		REQUIRE(light->GetComponent<Loom::Light>() != nullptr);
 		REQUIRE(camera->GetComponent<Loom::Camera>() != nullptr);
+		CHECK(glm::length(light->GetComponent<Loom::Light>()->Direction() - glm::normalize(Loom::Light::DefaultDirection)) < CLOSE);
 		CHECK(plane->GetComponent<Loom::Mesh>() != nullptr);
 
 		const glm::vec3 eye = *camera->transform.position;
