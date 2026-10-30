@@ -33,6 +33,8 @@ TEST_SUITE("TabHistory")
 		return history;
 	};
 
+	#pragma region History
+
 	TEST_CASE("back and forward walk the tabs focused, and stop at the ends")
 	{
 		Loom::TabHistory history = Focused({ a, b, c });
@@ -144,11 +146,14 @@ TEST_SUITE("TabHistory")
 		CHECK(reached == Tab(1));
 	};
 
-	// Three panels docked as tabs, in an ImGui context of the test's own with
-	// no renderer, driven by a UiScript.
+	#pragma endregion
+
+	#pragma region Dock
+
 	struct Dock
 	{
-		Dock()
+		explicit Dock(bool viewports = false)
+			: viewports(viewports)
 		{
 			constexpr float frame_time = 1.0f / 60.0f;
 			constexpr int settle_frames = 4;
@@ -166,6 +171,11 @@ TEST_SUITE("TabHistory")
 			int atlas_height = 0;
 			io.Fonts->GetTexDataAsRGBA32(&pixels, &atlas_width, &atlas_height);
 
+			raised.clear();
+
+			if (viewports)
+				UsePlatform();
+
 			ImGui::NewFrame();
 
 			const ImGuiID node = ImGui::DockSpaceOverViewport();
@@ -174,14 +184,39 @@ TEST_SUITE("TabHistory")
 				ImGui::DockBuilderDockWindow(panel, node);
 
 			ImGui::DockBuilderFinish(node);
-			ImGui::Render();
+			EndFrame();
 
 			Frames(settle_frames);
 		};
 
 		~Dock()
 		{
+			ImGui::DestroyPlatformWindows();
 			ImGui::DestroyContext(context);
+		};
+
+		void UsePlatform()
+		{
+			ImGuiIO& io = ImGui::GetIO();
+			io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+			io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_RendererHasViewports;
+
+			ImGuiPlatformIO& platform = ImGui::GetPlatformIO();
+			platform.Platform_CreateWindow = [](ImGuiViewport*) {};
+			platform.Platform_DestroyWindow = [](ImGuiViewport*) {};
+			platform.Platform_ShowWindow = [](ImGuiViewport*) {};
+			platform.Platform_SetWindowPos = [](ImGuiViewport*, ImVec2) {};
+			platform.Platform_GetWindowPos = [](ImGuiViewport* viewport) { return viewport->Pos; };
+			platform.Platform_SetWindowSize = [](ImGuiViewport*, ImVec2) {};
+			platform.Platform_GetWindowSize = [](ImGuiViewport* viewport) { return viewport->Size; };
+			platform.Platform_SetWindowTitle = [](ImGuiViewport*, const char*) {};
+			platform.Platform_SetWindowFocus = [](ImGuiViewport* viewport) { raised.push_back(viewport); };
+
+			ImGuiPlatformMonitor monitor;
+			monitor.MainSize = monitor.WorkSize = ImVec2(monitor_width, display_height);
+			platform.Monitors.push_back(monitor);
+
+			ImGui::GetMainViewport()->PlatformHandle = context;
 		};
 
 		void Frames(int count)
@@ -202,6 +237,14 @@ TEST_SUITE("TabHistory")
 					ImGui::End();
 				};
 
+			if (viewports)
+			{
+				ImGui::SetNextWindowPos(ImVec2(display_width * 2.0f, 0.0f));
+				ImGui::SetNextWindowSize(ImVec2(display_width / 2.0f, display_height / 2.0f));
+				ImGui::Begin(torn);
+				ImGui::End();
+			};
+
 			if (popup)
 			{
 				ImGui::OpenPopup("Menu");
@@ -210,7 +253,15 @@ TEST_SUITE("TabHistory")
 			};
 
 			history.Update(navigate);
+			EndFrame();
+		};
+
+		void EndFrame()
+		{
 			ImGui::Render();
+
+			if (viewports)
+				ImGui::UpdatePlatformWindows();
 		};
 
 		void Run(const std::string& text)
@@ -240,15 +291,14 @@ TEST_SUITE("TabHistory")
 
 		void Back()
 		{
-			Run("backclick 400 300");
+			Run("backclick " + Middle());
 		};
 
 		void Forward()
 		{
-			Run("forwardclick 400 300");
+			Run("forwardclick " + Middle());
 		};
 
-		// The panel focused, which must also be the tab showing in the dock.
 		std::string Current() const
 		{
 			const ImGuiWindow* focused = ImGui::GetCurrentContext()->NavWindow;
@@ -256,15 +306,25 @@ TEST_SUITE("TabHistory")
 			if (focused == nullptr)
 				return { };
 
-			CHECK(focused->DockTabIsVisible);
+			CHECK((focused->DockTabIsVisible || !focused->DockIsActive));
 
 			return focused->Name;
 		};
 
+		static std::string Middle()
+		{
+			return std::to_string((int)(display_width / 2.0f)) + " " + std::to_string((int)(display_height / 2.0f));
+		};
+
 		static constexpr float display_width = 800.0f;
 		static constexpr float display_height = 600.0f;
+		static constexpr float monitor_width = display_width * 4.0f;
 		static constexpr const char* panels[] = { "One", "Two", "Three" };
+		static constexpr const char* torn = "Torn";
 
+		static inline std::vector<ImGuiViewport*> raised{ };
+
+		bool viewports;
 		ImGuiContext* context = nullptr;
 		Loom::TabHistory history;
 		std::set<std::string> closed;
@@ -351,4 +411,36 @@ TEST_SUITE("TabHistory")
 
 		CHECK(dock.Current() == "Two");
 	};
+
+	TEST_CASE("the side buttons raise the OS window a panel is in, and only when it changes")
+	{
+		Dock dock{ true };
+
+		dock.ClickTab("One");
+		dock.ClickTab("Two");
+
+		ImGuiWindow* window = ImGui::FindWindowByName(Dock::torn);
+		REQUIRE(window->Viewport != ImGui::GetMainViewport());
+
+		ImGui::FocusWindow(window);
+		dock.Frame();
+		REQUIRE(dock.Current() == Dock::torn);
+
+		dock.Back();
+		CHECK(dock.Current() == "Two");
+		REQUIRE(Dock::raised.size() == 1);
+		CHECK(Dock::raised.back() == ImGui::GetMainViewport());
+
+		dock.Back();
+		CHECK(dock.Current() == "One");
+		CHECK(Dock::raised.size() == 1);
+
+		dock.Forward();
+		dock.Forward();
+		CHECK(dock.Current() == Dock::torn);
+		REQUIRE(Dock::raised.size() == 2);
+		CHECK(Dock::raised.back() == window->Viewport);
+	};
+
+	#pragma endregion
 };

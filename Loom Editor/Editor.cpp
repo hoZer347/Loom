@@ -2278,7 +2278,7 @@ namespace Loom
 #endif
 		Input::SetFocused(m_gameFocus.Update(m_gamePanelFocused, m_gamePanelHovered, AnyMouseClicked(), ImGui::IsAnyMouseDown() || AnyMouseReleased()));
 
-		m_tabHistory.Update(!m_fullscreen && !m_flyingView && !(IsPlaying() && Input::IsFocused()));
+		m_tabHistory.Update(!(IsPlaying() && Input::IsFocused()));
 
 		ImportQueued();
 		ClickQueued();

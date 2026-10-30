@@ -29,6 +29,8 @@ namespace Loom
 	{
 		const ImGuiWindow* focused = ImGui::GetCurrentContext()->NavWindow;
 
+		const ImGuiViewport* viewport = focused != nullptr ? focused->Viewport : nullptr;
+
 		if (focused != nullptr && IsPanel(*focused->RootWindow))
 			Focus(focused->RootWindow->ID);
 
@@ -42,9 +44,16 @@ namespace Loom
 		else if (ImGui::IsMouseClicked(forward_button))
 			tab = Forward(IsPanelOpen);
 
-		// A dock shows the tab holding focus.
-		if (tab)
-			ImGui::FocusWindow(ImGui::FindWindowByID(*tab));
+		if (!tab)
+			return;
+
+		ImGuiWindow* window = ImGui::FindWindowByID(*tab);
+		const ImGuiPlatformIO& platform = ImGui::GetPlatformIO();
+
+		ImGui::FocusWindow(window);
+
+		if (window->Viewport != viewport && platform.Platform_SetWindowFocus)
+			platform.Platform_SetWindowFocus(window->Viewport);
 	};
 
 	void TabHistory::Focus(Tab tab)
