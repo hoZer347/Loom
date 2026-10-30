@@ -5130,53 +5130,52 @@ namespace Loom
 
 	void Editor::DrawToolbar()
 	{
-		constexpr const char* play_label = "Play";
-		constexpr const char* pause_label = "Pause";
-		constexpr const char* stop_label = "Stop";
-		constexpr const char* step_label = "Step";
-		constexpr const char* play_labels[] = { play_label, pause_label, stop_label, step_label };
+		constexpr const char* labels[] = {
+			EditorIcons::Play,
+			EditorIcons::Pause,
+			EditorIcons::Stop,
+			EditorIcons::Step,
+			EditorIcons::Build };
 		constexpr float frame_sides = 2.0f;
 
 		float label_width = 0.0f;
 
-		for (const char* label : play_labels)
+		for (const char* label : labels)
 			label_width = (std::max)(label_width, ImGui::CalcTextSize(label).x);
 
-		const ImVec2 play_button_size(label_width + ImGui::GetStyle().FramePadding.x * frame_sides, 0.0f);
+		const ImVec2 button_size(label_width + ImGui::GetStyle().FramePadding.x * frame_sides, 0.0f);
 
-		ImGui::BeginDisabled(Engine::updateScenes || m_playAfterCompile);
+		const auto button = [button_size](const char* icon, const char* tooltip, bool enabled)
+		{
+			ImGui::BeginDisabled(!enabled);
 
-		if (ImGui::Button(play_label, play_button_size))
+			const bool pressed = ImGui::Button(icon, button_size);
+
+			ImGui::SetItemTooltip("%s", tooltip);
+			ImGui::EndDisabled();
+			ImGui::SameLine();
+
+			return pressed;
+		};
+
+		if (button(EditorIcons::Play, "Play", !Engine::updateScenes && !m_playAfterCompile))
 			TogglePlay();
 
-		ImGui::EndDisabled();
-		ImGui::SameLine();
-		ImGui::BeginDisabled(!Engine::updateScenes);
-
-		if (ImGui::Button(pause_label, play_button_size))
+		if (button(EditorIcons::Pause, "Pause", Engine::updateScenes))
 			TogglePlay();
 
-		ImGui::EndDisabled();
-		ImGui::SameLine();
-		ImGui::BeginDisabled(!IsPlaying());
-
-		if (ImGui::Button(stop_label, play_button_size))
+		if (button(EditorIcons::Stop, "Stop", IsPlaying()))
 			Stop();
 
-		ImGui::EndDisabled();
-		ImGui::SameLine();
-
-		ImGui::BeginDisabled(m_scripts.IsBuilding() || Engine::updateScenes);
-
-		if (ImGui::Button(step_label, play_button_size))
+		if (button(EditorIcons::Step, "Step", !m_scripts.IsBuilding() && !Engine::updateScenes))
 		{
 			BeginPlay();
 			m_steppedLastFrame = true;
 		};
 
-		ImGui::EndDisabled();
+		if (button(EditorIcons::Build, "Compile", m_scripts.HasProject() && !m_scripts.IsBuilding() && !IsPlaying()))
+			CompileScripts();
 
-		ImGui::SameLine();
 		ImGui::ColorEdit4(
 			"Background",
 			Engine::clearColor,

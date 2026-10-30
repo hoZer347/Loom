@@ -39,6 +39,12 @@ namespace Loom
 		constexpr const char* File = "📄";
 		constexpr const char* New = "➕";
 
+		// The Game and Debug windows' play controls.
+		constexpr const char* Play = "▶";
+		constexpr const char* Pause = "⏸";
+		constexpr const char* Stop = "⏹";
+		constexpr const char* Step = "⏭";
+
 		// What the Project panel's tabs show beside a file, models
 		// aside, which only ModelImporter can tell.
 		const char* Of(const std::string& path);

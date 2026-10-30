@@ -27,6 +27,7 @@ TEST_SUITE("EditorTheme")
 			EditorIcons::Palette, EditorIcons::Sound, EditorIcons::Font, EditorIcons::Model,
 			EditorIcons::Script, EditorIcons::State, EditorIcons::Dialogue, EditorIcons::Test,
 			EditorIcons::Bindings, EditorIcons::Build, EditorIcons::File, EditorIcons::New,
+			EditorIcons::Play, EditorIcons::Pause, EditorIcons::Stop, EditorIcons::Step,
 			EditorPanels::Hierarchy, EditorPanels::Project, EditorPanels::Inspector, EditorPanels::Game,
 			EditorPanels::Debug, EditorPanels::SceneData, EditorPanels::Console, EditorPanels::Shaders,
 			EditorPanels::Dialogues, EditorPanels::Sprites, EditorPanels::Model, EditorPanels::Palette,
