@@ -1620,7 +1620,9 @@ namespace Loom
 			return;
 		};
 
-		m_prefabScene->AddChild(prefab_light)->Attach<Light>();
+		GameObject* light = m_prefabScene->AddChild(prefab_light);
+		light->Attach<Light>();
+		light->transform.rotation = Light::RotationAlong(Light::DEFAULT_DIRECTION);
 
 		m_prefabRoot = root->GetGuid();
 		m_prefabPath = opening;

@@ -6,10 +6,15 @@
 #include "GameObject.h"
 #include "Light.h"
 #include "Scene.h"
+#include "SceneSerializer.h"
 
 #include "glm/glm.hpp"
 
+#include <algorithm>
 #include <cmath>
+#include <iterator>
+#include <memory>
+#include <string>
 
 using LoomTests::Pump;
 using LoomTests::RecordingRenderer;
@@ -112,12 +117,16 @@ TEST_SUITE("Light")
 		CHECK(scene.GetRoot().FindComponent<Loom::Light>() == root_light);
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the shadow map is centred on shadowCenter and looks along direction")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the shadow map is centred on shadowCenter and looks along the light's rotation")
 	{
-		Loom::Light light;
+		Loom::Scene scene("shadow map");
 		Pump();
 
-		light.direction = glm::vec3(0.0f, -1.0f, 0.0f);
+		Loom::GameObject* sun = scene.AddChild("Sun");
+		Loom::Light& light = *sun->Attach<Loom::Light>();
+		Pump();
+
+		sun->transform.rotation = Loom::Light::RotationAlong(glm::vec3(0.0f, -1.0f, 0.0f));
 		light.shadowCenter = glm::vec3(1.0f, 2.0f, 3.0f);
 		light.shadowExtent = 4.0f;
 
@@ -158,14 +167,94 @@ TEST_SUITE("Light")
 		CHECK(renderer.depthBiases.back() == std::tuple<float, float, float>{ 0.0f, 0.0f, 0.0f });
 	};
 
-	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a zero direction still gives a usable transform")
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a light shines along its GameObject's -Z, turned by its parents")
 	{
-		Loom::Light light;
+		Loom::Scene scene("direction");
 		Pump();
 
-		light.direction = glm::vec3();
+		Loom::GameObject* parent = scene.AddChild("Parent");
+		Loom::GameObject* sun = parent->AddChild("Sun");
+		Loom::Light* light = sun->Attach<Loom::Light>();
+		Pump();
 
-		const glm::mat4 transform = light.ViewProjection();
+		CHECK(glm::length(light->Direction() - glm::vec3(0.0f, 0.0f, -1.0f)) < EPSILON);
+
+		constexpr float QUARTER_TURN = 90.0f;
+		parent->transform.rotation = glm::vec3(0.0f, QUARTER_TURN, 0.0f);
+
+		CHECK(glm::length(light->Direction() - glm::vec3(-1.0f, 0.0f, 0.0f)) < EPSILON);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "RotationAlong aims a light along any direction")
+	{
+		Loom::Scene scene("rotation along");
+		Pump();
+
+		Loom::GameObject* sun = scene.AddChild("Sun");
+		Loom::Light* light = sun->Attach<Loom::Light>();
+		Pump();
+
+		const glm::vec3 DIRECTIONS[] =
+		{
+			Loom::Light::DEFAULT_DIRECTION,
+			{ 0.0f, -1.0f, 0.0f },
+			{ 0.0f, 1.0f, 0.0f },
+			{ 1.0f, 0.0f, 0.0f },
+			{ 0.0f, 0.0f, 1.0f },
+			{ -1.0f, -0.5f, -0.3f },
+		};
+
+		for (const glm::vec3& direction : DIRECTIONS)
+		{
+			sun->transform.rotation = Loom::Light::RotationAlong(direction);
+
+			CHECK(glm::length(light->Direction() - glm::normalize(direction)) < EPSILON);
+		};
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a direction saved by an older file becomes the rotation, and the rest keep their places")
+	{
+		Loom::Scene scene("older file");
+		Pump();
+
+		Loom::Light* written = scene.AddChild("Sun")->Attach<Loom::Light>();
+		written->ambient = 0.5f;
+		Pump();
+
+		std::string text = Loom::SceneSerializer::Serialize(scene);
+		const size_t light_line = text.find("Component Light");
+		REQUIRE(light_line != std::string::npos);
+
+		const std::string::iterator line_end = std::find(text.begin() + light_line, text.end(), '\n');
+		text.insert(line_end + 1, std::begin("\t\t\t\t0 = (0, -1, 0)\n"), std::end("\t\t\t\t0 = (0, -1, 0)\n") - 1);
+
+		const std::unique_ptr<Loom::Scene> loaded(Loom::SceneSerializer::Deserialize(text));
+		Pump();
+
+		REQUIRE(loaded);
+		const Loom::Light* light = loaded->GetRoot().FindComponent<Loom::Light>();
+		REQUIRE(light != nullptr);
+
+		CHECK(glm::length(light->Direction() - glm::vec3(0.0f, -1.0f, 0.0f)) < EPSILON);
+		CHECK(light->ambient == 0.5f);
+
+		const std::string saved = Loom::SceneSerializer::Serialize(*loaded);
+		const size_t saved_line = saved.find("Component Light");
+		CHECK(saved.find("\t0 = (0, -1, 0)", saved_line) == std::string::npos);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a transform scaled to nothing still gives a usable shadow map")
+	{
+		Loom::Scene scene("zero scale");
+		Pump();
+
+		Loom::GameObject* sun = scene.AddChild("Sun");
+		Loom::Light* light = sun->Attach<Loom::Light>();
+		Pump();
+
+		sun->transform.scale = glm::vec3();
+
+		const glm::mat4 transform = light->ViewProjection();
 
 		for (int column = 0; column < 4; column++)
 			for (int row = 0; row < 4; row++)

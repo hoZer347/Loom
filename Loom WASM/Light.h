@@ -29,7 +29,9 @@ namespace Loom
 	* - A shader with shading on has the engine light it (see ShaderSettings);
 	*   one with it off can still light itself with the functions below
 	* - The shadow map covers a box of shadowExtent either side of shadowCenter,
-	*   seen along direction; geometry outside it is lit
+	*   seen along Direction; geometry outside it is lit
+	* - It shines along its GameObject's -Z, the way a Camera looks, so the
+	*   Transform's rotation aims it
 	* - A shader lights itself by calling into the GLSL the engine puts in
 	*   front of a stage that uses it, when the shader is compiled:
 	*     vertex:   vec4 LoomLightSpace(vec4 world)
@@ -90,7 +92,25 @@ namespace Loom
 
 		#pragma region Light
 
-		Serial<glm::vec3> direction = glm::vec3(-0.4f, -1.0f, -0.3f);
+		// A sun's slant, for a new Light that nothing has aimed yet.
+		static constexpr glm::vec3 DEFAULT_DIRECTION = glm::vec3(-0.4f, -1.0f, -0.3f);
+
+		// The rotation that shines a Light along direction.
+		static glm::vec3 RotationAlong(const glm::vec3& direction);
+
+		// The way the light shines, in world space.
+		glm::vec3 Direction() const;
+
+		void OnAttach() override;
+		bool IsSaved(const SerializedField& field) const override;
+		bool IsShown(const SerializedField& field) const override;
+
+	private:
+		// Fields are saved by place: this keeps place 0, where older files have
+		// a direction, which OnAttach turns into the Transform's rotation.
+		Serial<glm::vec3> m_savedDirection;
+
+	public:
 		Serial<glm::vec3> color = glm::vec3(1.0f, 1.0f, 1.0f);
 		Serial<float> intensity = 1.0f;
 		Serial<float> ambient = 0.25f;

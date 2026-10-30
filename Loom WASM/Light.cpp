@@ -209,6 +209,41 @@ vec3 LoomLight(vec3 normal)
 		#pragma endregion
 	};
 
+	#pragma region Light
+
+	glm::vec3 Light::RotationAlong(const glm::vec3& direction)
+	{
+		const glm::vec3 forward = Normalised(direction);
+
+		return Transform::EulerDegrees(glm::quatLookAt(forward, UpFor(forward)));
+	};
+
+	glm::vec3 Light::Direction() const
+	{
+		return Normalised(m_gameObject ? -glm::vec3(m_gameObject->WorldMatrix()[2]) : glm::vec3());
+	};
+
+	void Light::OnAttach()
+	{
+		if (*m_savedDirection == glm::vec3())
+			return;
+
+		m_gameObject->transform.rotation = RotationAlong(*m_savedDirection);
+		m_savedDirection = glm::vec3();
+	};
+
+	bool Light::IsSaved(const SerializedField& field) const
+	{
+		return field.data != &*m_savedDirection;
+	};
+
+	bool Light::IsShown(const SerializedField& field) const
+	{
+		return field.data != &*m_savedDirection;
+	};
+
+	#pragma endregion
+
 	#pragma region Shadow Map
 
 	Light::~Light()
@@ -218,7 +253,7 @@ vec3 LoomLight(vec3 normal)
 
 	glm::mat4 Light::ViewProjection() const
 	{
-		const glm::vec3 forward = Normalised(direction);
+		const glm::vec3 forward = Direction();
 		const glm::vec3 center = *shadowCenter;
 		const float extent = shadowExtent;
 
@@ -346,7 +381,7 @@ vec3 LoomLight(vec3 normal)
 		// A map that failed to allocate still needs something behind the sampler.
 		renderer->SetTexture(program, "u_shadowMap", m_depth_texture ? m_depth_texture : NothingInShadow(*renderer));
 
-		renderer->SetUniform(program, "u_lightDirection", Normalised(direction));
+		renderer->SetUniform(program, "u_lightDirection", Direction());
 		renderer->SetUniform(program, "u_lightColor", *color * (float)intensity);
 		renderer->SetUniform(program, "u_ambient", (float)ambient);
 		renderer->SetUniform(program, "u_lightViewProjection", m_view_projection);

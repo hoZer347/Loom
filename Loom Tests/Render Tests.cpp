@@ -227,7 +227,8 @@ namespace
 		{
 			Pump();
 
-			light = m_scene.Attach<Loom::Light>();
+			sun = m_scene.AddChild("Sun");
+			light = sun->Attach<Loom::Light>();
 			Loom::GameObject* eye = m_scene.AddChild("Camera");
 			Loom::GameObject* plane = m_scene.AddChild("Plane");
 			Loom::GameObject* sphere = m_scene.AddChild("Sphere");
@@ -251,6 +252,7 @@ namespace
 			Pump();
 		};
 
+		Loom::GameObject* sun = nullptr;
 		Loom::Light* light = nullptr;
 		Loom::Camera* camera = nullptr;
 		Loom::Material* plane_material = nullptr;
@@ -351,7 +353,7 @@ namespace
 		constexpr float HALF_TURN = glm::pi<float>();
 
 		// The default light, whose frames are saved, then two lower suns past the pull's slope limit.
-		const glm::vec3 LIGHTS[] = { Loom::Light().direction, { -0.8f, -1.0f, -0.45f }, { -1.0f, -0.5f, -0.3f } };
+		const glm::vec3 LIGHTS[] = { Loom::Light::DEFAULT_DIRECTION, { -0.8f, -1.0f, -0.45f }, { -1.0f, -0.5f, -0.3f } };
 
 		for (const glm::vec3& direction : LIGHTS)
 			for (bool normals : { true, false })
@@ -361,13 +363,13 @@ namespace
 
 				{
 					Contact contact("Render - shadow at a contact from under, on " + backend, UNDER_POSITION, UNDER_ROTATION, normals);
-					contact.light->direction = direction;
+					contact.sun->transform.rotation = Loom::Light::RotationAlong(direction);
 					const Image image = fixture.Frame();
 
 					if (saved)
 						image.Save("Render - shadow at a contact from under, on " + backend);
 
-					const glm::vec3 toLight = -glm::normalize((glm::vec3)contact.light->direction);
+					const glm::vec3 toLight = -contact.light->Direction();
 					const float texel = ACROSS_EXTENTS * contact.light->shadowExtent / contact.light->shadowResolution;
 					int brightest = 0;
 
@@ -393,7 +395,7 @@ namespace
 				{
 					Contact contact("Render - shadow at a contact from above, on " + backend, ABOVE_POSITION, ABOVE_ROTATION, normals);
 
-					contact.light->direction = direction;
+					contact.sun->transform.rotation = Loom::Light::RotationAlong(direction);
 					// No ambient, so nothing lit reaches white and hides acne.
 					contact.light->ambient = 0.0f;
 
@@ -405,7 +407,7 @@ namespace
 					contact.light->castShadows = false;
 					const Image unshadowed = fixture.Frame();
 
-					const glm::vec3 toLight = -glm::normalize((glm::vec3)contact.light->direction);
+					const glm::vec3 toLight = -contact.light->Direction();
 					std::vector<glm::vec3> lit;
 
 					for (int around = 0; around < STEPS; around++)
