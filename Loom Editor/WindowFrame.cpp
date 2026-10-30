@@ -12,8 +12,6 @@
 #include <commctrl.h>
 #include <dwmapi.h>
 
-#include <chrono>
-
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "dwmapi.lib")
 
@@ -104,18 +102,14 @@ namespace Loom
 			return true;
 		};
 
-		// The OS's loop gets the window back at least this often, as a redraw that pumps no messages would not give it.
-		constexpr std::chrono::milliseconds LONGEST_HOLD{ 50 };
+		// A held window posts this to itself for its next frame, so a timer's tick does not pace them.
+		constexpr UINT REDRAW_AGAIN = WM_APP + 1;
 
-		// A timer comes at most once a system tick, so frames go on from one until the OS has something for its loop.
-		void RedrawUntilWaited(HWND window, const WindowFrame& frame)
+		// One frame to a message, so the OS's loop always has the window back between frames, and its timer resumes them after whatever else waits.
+		void RedrawHeld(HWND window, const WindowFrame& frame)
 		{
-			const auto end = std::chrono::steady_clock::now() + LONGEST_HOLD;
-
-			while (RedrawOnce(frame) &&
-				window == s_held &&
-				HIWORD(GetQueueStatus(QS_INPUT | QS_POSTMESSAGE | QS_SENDMESSAGE)) == 0 &&
-				std::chrono::steady_clock::now() < end);
+			if (RedrawOnce(frame) && window == s_held && HIWORD(GetQueueStatus(QS_INPUT | QS_PAINT | QS_TIMER)) == 0)
+				PostMessageW(window, REDRAW_AGAIN, 0, 0);
 		};
 
 		LRESULT HitCode(WindowFrame::Hit hit)
@@ -196,13 +190,15 @@ namespace Loom
 			if (message == WM_WINDOWPOSCHANGED && window == s_held && (((const WINDOWPOS*)lparam)->flags & (SWP_NOSIZE | SWP_NOMOVE)) != (SWP_NOSIZE | SWP_NOMOVE))
 			{
 				const LRESULT result = DefSubclassProc(window, message, wparam, lparam);
-				RedrawOnce(frame);
+				RedrawHeld(window, frame);
 				return result;
 			};
 
-			if (message == WM_TIMER && wparam == SUBCLASS_ID)
+			if (message == REDRAW_AGAIN || (message == WM_TIMER && wparam == SUBCLASS_ID))
 			{
-				RedrawUntilWaited(window, frame);
+				if (window == s_held)
+					RedrawHeld(window, frame);
+
 				return 0;
 			};
 

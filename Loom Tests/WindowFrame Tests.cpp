@@ -95,7 +95,7 @@ TEST_SUITE("WindowFrame")
 		{
 			MSG message;
 
-			while (PeekMessageW(&message, window, 0, 0, PM_REMOVE))
+			while (std::chrono::steady_clock::now() < end && PeekMessageW(&message, window, 0, 0, PM_REMOVE))
 			{
 				if (message.message == WM_TIMER)
 					timers++;
@@ -187,26 +187,20 @@ TEST_SUITE("WindowFrame")
 		CHECK(s_redraws == 2);
 	};
 
-	constexpr int redraws_between_messages = 8;
-
-	// As the mouse would, every so many frames.
-	void CountThenPost()
+	TEST_CASE_FIXTURE(HiddenWindow, "a window held still redraws over and over, and its timer still comes between them")
 	{
-		if (++s_redraws % redraws_between_messages == 0)
-			PostMessageW(s_window, WM_NULL, 0, 0);
-	};
+		// Far over the one redraw a timer alone gives, and far under what a hidden window manages.
+		constexpr int redraws_to_a_timer = 4;
 
-	TEST_CASE_FIXTURE(HiddenWindow, "a window held still redraws over and over between the OS's messages, not once a timer")
-	{
 		Loom::WindowFrame frame;
-		frame.Install(window, CountThenPost);
+		frame.Install(window, Count);
 
 		SendMessageW(hwnd, WM_ENTERSIZEMOVE, 0, 0);
 		const int timers = Pump(hwnd, held_for);
 		SendMessageW(hwnd, WM_EXITSIZEMOVE, 0, 0);
 
 		REQUIRE(timers > 0);
-		CHECK(s_redraws >= timers * redraws_between_messages);
+		CHECK(s_redraws >= timers * redraws_to_a_timer);
 	};
 
 	std::unique_ptr<Loom::WindowFrame> s_doomed;
