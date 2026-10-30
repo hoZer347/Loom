@@ -165,7 +165,7 @@ TEST_SUITE("WindowFrame")
 		CHECK(s_redraws == redraws);
 	};
 
-	TEST_CASE_FIXTURE(HiddenWindow, "a window being sized redraws at each new size before the OS goes on")
+	TEST_CASE_FIXTURE(HiddenWindow, "a window being moved or sized redraws at each new place and size before the OS goes on")
 	{
 		constexpr int grown = 16;
 		constexpr UINT size_only = SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE;
@@ -179,11 +179,33 @@ TEST_SUITE("WindowFrame")
 		CHECK(s_redraws == 1);
 
 		SetWindowPos(hwnd, nullptr, grown, grown, 0, 0, move_only);
-		CHECK(s_redraws == 1);
+		CHECK(s_redraws == 2);
 
 		SendMessageW(hwnd, WM_EXITSIZEMOVE, 0, 0);
 		SetWindowPos(hwnd, nullptr, 0, 0, window_width, window_height, size_only);
-		CHECK(s_redraws == 1);
+		CHECK(s_redraws == 2);
+	};
+
+	constexpr int redraws_between_messages = 8;
+
+	// As the mouse would, every so many frames.
+	void CountThenPost()
+	{
+		if (++s_redraws % redraws_between_messages == 0)
+			PostMessageW(s_window, WM_NULL, 0, 0);
+	};
+
+	TEST_CASE_FIXTURE(HiddenWindow, "a window held still redraws over and over between the OS's messages, not once a timer")
+	{
+		Loom::WindowFrame frame;
+		frame.Install(window, CountThenPost);
+
+		SendMessageW(hwnd, WM_ENTERSIZEMOVE, 0, 0);
+		const int timers = Pump(hwnd, held_for);
+		SendMessageW(hwnd, WM_EXITSIZEMOVE, 0, 0);
+
+		REQUIRE(timers > 0);
+		CHECK(s_redraws >= timers * redraws_between_messages);
 	};
 
 	std::vector<std::chrono::steady_clock::time_point> s_redrawnAt;

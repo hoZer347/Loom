@@ -12,6 +12,8 @@
 #include <commctrl.h>
 #include <dwmapi.h>
 
+#include <chrono>
+
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "dwmapi.lib")
 
@@ -87,17 +89,33 @@ namespace Loom
 		// The one window the OS is moving or sizing, which a thread has at most one of.
 		HWND s_held = nullptr;
 
-		// Not inside another redraw, as one that pumps messages would be.
-		void RedrawOnce(const WindowFrame& frame)
+		// Not inside another redraw, as one that pumps messages would be. False when it was.
+		bool RedrawOnce(const WindowFrame& frame)
 		{
 			static bool redrawing = false;
 
 			if (redrawing)
-				return;
+				return false;
 
 			redrawing = true;
 			frame.Redrawing()();
 			redrawing = false;
+
+			return true;
+		};
+
+		// The OS's loop gets the window back at least this often, as a redraw that pumps no messages would not give it.
+		constexpr std::chrono::milliseconds LONGEST_HOLD{ 50 };
+
+		// A timer comes at most once a system tick, so frames go on from one until the OS has something for its loop.
+		void RedrawUntilWaited(HWND window, const WindowFrame& frame)
+		{
+			const auto end = std::chrono::steady_clock::now() + LONGEST_HOLD;
+
+			while (RedrawOnce(frame) &&
+				window == s_held &&
+				HIWORD(GetQueueStatus(QS_INPUT | QS_POSTMESSAGE | QS_SENDMESSAGE)) == 0 &&
+				std::chrono::steady_clock::now() < end);
 		};
 
 		LRESULT HitCode(WindowFrame::Hit hit)
@@ -174,8 +192,8 @@ namespace Loom
 				KillTimer(window, SUBCLASS_ID);
 			};
 
-			// The timer only comes once the mouse is still, so each new size is drawn before the OS takes the next.
-			if (message == WM_WINDOWPOSCHANGED && window == s_held && (((const WINDOWPOS*)lparam)->flags & SWP_NOSIZE) == 0)
+			// The timer only comes once the mouse is still, so each new place and size is drawn before the OS takes the next.
+			if (message == WM_WINDOWPOSCHANGED && window == s_held && (((const WINDOWPOS*)lparam)->flags & (SWP_NOSIZE | SWP_NOMOVE)) != (SWP_NOSIZE | SWP_NOMOVE))
 			{
 				const LRESULT result = DefSubclassProc(window, message, wparam, lparam);
 				RedrawOnce(frame);
@@ -184,7 +202,7 @@ namespace Loom
 
 			if (message == WM_TIMER && wparam == SUBCLASS_ID)
 			{
-				RedrawOnce(frame);
+				RedrawUntilWaited(window, frame);
 				return 0;
 			};
 

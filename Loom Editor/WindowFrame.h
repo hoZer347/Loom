@@ -12,8 +12,9 @@ namespace Loom
 	* - The window's edges still resize it, and a strip the caller names each
 	*   frame drags it, snaps it and maximizes it on a double-click, as a
 	*   title bar does
-	* - Redraws at each new size, and on a timer, while Windows moves or
-	*   sizes it, which holds the frame loop until let go
+	* - Redraws at each new place and size, and over and over while held
+	*   still, while Windows moves or sizes it, which holds the frame loop
+	*   until let go
 	* - A window over a whole monitor has neither
 	*/
 	struct WindowFrame final
