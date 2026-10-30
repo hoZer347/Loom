@@ -544,6 +544,31 @@ TEST_SUITE("ImGuiAutoscroll")
 		CHECK(ImGui::GetMouseCursor() == ImGuiMouseCursor_Arrow);
 	};
 
+	TEST_CASE_FIXTURE(Driven, "what the pointer passes over does not light up while it runs")
+	{
+		bool hovered = false;
+
+		const auto contents =
+			[&hovered]()
+			{
+				ImGui::Button("Row", ImVec2(panel_side, tall_content));
+				hovered = ImGui::IsItemHovered();
+			};
+
+		Frames(settle_frames, contents);
+		CHECK(hovered);
+
+		Button(ImGuiMouseButton_Middle, true);
+		Frames(settle_frames, contents);
+		CHECK_FALSE(hovered);
+
+		Button(ImGuiMouseButton_Middle, false);
+		Frames(settle_frames, contents);
+		ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, true);
+		Frames(settle_frames, contents);
+		CHECK(hovered);
+	};
+
 	TEST_CASE("a context without it answers that nothing is running")
 	{
 		ImGuiContext* const previous = ImGui::GetCurrentContext();

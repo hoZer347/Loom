@@ -20,7 +20,8 @@ namespace
 
 	// Sizes at this font size, which they scale with.
 	constexpr float BASE_FONT_SIZE = 13.0f;
-	constexpr float MARKER_RADIUS = 14.0f;
+	constexpr float MARKER_RADIUS = 16.0f;
+	constexpr float HEADING_SCALE = 1.6f;
 	constexpr float DOT_RADIUS = 2.5f;
 	constexpr float ARROW_GAP = 4.0f;
 	constexpr float ARROW_LENGTH = 6.0f;
@@ -265,6 +266,10 @@ namespace
 		// Owned ahead of the frame it is pressed in, or the keyboard's navigation hears it first.
 		ImGui::SetKeyOwner(ImGuiKey_Escape, Owner(), ImGuiInputFlags_LockUntilRelease);
 
+		// The pointer is steering, so what it passes over does not light up.
+		g.HoveredWindow = nullptr;
+		g.HoveredWindowUnderMovingWindow = nullptr;
+
 		if (ImGui::IsMousePosValid())
 			Step(g, state, *window);
 	};
@@ -318,7 +323,7 @@ namespace
 
 		const float length = ImSqrt(ImLengthSqr(state.heading));
 
-		DrawArrow(list, center, ImVec2(state.heading.x / length, state.heading.y / length), scale);
+		DrawArrow(list, center, ImVec2(state.heading.x / length, state.heading.y / length), scale * HEADING_SCALE);
 		DrawDot(list, center, scale);
 	};
 
