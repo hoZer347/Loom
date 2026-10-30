@@ -15,7 +15,7 @@
 
 TEST_SUITE("EditorTheme")
 {
-	TEST_CASE("the emoji fonts draw every icon in the panel titles and tabs")
+	TEST_CASE("the emoji fonts draw every icon in the panel titles, tabs and toolbar")
 	{
 		using namespace Loom;
 

@@ -5130,12 +5130,10 @@ namespace Loom
 
 	void Editor::DrawToolbar()
 	{
-		constexpr const char* labels[] = {
-			EditorIcons::Play,
-			EditorIcons::Pause,
-			EditorIcons::Stop,
-			EditorIcons::Step,
-			EditorIcons::Build };
+		constexpr const char* labels[] =
+		{
+			EditorIcons::Play, EditorIcons::Pause, EditorIcons::Stop, EditorIcons::Step, EditorIcons::Build,
+		};
 		constexpr float frame_sides = 2.0f;
 
 		float label_width = 0.0f;

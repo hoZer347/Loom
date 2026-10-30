@@ -7,7 +7,7 @@
 namespace Loom
 {
 	/*
-	* Every kind of asset, panel and document tab has an emoji, so it can be
+	* Every kind of asset, panel, document tab and toolbar control has an emoji, so it can be
 	* told apart at a glance. EditorTheme merges Segoe UI Emoji into the UI
 	* font for them. A texture shows itself where there is room for a picture,
 	* and this only where there is not.
