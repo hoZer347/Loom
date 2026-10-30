@@ -91,6 +91,9 @@
     <ClCompile Include="EditorCamera Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="ImGuiAutoscroll Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="EditorConsole Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

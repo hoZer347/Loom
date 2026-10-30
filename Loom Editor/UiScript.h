@@ -26,7 +26,8 @@ namespace Loom
 	* - Commands, with a line starting # a comment:
 	*     wait <frames>
 	*     move <target>
-	*     click <target>, rightclick <target>, doubleclick <target>
+	*     click <target>, rightclick <target>, middleclick <target>,
+	*     doubleclick <target>
 	*     backclick <target>, forwardclick <target>
 	*                          the mouse's side buttons
 	*     drag <target> to <target>
@@ -36,6 +37,8 @@ namespace Loom
 	*     hold mouse           presses the left button and leaves it down, for
 	*                          moves to see what a drag shows on the way
 	*     release mouse        lets go of it
+	*     hold middle, release middle
+	*                          the same, for the middle button
 	*     scroll <notches>     turns the wheel where the mouse is, away from you
 	*                          positive
 	*     type <text>          the rest of the line
@@ -176,7 +179,7 @@ namespace Loom
 		int m_retries = 0;
 
 		std::vector<ImGuiKey> m_held{ };
-		bool m_mouseHeld = false;
+		bool m_mouseHeld[ImGuiMouseButton_COUNT]{ };
 		bool m_recordingStages = false;
 		bool m_everyFrameBefore = false;
 

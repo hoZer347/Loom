@@ -18,6 +18,7 @@
 #include "SerializedField.h"
 #include "Skin.h"
 
+#include "ImGuiAutoscroll.h"
 #include "glm/gtc/constants.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 
@@ -1297,6 +1298,9 @@ void main()
 	void ModelEditor::Steer(Document& document, bool hovered)
 	{
 		const ImGuiIO& io = ImGui::GetIO();
+
+		if (hovered)
+			ImGuiAutoscroll::KeepMiddleMouse();
 
 		if (hovered && io.MouseWheel != 0.0f)
 			document.distance = (std::max)(min_distance, document.distance * std::pow(zoom_per_notch, io.MouseWheel));

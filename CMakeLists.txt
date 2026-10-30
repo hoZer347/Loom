@@ -44,6 +44,7 @@ add_library(LoomImGui STATIC
 	"Loom ImGui/imgui_tables.cpp"
 	"Loom ImGui/imgui_widgets.cpp"
 	"Loom ImGui/TextEditor.cpp"
+	"Loom ImGui/ImGuiAutoscroll.cpp"
 	"Loom ImGui/ImGuiItemHooks.cpp")
 target_include_directories(LoomImGui PUBLIC "Loom ImGui" "${LIBS}/glm")
 target_link_libraries(LoomImGui PUBLIC glfw GLEW::GLEW OpenGL::GL Vulkan::Vulkan)

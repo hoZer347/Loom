@@ -4,6 +4,7 @@
 
 #include "glm/gtc/matrix_transform.hpp"
 
+#include "ImGuiAutoscroll.h"
 #include "imgui.h"
 
 #include <algorithm>
@@ -48,6 +49,9 @@ namespace Loom
 	void EditorCamera::Drive(bool hovered, bool held)
 	{
 		const ImGuiIO& io = ImGui::GetIO();
+
+		if (hovered)
+			ImGuiAutoscroll::KeepMiddleMouse();
 
 		const glm::mat4 rotation = Rotation();
 		const glm::vec3 right(rotation[0]);

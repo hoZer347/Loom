@@ -1,5 +1,6 @@
 #include "Engine.h"
 
+#include "ImGuiAutoscroll.h"
 #include "imgui.h"
 
 #include "Audio.h"
@@ -413,6 +414,7 @@ namespace Loom
 		// Setup Dear ImGui context
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
+		ImGuiAutoscroll::Install();
 
 		io = &ImGui::GetIO(); (void)io;
 

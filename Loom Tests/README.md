@@ -104,6 +104,7 @@ its title, address and steps for each browser, and the Copy button.
 | `Benchmark` | Skipped unless asked for with `--no-skip`: the Crowd scene timed step by step as `Benchmarks/Unity Crowd` times it in Unity. `run-physics-benchmark.ps1` runs both in Release and sets them side by side |
 | `ColliderGizmos` | The colliders under a selection drawn in one go over the view, and nothing drawn or compiled without an enabled one or for a MeshCollider |
 | `Input` | Button edges: down for one frame, held, up for one frame, a click inside one frame, buttons GLFW does not have; cursor and screen fields |
+| `ImGuiAutoscroll` | Middle-button scrolling: a held drag toward the pointer and a click left running, speed growing with distance, the dead zone, only overflowing axes moving, Escape or a click ending it unheard, whoever keeps the button or a closable tab keeping the press |
 | `SpeedManager` | `ClampMagnitude` and `MoveTowards`: clamping, no overshoot, zero-length input |
 | `Browser` | Run by `run-browser-tests.ps1` only: real mouse moves, buttons and the spacebar reaching `Input`, GLFW and `DialogueInput`; the page being cross-origin isolated |
 | `SceneHistory` | The editor's undo and redo: exact text both ways, redo cleared by a new edit, unrecorded edits, several scenes, closed scenes, the step cap, guids and references coming back, scene order |

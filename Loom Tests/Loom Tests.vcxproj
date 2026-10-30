@@ -169,6 +169,7 @@
     <ClCompile Include="ProjectTemplate Tests.cpp" />
     <ClCompile Include="Script Exports Tests.cpp" />
     <ClCompile Include="EditorCamera Tests.cpp" />
+    <ClCompile Include="ImGuiAutoscroll Tests.cpp" />
     <ClCompile Include="EditorConsole Tests.cpp" />
     <ClCompile Include="TextFit Tests.cpp" />
     <ClCompile Include="KeyBindings Tests.cpp" />

@@ -3,6 +3,7 @@
 #include "EditorIcons.h"
 #include "ProjectAssets.h"
 
+#include "ImGuiAutoscroll.h"
 #include "imgui_internal.h"
 
 #include <algorithm>
@@ -547,6 +548,9 @@ namespace Loom
 
 		const bool hovered = ImGui::IsItemHovered();
 		const ImGuiIO& io = ImGui::GetIO();
+
+		if (hovered)
+			ImGuiAutoscroll::KeepMiddleMouse();
 
 		if (document.zoom == 0.0f)
 			Fit(document, size);

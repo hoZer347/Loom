@@ -427,7 +427,7 @@ namespace Loom
 		}
 		else if (verb == "move")
 			return aim_only();
-		else if (verb == "click" || verb == "rightclick" || verb == "doubleclick" || verb == "backclick" || verb == "forwardclick")
+		else if (verb == "click" || verb == "rightclick" || verb == "middleclick" || verb == "doubleclick" || verb == "backclick" || verb == "forwardclick")
 		{
 			if (!aim_only())
 				return false;
@@ -436,6 +436,8 @@ namespace Loom
 
 			if (verb == "rightclick")
 				button = ImGuiMouseButton_Right;
+			else if (verb == "middleclick")
+				button = ImGuiMouseButton_Middle;
 			else if (verb == "backclick")
 				button = TabHistory::back_button;
 			else if (verb == "forwardclick")
@@ -488,15 +490,16 @@ namespace Loom
 
 			press(ImGuiMouseButton_Left, false);
 		}
-		else if ((verb == "hold" || verb == "release") && tokens.size() == 2 && tokens[1] == "mouse")
+		else if ((verb == "hold" || verb == "release") && tokens.size() == 2 && (tokens[1] == "mouse" || tokens[1] == "middle"))
 		{
 			const bool down = verb == "hold";
+			const ImGuiMouseButton button = tokens[1] == "mouse" ? ImGuiMouseButton_Left : ImGuiMouseButton_Middle;
 
-			press(ImGuiMouseButton_Left, down);
+			press(button, down);
 			m_actions.push_back(
-				[this, down]()
+				[this, button, down]()
 				{
-					m_mouseHeld = down;
+					m_mouseHeld[button] = down;
 					return Result::Done;
 				});
 		}
@@ -809,11 +812,14 @@ namespace Loom
 
 		m_held.clear();
 
-		if (m_mouseHeld)
+		for (const ImGuiMouseButton button : { ImGuiMouseButton_Left, ImGuiMouseButton_Middle })
 		{
-			m_context->IO.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
-			Input::OnMouseButtonThisFrame(ImGuiMouseButton_Left, false);
-			m_mouseHeld = false;
+			if (m_mouseHeld[button])
+			{
+				m_context->IO.AddMouseButtonEvent(button, false);
+				Input::OnMouseButtonThisFrame(button, false);
+				m_mouseHeld[button] = false;
+			};
 		};
 	};
 

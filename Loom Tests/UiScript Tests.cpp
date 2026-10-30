@@ -200,6 +200,42 @@ TEST_SUITE("UiScript")
 		CHECK(rights == 1);
 	};
 
+	TEST_CASE("the middle button clicks, holds through moves and lets go")
+	{
+		ScriptedUi ui(
+			"middleclick \"Panel\" \"Target\"\n"
+			"hold middle\n"
+			"wait 2\n"
+			"release middle\n"
+			"hold middle\n");
+
+		int clicks = 0;
+		int frames_held = 0;
+
+		ui.Run(
+			[&]()
+			{
+				Panel(
+					[&]()
+					{
+						ImGui::Button("Target");
+
+						if (ImGui::IsItemClicked(ImGuiMouseButton_Middle))
+							clicks++;
+
+						if (ImGui::IsMouseDown(ImGuiMouseButton_Middle))
+							frames_held++;
+					});
+			});
+
+		CHECK_FALSE(ui.script->Failed());
+		CHECK(clicks == 3);
+		CHECK(frames_held > 1);
+		ImGui::NewFrame();
+		CHECK_FALSE(ImGui::IsMouseDown(ImGuiMouseButton_Middle));
+		ImGui::EndFrame();
+	};
+
 	// Enter first: inside the field, Ctrl+Z would undo the typing.
 	TEST_CASE("typing goes into the field clicked, and a chord is pressed")
 	{

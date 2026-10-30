@@ -17,6 +17,7 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #endif
 
+#include "ImGuiAutoscroll.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 
@@ -1438,6 +1439,10 @@ void TextEditor::handleMouseInteractions() {
 		ImVec2((mousePos.x - textLeftOffset) / glyphSize.x, mousePos.y / glyphSize.y),
 		glyphPos,
 		cursorPos);
+
+	if (ImGui::IsWindowHovered()) {
+		ImGuiAutoscroll::KeepMiddleMouse();
+	}
 
 	panning &= config.panMode && ImGui::IsMouseDown(ImGuiMouseButton_Middle);
 
