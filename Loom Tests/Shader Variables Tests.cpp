@@ -181,48 +181,7 @@ TEST_SUITE("Shader variables")
 
 	#pragma endregion
 
-	#pragma region Declaring in Files
-
-	TEST_CASE("declaring into a file without a COMMON section adds one in front of the stages")
-	{
-		const ShaderFile file("declare without common.shader", "// A header comment.\n\n" + STAGES);
-
-		std::string error;
-		REQUIRE(Loom::DeclareShaderVariable(file.path.string(), "", { "u_tint", Loom::UniformType::Vec3, Loom::UniformScope::Instance }, error));
-
-		const std::string text = file.Text();
-
-		CHECK(text.find("// A header comment.\n\n// ===COMMON===\n\nuniform vec3 u_tint; // instance\n\n// ===VERTEX===") != std::string::npos);
-
-		const std::vector<Loom::ShaderVariable> variables = Loom::ParseShaderVariables(text);
-
-		REQUIRE(variables.size() == 1);
-		CHECK(variables[0].scope == Loom::UniformScope::Instance);
-	};
-
-	TEST_CASE("a new declaration goes after the ones already in COMMON, keeping the file's line endings")
-	{
-		const ShaderFile file(
-			"declare after.shader",
-			"// ===COMMON===\r\n"
-			"precision highp sampler2DShadow;\r\n"
-			"uniform float u_first; // material\r\n"
-			"\r\n"
-			"float Helper() { return 1.0; }\r\n"
-			"// ===VERTEX===\r\n");
-
-		std::string error;
-		REQUIRE(Loom::DeclareShaderVariable(file.path.string(), "", { "u_second", Loom::UniformType::Int }, error));
-
-		CHECK(file.Text() ==
-			"// ===COMMON===\r\n"
-			"precision highp sampler2DShadow;\r\n"
-			"uniform float u_first; // material\r\n"
-			"uniform int u_second; // material\r\n"
-			"\r\n"
-			"float Helper() { return 1.0; }\r\n"
-			"// ===VERTEX===\r\n");
-	};
+	#pragma region Settings in Files
 
 	TEST_CASE("writing the settings into a file without them adds the section in front of the stages")
 	{
@@ -263,72 +222,6 @@ TEST_SUITE("Shader variables")
 			"\r\n"
 			"// ===FRAGMENT===\r\n"
 			"void main() { }\r\n");
-
-		// A variable declared afterwards goes in its own section, not the settings.
-		REQUIRE(Loom::DeclareShaderVariable(file.path.string(), "", { "u_speed" }, error));
-		CHECK_NOTHROW(Loom::ParseShaderSettings(file.Text()));
-		CHECK(Loom::ParseShaderVariables(file.Text()).size() == 1);
-	};
-
-	TEST_CASE("redeclaring a variable rewrites its line where it is")
-	{
-		const ShaderFile file("redeclare.shader", "// ===FRAGMENT===\n\tuniform float u_speed;\nvoid main() { }\n");
-
-		std::string error;
-		REQUIRE(Loom::DeclareShaderVariable(file.path.string(), "u_speed", { "u_speed", Loom::UniformType::Vec2, Loom::UniformScope::Instance }, error));
-
-		CHECK(file.Text() == "// ===FRAGMENT===\n\tuniform vec2 u_speed; // instance\nvoid main() { }\n");
-	};
-
-	TEST_CASE("a name that is taken, the engine's or not GLSL is refused")
-	{
-		const ShaderFile file("refused.shader", "// ===COMMON===\nuniform float u_speed;\n" + STAGES);
-		const std::string before = file.Text();
-
-		std::string error;
-
-		CHECK_FALSE(Loom::DeclareShaderVariable(file.path.string(), "", { "u_speed" }, error));
-		CHECK_FALSE(error.empty());
-
-		CHECK_FALSE(Loom::DeclareShaderVariable(file.path.string(), "", { "u_model" }, error));
-		CHECK_FALSE(Loom::DeclareShaderVariable(file.path.string(), "", { "2fast" }, error));
-		CHECK_FALSE(Loom::DeclareShaderVariable(file.path.string(), "", { "gl_Mine" }, error));
-
-		CHECK(file.Text() == before);
-	};
-
-	TEST_CASE("removing a variable takes its line out of the file")
-	{
-		const ShaderFile file("remove.shader", "// ===COMMON===\nuniform float u_speed; // material\nuniform vec3 u_tint;\n" + STAGES);
-
-		std::string error;
-		REQUIRE(Loom::RemoveShaderVariable(file.path.string(), "u_speed", error));
-
-		CHECK(file.Text() == "// ===COMMON===\nuniform vec3 u_tint;\n" + STAGES);
-
-		CHECK_FALSE(Loom::RemoveShaderVariable(file.path.string(), "u_speed", error));
-	};
-
-	// One variable to the table, so every line declaring it goes with it:
-	// stages that disagree on a type do not link.
-	TEST_CASE("a uniform both stages declare is retyped and removed in both")
-	{
-		const ShaderFile file(
-			"both stages.shader",
-			"// ===VERTEX===\nuniform float u_wave;\nvoid main() { }\n"
-			"// ===FRAGMENT===\nuniform float u_wave;\nvoid main() { }\n");
-
-		std::string error;
-		REQUIRE(Loom::DeclareShaderVariable(file.path.string(), "u_wave", { "u_wave", Loom::UniformType::Vec2 }, error));
-
-		CHECK(file.Text() ==
-			"// ===VERTEX===\nuniform vec2 u_wave; // material\nvoid main() { }\n"
-			"// ===FRAGMENT===\nuniform vec2 u_wave; // material\nvoid main() { }\n");
-
-		REQUIRE(Loom::RemoveShaderVariable(file.path.string(), "u_wave", error));
-
-		CHECK(file.Text() == "// ===VERTEX===\nvoid main() { }\n// ===FRAGMENT===\nvoid main() { }\n");
-		CHECK(Loom::ParseShaderVariables(file.Text()).empty());
 	};
 
 	#pragma endregion

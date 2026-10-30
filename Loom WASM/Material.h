@@ -144,14 +144,10 @@ namespace Loom
 		#pragma region Editor
 
 		void DrawSettings();
-		void DrawDeclarations();
 
 		// After the shader file has been rewritten, or failed to be, with why
 		// in error.
 		void Edited(bool written, const std::string& error);
-
-		// The declaration being typed into the table's last row.
-		ShaderVariable m_new_variable;
 
 		// Why the last edit to the shader file failed, shown until the next one.
 		std::string m_edit_error;

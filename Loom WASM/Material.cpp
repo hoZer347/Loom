@@ -68,59 +68,6 @@ namespace Loom
 		};
 
 		#pragma endregion
-
-		#pragma region Editor
-
-		constexpr const char* SCOPE_NAMES[] = { "Material", "Instance", "Compute" };
-
-		bool TypeCombo(UniformType& type)
-		{
-			bool changed = false;
-
-			if (ImGui::BeginCombo("##type", InfoOf(type).glsl))
-			{
-				for (const UniformTypeInfo& info : UNIFORM_TYPES)
-					if (ImGui::Selectable(info.glsl, info.type == type))
-					{
-						changed = info.type != type;
-						type = info.type;
-					};
-
-				ImGui::EndCombo();
-			};
-
-			return changed;
-		};
-
-		// Compute is offered only to a sampler, the one type a ComputeShader fills.
-		bool ScopeCombo(UniformScope& scope, UniformType type)
-		{
-			bool changed = false;
-
-			if (type != UniformType::Sampler2D && scope == UniformScope::Compute)
-			{
-				scope = UniformScope::Material;
-				changed = true;
-			};
-
-			const int offered = type == UniformType::Sampler2D ? (int)std::size(SCOPE_NAMES) : (int)UniformScope::Compute;
-
-			if (ImGui::BeginCombo("##scope", SCOPE_NAMES[(int)scope]))
-			{
-				for (int i = 0; i < offered; i++)
-					if (ImGui::Selectable(SCOPE_NAMES[i], i == (int)scope))
-					{
-						changed = i != (int)scope;
-						scope = (UniformScope)i;
-					};
-
-				ImGui::EndCombo();
-			};
-
-			return changed;
-		};
-
-		#pragma endregion
 	};
 
 	#pragma region Shader
@@ -264,7 +211,8 @@ namespace Loom
 		if (DrawShaderVariables(shader->variables, UniformScope::Material, values))
 			variables = std::move(values);
 
-		DrawDeclarations();
+		if (!m_edit_error.empty())
+			ImGui::TextWrapped("%s", m_edit_error.c_str());
 	};
 
 	void Material::OnFieldChanged(const SerializedField& field)
@@ -301,106 +249,6 @@ namespace Loom
 
 		std::string error;
 		Edited(WriteShaderSettings(shader->file_path, settings, error), error);
-	};
-
-	void Material::DrawDeclarations()
-	{
-		// Open to begin with: adding a variable is the reason to look here.
-		if (!ImGui::TreeNodeEx("Shader Variables", ImGuiTreeNodeFlags_DefaultOpen))
-			return;
-
-		constexpr int COLUMNS = 4;
-
-		// Wide enough for the longest choice and the combo's arrow.
-		const auto combo_width = [](const char* longest)
-			{
-				return ImGui::CalcTextSize(longest).x + ImGui::GetFrameHeight() + ImGui::GetStyle().FramePadding.x * 2;
-			};
-
-		if (ImGui::BeginTable("##declarations", COLUMNS))
-		{
-			ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
-			ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, combo_width(InfoOf(UniformType::Sampler2D).glsl));
-			ImGui::TableSetupColumn("Scope", ImGuiTableColumnFlags_WidthFixed, combo_width(SCOPE_NAMES[(int)UniformScope::Material]));
-			ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
-
-			// A copy, since rewriting the file replaces this list.
-			const std::vector<ShaderVariable> declared = shader->variables;
-
-			for (const ShaderVariable& variable : declared)
-			{
-				ImGui::PushID(variable.name.c_str());
-				ImGui::TableNextRow();
-
-				ImGui::TableNextColumn();
-				ImGui::AlignTextToFramePadding();
-				ImGui::TextUnformatted(variable.name.c_str());
-
-				ShaderVariable changed = variable;
-				std::string error;
-
-				ImGui::TableNextColumn();
-				ImGui::SetNextItemWidth(-FLT_MIN);
-				const bool retyped = TypeCombo(changed.type);
-
-				ImGui::TableNextColumn();
-				ImGui::SetNextItemWidth(-FLT_MIN);
-				const bool rescoped = ScopeCombo(changed.scope, changed.type);
-
-				if (retyped || rescoped)
-					Edited(DeclareShaderVariable(shader->file_path, variable.name, changed, error), error);
-
-				ImGui::TableNextColumn();
-
-				if (ImGui::SmallButton("x"))
-					Edited(RemoveShaderVariable(shader->file_path, variable.name, error), error);
-
-				ImGui::SetItemTooltip("Take %s out of the shader file", variable.name.c_str());
-
-				ImGui::PopID();
-			};
-
-			ImGui::PushID("##new");
-			ImGui::TableNextRow();
-
-			ImGui::TableNextColumn();
-			ImGui::SetNextItemWidth(-FLT_MIN);
-			InputTextString("##name", m_new_variable.name);
-			ImGui::SetItemTooltip("The new variable's name, as the shader will use it");
-
-			ImGui::TableNextColumn();
-			ImGui::SetNextItemWidth(-FLT_MIN);
-			TypeCombo(m_new_variable.type);
-
-			ImGui::TableNextColumn();
-			ImGui::SetNextItemWidth(-FLT_MIN);
-			ScopeCombo(m_new_variable.scope, m_new_variable.type);
-
-			ImGui::TableNextColumn();
-			ImGui::BeginDisabled(m_new_variable.name.empty());
-
-			if (ImGui::SmallButton("+"))
-			{
-				std::string error;
-				const bool written = DeclareShaderVariable(shader->file_path, "", m_new_variable, error);
-
-				Edited(written, error);
-
-				if (written)
-					m_new_variable.name.clear();
-			};
-
-			ImGui::EndDisabled();
-			ImGui::SetItemTooltip("Declare it in the shader file");
-
-			ImGui::PopID();
-			ImGui::EndTable();
-		};
-
-		if (!m_edit_error.empty())
-			ImGui::TextWrapped("%s", m_edit_error.c_str());
-
-		ImGui::TreePop();
 	};
 
 	void Material::Edited(bool written, const std::string& error)

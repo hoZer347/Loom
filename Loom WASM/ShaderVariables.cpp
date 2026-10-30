@@ -25,34 +25,20 @@ namespace Loom
 		#pragma region Variables
 
 		constexpr const char* INSTANCE_TAG = "instance";
-		constexpr const char* MATERIAL_TAG = "material";
 		constexpr const char* COMPUTE_TAG = "compute";
-
-		const char* TagOf(UniformScope scope)
-		{
-			switch (scope)
-			{
-			case UniformScope::Instance:	return INSTANCE_TAG;
-			case UniformScope::Compute:		return COMPUTE_TAG;
-			default:						return MATERIAL_TAG;
-			};
-		};
-
-		// GLSL keeps gl_ for itself.
-		constexpr std::string_view RESERVED_PREFIX = "gl_";
 
 		const std::regex& DeclarationPattern()
 		{
-			// Indentation, type, name and the word in a trailing comment.
+			// Type, name and the word in a trailing comment.
 			static const std::regex pattern(
-				R"(^(\s*)uniform\s+(?:(?:lowp|mediump|highp)\s+)?(\w+)\s+(\w+)\s*;\s*(?://\s*(\w+))?.*$)");
+				R"(^\s*uniform\s+(?:(?:lowp|mediump|highp)\s+)?(\w+)\s+(\w+)\s*;\s*(?://\s*(\w+))?.*$)");
 
 			return pattern;
 		};
 
-		constexpr size_t TYPE_MATCH = 2;
-		constexpr size_t NAME_MATCH = 3;
-		constexpr size_t TAG_MATCH = 4;
+		constexpr size_t TYPE_MATCH = 1;
+		constexpr size_t NAME_MATCH = 2;
+		constexpr size_t TAG_MATCH = 3;
 
 		// Set by Material, Mesh, Camera and Light, so never a variable.
 		bool IsEngineUniform(std::string_view name)
@@ -61,19 +47,6 @@ namespace Loom
 				std::begin(ENGINE_SHADER_SYMBOLS),
 				std::end(ENGINE_SHADER_SYMBOLS),
 				[name](const ShaderSymbol& symbol) { return symbol.uniform && symbol.name == name; });
-		};
-
-		std::string Declaration(const ShaderVariable& variable)
-		{
-			return
-				std::string("uniform ") + InfoOf(variable.type).glsl + ' ' + variable.name + "; // " + TagOf(variable.scope);
-		};
-
-		bool IsIdentifier(const std::string& name)
-		{
-			static const std::regex identifier(R"([A-Za-z_]\w*)");
-
-			return std::regex_match(name, identifier);
 		};
 
 		#pragma endregion
@@ -140,49 +113,6 @@ namespace Loom
 					error = "Could not write " + path;
 
 				return (bool)file;
-			};
-
-			// Every line, since each stage can declare the same uniform.
-			std::vector<size_t> Declaring(const std::string& name) const
-			{
-				std::vector<size_t> found;
-				std::smatch match;
-
-				for (size_t i = 0; i < lines.size(); i++)
-					if (std::regex_match(lines[i], match, DeclarationPattern()) && match[NAME_MATCH] == name)
-						found.push_back(i);
-
-				return found;
-			};
-
-			// After COMMON's leading declarations, or ahead of the first section if there is none.
-			size_t InsertionPoint()
-			{
-				const auto common = std::find_if(
-					lines.begin(),
-					lines.end(),
-					[](const std::string& line) { return line.find(COMMON_SECTION) != std::string::npos; });
-
-				if (common == lines.end())
-				{
-					const size_t first = std::find_if(lines.begin(), lines.end(), IsSectionMarker) - lines.begin();
-
-					lines.insert(lines.begin() + first, { std::string("// ") + COMMON_SECTION, "", "" });
-
-					return first + 2;
-				};
-
-				size_t at = common - lines.begin() + 1;
-
-				for (size_t i = at; i < lines.size() && !IsSectionMarker(lines[i]); i++)
-				{
-					const std::string trimmed = Trimmed(lines[i]);
-
-					if (trimmed.starts_with("uniform") || trimmed.starts_with("precision"))
-						at = i + 1;
-				};
-
-				return at;
 			};
 		};
 
@@ -499,73 +429,6 @@ namespace Loom
 		};
 
 		return variables;
-	};
-
-	bool DeclareShaderVariable(const std::string& path, const std::string& replacing, const ShaderVariable& variable, std::string& error)
-	{
-		if (!IsIdentifier(variable.name) || variable.name.starts_with(RESERVED_PREFIX))
-		{
-			error = "'" + variable.name + "' is not a name GLSL allows";
-			return false;
-		};
-
-		if (IsEngineUniform(variable.name))
-		{
-			error = variable.name + " is set by the engine";
-			return false;
-		};
-
-		ShaderFile file;
-
-		if (!file.Read(path, error))
-			return false;
-
-		if (!file.Declaring(variable.name).empty() && variable.name != replacing)
-		{
-			error = path + " already declares " + variable.name;
-			return false;
-		};
-
-		const std::vector<size_t> replaced = replacing.empty() ? std::vector<size_t>{ } : file.Declaring(replacing);
-
-		for (const size_t line : replaced)
-		{
-			std::smatch match;
-			std::regex_match(file.lines[line], match, DeclarationPattern());
-
-			file.lines[line] = match[1].str() + Declaration(variable);
-		};
-
-		if (replaced.empty())
-		{
-			// Apart, since finding the point can add lines.
-			const size_t at = file.InsertionPoint();
-			file.lines.insert(file.lines.begin() + at, Declaration(variable));
-		};
-
-		return file.Write(path, error);
-	};
-
-	bool RemoveShaderVariable(const std::string& path, const std::string& name, std::string& error)
-	{
-		ShaderFile file;
-
-		if (!file.Read(path, error))
-			return false;
-
-		const std::vector<size_t> declaring = file.Declaring(name);
-
-		if (declaring.empty())
-		{
-			error = path + " does not declare " + name;
-			return false;
-		};
-
-		// From the last, so the lines still to go keep their places.
-		for (auto line = declaring.rbegin(); line != declaring.rend(); line++)
-			file.lines.erase(file.lines.begin() + *line);
-
-		return file.Write(path, error);
 	};
 
 	#pragma endregion

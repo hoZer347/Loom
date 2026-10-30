@@ -138,9 +138,8 @@ namespace Loom
 	*   to one the engine sets (u_model, u_color, the camera's and the light's)
 	* - The shader file is where they live: each is a line such as
 	*     uniform vec3 u_tint; // instance
-	*   which the editor writes into the file's COMMON section. Without the
-	*   comment, or with "// material", it is per material, and with
-	*   "// compute" it is a compute shader's data
+	*   Without the comment, or with "// material", it is per material, and
+	*   with "// compute" it is a compute shader's data
 	*/
 	struct ShaderVariable
 	{
@@ -151,16 +150,6 @@ namespace Loom
 
 	// Every uniform the source declares, bar the ones the engine sets.
 	LOOM_API std::vector<ShaderVariable> ParseShaderVariables(const std::string& source);
-
-	// Writes the variable's declaration into the shader file: over the line
-	// declaring replacing when it names one, otherwise into the COMMON
-	// section, which it adds when the file has none. False, with why in error,
-	// when the name is not one a variable can have or the file cannot be
-	// written.
-	LOOM_API bool DeclareShaderVariable(const std::string& path, const std::string& replacing, const ShaderVariable& variable, std::string& error);
-
-	// Takes the line declaring the variable out of the shader file.
-	LOOM_API bool RemoveShaderVariable(const std::string& path, const std::string& name, std::string& error);
 
 	#pragma endregion
 
