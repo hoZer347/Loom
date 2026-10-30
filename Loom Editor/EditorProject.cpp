@@ -2477,7 +2477,7 @@ namespace Loom
 			std::vector<std::string> names{ };
 
 			for (const auto& [name, entry] : m_scriptEntries)
-				if (entry.kind == *listed)
+				if (entry.kind == *listed && !BuiltInShaders::SourceOf(name))
 					names.push_back(name);
 
 			FolderTree::Hooks hooks = ScriptFolderHooks();
@@ -2493,7 +2493,7 @@ namespace Loom
 			std::vector<std::string> files{ };
 
 			for (const std::string& file : tab->files)
-				if (field.AcceptsFile(file) && !BuiltInShaders::SourceOf(file))
+				if (field.AcceptsFile(file))
 					files.push_back(file);
 
 			FolderTree::Hooks hooks = FileFolderHooks(*tab);
