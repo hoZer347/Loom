@@ -324,15 +324,15 @@ TEST_SUITE("Skin")
 		rig.skin->m_influences = Bound({ 0.0f });
 		rig.bone->transform.position = glm::vec3(2.0f, 0.0f, 0.0f);
 
-		const unsigned long long vertices = rig.mesh->m_vertices.Version();
-		const unsigned long long normals = rig.mesh->m_normals.Version();
-		const unsigned long long influences = rig.skin->m_influences.Version();
+		const unsigned long long vertices = rig.mesh->VersionOf(&rig.mesh->m_vertices);
+		const unsigned long long normals = rig.mesh->VersionOf(&rig.mesh->m_normals);
+		const unsigned long long influences = rig.skin->VersionOf(&rig.skin->m_influences);
 
 		rig.skin->Deform(*rig.mesh);
 
-		CHECK(rig.mesh->m_vertices.Version() == vertices);
-		CHECK(rig.mesh->m_normals.Version() == normals);
-		CHECK(rig.skin->m_influences.Version() == influences);
+		CHECK(rig.mesh->VersionOf(&rig.mesh->m_vertices) == vertices);
+		CHECK(rig.mesh->VersionOf(&rig.mesh->m_normals) == normals);
+		CHECK(rig.skin->VersionOf(&rig.skin->m_influences) == influences);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a skinned mesh held still is handed to the renderer once")

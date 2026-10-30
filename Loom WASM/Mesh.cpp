@@ -340,7 +340,7 @@ namespace Loom
 
 	CullFace Mesh::FarSide()
 	{
-		const unsigned long long version = m_vertices.Version() + primitive_id.Version();
+		const unsigned long long version = VersionOf(&m_vertices) + VersionOf(&primitive_id);
 
 		if (m_farSideVersion != version)
 		{
@@ -432,17 +432,17 @@ namespace Loom
 		const bool deformed = m_deformed.size() == vertices.size();
 
 		const Handed handed{
-			m_vertices.Version(),
-			m_textureCoordinates.Version(),
-			m_normals.Version(),
-			m_colors.Version(),
-			m_uvLayers.Version(),
-			m_draw_type.Version(),
+			VersionOf(&m_vertices),
+			VersionOf(&m_textureCoordinates),
+			VersionOf(&m_normals),
+			VersionOf(&m_colors),
+			VersionOf(&m_uvLayers),
+			VersionOf(&m_draw_type),
 			deformed,
 			deformed ? m_deformedVersion : 0,
 			gpuSkin != nullptr,
-			gpuSkin ? gpuSkin->m_influences.Version() : 0,
-			gpuSkin ? gpuSkin->m_joints.Version() : 0 };
+			gpuSkin ? gpuSkin->VersionOf(&gpuSkin->m_influences) : 0,
+			gpuSkin ? gpuSkin->VersionOf(&gpuSkin->m_joints) : 0 };
 
 		if (m_keeper != &renderer)
 		{

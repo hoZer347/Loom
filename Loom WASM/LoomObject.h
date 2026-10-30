@@ -111,6 +111,17 @@ namespace Loom
 		// it does an enum's. Empty for a field that is just a number.
 		virtual std::vector<std::string> GetFieldChoices(const SerializedField& field) { return { }; };
 
+		// The count of changes to a Serial of this object: VersionOf(&m_vertices).
+		// Goes up each time the value is changed: assigned, reached into with
+		// * or -> without const, or written through its SerializedField. While
+		// it holds still, so does the value, so whatever is made from it, such
+		// as a mesh's vertices on the GPU, need not be made again. It starts
+		// where no other field's has, so a field made where another one was
+		// never passes for it. Reach in through a const Serial to look without
+		// counting. A number or a vector is only counted while changes are
+		// watched, or when written through its SerializedField.
+		unsigned long long VersionOf(const void* serial) const;
+
 		#pragma endregion
 
 		#pragma region Journal
@@ -165,14 +176,13 @@ namespace Loom
 		#pragma region Fields
 
 		// Declaring a Serial member is what fills these in.
-		friend LOOM_API LoomObject* RegisterSerialField(
+		friend LOOM_API void RegisterSerialField(
 			FieldType type,
 			void* data,
 			LoomObject* (*get_reference)(void*),
 			void (*set_reference)(void*, LoomObject*),
 			bool (*accepts_reference)(LoomObject*),
 			const char* name,
-			unsigned long long* version,
 			std::span<const char* const> extensions);
 
 		std::vector<SerializedField> m_fields{ };
@@ -188,6 +198,7 @@ namespace Loom
 		#pragma region Journal
 
 		friend LOOM_API void SerialChanged(LoomObject* owner, bool reference);
+		friend LOOM_API void SerialChangedAt(const void* data, bool reference, bool counted);
 
 		static inline std::atomic<bool> watching = false;
 		static inline std::atomic<unsigned long long> watch_count = 0;

@@ -2,9 +2,13 @@
 
 #include "Engine.h"
 
+#include <array>
 #include <atomic>
+#include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <iostream>
+#include <unordered_map>
 
 
 namespace Loom
@@ -13,6 +17,29 @@ namespace Loom
 	{
 		// The object whose constructor last started on this thread, owner of any Serial being built.
 		thread_local LoomObject* constructing = nullptr;
+
+		// What a Serial needs but does not hold, kept by the Serial's address.
+		struct SerialRecord
+		{
+			LoomObject* owner = nullptr;
+			unsigned long long version = 0;
+		};
+
+		// Several, so threads writing different fields rarely meet.
+		struct SerialShard
+		{
+			std::shared_mutex mutex{ };
+			std::unordered_map<const void*, SerialRecord> records{ };
+		};
+
+		constexpr size_t SERIAL_SHARDS = 64;
+
+		std::array<SerialShard, SERIAL_SHARDS> serial_shards{ };
+
+		SerialShard& ShardOf(const void* data)
+		{
+			return serial_shards[std::hash<const void*>{ }(data) % SERIAL_SHARDS];
+		};
 	};
 
 	#pragma region Identity
@@ -134,21 +161,18 @@ namespace Loom
 
 	#pragma region Fields
 
-	LoomObject* RegisterSerialField(
+	void RegisterSerialField(
 		FieldType type,
 		void* data,
 		LoomObject* (*get_reference)(void*),
 		void (*set_reference)(void*, LoomObject*),
 		bool (*accepts_reference)(LoomObject*),
 		const char* name,
-		unsigned long long* version,
 		std::span<const char* const> extensions)
 	{
 		// Each field's count starts this far past the last, beyond any field's changes.
 		constexpr int VERSIONS_EACH = 32;
 		static std::atomic<unsigned long long> fields{ 0 };
-
-		*version = fields.fetch_add(1) << VERSIONS_EACH;
 
 		LoomObject* owner = constructing;
 
@@ -158,7 +182,19 @@ namespace Loom
 				<< "A Serial field has no LoomObject under construction on this"
 				   " thread to belong to" << std::endl;
 
-			return nullptr;
+			return;
+		};
+
+		SerialShard& shard = ShardOf(data);
+		unsigned long long* version = nullptr;
+
+		{
+			std::unique_lock lock{ shard.mutex };
+
+			SerialRecord& record = shard.records[data];
+
+			record = { owner, fields.fetch_add(1) << VERSIONS_EACH };
+			version = &record.version;
 		};
 
 		// Under the lock, since destructors elsewhere read their holders' fields.
@@ -181,8 +217,15 @@ namespace Loom
 
 		if (type == FieldType::Reference)
 			owner->ReferencesWritten();
+	};
 
-		return owner;
+	unsigned long long LoomObject::VersionOf(const void* serial) const
+	{
+		for (const SerializedField& field : m_fields)
+			if (field.data == serial)
+				return *field.version;
+
+		return 0;
 	};
 
 	void RegisterButton(const char* name, const std::function<void()>* press)
@@ -304,6 +347,29 @@ namespace Loom
 			owner->ReferencesWritten();
 	};
 
+	void SerialChangedAt(const void* data, bool reference, bool counted)
+	{
+		if (!counted && !LoomObject::watching)
+			return;
+
+		SerialShard& shard = ShardOf(data);
+		LoomObject* owner = nullptr;
+
+		{
+			std::shared_lock lock{ shard.mutex };
+
+			const auto found = shard.records.find(data);
+
+			if (found == shard.records.end())
+				return;
+
+			found->second.version++;
+			owner = found->second.owner;
+		};
+
+		SerialChanged(owner, reference);
+	};
+
 	#pragma endregion
 
 	#pragma region References
@@ -392,6 +458,17 @@ namespace Loom
 
 			if (watching)
 				destroyed.push_back(this);
+		};
+
+		for (const SerializedField& field : m_fields)
+		{
+			SerialShard& shard = ShardOf(field.data);
+			std::unique_lock lock{ shard.mutex };
+
+			const auto found = shard.records.find(field.data);
+
+			if (found != shard.records.end() && found->second.owner == this)
+				shard.records.erase(found);
 		};
 
 		if (m_referencesDirty)

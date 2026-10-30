@@ -200,10 +200,10 @@ namespace Loom
 
 		Pose pose{
 			&mesh,
-			mesh.m_vertices.Version(),
-			mesh.m_normals.Version(),
-			m_influences.Version(),
-			m_shapeOffsets.Version(),
+			mesh.VersionOf(&mesh.m_vertices),
+			mesh.VersionOf(&mesh.m_normals),
+			VersionOf(&m_influences),
+			VersionOf(&m_shapeOffsets),
 			weights,
 			std::move(matrices) };
 

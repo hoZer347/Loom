@@ -45,19 +45,23 @@ namespace Loom
 	// thread, and returns that object. A Serial member is built as part of its
 	// owner, before that constructor has finished, which is what makes that
 	// object the right one.
-	LOOM_API LoomObject* RegisterSerialField(
+	LOOM_API void RegisterSerialField(
 		FieldType type,
 		void* data,
 		LoomObject* (*get_reference)(void*),
 		void (*set_reference)(void*, LoomObject*),
 		bool (*accepts_reference)(LoomObject*),
 		const char* name,
-		unsigned long long* version,
 		std::span<const char* const> extensions = { });
 
 	// After a field of owner changed, for the journal of what changed and,
 	// for a reference, the index of who points where.
 	LOOM_API void SerialChanged(LoomObject* owner, bool reference);
+
+	// The same for the field at data, counting the change. A Serial holds only
+	// its value, so its owner and count are found from where it sits. Unless
+	// counted, that search is skipped while nothing watches for changes.
+	LOOM_API void SerialChangedAt(const void* data, bool reference, bool counted);
 
 	// Hands a button to the same object, with its name and what pressing it runs.
 	LOOM_API void RegisterButton(const char* name, const std::function<void()>* press);
@@ -245,15 +249,6 @@ namespace Loom
 			else return &m_value;
 		};
 
-		// Goes up each time the value is changed: assigned, reached into with
-		// * or -> without const, or written through its SerializedField. While
-		// it holds still, so does the value, so whatever is made from it, such
-		// as a mesh's vertices on the GPU, need not be made again. It starts
-		// where no other field's has, so a field made where another one was
-		// never passes for it. Reach in through a const Serial to look without
-		// counting.
-		unsigned long long Version() const { return m_version; };
-
 		#pragma endregion
 
 	private:
@@ -261,12 +256,22 @@ namespace Loom
 
 		void Changed()
 		{
-			m_version++;
-			SerialChanged(m_owner, std::is_pointer_v<T>);
+			constexpr FieldType type = FieldTypeOf<T>();
+
+			// Written far more often than anything else, and nothing is made from them.
+			constexpr bool plain =
+				std::is_arithmetic_v<T> ||
+				type == FieldType::Vec2 ||
+				type == FieldType::Vec3 ||
+				type == FieldType::Vec4;
+
+			SerialChangedAt(Data(), std::is_pointer_v<T>, !plain);
 		};
 
 		void Register()
 		{
+			static_assert(sizeof(Serial) == sizeof(T), "A Serial holds its value and nothing else");
+
 			if constexpr (std::is_pointer_v<T>)
 			{
 				static_assert(
@@ -276,7 +281,7 @@ namespace Loom
 				// Generated here, where T is still known: the LoomObject part of
 				// a T is not necessarily at the front of it, so the field cannot
 				// do these casts through a LoomObject** of its own.
-				m_owner = RegisterSerialField(
+				RegisterSerialField(
 					FieldType::Reference,
 					&m_value,
 					[](void* data) -> LoomObject*
@@ -291,14 +296,13 @@ namespace Loom
 					{
 						return dynamic_cast<T>(object) != nullptr;
 					},
-					name.value,
-					&m_version);
+					name.value);
 			}
 			else if constexpr (FieldTypeOf<T>() == FieldType::Asset)
-				m_owner = RegisterSerialField(FieldType::Asset, Data(), nullptr, nullptr, nullptr, name.value, &m_version, T::fileExtensions);
+				RegisterSerialField(FieldType::Asset, Data(), nullptr, nullptr, nullptr, name.value, T::fileExtensions);
 			else if constexpr (FieldTypeOf<T>() == FieldType::AssetList)
-				m_owner = RegisterSerialField(FieldType::AssetList, Data(), nullptr, nullptr, nullptr, name.value, &m_version, T::listExtensions);
-			else m_owner = RegisterSerialField(FieldTypeOf<T>(), Data(), nullptr, nullptr, nullptr, name.value, &m_version);
+				RegisterSerialField(FieldType::AssetList, Data(), nullptr, nullptr, nullptr, name.value, T::listExtensions);
+			else RegisterSerialField(FieldTypeOf<T>(), Data(), nullptr, nullptr, nullptr, name.value);
 		};
 
 		// The vector types are written out of their components, so the field
@@ -326,8 +330,6 @@ namespace Loom
 		#pragma region State
 
 		T m_value;
-		unsigned long long m_version = 0;
-		LoomObject* m_owner = nullptr;
 
 		#pragma endregion
 	};

@@ -972,27 +972,36 @@ TEST_SUITE("SerializedField")
 
 	#pragma region Counts and Raw Words
 
+	TEST_CASE("a Serial is the size of what it wraps")
+	{
+		CHECK(sizeof(Loom::Serial<float>) == sizeof(float));
+		CHECK(sizeof(Loom::Serial<glm::vec3>) == sizeof(glm::vec3));
+		CHECK(sizeof(Loom::Serial<std::string>) == sizeof(std::string));
+		CHECK(sizeof(Loom::Serial<std::vector<float>>) == sizeof(std::vector<float>));
+		CHECK(sizeof(Loom::Serial<Loom::LoomObject*>) == sizeof(Loom::LoomObject*));
+	};
+
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a field counts its changes, and looking at it through const is not one")
 	{
 		Counted counted;
 		Pump();
 
-		const unsigned long long fresh = counted.values.Version();
+		const unsigned long long fresh = counted.VersionOf(&counted.values);
 
 		CHECK(std::as_const(counted.values)->empty());
-		CHECK(counted.values.Version() == fresh);
+		CHECK(counted.VersionOf(&counted.values) == fresh);
 
 		counted.values = { 1.0f };
-		CHECK(counted.values.Version() == fresh + 1);
+		CHECK(counted.VersionOf(&counted.values) == fresh + 1);
 
 		counted.values->push_back(2.0f);
-		CHECK(counted.values.Version() == fresh + 2);
+		CHECK(counted.VersionOf(&counted.values) == fresh + 2);
 
 		CHECK(Field(counted, 0).Read("[3]"));
-		CHECK(counted.values.Version() == fresh + 3);
+		CHECK(counted.VersionOf(&counted.values) == fresh + 3);
 
 		Field(counted, 0).Changed();
-		CHECK(counted.values.Version() == fresh + 4);
+		CHECK(counted.VersionOf(&counted.values) == fresh + 4);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a field made where another was does not take up its count")
@@ -1004,14 +1013,14 @@ TEST_SUITE("SerializedField")
 			Pump();
 
 			counted.values = { 1.0f };
-			first = counted.values.Version();
+			first = counted.VersionOf(&counted.values);
 		};
 
 		Counted again;
 		Pump();
 
 		again.values = { 1.0f };
-		CHECK(again.values.Version() != first);
+		CHECK(again.VersionOf(&again.values) != first);
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "raw words are written as integers and read back bit for bit")
