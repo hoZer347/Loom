@@ -598,6 +598,29 @@ TEST_SUITE("ModelEditor")
 		CHECK(driven.editor.UnsavedFiles().empty());
 	};
 
+	TEST_CASE("The Model panel counts an edited prefab as unsaved on its path and folder, and only those close it")
+	{
+		Driven driven("model_unsaved_under");
+		const std::filesystem::path file(driven.path);
+		const std::string folder = file.parent_path().string();
+		const std::string other = (file.parent_path() / "another.loomprefab").string();
+
+		CHECK_FALSE(driven.editor.HasUnsaved(file.string()));
+
+		driven.editor.Add(Shapes::Shape::Cylinder);
+
+		CHECK(driven.editor.HasUnsaved(file.string()));
+		CHECK(driven.editor.HasUnsaved(folder));
+		CHECK_FALSE(driven.editor.HasUnsaved(other));
+
+		driven.editor.CloseUnder(other);
+		CHECK(driven.editor.HasUnsaved(file.string()));
+
+		driven.editor.CloseUnder(folder);
+		CHECK(driven.editor.UnsavedFiles().empty());
+		driven.Frame();
+	};
+
 	TEST_CASE("The Model panel's undo back to what was saved leaves nothing unsaved, until a new step leaves it behind")
 	{
 		Driven driven("model_saved_steps");

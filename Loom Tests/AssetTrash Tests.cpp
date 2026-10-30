@@ -53,6 +53,19 @@ namespace
 	{
 		return std::filesystem::exists(path);
 	};
+
+#ifdef _WIN32
+	// The same folder through the machine's admin share, which is another
+	// volume to Windows, or none where the share is off.
+	std::filesystem::path OnAnotherVolume(const std::filesystem::path& folder)
+	{
+		std::error_code code;
+		const std::string text = folder.string();
+		const std::filesystem::path share = "\\\\localhost\\" + text.substr(0, 1) + "$" + text.substr(text.find(':') + 1);
+
+		return std::filesystem::exists(share, code) ? share : std::filesystem::path();
+	};
+#endif
 };
 
 #pragma endregion
@@ -199,4 +212,54 @@ TEST_SUITE("AssetTrash")
 		CHECK(discarded.empty());
 		CHECK(Read(file) == "kept");
 	};
+
+#ifdef _WIN32
+	TEST_CASE("a folder on another volume leaves and comes back")
+	{
+		const Project project;
+		project.Write("Folder/Inner.png", "inner");
+
+		const std::filesystem::path share = OnAnotherVolume(project.root);
+
+		if (share.empty())
+			return;
+
+		const std::string folder = (share / "Folder").string();
+
+		Loom::AssetTrash trash([](const std::string&) { });
+
+		REQUIRE(trash.Delete({ folder }));
+		CHECK_FALSE(There(folder));
+
+		REQUIRE(trash.Step(true));
+		CHECK(Read((share / "Folder" / "Inner.png").string()) == "inner");
+	};
+
+	TEST_CASE("a folder on another volume that cannot finish leaving stays whole, with no step")
+	{
+		const Project project;
+		project.Write("Folder/A Free.png", "free");
+		const std::string held_open = project.Write("Folder/B Open.png", "open");
+
+		const std::filesystem::path share = OnAnotherVolume(project.root);
+
+		if (share.empty())
+			return;
+
+		std::string error{ };
+
+		Loom::AssetTrash trash([](const std::string&) { });
+
+		{
+			std::ofstream open(held_open, std::ios::app);
+
+			CHECK_FALSE(trash.Delete({ (share / "Folder").string() }, &error));
+		};
+
+		CHECK_FALSE(error.empty());
+		CHECK_FALSE(trash.CanUndo());
+		CHECK(Read((project.root / "Folder" / "A Free.png").string()) == "free");
+		CHECK(Read(held_open) == "open");
+	};
+#endif
 };

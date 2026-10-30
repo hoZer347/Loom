@@ -309,6 +309,31 @@ TEST_SUITE("ShaderEditor")
 		CHECK(driven.editor.UnsavedFiles().empty());
 	};
 
+	TEST_CASE("an edited shader counts as unsaved on its path and folder, and only those close it")
+	{
+		Driven driven;
+		const std::string file = driven.path.string();
+		const std::string folder = driven.path.parent_path().string();
+		const std::string other = (driven.path.parent_path() / "another.shader").string();
+
+		CHECK_FALSE(driven.editor.HasUnsaved(file));
+
+		driven.Type("x");
+		driven.Settle();
+
+		CHECK(driven.editor.HasUnsaved(file));
+		CHECK(driven.editor.HasUnsaved(folder));
+		CHECK_FALSE(driven.editor.HasUnsaved(other));
+
+		driven.editor.CloseUnder(other);
+		CHECK(driven.editor.HasUnsaved(file));
+
+		driven.editor.CloseUnder(folder);
+		CHECK_FALSE(driven.editor.HasUnsaved(file));
+		CHECK(driven.editor.UnsavedFiles().empty());
+		driven.Frame();
+	};
+
 	TEST_CASE("saving everything leaves a shader with no edits alone")
 	{
 		constexpr const char* changed_outside = "// written by something else\n";

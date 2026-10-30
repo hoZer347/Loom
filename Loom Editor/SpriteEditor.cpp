@@ -2144,28 +2144,46 @@ namespace Loom
 		return saved;
 	};
 
+	bool SpriteEditor::IsEditing(const std::string& path) const
+	{
+		std::error_code code;
+		const std::string normal = std::filesystem::absolute(path, code).lexically_normal().string();
+
+		return std::ranges::any_of(
+			m_documents,
+			[&normal](const std::unique_ptr<Document>& document)
+			{
+				return !document->preview && (document->path == normal || document->links.image == normal);
+			});
+	};
+
 	bool SpriteEditor::HasUnsaved(const std::string& path) const
 	{
-		const bool sprite = std::ranges::any_of(m_documents, [&path](const std::unique_ptr<Document>& document)
-		{
-			return document->unsaved && (ProjectAssets::IsUnder(document->path, path) || ProjectAssets::IsUnder(document->links.image, path));
-		});
+		const bool sprite = std::ranges::any_of(
+			m_documents,
+			[&path](const std::unique_ptr<Document>& document)
+			{
+				return document->unsaved && (ProjectAssets::IsUnder(document->path, path) || ProjectAssets::IsUnder(document->links.image, path));
+			});
 
-		return sprite || std::ranges::any_of(m_palettes, [this, &path](const auto& palette)
-		{
-			return palette.second.Unsaved() && Kept(palette.first) && ProjectAssets::IsUnder(palette.first, path);
-		});
+		return sprite || std::ranges::any_of(
+			m_palettes,
+			[this, &path](const auto& palette)
+			{
+				return palette.second.Unsaved() && Kept(palette.first) && ProjectAssets::IsUnder(palette.first, path);
+			});
 	};
 
 	void SpriteEditor::CloseUnder(const std::string& path)
 	{
-		if (m_active != nullptr && (ProjectAssets::IsUnder(m_active->path, path) || ProjectAssets::IsUnder(m_active->links.image, path)))
-			m_active = nullptr;
+		std::vector<const Document*> closing{ };
 
-		std::erase_if(m_documents, [&path](const std::unique_ptr<Document>& document)
-		{
-			return ProjectAssets::IsUnder(document->path, path) || ProjectAssets::IsUnder(document->links.image, path);
-		});
+		for (const std::unique_ptr<Document>& document : m_documents)
+			if (ProjectAssets::IsUnder(document->path, path) || ProjectAssets::IsUnder(document->links.image, path))
+				closing.push_back(document.get());
+
+		for (const Document* document : closing)
+			Close(document);
 
 		if (!m_loosePalette.empty() && ProjectAssets::IsUnder(m_loosePalette, path))
 			m_loosePalette.clear();

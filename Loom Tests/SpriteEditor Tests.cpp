@@ -336,6 +336,63 @@ TEST_SUITE("SpriteEditor")
 		CHECK(driven.editor.UnsavedFiles().empty());
 	};
 
+	TEST_CASE("a painted sprite counts as unsaved on its image, its file and their folder, and not elsewhere")
+	{
+		Driven driven("loom sprite unsaved under.tga");
+		const std::filesystem::path image(driven.path);
+		const std::string folder = image.parent_path().string();
+		const std::string other = (image.parent_path() / "another.tga").string();
+
+		CHECK_FALSE(driven.editor.HasUnsaved(driven.path));
+
+		driven.Stroke(middle, middle);
+
+		CHECK(driven.editor.HasUnsaved(driven.path));
+		CHECK(driven.editor.HasUnsaved(SpriteAsset::For(driven.path)));
+		CHECK(driven.editor.HasUnsaved(folder));
+		CHECK_FALSE(driven.editor.HasUnsaved(other));
+	};
+
+	TEST_CASE("closing under a path takes the tab in front, by its image or its sprite, and leaves others")
+	{
+		for (const bool by_image : { true, false })
+		{
+			Driven driven("loom sprite close under.tga");
+			const std::string kept = LoomTests::WriteTga("loom sprite close kept.tga", Driven::side, Driven::side, SpriteAsset::Image::Blank(Driven::side, Driven::side).pixels);
+
+			driven.editor.Open(kept);
+			driven.Frame();
+			driven.editor.Open(driven.path);
+			driven.Frame();
+
+			driven.editor.CloseUnder(by_image ? driven.path : SpriteAsset::For(driven.path));
+
+			CHECK_FALSE(driven.editor.IsEditing(driven.path));
+			CHECK(driven.editor.IsEditing(kept));
+			driven.Frame();
+
+			std::error_code code;
+			std::filesystem::remove(kept, code);
+		};
+	};
+
+	TEST_CASE("a preview is not a tab being edited until it is opened for good")
+	{
+		Driven driven("loom sprite previewed under.tga");
+		const std::string previewed = LoomTests::WriteTga("loom sprite preview.tga", Driven::side, Driven::side, SpriteAsset::Image::Blank(Driven::side, Driven::side).pixels);
+
+		CHECK(driven.editor.IsEditing(driven.path));
+
+		driven.editor.Open(previewed, true);
+		CHECK_FALSE(driven.editor.IsEditing(previewed));
+
+		driven.editor.Open(previewed);
+		CHECK(driven.editor.IsEditing(previewed));
+
+		std::error_code code;
+		std::filesystem::remove(previewed, code);
+	};
+
 	TEST_CASE("a stroke across the image paints the row it crosses, end to end")
 	{
 		Driven driven("loom sprite stroke.tga");

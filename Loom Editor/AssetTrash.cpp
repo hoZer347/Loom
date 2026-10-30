@@ -9,6 +9,7 @@
 #define NOMINMAX
 #include <windows.h>
 #include <shellapi.h>
+#include <cwchar>
 #endif
 
 
@@ -16,20 +17,58 @@ namespace Loom
 {
 	namespace
 	{
+		// Rename says access denied, not cross device, for a folder on Windows.
+		bool OnSameVolume(const std::filesystem::path& from, const std::filesystem::path& to)
+		{
+#ifdef _WIN32
+			constexpr DWORD volume_length = MAX_PATH + 1;
+
+			wchar_t from_volume[volume_length]{ };
+			wchar_t to_volume[volume_length]{ };
+
+			return GetVolumePathNameW(from.c_str(), from_volume, volume_length) &&
+				GetVolumePathNameW(to.c_str(), to_volume, volume_length) &&
+				_wcsicmp(from_volume, to_volume) == 0;
+#else
+			return true;
+#endif
+		};
+
+		// On a failure from is whole again, even if it had started to go.
+		void MoveAcrossVolumes(const std::filesystem::path& from, const std::filesystem::path& to, std::error_code& code)
+		{
+			std::filesystem::copy(from, to, std::filesystem::copy_options::recursive, code);
+
+			if (!code)
+				std::filesystem::remove_all(from, code);
+
+			if (!code)
+				return;
+
+			std::error_code restoring;
+
+			std::filesystem::copy(to, from, std::filesystem::copy_options::recursive | std::filesystem::copy_options::skip_existing, restoring);
+
+			if (!restoring)
+				std::filesystem::remove_all(to, restoring);
+		};
+
 		bool MoveTo(const std::filesystem::path& from, const std::filesystem::path& to, std::string* error)
 		{
 			std::error_code code;
 
 			std::filesystem::create_directories(to.parent_path(), code);
-			std::filesystem::rename(from, to, code);
 
-			if (code == std::errc::cross_device_link)
+			bool across = !OnSameVolume(from, to.parent_path());
+
+			if (!across)
 			{
-				std::filesystem::copy(from, to, std::filesystem::copy_options::recursive, code);
-
-				if (!code)
-					std::filesystem::remove_all(from, code);
+				std::filesystem::rename(from, to, code);
+				across = code == std::errc::cross_device_link;
 			};
+
+			if (across)
+				MoveAcrossVolumes(from, to, code);
 
 			if (code && error)
 				*error = "Could not move " + from.string() + ": " + code.message();
@@ -40,7 +79,7 @@ namespace Loom
 
 	void AssetTrash::Recycle(const std::string& path)
 	{
-		#ifdef _WIN32
+#ifdef _WIN32
 		// The list ends in a second terminator.
 		std::wstring from = std::filesystem::path(path).wstring();
 		from.push_back(L'\0');
@@ -52,14 +91,14 @@ namespace Loom
 
 		if (SHFileOperationW(&operation) != 0)
 			std::cerr << "Could not recycle " << path << std::endl;
-		#else
+#else
 		std::error_code code;
 
 		std::filesystem::remove_all(path, code);
 
 		if (code)
 			std::cerr << "Could not remove " << path << ": " << code.message() << std::endl;
-		#endif
+#endif
 	};
 
 	bool AssetTrash::Delete(const std::vector<std::string>& paths, std::string* error)

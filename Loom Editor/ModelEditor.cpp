@@ -550,10 +550,12 @@ void main()
 
 	bool ModelEditor::HasUnsaved(const std::string& path) const
 	{
-		return std::ranges::any_of(m_documents, [&path](const std::unique_ptr<Document>& document)
-		{
-			return document->unsaved && ProjectAssets::IsUnder(document->path, path);
-		});
+		return std::ranges::any_of(
+			m_documents,
+			[&path](const std::unique_ptr<Document>& document)
+			{
+				return document->unsaved && ProjectAssets::IsUnder(document->path, path);
+			});
 	};
 
 	void ModelEditor::CloseUnder(const std::string& path)

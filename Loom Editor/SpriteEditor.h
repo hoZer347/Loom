@@ -75,6 +75,9 @@ namespace Loom
 		// Keeps the tabs of files that were moved saving to where they are now.
 		void Relocate(const std::string& from, const std::string& to);
 
+		// Whether path is open in a tab of its own rather than a preview.
+		bool IsEditing(const std::string& path) const;
+
 		// Whether a tab or palette on path, or on a file inside it, has unsaved
 		// changes.
 		bool HasUnsaved(const std::string& path) const;

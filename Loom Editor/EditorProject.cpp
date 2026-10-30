@@ -444,6 +444,17 @@ namespace Loom
 		};
 
 		#pragma endregion
+
+		#pragma region Menus
+
+		bool MenuBarIsOpen()
+		{
+			const ImVector<ImGuiPopupData>& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+
+			return !popups.empty() && popups[0].Window != nullptr && (popups[0].Window->Flags & ImGuiWindowFlags_ChildMenu) != 0;
+		};
+
+		#pragma endregion
 	};
 
 	#pragma region Project Panel
@@ -516,9 +527,9 @@ namespace Loom
 
 		const bool shown = ImGui::Begin(EditorPanels::Project, &m_showProject);
 
-		// An open menu has the focus, and Edit's Undo is still about this panel.
-		if (!ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel))
-			m_projectFocused = shown && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+		// A menu bar menu has the focus, and Edit's Undo is still about this panel.
+		if (!MenuBarIsOpen())
+			m_projectFocused = shown && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows | ImGuiFocusedFlags_NoPopupHierarchy);
 
 		if (shown)
 		{
@@ -2513,11 +2524,14 @@ namespace Loom
 		const bool double_clicked = ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
 
 		if (double_clicked)
+		{
 			OpenAsset(node.path);
+			m_previewingFile = false;
+		}
 		else if (released && ProjectAssets::IsTwoDFile(node.path))
 		{
 			OpenAsset(node.path, true);
-			m_previewingFile = true;
+			m_previewingFile = io.MouseClickedLastCount[ImGuiMouseButton_Left] == 1 && !m_sprites.IsEditing(node.path);
 		};
 
 		ImGui::SetItemTooltip("%s", file.c_str());
