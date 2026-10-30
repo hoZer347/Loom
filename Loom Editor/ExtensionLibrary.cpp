@@ -3,6 +3,7 @@
 #include "ExtensionRegistry.h"
 
 #include <cstdlib>
+#include <deque>
 #include <exception>
 #include <iostream>
 #include <ranges>
@@ -143,35 +144,55 @@ namespace Loom
 		const auto start = (void(*)())Symbol(module, "LoomExtensionStart");
 		const auto stop = (void(*)())Symbol(module, "LoomExtensionStop");
 
-		const auto reject = [&module, &copy, &code, &name](const std::string& reason)
-		{
-			std::cerr << "Skipped the extension " << name << ": " << reason << std::endl;
-			CloseModule(module);
-			std::filesystem::remove(copy, code);
-		};
+		const std::optional<std::string> refused = Admit({ abi, start, stop }, module, copy);
 
-		if (abi == nullptr || start == nullptr || stop == nullptr)
-			return reject("it does not export LoomExtensionAbi, LoomExtensionStart and LoomExtensionStop.");
+		if (!refused)
+			return;
 
-		if (abi() != extension_abi)
-			return reject("it was built against another version of the editor.");
+		std::cerr << "Skipped the extension " << name << ": " << *refused << std::endl;
+		CloseModule(module);
+		std::filesystem::remove(copy, code);
+	};
+
+	std::optional<std::string> ExtensionLibrary::Admit(const Entry& entry, void* module, const std::filesystem::path& copy)
+	{
+		if (entry.abi == nullptr || entry.start == nullptr || entry.stop == nullptr)
+			return "it does not export LoomExtensionAbi, LoomExtensionStart and LoomExtensionStop.";
+
+		if (entry.abi() != ExtensionAbi)
+			return "it was built against another version of the editor.";
+
+		std::deque<ExtensionRegistry::Panel>& panels = ExtensionRegistry::Panels();
+		const size_t panelsBefore = panels.size();
 
 		try
 		{
-			start();
+			entry.start();
 		}
 		catch (const std::exception& error)
 		{
-			return reject(error.what());
+			panels.erase(panels.begin() + panelsBefore, panels.end());
+			return error.what();
 		};
 
-		m_loaded.push_back({ module, stop, copy });
+		m_loaded.push_back({ module, entry.stop, copy });
+
+		return std::nullopt;
 	};
 
 	void ExtensionLibrary::Unload()
 	{
 		for (const Loaded& loaded : m_loaded | std::views::reverse)
-			loaded.stop();
+		{
+			try
+			{
+				loaded.stop();
+			}
+			catch (const std::exception& error)
+			{
+				std::cerr << "An extension failed to stop: " << error.what() << std::endl;
+			};
+		};
 
 		ExtensionRegistry::Panels().clear();
 
@@ -179,7 +200,9 @@ namespace Loom
 
 		for (const Loaded& loaded : m_loaded)
 		{
-			CloseModule(loaded.module);
+			if (loaded.module != nullptr)
+				CloseModule(loaded.module);
+
 			std::filesystem::remove(loaded.copy, code);
 		};
 

@@ -2262,6 +2262,10 @@ namespace Loom
 		if (ImGui::IsKeyPressed(ImGuiKey_F11, false))
 			m_fullscreen ? LeaveFullscreen() : EnterFullscreen(m_lastView);
 
+		for (const ExtensionRegistry::Panel& panel : ExtensionRegistry::Panels())
+			if (panel.update)
+				panel.update(m_projectPath);
+
 		if (m_fullscreen)
 			DrawFullscreen();
 		else

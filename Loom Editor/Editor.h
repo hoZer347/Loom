@@ -854,7 +854,6 @@ namespace Loom
 		// The panels the Window menu toggles, by the name ImGui knows each by.
 		struct Panel
 		{
-			// One of EditorPanels'.
 			const char* title;
 			bool* shown;
 			bool shownByDefault;

@@ -29,7 +29,7 @@
 //#define IMGUI_API __attribute__((visibility("default")))  // GCC/Clang: override visibility when set is hidden
 
 // Exported from whatever executable links it, as the engine is, so editor extensions draw into the editor's context.
-#if defined(_WIN32) && !defined(__EMSCRIPTEN__)
+#ifdef _WIN32
 #ifdef LOOM_SCRIPT_MODULE
 #define IMGUI_API __declspec(dllimport)
 #else

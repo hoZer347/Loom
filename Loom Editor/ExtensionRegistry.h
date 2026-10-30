@@ -20,13 +20,17 @@
 
 namespace Loom
 {
+	// Raised by hand with any change to what an extension calls here or in
+	// EditorGui.h. Nothing checks that it was.
+	inline constexpr int ExtensionApiRevision = 1;
+
 	// An extension calls straight into ImGui and these, and shares the editor's
-	// standard library types, so one built against another version or
-	// configuration is refused instead of crashing the editor.
+	// standard library types. One built against another ImGui, API revision or
+	// configuration is refused.
 #ifdef _DEBUG
-	inline constexpr int extension_abi = IMGUI_VERSION_NUM * 100 + 2;
+	inline constexpr int ExtensionAbi = (IMGUI_VERSION_NUM * 100 + ExtensionApiRevision) * 10 + 2;
 #else
-	inline constexpr int extension_abi = IMGUI_VERSION_NUM * 100 + 1;
+	inline constexpr int ExtensionAbi = (IMGUI_VERSION_NUM * 100 + ExtensionApiRevision) * 10 + 1;
 #endif
 
 	/**
@@ -44,15 +48,18 @@ namespace Loom
 		{
 			std::string title;
 			std::function<void(const std::string& project)> draw;
+			std::function<void(const std::string& project)> update;
 			bool shown = false;
 		};
 
-		// Called between ImGui::Begin and End while the panel shows, given the
-		// open project's folder.
+		// draw runs between ImGui::Begin and End while the panel shows. update
+		// runs every frame whether it shows or not, and draws nothing. Both are
+		// given the open project's folder.
 		static void AddPanel(
 			const std::string& icon,
 			const std::string& name,
-			std::function<void(const std::string& project)> draw);
+			std::function<void(const std::string& project)> draw,
+			std::function<void(const std::string& project)> update = { });
 
 		static std::deque<Panel>& Panels();
 	};
