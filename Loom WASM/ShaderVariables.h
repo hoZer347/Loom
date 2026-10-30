@@ -4,12 +4,17 @@
 
 #include "UniformType.h"
 
+#include "glm/glm.hpp"
+
 #include <array>
+#include <concepts>
 #include <cstdint>
 #include <initializer_list>
 #include <map>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 
@@ -204,6 +209,139 @@ namespace Loom
 
 	// An editor for each variable of the scope. Whether any value changed.
 	LOOM_API bool DrawShaderVariables(const std::vector<ShaderVariable>& variables, UniformScope scope, UniformValues& values);
+
+	#pragma endregion
+
+	#pragma region Typed Values
+
+	// The columns and rows of a value a script hands a variable: a number, a
+	// glm vector or a glm matrix.
+	template <typename T>
+	struct UniformShape
+	{
+		using Scalar = T;
+		static constexpr int Columns = 1;
+		static constexpr int Rows = 1;
+	};
+
+	template <glm::length_t L, typename T, glm::qualifier Q>
+	struct UniformShape<glm::vec<L, T, Q>>
+	{
+		using Scalar = T;
+		static constexpr int Columns = 1;
+		static constexpr int Rows = L;
+	};
+
+	template <glm::length_t C, glm::length_t R, typename T, glm::qualifier Q>
+	struct UniformShape<glm::mat<C, R, T, Q>>
+	{
+		using Scalar = T;
+		static constexpr int Columns = C;
+		static constexpr int Rows = R;
+	};
+
+	// The type a variable holding a T is declared as, or nothing when no
+	// variable can hold one.
+	template <typename T>
+	constexpr std::optional<UniformType> UniformTypeOf()
+	{
+		using Scalar = typename UniformShape<T>::Scalar;
+		UniformKind kind;
+
+		if constexpr (std::same_as<Scalar, bool>)
+			kind = UniformKind::Bool;
+		else if constexpr (std::floating_point<Scalar>)
+			kind = UniformKind::Float;
+		else if constexpr (std::signed_integral<Scalar>)
+			kind = UniformKind::Int;
+		else if constexpr (std::unsigned_integral<Scalar>)
+			kind = UniformKind::UInt;
+		else
+			return std::nullopt;
+
+		for (const UniformTypeInfo& info : UNIFORM_TYPES)
+			if (info.kind == kind && info.columns == UniformShape<T>::Columns && info.rows == UniformShape<T>::Rows)
+				return info.type;
+
+		return std::nullopt;
+	};
+
+	// A number, vector or matrix a variable can hold, or a sampler's image path.
+	template <typename T>
+	concept AUniform = UniformTypeOf<T>().has_value() || std::convertible_to<const T&, std::string>;
+
+	template <typename T>
+	auto& UniformComponent(T& value, int column, int row)
+	{
+		using Shape = UniformShape<std::remove_const_t<T>>;
+
+		if constexpr (Shape::Columns > 1)
+			return value[column][row];
+		else if constexpr (!std::same_as<typename Shape::Scalar, std::remove_const_t<T>>)
+			return value[row];
+		else
+			return value;
+	};
+
+	template <AUniform T>
+	UniformValue ToUniformValue(const T& value)
+	{
+		if constexpr (std::convertible_to<const T&, std::string>)
+		{
+			UniformValue uniform = UniformValue::Default(UniformType::Sampler2D);
+			uniform.texture = value;
+
+			return uniform;
+		}
+		else
+		{
+			using Shape = UniformShape<T>;
+			UniformValue uniform = UniformValue::Default(*UniformTypeOf<T>());
+
+			for (int column = 0; column < Shape::Columns; ++column)
+				for (int row = 0; row < Shape::Rows; ++row)
+					uniform.components[column * Shape::Rows + row] = (double)UniformComponent(value, column, row);
+
+			return uniform;
+		};
+	};
+
+	template <AUniform T>
+	T FromUniformValue(const UniformValue& uniform)
+	{
+		if constexpr (std::convertible_to<const T&, std::string>)
+			return T(uniform.texture);
+		else
+		{
+			using Shape = UniformShape<T>;
+			T value{ };
+
+			for (int column = 0; column < Shape::Columns; ++column)
+				for (int row = 0; row < Shape::Rows; ++row)
+					UniformComponent(value, column, row) = (typename Shape::Scalar)uniform.components[column * Shape::Rows + row];
+
+			return value;
+		};
+	};
+
+	// A variable's value, read as whatever it is assigned to: zero, the
+	// identity or no image when it has none.
+	struct UniformRead
+	{
+		std::optional<UniformValue> value;
+
+		template <AUniform T>
+		operator T() const
+		{
+			if (value.has_value())
+				return FromUniformValue<T>(*value);
+
+			if constexpr (std::convertible_to<const T&, std::string>)
+				return T{ };
+			else
+				return FromUniformValue<T>(UniformValue::Default(*UniformTypeOf<T>()));
+		};
+	};
 
 	#pragma endregion
 };

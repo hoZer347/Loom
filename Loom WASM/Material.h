@@ -108,6 +108,47 @@ namespace Loom
 		// The per-material variables' values.
 		Serial<UniformValues> variables;
 
+		// Sets a per-material variable: material->Set<"u_tint">(glm::vec3(1.0f)).
+		// Held as its shader declares it, so 1 sets a float. Left be when the
+		// shader declares it with another shape or for its meshes to hold.
+		template <Str name>
+		void Set(const AUniform auto& value)
+		{
+			UniformValue uniform = ToUniformValue(value);
+			const UniformTypeInfo& given = InfoOf(uniform.type);
+
+			if (shader != nullptr)
+				for (const ShaderVariable& variable : shader->variables)
+				{
+					if (variable.name != name.value)
+						continue;
+
+					const UniformTypeInfo& declared = InfoOf(variable.type);
+
+					if (variable.scope != UniformScope::Material ||
+						declared.columns != given.columns ||
+						declared.rows != given.rows ||
+						(declared.kind == UniformKind::Texture) != (given.kind == UniformKind::Texture))
+						return;
+
+					uniform.type = variable.type;
+				};
+
+			variables->values[name.value] = uniform;
+		};
+
+		// A per-material variable's value, as the type it is assigned to:
+		// glm::vec3 tint = material->Get<"u_tint">().
+		template <Str name>
+		UniformRead Get() const
+		{
+			const auto found = variables->values.find(name.value);
+
+			return found != variables->values.end()
+				? UniformRead{ found->second }
+				: UniformRead{ };
+		};
+
 		// How its textures are sampled: as its shader's Pixelated setting says,
 		// blended between texels, or nearest, each texel a hard-edged square.
 		enum Sampling : uint32_t

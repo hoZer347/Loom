@@ -340,4 +340,90 @@ TEST_SUITE("Material")
 	};
 
 	#pragma endregion
+
+	#pragma region Variables
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a script sets and gets a material's variables by name, as its shader declares them")
+	{
+		LoomTests::RecordingRenderer renderer;
+		const std::string path = "Variables/declared.shader";
+		const std::string declarations = "uniform float u_wear;\nuniform vec3 u_tint;\nuniform sampler2D u_grain;\n";
+
+		REQUIRE(Loom::Material::EditShader(path, VERTEX + declarations + Fragment("vec4(u_tint * u_wear, 1.0)")).empty());
+
+		Loom::Scene scene("variables");
+		Loom::Material* material = scene.Attach<Loom::Material>();
+		material->SetShaderPath(path);
+		Pump();
+
+		REQUIRE(material->shader != nullptr);
+		REQUIRE(material->shader->variables.size() == 3);
+
+		material->Set<"u_wear">(1);
+		material->Set<"u_tint">(glm::vec3(1.0f, 0.5f, 0.25f));
+		material->Set<"u_grain">("Assets/grain.png");
+
+		CHECK(material->variables->values.at("u_wear").type == Loom::UniformType::Float);
+
+		const float wear = material->Get<"u_wear">();
+		const glm::vec3 tint = material->Get<"u_tint">();
+		const std::string grain = material->Get<"u_grain">();
+
+		CHECK(wear == 1.0f);
+		CHECK(tint == glm::vec3(1.0f, 0.5f, 0.25f));
+		CHECK(grain == "Assets/grain.png");
+		CHECK(material->variables->Find({ "u_tint", Loom::UniformType::Vec3 }) != nullptr);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a variable the shader does not declare keeps the value's own type, and one never set reads as zero")
+	{
+		Loom::Material material;
+		Pump();
+
+		material.Set<"u_cell">(glm::ivec2(2, 3));
+		material.Set<"u_turn">(glm::mat2(1.0f, 2.0f, 3.0f, 4.0f));
+
+		CHECK(material.variables->values.at("u_cell").type == Loom::UniformType::IVec2);
+		CHECK(material.variables->Write() == "u_cell ivec2 2 3\nu_turn mat2 1 2 3 4\n");
+
+		const glm::ivec2 cell = material.Get<"u_cell">();
+		const glm::mat2 turn = material.Get<"u_turn">();
+		const glm::mat4 unset = material.Get<"u_unset">();
+		const int none = material.Get<"u_unset">();
+		const std::string image = material.Get<"u_unset">();
+
+		CHECK(cell == glm::ivec2(2, 3));
+		CHECK(turn == glm::mat2(1.0f, 2.0f, 3.0f, 4.0f));
+		CHECK(unset == glm::mat4(1.0f));
+		CHECK(none == 0);
+		CHECK(image.empty());
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a script cannot set a variable as another shape than its shader declares, or one its meshes hold")
+	{
+		LoomTests::RecordingRenderer renderer;
+		const std::string path = "Variables/refused.shader";
+		const std::string declarations = "uniform vec3 u_tint;\nuniform float u_speed; // instance\n";
+
+		REQUIRE(Loom::Material::EditShader(path, VERTEX + declarations + Fragment("vec4(u_tint * u_speed, 1.0)")).empty());
+
+		Loom::Scene scene("refused");
+		Loom::Material* material = scene.Attach<Loom::Material>();
+		material->SetShaderPath(path);
+		Pump();
+
+		REQUIRE(material->shader != nullptr);
+		REQUIRE(material->shader->variables.size() == 2);
+
+		material->Set<"u_tint">(glm::vec3(1.0f, 0.5f, 0.25f));
+		material->Set<"u_tint">(1.0f);
+		material->Set<"u_speed">(2.0f);
+
+		const glm::vec3 tint = material->Get<"u_tint">();
+
+		CHECK(tint == glm::vec3(1.0f, 0.5f, 0.25f));
+		CHECK(material->variables->values.count("u_speed") == 0);
+	};
+
+	#pragma endregion
 };
