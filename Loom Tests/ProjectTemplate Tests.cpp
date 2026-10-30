@@ -310,9 +310,14 @@ TEST_SUITE("ProjectTemplate")
 		const std::filesystem::path scripts = project.path / "Game.vcxproj";
 		const std::filesystem::path props = project.path / "Directory.Build.props";
 
+		std::ofstream(scripts, std::ios::binary) << unprecompiled;
+
 		REQUIRE(Loom::ProjectTemplate::ReadOnly(scripts.string()));
 
-		CHECK(Count(ReadBytes(props), "<ReadOnlyProject>true</ReadOnlyProject>") == 1);
+		const std::string written = ReadBytes(props);
+
+		CHECK(Count(written, "<ReadOnlyProject>true</ReadOnlyProject>") == 1);
+		CHECK(written.find("<Import Project=\"$([MSBuild]::GetPathOfFileAbove('Directory.Build.props'") < written.find("<ReadOnlyProject>"));
 
 		const std::string own = "<Project />";
 
@@ -321,6 +326,21 @@ TEST_SUITE("ProjectTemplate")
 		REQUIRE(Loom::ProjectTemplate::ReadOnly(scripts.string()));
 
 		CHECK(ReadBytes(props) == own);
+	};
+
+	TEST_CASE("a scripts project with no wildcard, or none at all, gets no props file")
+	{
+		const Folder project("loom template no wildcard");
+		const std::filesystem::path scripts = project.path / "Game.vcxproj";
+		const std::filesystem::path gone = project.path / "Gone" / "Gone.vcxproj";
+
+		std::ofstream(scripts, std::ios::binary) << "<Project><ClCompile Include=\"Thing.hpp\" /></Project>";
+
+		REQUIRE(Loom::ProjectTemplate::ReadOnly(scripts.string()));
+		REQUIRE(Loom::ProjectTemplate::ReadOnly(gone.string()));
+
+		CHECK_FALSE(std::filesystem::exists(project.path / "Directory.Build.props"));
+		CHECK_FALSE(std::filesystem::exists(gone.parent_path()));
 	};
 
 	TEST_CASE("a scripts project changed past recognising is not precompiled")

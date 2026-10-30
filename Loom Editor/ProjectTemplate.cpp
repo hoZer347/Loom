@@ -246,13 +246,13 @@ namespace {NAME}Scripts
 </Project>
 )";
 
-		// Visual Studio warns about the wildcard in a project it could edit.
-		const char* const read_only = R"(<Project>
+		const char* const read_only = R"props(<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" Condition="'$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))' != ''" />
   <PropertyGroup>
     <ReadOnlyProject>true</ReadOnlyProject>
   </PropertyGroup>
 </Project>
-)";
+)props";
 
 		const char* const solution = R"(
 Microsoft Visual Studio Solution File, Format Version 12.00
@@ -410,6 +410,7 @@ SpinningTriangle is there as a worked example.
 		};
 
 		constexpr std::string_view props_file = "Directory.Build.props";
+		constexpr std::string_view scripts_item = "<ClCompile Include=\"**\\*.hpp\">";
 
 		bool WriteScripts(const std::filesystem::path& root, const std::string& name, std::string* error)
 		{
@@ -646,7 +647,6 @@ SpinningTriangle is there as a worked example.
 		constexpr std::string_view includes_tag = "<AdditionalIncludeDirectories>";
 		constexpr std::string_view headers_folder = "Loom WASM";
 		constexpr std::string_view defines_tag = "<PreprocessorDefinitions>LOOM_SCRIPT_MODULE";
-		constexpr std::string_view scripts_item = "<ClCompile Include=\"**\\*.hpp\">";
 
 		std::string text = ProjectAssets::ReadText(scripts);
 
@@ -706,7 +706,10 @@ SpinningTriangle is there as a worked example.
 
 		std::error_code code;
 
-		return std::filesystem::exists(props, code) || Write(props, read_only, error);
+		if (std::filesystem::exists(props, code) || ProjectAssets::ReadText(scripts).find(scripts_item) == std::string::npos)
+			return true;
+
+		return Write(props, read_only, error);
 	};
 
 	std::string ProjectTemplate::AddScripts(

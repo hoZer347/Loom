@@ -71,7 +71,8 @@ namespace Loom
 
 		// Gives a scripts project a Directory.Build.props that marks it
 		// read-only, which is what keeps Visual Studio from warning about its
-		// wildcard. A folder with one of its own is left alone.
+		// wildcard, and imports any further up. A project with no wildcard, or
+		// a folder with one of its own, is left alone.
 		static bool ReadOnly(const std::string& scripts, std::string* error = nullptr);
 
 		// EnsureScripts for the project in folder, writing it a .loomproject
