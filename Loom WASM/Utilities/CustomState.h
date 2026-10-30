@@ -17,6 +17,7 @@ namespace Loom
 		std::function<void(StateBase* lastState, CustomState& self)> onEnter{ };
 		std::function<void(CustomState& self)> onUpdate{ };
 		std::function<void(CustomState& self)> onPhysics{ };
+		std::function<void(CustomState& self)> onFixedUpdate{ };
 		std::function<void(CustomState& self)> onLateUpdate{ };
 		std::function<void(CustomState& self)> onGui{ };
 		std::function<void(StateBase* nextState, CustomState& self)> onExit{ };
@@ -30,6 +31,7 @@ namespace Loom
 		void OnEnter(StateBase* lastState) override { if (onEnter) onEnter(lastState, *this); };
 		void OnUpdate() override { if (onUpdate) onUpdate(*this); };
 		void OnPhysics() override { if (onPhysics) onPhysics(*this); };
+		void OnFixedUpdate() override { if (onFixedUpdate) onFixedUpdate(*this); };
 		void OnLateUpdate() override { if (onLateUpdate) onLateUpdate(*this); };
 		void OnGui() override { if (onGui) onGui(*this); };
 		void OnExit(StateBase* nextState) override { if (onExit) onExit(nextState, *this); };

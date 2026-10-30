@@ -165,6 +165,7 @@ namespace Loom
 		void OnEnter(StateBase* lastState) override { Each([&](StateBase& s) { s.OnEnter(lastState); }); };
 		void OnUpdate() override { Each([](StateBase& s) { s.OnUpdate(); }); };
 		void OnPhysics() override { Each([](StateBase& s) { s.OnPhysics(); }); };
+		void OnFixedUpdate() override { Each([](StateBase& s) { s.OnFixedUpdate(); }); };
 		void OnLateUpdate() override { Each([](StateBase& s) { s.OnLateUpdate(); }); };
 		void OnGui() override { Each([](StateBase& s) { s.OnGui(); }); };
 
@@ -370,12 +371,25 @@ namespace Loom
 			current->OnLateUpdate();
 	};
 
+	void StateMachineBase::StepFixed()
+	{
+		if (current)
+			current->OnFixedUpdate();
+	};
+
 	void StateMachineBase::StepAttached()
 	{
 		// One snapshot per frame, since destruction only happens in queued tasks.
 		for (StateMachineBase* machine : All())
 			if (machine->GetGameObject())
 				machine->Step();
+	};
+
+	void StateMachineBase::StepAttachedFixed()
+	{
+		for (StateMachineBase* machine : All())
+			if (machine->GetGameObject())
+				machine->StepFixed();
 	};
 
 	void StateMachineBase::Advance(float deltaTime)

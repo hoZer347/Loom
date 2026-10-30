@@ -50,5 +50,8 @@ namespace Loom
 
 		/// Driven once per frame by Utilities::Tick.
 		static void Pump();
+
+		/// Driven ahead of each physics step by Utilities::FixedUpdate.
+		static void PumpFixed();
 	};
 };

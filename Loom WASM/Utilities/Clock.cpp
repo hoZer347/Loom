@@ -73,4 +73,10 @@ namespace Loom
 	{
 		StateMachineBase::StepAttached();
 	};
+
+	void Utilities::FixedUpdate()
+	{
+		StaticStateMachine::PumpFixed();
+		StateMachineBase::StepAttachedFixed();
+	};
 };

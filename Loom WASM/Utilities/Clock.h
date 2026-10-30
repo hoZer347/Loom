@@ -54,6 +54,10 @@ namespace Loom
 		/// on the frames they update.
 		static void Update();
 
+		/// The fixed updates of every state machine. Loom::Engine calls this ahead of
+		/// each physics step.
+		static void FixedUpdate();
+
 		Utilities() = delete;
 		~Utilities() = delete;
 	};

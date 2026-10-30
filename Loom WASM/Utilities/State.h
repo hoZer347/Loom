@@ -152,6 +152,10 @@ namespace Loom
 		/// Called from the machine's physics step.
 		virtual void OnPhysics() { };
 
+		/// Called ahead of each of the engine's physics steps the state is current for,
+		/// however many of them the frame takes.
+		virtual void OnFixedUpdate() { };
+
 		/// Called after all update work, so follow/camera logic reads the final state of
 		/// the frame.
 		virtual void OnLateUpdate() { };

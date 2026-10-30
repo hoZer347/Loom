@@ -9,7 +9,9 @@
 #include "SerializedField.h"
 
 #include "Utilities/Clock.h"
+#include "Utilities/CustomState.h"
 #include "Utilities/StateMachine.h"
+#include "Utilities/StaticStateMachine.h"
 
 #include <memory>
 #include <string>
@@ -34,9 +36,11 @@ namespace
 	{
 		void OnStart() override { starts++; };
 		void OnUpdate() override { updates++; };
+		void OnFixedUpdate() override { fixedUpdates++; };
 
 		int starts = 0;
 		int updates = 0;
+		int fixedUpdates = 0;
 	};
 
 	struct StateTestCounted final : Loom::State<StateTestCounted>
@@ -44,6 +48,13 @@ namespace
 		void OnUpdate() override { updates++; };
 
 		static inline int updates = 0;
+	};
+
+	struct StateTestFixed final : Loom::State<StateTestFixed>
+	{
+		void OnFixedUpdate() override { steps++; };
+
+		static inline int steps = 0;
 	};
 
 	struct StateTestWalk final : Loom::State<StateTestWalk, StateTestMachine>
@@ -292,6 +303,97 @@ TEST_SUITE("StateMachine")
 		patrol.machine->Enable();
 
 		CHECK(patrol.machine->m_current->StateType() == "StateTestWalk");
+	};
+
+	#pragma endregion
+
+	#pragma region Fixed updates
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the current state gets one fixed update for each physics step")
+	{
+		constexpr int physics_steps = 3;
+
+		Machine patrol;
+		patrol.machine->m_start = Loom::StateReference::Named("StateTestFixed");
+		patrol.machine->Step();
+
+		const int steps = StateTestFixed::steps;
+
+		for (int step = 0; step < physics_steps; step++)
+			Loom::Utilities::FixedUpdate();
+
+		CHECK(StateTestFixed::steps == steps + physics_steps);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a fixed update neither starts a machine nor reaches a state it has not entered")
+	{
+		Machine patrol;
+		patrol.machine->m_start = Loom::StateReference::Named("StateTestFixed");
+
+		const int steps = StateTestFixed::steps;
+
+		Loom::Utilities::FixedUpdate();
+
+		CHECK_FALSE(patrol.machine->IsStarted());
+		CHECK(StateTestFixed::steps == steps);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "a machine's own OnFixedUpdate is its, and its state still gets the step")
+	{
+		Loom::Scene scene{ "Hooked" };
+		Loom::GameObject* object = scene.AddChild("Guard");
+		Pump();
+
+		StateTestHooked* machine = object->Attach<StateTestHooked>();
+		Pump();
+
+		machine->m_start = Loom::StateReference::Named("StateTestFixed");
+		machine->Step();
+
+		const int steps = StateTestFixed::steps;
+
+		Loom::Utilities::FixedUpdate();
+		scene.Physics();
+
+		CHECK(machine->fixedUpdates == 1);
+		CHECK(StateTestFixed::steps == steps + 1);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "every state running in parallel gets the fixed update")
+	{
+		Machine patrol;
+		int steps = 0;
+
+		const auto counted = [&steps]()
+		{
+			auto state = std::make_shared<Loom::CustomState>();
+			state->onFixedUpdate = [&steps](Loom::CustomState&) { steps++; };
+
+			return state;
+		};
+
+		patrol.machine->Step();
+		patrol.machine->EnterParallel({ counted(), counted() });
+
+		Loom::Utilities::FixedUpdate();
+
+		CHECK(steps == 2);
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "the static machine's state gets the fixed update")
+	{
+		Loom::StaticStateMachine::Destroy();
+		Loom::StaticStateMachine& machine = Loom::StaticStateMachine::Instance();
+		machine.startState = Loom::StateReference::Named("StateTestFixed");
+		machine.Step();
+
+		const int steps = StateTestFixed::steps;
+
+		Loom::Utilities::FixedUpdate();
+
+		CHECK(StateTestFixed::steps == steps + 1);
+
+		Loom::StaticStateMachine::Destroy();
 	};
 
 	#pragma endregion

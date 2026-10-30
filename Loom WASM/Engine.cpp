@@ -319,14 +319,19 @@ namespace Loom
 
 			const int steps = Physics::TakeSteps(s_physicsTime);
 
-			// The last step solves on its own thread while the GUI is built.
-			for (int step = 1; step < steps; step++)
-				for (auto& scene : Scene::allScenes)
-					scene->Physics();
+			for (int step = 1; step <= steps; step++)
+			{
+				{
+					LOOM_STAGE("Utilities::FixedUpdate");
+					Utilities::FixedUpdate();
+				};
 
-			if (steps > 0)
+				// The last step solves on its own thread while the GUI is built.
 				for (auto& scene : Scene::allScenes)
-					scene->BeginPhysics();
+					if (step < steps)
+						scene->Physics();
+					else scene->BeginPhysics();
+			};
 		};
 
 #ifndef __EMSCRIPTEN__

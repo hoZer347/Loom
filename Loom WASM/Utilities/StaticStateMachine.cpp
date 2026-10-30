@@ -38,4 +38,12 @@ namespace Loom
 
 		s_instance->Step();
 	};
+
+	void StaticStateMachine::PumpFixed()
+	{
+		if (s_instance == nullptr)
+			return;
+
+		s_instance->StepFixed();
+	};
 };

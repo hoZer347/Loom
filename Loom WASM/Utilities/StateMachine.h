@@ -92,9 +92,17 @@ namespace Loom
 		/// state's physics, update and late update.
 		void Step();
 
+		/// One physics step: the current state's fixed update. A machine that has not
+		/// started has none, and waits for its first Step.
+		void StepFixed();
+
 		/// Steps every machine on a GameObject. What the engine runs each frame the
 		/// scenes update.
 		static void StepAttached();
+
+		/// StepFixed on every machine on a GameObject. What the engine runs ahead of
+		/// each physics step.
+		static void StepAttachedFixed();
 
 		/// The current state's debug GUI, for whatever draws the machine.
 		void PumpGui();
