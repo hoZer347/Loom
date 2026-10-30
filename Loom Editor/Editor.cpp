@@ -385,7 +385,7 @@ namespace Loom
 			constexpr float control_x = 0.5f;
 
 			const auto lid =
-				[&](float side)
+				[&draw, &left, &right, &half, &bow, &centre, &colour](float side)
 				{
 					draw->PathLineTo(left);
 					draw->PathBezierCubicCurveTo(
@@ -2870,7 +2870,7 @@ namespace Loom
 		ImVec2 center{ };
 		ImU32 color = 0;
 
-		const auto button = [&](int index, const char* id, ImU32 hovered, ImU32 pressed) -> bool
+		const auto button = [&width, &bar_min, &color, &height, &bar_max, &center, &draw, &buttons_left](int index, const char* id, ImU32 hovered, ImU32 pressed) -> bool
 		{
 			const ImVec2 corner(buttons_left + width * index, bar_min.y);
 
@@ -4836,7 +4836,7 @@ namespace Loom
 		// Deeper nested fields indent their labels but keep their values in one column.
 		const float left = ImGui::GetCursorPosX();
 
-		const auto draw_field = [&](size_t i)
+		const auto draw_field = [this, &objects, &object, &left, &enumerators, &column, &labels](size_t i)
 		{
 			const SerializedField& field = object.GetFields()[i];
 
@@ -5009,7 +5009,7 @@ namespace Loom
 		};
 
 		// A Button fills the row, pressed as a button anywhere else is.
-		const auto draw_item = [&](const FieldItem& item)
+		const auto draw_item = [&draw_field, &objects, &object](const FieldItem& item)
 		{
 			if (item.kind == FieldItem::Field)
 			{

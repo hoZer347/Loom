@@ -337,7 +337,7 @@ namespace Loom
 
 		ChangeComponents(
 			objects,
-			[&objects, &missed](size_t i)
+			[&objects, &missed, &name](size_t i)
 			{
 				if (ComponentRegistry::Create(name, *objects[i]) == nullptr)
 					missed.push_back(objects[i]);

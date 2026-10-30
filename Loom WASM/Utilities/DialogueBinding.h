@@ -217,7 +217,7 @@ namespace Loom
 		{
 			return [self, method](const std::vector<std::string>& tokens)
 			{
-				return DialogueBindings::Call<_Args...>(tokens, [&](auto&... args) { (self->*method)(args...); });
+				return DialogueBindings::Call<_Args...>(tokens, [self, method](auto&... args) { (self->*method)(args...); });
 			};
 		};
 	};

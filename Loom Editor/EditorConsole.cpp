@@ -109,7 +109,7 @@ namespace Loom
 				EditorLog::Link hovered{ };
 
 				EditorLog::Get().ForEach(
-					[&](size_t id, const EditorLog::Line& entry)
+					[&link_colour, &text_bottom, &highlight, &under_mouse_length, &copying, &mouse, &newline_width, &line_spacing, &text_colour, &any, &first, &draw_list, &hovered_link, &text_end, &under_mouse, &line_height, &copied, &filter, &hovered, &text_start, &text_width, &last, &tracking, &error_colour, &copy](size_t id, const EditorLog::Line& entry)
 					{
 						const std::string& line = entry.text;
 

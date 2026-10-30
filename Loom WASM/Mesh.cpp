@@ -539,7 +539,7 @@ namespace Loom
 					m_interleaved = { };
 
 				Jobs::For(count, VERTEX_GRAIN,
-					[&](size_t, size_t begin, size_t end)
+					[&hasNormals, &hasColors, &layers, &stride, &hasUVs, &interleaved, &layout, &textureCoordinates, &colors, &positions, &NO_NORMAL, &normals](size_t, size_t begin, size_t end)
 					{
 						float* out = interleaved.data() + begin * stride;
 

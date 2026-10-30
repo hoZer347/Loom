@@ -50,9 +50,9 @@ namespace Loom
 			return '"' + argument + '"';
 		};
 
-	private:
 		void Stop();
 
+	private:
 		void* m_job = nullptr;
 		std::thread m_reader{ };
 

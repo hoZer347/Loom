@@ -1611,7 +1611,7 @@ namespace Loom
 
 		// Centred in the view, or from its top where it does not fit.
 		const auto centre =
-			[&](float width, float height)
+			[&available, &corner](float width, float height)
 			{
 				ImGui::SetCursorPos(ImVec2(
 					corner.x + (std::max)(0.0f, (available.x - width) * half),

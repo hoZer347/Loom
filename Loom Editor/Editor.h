@@ -388,6 +388,22 @@ namespace Loom
 
 		#pragma endregion
 
+		#pragma region Window
+
+		// File > Exit, the window's close button and Alt+F4: stops any run,
+		// then closes once the question about anything unsaved is answered.
+		void Quit();
+
+		#pragma endregion
+
+		#pragma region Hierarchy
+
+		// What the Hierarchy drags: a GameObject's guid rather than its address,
+		// so a drop resolves against what still exists when the mouse comes up.
+		static constexpr const char* object_payload = "LoomObject";
+
+		#pragma endregion
+
 	private:
 		#pragma region Project Panel
 
@@ -527,10 +543,6 @@ namespace Loom
 		#pragma endregion
 
 		#pragma region Hierarchy
-
-		// What the Hierarchy drags: a GameObject's guid rather than its address,
-		// so a drop resolves against what still exists when the mouse comes up.
-		static constexpr const char* object_payload = "LoomObject";
 
 		// The Hierarchy's right-click menu on empty space adds to the rows
 		// above it, as a drop there does.
@@ -997,10 +1009,6 @@ namespace Loom
 		#pragma region Project
 
 		bool IsRefreshing() const { return m_refresh.IsRunning() || m_relaunch; };
-
-		// File > Exit, the window's close button and Alt+F4: stops any run,
-		// then closes once the question about anything unsaved is answered.
-		void Quit();
 
 		// Reads <folder>/*.loomproject, if there is one, and hooks up the script
 		// library it names.
