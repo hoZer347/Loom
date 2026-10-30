@@ -1,6 +1,5 @@
 #include "Material.h"
 
-#include "EditorGui.h"
 #include "PreVertex.h"
 #include "RenderMath.h"
 #include "Renderer.h"

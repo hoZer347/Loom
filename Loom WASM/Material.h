@@ -82,9 +82,9 @@ namespace Loom
 
 		#pragma region Editor
 
-		// A link that opens the shader file, its settings, the values of its
-		// per-material variables, and the declarations themselves. The settings
-		// and declarations are edited in the file.
+		// A link that opens the shader file, its settings and the values of its
+		// per-material variables. Settings written here go into the file, and
+		// variables are declared there.
 		void OnGui() override;
 
 		void OnFieldChanged(const SerializedField& field) override;
