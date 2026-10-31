@@ -337,7 +337,7 @@
     <ClCompile Include="..\Loom Editor\TornWindows.cpp" />
     <ClCompile Include="..\Loom Editor\WindowFullscreen.cpp" />
   </ItemGroup>
-  <!-- Built against Assimp and Winsock, which the web build has no wasm copy of. -->
+  <!-- Built against Assimp and Winsock, which the web build has no wasm copy of, and its precompiled header, which it does not use. -->
   <ItemGroup Label="Desktop">
     <ClCompile Include="..\Precompiled\Tests.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
