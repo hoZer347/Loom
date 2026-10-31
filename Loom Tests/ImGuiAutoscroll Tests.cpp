@@ -6,6 +6,7 @@
 
 #include <functional>
 
+
 namespace
 {
 	constexpr float width = 800.0f;
@@ -113,6 +114,8 @@ namespace
 
 TEST_SUITE("ImGuiAutoscroll")
 {
+	#pragma region Scrolling
+
 	TEST_CASE_FIXTURE(Driven, "a held drag scrolls toward the pointer and letting go ends it")
 	{
 		Tall();
@@ -198,6 +201,10 @@ TEST_SUITE("ImGuiAutoscroll")
 		CHECK(scroll.y > 0.0f);
 	};
 
+	#pragma endregion
+
+	#pragma region Clicks and Escape
+
 	TEST_CASE_FIXTURE(Driven, "a click stays on until the next click, which nothing else hears")
 	{
 		Tall();
@@ -261,6 +268,102 @@ TEST_SUITE("ImGuiAutoscroll")
 		CHECK_FALSE(ImGuiAutoscroll::IsActive());
 	};
 
+	TEST_CASE_FIXTURE(Driven, "the click that ends it is not heard coming up")
+	{
+		for (const ImGuiMouseButton button : { ImGuiMouseButton_Left, ImGuiMouseButton_Right })
+		{
+			const ImGuiPopupFlags opensOn = button == ImGuiMouseButton_Left ?
+				ImGuiPopupFlags_MouseButtonLeft :
+				ImGuiPopupFlags_MouseButtonRight;
+
+			bool released = false;
+			bool opened = false;
+
+			const auto contents =
+				[button, opensOn, &released, &opened]()
+				{
+					ImGui::Dummy(ImVec2(panel_side, tall_content));
+
+					if (ImGui::BeginPopupContextItem("Menu", opensOn))
+					{
+						opened = true;
+						ImGui::EndPopup();
+					};
+
+					released |= ImGui::IsMouseReleased(button);
+				};
+
+			Frames(settle_frames, contents);
+
+			Button(ImGuiMouseButton_Middle, true);
+			Frames(1, contents);
+			Button(ImGuiMouseButton_Middle, false);
+			Frames(settle_frames, contents);
+			REQUIRE(ImGuiAutoscroll::IsSticky());
+
+			Button(button, true);
+			Frames(1, contents);
+			CHECK_FALSE(ImGuiAutoscroll::IsActive());
+
+			Button(button, false);
+			Frames(settle_frames, contents);
+			CHECK_FALSE(released);
+			CHECK_FALSE(opened);
+		};
+	};
+
+	TEST_CASE_FIXTURE(Driven, "the press that starts it is not heard coming up")
+	{
+		bool released = false;
+
+		const auto contents =
+			[&released]()
+			{
+				ImGui::Dummy(ImVec2(panel_side, tall_content));
+				released |= ImGui::IsMouseReleased(ImGuiMouseButton_Middle);
+			};
+
+		Frames(settle_frames, contents);
+
+		Button(ImGuiMouseButton_Middle, true);
+		Frames(1, contents);
+		MouseAt(panel_centre, panel_centre + far_drag);
+		Frames(settle_frames, contents);
+		Button(ImGuiMouseButton_Middle, false);
+		Frames(settle_frames, contents);
+
+		CHECK_FALSE(ImGuiAutoscroll::IsActive());
+		CHECK_FALSE(released);
+	};
+
+	TEST_CASE_FIXTURE(Driven, "another button during a held drag is not heard and moves no focus")
+	{
+		Tall();
+
+		Button(ImGuiMouseButton_Middle, true);
+		TallFrames(1);
+
+		const ImGuiWindow* focused = ImGui::GetCurrentContext()->NavWindow;
+		REQUIRE(focused != nullptr);
+
+		for (const ImGuiMouseButton button : { ImGuiMouseButton_Left, ImGuiMouseButton_Right })
+		{
+			Button(button, true);
+			TallFrames(settle_frames);
+			Button(button, false);
+			TallFrames(settle_frames);
+
+			CHECK(ImGuiAutoscroll::IsActive());
+			CHECK(ImGui::GetCurrentContext()->NavWindow == focused);
+		};
+
+		CHECK_FALSE(leftClicked);
+	};
+
+	#pragma endregion
+
+	#pragma region Axes
+
 	TEST_CASE_FIXTURE(Driven, "an axis that does not overflow does not move or point")
 	{
 		Tall();
@@ -274,10 +377,10 @@ TEST_SUITE("ImGuiAutoscroll")
 		CHECK(scroll.y == 0.0f);
 		CHECK(ImGuiAutoscroll::Heading().x == 0.0f);
 
-		// Sideways alone has left no dead zone behind, so this is still a click.
+		// A long drag on the axis that cannot move is still a drag, not a click.
 		Button(ImGuiMouseButton_Middle, false);
 		TallFrames(1);
-		CHECK(ImGuiAutoscroll::IsSticky());
+		CHECK_FALSE(ImGuiAutoscroll::IsActive());
 	};
 
 	TEST_CASE_FIXTURE(Driven, "both axes move when both overflow")
@@ -313,6 +416,10 @@ TEST_SUITE("ImGuiAutoscroll")
 		CHECK(scroll.x == 0.0f);
 		CHECK(scroll.y > 0.0f);
 	};
+
+	#pragma endregion
+
+	#pragma region Who Keeps the Press
 
 	TEST_CASE_FIXTURE(Driven, "a window with nothing to scroll leaves the press alone")
 	{
@@ -480,6 +587,10 @@ TEST_SUITE("ImGuiAutoscroll")
 		CHECK_FALSE(ImGuiAutoscroll::IsActive());
 	};
 
+	#pragma endregion
+
+	#pragma region Ending by Itself
+
 	TEST_CASE_FIXTURE(Driven, "it ends with the window it was scrolling")
 	{
 		Tall();
@@ -512,6 +623,10 @@ TEST_SUITE("ImGuiAutoscroll")
 
 		CHECK_FALSE(ImGuiAutoscroll::IsActive());
 	};
+
+	#pragma endregion
+
+	#pragma region Drawing
 
 	TEST_CASE_FIXTURE(Driven, "the pointer hides for a marker and a drawn cursor while it runs")
 	{
@@ -569,6 +684,10 @@ TEST_SUITE("ImGuiAutoscroll")
 		CHECK(hovered);
 	};
 
+	#pragma endregion
+
+	#pragma region No Context
+
 	TEST_CASE("a context without it answers that nothing is running")
 	{
 		ImGuiContext* const previous = ImGui::GetCurrentContext();
@@ -583,4 +702,6 @@ TEST_SUITE("ImGuiAutoscroll")
 		ImGui::DestroyContext(context);
 		ImGui::SetCurrentContext(previous);
 	};
+
+	#pragma endregion
 };

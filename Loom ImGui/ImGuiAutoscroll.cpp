@@ -50,6 +50,9 @@ namespace
 		// What is left of a step after whole pixels, which is all a window takes.
 		ImVec2 remainder{ };
 
+		// One bit per button held from a press nothing else heard.
+		int swallowed = 0;
+
 		int keptFrame = -1;
 	};
 
@@ -139,10 +142,36 @@ namespace
 	#pragma region Running
 
 	// Hides a press from everything else, for as long as it is held.
-	void Swallow(ImGuiContext& g, ImGuiMouseButton button)
+	void Swallow(ImGuiContext& g, State& state, ImGuiMouseButton button)
 	{
 		g.IO.MouseClicked[button] = false;
 		ImGui::SetKeyOwner(ImGui::MouseButtonToKey(button), Owner(), ImGuiInputFlags_LockUntilRelease);
+		state.swallowed |= 1 << button;
+	};
+
+	bool SwallowPresses(ImGuiContext& g, State& state)
+	{
+		bool pressed = false;
+
+		for (int button = 0; button < ImGuiMouseButton_COUNT; button++)
+			if (g.IO.MouseClicked[button])
+			{
+				Swallow(g, state, button);
+				pressed = true;
+			};
+
+		return pressed;
+	};
+
+	// The owner's lock drops in the frame a button comes up, so that frame is hidden here.
+	void HideReleases(ImGuiContext& g, State& state)
+	{
+		for (int button = 0; button < ImGuiMouseButton_COUNT; button++)
+			if ((state.swallowed & (1 << button)) && !g.IO.MouseDown[button])
+			{
+				g.IO.MouseReleased[button] = false;
+				state.swallowed &= ~(1 << button);
+			};
 	};
 
 	void TryStart(ImGuiContext& g, State& state)
@@ -164,13 +193,15 @@ namespace
 		state.heading = ImVec2(0.0f, 0.0f);
 		state.remainder = ImVec2(0.0f, 0.0f);
 
-		Swallow(g, ImGuiMouseButton_Middle);
+		Swallow(g, state, ImGuiMouseButton_Middle);
 	};
 
 	bool Ended(ImGuiContext& g, State& state, const ImGuiWindow* window)
 	{
 		if (!window || !window->WasActive || g.IO.AppFocusLost)
 			return true;
+
+		const bool pressed = SwallowPresses(g, state);
 
 		if (ImGui::IsKeyPressed(ImGuiKey_Escape, ImGuiInputFlags_None, Owner()))
 			return true;
@@ -185,16 +216,7 @@ namespace
 			return state.dragged;
 		};
 
-		bool clicked = false;
-
-		for (int button = 0; button < ImGuiMouseButton_COUNT; button++)
-			if (g.IO.MouseClicked[button])
-			{
-				Swallow(g, button);
-				clicked = true;
-			};
-
-		return clicked;
+		return pressed;
 	};
 
 	float Sign(float value)
@@ -207,16 +229,16 @@ namespace
 		state.axes = ScrollAxes(window);
 		state.heading = ImVec2(0.0f, 0.0f);
 
-		const ImVec2 offset(
-			(g.IO.MousePos.x - state.origin.x) * state.axes.x,
-			(g.IO.MousePos.y - state.origin.y) * state.axes.y);
+		const ImVec2 moved(g.IO.MousePos.x - state.origin.x, g.IO.MousePos.y - state.origin.y);
 
+		if (ImLengthSqr(moved) > DEAD_ZONE * DEAD_ZONE)
+			state.dragged = true;
+
+		const ImVec2 offset(moved.x * state.axes.x, moved.y * state.axes.y);
 		const float distance = ImSqrt(ImLengthSqr(offset));
 
 		if (distance <= DEAD_ZONE)
 			return;
-
-		state.dragged = true;
 
 		if (std::fabs(offset.x) > std::fabs(offset.y) * DIAGONAL_SLOPE)
 			state.heading.x = Sign(offset.x);
@@ -248,6 +270,8 @@ namespace
 	{
 		ImGuiContext& g = *context;
 		State& state = *(State*)hook->UserData;
+
+		HideReleases(g, state);
 
 		if (!state.active)
 		{
