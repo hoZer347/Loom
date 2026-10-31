@@ -59,6 +59,20 @@ namespace
 #endif
 	};
 
+	bool OnUserDesktop()
+	{
+#ifdef _WIN32
+		constexpr std::wstring_view userDesktop = L"Default";
+
+		wchar_t name[MAX_PATH]{ };
+		GetUserObjectInformationW(GetThreadDesktop(GetCurrentThreadId()), UOI_NAME, name, sizeof(name), nullptr);
+
+		return name == userDesktop;
+#else
+		return false;
+#endif
+	}
+
 	#pragma endregion
 
 	#pragma region Options
@@ -265,6 +279,12 @@ int main(int argc, char** argv)
 		if (argument == "--extensions" && i + 1 < argc)
 			Editor::extensionsFolder = argv[i + 1];
 	};
+
+	if (own_desktop && OnUserDesktop())
+	{
+		std::cerr << "--own-desktop needs a desktop of its own: start it through run-on-agent-desktop.ps1.\n";
+		return 1;
+	}
 
 	if (!Engine::showWindow)
 		ReportCrashesToStderr();

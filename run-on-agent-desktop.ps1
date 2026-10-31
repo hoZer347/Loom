@@ -14,12 +14,16 @@
     to click it. The script prints its text to stderr, stops the program and
     exits with 1.
 
+    Everything the program starts runs in a job with it, so past -TimeoutSeconds
+    and at the end of every run nothing it left is still alive.
+
     Never use a Windows virtual desktop for this: activating a window on one
     makes Windows switch the user to it.
 
 .EXAMPLE
-    .\run-on-agent-desktop.ps1 -Exe 'x64\Debug\Loom Editor.exe' -- 'C:\MyProject' --play
+    powershell -ExecutionPolicy Bypass -Command "& '.\run-on-agent-desktop.ps1' -Exe 'x64\Debug\Loom Editor.exe' -- 'C:\MyProject' --play"
 #>
+[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
     [string] $Exe,
@@ -36,6 +40,7 @@ $ErrorActionPreference = 'Stop'
 
 $namePrefix = 'LoomAgent'
 $closeGraceMilliseconds = 3000
+$drainMilliseconds = 5000
 $pollMilliseconds = 100
 
 #endregion
@@ -71,9 +76,6 @@ namespace LoomAgentDesktop
         [DllImport("user32.dll")]
         static extern bool IsWindowVisible(IntPtr window);
 
-        [DllImport("user32.dll")]
-        static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
-
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         static extern int GetWindowTextLength(IntPtr window);
 
@@ -92,6 +94,44 @@ namespace LoomAgentDesktop
 
         [DllImport("kernel32.dll")]
         static extern bool CloseHandle(IntPtr handle);
+
+        [DllImport("kernel32.dll")]
+        static extern uint ResumeThread(IntPtr thread);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern IntPtr CreateJobObjectW(IntPtr attributes, string name);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool SetInformationJobObject(IntPtr job, int kind, ref ExtendedLimits limits, int size);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+
+        [DllImport("kernel32.dll")]
+        static extern bool TerminateJobObject(IntPtr job, uint exitCode);
+
+        [DllImport("kernel32.dll")]
+        static extern bool QueryInformationJobObject(IntPtr job, int kind, out Accounting accounting, int size, IntPtr returned);
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct ExtendedLimits
+        {
+            public long processTime, jobTime;
+            public uint flags;
+            public UIntPtr smallestWorkingSet, largestWorkingSet;
+            public uint processLimit;
+            public UIntPtr affinity;
+            public uint priority, schedulingClass;
+            public ulong reads, writes, others, readBytes, writtenBytes, otherBytes;
+            public UIntPtr processMemory, jobMemory, peakProcessMemory, peakJobMemory;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct Accounting
+        {
+            public long userTime, kernelTime, periodUserTime, periodKernelTime;
+            public uint pageFaults, processes, activeProcesses, terminatedProcesses;
+        }
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
         struct StartupInfo
@@ -112,6 +152,11 @@ namespace LoomAgentDesktop
 
         const uint GENERIC_ALL = 0x10000000;
         const uint WM_CLOSE = 0x0010;
+        const uint CREATE_SUSPENDED = 0x00000004;
+        const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000;
+        const int JobObjectBasicAccountingInformation = 1;
+        const int JobObjectExtendedLimitInformation = 9;
+        const uint StoppedExitCode = 0xFFFFFFFF;
         const string WindowStation = @"WinSta0\";
 
         // What a message box or a runtime error dialog is made from.
@@ -135,7 +180,46 @@ namespace LoomAgentDesktop
             CloseDesktop(desktop);
         }
 
-        public static Process Start(string name, string commandLine)
+        // Closing it, even by this script being killed, stops all that is left in it.
+        public static IntPtr CreateJob()
+        {
+            IntPtr job = CreateJobObjectW(IntPtr.Zero, null);
+
+            if (job == IntPtr.Zero)
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            }
+
+            var limits = new ExtendedLimits();
+            limits.flags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+
+            if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, ref limits, Marshal.SizeOf(typeof(ExtendedLimits))))
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            }
+
+            return job;
+        }
+
+        public static void Stop(IntPtr job)
+        {
+            TerminateJobObject(job, StoppedExitCode);
+        }
+
+        public static bool IsRunning(IntPtr job)
+        {
+            Accounting accounting;
+            QueryInformationJobObject(job, JobObjectBasicAccountingInformation, out accounting, Marshal.SizeOf(typeof(Accounting)), IntPtr.Zero);
+            return accounting.activeProcesses > 0;
+        }
+
+        public static void RemoveJob(IntPtr job)
+        {
+            CloseHandle(job);
+        }
+
+        // Suspended until it is in the job, so nothing it starts can get out first.
+        public static Process Start(string name, string commandLine, IntPtr job)
         {
             var startup = new StartupInfo();
             startup.cb = Marshal.SizeOf(typeof(StartupInfo));
@@ -143,14 +227,36 @@ namespace LoomAgentDesktop
 
             ProcessInformation information;
 
-            if (!CreateProcessW(null, new StringBuilder(commandLine), IntPtr.Zero, IntPtr.Zero, true, 0, IntPtr.Zero, null, ref startup, out information))
+            if (!CreateProcessW(null, new StringBuilder(commandLine), IntPtr.Zero, IntPtr.Zero, true, CREATE_SUSPENDED, IntPtr.Zero, null, ref startup, out information))
             {
                 throw new Win32Exception(Marshal.GetLastWin32Error());
             }
 
             Process process = Process.GetProcessById(information.processId);
+
+            // Without the handle cached now, ExitCode reads as null once it has exited.
+            IntPtr cached = process.Handle;
+
+            bool assigned = AssignProcessToJobObject(job, information.process);
+            int error = Marshal.GetLastWin32Error();
+
+            if (assigned)
+            {
+                ResumeThread(information.thread);
+            }
+            else
+            {
+                process.Kill();
+            }
+
             CloseHandle(information.thread);
             CloseHandle(information.process);
+
+            if (!assigned)
+            {
+                throw new Win32Exception(error);
+            }
+
             return process;
         }
 
@@ -214,19 +320,12 @@ namespace LoomAgentDesktop
         {
             PostMessage(window, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
         }
-
-        public static uint ProcessOf(IntPtr window)
-        {
-            uint process;
-            GetWindowThreadProcessId(window, out process);
-            return process;
-        }
     }
 }
 '@
 
-# Asks each window on the desktop to close, then kills what ignores that.
-function Close-Desktop([IntPtr] $handle)
+# Asks each window on the desktop to close, then stops whatever is left in the job.
+function Close-Desktop([IntPtr] $handle, [IntPtr] $job)
 {
     foreach ($window in [LoomAgentDesktop.Desktops]::WindowsOn($handle))
     {
@@ -239,11 +338,15 @@ function Close-Desktop([IntPtr] $handle)
         Start-Sleep -Milliseconds $pollMilliseconds
     }
 
-    [LoomAgentDesktop.Desktops]::WindowsOn($handle) |
-        ForEach-Object { [LoomAgentDesktop.Desktops]::ProcessOf($_) } |
-        Sort-Object -Unique |
-        ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
+    [LoomAgentDesktop.Desktops]::Stop($job)
 
+    $deadline = [DateTime]::Now.AddMilliseconds($drainMilliseconds)
+    while ([LoomAgentDesktop.Desktops]::IsRunning($job) -and [DateTime]::Now -lt $deadline)
+    {
+        Start-Sleep -Milliseconds $pollMilliseconds
+    }
+
+    [LoomAgentDesktop.Desktops]::RemoveJob($job)
     [LoomAgentDesktop.Desktops]::Remove($handle)
 }
 
@@ -253,6 +356,7 @@ function Close-Desktop([IntPtr] $handle)
 
 $name = "$namePrefix$PID"
 $handle = [LoomAgentDesktop.Desktops]::Create($name)
+$job = [LoomAgentDesktop.Desktops]::CreateJob()
 $process = $null
 $dialogExitCode = 0
 
@@ -260,10 +364,7 @@ try
 {
     $arguments = @($Exe) + $ExeArgs | ForEach-Object { if ($_ -match '\s') { "`"$_`"" } else { $_ } }
 
-    $process = [LoomAgentDesktop.Desktops]::Start($name, ($arguments -join ' '))
-
-    # Without the handle cached now, ExitCode reads as null once it has exited.
-    $null = $process.Handle
+    $process = [LoomAgentDesktop.Desktops]::Start($name, ($arguments -join ' '), $job)
 
     $deadline = [DateTime]::Now.AddSeconds($TimeoutSeconds)
     while (-not $process.WaitForExit($pollMilliseconds))
@@ -277,22 +378,18 @@ try
                 [Console]::Error.WriteLine("$Exe put up a dialog; stopping it.`n$text")
             }
             $dialogExitCode = 1
-            Stop-Process -Id $process.Id -Force
+            [LoomAgentDesktop.Desktops]::Stop($job)
         }
         elseif ([DateTime]::Now -gt $deadline)
         {
             Write-Warning "$Exe still running after $TimeoutSeconds s; stopping it."
-            Stop-Process -Id $process.Id -Force
+            [LoomAgentDesktop.Desktops]::Stop($job)
         }
     }
 }
 finally
 {
-    if ($process -and -not $process.HasExited)
-    {
-        Stop-Process -Id $process.Id -Force
-    }
-    Close-Desktop $handle
+    Close-Desktop $handle $job
 }
 
 if ($dialogExitCode) { exit $dialogExitCode }

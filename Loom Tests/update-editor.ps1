@@ -23,8 +23,8 @@
     powershell -ExecutionPolicy Bypass -File 'C:\Users\3hoze\Desktop\Loom 1\Loom Tests\update-editor.ps1'
 #>
 param(
-    # Set by run-on-agent-desktop.ps1's run of this; without it this runs itself under that.
-    [switch] $OnAgentDesktop
+    # The scratch project, set by the run of this under run-on-agent-desktop.ps1 that this starts without it.
+    [string] $Project
 )
 
 $ErrorActionPreference = 'Stop'
@@ -53,42 +53,58 @@ $WindowOffset = 137, 89
 $WindowSize = 1111, 677
 $MinimizeCommand = 6
 $RestoreCommand = 9
+$RefusalMilliseconds = 10000
 
 $common = & git -C $Root rev-parse --path-format=absolute --git-common-dir
 if ([IO.Path]::GetFullPath((Split-Path $common -Parent)) -eq [IO.Path]::GetFullPath($Root)) { throw "$Root is the user's Loom. Run a slot's copy." }
 
-if (-not $OnAgentDesktop)
+if (-not $Project)
 {
-    & (Join-Path $Root 'run-on-agent-desktop.ps1') -Exe 'powershell.exe' -TimeoutSeconds 600 -- -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -OnAgentDesktop
+    $refused = Start-Process -FilePath $Editor -ArgumentList '--own-desktop' -PassThru -WindowStyle Hidden
+    $null = $refused.Handle
+    if (-not $refused.WaitForExit($RefusalMilliseconds))
+    {
+        Stop-Process -Id $refused.Id -Force
+        throw 'The editor took --own-desktop on the user''s desktop.'
+    }
+    if ($refused.ExitCode -ne 1) { throw "The editor took --own-desktop on the user's desktop and exited $($refused.ExitCode)." }
+
+    $scratch = Join-Path ([IO.Path]::GetTempPath()) "loom-update-test-$PID"
+    try
+    {
+        & (Join-Path $Root 'run-on-agent-desktop.ps1') -Exe 'powershell.exe' -TimeoutSeconds 600 -- -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -Project $scratch
+    }
+    finally
+    {
+        Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
+    }
     exit $LASTEXITCODE
 }
 
 Add-Type -Namespace LoomTest -Name Desktop -MemberDefinition @'
-[DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
-[DllImport("user32.dll")] public static extern IntPtr GetThreadDesktop(uint thread);
-[DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern bool GetUserObjectInformation(IntPtr handle, int index, StringBuilder name, int length, out int needed);
+[DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+[DllImport("user32.dll")] static extern IntPtr GetThreadDesktop(uint thread);
+[DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern bool GetUserObjectInformation(IntPtr handle, int index, StringBuilder name, int length, out int needed);
 const int NameIndex = 2;
 const int NameCapacity = 256;
-public static string NameOf(uint thread)
+public static string Current()
 {
     var name = new StringBuilder(NameCapacity);
     int needed;
-    GetUserObjectInformation(GetThreadDesktop(thread), NameIndex, name, name.Capacity * 2, out needed);
+    GetUserObjectInformation(GetThreadDesktop(GetCurrentThreadId()), NameIndex, name, name.Capacity * 2, out needed);
     return name.ToString();
 }
 '@ -UsingNamespace System.Text
 
-# Only a desktop of its own keeps a window it activates off the user's screen.
 $UserDesktop = 'Default'
-if ([LoomTest.Desktop]::NameOf([LoomTest.Desktop]::GetCurrentThreadId()) -eq $UserDesktop) { throw "update-editor test is on the user's desktop." }
+if ([LoomTest.Desktop]::Current() -eq $UserDesktop) { throw "update-editor test is on the user's desktop." }
 
 $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
 $listener.Start()
 $port = $listener.LocalEndpoint.Port
 $listener.Stop()
 
-$project = Join-Path ([IO.Path]::GetTempPath()) "loom-update-test-$port"
-New-Item -ItemType Directory $project | Out-Null
+New-Item -ItemType Directory $Project | Out-Null
 $projectFile = Join-Path $project 'Scratch.loomproject'
 Set-Content -LiteralPath $projectFile -Value 'name=Scratch' -Encoding ascii
 $scene = Join-Path $project 'Scratch.loomscene'
@@ -151,7 +167,7 @@ Add-Type -Namespace LoomTest -Name Window -MemberDefinition @'
 [DllImport("user32.dll")] public static extern bool IsZoomed(IntPtr window);
 [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr window);
 [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr window, int command);
-[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
+[DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
 [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string name, string title);
 public static IntPtr EditorOf(uint process)
 {
@@ -241,10 +257,6 @@ try
 {
     Wait-Pid { param($id) $id -eq $first.Id } 'editor answering' | Out-Null
     Wait-Compiled
-
-    $editorProcess = [uint32] 0
-    $editorThread = [LoomTest.Window]::GetWindowThreadProcessId((Get-WindowState).Handle, [ref] $editorProcess)
-    if ([LoomTest.Desktop]::NameOf($editorThread) -eq $UserDesktop) { throw "The editor's window is on the user's desktop." }
 
     $idle = & powershell -NoProfile -ExecutionPolicy Bypass -Command "& '$Script' -Port $port"
     if ($idle -match 'told') { throw "An editor with nothing to take was told: $idle" }
@@ -431,6 +443,4 @@ finally
     Get-CimInstance Win32_Process -Filter "Name = 'Loom Editor.exe'" |
         Where-Object { $_.CommandLine -like "*--mcp $port *" } |
         ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-    Start-Sleep -Seconds 1
-    Remove-Item -LiteralPath $project -Recurse -Force -ErrorAction SilentlyContinue
 }

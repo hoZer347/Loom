@@ -21,6 +21,7 @@ the other shows up as a failure rather than as a surprise in the browser.
 .\run-browser-tests.ps1                  # the cases that need a real page, in headless Chrome
 & '.\Loom Tests\update-editor.ps1'       # update-editor.ps1 against an open Release editor, in a slot
 & '.\Loom Tests\extension-reload.ps1'    # extensions, Claude.dll included, through an update, in a slot; run-tests.ps1 runs it after a whole suite
+& '.\Loom Tests\agent-desktop.ps1'       # run-on-agent-desktop.ps1 leaves nothing of a run behind
 ```
 
 The first two scripts take `-NoBuild` to run the last binary as-is, and pass
