@@ -16,7 +16,13 @@
     is told whatever -ScriptsOnly says, and any other only when the build is
     newer than it. Demos and hidden runs are left alone.
 
-    Exits non-zero if the build fails or an open editor cannot be reached.
+    An extension links against the editor's exports, so one installed with a
+    manifest naming this copy is rebuilt once the editor is newer than it, by
+    the update-extension.ps1 in its source folder, before any editor restarts
+    onto the new build.
+
+    Exits non-zero if a build fails or an open editor cannot be reached. An
+    extension that fails to build leaves open editors on the build they have.
 
 .PARAMETER Project
     The project the merge landed on, when it was not the engine's.
@@ -30,6 +36,9 @@
 .PARAMETER Port
     The MCP port the editors share.
 
+.PARAMETER Extensions
+    The folder extensions are installed in.
+
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File 'C:\Users\3hoze\Desktop\Loom\update-editor.ps1' -Project 'C:\Users\3hoze\Desktop\RTS' -ScriptsOnly
 #>
@@ -38,7 +47,8 @@ param(
     [string] $Project,
     [switch] $ScriptsOnly,
     [switch] $BuildOnly,
-    [int] $Port = 47800
+    [int] $Port = 47800,
+    [string] $Extensions = (Join-Path $env:LOCALAPPDATA 'Loom\Extensions')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -48,8 +58,75 @@ $Output = Join-Path $PSScriptRoot "x64\$Configuration"
 $Editor = Join-Path $Output 'Loom Editor.exe'
 $Locked = @($Editor, (Join-Path $Output 'Loom Editor.pdb'))
 $AsideExtension = '.aside'
+$ManifestExtension = '.extension.json'
 $AutomatedFlags = '--play', '--screenshot', '--ui-script'
 $McpTimeoutSeconds = 15
+
+function Update-EditorBuild
+{
+    # Left by earlier runs; the ones a running editor still holds stay until it closes.
+    Get-ChildItem $Output -Filter "*$AsideExtension" -ErrorAction SilentlyContinue |
+        ForEach-Object { try { Remove-Item -LiteralPath $_.FullName } catch { } }
+
+    # When master moved here; a branch merged later carries older commit dates.
+    $moved = & git -C $PSScriptRoot reflog -1 --format=%gd --date=unix master
+    if ($LASTEXITCODE -ne 0 -or $moved -notmatch '\{(\d+)\}') { throw "Could not read when master last moved in $PSScriptRoot." }
+
+    $updated = [DateTimeOffset]::FromUnixTimeSeconds([long]$Matches[1]).UtcDateTime
+    $built = if (Test-Path $Editor) { (Get-Item $Editor).LastWriteTimeUtc } else { [DateTime]::MinValue }
+
+    if ($updated -le $built)
+    {
+        Write-Output "$Editor is up to date."
+        return
+    }
+
+    $msbuild = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -prerelease `
+        -find 'MSBuild\**\Bin\amd64\MSBuild.exe' | Select-Object -First 1
+    if (-not $msbuild) { throw 'No MSBuild found.' }
+
+    # A running exe can be renamed but not written. The copy put back keeps
+    # its timestamps, so the link sees it as the old build and replaces it.
+    $asides = @{}
+
+    foreach ($file in $Locked | Where-Object { Test-Path $_ })
+    {
+        $asides[$file] = "$file.$([DateTime]::UtcNow.Ticks)$AsideExtension"
+        Move-Item -LiteralPath $file -Destination $asides[$file]
+        Copy-Item -LiteralPath $asides[$file] -Destination $file
+    }
+
+    Write-Output "Building $Editor"
+    & $msbuild (Join-Path $PSScriptRoot 'Loom.sln') '-t:Loom Editor' "-p:Configuration=$Configuration" -p:Platform=x64 -nologo -v:m '-clp:ErrorsOnly;WarningsOnly;Summary' -m -nr:false
+    $result = $LASTEXITCODE
+
+    # A failed link can leave nothing behind; the last good build goes back.
+    foreach ($file in $asides.Keys | Where-Object { -not (Test-Path $_) })
+    {
+        Copy-Item -LiteralPath $asides[$file] -Destination $file
+    }
+
+    if ($result -ne 0) { throw "$Editor failed to build." }
+}
+
+function Update-Extensions
+{
+    $built = (Get-Item $Editor).LastWriteTimeUtc
+
+    foreach ($manifest in Get-ChildItem $Extensions -Filter "*$ManifestExtension" -ErrorAction SilentlyContinue)
+    {
+        $extension = Get-Content -LiteralPath $manifest.FullName -Raw | ConvertFrom-Json
+        if ([IO.Path]::GetFullPath($extension.LoomRoot) -ne [IO.Path]::GetFullPath($PSScriptRoot)) { continue }
+
+        $name = $manifest.Name.Substring(0, $manifest.Name.Length - $ManifestExtension.Length)
+        $library = Get-Item -LiteralPath (Join-Path $Extensions "$name.dll") -ErrorAction SilentlyContinue
+        if ($library -and $library.LastWriteTimeUtc -ge $built) { continue }
+
+        Write-Output "Rebuilding the extension $name"
+        & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $extension.Source 'update-extension.ps1') -LoomRoot $PSScriptRoot
+        if ($LASTEXITCODE -ne 0) { throw "The extension $name failed to build against $Editor, so open editors stay on the build they have." }
+    }
+}
 
 function Update-Build
 {
@@ -59,49 +136,8 @@ function Update-Build
 
     try
     {
-        # Left by earlier runs; the ones a running editor still holds stay until it closes.
-        Get-ChildItem $Output -Filter "*$AsideExtension" -ErrorAction SilentlyContinue |
-            ForEach-Object { try { Remove-Item -LiteralPath $_.FullName } catch { } }
-
-        # When master moved here; a branch merged later carries older commit dates.
-        $moved = & git -C $PSScriptRoot reflog -1 --format=%gd --date=unix master
-        if ($LASTEXITCODE -ne 0 -or $moved -notmatch '\{(\d+)\}') { throw "Could not read when master last moved in $PSScriptRoot." }
-
-        $updated = [DateTimeOffset]::FromUnixTimeSeconds([long]$Matches[1]).UtcDateTime
-        $built = if (Test-Path $Editor) { (Get-Item $Editor).LastWriteTimeUtc } else { [DateTime]::MinValue }
-
-        if ($updated -le $built)
-        {
-            Write-Output "$Editor is up to date."
-            return
-        }
-
-        $msbuild = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -prerelease `
-            -find 'MSBuild\**\Bin\amd64\MSBuild.exe' | Select-Object -First 1
-        if (-not $msbuild) { throw 'No MSBuild found.' }
-
-        # A running exe can be renamed but not written. The copy put back keeps
-        # its timestamps, so the link sees it as the old build and replaces it.
-        $asides = @{}
-
-        foreach ($file in $Locked | Where-Object { Test-Path $_ })
-        {
-            $asides[$file] = "$file.$([DateTime]::UtcNow.Ticks)$AsideExtension"
-            Move-Item -LiteralPath $file -Destination $asides[$file]
-            Copy-Item -LiteralPath $asides[$file] -Destination $file
-        }
-
-        Write-Output "Building $Editor"
-        & $msbuild (Join-Path $PSScriptRoot 'Loom.sln') '-t:Loom Editor' "-p:Configuration=$Configuration" -p:Platform=x64 -nologo -v:m '-clp:ErrorsOnly;WarningsOnly;Summary' -m -nr:false
-        $result = $LASTEXITCODE
-
-        # A failed link can leave nothing behind; the last good build goes back.
-        foreach ($file in $asides.Keys | Where-Object { -not (Test-Path $_) })
-        {
-            Copy-Item -LiteralPath $asides[$file] -Destination $file
-        }
-
-        if ($result -ne 0) { throw "$Editor failed to build." }
+        Update-EditorBuild
+        Update-Extensions
     }
     finally
     {

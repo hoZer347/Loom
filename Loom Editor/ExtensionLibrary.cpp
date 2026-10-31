@@ -31,6 +31,7 @@ namespace Loom
 #endif
 
 		constexpr const char* copies_folder = "Loom Extensions";
+		constexpr const char* other_editor = "it was built against another version of the editor";
 
 		void* OpenModule(const std::filesystem::path& path)
 		{
@@ -44,7 +45,9 @@ namespace Loom
 		std::string LastError()
 		{
 #ifdef _WIN32
-			return "error " + std::to_string(GetLastError());
+			const DWORD error = GetLastError();
+
+			return error == ERROR_PROC_NOT_FOUND ? other_editor : "error " + std::to_string(error);
 #else
 			return dlerror();
 #endif
@@ -160,7 +163,7 @@ namespace Loom
 			return "it does not export LoomExtensionAbi, LoomExtensionStart and LoomExtensionStop.";
 
 		if (entry.abi() != ExtensionAbi)
-			return "it was built against another version of the editor.";
+			return std::string(other_editor) + ".";
 
 		std::deque<ExtensionRegistry::Panel>& panels = ExtensionRegistry::Panels();
 		const size_t panelsBefore = panels.size();
