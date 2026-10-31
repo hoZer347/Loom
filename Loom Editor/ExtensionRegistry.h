@@ -7,6 +7,7 @@
 #include <deque>
 #include <functional>
 #include <string>
+#include <vector>
 
 
 // What the editor looks up in an extension's library. Stop runs before the
@@ -22,7 +23,7 @@ namespace Loom
 {
 	// Raised by hand with any change to what an extension calls here or in
 	// EditorGui.h. Nothing checks that it was.
-	inline constexpr int ExtensionApiRevision = 1;
+	inline constexpr int ExtensionApiRevision = 2;
 
 	// An extension calls straight into ImGui and these, and shares the editor's
 	// standard library types. One built against another ImGui, API revision or
@@ -49,17 +50,20 @@ namespace Loom
 			std::string title;
 			std::function<void(const std::string& project)> draw;
 			std::function<void(const std::string& project)> update;
+			std::function<void(const std::vector<std::string>& files)> drop;
 			bool shown = false;
 		};
 
 		// draw runs between ImGui::Begin and End while the panel shows. update
 		// runs every frame whether it shows or not, and draws nothing. Both are
-		// given the open project's folder.
+		// given the open project's folder. drop takes files dropped on the
+		// panel from outside the editor, which then stay out of the project.
 		static void AddPanel(
 			const std::string& icon,
 			const std::string& name,
 			std::function<void(const std::string& project)> draw,
-			std::function<void(const std::string& project)> update = { });
+			std::function<void(const std::string& project)> update = { },
+			std::function<void(const std::vector<std::string>& files)> drop = { });
 
 		static std::deque<Panel>& Panels();
 	};

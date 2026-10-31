@@ -31,6 +31,9 @@ namespace Loom
 	*     backclick <target>, forwardclick <target>
 	*                          the mouse's side buttons
 	*     drag <target> to <target>
+	*     drop <file> to <target>
+	*                          a file from outside the editor onto the target,
+	*                          as the platform's drop does
 	*     key <chord>          ImGui's key names joined by +: ctrl+z, enter, f2
 	*     hold <chord>         presses it and leaves it down, for a click with ctrl
 	*     release <chord>      lets go of a held chord
@@ -78,6 +81,9 @@ namespace Loom
 		UiScript& operator=(const UiScript&) = delete;
 
 		#pragma region Script
+
+		// Takes what the drop command drops, from the editor that is running.
+		inline static std::function<void(const std::string& path, float x, float y)> dropped{ };
 
 		// False, with why on stderr, when the file cannot be read.
 		bool Load(const std::string& path);

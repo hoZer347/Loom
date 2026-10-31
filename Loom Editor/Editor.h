@@ -1718,6 +1718,12 @@ namespace Loom
 			float y = 0.0f;
 		};
 
+		// Files dropped together go in together; others wait for the mouse.
+		std::vector<QueuedImport>::iterator FrontDropEnd();
+
+		// The files of the drop just hovered, which leave the import queue.
+		std::vector<std::string> TakeDrop();
+
 		std::vector<QueuedImport> m_importQueue{ };
 		GameObject* m_importTarget = nullptr;
 

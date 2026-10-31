@@ -8,6 +8,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #pragma region Helpers
 
@@ -50,6 +51,19 @@ namespace
 
 TEST_SUITE("ExtensionLibrary")
 {
+	TEST_CASE("a panel keeps what takes the files dropped on it")
+	{
+		std::vector<std::string> taken;
+
+		Loom::ExtensionRegistry::AddPanel("A", "Drop Panel", [](const std::string&) { }, { },
+			[&taken](const std::vector<std::string>& files) { taken = files; });
+
+		Loom::ExtensionRegistry::Panels().back().drop({ "shot.png" });
+		Loom::ExtensionRegistry::Panels().pop_back();
+
+		CHECK(taken == std::vector<std::string>{ "shot.png" });
+	};
+
 	TEST_CASE("a panel is titled with its icon and keeps its name as its id")
 	{
 		Loom::ExtensionRegistry::AddPanel("A", "Test Panel", [](const std::string&) { });

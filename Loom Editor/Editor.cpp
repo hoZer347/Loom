@@ -2348,6 +2348,7 @@ namespace Loom
 
 		// Panels come and go as OS windows, so the callback goes on whichever exist.
 		SetDropCallback(OnDrop);
+		UiScript::dropped = [this](const std::string& path, float x, float y) { Drop(path, x, y); };
 
 		if (!m_pendingLayout.empty())
 		{
@@ -2566,7 +2567,13 @@ namespace Loom
 				ImGui::SetNextWindowDockID(inspector->DockId, ImGuiCond_FirstUseEver);
 
 			if (ImGui::Begin(panel.title.c_str(), &panel.shown))
+			{
 				panel.draw(m_projectPath);
+
+				if (panel.drop && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
+					if (const std::vector<std::string> files = TakeDrop(); !files.empty())
+						panel.drop(files);
+			};
 
 			ImGui::End();
 		};
@@ -5519,6 +5526,35 @@ namespace Loom
 		m_importQueue.push_back(QueuedImport{ path, true, x, y });
 	};
 
+	std::vector<Editor::QueuedImport>::iterator Editor::FrontDropEnd()
+	{
+		const QueuedImport& front = m_importQueue.front();
+
+		return std::find_if_not(m_importQueue.begin(), m_importQueue.end(),
+			[&front](const QueuedImport& queued)
+			{
+				return queued.positioned == front.positioned && queued.x == front.x && queued.y == front.y;
+			});
+	};
+
+	std::vector<std::string> Editor::TakeDrop()
+	{
+		std::vector<std::string> files;
+
+		if (!m_importPlaced || m_importQueue.empty())
+			return files;
+
+		const auto end = FrontDropEnd();
+
+		for (auto queued = m_importQueue.begin(); queued != end; ++queued)
+			files.push_back(queued->path);
+
+		m_importQueue.erase(m_importQueue.begin(), end);
+		m_importPlaced = false;
+
+		return files;
+	};
+
 	void Editor::TakeImportTarget(GameObject* gameObject)
 	{
 		if (!m_importQueue.empty() && ImGui::IsItemHovered())
@@ -5550,14 +5586,7 @@ namespace Loom
 			return;
 		};
 
-		// Files dropped together go in together; others wait for the mouse.
-		const auto together =
-			[&front](const QueuedImport& queued)
-			{
-				return queued.positioned == front.positioned && queued.x == front.x && queued.y == front.y;
-			};
-
-		const auto end = std::find_if_not(m_importQueue.begin(), m_importQueue.end(), together);
+		const auto end = FrontDropEnd();
 
 		if (!m_importFolder.empty())
 		{

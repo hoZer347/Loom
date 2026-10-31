@@ -451,6 +451,29 @@ namespace Loom
 				press(button, false);
 			};
 		}
+		else if (verb == "drop")
+		{
+			constexpr size_t target = 3;
+
+			if (tokens.size() <= target || tokens[2] != "to" || !dropped)
+			{
+				Fail("drop takes a file, then to and a target, in an editor");
+				return false;
+			};
+
+			size_t end = 0;
+
+			if (!Aim(tokens, target, &end))
+				return false;
+
+			m_actions.push_back(
+				[this, file = tokens[1]]()
+				{
+					dropped(file, m_mouse.x, m_mouse.y);
+
+					return Result::Done;
+				});
+		}
 		else if (verb == "drag")
 		{
 			size_t to = 0;
