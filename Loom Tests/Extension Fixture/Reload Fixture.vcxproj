@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{8E5D2C31-6A7F-4B1E-9C02-7D3F1A4B6E58}</ProjectGuid>
+    <RootNamespace>ReloadFixture</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <LoomRoot>$(MSBuildThisFileDirectory)..\..</LoomRoot>
+    <TargetName>Reload Fixture</TargetName>
+    <OldApiDefine Condition="'$(OldApi)'=='true'">LOOM_FIXTURE_OLD_API;</OldApiDefine>
+    <OldApiLibrary Condition="'$(OldApi)'=='true'">$(IntDir)Old API.lib;</OldApiLibrary>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <ConformanceMode>true</ConformanceMode>
+      <ExceptionHandling>Async</ExceptionHandling>
+      <Optimization>MaxSpeed</Optimization>
+      <DisableSpecificWarnings>4251;4275</DisableSpecificWarnings>
+      <PreprocessorDefinitions>$(OldApiDefine)LOOM_SCRIPT_MODULE;NDEBUG;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0A00;WIN32;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(LoomRoot)\Loom WASM;$(LoomRoot)\Loom Editor;$(LoomRoot)\Loom ImGui;$(LoomRoot)\External Libraries\glm;$(LoomRoot)\External Libraries\glew\include;$(LoomRoot)\External Libraries\glfw\include;$(LoomRoot)\External Libraries\json\single_include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(LoomRoot)\x64\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>$(OldApiLibrary)Loom Editor.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <PreLinkEvent Condition="'$(OldApi)'=='true'">
+      <Command>lib /nologo /machine:x64 /def:"$(MSBuildThisFileDirectory)Old API.def" /out:"$(IntDir)Old API.lib"</Command>
+    </PreLinkEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="Fixture.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

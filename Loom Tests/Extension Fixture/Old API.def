@@ -1,0 +1,3 @@
+LIBRARY "Loom Editor.exe"
+EXPORTS
+	?AddPanel@ExtensionRegistry@Loom@@SAXAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@0V?$function@$$A6AXAEBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z@4@1@Z

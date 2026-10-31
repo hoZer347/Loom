@@ -68,4 +68,15 @@ $progress = if ($env:CLAUDECODE) { Join-Path (Split-Path $exe) 'Loom Tests Progr
 # So a run stopped at its time limit reports it and still exits with its code.
 $ErrorActionPreference = 'Continue'
 Invoke-TestSuite $exe $TestArgs $TimeoutMinutes $progress
-exit $LASTEXITCODE
+$result = $LASTEXITCODE
+
+$common = & git -C $root rev-parse --path-format=absolute --git-common-dir
+$slot = [IO.Path]::GetFullPath((Split-Path $common -Parent)) -ne [IO.Path]::GetFullPath($root)
+
+if ($slot -and $result -eq 0 -and -not $TestArgs)
+{
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'Loom Tests\extension-reload.ps1')
+    $result = $LASTEXITCODE
+}
+
+exit $result
