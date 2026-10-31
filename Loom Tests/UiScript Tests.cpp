@@ -344,6 +344,45 @@ TEST_SUITE("UiScript")
 		CHECK(dropped == payload);
 	};
 
+	TEST_CASE("drop hands the editor its file at the target")
+	{
+		ScriptedUi ui("drop shot.png to 40 30\n");
+		std::string file;
+		ImVec2 at{ };
+
+		Loom::UiScript::dropped = [&file, &at](const std::string& path, float x, float y)
+		{
+			file = path;
+			at = { x, y };
+		};
+
+		ui.Run([]() { Panel([]() { }); });
+
+		Loom::UiScript::dropped = nullptr;
+
+		CHECK_FALSE(ui.script->Failed());
+		CHECK(file == "shot.png");
+		CHECK(at.x == doctest::Approx(40));
+		CHECK(at.y == doctest::Approx(30));
+	};
+
+	TEST_CASE("drop fails with no editor to take it, and without to and a target")
+	{
+		ScriptedUi headless("drop shot.png to 40 30\n");
+		headless.Run([]() { Panel([]() { }); });
+
+		CHECK(headless.script->Failed());
+
+		Loom::UiScript::dropped = [](const std::string&, float, float) { };
+
+		ScriptedUi aimless("drop shot.png\n");
+		aimless.Run([]() { Panel([]() { }); });
+
+		Loom::UiScript::dropped = nullptr;
+
+		CHECK(aimless.script->Failed());
+	};
+
 	TEST_CASE("a held mouse is let go of when the script ends")
 	{
 		ScriptedUi ui("hold mouse\nwait 1\n");
