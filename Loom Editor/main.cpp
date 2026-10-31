@@ -59,19 +59,23 @@ namespace
 #endif
 	};
 
+	#pragma endregion
+
+	#pragma region Desktop
+
 	bool OnUserDesktop()
 	{
 #ifdef _WIN32
-		constexpr std::wstring_view userDesktop = L"Default";
+		constexpr std::wstring_view user_desktop = L"Default";
 
 		wchar_t name[MAX_PATH]{ };
 		GetUserObjectInformationW(GetThreadDesktop(GetCurrentThreadId()), UOI_NAME, name, sizeof(name), nullptr);
 
-		return name == userDesktop;
+		return name == user_desktop;
 #else
 		return false;
 #endif
-	}
+	};
 
 	#pragma endregion
 
@@ -284,7 +288,7 @@ int main(int argc, char** argv)
 	{
 		std::cerr << "--own-desktop needs a desktop of its own: start it through run-on-agent-desktop.ps1.\n";
 		return 1;
-	}
+	};
 
 	if (!Engine::showWindow)
 		ReportCrashesToStderr();
