@@ -1716,6 +1716,7 @@ namespace Loom
 			bool positioned = false;
 			float x = 0.0f;
 			float y = 0.0f;
+			bool offered = false;
 		};
 
 		// Files dropped together go in together; others wait for the mouse.

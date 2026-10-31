@@ -5566,23 +5566,26 @@ namespace Loom
 		if (m_importQueue.empty())
 			return;
 
-		if (!m_scripts.IsIdle())
+		QueuedImport& front = m_importQueue.front();
+		const bool compiling = !m_scripts.IsIdle();
+
+		// The mouse event lands next frame, and the panels drawn then pick the target.
+		// A compile holds an import but not a panel's drop, so it offers the drop once.
+		if (front.positioned && !m_importPlaced && !(compiling && front.offered))
+		{
+			ImGui::GetIO().AddMousePosEvent(front.x, front.y);
+			m_importPlaced = true;
+			front.offered = compiling;
+			m_importTarget = nullptr;
+			m_importFolder.clear();
+			return;
+		};
+
+		if (compiling)
 		{
 			m_importTarget = nullptr;
 			m_importFolder.clear();
 			m_importPlaced = false;
-			return;
-		};
-
-		const QueuedImport& front = m_importQueue.front();
-
-		// The mouse event lands next frame, and the panels drawn then pick the target.
-		if (front.positioned && !m_importPlaced)
-		{
-			ImGui::GetIO().AddMousePosEvent(front.x, front.y);
-			m_importPlaced = true;
-			m_importTarget = nullptr;
-			m_importFolder.clear();
 			return;
 		};
 
