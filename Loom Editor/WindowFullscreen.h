@@ -22,6 +22,8 @@ namespace Loom
 	*/
 	struct WindowFullscreen final
 	{
+		#pragma region Fullscreen
+
 		struct Rect
 		{
 			int x = 0;
@@ -30,8 +32,21 @@ namespace Loom
 			int height = 0;
 		};
 
+		void Enter(GLFWwindow* window);
+		void Leave(GLFWwindow* window);
+
+		bool IsOn() const { return m_on; };
+
+		// Which of monitors window overlaps most, or the first when it
+		// overlaps none; -1 when there are none.
+		static int MonitorUnder(const Rect& window, const std::vector<Rect>& monitors);
+
+		#pragma endregion
+
+		#pragma region Placement
+
 		// The view Placement holds when it is not fullscreen.
-		static constexpr int no_view = -1;
+		static constexpr int NoView = -1;
 
 		// A window's state, for the next process to take up. windowed is
 		// where it sits when neither maximized nor fullscreen.
@@ -40,11 +55,8 @@ namespace Loom
 			Rect windowed{ };
 			bool maximized = false;
 			bool minimized = false;
-			int view = no_view;
+			int view = NoView;
 		};
-
-		void Enter(GLFWwindow* window);
-		void Leave(GLFWwindow* window);
 
 		// Called once a frame, since a maximized or minimized window no longer
 		// says where it sits otherwise.
@@ -52,27 +64,27 @@ namespace Loom
 
 		Placement Placed(GLFWwindow* window) const;
 
-		// Puts a new window where placement has it, as soon as it opens.
-		static void Place(GLFWwindow* window, const Placement& placement);
+		// Puts a new window where placement has it, once it has its frame, and
+		// gives back the placement as it could be met.
+		static Placement Place(GLFWwindow* window, const Placement& placement);
 
-		// Takes over from a Place on window, once it has its frame and any
-		// Enter is done.
+		// Takes over from a Place on window, once any Enter is done.
 		void Adopt(GLFWwindow* window, const Placement& placement);
-
-		bool IsOn() const { return m_on; };
-
-		// Which of monitors window overlaps most, or the first when it
-		// overlaps none; -1 when there are none.
-		static int MonitorUnder(const Rect& window, const std::vector<Rect>& monitors);
 
 		// Where windowed lands if a window maximized at maximized is restored,
 		// which moves it along when that window was sent to another monitor.
 		static Rect Carried(const Rect& windowed, const Rect& maximized, const std::vector<Rect>& monitors);
 
-		// As an argument of --window-placement. Read has no value for anything
-		// Write would not give.
+		// window as it is on monitors, or on the first, as large as fits, when
+		// it overlaps none, as after one is unplugged.
+		static Rect Reachable(const Rect& window, const std::vector<Rect>& monitors);
+
+		// As an argument of --window-placement. Read has no value for text of
+		// another shape or a window of no size.
 		static std::string Write(const Placement& placement);
 		static std::optional<Placement> Read(const std::string& text);
+
+		#pragma endregion
 
 	private:
 		bool m_on = false;

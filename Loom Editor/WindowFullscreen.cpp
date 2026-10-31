@@ -27,7 +27,25 @@ namespace Loom
 
 			return rects;
 		};
+
+		std::vector<WindowFullscreen::Rect> CurrentMonitorRects()
+		{
+			int count = 0;
+			GLFWmonitor** monitors = glfwGetMonitors(&count);
+
+			return MonitorRects(monitors, count);
+		};
+
+		long long Overlap(const WindowFullscreen::Rect& a, const WindowFullscreen::Rect& b)
+		{
+			const long long across = std::min(a.x + a.width, b.x + b.width) - std::max(a.x, b.x);
+			const long long down = std::min(a.y + a.height, b.y + b.height) - std::max(a.y, b.y);
+
+			return across > 0 && down > 0 ? across * down : 0;
+		};
 	};
+
+	#pragma region Fullscreen
 
 	int WindowFullscreen::MonitorUnder(const Rect& window, const std::vector<Rect>& monitors)
 	{
@@ -36,13 +54,11 @@ namespace Loom
 
 		for (int i = 0; i < (int)monitors.size(); i++)
 		{
-			const Rect& monitor = monitors[i];
-			const long long across = std::min(window.x + window.width, monitor.x + monitor.width) - std::max(window.x, monitor.x);
-			const long long down = std::min(window.y + window.height, monitor.y + monitor.height) - std::max(window.y, monitor.y);
+			const long long overlap = Overlap(window, monitors[i]);
 
-			if (across > 0 && down > 0 && across * down > most)
+			if (overlap > most)
 			{
-				most = across * down;
+				most = overlap;
 				best = i;
 			};
 		};
@@ -106,6 +122,10 @@ namespace Loom
 			glfwMaximizeWindow(window);
 	};
 
+	#pragma endregion
+
+	#pragma region Placement
+
 	void WindowFullscreen::Track(GLFWwindow* window)
 	{
 		const bool shown = window != nullptr && glfwGetWindowAttrib(window, GLFW_VISIBLE);
@@ -130,29 +150,31 @@ namespace Loom
 		placed.minimized = window != nullptr && glfwGetWindowAttrib(window, GLFW_ICONIFIED);
 
 		if (m_maximized && !m_on)
-		{
-			int count = 0;
-			GLFWmonitor** monitors = glfwGetMonitors(&count);
+			placed.windowed = Carried(m_windowed, m_zoomed, CurrentMonitorRects());
 
-			placed.windowed = Carried(m_windowed, m_zoomed, MonitorRects(monitors, count));
+		return placed;
+	};
+
+	WindowFullscreen::Placement WindowFullscreen::Place(GLFWwindow* window, const Placement& placement)
+	{
+		Placement placed = placement;
+
+		placed.windowed = Reachable(placement.windowed, CurrentMonitorRects());
+
+		if (window != nullptr && glfwGetWindowAttrib(window, GLFW_VISIBLE))
+		{
+			// The size last: arriving on a monitor of another scale may change it.
+			glfwSetWindowPos(window, placed.windowed.x, placed.windowed.y);
+			glfwSetWindowSize(window, placed.windowed.width, placed.windowed.height);
 		};
 
 		return placed;
 	};
 
-	void WindowFullscreen::Place(GLFWwindow* window, const Placement& placement)
-	{
-		if (window == nullptr || !glfwGetWindowAttrib(window, GLFW_VISIBLE))
-			return;
-
-		// The size last: arriving on a monitor of another scale may change it.
-		glfwSetWindowPos(window, placement.windowed.x, placement.windowed.y);
-		glfwSetWindowSize(window, placement.windowed.width, placement.windowed.height);
-	};
-
 	void WindowFullscreen::Adopt(GLFWwindow* window, const Placement& placement)
 	{
-		m_windowed = placement.windowed;
+		// Until Track sees it maximized, which a window minimized from the start waits for.
+		m_windowed = m_zoomed = placement.windowed;
 		m_maximized = placement.maximized;
 
 		if (window == nullptr || !glfwGetWindowAttrib(window, GLFW_VISIBLE))
@@ -179,6 +201,19 @@ namespace Loom
 		carried.y += monitors[to].y - monitors[from].y;
 
 		return carried;
+	};
+
+	WindowFullscreen::Rect WindowFullscreen::Reachable(const Rect& window, const std::vector<Rect>& monitors)
+	{
+		const bool reachable = std::any_of(monitors.begin(), monitors.end(),
+			[&window](const Rect& monitor) { return Overlap(window, monitor) > 0; });
+
+		if (reachable || monitors.empty())
+			return window;
+
+		const Rect& primary = monitors.front();
+
+		return { primary.x, primary.y, std::min(window.width, primary.width), std::min(window.height, primary.height) };
 	};
 
 	std::string WindowFullscreen::Write(const Placement& placement)
@@ -210,7 +245,7 @@ namespace Loom
 				return std::nullopt;
 		};
 
-		if (stream.peek() != std::char_traits<char>::eof() || rect.width <= 0 || rect.height <= 0 || placement.view < no_view)
+		if (stream.peek() != std::char_traits<char>::eof() || rect.width <= 0 || rect.height <= 0 || placement.view < NoView)
 			return std::nullopt;
 
 		placement.maximized = maximized != 0;
@@ -218,4 +253,6 @@ namespace Loom
 
 		return placement;
 	};
+
+	#pragma endregion
 };

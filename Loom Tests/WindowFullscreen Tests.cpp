@@ -49,7 +49,7 @@ TEST_SUITE("WindowFullscreen")
 		REQUIRE(read.has_value());
 		CHECK_FALSE(read->maximized);
 		CHECK_FALSE(read->minimized);
-		CHECK(read->view == Loom::WindowFullscreen::no_view);
+		CHECK(read->view == Loom::WindowFullscreen::NoView);
 	};
 
 	TEST_CASE("anything else is no placement")
@@ -80,6 +80,37 @@ TEST_SUITE("WindowFullscreen")
 		CHECK(carried.y == 100);
 		CHECK(carried.width == 800);
 		CHECK(carried.height == 600);
+	};
+
+	TEST_CASE("a window on a monitor stays where it is, even hanging off it")
+	{
+		const Rect window = { 1900, 100, 800, 600 };
+		const Rect reachable = Loom::WindowFullscreen::Reachable(window, { left_monitor, right_monitor });
+
+		CHECK(reachable.x == window.x);
+		CHECK(reachable.y == window.y);
+		CHECK(reachable.width == window.width);
+		CHECK(reachable.height == window.height);
+	};
+
+	TEST_CASE("a window whose monitor went away comes to the first one, as large as fits")
+	{
+		const Rect moved = Loom::WindowFullscreen::Reachable({ 20000, 20000, 800, 600 }, { right_monitor, left_monitor });
+
+		CHECK(moved.x == right_monitor.x);
+		CHECK(moved.y == right_monitor.y);
+		CHECK(moved.width == 800);
+		CHECK(moved.height == 600);
+
+		const Rect fitted = Loom::WindowFullscreen::Reachable({ -9000, 100, 3000, 2000 }, { left_monitor });
+
+		CHECK(fitted.width == left_monitor.width);
+		CHECK(fitted.height == left_monitor.height);
+	};
+
+	TEST_CASE("with no monitors a window stays as it is")
+	{
+		CHECK(Loom::WindowFullscreen::Reachable({ 20000, 20000, 800, 600 }, { }).x == 20000);
 	};
 
 	// A hidden run lays out as though it filled the monitor, and moves no window.

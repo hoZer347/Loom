@@ -376,9 +376,6 @@ int main(int argc, char** argv)
 		if (!desktop.empty() && !ShowOnDesktop(Engine::window, desktop))
 			return 1;
 
-		if (placement)
-			WindowFullscreen::Place(Engine::window, *placement);
-
 		// Opening a project moves the working directory, so command-line paths resolve first.
 		const std::filesystem::path launch_folder = std::filesystem::current_path();
 

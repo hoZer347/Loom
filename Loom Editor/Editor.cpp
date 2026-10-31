@@ -1589,7 +1589,9 @@ namespace Loom
 
 	void Editor::RestoreWindow(const WindowFullscreen::Placement& placement)
 	{
-		if (placement.view != WindowFullscreen::no_view)
+		const WindowFullscreen::Placement placed = WindowFullscreen::Place(Engine::window, placement);
+
+		if (placement.view != WindowFullscreen::NoView && placement.view <= (int)View::Debug)
 		{
 			// A prefab left open does not come back, so its view has nothing to show.
 			const View view = (View)placement.view;
@@ -1597,7 +1599,7 @@ namespace Loom
 			EnterFullscreen(view == View::Prefab ? View::Game : view);
 		};
 
-		m_windowFullscreen.Adopt(Engine::window, placement);
+		m_windowFullscreen.Adopt(Engine::window, placed);
 	};
 
 	#pragma endregion

@@ -249,6 +249,13 @@ try
     Assert-Maximized 'Maximizing'
     Invoke-Restart 'restart maximized'
     Assert-Maximized 'A maximized restart'
+    [void] [LoomTest.Window]::ShowWindow((Get-WindowState).Handle, $MinimizeCommand)
+    Start-Sleep -Seconds $SettleSeconds
+    Invoke-Restart 'restart minimized from maximized'
+    Invoke-Restart 'second restart while minimized from maximized'
+    [void] [LoomTest.Window]::ShowWindow((Get-WindowState).Handle, $RestoreCommand)
+    Start-Sleep -Seconds $SettleSeconds
+    Assert-Maximized 'Restoring after restarts minimized from maximized'
     Invoke-Ui $ToggleFullscreen
     Assert-Fullscreen 'F11 on a maximized window'
     Invoke-Restart 'restart in fullscreen over maximized'
