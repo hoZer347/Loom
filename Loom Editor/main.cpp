@@ -3,8 +3,6 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
-#include <dwmapi.h>
-#include <objbase.h>
 #endif
 
 #include "CrashReports.h"
@@ -35,90 +33,13 @@
 #include <utility>
 #include <vector>
 
-#ifdef _WIN32
-#define GLFW_EXPOSE_NATIVE_WIN32
-#include <GLFW/glfw3native.h>
-
-#pragma comment(lib, "dwmapi.lib")
-#else
 #include <GLFW/glfw3.h>
-#endif
 
 using namespace Loom;
 
 
 namespace
 {
-	#pragma region Desktop
-
-#ifdef _WIN32
-	// shobjidl.h only declares it for a Windows 10 target; the engine targets Windows 7.
-	MIDL_INTERFACE("a5cd92ff-29be-454c-8d04-d82879fb3f1b")
-	DesktopManager : public IUnknown
-	{
-		virtual HRESULT STDMETHODCALLTYPE IsWindowOnCurrentVirtualDesktop(HWND window, BOOL* on_current) = 0;
-		virtual HRESULT STDMETHODCALLTYPE GetWindowDesktopId(HWND window, GUID* desktop) = 0;
-		virtual HRESULT STDMETHODCALLTYPE MoveWindowToDesktop(HWND window, REFGUID desktop) = 0;
-	};
-
-	constexpr CLSID CLSID_DesktopManager = { 0xaa509086, 0x5ca9, 0x4c25, { 0x8f, 0x95, 0x58, 0x9d, 0x3c, 0x07, 0xb4, 0x8a } };
-
-	// The shell only tracks a shown window, so it is shown cloaked, moved, then uncloaked.
-	bool ShowOnDesktop(GLFWwindow* window, const std::string& id)
-	{
-		const std::wstring braced = L"{" + std::wstring(id.begin(), id.end()) + L"}";
-
-		GUID desktop{ };
-
-		if (FAILED(CLSIDFromString(braced.c_str(), &desktop)))
-		{
-			std::cerr << "--desktop: " << id << " is not a desktop id" << std::endl;
-			return false;
-		};
-
-		const HRESULT com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-
-		DesktopManager* manager = nullptr;
-		HRESULT result = CoCreateInstance(CLSID_DesktopManager, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&manager));
-
-		const HWND hwnd = glfwGetWin32Window(window);
-		BOOL cloak = TRUE;
-
-		DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
-		ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-
-		if (SUCCEEDED(result))
-		{
-			result = manager->MoveWindowToDesktop(hwnd, desktop);
-			manager->Release();
-		};
-
-		if (SUCCEEDED(com))
-			CoUninitialize();
-
-		if (FAILED(result))
-		{
-			std::cerr << "--desktop: could not move the window to " << id << std::endl;
-			ShowWindow(hwnd, SW_HIDE);
-			return false;
-		};
-
-		cloak = FALSE;
-		DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, &cloak, sizeof(cloak));
-
-		return true;
-	};
-#else
-	// Virtual desktops by id are the Windows shell's.
-	bool ShowOnDesktop(GLFWwindow*, const std::string&)
-	{
-		std::cerr << "--desktop: virtual desktops are only on Windows" << std::endl;
-		return false;
-	};
-#endif
-
-	#pragma endregion
-
 	#pragma region File Types
 
 	// False when this is not the main checkout's editor, or there is no Explorer to claim them in.
@@ -227,8 +148,8 @@ namespace
 			<< "  --ui-script <file>             click, type and screenshot through the UI\n"
 			<< "                                 from a script (see UiScript.h), then exit,\n"
 			<< "                                 without showing a window\n"
-			<< "  --desktop <id>                 show the window on that virtual desktop,\n"
-			<< "                                 without activating it\n"
+			<< "  --own-desktop                  an automated run with its window shown, on a\n"
+			<< "                                 desktop of its own (run-on-agent-desktop.ps1)\n"
 			<< "  --window-placement <placement> open the window as a restart left it: x,y,\n"
 			<< "                                 width,height,maximized,minimized,view\n"
 			<< "  --mcp <port>                   serve the editor's MCP tools on that port,\n"
@@ -309,8 +230,8 @@ int main(int argc, char** argv)
 		return 1;
 	};
 
-	// Automated runs and runs on another desktop start hidden; read before the Engine opens the window.
-	std::string desktop;
+	// Automated runs start hidden; read before the Engine opens the window.
+	bool own_desktop = false;
 	std::optional<WindowFullscreen::Placement> placement;
 
 	Engine::backend = Editor::SavedBackend();
@@ -329,11 +250,11 @@ int main(int argc, char** argv)
 		if (argument == "--opengl")
 			Engine::backend = Backend::OpenGL;
 
-		if (argument == "--screenshot" || argument == "--ui-script" || argument == "--desktop")
+		if (argument == "--screenshot" || argument == "--ui-script" || argument == "--own-desktop")
 			Engine::showWindow = false;
 
-		if (argument == "--desktop" && i + 1 < argc)
-			desktop = argv[i + 1];
+		if (argument == "--own-desktop")
+			own_desktop = true;
 
 		if (argument == "--window-placement" && i + 1 < argc)
 			placement = WindowFullscreen::Read(argv[i + 1]);
@@ -374,8 +295,8 @@ int main(int argc, char** argv)
 		glfwSetWindowTitle(Engine::window, "Loom Editor");
 		glfwSetWindowSize(Engine::window, 1600, 900);
 
-		if (!desktop.empty() && !ShowOnDesktop(Engine::window, desktop))
-			return 1;
+		if (own_desktop)
+			glfwShowWindow(Engine::window);
 
 		// RestoreWindow places it again once it has its frame: this keeps it from jumping there.
 		if (placement)
@@ -555,16 +476,6 @@ int main(int argc, char** argv)
 
 				selection.push_back(argv[++i]);
 			}
-			else if (argument == "--desktop")
-			{
-				if (i + 1 >= argc)
-				{
-					std::cerr << "--desktop needs a virtual desktop id" << std::endl;
-					return 1;
-				};
-
-				i++;
-			}
 			else if (argument == "--window-placement")
 			{
 				if (!placement)
@@ -575,7 +486,7 @@ int main(int argc, char** argv)
 
 				i++;
 			}
-			else if (argument == "--vulkan" || argument == "--opengl" || argument == "--log-scripts-project")
+			else if (argument == "--vulkan" || argument == "--opengl" || argument == "--log-scripts-project" || argument == "--own-desktop")
 				continue;
 			else if (argument == "--extensions")
 				i++;
@@ -769,8 +680,8 @@ int main(int argc, char** argv)
 			if (mcp_port != 0 && mcp_port != EditorMcp::default_port)
 				options += " --mcp " + std::to_string(mcp_port);
 
-			if (!desktop.empty())
-				options += " --desktop " + desktop;
+			if (own_desktop)
+				options += " --own-desktop";
 
 			if (!Editor::extensionsFolder.empty())
 				options += " --extensions \"" + Editor::extensionsFolder.string() + '"';
