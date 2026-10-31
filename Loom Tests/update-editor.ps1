@@ -198,19 +198,14 @@ function Invoke-Update([string[]] $Flags = @())
     if ($LASTEXITCODE -ne 0) { throw "update-editor.ps1 failed." }
 }
 
-function Invoke-ExtensionUpdate
-{
-    $line = "`$env:LOCALAPPDATA = '$project'; & '$Script' -Port $port"
-    (& powershell -NoProfile -ExecutionPolicy Bypass -Command $line) -join "`n"
-    if ($LASTEXITCODE -ne 0) { throw "update-editor.ps1 failed." }
-}
-
 $screen = ([Windows.Forms.Screen]::AllScreens | Sort-Object Primary | Select-Object -First 1).Bounds
 $windowed = [pscustomobject] @{ X = $screen.X + $WindowOffset[0]; Y = $screen.Y + $WindowOffset[1]; Width = $WindowSize[0]; Height = $WindowSize[1] }
 $placement = "$($windowed.X),$($windowed.Y),$($windowed.Width),$($windowed.Height),0,0,-1"
 
 $first = Start-Process -FilePath $Editor -ArgumentList "--desktop $Desktop --mcp $port --window-placement $placement `"$projectFile`"" -WorkingDirectory $project -PassThru
 $latest = $first.Id
+
+$env:LOCALAPPDATA = $project
 
 try
 {
@@ -401,18 +396,18 @@ try
     New-Item -ItemType File $extension | Out-Null
     (Get-Item $extension).LastWriteTime = (Get-Process -Id $latest).StartTime.AddMinutes(-1)
 
-    $older = Invoke-ExtensionUpdate
+    $older = Invoke-Update
     if ($older -match 'told to') { throw "An extension older than the editor restarted it: $older" }
 
     (Get-Item $extension).LastWriteTime = Get-Date
-    $installed = Invoke-ExtensionUpdate
+    $installed = Invoke-Update
     if ($installed -notmatch 'told to update') { throw "An extension installed since the editor opened did not reach it: $installed" }
 
     $beforeInstall = $latest
     $latest = Wait-Pid { param($id) $id -ne $beforeInstall } 'restart on an installed extension'
     Wait-Compiled
 
-    $taken = Invoke-ExtensionUpdate
+    $taken = Invoke-Update
     if ($taken -match 'told to') { throw "An extension the editor already took restarted it again: $taken" }
 
     Write-Output 'update-editor passed.'
