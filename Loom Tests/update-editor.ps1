@@ -191,11 +191,16 @@ function Test-Asking
     (Invoke-Tool 'ui_items') -match "Don't Save"
 }
 
-function Invoke-Update([string[]] $Flags = @())
+function Invoke-Script([string] $Arguments)
 {
-    $line = "& '$Script' -Port $port -Project '$project' $($Flags -join ' ')"
+    $line = "& '$Script' -Port $port $Arguments"
     (& powershell -NoProfile -ExecutionPolicy Bypass -Command $line) -join "`n"
     if ($LASTEXITCODE -ne 0) { throw "update-editor.ps1 failed." }
+}
+
+function Invoke-Update([string[]] $Flags = @())
+{
+    Invoke-Script "-Project '$project' $($Flags -join ' ')"
 }
 
 $screen = ([Windows.Forms.Screen]::AllScreens | Sort-Object Primary | Select-Object -First 1).Bounds
@@ -212,7 +217,7 @@ try
     Wait-Pid { param($id) $id -eq $first.Id } 'editor answering' | Out-Null
     Wait-Compiled
 
-    $idle = & powershell -NoProfile -ExecutionPolicy Bypass -Command "& '$Script' -Port $port"
+    $idle = Invoke-Script
     if ($idle -match 'told') { throw "An editor with nothing to take was told: $idle" }
 
     Invoke-Tool 'open_scene' @{ path = $scene } | Out-Null
@@ -396,18 +401,18 @@ try
     New-Item -ItemType File $extension | Out-Null
     (Get-Item $extension).LastWriteTime = (Get-Process -Id $latest).StartTime.AddMinutes(-1)
 
-    $older = Invoke-Update
+    $older = Invoke-Script
     if ($older -match 'told to') { throw "An extension older than the editor restarted it: $older" }
 
     (Get-Item $extension).LastWriteTime = Get-Date
-    $installed = Invoke-Update
+    $installed = Invoke-Script
     if ($installed -notmatch 'told to update') { throw "An extension installed since the editor opened did not reach it: $installed" }
 
     $beforeInstall = $latest
     $latest = Wait-Pid { param($id) $id -ne $beforeInstall } 'restart on an installed extension'
     Wait-Compiled
 
-    $taken = Invoke-Update
+    $taken = Invoke-Script
     if ($taken -match 'told to') { throw "An extension the editor already took restarted it again: $taken" }
 
     Write-Output 'update-editor passed.'
