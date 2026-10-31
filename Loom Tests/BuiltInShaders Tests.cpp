@@ -50,6 +50,9 @@ namespace
 	const glm::vec3 RED(1.0f, 0.0f, 0.0f);
 	const glm::vec3 CAMERA_POSITION(0.0f, 0.0f, 5.0f);
 
+	// A light along this leaves a face toward the camera short of full.
+	const glm::vec3 SIDELONG(0.8f, -0.4f, -0.45f);
+
 	// Over the whole view from CAMERA_POSITION, facing it, with the same UV
 	// everywhere.
 	const std::vector<float> COVERING = { -50.0f, -50.0f, 0.0f, 50.0f, -50.0f, 0.0f, 0.0f, 50.0f, 0.0f };
@@ -85,7 +88,13 @@ namespace
 		Pump();
 
 		if (lit)
-			scene.Attach<Loom::Light>();
+		{
+			Loom::GameObject* sun = scene.AddChild("Sun");
+			Pump();
+
+			sun->Attach<Loom::Light>();
+			sun->transform.rotation = Loom::Light::RotationAlong(SIDELONG);
+		};
 
 		Loom::GameObject* eye = scene.AddChild("Camera");
 		Loom::GameObject* shape = scene.AddChild("Shape");
@@ -206,10 +215,14 @@ namespace
 		return image;
 	};
 
+	// Spelled apart from CheckDraws's folders, as compiled shaders are kept by path.
 	void CheckBloom(RenderFixture& fixture, const std::string& folder)
 	{
 		constexpr glm::u8vec3 RED_PIXEL(255, 0, 0);
 		constexpr glm::u8vec3 BLUE_PIXEL(0, 0, 255);
+
+		// Its mark's alpha lets a little of what is behind it through.
+		constexpr int GLOW_RED = 245;
 
 		// Inside the spread of the edge, and well past it.
 		constexpr int NEAR_EDGE = 4;
@@ -220,7 +233,7 @@ namespace
 
 		const Image glowing = Bloomed(fixture, folder + "Glow.shader", folder + "Bloom.loompixel");
 
-		CHECK(glowing.At(middle - FAR_FROM_EDGE, row) == RED_PIXEL);
+		CHECK(glowing.At(middle - FAR_FROM_EDGE, row).r >= GLOW_RED);
 		CHECK(glowing.At(middle + FAR_FROM_EDGE, row) == BLUE_PIXEL);
 
 		const glm::u8vec3 spread = glowing.At(middle + NEAR_EDGE, row);
@@ -334,12 +347,12 @@ TEST_SUITE("BuiltInShaders")
 
 	TEST_CASE_FIXTURE(RenderFixture, "the bloom pass spreads Loom/Glow.shader and nothing else, on OpenGL")
 	{
-		CheckBloom(*this, "Loom/");
+		CheckBloom(*this, "Loom/./");
 	};
 
 	TEST_CASE_FIXTURE(VulkanRenderFixture, "the bloom pass spreads Loom/Glow.shader and nothing else, on Vulkan")
 	{
-		CheckBloom(*this, "./Loom/");
+		CheckBloom(*this, "./Loom/./");
 	};
 
 	#pragma endregion
