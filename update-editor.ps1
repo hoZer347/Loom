@@ -62,6 +62,8 @@ $ManifestExtension = '.extension.json'
 $AutomatedFlags = '--play', '--screenshot', '--ui-script'
 $McpTimeoutSeconds = 15
 
+#region Editor build
+
 function Update-EditorBuild
 {
     # Left by earlier runs; the ones a running editor still holds stay until it closes.
@@ -109,6 +111,10 @@ function Update-EditorBuild
     if ($result -ne 0) { throw "$Editor failed to build." }
 }
 
+#endregion
+
+#region Extensions
+
 function Update-Extensions
 {
     $built = (Get-Item $Editor).LastWriteTimeUtc
@@ -128,6 +134,10 @@ function Update-Extensions
     }
 }
 
+#endregion
+
+#region Build lock
+
 function Update-Build
 {
     $mutex = [Threading.Mutex]::new($false, 'Global\LoomUpdateEditor')
@@ -144,6 +154,10 @@ function Update-Build
         $mutex.ReleaseMutex()
     }
 }
+
+#endregion
+
+#region Open editors
 
 # The tool's text, or a throw naming what it answered instead.
 function Invoke-EditorTool([string] $Tool, [hashtable] $Arguments = @{})
@@ -195,6 +209,8 @@ function Send-Updates
         Write-Output "Editor $($process.ProcessId) told to $command."
     }
 }
+
+#endregion
 
 Update-Build
 

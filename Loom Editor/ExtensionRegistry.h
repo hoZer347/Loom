@@ -42,6 +42,9 @@ namespace Loom
 	* - An extension is a shared library in the extensions folder, built with
 	*   LOOM_SCRIPT_MODULE against the editor's import library as scripts are.
 	*   It exports LoomExtensionAbi, LoomExtensionStart and LoomExtensionStop
+	* - An install leaves <name>.extension.json beside it, holding Source and
+	*   LoomRoot. update-editor.ps1 then runs Source's update-extension.ps1
+	*   -LoomRoot <that Loom> whenever the editor is newer than the library
 	*/
 	struct LOOM_API ExtensionRegistry final
 	{

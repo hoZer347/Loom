@@ -12,9 +12,11 @@
     extension built before the editor's API last changed has it, which is what a
     merge leaves in the folder, and Claude.dll is made older than the editor.
     An extension that cannot rebuild must fail update-editor.ps1 and leave the
-    editor open, and one for another Loom must be left alone. update-editor.ps1
-    then rebuilds both and restarts the editor. Every panel must come back and
-    work, and the console must not say an extension was left out.
+    editor open, and an editor restarted on it anyway must say it is out of date.
+    One for another Loom must be left alone. update-editor.ps1 then rebuilds both
+    and restarts the editor, keeping --extensions. Every panel must come back and
+    work, and the console must not say an extension was left out. Ctrl+Shift+R's
+    refresh must do the same for extensions older than the editor.
     Throws naming what failed.
     A slot only: the user's Loom refuses, since its settings hold what they
     left open.
@@ -63,6 +65,8 @@ $AgentsPanel = "$([char]::ConvertFromUtf32(0x1F465)) Agents###Agents"
 $AgentTab = "$([char]::ConvertFromUtf32(0x1F464)) Agent###Agent"
 $AgentsHeading = 'Session / subagent'
 $LeftOut = 'Could not (load|copy) the extension|Skipped the extension'
+$OutOfDate = 'Could not load the extension Reload Fixture\.dll \(it was built against another version of the editor\)'
+$KeepsExtensions = '*--extensions*'
 
 $common = & git -C $Root rev-parse --path-format=absolute --git-common-dir
 if ([IO.Path]::GetFullPath((Split-Path $common -Parent)) -eq [IO.Path]::GetFullPath($Root)) { throw "$Root is the user's Loom. Run a slot's copy." }
@@ -166,7 +170,20 @@ function Invoke-Update
 {
     # A native command's stderr would stop this script before its text can be read.
     $ErrorActionPreference = 'Continue'
-    (& powershell -NoProfile -ExecutionPolicy Bypass -Command "& '$UpdateScript' -Port $port -Project '$Project'" 2>&1) -join "`n"
+    (& powershell -NoProfile -ExecutionPolicy Bypass -Command "& '$UpdateScript' -Port $port -Project '$Project' -Extensions '$Extensions'" 2>&1) -join "`n"
+}
+
+function Invoke-EditorCommand([string] $Command)
+{
+    if ((Invoke-Tool 'editors') -notmatch 'Editor (\d+)') { throw 'No editor is listed.' }
+    Invoke-Tool 'command' @{ command = $Command; editor = $Matches[1] } | Out-Null
+}
+
+function Assert-Current([string[]] $Files)
+{
+    $built = (Get-Item -LiteralPath $Editor).LastWriteTimeUtc
+    $older = $Files | Where-Object { (Get-Item -LiteralPath (Join-Path $Extensions $_)).LastWriteTimeUtc -lt $built }
+    if ($older) { throw "$($older -join ', ') stayed older than the editor." }
 }
 
 function Invoke-Tool([string] $Tool, [hashtable] $Arguments = @{})
@@ -184,16 +201,16 @@ function Get-EditorId
     if ($state -match 'Process: (\d+)') { [int] $Matches[1] }
 }
 
-function Wait-Editor([scriptblock] $Until, [string] $What)
+function Wait-Editor([scriptblock] $Until, [string] $What, [int] $Seconds = $StartSeconds)
 {
     $clock = [Diagnostics.Stopwatch]::StartNew()
-    while ($clock.Elapsed.TotalSeconds -lt $StartSeconds)
+    while ($clock.Elapsed.TotalSeconds -lt $Seconds)
     {
         $found = Get-EditorId
         if ($found -and (& $Until $found)) { return $found }
         Start-Sleep -Milliseconds $PollMilliseconds
     }
-    throw "No $What within $StartSeconds seconds."
+    throw "No $What within $Seconds seconds."
 }
 
 function Wait-Compiled
@@ -306,7 +323,7 @@ try
     $withClaude = Test-Path -LiteralPath (Join-Path $ClaudeSource 'Source\Extension.cpp')
     if ($withClaude) { Install-Claude }
 
-    $first = [OwnDesktop]::Start("Loom extension reload $port", $Editor, "`"$Editor`" --mcp $port `"$projectFile`"", $Project)
+    $first = [OwnDesktop]::Start("Loom extension reload $port", $Editor, "`"$Editor`" --extensions `"$Extensions`" --mcp $port `"$projectFile`"", $Project)
 
     Wait-Editor { param($id) $id -eq $first } 'editor answering' | Out-Null
     Wait-Compiled
@@ -328,19 +345,26 @@ try
     $refused = Invoke-Update
     if ($LASTEXITCODE -eq 0 -or $refused -notmatch 'failed to build') { throw "An extension that cannot rebuild did not stop the update: $refused" }
     if ($refused -match 'told to') { throw "An extension that cannot rebuild still told the editor: $refused" }
+    if ((Get-EditorId) -ne $first) { throw 'An extension that cannot rebuild still restarted the editor.' }
+
+    Invoke-EditorCommand 'update'
+    $second = Wait-Editor { param($id) $id -ne $first } 'restart on the out of date extension'
+    Wait-Compiled
+    if ((Get-ConsoleText) -notmatch $OutOfDate) { throw "The console did not say the extension is out of date: $(Get-ConsoleText)" }
 
     Set-Manifest $fixtureName $FixtureSource $Root
     Set-Manifest 'Another Loom' $Refuses (Join-Path $Scratch 'Another Loom')
 
     $told = Invoke-Update
     if ($LASTEXITCODE -ne 0 -or $told -notmatch 'told to update') { throw "The editor was not told to update: $told" }
-    foreach ($file in @($FixtureFile) + @(if ($withClaude) { $ClaudeFile }))
-    {
-        if ((Get-Item -LiteralPath (Join-Path $Extensions $file)).LastWriteTimeUtc -lt (Get-Item -LiteralPath $Editor).LastWriteTimeUtc) { throw "The update left $file older than the editor." }
-    }
+    $files = @($FixtureFile) + @(if ($withClaude) { $ClaudeFile })
+    Assert-Current $files
 
-    $latest = Wait-Editor { param($id) $id -ne $first } 'restart'
+    $latest = Wait-Editor { param($id) $id -ne $second } 'restart'
     Wait-Compiled
+
+    $line = (Get-CimInstance Win32_Process -Filter "ProcessId = $latest").CommandLine
+    if ($line -notlike $KeepsExtensions) { throw "The restart dropped --extensions: $line" }
 
     Assert-NothingLeftOut 'After the update'
     if ($withClaude)
@@ -349,9 +373,19 @@ try
         Assert-Listed @($ClaudePanel, $AgentsPanel, $AgentTab) 'After the update'
         Assert-ClaudeWorks 'After the update'
     }
-    Assert-StillOpen @($FixturePanel)
     Assert-Listed @($FixturePanel) 'After the update'
     Assert-FixtureWorks 'After the update'
+
+    $files | ForEach-Object { Set-OlderThanEditor $_ }
+    Invoke-EditorCommand 'refresh'
+    Wait-Editor { param($id) $id -ne $latest } 'restart after the refresh' $CompileSeconds | Out-Null
+    Wait-Compiled
+
+    Assert-Current $files
+    Assert-NothingLeftOut 'After the refresh'
+    Assert-StillOpen @($FixturePanel)
+    Assert-Listed @($FixturePanel) 'After the refresh'
+    Assert-FixtureWorks 'After the refresh'
 
     Write-Output 'extension-reload passed.'
 }
