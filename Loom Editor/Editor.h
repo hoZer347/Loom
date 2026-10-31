@@ -177,6 +177,10 @@ namespace Loom
 		bool WantsRelaunch() const { return m_relaunch; };
 		const std::filesystem::path& RelaunchExecutable() const { return m_refresh.GetExecutable(); };
 		std::string RelaunchTarget() const;
+		WindowFullscreen::Placement RelaunchPlacement() const;
+
+		// Takes the window up as the editor being restarted left it.
+		void RestoreWindow(const WindowFullscreen::Placement& placement);
 
 		#pragma endregion
 

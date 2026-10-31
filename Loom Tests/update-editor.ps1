@@ -12,7 +12,10 @@
     waiting with no question and a close then still asks, a scripts update
     stops a run and compiles over unsaved work without a restart, and takes
     back a question, a restart waits out a game being built, and an editor
-    with nothing to take is told nothing. Throws naming what failed.
+    with nothing to take is told nothing. The window comes back from a restart
+    windowed, minimized, maximized and fullscreen at the place and size it left,
+    on a monitor other than the primary when there is one. Throws naming what
+    failed.
     A slot only: the user's Loom refuses, since its settings hold what they
     left open.
 
@@ -44,6 +47,12 @@ click "##Menu_00" "Exit"
 wait 5
 '@
 $Answer = 'click "Unsaved Changes" "Cancel"'
+$ToggleFullscreen = 'key f11'
+$ToggleMaximized = 'click "##MainMenuBar" "##Maximize"'
+$WindowOffset = 137, 89
+$WindowSize = 1111, 677
+$MinimizeCommand = 6
+$RestoreCommand = 9
 
 $common = & git -C $Root rev-parse --path-format=absolute --git-common-dir
 if ([IO.Path]::GetFullPath((Split-Path $common -Parent)) -eq [IO.Path]::GetFullPath($Root)) { throw "$Root is the user's Loom. Run a slot's copy." }
@@ -116,6 +125,58 @@ function Wait-Running
     throw "No run within $DeadlineSeconds seconds."
 }
 
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -Namespace LoomTest -Name Window -MemberDefinition @'
+[StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
+[DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr window, out RECT rect);
+[DllImport("user32.dll")] public static extern bool IsZoomed(IntPtr window);
+[DllImport("user32.dll")] public static extern bool IsIconic(IntPtr window);
+[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr window, int command);
+'@
+
+function Get-WindowState
+{
+    $handle = (Get-Process -Id $latest).MainWindowHandle
+    $rect = New-Object LoomTest.Window+RECT
+    if (-not [LoomTest.Window]::GetWindowRect($handle, [ref] $rect)) { throw "No window on editor $latest." }
+    [pscustomobject] @{
+        Handle = $handle; X = $rect.Left; Y = $rect.Top; Width = $rect.Right - $rect.Left; Height = $rect.Bottom - $rect.Top
+        Maximized = [LoomTest.Window]::IsZoomed($handle); Minimized = [LoomTest.Window]::IsIconic($handle)
+    }
+}
+
+function Assert-Windowed([string] $What)
+{
+    $state = Get-WindowState
+    if ($state.Maximized -or $state.Minimized -or $state.X -ne $windowed.X -or $state.Y -ne $windowed.Y -or $state.Width -ne $windowed.Width -or $state.Height -ne $windowed.Height)
+    {
+        throw "$What`: expected the window at $($windowed.X),$($windowed.Y) $($windowed.Width)x$($windowed.Height), found $($state | Out-String)"
+    }
+}
+
+function Assert-Fullscreen([string] $What)
+{
+    $state = Get-WindowState
+    if ($state.Maximized -or $state.X -ne $screen.X -or $state.Y -ne $screen.Y -or $state.Width -ne $screen.Width -or $state.Height -ne $screen.Height)
+    {
+        throw "$What`: expected the window over $screen, found $($state | Out-String)"
+    }
+}
+
+function Assert-Maximized([string] $What)
+{
+    $state = Get-WindowState
+    $centreX = $state.X + $state.Width / 2
+    $centreY = $state.Y + $state.Height / 2
+    if (-not $state.Maximized -or -not $screen.Contains([int] $centreX, [int] $centreY)) { throw "$What`: expected the window maximized on $screen, found $($state | Out-String)" }
+}
+
+function Invoke-Ui([string] $Script)
+{
+    Invoke-Tool 'ui' @{ script = $Script } | Out-Null
+    Start-Sleep -Seconds $SettleSeconds
+}
+
 function Invoke-Restart([string] $What)
 {
     $before = $latest
@@ -136,7 +197,11 @@ function Invoke-Update([string[]] $Flags = @())
     if ($LASTEXITCODE -ne 0) { throw "update-editor.ps1 failed." }
 }
 
-$first = Start-Process -FilePath $Editor -ArgumentList "--desktop $Desktop --mcp $port `"$projectFile`"" -WorkingDirectory $project -PassThru
+$screen = ([Windows.Forms.Screen]::AllScreens | Sort-Object Primary | Select-Object -First 1).Bounds
+$windowed = [pscustomobject] @{ X = $screen.X + $WindowOffset[0]; Y = $screen.Y + $WindowOffset[1]; Width = $WindowSize[0]; Height = $WindowSize[1] }
+$placement = "$($windowed.X),$($windowed.Y),$($windowed.Width),$($windowed.Height),0,0,-1"
+
+$first = Start-Process -FilePath $Editor -ArgumentList "--desktop $Desktop --mcp $port --window-placement $placement `"$projectFile`"" -WorkingDirectory $project -PassThru
 $latest = $first.Id
 
 try
@@ -162,6 +227,36 @@ try
     if ((Invoke-Tool 'hierarchy') -notmatch 'Unsaved') { throw 'The restarted editor did not reopen the scene.' }
 
     Wait-Compiled
+
+    Assert-Windowed 'A windowed restart'
+
+    [void] [LoomTest.Window]::ShowWindow((Get-WindowState).Handle, $MinimizeCommand)
+    Start-Sleep -Seconds $SettleSeconds
+    Invoke-Restart 'restart while minimized'
+    if (-not (Get-WindowState).Minimized) { throw 'A minimized editor came back up.' }
+    [void] [LoomTest.Window]::ShowWindow((Get-WindowState).Handle, $RestoreCommand)
+    Start-Sleep -Seconds $SettleSeconds
+    Assert-Windowed 'Restoring after a minimized restart'
+
+    Invoke-Ui $ToggleFullscreen
+    Assert-Fullscreen 'F11'
+    Invoke-Restart 'restart in fullscreen'
+    Assert-Fullscreen 'A fullscreen restart'
+    Invoke-Ui $ToggleFullscreen
+    Assert-Windowed 'Leaving fullscreen after a restart'
+
+    Invoke-Ui $ToggleMaximized
+    Assert-Maximized 'Maximizing'
+    Invoke-Restart 'restart maximized'
+    Assert-Maximized 'A maximized restart'
+    Invoke-Ui $ToggleFullscreen
+    Assert-Fullscreen 'F11 on a maximized window'
+    Invoke-Restart 'restart in fullscreen over maximized'
+    Assert-Fullscreen 'A fullscreen restart over maximized'
+    Invoke-Ui $ToggleFullscreen
+    Assert-Maximized 'Leaving fullscreen back to maximized after a restart'
+    Invoke-Ui $ToggleMaximized
+    Assert-Windowed 'Restoring after a maximized restart'
 
     $saved = Get-Content -LiteralPath $scene -Raw
     Set-Content -LiteralPath $scene -Value ($saved -replace 'Unsaved', 'Merged') -NoNewline -Encoding utf8

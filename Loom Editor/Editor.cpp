@@ -1577,6 +1577,29 @@ namespace Loom
 		return scene != m_scenePaths.end() ? scene->second : m_projectPath;
 	};
 
+	WindowFullscreen::Placement Editor::RelaunchPlacement() const
+	{
+		WindowFullscreen::Placement placement = m_windowFullscreen.Placed(Engine::window);
+
+		if (m_fullscreen)
+			placement.view = (int)*m_fullscreen;
+
+		return placement;
+	};
+
+	void Editor::RestoreWindow(const WindowFullscreen::Placement& placement)
+	{
+		if (placement.view != WindowFullscreen::no_view)
+		{
+			// A prefab left open does not come back, so its view has nothing to show.
+			const View view = (View)placement.view;
+
+			EnterFullscreen(view == View::Prefab ? View::Game : view);
+		};
+
+		m_windowFullscreen.Adopt(Engine::window, placement);
+	};
+
 	#pragma endregion
 
 	#pragma region Prefabs
@@ -2344,6 +2367,8 @@ namespace Loom
 #ifndef LOOM_FINAL
 		m_stagesShown = false;
 #endif
+
+		m_windowFullscreen.Track(Engine::window);
 
 		if (ImGui::IsKeyPressed(ImGuiKey_F11, false))
 			m_fullscreen ? LeaveFullscreen() : EnterFullscreen(m_lastView);

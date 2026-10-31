@@ -228,6 +228,8 @@ namespace
 			<< "                                 without showing a window\n"
 			<< "  --desktop <id>                 show the window on that virtual desktop,\n"
 			<< "                                 without activating it\n"
+			<< "  --window-placement <placement> open the window as a restart left it: x,y,\n"
+			<< "                                 width,height,maximized,minimized,view\n"
 			<< "  --mcp <port>                   serve the editor's MCP tools on that port,\n"
 			<< "                                 shared by every editor given it; a run\n"
 			<< "                                 with a window serves them on "
@@ -308,6 +310,7 @@ int main(int argc, char** argv)
 
 	// Automated runs and runs on another desktop start hidden; read before the Engine opens the window.
 	std::string desktop;
+	std::optional<WindowFullscreen::Placement> placement;
 
 	Engine::backend = Editor::SavedBackend();
 	Engine::vsync = false;
@@ -330,6 +333,9 @@ int main(int argc, char** argv)
 
 		if (argument == "--desktop" && i + 1 < argc)
 			desktop = argv[i + 1];
+
+		if (argument == "--window-placement" && i + 1 < argc)
+			placement = WindowFullscreen::Read(argv[i + 1]);
 
 		if (argument == "--log-scripts-project")
 			Editor::logScriptsProject = true;
@@ -370,10 +376,16 @@ int main(int argc, char** argv)
 		if (!desktop.empty() && !ShowOnDesktop(Engine::window, desktop))
 			return 1;
 
+		if (placement)
+			WindowFullscreen::Place(Engine::window, *placement);
+
 		// Opening a project moves the working directory, so command-line paths resolve first.
 		const std::filesystem::path launch_folder = std::filesystem::current_path();
 
 		Editor editor;
+
+		if (placement)
+			editor.RestoreWindow(*placement);
 
 		bool compile = false;
 		bool play = false;
@@ -546,6 +558,16 @@ int main(int argc, char** argv)
 				if (i + 1 >= argc)
 				{
 					std::cerr << "--desktop needs a virtual desktop id" << std::endl;
+					return 1;
+				};
+
+				i++;
+			}
+			else if (argument == "--window-placement")
+			{
+				if (!placement)
+				{
+					std::cerr << "--window-placement needs x,y,width,height,maximized,minimized,view" << std::endl;
 					return 1;
 				};
 
@@ -747,6 +769,10 @@ int main(int argc, char** argv)
 
 			if (!desktop.empty())
 				options += " --desktop " + desktop;
+
+			// A window never shown has no place to go back to.
+			if (const WindowFullscreen::Placement placed = editor.RelaunchPlacement(); placed.windowed.width > 0)
+				options += " --window-placement " + WindowFullscreen::Write(placed);
 
 			if (const std::string target = editor.RelaunchTarget(); !target.empty())
 				options += " \"" + target + '"';
