@@ -16,6 +16,7 @@ namespace
 	{
 		const std::string DIRECTIVE = "#include";
 		const size_t directive = line.find_first_not_of(" \t");
+
 		if (directive == std::string::npos || line.compare(directive, DIRECTIVE.size(), DIRECTIVE) != 0)
 			return "";
 		const size_t open = line.find_first_of("\"<", directive);
