@@ -1,6 +1,7 @@
 #ifdef _WIN32
 // Before GLFW, which defines APIENTRY itself when windows.h has not been seen.
 #define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <windows.h>
 #include <dwmapi.h>
 #include <objbase.h>
