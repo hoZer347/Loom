@@ -81,6 +81,7 @@
     <Import Project="..\Property Files\JSON.props" />
     <Import Project="..\Property Files\UserMacros.props" />
   </ImportGroup>
+  <Import Project="..\Property Files\Precompiled.props" />
   <PropertyGroup Label="UserMacros" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -142,6 +143,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\Precompiled\Common.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="CrashReports.cpp" />
     <ClCompile Include="Editor.cpp" />
     <ClCompile Include="HiddenProcess.cpp" />

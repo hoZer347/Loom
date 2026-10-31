@@ -12,6 +12,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\Precompiled\Common.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="EditorScripts.cpp">
       <Filter>Scripts</Filter>

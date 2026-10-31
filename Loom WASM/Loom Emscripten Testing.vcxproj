@@ -78,6 +78,7 @@
     <Import Project="..\Property Files\miniaudio.props" />
     <Import Project="..\Property Files\UserMacros.props" />
   </ImportGroup>
+  <Import Project="..\Property Files\Precompiled.props" />
   <PropertyGroup Label="UserMacros" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -145,6 +146,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\Precompiled\Common.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="Audio.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Collider.cpp" />
@@ -177,6 +181,8 @@
     <ClCompile Include="Profiler.cpp" />
     <ClCompile Include="ScriptTests.cpp">
       <ExceptionHandling>Async</ExceptionHandling>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
     </ClCompile>
     <ClCompile Include="StageTiming.cpp" />
     <ClCompile Include="Renderer.cpp" />
@@ -195,7 +201,10 @@
     <ClCompile Include="ShaderVariables.cpp" />
     <ClCompile Include="EditorGui.cpp" />
     <ClCompile Include="VulkanRenderer.cpp" />
-    <ClCompile Include="$(VulkanSdk)\Source\SPIRV-Reflect\spirv_reflect.c" />
+    <ClCompile Include="$(VulkanSdk)\Source\SPIRV-Reflect\spirv_reflect.c">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
+    </ClCompile>
     <ClCompile Include="Utilities\AttributeFields.cpp" />
     <ClCompile Include="Utilities\AttributeGui.cpp" />
     <ClCompile Include="Utilities\AxisGui.cpp" />

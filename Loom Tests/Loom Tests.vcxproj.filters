@@ -9,6 +9,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\Precompiled\Tests.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Platform Tests.cpp">
       <Filter>Tests</Filter>
@@ -80,6 +81,9 @@
       <Filter>Tests</Filter>
     </ClCompile>
     <ClCompile Include="VisualStudio Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="Precompiled Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
     <ClCompile Include="ProjectTemplate Tests.cpp">

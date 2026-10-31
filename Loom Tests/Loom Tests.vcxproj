@@ -15,6 +15,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
+    <PrecompiledName>Tests</PrecompiledName>
     <ProjectGuid>{7C3E1A42-9B0D-4F58-A1E6-2D5C8B7F0431}</ProjectGuid>
     <RootNamespace>LoomTests</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
@@ -81,6 +82,7 @@
     <Import Project="..\Property Files\Assimp.props" />
     <Import Project="..\Property Files\UserMacros.props" />
   </ImportGroup>
+  <Import Project="..\Property Files\Precompiled.props" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
@@ -141,12 +143,18 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\Precompiled\Tests.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Precompiled Tests.cpp" />
     <ClCompile Include="Platform Tests.cpp" />
     <ClCompile Include="Macro Helpers Tests.cpp" />
     <ClCompile Include="Engine Tests.cpp" />
     <ClCompile Include="ScriptTests Tests.cpp">
       <ExceptionHandling>Async</ExceptionHandling>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
     </ClCompile>
     <ClCompile Include="TestsPanel Tests.cpp" />
     <ClCompile Include="LoomObject Tests.cpp" />
@@ -267,7 +275,10 @@
          Only the Render suite's RenderFixture constructs an Engine, on a
          hidden window; the rest drive the parts that need no GL context. -->
     <ClCompile Include="..\Loom WASM\*.cpp" />
-    <ClCompile Include="$(VulkanSdk)\Source\SPIRV-Reflect\spirv_reflect.c" />
+    <ClCompile Include="$(VulkanSdk)\Source\SPIRV-Reflect\spirv_reflect.c">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
+    </ClCompile>
     <ClCompile Include="..\Loom WASM\Utilities\*.cpp" Exclude="..\Loom WASM\Utilities\_*.cpp" />
   </ItemGroup>
   <ItemGroup>
