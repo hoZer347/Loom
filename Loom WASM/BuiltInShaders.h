@@ -14,7 +14,8 @@ namespace Loom
 	*   file on disk, in the editor, a built game or on the web
 	* - A Material names one by its path, as it would a project's file:
 	*   Loom/Lit.shader, Loom/Unlit.shader, Loom/LitTextured.shader,
-	*   Loom/UnlitTextured.shader or Loom/Transparent.shader
+	*   Loom/UnlitTextured.shader, Loom/Transparent.shader or Loom/Glow.shader
+	* - A PixelShader names Loom/Bloom.loompixel, which spreads what Loom/Glow.shader draws
 	* - The Loom folder is the engine's, so a project's own Loom/Lit.shader is
 	*   never read
 	*/
@@ -26,6 +27,9 @@ namespace Loom
 
 		// Every one's path, for a list to pick from.
 		static const std::vector<std::string>& Paths();
+
+		// Those of one kind of file, by its extension.
+		static std::vector<std::string> Paths(const std::string& extension);
 
 		// The source of the one at path, or nullptr for any other path.
 		static const char* SourceOf(const std::string& path);

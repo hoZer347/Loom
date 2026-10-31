@@ -2467,8 +2467,8 @@ namespace Loom
 				m_newAssetFor = field.data;
 			};
 
-		if (extension == ProjectAssets::shaderExtension)
-			for (const std::string& file : BuiltInShaders::Paths())
+		if (!folder)
+			for (const std::string& file : BuiltInShaders::Paths(std::string(extension)))
 				if (m_fieldPicker.Matches(file))
 					row(file, file);
 

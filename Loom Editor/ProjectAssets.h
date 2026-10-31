@@ -182,7 +182,6 @@ namespace Loom
 
 		#pragma region Shaders
 
-
 		// What a new .loomprevertex file holds: a wave along world X.
 		static const char* const defaultPreVertex;
 

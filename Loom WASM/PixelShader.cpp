@@ -1,5 +1,6 @@
 #include "PixelShader.h"
 
+#include "BuiltInShaders.h"
 #include "Material.h"
 #include "PixelPass.h"
 #include "Renderer.h"
@@ -44,7 +45,7 @@ namespace Loom
 
 		std::error_code code;
 
-		if (m_shader_path->empty() || (Shader::IsPixel(m_shader_path) && std::filesystem::is_regular_file(GetShaderPath(), code)))
+		if (m_shader_path->empty() || (Shader::IsPixel(m_shader_path) && (BuiltInShaders::SourceOf(m_shader_path) || std::filesystem::is_regular_file(GetShaderPath(), code))))
 			ChangeShader(m_shader_path);
 	};
 

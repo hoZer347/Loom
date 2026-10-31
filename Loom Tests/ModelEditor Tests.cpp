@@ -805,7 +805,8 @@ TEST_SUITE("ModelEditor")
 			Driven driven("model_shaders", nullptr, prefab.string());
 
 			std::vector<std::string> shaders{ "Assets/Lit.shader", "Assets/Model.shader" };
-			shaders.insert(shaders.end(), Loom::BuiltInShaders::Paths().begin(), Loom::BuiltInShaders::Paths().end());
+			const std::vector<std::string> builtIn = Loom::BuiltInShaders::Paths(Loom::Shader::extension);
+			shaders.insert(shaders.end(), builtIn.begin(), builtIn.end());
 
 			CHECK(driven.editor.Shaders() == shaders);
 

@@ -17,6 +17,7 @@
 #include "Light.h"
 #include "Material.h"
 #include "Mesh.h"
+#include "PixelShader.h"
 #include "Scene.h"
 #include "Shaders.h"
 #include "UiScript.h"
@@ -166,6 +167,73 @@ namespace
 		CHECK(lit_textured.r == 0);
 	};
 
+	// The left half of the view in red, over blue, drawn with the shader at path
+	// and seen through the bloom pass at bloom. Its edge is the middle column.
+	Image Bloomed(RenderFixture& fixture, const std::string& path, const std::string& bloom)
+	{
+		const std::vector<float> LEFT_HALF = { 0.0f, -50.0f, 0.0f, 0.0f, 50.0f, 0.0f, -100.0f, 0.0f, 0.0f };
+
+		const ClearedTo cleared(CLEAR);
+
+		Loom::Scene scene(bloom);
+		Pump();
+
+		Loom::GameObject* eye = scene.AddChild("Camera");
+		Loom::GameObject* shape = scene.AddChild("Shape");
+		Loom::GameObject* screen = scene.AddChild("Screen");
+		Pump();
+
+		eye->Attach<Loom::Camera>();
+		eye->transform.position = CAMERA_POSITION;
+
+		Loom::Material* material = shape->Attach<Loom::Material>();
+		material->SetShaderPath(path);
+		material->color = RED;
+
+		shape->Attach<Loom::Mesh>()->m_vertices = LEFT_HALF;
+
+		Loom::PixelShader* pixel = screen->Attach<Loom::PixelShader>();
+		pixel->ChangeShader(bloom);
+		Pump();
+
+		REQUIRE(material->shader != nullptr);
+		REQUIRE(pixel->shader != nullptr);
+
+		const Image image = fixture.Frame();
+
+		image.Save("BuiltInShaders - bloom of " + std::filesystem::path(path).stem().string());
+
+		return image;
+	};
+
+	void CheckBloom(RenderFixture& fixture, const std::string& folder)
+	{
+		constexpr glm::u8vec3 RED_PIXEL(255, 0, 0);
+		constexpr glm::u8vec3 BLUE_PIXEL(0, 0, 255);
+
+		// Inside the spread of the edge, and well past it.
+		constexpr int NEAR_EDGE = 4;
+		constexpr int FAR_FROM_EDGE = 40;
+
+		const int middle = RenderFixture::DEFAULT_SIZE.x / 2;
+		const int row = RenderFixture::DEFAULT_SIZE.y / 2;
+
+		const Image glowing = Bloomed(fixture, folder + "Glow.shader", folder + "Bloom.loompixel");
+
+		CHECK(glowing.At(middle - FAR_FROM_EDGE, row) == RED_PIXEL);
+		CHECK(glowing.At(middle + FAR_FROM_EDGE, row) == BLUE_PIXEL);
+
+		const glm::u8vec3 spread = glowing.At(middle + NEAR_EDGE, row);
+
+		CHECK(spread.r > 0);
+		CHECK(spread.b < BLUE_PIXEL.b);
+
+		const Image plain = Bloomed(fixture, folder + "Unlit.shader", folder + "Bloom.loompixel");
+
+		CHECK(plain.At(middle - FAR_FROM_EDGE, row) == RED_PIXEL);
+		CHECK(plain.At(middle + NEAR_EDGE, row) == BLUE_PIXEL);
+	};
+
 	// Runs a UiScript of text over the material's inspector, in a context of its
 	// own, and gives back the items it drew.
 	std::string InspectorItems(Loom::Material& material, const std::string& text)
@@ -264,6 +332,16 @@ TEST_SUITE("BuiltInShaders")
 		CheckDraws(*this, "./Loom/", "Vulkan");
 	};
 
+	TEST_CASE_FIXTURE(RenderFixture, "the bloom pass spreads Loom/Glow.shader and nothing else, on OpenGL")
+	{
+		CheckBloom(*this, "Loom/");
+	};
+
+	TEST_CASE_FIXTURE(VulkanRenderFixture, "the bloom pass spreads Loom/Glow.shader and nothing else, on Vulkan")
+	{
+		CheckBloom(*this, "./Loom/");
+	};
+
 	#pragma endregion
 
 	#pragma region Files
@@ -302,6 +380,23 @@ TEST_SUITE("BuiltInShaders")
 
 		REQUIRE(material->shader != nullptr);
 		CHECK(material->shader == Loom::Material::SharedShader("Loom/Unlit.shader"));
+	};
+
+	TEST_CASE_FIXTURE(RenderFixture, "a built-in pixel pass written into a PixelShader's path field is the one it uses")
+	{
+		Loom::Scene scene("built-in pixel pass field");
+		Pump();
+
+		Loom::PixelShader* pixel = scene.Attach<Loom::PixelShader>();
+		Pump();
+
+		const Loom::SerializedField& path = pixel->GetFields().front();
+
+		*(std::string*)path.data = "Loom/Bloom.loompixel";
+		pixel->OnFieldChanged(path);
+
+		REQUIRE(pixel->shader != nullptr);
+		CHECK(pixel->shader == Loom::Material::SharedShader("Loom/Bloom.loompixel"));
 	};
 
 	TEST_CASE_FIXTURE(RenderFixture, "a built-in shader's inspector has no Edit link, and clicking its settings writes nothing")
@@ -350,6 +445,18 @@ TEST_SUITE("BuiltInShaders")
 		CHECK(Loom::BuiltInShaders::SourceOf("") == nullptr);
 	};
 
+	TEST_CASE("each kind of file lists only its own built-ins")
+	{
+		const std::vector<std::string> passes = Loom::BuiltInShaders::Paths(Loom::Shader::pixel_extension);
+		const std::vector<std::string> shaders = Loom::BuiltInShaders::Paths(Loom::Shader::extension);
+
+		CHECK(passes == std::vector<std::string>{ "Loom/Bloom.loompixel" });
+		CHECK(shaders.size() == Loom::BuiltInShaders::Paths().size() - passes.size());
+		CHECK(std::find(shaders.begin(), shaders.end(), "Loom/Glow.shader") != shaders.end());
+		CHECK(std::find(shaders.begin(), shaders.end(), "Loom/Bloom.loompixel") == shaders.end());
+		CHECK(Loom::BuiltInShaders::Paths(".png").empty());
+	};
+
 	TEST_CASE("a path is matched however it is spelled")
 	{
 		CHECK(Loom::BuiltInShaders::SourceOf("Loom/./Lit.shader") != nullptr);
@@ -360,12 +467,15 @@ TEST_SUITE("BuiltInShaders")
 		const Loom::ShaderSettings lit = Loom::ParseShaderSettings(Loom::BuiltInShaders::SourceOf("Loom/Lit.shader"));
 		const Loom::ShaderSettings unlit = Loom::ParseShaderSettings(Loom::BuiltInShaders::SourceOf("Loom/Unlit.shader"));
 		const Loom::ShaderSettings transparent = Loom::ParseShaderSettings(Loom::BuiltInShaders::SourceOf("Loom/Transparent.shader"));
+		const Loom::ShaderSettings glow = Loom::ParseShaderSettings(Loom::BuiltInShaders::SourceOf("Loom/Glow.shader"));
 
 		CHECK(lit.shading);
 		CHECK(lit.shadows);
 		CHECK_FALSE(unlit.shading);
 		CHECK_FALSE(unlit.shadows);
 		CHECK(transparent.transparency);
+		CHECK_FALSE(glow.shading);
+		CHECK(glow.shadows);
 	};
 
 	TEST_CASE("the built-in shaders declare what a material fills in")
