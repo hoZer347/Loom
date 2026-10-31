@@ -12,7 +12,8 @@
     waiting with no question and a close then still asks, a scripts update
     stops a run and compiles over unsaved work without a restart, and takes
     back a question, a restart waits out a game being built, and an editor
-    with nothing to take is told nothing. The window comes back from a restart
+    with nothing to take is told nothing, and an extension installed since it
+    opened restarts it. The window comes back from a restart
     windowed, minimized, maximized and fullscreen at the place and size it left,
     on a monitor other than the primary when there is one. Throws naming what
     failed.
@@ -193,6 +194,13 @@ function Test-Asking
 function Invoke-Update([string[]] $Flags = @())
 {
     $line = "& '$Script' -Port $port -Project '$project' $($Flags -join ' ')"
+    (& powershell -NoProfile -ExecutionPolicy Bypass -Command $line) -join "`n"
+    if ($LASTEXITCODE -ne 0) { throw "update-editor.ps1 failed." }
+}
+
+function Invoke-ExtensionUpdate
+{
+    $line = "`$env:LOCALAPPDATA = '$project'; & '$Script' -Port $port"
     (& powershell -NoProfile -ExecutionPolicy Bypass -Command $line) -join "`n"
     if ($LASTEXITCODE -ne 0) { throw "update-editor.ps1 failed." }
 }
@@ -386,6 +394,26 @@ try
 
     $beforeBuild = $latest
     $latest = Wait-Pid { param($id) $id -ne $beforeBuild } 'restart once built' $CompileSeconds
+    Wait-Compiled
+
+    $extensions = New-Item -ItemType Directory -Force (Join-Path $project 'Loom\Extensions')
+    $extension = Join-Path $extensions 'Installed.dll'
+    New-Item -ItemType File $extension | Out-Null
+    (Get-Item $extension).LastWriteTime = (Get-Process -Id $latest).StartTime.AddMinutes(-1)
+
+    $older = Invoke-ExtensionUpdate
+    if ($older -match 'told to') { throw "An extension older than the editor restarted it: $older" }
+
+    (Get-Item $extension).LastWriteTime = Get-Date
+    $installed = Invoke-ExtensionUpdate
+    if ($installed -notmatch 'told to update') { throw "An extension installed since the editor opened did not reach it: $installed" }
+
+    $beforeInstall = $latest
+    $latest = Wait-Pid { param($id) $id -ne $beforeInstall } 'restart on an installed extension'
+    Wait-Compiled
+
+    $taken = Invoke-ExtensionUpdate
+    if ($taken -match 'told to') { throw "An extension the editor already took restarted it again: $taken" }
 
     Write-Output 'update-editor passed.'
 }

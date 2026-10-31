@@ -13,8 +13,8 @@
     once no game or page is building and no test is queued, or update-scripts,
     which stops its run and compiles over unsaved work. Either takes back any
     question about saving that is on screen. An editor on -Project
-    is told whatever -ScriptsOnly says, and any other only when the build is
-    newer than it. Demos and hidden runs are left alone.
+    is told whatever -ScriptsOnly says, and any other only when the build or an
+    installed extension is newer than it. Demos and hidden runs are left alone.
 
     Exits non-zero if the build fails or an open editor cannot be reached.
 
@@ -46,6 +46,7 @@ $ErrorActionPreference = 'Stop'
 $Configuration = 'Release'
 $Output = Join-Path $PSScriptRoot "x64\$Configuration"
 $Editor = Join-Path $Output 'Loom Editor.exe'
+$Extensions = Join-Path $env:LOCALAPPDATA 'Loom\Extensions'
 $Locked = @($Editor, (Join-Path $Output 'Loom Editor.pdb'))
 $AsideExtension = '.aside'
 $AutomatedFlags = '--play', '--screenshot', '--ui-script'
@@ -140,7 +141,8 @@ function Send-Updates
         return
     }
 
-    $built = (Get-Item $Editor).LastWriteTimeUtc
+    $installed = @(Get-Item $Editor) + @(Get-ChildItem $Extensions -Filter '*.dll' -ErrorAction SilentlyContinue)
+    $built = ($installed | Measure-Object LastWriteTimeUtc -Maximum).Maximum
     $listing = Invoke-EditorTool 'editors'
 
     foreach ($process in $open)
