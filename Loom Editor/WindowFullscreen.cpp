@@ -206,7 +206,10 @@ namespace Loom
 	WindowFullscreen::Rect WindowFullscreen::Reachable(const Rect& window, const std::vector<Rect>& monitors)
 	{
 		const bool reachable = std::any_of(monitors.begin(), monitors.end(),
-			[&window](const Rect& monitor) { return Overlap(window, monitor) > 0; });
+			[&window](const Rect& monitor)
+			{
+				return Overlap(window, monitor) > 0;
+			});
 
 		if (reachable || monitors.empty())
 			return window;
