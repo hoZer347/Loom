@@ -17,4 +17,16 @@ TEST_SUITE("EditorRefresh")
 			"/usr/bin/cmake --build \"/home/me/Loom/build\" --target LoomEditor");
 #endif
 	};
+
+	TEST_CASE("a Release build on Windows brings the installed extensions up to it")
+	{
+#ifdef _WIN32
+		const std::string command = Loom::EditorRefresh::ExtensionsCommand("C:\\Loom\\Loom.sln", "Release");
+
+		CHECK(command.find("\"C:\\Loom\\update-editor.ps1\" -BuildOnly") != std::string::npos);
+		CHECK(Loom::EditorRefresh::ExtensionsCommand("C:\\Loom\\Loom.sln", "Debug").empty());
+#else
+		CHECK(Loom::EditorRefresh::ExtensionsCommand("/home/me/Loom/build/CMakeCache.txt", "Release").empty());
+#endif
+	};
 };

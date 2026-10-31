@@ -6,11 +6,15 @@
     Opens this slot's Release editor on a Win32 desktop of its own, with
     LOCALAPPDATA and TEMP moved to a scratch folder, on a scratch project. The
     folder holds a fixture built against this editor and, where its source sits
-    beside this slot, a Claude.dll built from a copy of it. Their panels open and
-    work. The fixture is then replaced by the same source as an extension built
-    before the editor's API last changed has it, which is what a merge leaves in
-    the folder, and update-editor.ps1 restarts the editor. Every panel must come
-    back and work, and the console must not say an extension was left out.
+    beside this slot, a Claude.dll built and installed by a clone of it, so an
+    engine change that stops it compiling fails here, ahead of a merge. Their
+    panels open and work. The fixture is then replaced by the same source as an
+    extension built before the editor's API last changed has it, which is what a
+    merge leaves in the folder, and Claude.dll is made older than the editor.
+    An extension that cannot rebuild must fail update-editor.ps1 and leave the
+    editor open, and one for another Loom must be left alone. update-editor.ps1
+    then rebuilds both and restarts the editor. Every panel must come back and
+    work, and the console must not say an extension was left out.
     Throws naming what failed.
     A slot only: the user's Loom refuses, since its settings hold what they
     left open.
@@ -18,7 +22,10 @@
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File 'C:\Users\3hoze\Desktop\Loom 1\Loom Tests\extension-reload.ps1'
 #>
-param()
+param(
+    # A checkout of Claude for Loom, or a worktree holding a change to it.
+    [string] $ClaudeSource = (Join-Path (Split-Path (Split-Path $PSScriptRoot)) 'Claude for Loom')
+)
 
 $ErrorActionPreference = 'Stop'
 
@@ -27,14 +34,15 @@ $ErrorActionPreference = 'Stop'
 $Root = Split-Path $PSScriptRoot
 $Editor = Join-Path $Root 'x64\Release\Loom Editor.exe'
 $UpdateScript = Join-Path $Root 'update-editor.ps1'
-$Fixture = Join-Path $PSScriptRoot 'Extension Fixture\Reload Fixture.vcxproj'
-$ClaudeSource = Join-Path (Split-Path $Root) 'Claude for Loom'
-$ClaudeFiles = 'Source', 'Claude.vcxproj', 'Loom.props'
+$FixtureSource = Join-Path $PSScriptRoot 'Extension Fixture'
+$Fixture = Join-Path $FixtureSource 'Reload Fixture.vcxproj'
 $Scratch = Join-Path ([IO.Path]::GetTempPath()) "loom-extension-reload-$PID"
 $AppData = Join-Path $Scratch 'AppData'
 $TempFolder = Join-Path $Scratch 'Temp'
 $Extensions = Join-Path $AppData 'Loom\Extensions'
 $Project = Join-Path $Scratch 'Project'
+$Refuses = Join-Path $Scratch 'Refuses'
+$ManifestExtension = '.extension.json'
 $StartSeconds = 60
 $CompileSeconds = 240
 $PollMilliseconds = 250
@@ -49,6 +57,7 @@ $FixturePanel = 'F Reload Fixture###Reload Fixture'
 $FixtureWaiting = 'Fixture Waiting'
 $FixtureClicked = 'Fixture Clicked'
 $FixtureFile = 'Reload Fixture.dll'
+$ClaudeFile = 'Claude.dll'
 $ClaudePanel = "$([char]::ConvertFromUtf32(0x1F916)) Claude###Claude"
 $AgentsPanel = "$([char]::ConvertFromUtf32(0x1F465)) Agents###Agents"
 $AgentTab = "$([char]::ConvertFromUtf32(0x1F464)) Agent###Agent"
@@ -132,15 +141,28 @@ function Build-Fixture([string] $Name, [bool] $OldApi)
     Join-Path $folder $FixtureFile
 }
 
-function Build-Claude
+function Install-Claude
 {
-    $copy = Join-Path $Scratch 'Claude'
-    New-Item -ItemType Directory $copy | Out-Null
-    foreach ($file in $ClaudeFiles) { Copy-Item -LiteralPath (Join-Path $ClaudeSource $file) -Destination $copy -Recurse }
+    $clone = Join-Path $Scratch 'Claude'
+    & git clone --quiet --shared $ClaudeSource $clone 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Could not clone $ClaudeSource." }
 
-    Invoke-Build 'Claude.dll' @((Join-Path $copy 'Claude.vcxproj'), "-p:LoomRoot=$Root")
-    Join-Path $copy 'Build\Release\Claude.dll'
+    $output = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $clone 'update-extension.ps1') -LoomRoot $Root 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "Claude for Loom failed to build against this editor:`n$($output -join "`n")" }
 }
+
+function Set-Manifest([string] $Name, [string] $Source, [string] $LoomRoot)
+{
+    @{ Source = $Source; LoomRoot = $LoomRoot } | ConvertTo-Json |
+        Set-Content -LiteralPath (Join-Path $Extensions "$Name$ManifestExtension") -Encoding UTF8
+}
+
+function Set-OlderThanEditor([string] $File)
+{
+    (Get-Item -LiteralPath (Join-Path $Extensions $File)).LastWriteTimeUtc = (Get-Item -LiteralPath $Editor).LastWriteTimeUtc.AddMinutes(-1)
+}
+
+function Invoke-Update { (& powershell -NoProfile -ExecutionPolicy Bypass -Command "& '$UpdateScript' -Port $port -Project '$Project'" 2>&1) -join "`n" }
 
 function Invoke-Tool([string] $Tool, [hashtable] $Arguments = @{})
 {
@@ -258,7 +280,8 @@ $listener.Start()
 $port = $listener.LocalEndpoint.Port
 $listener.Stop()
 
-New-Item -ItemType Directory $Extensions, $TempFolder, $Project | Out-Null
+New-Item -ItemType Directory $Extensions, $TempFolder, $Project, $Refuses | Out-Null
+Set-Content -LiteralPath (Join-Path $Refuses 'update-extension.ps1') -Value 'exit 1' -Encoding ascii
 $projectFile = Join-Path $Project 'Scratch.loomproject'
 Set-Content -LiteralPath $projectFile -Value 'name=Scratch' -Encoding ascii
 
@@ -270,13 +293,13 @@ try
     $old = Build-Fixture 'Old' $true
     Copy-Item -LiteralPath $current -Destination $Extensions
 
-    $withClaude = Test-Path -LiteralPath (Join-Path $ClaudeSource 'Source\Extension.cpp')
-    if ($withClaude) { Copy-Item -LiteralPath (Build-Claude) -Destination $Extensions }
-
     $env:LOCALAPPDATA = $AppData
     $env:TEMP = $TempFolder
     $env:TMP = $TempFolder
     $env:CLAUDE_EXE = Join-Path $Scratch 'No Claude.exe'
+
+    $withClaude = Test-Path -LiteralPath (Join-Path $ClaudeSource 'Source\Extension.cpp')
+    if ($withClaude) { Install-Claude }
 
     $first = [OwnDesktop]::Start("Loom extension reload $port", $Editor, "`"$Editor`" --mcp $port `"$projectFile`"", $Project)
 
@@ -292,9 +315,24 @@ try
     Assert-FixtureWorks 'Before the update'
 
     Copy-Item -LiteralPath $old -Destination $Extensions -Force
+    Set-OlderThanEditor $FixtureFile
+    if ($withClaude) { Set-OlderThanEditor $ClaudeFile }
 
-    $told = (& powershell -NoProfile -ExecutionPolicy Bypass -Command "& '$UpdateScript' -Port $port -Project '$Project'") -join "`n"
+    $fixtureName = [IO.Path]::GetFileNameWithoutExtension($FixtureFile)
+    Set-Manifest $fixtureName $Refuses $Root
+    $refused = Invoke-Update
+    if ($LASTEXITCODE -eq 0 -or $refused -notmatch 'failed to build') { throw "An extension that cannot rebuild did not stop the update: $refused" }
+    if ($refused -match 'told to') { throw "An extension that cannot rebuild still told the editor: $refused" }
+
+    Set-Manifest $fixtureName $FixtureSource $Root
+    Set-Manifest 'Another Loom' $Refuses (Join-Path $Scratch 'Another Loom')
+
+    $told = Invoke-Update
     if ($LASTEXITCODE -ne 0 -or $told -notmatch 'told to update') { throw "The editor was not told to update: $told" }
+    foreach ($file in @($FixtureFile) + @(if ($withClaude) { $ClaudeFile }))
+    {
+        if ((Get-Item -LiteralPath (Join-Path $Extensions $file)).LastWriteTimeUtc -lt (Get-Item -LiteralPath $Editor).LastWriteTimeUtc) { throw "The update left $file older than the editor." }
+    }
 
     $latest = Wait-Editor { param($id) $id -ne $first } 'restart'
     Wait-Compiled

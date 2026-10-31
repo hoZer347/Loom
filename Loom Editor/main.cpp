@@ -771,6 +771,9 @@ int main(int argc, char** argv)
 			if (!desktop.empty())
 				options += " --desktop " + desktop;
 
+			if (!Editor::extensionsFolder.empty())
+				options += " --extensions \"" + Editor::extensionsFolder.string() + '"';
+
 			// A window never shown has no place to go back to.
 			if (const WindowFullscreen::Placement placed = editor.RelaunchPlacement(); placed.windowed.width > 0)
 				options += " --window-placement " + WindowFullscreen::Write(placed);

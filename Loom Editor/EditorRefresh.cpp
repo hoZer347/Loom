@@ -138,19 +138,21 @@ namespace Loom
 #endif
 
 		const std::string command = Command(msbuild, sources, ScriptLibrary::Configuration());
+		const std::string extensions = ExtensionsCommand(sources, ScriptLibrary::Configuration());
 
 		std::cout << "Full refresh: building the editor (" << ScriptLibrary::Configuration() << ")..." << std::endl;
 
 		m_worker = std::thread(
-			[command, build = m_current]()
+			[command, extensions, build = m_current]()
 			{
-				build->succeeded = HiddenProcess::Run(
-					command,
-					[](const std::string& line)
-					{
-						if (!line.empty())
-							std::cout << "  " << line << std::endl;
-					});
+				const auto report = [](const std::string& line)
+				{
+					if (!line.empty())
+						std::cout << "  " << line << std::endl;
+				};
+
+				build->succeeded = HiddenProcess::Run(command, report) &&
+					(extensions.empty() || HiddenProcess::Run(extensions, report));
 				build->done = true;
 			});
 	};

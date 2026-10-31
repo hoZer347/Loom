@@ -68,6 +68,20 @@ namespace Loom
 #endif
 		};
 
+		// What brings installed extensions up to that build, when it needs a step of its own.
+		static std::string ExtensionsCommand(const std::filesystem::path& sources, const std::string& configuration)
+		{
+#ifdef _WIN32
+			if (configuration == "Release")
+				return "powershell -NoProfile -ExecutionPolicy Bypass -File \"" +
+					(sources.parent_path() / "update-editor.ps1").string() + "\" -BuildOnly";
+#else
+			(void)sources;
+			(void)configuration;
+#endif
+			return { };
+		};
+
 		#pragma endregion
 
 		#pragma region Relaunch
