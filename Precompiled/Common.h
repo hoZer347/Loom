@@ -1,6 +1,6 @@
 #pragma once
 
-#define GLM_ENABLE_EXPERIMENTAL
+#include "glm/glm.hpp"
 
 #include <algorithm>
 #include <array>
@@ -28,4 +28,3 @@
 #include <utility>
 #include <variant>
 #include <vector>
-#include <glm/glm.hpp>

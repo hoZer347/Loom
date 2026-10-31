@@ -143,9 +143,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\Precompiled\Tests.cpp">
-      <PrecompiledHeader>Create</PrecompiledHeader>
-    </ClCompile>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Precompiled Tests.cpp" />
     <ClCompile Include="Platform Tests.cpp" />
@@ -342,6 +339,9 @@
   </ItemGroup>
   <!-- Built against Assimp and Winsock, which the web build has no wasm copy of. -->
   <ItemGroup Label="Desktop">
+    <ClCompile Include="..\Precompiled\Tests.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\Loom Editor\McpRelay.cpp" />
     <ClCompile Include="..\Loom Editor\ModelImporter.cpp" />
     <ClCompile Include="McpRelay Tests.cpp" />

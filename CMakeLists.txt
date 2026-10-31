@@ -72,6 +72,7 @@ function(vcxproj_sources project out)
 		string(REPLACE "\\" "/" path "${path}")
 		list(APPEND sources "${dir}/${path}")
 	endforeach()
+	list(FILTER sources EXCLUDE REGEX "/Precompiled/")
 	set(${out} ${sources} PARENT_SCOPE)
 endfunction()
 
