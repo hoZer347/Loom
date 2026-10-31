@@ -25,7 +25,7 @@ namespace Loom
 		// shader file starts from.
 		static constexpr const char* Lit = "Loom/Lit.shader";
 
-		// Every one's path, for a list to pick from.
+		// Every one's path.
 		static const std::vector<std::string>& Paths();
 
 		// Those of one kind of file, by its extension.

@@ -232,8 +232,8 @@ namespace Loom
 		std::error_code code;
 
 		if (m_shader_path->empty() ||
-			BuiltInShaders::SourceOf(m_shader_path) ||
-			(m_shader_path->ends_with(Shader::extension) && std::filesystem::is_regular_file(GetShaderPath(), code)))
+			(m_shader_path->ends_with(Shader::extension) &&
+				(BuiltInShaders::SourceOf(m_shader_path) || std::filesystem::is_regular_file(GetShaderPath(), code))))
 			ChangeShader(m_shader_path);
 	};
 

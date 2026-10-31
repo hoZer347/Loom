@@ -4,8 +4,10 @@
 #include "Test Support.h"
 
 #include "BuiltInShaders.h"
+#include "Shaders.h"
 #include "ShaderVariables.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -19,12 +21,10 @@
 #include "Mesh.h"
 #include "PixelShader.h"
 #include "Scene.h"
-#include "Shaders.h"
 #include "UiScript.h"
 
 #include "imgui.h"
 
-#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -152,11 +152,11 @@ namespace
 		CHECK(lit.r > 0);
 		CHECK(lit.r < 255);
 
-		const glm::u8vec3 see_through = Drawn(fixture, folder + "Transparent.shader", false,
+		const glm::u8vec3 seeThrough = Drawn(fixture, folder + "Transparent.shader", false,
 			[](Loom::Material& material) { material.variables->Set("u_transparency", Loom::UniformType::Float, { TRANSPARENCY }); });
 
-		CHECK(std::abs(see_through.r - HALF) <= ROUNDING);
-		CHECK(std::abs(see_through.b - HALF) <= ROUNDING);
+		CHECK(std::abs(seeThrough.r - HALF) <= ROUNDING);
+		CHECK(std::abs(seeThrough.b - HALF) <= ROUNDING);
 
 		CHECK(Drawn(fixture, folder + "Lit.shader", true,
 			[&folder](Loom::Material& material) { material.ChangeShader(folder + "Unlit.shader"); }) == glm::u8vec3(255, 0, 0));
@@ -170,10 +170,10 @@ namespace
 
 		CHECK(Drawn(fixture, folder + "UnlitTextured.shader", false, textured) == glm::u8vec3(0, 255, 0));
 
-		const glm::u8vec3 lit_textured = Drawn(fixture, folder + "LitTextured.shader", true, textured);
+		const glm::u8vec3 litTextured = Drawn(fixture, folder + "LitTextured.shader", true, textured);
 
-		CHECK(lit_textured.g > 0);
-		CHECK(lit_textured.r == 0);
+		CHECK(litTextured.g > 0);
+		CHECK(litTextured.r == 0);
 	};
 
 	// The left half of the view in red, over blue, drawn with the shader at path
@@ -266,9 +266,9 @@ namespace
 		io.ConfigInputTrickleEventQueue = false;
 
 		unsigned char* pixels = nullptr;
-		int atlas_width = 0;
-		int atlas_height = 0;
-		io.Fonts->GetTexDataAsRGBA32(&pixels, &atlas_width, &atlas_height);
+		int atlasWidth = 0;
+		int atlasHeight = 0;
+		io.Fonts->GetTexDataAsRGBA32(&pixels, &atlasWidth, &atlasHeight);
 
 		std::ostringstream items;
 
@@ -393,6 +393,26 @@ TEST_SUITE("BuiltInShaders")
 
 		REQUIRE(material->shader != nullptr);
 		CHECK(material->shader == Loom::Material::SharedShader("Loom/Unlit.shader"));
+	};
+
+	TEST_CASE_FIXTURE(RenderFixture, "a built-in pixel pass written into a material's path field leaves its shader as it was")
+	{
+		Loom::Scene scene("built-in pixel pass in a material");
+		Pump();
+
+		Loom::Material* material = scene.Attach<Loom::Material>();
+		material->SetShaderPath("Loom/Unlit.shader");
+		Pump();
+
+		Loom::Shader* before = material->shader;
+		REQUIRE(before != nullptr);
+
+		const Loom::SerializedField& path = material->GetFields().front();
+
+		*(std::string*)path.data = "Loom/Bloom.loompixel";
+		material->OnFieldChanged(path);
+
+		CHECK(material->shader == before);
 	};
 
 	TEST_CASE_FIXTURE(RenderFixture, "a built-in pixel pass written into a PixelShader's path field is the one it uses")

@@ -243,7 +243,7 @@ void main()
 
 	std::vector<std::string> BuiltInShaders::Paths(const std::string& extension)
 	{
-		std::vector<std::string> found;
+		std::vector<std::string> found{ };
 
 		std::copy_if(Paths().begin(), Paths().end(), std::back_inserter(found), [&extension](const std::string& path) { return path.ends_with(extension); });
 

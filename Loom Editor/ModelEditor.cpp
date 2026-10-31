@@ -369,8 +369,8 @@ void main()
 
 			std::erase_if(shaders, [](const std::string& shader) { return BuiltInShaders::SourceOf(shader) != nullptr; });
 
-			const std::vector<std::string> builtIn = BuiltInShaders::Paths(ProjectAssets::shaderExtension);
-			shaders.insert(shaders.end(), builtIn.begin(), builtIn.end());
+			const std::vector<std::string> built_in = BuiltInShaders::Paths(ProjectAssets::shaderExtension);
+			shaders.insert(shaders.end(), built_in.begin(), built_in.end());
 
 			return shaders;
 		};
