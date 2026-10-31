@@ -10,7 +10,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$folder = Join-Path $env:LOCALAPPDATA 'Loom\Fixture Build'
+$folder = Join-Path $env:LOCALAPPDATA 'Loom\FixtureBuild'
 
 . (Join-Path $LoomRoot 'MSBuild.ps1')
 $msbuild = Find-MSBuild

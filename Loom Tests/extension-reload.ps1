@@ -162,7 +162,12 @@ function Set-OlderThanEditor([string] $File)
     (Get-Item -LiteralPath (Join-Path $Extensions $File)).LastWriteTimeUtc = (Get-Item -LiteralPath $Editor).LastWriteTimeUtc.AddMinutes(-1)
 }
 
-function Invoke-Update { (& powershell -NoProfile -ExecutionPolicy Bypass -Command "& '$UpdateScript' -Port $port -Project '$Project'" 2>&1) -join "`n" }
+function Invoke-Update
+{
+    # A native command's stderr would stop this script before its text can be read.
+    $ErrorActionPreference = 'Continue'
+    (& powershell -NoProfile -ExecutionPolicy Bypass -Command "& '$UpdateScript' -Port $port -Project '$Project'" 2>&1) -join "`n"
+}
 
 function Invoke-Tool([string] $Tool, [hashtable] $Arguments = @{})
 {
