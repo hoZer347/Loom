@@ -36,6 +36,15 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Logs to this tree's stage times, on a machine that has the tool.
+function Write-StageTime([string] $Stage, [datetime] $Started)
+{
+    $tool = Join-Path $env:USERPROFILE '.claude\tools\stage-timing.ps1'
+    if (Test-Path -LiteralPath $tool) { & $tool -Stage $Stage -Root $PSScriptRoot -Started $Started }
+}
+
+$started = Get-Date
 $root = $PSScriptRoot
 
 . (Join-Path $root 'WebBuild.ps1')
@@ -259,6 +268,8 @@ $progress = if ($env:CLAUDECODE) { Join-Path $outputDir 'Loom Tests Progress.log
 # So a run stopped at its time limit reports it and still exits with its code.
 $ErrorActionPreference = 'Continue'
 Invoke-TestSuite $node.Source (@($output) + $TestArgs) $TimeoutMinutes $progress
-exit $LASTEXITCODE
+$code = $LASTEXITCODE
+Write-StageTime 'test' $started
+exit $code
 
 #endregion

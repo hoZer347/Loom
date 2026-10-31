@@ -30,6 +30,15 @@ $root = $PSScriptRoot
 . (Join-Path $root 'MSBuild.ps1')
 . (Join-Path $root 'TestRun.ps1')
 
+# Logs to this tree's stage times, on a machine that has the tool.
+function Write-StageTime([string] $Stage, [datetime] $Started)
+{
+    $tool = Join-Path $env:USERPROFILE '.claude\tools\stage-timing.ps1'
+    if (Test-Path -LiteralPath $tool) { & $tool -Stage $Stage -Root $PSScriptRoot -Started $Started }
+}
+
+$started = Get-Date
+
 if (-not $NoBuild)
 {
     $msbuild = Find-MSBuild
@@ -48,10 +57,14 @@ if (-not $NoBuild)
     }
     finally { $ErrorActionPreference = $previous }
 
-    if ($LASTEXITCODE -ne 0)
+    $code = $LASTEXITCODE
+    Write-StageTime 'build' $started
+    $started = Get-Date
+
+    if ($code -ne 0)
     {
-        Write-Error "Build failed with exit code $LASTEXITCODE"
-        exit $LASTEXITCODE
+        Write-Error "Build failed with exit code $code"
+        exit $code
     }
 }
 
@@ -79,4 +92,5 @@ if ($slot -and $result -eq 0 -and -not $TestArgs)
     $result = $LASTEXITCODE
 }
 
+Write-StageTime 'test' $started
 exit $result
