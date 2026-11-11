@@ -422,6 +422,43 @@ namespace LoomTests
 
 	#pragma region Captures
 
+	// Makes folder the working directory, as the editor does for a project, until
+	// it ends. A temporary folder starts empty and is gone afterwards.
+	struct InFolder
+	{
+		explicit InFolder(const std::filesystem::path& folder, bool temporary = false) :
+			m_previous(std::filesystem::current_path()),
+			m_folder(folder),
+			m_temporary(temporary)
+		{
+			std::error_code code;
+
+			if (m_temporary)
+				std::filesystem::remove_all(m_folder, code);
+
+			std::filesystem::create_directories(m_folder);
+			std::filesystem::current_path(m_folder);
+		};
+
+		~InFolder()
+		{
+			std::filesystem::current_path(m_previous);
+
+			std::error_code code;
+
+			if (m_temporary)
+				std::filesystem::remove_all(m_folder, code);
+		};
+
+		InFolder(const InFolder&) = delete;
+		InFolder& operator=(const InFolder&) = delete;
+
+	private:
+		std::filesystem::path m_previous;
+		std::filesystem::path m_folder;
+		bool m_temporary;
+	};
+
 	// Takes what is written to a stream for as long as it lives, so a test
 	// that makes the engine complain on purpose keeps it off the console and
 	// can check it was said. doctest reports on std::cout, so a capture of

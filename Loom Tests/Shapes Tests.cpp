@@ -2,6 +2,7 @@
 
 #include "Test Support.h"
 
+#include "BuiltInShaders.h"
 #include "Shapes.h"
 
 #include "GameObject.h"
@@ -20,7 +21,7 @@ namespace
 	constexpr size_t POSITION_FLOATS = 3;
 	constexpr size_t UV_FLOATS = 2;
 
-	constexpr const char* LIT = "Assets/Lit.shader";
+	constexpr const char* LIT = Loom::BuiltInShaders::Lit;
 };
 
 
