@@ -56,21 +56,24 @@ namespace Loom
 			return object->Invoke(id, IID_NULL, LOCALE_USER_DEFAULT, kind, &parameters, result, nullptr, nullptr);
 		};
 
-		ComPtr<IDispatch> Property(IDispatch* object, const wchar_t* member)
+		HRESULT Property(IDispatch* object, const wchar_t* member, ComPtr<IDispatch>& result)
 		{
 			VARIANT value;
 			VariantInit(&value);
 
-			if (FAILED(Call(object, member, DISPATCH_PROPERTYGET, &value)) || value.vt != VT_DISPATCH)
+			const HRESULT called = Call(object, member, DISPATCH_PROPERTYGET, &value);
+
+			if (FAILED(called) || value.vt != VT_DISPATCH)
 			{
 				VariantClear(&value);
-				return nullptr;
+				result.Reset();
+
+				return FAILED(called) ? called : E_NOINTERFACE;
 			};
 
-			ComPtr<IDispatch> result;
 			result.Attach(value.pdispVal);
 
-			return result;
+			return S_OK;
 		};
 
 		VARIANT Integer(int value)
@@ -86,11 +89,14 @@ namespace Loom
 		// The first column when none is given.
 		HRESULT GoTo(IDispatch* window, int line, int column)
 		{
-			const ComPtr<IDispatch> document = Property(window, L"Document");
-			const ComPtr<IDispatch> selection = document ? Property(document.Get(), L"Selection") : nullptr;
+			ComPtr<IDispatch> document;
+			ComPtr<IDispatch> selection;
 
-			if (!selection)
-				return E_NOINTERFACE;
+			if (const HRESULT found = Property(window, L"Document", document); FAILED(found))
+				return found;
+
+			if (const HRESULT found = Property(document.Get(), L"Selection", selection); FAILED(found))
+				return found;
 
 			VARIANT position[]{ Integer((std::max)(column, 1)), Integer(line) };
 
@@ -170,6 +176,69 @@ namespace Loom
 			return nullptr;
 		};
 
+		// How long a busy Visual Studio is asked again before its refusal is believed.
+		constexpr DWORD busyRetryTimeout = 5000;
+		constexpr DWORD busyRetryDelay = 100;
+		constexpr DWORD noRetry = (DWORD)-1;
+
+		// Retries calls a busy Visual Studio rejects; lives on the stack, so it counts no references.
+		struct RetryBusyCalls final : IMessageFilter
+		{
+			RetryBusyCalls()
+			{
+				m_registered = SUCCEEDED(CoRegisterMessageFilter(this, &m_previous));
+			};
+
+			~RetryBusyCalls()
+			{
+				if (m_registered)
+				{
+					IMessageFilter* ours = nullptr;
+					CoRegisterMessageFilter(m_previous, &ours);
+
+					if (m_previous)
+						m_previous->Release();
+				};
+			};
+
+			RetryBusyCalls(const RetryBusyCalls&) = delete;
+			RetryBusyCalls& operator=(const RetryBusyCalls&) = delete;
+
+			STDMETHODIMP QueryInterface(REFIID id, void** object) override
+			{
+				if (id != IID_IUnknown && id != IID_IMessageFilter)
+				{
+					*object = nullptr;
+					return E_NOINTERFACE;
+				};
+
+				*object = static_cast<IMessageFilter*>(this);
+				return S_OK;
+			};
+
+			STDMETHODIMP_(ULONG) AddRef() override { return 1; };
+			STDMETHODIMP_(ULONG) Release() override { return 1; };
+
+			STDMETHODIMP_(DWORD) HandleInComingCall(DWORD, HTASK, DWORD, LPINTERFACEINFO) override
+			{
+				return SERVERCALL_ISHANDLED;
+			};
+
+			STDMETHODIMP_(DWORD) RetryRejectedCall(HTASK, DWORD elapsed, DWORD) override
+			{
+				return elapsed < busyRetryTimeout ? busyRetryDelay : noRetry;
+			};
+
+			STDMETHODIMP_(DWORD) MessagePending(HTASK, DWORD, DWORD) override
+			{
+				return PENDINGMSG_WAITDEFPROCESS;
+			};
+
+		private:
+			IMessageFilter* m_previous = nullptr;
+			bool m_registered = false;
+		};
+
 		enum struct Handover
 		{
 			Opened,
@@ -191,8 +260,11 @@ namespace Loom
 			if (!dte)
 				return busy ? Handover::Busy : Handover::NotRunning;
 
-			const ComPtr<IDispatch> operations = Property(dte.Get(), L"ItemOperations");
-			const ComPtr<IDispatch> window = Property(dte.Get(), L"MainWindow");
+			ComPtr<IDispatch> operations;
+			ComPtr<IDispatch> window;
+
+			const HRESULT reached = Property(dte.Get(), L"ItemOperations", operations);
+			Property(dte.Get(), L"MainWindow", window);
 
 			VARIANT path;
 			VariantInit(&path);
@@ -202,9 +274,9 @@ namespace Loom
 			VARIANT opened;
 			VariantInit(&opened);
 
-			const HRESULT result = operations
+			const HRESULT result = SUCCEEDED(reached)
 				? Call(operations.Get(), L"OpenFile", DISPATCH_METHOD, &opened, { &path, 1 })
-				: E_NOINTERFACE;
+				: reached;
 
 			const HRESULT moved = SUCCEEDED(result) && line > 0 && opened.vt == VT_DISPATCH
 				? GoTo(opened.pdispVal, line, column)
@@ -244,7 +316,12 @@ namespace Loom
 		{
 			const HRESULT com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
-			const Handover handover = OpenThroughAutomation(solution, file, line, column);
+			Handover handover;
+
+			{
+				const RetryBusyCalls retry;
+				handover = OpenThroughAutomation(solution, file, line, column);
+			};
 
 			// A busy one may have the solution, and starting another would open it twice.
 			if (handover == Handover::Busy)
@@ -272,14 +349,18 @@ namespace Loom
 
 					Handover handover = Handover::NotRunning;
 
-					while (std::chrono::steady_clock::now() < deadline)
 					{
-						handover = OpenThroughAutomation(solution, file, line, column);
+						const RetryBusyCalls retry;
 
-						if (handover == Handover::Opened || handover == Handover::Failed)
-							break;
+						while (std::chrono::steady_clock::now() < deadline)
+						{
+							handover = OpenThroughAutomation(solution, file, line, column);
 
-						std::this_thread::sleep_for(visualStudioPollInterval);
+							if (handover == Handover::Opened || handover == Handover::Failed)
+								break;
+
+							std::this_thread::sleep_for(visualStudioPollInterval);
+						};
 					};
 
 					if (handover == Handover::NotRunning || handover == Handover::Busy)
@@ -433,6 +514,44 @@ namespace Loom
 			[](char a, char b) { return tolower((unsigned char)a) == tolower((unsigned char)b); });
 	};
 
+	std::filesystem::path VisualStudio::Normalise(const std::filesystem::path& path)
+	{
+		std::error_code code;
+
+		return std::filesystem::absolute(path, code).lexically_normal();
+	};
+
+	std::filesystem::path VisualStudio::Reroot(const std::filesystem::path& file, const std::filesystem::path& root)
+	{
+		std::error_code code;
+
+		const std::filesystem::path normalised = Normalise(file);
+
+		if (std::filesystem::exists(normalised, code) || root.empty())
+			return normalised;
+
+		const std::filesystem::path normalisedRoot = Normalise(root);
+
+		std::vector<std::filesystem::path> parts;
+
+		for (const std::filesystem::path& part : normalised.relative_path())
+			parts.push_back(part);
+
+		// The longest tail first, so Scripts/Grid.hpp wins over a bare Grid.hpp.
+		for (size_t first = 0; first < parts.size(); ++first)
+		{
+			std::filesystem::path candidate = normalisedRoot;
+
+			for (size_t part = first; part < parts.size(); ++part)
+				candidate /= parts[part];
+
+			if (std::filesystem::exists(candidate, code))
+				return candidate;
+		};
+
+		return normalised;
+	};
+
 	std::string VisualStudio::SolutionFor(const std::filesystem::path& file)
 	{
 		std::error_code code;
@@ -453,8 +572,19 @@ namespace Loom
 		};
 	};
 
-	std::thread VisualStudio::Open(const std::string& solution, const std::string& file, int line, int column)
+	std::thread VisualStudio::Open(const std::string& solutionPath, const std::string& filePath, int line, int column)
 	{
+		std::error_code missing;
+
+		const std::string file = Normalise(filePath).string();
+		const std::string solution = solutionPath.empty() ? "" : Normalise(solutionPath).string();
+
+		if (!std::filesystem::exists(file, missing))
+		{
+			std::cerr << file << " does not exist" << std::endl;
+			return { };
+		};
+
 #ifndef _WIN32
 		// Visual Studio Code where it is installed, which takes a line and column too.
 		static const std::string code_editor = OnPath("code");

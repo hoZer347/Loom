@@ -76,6 +76,64 @@ TEST_SUITE("VisualStudio")
 
 		CHECK(Loom::VisualStudio::SolutionFor(header).empty());
 	};
+
+	TEST_CASE("a path under a stale root is re-rooted to the moved project")
+	{
+		const Project project("loom visual studio moved");
+
+		const std::filesystem::path moved = project.Write("Scripts/Grid.hpp");
+		const std::filesystem::path stale = std::filesystem::temp_directory_path() / "loom visual studio old" / "RTS" / "Scripts" / "Grid.hpp";
+
+		CHECK(Loom::VisualStudio::Reroot(stale, project.root) == Loom::VisualStudio::Normalise(moved));
+	};
+
+	TEST_CASE("a path that exists is left where it is")
+	{
+		const Project project("loom visual studio existing");
+		const Project other("loom visual studio other");
+
+		const std::filesystem::path existing = project.Write("Scripts/Grid.hpp");
+		other.Write("Scripts/Grid.hpp");
+
+		CHECK(Loom::VisualStudio::Reroot(existing, other.root) == Loom::VisualStudio::Normalise(existing));
+	};
+
+	TEST_CASE("a relative path is made absolute and normalised")
+	{
+		const std::filesystem::path relative = "Scripts/../Scripts/Grid.hpp";
+		const std::filesystem::path result = Loom::VisualStudio::Normalise(relative);
+
+		CHECK(result.is_absolute());
+		CHECK(result == std::filesystem::absolute("Scripts/Grid.hpp").lexically_normal());
+		CHECK(Loom::VisualStudio::Reroot("Scripts/Grid.hpp", std::filesystem::path()) == std::filesystem::absolute("Scripts/Grid.hpp").lexically_normal());
+	};
+
+	TEST_CASE("a path found nowhere comes back normalised")
+	{
+		const Project project("loom visual studio nowhere");
+
+		const std::filesystem::path stale = std::filesystem::temp_directory_path() / "loom visual studio old" / "RTS" / ".." / "Scripts" / "Grid.hpp";
+
+		CHECK(Loom::VisualStudio::Reroot(stale, project.root) == Loom::VisualStudio::Normalise(stale));
+	};
+
+	TEST_CASE("an empty root returns the path normalised")
+	{
+		const std::filesystem::path stale = std::filesystem::temp_directory_path() / "loom visual studio old" / "RTS" / ".." / "Scripts" / "Grid.hpp";
+
+		CHECK(Loom::VisualStudio::Reroot(stale, std::filesystem::path()) == Loom::VisualStudio::Normalise(stale));
+	};
+
+	TEST_CASE("the longest tail wins when a shorter one also exists")
+	{
+		const Project project("loom visual studio longest");
+
+		project.Write("Grid.hpp");
+		const std::filesystem::path longest = project.Write("Scripts/Grid.hpp");
+		const std::filesystem::path stale = std::filesystem::temp_directory_path() / "loom visual studio old" / "RTS" / "Scripts" / "Grid.hpp";
+
+		CHECK(Loom::VisualStudio::Reroot(stale, project.root) == Loom::VisualStudio::Normalise(longest));
+	};
 };
 
 #endif

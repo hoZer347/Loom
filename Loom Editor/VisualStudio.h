@@ -33,6 +33,14 @@ namespace Loom
 		// Visual Studio, empty when there is none.
 		static std::string Where(const std::string& arguments);
 
+		// The path made absolute and lexically normal.
+		static std::filesystem::path Normalise(const std::filesystem::path& path);
+
+		// file normalised; when it does not exist, the first existing path found by
+		// putting the longest tail of its components under root, so a file from a
+		// project's old location lands in the project's current one.
+		static std::filesystem::path Reroot(const std::filesystem::path& file, const std::filesystem::path& root);
+
 		// The first solution in the nearest folder above file that has one,
 		// empty when none does.
 		static std::string SolutionFor(const std::filesystem::path& file);
