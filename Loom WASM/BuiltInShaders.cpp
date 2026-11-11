@@ -3,7 +3,9 @@
 #include "Shaders.h"
 
 #include <algorithm>
+#include <filesystem>
 #include <iterator>
+#include <string_view>
 
 
 namespace Loom
@@ -257,6 +259,26 @@ void main()
 		const auto found = std::find_if(Entries().begin(), Entries().end(), [&key](const Entry& entry) { return entry.path == key; });
 
 		return found != Entries().end() ? found->source.c_str() : nullptr;
+	};
+
+	std::string BuiltInShaders::Resolved(const std::string& path)
+	{
+		static constexpr std::string_view PROJECT_FOLDER = "Assets/";
+		static constexpr std::string_view ENGINE_FOLDER = "Loom/";
+
+		const std::string key = Shader::SourceKey(path);
+
+		if (!key.starts_with(PROJECT_FOLDER) || key.find('/', PROJECT_FOLDER.size()) != std::string::npos)
+			return path;
+
+		const std::string builtIn = std::string(ENGINE_FOLDER) + key.substr(PROJECT_FOLDER.size());
+
+		if (SourceOf(builtIn) == nullptr || Shader::SourceFor(key).has_value())
+			return path;
+
+		std::error_code code;
+
+		return std::filesystem::exists(key, code) ? path : builtIn;
 	};
 
 	#pragma endregion

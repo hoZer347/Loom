@@ -14,7 +14,7 @@ namespace Loom
 	* Loom::Asset
 	* - A file in the project, named by its path from the project folder with
 	*   '/' between folders, and a std::string of that path to everything that
-	*   reads it: Serial<Asset<".shader">> m_shader = "Assets/Lit.shader"
+	*   reads it: Serial<Asset<".shader">> m_shader = "Assets/Wave.shader"
 	* - Takes every extension its files may end in, first the one it is filed
 	*   under: Asset<".ttf", ".otf", ".ttc">. A kind of file with several, such
 	*   as FontAsset, is named beside what loads it

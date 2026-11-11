@@ -74,6 +74,8 @@ namespace Loom
 
 	void Material::OnAttach()
 	{
+		m_shader_path = BuiltInShaders::Resolved(m_shader_path);
+
 		if (shader == nullptr && !m_shader_path->empty())
 			shader = Shared(m_shader_path);
 	};
@@ -86,8 +88,8 @@ namespace Loom
 
 	void Material::ChangeShader(const std::string& path)
 	{
-		m_shader_path = path;
-		shader = path.empty() ? nullptr : Shared(path);
+		m_shader_path = BuiltInShaders::Resolved(path);
+		shader = m_shader_path->empty() ? nullptr : Shared(m_shader_path);
 	};
 
 	void Material::ReloadChangedShaders()

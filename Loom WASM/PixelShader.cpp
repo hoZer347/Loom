@@ -28,12 +28,14 @@ namespace Loom
 
 	void PixelShader::ChangeShader(const std::string& path)
 	{
-		m_shader_path = path;
-		shader = path.empty() ? nullptr : Material::SharedShader(path);
+		m_shader_path = BuiltInShaders::Resolved(path);
+		shader = m_shader_path->empty() ? nullptr : Material::SharedShader(m_shader_path);
 	};
 
 	void PixelShader::OnAttach()
 	{
+		m_shader_path = BuiltInShaders::Resolved(m_shader_path);
+
 		if (shader == nullptr && !m_shader_path->empty())
 			shader = Material::SharedShader(m_shader_path);
 	};

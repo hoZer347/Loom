@@ -33,5 +33,10 @@ namespace Loom
 
 		// The source of the one at path, or nullptr for any other path.
 		static const char* SourceOf(const std::string& path);
+
+		// The built-in a stored Assets/<name> reference stands for, when the
+		// project has no such file, as the old project template wrote Assets/Lit.shader.
+		// Any other path comes back as it was.
+		static std::string Resolved(const std::string& path);
 	};
 };
