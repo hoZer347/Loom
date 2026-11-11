@@ -85,6 +85,11 @@ namespace Loom
 		// A name usable as a file name, and as a path in an MSBuild project.
 		static bool IsValidName(const std::string& name);
 
+		// The name as a C++ identifier: anything but letters, digits and _ becomes
+		// _, a double underscore shrinks to one, a digit start or a leading _ and
+		// capital gets "Project" in front, and a keyword gets a trailing _.
+		static std::string Identifier(const std::string& name);
+
 		// Each returns the path written, or an empty string with the reason in
 		// error.
 		static std::string CreateFolder(const std::string& folder, const std::string& name, std::string* error = nullptr);

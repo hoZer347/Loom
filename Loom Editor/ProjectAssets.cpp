@@ -49,6 +49,36 @@ namespace Loom
 			"static_assert", "static_cast", "struct", "switch", "template", "this",
 			"thread_local", "throw", "true", "try", "typedef", "typeid", "typename", "union",
 			"unsigned", "using", "virtual", "void", "volatile", "wchar_t", "while",
+			"and", "and_eq", "bitand", "bitor", "compl", "not", "not_eq", "or", "or_eq",
+			"xor", "xor_eq",
+		};
+
+		// Stands in front of what would otherwise begin with a digit or be reserved.
+		constexpr const char* const identifierPrefix = "Project";
+
+		// A double underscore is reserved wherever it sits.
+		constexpr const char* const reservedUnderscores = "__";
+
+		bool IsKeyword(const std::string& name)
+		{
+			for (const char* keyword : keywords)
+				if (name == keyword)
+					return true;
+
+			return false;
+		};
+
+		// Letters, digits and _, not starting with a digit.
+		bool IsPlainIdentifier(const std::string& name)
+		{
+			if (name.empty() || isdigit((unsigned char)name.front()))
+				return false;
+
+			for (const char c : name)
+				if (!isalnum((unsigned char)c) && c != '_')
+					return false;
+
+			return true;
 		};
 
 		#pragma endregion
@@ -236,9 +266,14 @@ namespace Loom
 		{
 			const std::string name = ProjectAssets::Element(ProjectAssets::ReadText(project.string()), "RootNamespace");
 
-			return name.empty()
+			const std::string chosen = name.empty()
 				? project.stem().string()
 				: name;
+
+			// Older scripts already sit in a namespace that compiles, so it stays.
+			return IsPlainIdentifier(chosen) && !IsKeyword(chosen)
+				? chosen
+				: ProjectAssets::Identifier(chosen);
 		};
 
 		// Picked up by the scripts project's **\*.hpp glob.
@@ -487,6 +522,28 @@ namespace {NAMESPACE}
 				return false;
 
 		return true;
+	};
+
+	std::string ProjectAssets::Identifier(const std::string& name)
+	{
+		std::string identifier;
+
+		for (const char c : name)
+			identifier += (isalnum((unsigned char)c) || c == '_')
+				? c
+				: '_';
+
+		for (size_t at = identifier.find(reservedUnderscores); at != std::string::npos; at = identifier.find(reservedUnderscores, at))
+			identifier.erase(at, 1);
+
+		const bool reserved = identifier.size() > 1 && identifier[0] == '_' && isupper((unsigned char)identifier[1]);
+
+		if (identifier.empty() || isdigit((unsigned char)identifier.front()) || reserved)
+			identifier = identifierPrefix + identifier;
+
+		return IsKeyword(identifier)
+			? identifier + '_'
+			: identifier;
 	};
 
 	std::string ProjectAssets::CreateFolder(const std::string& folder, const std::string& name, std::string* error)
@@ -877,25 +934,11 @@ namespace {NAMESPACE}
 
 	std::string ProjectAssets::ScriptNameProblem(const std::string& scripts_project, const std::string& name)
 	{
-		const auto identifier =
-			[&name]()
-			{
-				if (name.empty() || name.size() > maxNameLength || isdigit((unsigned char)name.front()))
-					return false;
-
-				for (const char c : name)
-					if (!isalnum((unsigned char)c) && c != '_')
-						return false;
-
-				return true;
-			};
-
-		if (!identifier())
+		if (name.size() > maxNameLength || !IsPlainIdentifier(name))
 			return "Letters, digits and _; it becomes a C++ type.";
 
-		for (const char* keyword : keywords)
-			if (name == keyword)
-				return "'" + name + "' is a C++ keyword.";
+		if (IsKeyword(name))
+			return "'" + name + "' is a C++ keyword.";
 
 		// The registry turns away a second component of a name, namespaces dropped.
 		if (ComponentRegistry::All().contains(name))

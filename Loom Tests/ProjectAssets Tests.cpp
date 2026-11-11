@@ -9,10 +9,12 @@
 #include "Utilities/StateReference.h"
 
 #include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <utility>
 #include <vector>
 
 
@@ -55,6 +57,43 @@ namespace
 	{
 		std::ifstream in(path);
 		return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+	};
+
+	// What follows "namespace " on the first line that starts with it.
+	std::string NamespaceOf(const std::string& text)
+	{
+		const std::string keyword = "namespace ";
+
+		for (size_t at = text.find(keyword); at != std::string::npos; at = text.find(keyword, at + 1))
+		{
+			if (at != 0 && text[at - 1] != '\n')
+				continue;
+
+			const size_t start = at + keyword.size();
+			const size_t end = text.find_first_of("\r\n{", start);
+			std::string name = text.substr(start, end - start);
+
+			while (!name.empty() && std::isspace((unsigned char)name.back()))
+				name.pop_back();
+
+			return name;
+		};
+
+		return "";
+	};
+
+	bool IsIdentifier(const std::string& name)
+	{
+		if (name.empty() || std::isdigit((unsigned char)name[0]))
+			return false;
+
+		for (const char c : name)
+		{
+			if (!std::isalnum((unsigned char)c) && c != '_')
+				return false;
+		};
+
+		return name != "class" && name != "not";
 	};
 };
 
@@ -373,6 +412,104 @@ TEST_SUITE("ProjectAssets")
 		std::ofstream(scripts.project) << "<Project>\n</Project>\n";
 
 		CHECK(ReadAll(scripts.Create("Spinner")).find("namespace GameScripts") != std::string::npos);
+	};
+
+	TEST_CASE("a namespace that is not an identifier is made into one, for every kind of script")
+	{
+		using Kind = Loom::ProjectAssets::ScriptKind;
+
+		const Kind kinds[] = { Kind::Component, Kind::State, Kind::StateMachine, Kind::DialogueManager, Kind::Test };
+		const char* const namespaces[] = { "My Game.v2", "3D-Game", "class", "Project-NameScripts" };
+
+		for (const char* const declared : namespaces)
+		{
+			for (const Kind kind : kinds)
+			{
+				const ScriptsProject scripts("loom project assets bad namespace");
+
+				std::ofstream(scripts.project) << "<Project>\n  <RootNamespace>" << declared << "</RootNamespace>\n</Project>\n";
+
+				std::string error;
+				const std::string written = scripts.Create("Spinner", &error, kind);
+
+				REQUIRE_MESSAGE(!written.empty(), error);
+
+				const std::string name = NamespaceOf(ReadAll(written));
+
+				CAPTURE(declared);
+				CAPTURE(name);
+				CHECK(IsIdentifier(name));
+			};
+		};
+	};
+
+	TEST_CASE("a project with no RootNamespace and a name that is not an identifier declares one that is")
+	{
+		using Kind = Loom::ProjectAssets::ScriptKind;
+
+		const Kind kinds[] = { Kind::Component, Kind::State, Kind::StateMachine, Kind::DialogueManager, Kind::Test };
+
+		for (const Kind kind : kinds)
+		{
+			const ScriptsProject scripts("loom project assets bad stem");
+			const std::filesystem::path project = scripts.root / "Project-NameScripts.vcxproj";
+
+			std::ofstream(project) << "<Project>\n</Project>\n";
+
+			std::string error;
+			const std::string written = Loom::ProjectAssets::CreateScript(project.string(), scripts.root.string(), "Spinner", kind, &error);
+
+			REQUIRE_MESSAGE(!written.empty(), error);
+
+			const std::string name = NamespaceOf(ReadAll(written));
+
+			CAPTURE(name);
+			CHECK(IsIdentifier(name));
+			CHECK(name == "Project_NameScripts");
+		};
+	};
+
+	TEST_CASE("a name becomes the identifier the rules give, and an identifier stays as it is")
+	{
+		const std::pair<std::string, std::string> names[] =
+		{
+			{ "", "Project" },
+			{ "-", "_" },
+			{ "__", "_" },
+			{ "a__b", "a_b" },
+			{ "_Foo", "Project_Foo" },
+			{ "_foo", "_foo" },
+			{ "3d", "Project3d" },
+			{ "not", "not_" },
+			{ "class", "class_" },
+			{ "a b", "a_b" },
+			{ "\xC3\xA9", "_" },
+		};
+
+		for (const auto& [name, expected] : names)
+		{
+			CAPTURE(name);
+
+			CHECK(Loom::ProjectAssets::Identifier(name) == expected);
+			CHECK(Loom::ProjectAssets::Identifier(Loom::ProjectAssets::Identifier(name)) == Loom::ProjectAssets::Identifier(name));
+		};
+	};
+
+	TEST_CASE("a script cannot take a C++ keyword, alternative tokens included")
+	{
+		const ScriptsProject scripts("loom project assets keywords");
+
+		for (const char* const keyword : { "and", "not", "xor_eq" })
+			CHECK(Loom::ProjectAssets::ScriptNameProblem(scripts.project.string(), keyword) == std::string("'") + keyword + "' is a C++ keyword.");
+	};
+
+	TEST_CASE("a RootNamespace that already compiles is kept as it is")
+	{
+		const ScriptsProject scripts("loom project assets kept namespace");
+
+		std::ofstream(scripts.project) << "<Project>\n  <RootNamespace>My__GameScripts</RootNamespace>\n</Project>\n";
+
+		CHECK(NamespaceOf(ReadAll(scripts.Create("Spinner"))) == "My__GameScripts");
 	};
 
 	TEST_CASE("scenes, shaders, dialogues, sprites, palettes, textures and sounds are game files, scripts and the project's other files are not")
