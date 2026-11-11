@@ -17,6 +17,13 @@ foreach(script IN LISTS SCRIPTS)
 	list(APPEND SOURCES "${source}")
 endforeach()
 
+# A project with no scripts yet still builds an empty library, which a target needs a source for.
+if(NOT SOURCES)
+	set(source "${CMAKE_BINARY_DIR}/Sources/Empty.cpp")
+	file(CONFIGURE OUTPUT "${source}" CONTENT "\n")
+	list(APPEND SOURCES "${source}")
+endif()
+
 cmake_path(GET LOOM_LIBRARY PARENT_PATH LIBRARY_FOLDER)
 cmake_path(GET LOOM_LIBRARY STEM LAST_ONLY LIBRARY_NAME)
 set(LIBS "${LOOM_ROOT}/External Libraries")

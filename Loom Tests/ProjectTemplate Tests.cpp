@@ -214,7 +214,6 @@ TEST_SUITE("ProjectTemplate")
 
 		CHECK(CountFiles(project, ".hpp") == 0);
 		CHECK(CountFiles(project, ".shader") == 0);
-		CHECK_FALSE(std::filesystem::exists(project / "Scripts" / "SpinningTriangle.hpp"));
 		CHECK_FALSE(std::filesystem::exists(project / "Assets" / "Lit.shader"));
 		CHECK_FALSE(readme.empty());
 		CHECK(readme.find("SpinningTriangle") == std::string::npos);
