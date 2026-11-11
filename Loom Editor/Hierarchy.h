@@ -95,9 +95,20 @@ namespace Loom
 		Zone ZoneOf(float top, float bottom, float mouse, bool root);
 
 		// Where a drop in zone of row puts what it carries, row drawn open or
-		// not. moving is the GameObject the drop moves, null for one it makes,
-		// and is stepped over when it is the next after row.
-		Placement Place(GameObject& row, bool open, Zone zone, const GameObject* moving);
+		// not. moving is what the drop moves, empty for one it makes, and any
+		// of it next after row is stepped over.
+		Placement Place(
+			GameObject& row,
+			bool open,
+			Zone zone,
+			const std::vector<GameObject*>& moving);
+
+		// What a drag of dragged carries: the selection, in the order the
+		// Hierarchy draws it, less roots and what is under another of it, when
+		// dragged is one of it, and dragged alone when not.
+		std::vector<GameObject*> Moving(
+			const std::vector<GameObject*>& selection,
+			GameObject& dragged);
 
 		#pragma endregion
 	};

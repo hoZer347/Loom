@@ -46,6 +46,15 @@ namespace
 
 		return parent.GetChildren();
 	};
+
+	// Applies a drop the way the Editor does, one object after another.
+	void Drop(const std::vector<Loom::GameObject*>& moving, const Placement& placement)
+	{
+		for (Loom::GameObject* gameObject : moving)
+			gameObject->SetParent(placement.parent, placement.before);
+
+		Pump();
+	};
 };
 
 #pragma endregion
@@ -212,16 +221,16 @@ TEST_SUITE("Hierarchy")
 
 		Loom::GameObject* root = &scene.GetRoot();
 
-		CHECK(Loom::Hierarchy::Place(*children[1], false, Zone::Above, nullptr) == Placement{ root, children[1] });
-		CHECK(Loom::Hierarchy::Place(*children[1], false, Zone::Into, nullptr) == Placement{ children[1], nullptr });
-		CHECK(Loom::Hierarchy::Place(*children[0], false, Zone::Below, nullptr) == Placement{ root, children[1] });
-		CHECK(Loom::Hierarchy::Place(*children[2], false, Zone::Below, nullptr) == Placement{ root, nullptr });
-		CHECK(Loom::Hierarchy::Place(*root, true, Zone::Into, nullptr) == Placement{ root, nullptr });
+		CHECK(Loom::Hierarchy::Place(*children[1], false, Zone::Above, { }) == Placement{ root, children[1] });
+		CHECK(Loom::Hierarchy::Place(*children[1], false, Zone::Into, { }) == Placement{ children[1], nullptr });
+		CHECK(Loom::Hierarchy::Place(*children[0], false, Zone::Below, { }) == Placement{ root, children[1] });
+		CHECK(Loom::Hierarchy::Place(*children[2], false, Zone::Below, { }) == Placement{ root, nullptr });
+		CHECK(Loom::Hierarchy::Place(*root, true, Zone::Into, { }) == Placement{ root, nullptr });
 
 		// Below an open row is above its first child, and below a closed one
 		// is after the whole of it.
-		CHECK(Loom::Hierarchy::Place(*children[1], true, Zone::Below, nullptr) == Placement{ children[1], grandchildren[0] });
-		CHECK(Loom::Hierarchy::Place(*children[1], false, Zone::Below, nullptr) == Placement{ root, children[2] });
+		CHECK(Loom::Hierarchy::Place(*children[1], true, Zone::Below, { }) == Placement{ children[1], grandchildren[0] });
+		CHECK(Loom::Hierarchy::Place(*children[1], false, Zone::Below, { }) == Placement{ root, children[2] });
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Place steps over the object being moved when it is next after the row")
@@ -229,8 +238,91 @@ TEST_SUITE("Hierarchy")
 		Loom::Scene scene("Place");
 		const std::vector<Loom::GameObject*> children = Children(scene.GetRoot(), 3);
 
-		CHECK(Loom::Hierarchy::Place(*children[0], false, Zone::Below, children[1]) == Placement{ &scene.GetRoot(), children[2] });
-		CHECK(Loom::Hierarchy::Place(*children[1], false, Zone::Below, children[2]) == Placement{ &scene.GetRoot(), nullptr });
+		CHECK(Loom::Hierarchy::Place(*children[0], false, Zone::Below, { children[1] }) == Placement{ &scene.GetRoot(), children[2] });
+		CHECK(Loom::Hierarchy::Place(*children[1], false, Zone::Below, { children[2] }) == Placement{ &scene.GetRoot(), nullptr });
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Place steps over a run of moving siblings after the row, and to null when all the rest move")
+	{
+		Loom::Scene scene("Place");
+		const std::vector<Loom::GameObject*> children = Children(scene.GetRoot(), 6);
+		Loom::GameObject* root = &scene.GetRoot();
+
+		CHECK(Loom::Hierarchy::Place(*children[0], false, Zone::Below, { children[1], children[2], children[3] }) == Placement{ root, children[4] });
+		CHECK(Loom::Hierarchy::Place(*children[0], false, Zone::Below, { children[3], children[2], children[1] }) == Placement{ root, children[4] });
+		CHECK(Loom::Hierarchy::Place(*children[0], false, Zone::Below, { children[1], children[3] }) == Placement{ root, children[2] });
+		CHECK(Loom::Hierarchy::Place(*children[2], false, Zone::Below, { children[3], children[4], children[5] }) == Placement{ root, nullptr });
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Moving is the dragged object alone when it is not selected")
+	{
+		Loom::Scene scene("Moving");
+		const std::vector<Loom::GameObject*> children = Children(scene.GetRoot(), 4);
+
+		CHECK(Loom::Hierarchy::Moving({ children[1], children[2] }, *children[3]) == std::vector<Loom::GameObject*>{ children[3] });
+		CHECK(Loom::Hierarchy::Moving({ }, *children[0]) == std::vector<Loom::GameObject*>{ children[0] });
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Moving drops roots and objects under another selected one")
+	{
+		Loom::Scene scene("Moving");
+		const std::vector<Loom::GameObject*> children = Children(scene.GetRoot(), 3);
+		const std::vector<Loom::GameObject*> grandchildren = Children(*children[0], 2);
+		const std::vector<Loom::GameObject*> deep = Children(*grandchildren[0], 1);
+
+		const std::vector<Loom::GameObject*> selection{ &scene.GetRoot(), children[0], grandchildren[0], deep[0], grandchildren[1], children[2] };
+
+		CHECK(Loom::Hierarchy::Moving(selection, *children[2]) == std::vector<Loom::GameObject*>{ children[0], children[2] });
+		CHECK(Loom::Hierarchy::Moving({ &scene.GetRoot(), children[1] }, *children[1]) == std::vector<Loom::GameObject*>{ children[1] });
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Moving sorts a scattered selection across parents and depths into draw order")
+	{
+		Loom::Scene scene("Moving");
+		const std::vector<Loom::GameObject*> children = Children(scene.GetRoot(), 4);
+		const std::vector<Loom::GameObject*> inFirst = Children(*children[0], 3);
+		const std::vector<Loom::GameObject*> inSecond = Children(*children[1], 2);
+		const std::vector<Loom::GameObject*> deep = Children(*inSecond[0], 2);
+
+		const std::vector<Loom::GameObject*> selection
+		{
+			children[3],
+			deep[1],
+			inFirst[2],
+			children[1],
+			inFirst[0],
+			deep[0],
+		};
+
+		// children[1] holds deep ones, so they go with it.
+		CHECK(Loom::Hierarchy::Moving(selection, *children[3]) == std::vector<Loom::GameObject*>{ inFirst[0], inFirst[2], children[1], children[3] });
+
+		const std::vector<Loom::GameObject*> split{ children[3], deep[1], inFirst[2], inSecond[1], inFirst[0], deep[0] };
+
+		CHECK(Loom::Hierarchy::Moving(split, *deep[0]) == std::vector<Loom::GameObject*>{ inFirst[0], inFirst[2], deep[0], deep[1], inSecond[1], children[3] });
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Dropping what Moving returns keeps its relative order, reordering up and down and reparenting")
+	{
+		Loom::Scene scene("Drop");
+		const std::vector<Loom::GameObject*> children = Children(scene.GetRoot(), 7);
+		const std::vector<Loom::GameObject*> target = Children(*children[6], 2);
+		Loom::GameObject* root = &scene.GetRoot();
+
+		// Up: 4 and 2 land above 1, in the order they were in.
+		const std::vector<Loom::GameObject*> up = Loom::Hierarchy::Moving({ children[4], children[2] }, *children[4]);
+		Drop(up, Loom::Hierarchy::Place(*children[0], false, Zone::Below, up));
+		CHECK(root->GetChildren() == std::vector<Loom::GameObject*>{ children[0], children[2], children[4], children[1], children[3], children[5], children[6] });
+
+		// Down: 0 and 2 land after 5, in the order they were in.
+		const std::vector<Loom::GameObject*> down = Loom::Hierarchy::Moving({ children[2], children[0] }, *children[0]);
+		Drop(down, Loom::Hierarchy::Place(*children[5], false, Zone::Below, down));
+		CHECK(root->GetChildren() == std::vector<Loom::GameObject*>{ children[4], children[1], children[3], children[5], children[0], children[2], children[6] });
+
+		// Reparent: 3 and 4 land under the last, after what it holds.
+		const std::vector<Loom::GameObject*> into = Loom::Hierarchy::Moving({ children[3], children[4] }, *children[3]);
+		Drop(into, Loom::Hierarchy::Place(*children[6], false, Zone::Into, into));
+		CHECK(children[6]->GetChildren() == std::vector<Loom::GameObject*>{ target[0], target[1], children[4], children[3] });
 	};
 
 	#pragma endregion

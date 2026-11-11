@@ -167,7 +167,11 @@ namespace Loom::Hierarchy
 		return mouse <= top + edge ? Zone::Above : Zone::Below;
 	};
 
-	Placement Place(GameObject& row, bool open, Zone zone, const GameObject* moving)
+	Placement Place(
+		GameObject& row,
+		bool open,
+		Zone zone,
+		const std::vector<GameObject*>& moving)
 	{
 		if (zone == Zone::Into)
 			return { &row, nullptr };
@@ -186,10 +190,86 @@ namespace Loom::Hierarchy
 		const std::vector<GameObject*>& siblings = parent->GetChildren();
 		auto next = std::find(siblings.begin(), siblings.end(), &row) + 1;
 
-		if (next != siblings.end() && *next == moving)
+		const auto carried =
+			[&moving](const GameObject* gameObject)
+			{
+				return std::find(moving.begin(), moving.end(), gameObject) != moving.end();
+			};
+
+		while (next != siblings.end() && carried(*next))
 			next++;
 
 		return { parent, next == siblings.end() ? nullptr : *next };
+	};
+
+	std::vector<GameObject*> Moving(
+		const std::vector<GameObject*>& selection,
+		GameObject& dragged)
+	{
+		if (std::find(selection.begin(), selection.end(), &dragged) == selection.end())
+			return { &dragged };
+
+		const auto under_another =
+			[&selection](const GameObject& gameObject)
+			{
+				for (const GameObject* above = gameObject.GetParent(); above && above->GetParent(); above = above->GetParent())
+					if (std::find(selection.begin(), selection.end(), above) != selection.end())
+						return true;
+
+				return false;
+			};
+
+		// Sibling indices from the root down, which sort as the rows are drawn.
+		const auto path =
+			[](const GameObject& gameObject)
+			{
+				std::vector<size_t> indices{ };
+
+				for (const GameObject* at = &gameObject; at->GetParent(); at = at->GetParent())
+					indices.insert(indices.begin(), at->GetSiblingIndex());
+
+				return indices;
+			};
+
+		const auto root =
+			[](const GameObject& gameObject)
+			{
+				const GameObject* at = &gameObject;
+
+				while (at->GetParent())
+					at = at->GetParent();
+
+				return at;
+			};
+
+		std::vector<const GameObject*> roots{ };
+		std::vector<std::pair<std::pair<size_t, std::vector<size_t>>, GameObject*>> keyed{ };
+
+		for (GameObject* gameObject : selection)
+		{
+			if (gameObject->GetParent() == nullptr || under_another(*gameObject))
+				continue;
+
+			const GameObject* top = root(*gameObject);
+			auto rank = std::find(roots.begin(), roots.end(), top);
+
+			if (rank == roots.end())
+				rank = roots.insert(roots.end(), top);
+
+			keyed.push_back({ { (size_t)(rank - roots.begin()), path(*gameObject) }, gameObject });
+		};
+
+		std::sort(
+			keyed.begin(),
+			keyed.end(),
+			[](const auto& a, const auto& b) { return a.first < b.first; });
+
+		std::vector<GameObject*> moving{ };
+
+		for (const auto& [key, gameObject] : keyed)
+			moving.push_back(gameObject);
+
+		return moving;
 	};
 
 	#pragma endregion

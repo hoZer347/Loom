@@ -647,13 +647,21 @@ namespace Loom
 			return object.NameAndID();
 		};
 
-		void DragSource(const LoomObject& object, ImGuiDragDropFlags flags = 0)
+		// Carrying shows how many go with object when there are others.
+		void DragSource(
+			const LoomObject& object,
+			ImGuiDragDropFlags flags = 0,
+			size_t carrying = 1)
 		{
 			if (!ImGui::BeginDragDropSource(flags))
 				return;
 
 			ImGui::SetDragDropPayload(Editor::object_payload, &object.GetGuid(), sizeof(Guid));
-			ImGui::TextUnformatted(Describe(object).c_str());
+
+			if (carrying > 1)
+				ImGui::Text("%zu objects", carrying);
+			else
+				ImGui::TextUnformatted(Describe(object).c_str());
 
 			ImGui::EndDragDropSource();
 		};
@@ -3623,7 +3631,10 @@ namespace Loom
 		TakeImportTarget(gameObject);
 		DragAndDropNode(gameObject, open);
 
-		DragSource(*gameObject);
+		DragSource(
+			*gameObject,
+			0,
+			IsSelected(*gameObject) ? Hierarchy::Moving(GetSelection(), *gameObject).size() : 1);
 
 		if (ImGui::IsItemHovered() &&
 			ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
@@ -3935,7 +3946,7 @@ namespace Loom
 		if (dragged->IsDataType(ASSET_PAYLOAD))
 		{
 			const std::string path = (const char*)dragged->Data;
-			const Hierarchy::Placement placement = Hierarchy::Place(row, open, zone, nullptr);
+			const Hierarchy::Placement placement = Hierarchy::Place(row, open, zone, { });
 
 			if (!CanPlace(path, *placement.parent))
 				return false;
@@ -3950,19 +3961,46 @@ namespace Loom
 
 		const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(object_payload, flags);
 
-		GameObject* moving = payload
+		GameObject* held = payload
 			? LoomObject::GetByGuid<GameObject>(*(const Guid*)payload->Data)
 			: nullptr;
 
-		if (moving == nullptr || !EditCommands::CanMove(*moving, row, m_ownedScenes))
+		if (held == nullptr)
 			return false;
+
+		const std::vector<GameObject*> moving = Hierarchy::Moving(GetSelection(), *held);
+
+		if (moving.empty())
+			return false;
+
+		for (const GameObject* gameObject : moving)
+			if (!EditCommands::CanMove(*gameObject, row, m_ownedScenes))
+				return false;
 
 		if (payload->IsDelivery())
 		{
 			const Hierarchy::Placement placement = Hierarchy::Place(row, open, zone, moving);
 
-			moving->SetParent(placement.parent, placement.before);
-			Select(moving);
+			// Each goes ahead of the same sibling, so they land in the order they had.
+			for (GameObject* gameObject : moving)
+				gameObject->SetParent(placement.parent, placement.before);
+
+			if (moving.size() == 1)
+				Select(held);
+			else
+			{
+				std::vector<GameObject*> selection = moving;
+				auto primary = std::find(selection.begin(), selection.end(), m_selected);
+
+				if (primary == selection.end())
+					primary = std::find(selection.begin(), selection.end(), held);
+
+				if (primary == selection.end())
+					primary = selection.begin();
+
+				std::rotate(selection.begin(), primary, primary + 1);
+				SetSelection(selection);
+			};
 
 			m_historyDirty = true;
 		};
