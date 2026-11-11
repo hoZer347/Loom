@@ -178,23 +178,6 @@ namespace
 		CHECK(glowing->GetComponent<Loom::Mesh>()->UVLayers().empty());
 	};
 
-	// The importer writes Model.shader and the textures into the project it
-	// runs in, so a case runs in a folder of its own until it ends.
-	struct InFolder
-	{
-		std::filesystem::path was = std::filesystem::current_path();
-
-		explicit InFolder(const std::filesystem::path& folder)
-		{
-			std::error_code code;
-			std::filesystem::remove_all(folder, code);
-			std::filesystem::create_directories(folder);
-			std::filesystem::current_path(folder);
-		};
-
-		~InFolder() { std::filesystem::current_path(was); };
-	};
-
 	// One triangle whose last corner is the vertex given.
 	std::string Triangle(int last)
 	{
@@ -243,7 +226,7 @@ TEST_SUITE("ModelImporter")
 		SUBCASE("rigged") { animated = true; };
 
 		{
-			const InFolder in(project);
+			const LoomTests::InFolder in(project, true);
 			WriteModel(project / "Swatch.gltf", animated);
 
 			// No renderer compiles the shader the importer writes.

@@ -305,29 +305,27 @@ namespace
 
 	// A project's folder as the working directory, with its own file at a
 	// built-in shader's path, gone once it ends.
-	struct ProjectWithLit
+	struct ProjectWithLit final : LoomTests::InFolder
 	{
-		ProjectWithLit() :
-			m_previous(std::filesystem::current_path()),
-			m_folder(std::filesystem::temp_directory_path() / "loom built-in shader file")
+		ProjectWithLit() : InFolder(std::filesystem::temp_directory_path() / "loom built-in shader file", true)
 		{
-			std::filesystem::remove_all(m_folder);
-			std::filesystem::create_directories(m_folder / "Loom");
-			std::ofstream(m_folder / "Loom" / "Lit.shader") << "not a shader";
-			std::filesystem::current_path(m_folder);
+			std::filesystem::create_directories("Loom");
+			std::ofstream("Loom/Lit.shader") << "not a shader";
 		};
+	};
 
-		~ProjectWithLit()
+	// A project's folder as the working directory, with its own Assets/Lit.shader
+	// or none, gone once it ends.
+	struct Project final : LoomTests::InFolder
+	{
+		explicit Project(bool ownLit) : InFolder(std::filesystem::temp_directory_path() / "loom old built-in reference", true)
 		{
-			std::filesystem::current_path(m_previous);
-
-			std::error_code code;
-			std::filesystem::remove_all(m_folder, code);
+			if (ownLit)
+			{
+				std::filesystem::create_directories("Assets");
+				std::ofstream("Assets/Lit.shader") << "not a shader";
+			};
 		};
-
-	private:
-		std::filesystem::path m_previous;
-		std::filesystem::path m_folder;
 	};
 };
 
@@ -452,6 +450,95 @@ TEST_SUITE("BuiltInShaders")
 		*(std::string*)material->GetFields().front().data = "Assets/Own.shader";
 
 		CHECK(InspectorItems(*material, "wait 2\n").find("Edit Assets/Own.shader") != std::string::npos);
+	};
+
+	#pragma endregion
+
+	#pragma region Old references
+
+	TEST_CASE("an Assets reference to a built-in shader with no file there resolves to the built-in")
+	{
+		const Project project(false);
+
+		CHECK(Loom::BuiltInShaders::Resolved("Assets/Lit.shader") == "Loom/Lit.shader");
+		CHECK(Loom::BuiltInShaders::Resolved("Assets/./Lit.shader") == "Loom/Lit.shader");
+		CHECK(Loom::BuiltInShaders::Resolved("Assets/Bloom.loompixel") == "Loom/Bloom.loompixel");
+	};
+
+	TEST_CASE("a project's own Assets file, another name, or a built-in path is left as it is")
+	{
+		{
+			const Project project(true);
+
+			CHECK(Loom::BuiltInShaders::Resolved("Assets/Lit.shader") == "Assets/Lit.shader");
+			CHECK(Loom::BuiltInShaders::Resolved("Assets/./Lit.shader") == "Assets/./Lit.shader");
+		};
+
+		const Project project(false);
+
+		CHECK(Loom::BuiltInShaders::Resolved("Assets/Water.shader") == "Assets/Water.shader");
+		CHECK(Loom::BuiltInShaders::Resolved("Loom/Lit.shader") == "Loom/Lit.shader");
+	};
+
+	TEST_CASE_FIXTURE(RenderFixture, "a material written with an Assets path to a built-in shader uses the built-in")
+	{
+		const Project project(false);
+
+		Loom::Scene scene("old built-in reference");
+		Pump();
+
+		Loom::Shader::lastError.clear();
+
+		const LoomTests::Captured captured(std::cerr);
+
+		Loom::Material* material = scene.Attach<Loom::Material>();
+		material->SetShaderPath("Assets/Lit.shader");
+		Pump();
+
+		REQUIRE(material->shader != nullptr);
+		CHECK(material->GetShaderPath() == "Loom/Lit.shader");
+		CHECK(material->shader == Loom::Material::SharedShader("Loom/Lit.shader"));
+		CHECK_FALSE(captured.Says("could not open the file"));
+		CHECK(Loom::Shader::lastError.empty());
+	};
+
+	TEST_CASE_FIXTURE(RenderFixture, "changing a material to an Assets path to a built-in shader uses the built-in")
+	{
+		const Project project(false);
+
+		Loom::Scene scene("old built-in change");
+		Pump();
+
+		const LoomTests::Captured captured(std::cerr);
+
+		Loom::Material* material = scene.Attach<Loom::Material>();
+		Pump();
+
+		material->ChangeShader("Assets/Unlit.shader");
+
+		REQUIRE(material->shader != nullptr);
+		CHECK(material->GetShaderPath() == "Loom/Unlit.shader");
+		CHECK_FALSE(captured.Says("could not open the file"));
+	};
+
+	TEST_CASE_FIXTURE(RenderFixture, "a pixel shader written with an Assets path to a built-in pass uses the built-in")
+	{
+		const Project project(false);
+
+		Loom::Scene scene("old built-in pass reference");
+		Pump();
+
+		const LoomTests::Captured captured(std::cerr);
+
+		Loom::PixelShader* pixel = scene.Attach<Loom::PixelShader>();
+		Pump();
+
+		pixel->ChangeShader("Assets/Bloom.loompixel");
+		Pump();
+
+		REQUIRE(pixel->shader != nullptr);
+		CHECK(pixel->GetShaderPath() == "Loom/Bloom.loompixel");
+		CHECK_FALSE(captured.Says("could not open the file"));
 	};
 
 	#pragma endregion

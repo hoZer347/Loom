@@ -35,6 +35,9 @@ using LoomTests::EPSILON;
 
 namespace
 {
+	// A fragment stage RecordingRenderer refuses, as a shader file the project has.
+	const std::string BROKEN_SHADER = std::string("// ===FRAGMENT===\n") + LoomTests::RecordingRenderer::BROKEN + "\n";
+
 	using Loom::EditableMesh;
 	using Loom::ModelEditor;
 	namespace Shapes = Loom::Shapes;
@@ -725,11 +728,13 @@ TEST_SUITE("ModelEditor")
 
 		std::filesystem::create_directories(prefab.parent_path());
 		std::ofstream(project / "Model.loomproject") << "name=Model\n";
-		std::ofstream(project / "Assets" / "Lit.shader") << "";
+		std::ofstream(project / "Assets" / "Lit.shader") << BROKEN_SHADER;
 		std::ofstream(prefab, std::ios::binary) << "GameObject Empty(5d0c6b7e-2f43-4a8e-9c1d-7a6e0b3f2c11)\n\t0 = 0\n\t1 = false\n\t2 = (0, 0, 0)\n\t3 = (0, 0, 0)\n\t4 = (1, 1, 1)\n\t5 = false\n";
 
 		{
-			// The shader is empty, so it does not compile.
+			const LoomTests::InFolder in(project);
+
+			// The shader is broken, so it does not compile.
 			const LoomTests::Captured captured(std::cerr);
 			Driven driven("model_add_mesh", nullptr, prefab.string());
 			CHECK(driven.editor.Editing() == nullptr);
@@ -793,14 +798,16 @@ TEST_SUITE("ModelEditor")
 
 		std::filesystem::create_directories(prefab.parent_path());
 		std::ofstream(project / "Model.loomproject") << "name=Model\n";
-		std::ofstream(project / "Assets" / "Lit.shader") << "";
-		std::ofstream(project / "Assets" / "Model.shader") << "";
+		std::ofstream(project / "Assets" / "Lit.shader") << BROKEN_SHADER;
+		std::ofstream(project / "Assets" / "Model.shader") << BROKEN_SHADER;
 		std::filesystem::create_directories(project / "Loom");
 		std::ofstream(project / "Loom" / "Lit.shader") << "";
 		std::ofstream(prefab, std::ios::binary) << ReadFile(WritePrefab("model_shaders_source", &cube, &cube));
 
 		{
-			// The shaders are empty, so they do not compile.
+			const LoomTests::InFolder in(project);
+
+			// The shaders are broken, so they do not compile.
 			const LoomTests::Captured captured(std::cerr);
 			Driven driven("model_shaders", nullptr, prefab.string());
 
