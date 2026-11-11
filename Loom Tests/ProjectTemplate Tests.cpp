@@ -369,6 +369,41 @@ TEST_SUITE("ProjectTemplate")
 		CHECK_FALSE(std::filesystem::exists(gone.parent_path()));
 	};
 
+	TEST_CASE("a scripts project gets an editorconfig, and one of its own is kept")
+	{
+		const Folder project("loom template indent");
+		const std::filesystem::path scripts = project.path / "Game.vcxproj";
+		const std::filesystem::path config = project.path / ".editorconfig";
+
+		std::ofstream(scripts, std::ios::binary) << unprecompiled;
+
+		REQUIRE(Loom::ProjectTemplate::Indent(scripts.string()));
+
+		const std::string written = ReadBytes(config);
+
+		CHECK(Count(written, "root = true") == 1);
+		CHECK(Count(written, "indent_style = tab") == 1);
+		CHECK(Count(written, "cpp_new_line_before_open_brace_function = new_line") == 1);
+
+		const std::string own = "root = true\n";
+
+		std::ofstream(config, std::ios::binary) << own;
+
+		REQUIRE(Loom::ProjectTemplate::Indent(scripts.string()));
+
+		CHECK(ReadBytes(config) == own);
+	};
+
+	TEST_CASE("a scripts project that is not there gets no editorconfig")
+	{
+		const Folder project("loom template indent gone");
+		const std::filesystem::path gone = project.path / "Gone" / "Gone.vcxproj";
+
+		REQUIRE(Loom::ProjectTemplate::Indent(gone.string()));
+
+		CHECK_FALSE(std::filesystem::exists(gone.parent_path()));
+	};
+
 	TEST_CASE("a scripts project changed past recognising is not precompiled")
 	{
 		const Folder project("loom template precompile unknown");
@@ -393,6 +428,7 @@ TEST_SUITE("ProjectTemplate")
 		CHECK(ReadBytes(scripts).find("<ExceptionHandling>Async</ExceptionHandling>") != std::string::npos);
 		CHECK(std::filesystem::is_regular_file(project.root / "Scripts" / "GameScripts.sln"));
 		CHECK(std::filesystem::is_regular_file(project.root / "Scripts" / "SpinningTriangle.hpp"));
+		CHECK(std::filesystem::is_regular_file(project.root / "Scripts" / ".editorconfig"));
 
 		const std::string text = project.Text();
 

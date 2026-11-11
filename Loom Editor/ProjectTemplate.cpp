@@ -258,6 +258,39 @@ namespace {NAMESPACE}
 </Project>
 )props";
 
+		const char* const editor_config = R"(root = true
+
+[*.{hpp,h,cpp}]
+indent_style = tab
+indent_size = 4
+tab_width = 4
+cpp_indent_braces = false
+cpp_indent_multi_line_relative_to = innermost_parenthesis
+cpp_indent_within_parentheses = indent
+cpp_indent_preserve_within_parentheses = true
+cpp_indent_case_contents = true
+cpp_indent_case_labels = false
+cpp_indent_case_contents_when_block = false
+cpp_indent_lambda_braces_when_parameter = false
+cpp_indent_goto_labels = one_left
+cpp_indent_preprocessor = leftmost_column
+cpp_indent_access_specifiers = false
+cpp_indent_namespace_contents = true
+cpp_indent_preserve_comments = false
+cpp_new_line_before_open_brace_namespace = new_line
+cpp_new_line_before_open_brace_type = new_line
+cpp_new_line_before_open_brace_function = new_line
+cpp_new_line_before_open_brace_block = new_line
+cpp_new_line_before_open_brace_lambda = new_line
+cpp_new_line_scope_braces_on_separate_lines = true
+cpp_new_line_close_brace_same_line_empty_type = false
+cpp_new_line_close_brace_same_line_empty_function = false
+cpp_new_line_before_catch = true
+cpp_new_line_before_else = true
+cpp_new_line_before_while_in_do_while = true
+cpp_wrap_preserve_blocks = one_liners
+)";
+
 		const char* const solution = R"(
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
@@ -416,6 +449,7 @@ SpinningTriangle is there as a worked example.
 
 		constexpr std::string_view props_file = "Directory.Build.props";
 		constexpr std::string_view scripts_item = "<ClCompile Include=\"**\\*.hpp\">";
+		constexpr std::string_view editor_config_file = ".editorconfig";
 
 		bool WriteScripts(const std::filesystem::path& root, const std::string& name, std::string* error)
 		{
@@ -434,6 +468,7 @@ SpinningTriangle is there as a worked example.
 				Write(folder / (name + "Scripts.vcxproj"), fill(vcxproj), error) &&
 				Write(folder / (name + "Scripts.vcxproj.filters"), fill(filters), error) &&
 				ProjectTemplate::ReadOnly((folder / (name + "Scripts.vcxproj")).string(), error) &&
+				ProjectTemplate::Indent((folder / (name + "Scripts.vcxproj")).string(), error) &&
 				Write(folder / (name + "Scripts.sln"), fill(solution), error);
 		};
 
@@ -715,6 +750,18 @@ SpinningTriangle is there as a worked example.
 			return true;
 
 		return Write(props, read_only, error);
+	};
+
+	bool ProjectTemplate::Indent(const std::string& scripts, std::string* error)
+	{
+		const std::filesystem::path config = std::filesystem::path(scripts).parent_path() / editor_config_file;
+
+		std::error_code code;
+
+		if (std::filesystem::exists(config, code) || !std::filesystem::is_regular_file(scripts, code))
+			return true;
+
+		return Write(config, editor_config, error);
 	};
 
 	std::string ProjectTemplate::AddScripts(

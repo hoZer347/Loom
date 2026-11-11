@@ -75,6 +75,11 @@ namespace Loom
 		// a folder with one of its own, is left alone.
 		static bool ReadOnly(const std::string& scripts, std::string* error = nullptr);
 
+		// Gives a scripts project an .editorconfig that has Visual Studio
+		// indent with tabs and put braces on their own lines. A folder with
+		// one of its own, or no project, is left alone.
+		static bool Indent(const std::string& scripts, std::string* error = nullptr);
+
 		// EnsureScripts for the project in folder, writing it a .loomproject
 		// named after name first if it has none. Returns the .vcxproj, or an
 		// empty string with the reason in error.
