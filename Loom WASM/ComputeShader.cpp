@@ -1,5 +1,6 @@
 #include "ComputeShader.h"
 
+#include "BuiltInShaders.h"
 #include "Material.h"
 #include "Mesh.h"
 #include "PixelPass.h"
@@ -70,14 +71,15 @@ namespace Loom
 	void ComputeShader::ChangeShader(const std::string& path)
 	{
 		Release();
-		m_shader_path = path;
-		m_stem = std::filesystem::path(path).stem().string();
-		shader = path.empty() ? nullptr : Material::SharedShader(path);
+		m_shader_path = BuiltInShaders::Resolved(path);
+		m_stem = std::filesystem::path(GetShaderPath()).stem().string();
+		shader = m_shader_path->empty() ? nullptr : Material::SharedShader(m_shader_path);
 		m_frame = 0;
 	};
 
 	void ComputeShader::OnAttach()
 	{
+		m_shader_path = BuiltInShaders::Resolved(m_shader_path);
 		m_stem = std::filesystem::path(GetShaderPath()).stem().string();
 
 		if (shader == nullptr && !m_shader_path->empty())
