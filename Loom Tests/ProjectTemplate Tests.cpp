@@ -109,6 +109,19 @@ namespace
 		return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
 	};
 
+	size_t CountFiles(const std::filesystem::path& root, const std::string& extension)
+	{
+		size_t count = 0;
+
+		for (const auto& entry : std::filesystem::recursive_directory_iterator(root))
+		{
+			if (entry.is_regular_file() && entry.path().extension() == extension)
+				count++;
+		};
+
+		return count;
+	};
+
 	size_t Count(const std::string& text, const std::string& part)
 	{
 		size_t count = 0;
@@ -154,7 +167,8 @@ TEST_SUITE("ProjectTemplate")
 		CHECK(vcxproj.find("<ProjectConfiguration Include=\"Final|x64\">") != std::string::npos);
 		CHECK(vcxproj.find("<Import Project=\"" + Loom::ProjectTemplate::EngineRoot() + "\\Property Files\\Final.props\"") != std::string::npos);
 		CHECK(ReadAll(project.path / "Scripts" / "MyGameScripts.sln").find("Final|x64 = Final|x64") != std::string::npos);
-		CHECK(ReadAll(project.path / "Scripts" / "SpinningTriangle.hpp").find("#include \"Loom.h\"") != std::string::npos);
+		CHECK(CountFiles(project.path, ".hpp") == 0);
+		CHECK_FALSE(std::filesystem::exists(project.path / "Scripts" / "SpinningTriangle.hpp"));
 		CHECK(ReadAll(project.path / "Scripts" / "Directory.Build.props").find("<ReadOnlyProject>true</ReadOnlyProject>") != std::string::npos);
 
 		const std::string file = ReadAll(project.path / "MyGame.loomproject");
@@ -173,7 +187,6 @@ TEST_SUITE("ProjectTemplate")
 		REQUIRE_MESSAGE(!Loom::ProjectTemplate::Create(folder.path.string(), "Project-Name", &error).empty(), error);
 
 		const std::filesystem::path scripts = folder.path / "Project-Name" / "Scripts";
-		const std::string starter = ReadAll(scripts / "SpinningTriangle.hpp");
 
 		std::string vcxproj;
 
@@ -183,10 +196,31 @@ TEST_SUITE("ProjectTemplate")
 				vcxproj = ReadAll(entry.path());
 		};
 
-		CHECK(starter.find("namespace Project_NameScripts") != std::string::npos);
-		CHECK(starter.find("namespace Project-Name") == std::string::npos);
 		CHECK(vcxproj.find("<RootNamespace>Project_NameScripts</RootNamespace>") != std::string::npos);
 		CHECK(vcxproj.find("<RootNamespace>Project-Name") == std::string::npos);
+	};
+
+	TEST_CASE("a new project has no starter script or shader of its own and its scene uses the built-in Lit")
+	{
+		const Folder folder("loom template no starter");
+
+		std::string error;
+
+		REQUIRE_MESSAGE(!Loom::ProjectTemplate::Create(folder.path.string(), "Starter", &error).empty(), error);
+
+		const std::filesystem::path project = folder.path / "Starter";
+		const std::string readme = ReadAll(project / "README.txt");
+		const std::string scene = ReadAll(project / "Scenes" / "Main.loomscene");
+
+		CHECK(CountFiles(project, ".hpp") == 0);
+		CHECK(CountFiles(project, ".shader") == 0);
+		CHECK_FALSE(std::filesystem::exists(project / "Scripts" / "SpinningTriangle.hpp"));
+		CHECK_FALSE(std::filesystem::exists(project / "Assets" / "Lit.shader"));
+		CHECK_FALSE(readme.empty());
+		CHECK(readme.find("SpinningTriangle") == std::string::npos);
+		CHECK(readme.find("Lit.shader") == std::string::npos);
+		CHECK(scene.find("Loom/Lit.shader") != std::string::npos);
+		CHECK(scene.find("Assets/Lit.shader") == std::string::npos);
 	};
 
 	TEST_CASE("an existing project file keeps what it had and is pointed at the scripts once")
@@ -427,8 +461,8 @@ TEST_SUITE("ProjectTemplate")
 		CHECK(std::filesystem::is_regular_file(scripts));
 		CHECK(ReadBytes(scripts).find("<ExceptionHandling>Async</ExceptionHandling>") != std::string::npos);
 		CHECK(std::filesystem::is_regular_file(project.root / "Scripts" / "GameScripts.sln"));
-		CHECK(std::filesystem::is_regular_file(project.root / "Scripts" / "SpinningTriangle.hpp"));
 		CHECK(std::filesystem::is_regular_file(project.root / "Scripts" / ".editorconfig"));
+		CHECK(CountFiles(project.root, ".hpp") == 0);
 
 		const std::string text = project.Text();
 

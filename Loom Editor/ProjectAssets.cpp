@@ -5,7 +5,6 @@
 #include "BuiltInShaders.h"
 #include "ComponentRegistry.h"
 #include "Prefab.h"
-#include "ProjectTemplate.h"
 #include "SceneSerializer.h"
 #include "SpriteAsset.h"
 #include "Textures.h"
@@ -1168,11 +1167,6 @@ vec3 PreVertex(vec3 world)
 
 	std::string ProjectAssets::ProjectShader(const std::string& folder)
 	{
-		std::error_code code;
-
-		if (!folder.empty() && std::filesystem::exists(std::filesystem::path(folder) / ProjectTemplate::shader_path, code))
-			return ProjectTemplate::shader_path;
-
 		const std::vector<std::string> shaders = ShadersIn(folder);
 
 		return shaders.empty() ? BuiltInShaders::Lit : shaders.front();

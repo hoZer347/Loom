@@ -194,8 +194,7 @@ namespace Loom
 		// folders, in order.
 		static std::vector<std::string> ShadersIn(const std::string& folder);
 
-		// The shader a new project draws with, or else the first the project
-		// folder has, or else the built-in Lit.
+		// The first shader the project folder has, or else the built-in Lit.
 		static std::string ProjectShader(const std::string& folder);
 
 		#pragma endregion

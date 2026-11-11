@@ -41,85 +41,6 @@ library=Build/{NAME}Scripts.dll
 		// Every scripts project the template writes defines this.
 		constexpr const char* script_module_define = "LOOM_SCRIPT_MODULE";
 
-		const char* const script = R"(#pragma once
-
-#include "Loom.h"
-
-#include <cmath>
-#include <numbers>
-#include <string>
-
-
-namespace {NAMESPACE}
-{
-	// A script is an ordinary Loom component, written whole in one header.
-	// Deriving from Loom::Component is all it takes to appear under Add
-	// Component. Serial members show up in the inspector and are written to the
-	// scene file, with no editor code to write for them.
-	struct SpinningTriangle : Loom::Component<SpinningTriangle>
-	{
-		void OnAttach() override
-		{
-			Loom::Material* material = m_gameObject->GetComponent<Loom::Material>();
-
-			if (material == nullptr)
-				material = m_gameObject->Attach<Loom::Material>();
-
-			// Named, not built here: the engine compiles one shader per path and
-			// shares it, so a script hands over the name and lets it do that.
-			material->SetShaderPath(m_shader);
-
-			m_mesh = m_gameObject->GetComponent<Loom::Mesh>();
-
-			if (m_mesh == nullptr)
-				m_mesh = m_gameObject->Attach<Loom::Mesh>();
-
-			m_mesh->material = material;
-
-			Rebuild();
-		};
-
-		void OnUpdate() override
-		{
-			if (!m_spinning)
-				return;
-
-			m_angle += m_speed;
-
-			Rebuild();
-		};
-
-	private:
-		static constexpr int corners = 3;
-
-		void Rebuild()
-		{
-			if (m_mesh == nullptr)
-				return;
-
-			m_mesh->m_vertices->clear();
-
-			for (int corner = 0; corner < corners; corner++)
-			{
-				const float turn = m_angle + (float)corner * 2.0f * std::numbers::pi_v<float> / corners;
-
-				m_mesh->m_vertices->push_back(std::cos(turn) * m_radius);
-				m_mesh->m_vertices->push_back(std::sin(turn) * m_radius);
-				m_mesh->m_vertices->push_back(0.0f);
-			};
-		};
-
-		Loom::Serial<float> m_speed = 0.02f;
-		Loom::Serial<float> m_radius = 0.6f;
-		Loom::Serial<float> m_angle;
-		Loom::Serial<bool> m_spinning = true;
-		Loom::Serial<Loom::Asset<".shader">> m_shader = "Assets/Lit.shader";
-
-		Loom::Mesh* m_mesh = nullptr;
-	};
-};
-)";
-
 		// For the template and for scripts projects from before it precompiled.
 		const char* const pch_settings = R"(      <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>Loom.h</PrecompiledHeaderFile>
@@ -324,7 +245,6 @@ scripts are an ordinary C++ project in Scripts/.
 
     Scenes/Main{SCENE_EXTENSION}     opened when the project loads
     Scripts/{NAME}Scripts.sln    open this in Visual Studio to write scripts
-    Assets/Lit.shader            what the starter scene draws with
     Build/                       where the compiled script library lands
 
 Scripts are Loom components written in headers: add a .hpp to Scripts/ with
@@ -366,7 +286,6 @@ or button declared before it. The name is not written to the scene, so naming a 
 leaves the values already saved where they were. A Loom::Button<"Name"> m_name{
 [this] { ... } }; member, named the same way, is a button among them that runs
 its function when pressed.
-SpinningTriangle is there as a worked example.
 )";
 
 		std::string Fill(
@@ -388,17 +307,13 @@ SpinningTriangle is there as a worked example.
 			return filled;
 		};
 
-		// A new project's Main scene, built from inside the project so its shader is found.
-		std::string StarterScene(const std::filesystem::path& root)
+		// A new project's Main scene, drawn with the built-in Lit.
+		std::string StarterScene()
 		{
-			std::error_code code;
-			const std::filesystem::path launched = std::filesystem::current_path(code);
-			std::filesystem::current_path(root, code);
-
 			Scene* scene = new Scene("Main");
 			Scene::Unlist(scene);
 
-			RenderingObjects::AddStarter(scene->GetRoot(), ProjectTemplate::shader_path);
+			RenderingObjects::AddStarter(scene->GetRoot(), BuiltInShaders::Lit);
 
 			// Children join their parents through the queue.
 			Engine::DoTasks();
@@ -406,8 +321,6 @@ SpinningTriangle is there as a worked example.
 			const std::string text = SceneSerializer::Serialize(*scene);
 
 			Engine::QueueTask([scene]() { delete scene; });
-
-			std::filesystem::current_path(launched, code);
 
 			return text;
 		};
@@ -464,7 +377,6 @@ SpinningTriangle is there as a worked example.
 				};
 
 			return
-				Write(folder / "SpinningTriangle.hpp", fill(script), error) &&
 				Write(folder / (name + "Scripts.vcxproj"), fill(vcxproj), error) &&
 				Write(folder / (name + "Scripts.vcxproj.filters"), fill(filters), error) &&
 				ProjectTemplate::ReadOnly((folder / (name + "Scripts.vcxproj")).string(), error) &&
@@ -581,8 +493,7 @@ SpinningTriangle is there as a worked example.
 
 		const bool written =
 			Write(root / (name + extension), fill(loomproject) + fill(scripts_entries), error) &&
-			Write(root / shader_path, BuiltInShaders::SourceOf(BuiltInShaders::Lit), error) &&
-			Write(root / scenes_folder / (std::string("Main") + SceneSerializer::extension), StarterScene(root), error) &&
+			Write(root / scenes_folder / (std::string("Main") + SceneSerializer::extension), StarterScene(), error) &&
 			Write(root / "README.txt", fill(readme), error) &&
 			WriteScripts(root, name, error);
 

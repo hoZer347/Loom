@@ -4,6 +4,7 @@
 
 #include "RenderingObjects.h"
 
+#include "BuiltInShaders.h"
 #include "Camera.h"
 #include "GameObject.h"
 #include "Light.h"
@@ -149,7 +150,8 @@ TEST_SUITE("RenderingObjects")
 		CHECK(text.find("GameObject Camera(") != std::string::npos);
 		CHECK(text.find("Component Camera(") != std::string::npos);
 		CHECK(text.find("GameObject Plane(") != std::string::npos);
-		CHECK(text.find(Loom::ProjectTemplate::shader_path) != std::string::npos);
+		CHECK(text.find(Loom::BuiltInShaders::Lit) != std::string::npos);
+		CHECK(text.find("Assets/Lit.shader") == std::string::npos);
 
 		std::filesystem::remove_all(folder);
 	};

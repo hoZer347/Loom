@@ -3,7 +3,6 @@
 #include "AssetKind.h"
 #include "BuiltInShaders.h"
 #include "ProjectAssets.h"
-#include "ProjectTemplate.h"
 #include "Shaders.h"
 
 #include "Utilities/StateReference.h"
@@ -766,9 +765,21 @@ TEST_SUITE("ProjectAssets")
 		CHECK(Loom::ProjectAssets::ShadersIn(root.string()) == std::vector<std::string>{ "Assets/Terrain.shader", "Assets/Units/Tank.shader" });
 		CHECK(Loom::ProjectAssets::ProjectShader(root.string()) == "Assets/Terrain.shader");
 
-		std::ofstream(root / Loom::ProjectTemplate::shader_path) << "template";
+		std::filesystem::remove_all(root);
+	};
 
-		CHECK(Loom::ProjectAssets::ProjectShader(root.string()) == Loom::ProjectTemplate::shader_path);
+	TEST_CASE("a project's first shader in order is drawn with, not one called Lit")
+	{
+		const std::filesystem::path root = std::filesystem::temp_directory_path() / "loom project assets shader order";
+		std::filesystem::remove_all(root);
+		std::filesystem::create_directories(root / "Assets");
+
+		CHECK(Loom::ProjectAssets::ProjectShader(root.string()) == Loom::BuiltInShaders::Lit);
+
+		std::ofstream(root / "Assets" / "Lit.shader") << "lit";
+		std::ofstream(root / "Assets" / "Aaa.shader") << "aaa";
+
+		CHECK(Loom::ProjectAssets::ProjectShader(root.string()) == "Assets/Aaa.shader");
 
 		std::filesystem::remove_all(root);
 	};
