@@ -1491,7 +1491,7 @@ namespace Loom
 			? std::filesystem::path(m_scripts.GetProject()).replace_extension(".sln").string()
 			: "";
 
-		if (std::thread opening = VisualStudio::Open(solution, path, line, column); opening.joinable())
+		if (std::thread opening = VisualStudio::Open(solution, VisualStudio::Reroot(path, m_projectPath).string(), line, column); opening.joinable())
 			opening.detach();
 	};
 

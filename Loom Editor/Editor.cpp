@@ -1119,6 +1119,8 @@ namespace Loom
 		m_opening.reset();
 		m_openingPath.clear();
 		m_projectLoad.reset();
+		m_assetToOpen.clear();
+		m_componentSource = { };
 
 		// Ahead of the scenes, whose closing deletes it while its scripts are still loaded.
 		ClosePrefab();
