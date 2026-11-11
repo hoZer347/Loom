@@ -50,7 +50,7 @@ library=Build/{NAME}Scripts.dll
 #include <string>
 
 
-namespace {NAME}Scripts
+namespace {NAMESPACE}
 {
 	// A script is an ordinary Loom component, written whole in one header.
 	// Deriving from Loom::Component is all it takes to appear under Add
@@ -154,7 +154,7 @@ namespace {NAME}Scripts
     <VCProjectVersion>18.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{PROJECT_GUID}</ProjectGuid>
-    <RootNamespace>{NAME}Scripts</RootNamespace>
+    <RootNamespace>{NAMESPACE}</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
     <ProjectName>{NAME}Scripts</ProjectName>
   </PropertyGroup>
@@ -344,6 +344,7 @@ SpinningTriangle is there as a worked example.
 		{
 			std::string filled = ProjectAssets::Replace(text, "{PCH_SETTINGS}", pch_settings);
 			filled = ProjectAssets::Replace(filled, "{PCH_ITEM}", ProjectAssets::Replace(pch_item, "{HEADERS}", "{ENGINE}\\Loom WASM"));
+			filled = ProjectAssets::Replace(filled, "{NAMESPACE}", ProjectAssets::Identifier(name + "Scripts"));
 			filled = ProjectAssets::Replace(filled, "{NAME}", name);
 			filled = ProjectAssets::Replace(filled, "{ENGINE}", ProjectTemplate::EngineRoot());
 			filled = ProjectAssets::Replace(filled, "{PROJECT}", project);

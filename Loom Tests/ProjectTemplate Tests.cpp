@@ -164,6 +164,31 @@ TEST_SUITE("ProjectTemplate")
 		CHECK(file.find("library=Build/MyGameScripts.dll\n") != std::string::npos);
 	};
 
+	TEST_CASE("a project named with a hyphen declares its scripts in a namespace that is an identifier")
+	{
+		const Folder folder("loom template hyphen");
+
+		std::string error;
+
+		REQUIRE_MESSAGE(!Loom::ProjectTemplate::Create(folder.path.string(), "Project-Name", &error).empty(), error);
+
+		const std::filesystem::path scripts = folder.path / "Project-Name" / "Scripts";
+		const std::string starter = ReadAll(scripts / "SpinningTriangle.hpp");
+
+		std::string vcxproj;
+
+		for (const auto& entry : std::filesystem::directory_iterator(scripts))
+		{
+			if (entry.path().extension() == ".vcxproj")
+				vcxproj = ReadAll(entry.path());
+		};
+
+		CHECK(starter.find("namespace Project_NameScripts") != std::string::npos);
+		CHECK(starter.find("namespace Project-Name") == std::string::npos);
+		CHECK(vcxproj.find("<RootNamespace>Project_NameScripts</RootNamespace>") != std::string::npos);
+		CHECK(vcxproj.find("<RootNamespace>Project-Name") == std::string::npos);
+	};
+
 	TEST_CASE("an existing project file keeps what it had and is pointed at the scripts once")
 	{
 		const Folder project("loom template existing");
