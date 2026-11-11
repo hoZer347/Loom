@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <string>
 #include <typeinfo>
+#include <unordered_set>
 
 
 namespace Loom
@@ -58,6 +59,8 @@ namespace Loom
 
 	std::vector<GameObject*> MultiEdit::Tops(const std::vector<GameObject*>& objects)
 	{
+		const std::unordered_set<const GameObject*> among(objects.begin(), objects.end());
+
 		std::vector<GameObject*> tops{ };
 
 		for (GameObject* object : objects)
@@ -65,7 +68,7 @@ namespace Loom
 			bool under = false;
 
 			for (const GameObject* above = object->GetParent(); above && !under; above = above->GetParent())
-				under = std::find(objects.begin(), objects.end(), above) != objects.end();
+				under = among.contains(above);
 
 			if (!under)
 				tops.push_back(object);

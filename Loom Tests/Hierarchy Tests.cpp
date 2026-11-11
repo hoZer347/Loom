@@ -6,6 +6,7 @@
 #include "Hierarchy.h"
 #include "Scene.h"
 
+#include <chrono>
 #include <utility>
 #include <vector>
 
@@ -280,26 +281,26 @@ TEST_SUITE("Hierarchy")
 	{
 		Loom::Scene scene("Moving");
 		const std::vector<Loom::GameObject*> children = Children(scene.GetRoot(), 4);
-		const std::vector<Loom::GameObject*> inFirst = Children(*children[0], 3);
-		const std::vector<Loom::GameObject*> inSecond = Children(*children[1], 2);
-		const std::vector<Loom::GameObject*> deep = Children(*inSecond[0], 2);
+		const std::vector<Loom::GameObject*> in_first = Children(*children[0], 3);
+		const std::vector<Loom::GameObject*> in_second = Children(*children[1], 2);
+		const std::vector<Loom::GameObject*> deep = Children(*in_second[0], 2);
 
 		const std::vector<Loom::GameObject*> selection
 		{
 			children[3],
 			deep[1],
-			inFirst[2],
+			in_first[2],
 			children[1],
-			inFirst[0],
+			in_first[0],
 			deep[0],
 		};
 
 		// children[1] holds deep ones, so they go with it.
-		CHECK(Loom::Hierarchy::Moving(selection, *children[3]) == std::vector<Loom::GameObject*>{ inFirst[0], inFirst[2], children[1], children[3] });
+		CHECK(Loom::Hierarchy::Moving(selection, *children[3]) == std::vector<Loom::GameObject*>{ in_first[0], in_first[2], children[1], children[3] });
 
-		const std::vector<Loom::GameObject*> split{ children[3], deep[1], inFirst[2], inSecond[1], inFirst[0], deep[0] };
+		const std::vector<Loom::GameObject*> split{ children[3], deep[1], in_first[2], in_second[1], in_first[0], deep[0] };
 
-		CHECK(Loom::Hierarchy::Moving(split, *deep[0]) == std::vector<Loom::GameObject*>{ inFirst[0], inFirst[2], deep[0], deep[1], inSecond[1], children[3] });
+		CHECK(Loom::Hierarchy::Moving(split, *deep[0]) == std::vector<Loom::GameObject*>{ in_first[0], in_first[2], deep[0], deep[1], in_second[1], children[3] });
 	};
 
 	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Dropping what Moving returns keeps its relative order, reordering up and down and reparenting")
@@ -323,6 +324,23 @@ TEST_SUITE("Hierarchy")
 		const std::vector<Loom::GameObject*> into = Loom::Hierarchy::Moving({ children[3], children[4] }, *children[3]);
 		Drop(into, Loom::Hierarchy::Place(*children[6], false, Zone::Into, into));
 		CHECK(children[6]->GetChildren() == std::vector<Loom::GameObject*>{ target[0], target[1], children[4], children[3] });
+	};
+
+	TEST_CASE_FIXTURE(LoomTests::EngineFixture, "Moving a large deep selection takes a fraction of a frame's worth of time")
+	{
+		constexpr size_t sibling_count = 2000;
+		constexpr double budget_milliseconds = 250.0;
+
+		Loom::Scene scene("Large");
+		Loom::GameObject* deepest = Children(*Children(*Children(scene.GetRoot(), 1)[0], 1)[0], 1)[0];
+		const std::vector<Loom::GameObject*> selection = Children(*deepest, sibling_count);
+
+		const auto start = std::chrono::steady_clock::now();
+		const std::vector<Loom::GameObject*> moving = Loom::Hierarchy::Moving(selection, *selection.back());
+		const double taken = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+
+		CHECK(moving == selection);
+		CHECK(taken < budget_milliseconds);
 	};
 
 	#pragma endregion

@@ -1,9 +1,11 @@
 #include "Hierarchy.h"
 
 #include "GameObject.h"
+#include "MultiEdit.h"
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 
 
 namespace Loom::Hierarchy
@@ -209,16 +211,6 @@ namespace Loom::Hierarchy
 		if (std::find(selection.begin(), selection.end(), &dragged) == selection.end())
 			return { &dragged };
 
-		const auto under_another =
-			[&selection](const GameObject& gameObject)
-			{
-				for (const GameObject* above = gameObject.GetParent(); above && above->GetParent(); above = above->GetParent())
-					if (std::find(selection.begin(), selection.end(), above) != selection.end())
-						return true;
-
-				return false;
-			};
-
 		// Sibling indices from the root down, which sort as the rows are drawn.
 		const auto path =
 			[](const GameObject& gameObject)
@@ -242,14 +234,19 @@ namespace Loom::Hierarchy
 				return at;
 			};
 
+		std::vector<GameObject*> movable{ };
+
+		std::copy_if(
+			selection.begin(),
+			selection.end(),
+			std::back_inserter(movable),
+			[](const GameObject* gameObject) { return gameObject->GetParent() != nullptr; });
+
 		std::vector<const GameObject*> roots{ };
 		std::vector<std::pair<std::pair<size_t, std::vector<size_t>>, GameObject*>> keyed{ };
 
-		for (GameObject* gameObject : selection)
+		for (GameObject* gameObject : MultiEdit::Tops(movable))
 		{
-			if (gameObject->GetParent() == nullptr || under_another(*gameObject))
-				continue;
-
 			const GameObject* top = root(*gameObject);
 			auto rank = std::find(roots.begin(), roots.end(), top);
 

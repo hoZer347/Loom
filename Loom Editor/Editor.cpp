@@ -65,6 +65,7 @@
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
+#include <functional>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -647,19 +648,19 @@ namespace Loom
 			return object.NameAndID();
 		};
 
-		// Carrying shows how many go with object when there are others.
+		// Carrying counts what goes with object, asked only once a drag starts.
 		void DragSource(
 			const LoomObject& object,
 			ImGuiDragDropFlags flags = 0,
-			size_t carrying = 1)
+			const std::function<size_t()>& carrying = { })
 		{
 			if (!ImGui::BeginDragDropSource(flags))
 				return;
 
 			ImGui::SetDragDropPayload(Editor::object_payload, &object.GetGuid(), sizeof(Guid));
 
-			if (carrying > 1)
-				ImGui::Text("%zu objects", carrying);
+			if (const size_t count = carrying ? carrying() : 1; count > 1)
+				ImGui::Text("%zu objects", count);
 			else
 				ImGui::TextUnformatted(Describe(object).c_str());
 
@@ -3634,7 +3635,7 @@ namespace Loom
 		DragSource(
 			*gameObject,
 			0,
-			IsSelected(*gameObject) ? Hierarchy::Moving(GetSelection(), *gameObject).size() : 1);
+			[this, gameObject]() { return Hierarchy::Moving(GetSelection(), *gameObject).size(); });
 
 		if (ImGui::IsItemHovered() &&
 			ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
