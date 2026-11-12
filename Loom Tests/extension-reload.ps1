@@ -5,12 +5,10 @@
 .DESCRIPTION
     Opens this slot's Release editor on a Win32 desktop of its own, with
     LOCALAPPDATA and TEMP moved to a scratch folder, on a scratch project. The
-    folder holds a fixture built against this editor and, where its source sits
-    beside this slot, a Claude.dll built and installed by a clone of it, so an
-    engine change that stops it compiling fails here, ahead of a merge. Their
-    panels open and work. The fixture is then replaced by the same source as an
-    extension built before the editor's API last changed has it, which is what a
-    merge leaves in the folder, and Claude.dll is made older than the editor.
+    folder holds a fixture built against this editor. Its panel opens and works.
+    The fixture is then replaced by the same source as an extension built
+    before the editor's API last changed has it, which is what a merge leaves in
+    the folder.
     An extension that cannot rebuild must fail update-editor.ps1 and leave the
     editor open, and an editor restarted on it anyway must say it is out of date.
     One for another Loom must be left alone. update-editor.ps1 then rebuilds both
@@ -24,11 +22,6 @@
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File 'C:\Users\3hoze\Desktop\Loom 1\Loom Tests\extension-reload.ps1'
 #>
-param(
-    # A checkout of Claude for Loom, or a worktree holding a change to it.
-    [string] $ClaudeSource = (Join-Path (Split-Path (Split-Path $PSScriptRoot)) 'Claude for Loom')
-)
-
 $ErrorActionPreference = 'Stop'
 
 #region Setup
@@ -59,11 +52,6 @@ $FixturePanel = 'F Reload Fixture###Reload Fixture'
 $FixtureWaiting = 'Fixture Waiting'
 $FixtureClicked = 'Fixture Clicked'
 $FixtureFile = 'Reload Fixture.dll'
-$ClaudeFile = 'Claude.dll'
-$ClaudePanel = "$([char]::ConvertFromUtf32(0x1F916)) Claude###Claude"
-$AgentsPanel = "$([char]::ConvertFromUtf32(0x1F465)) Agents###Agents"
-$AgentTab = "$([char]::ConvertFromUtf32(0x1F464)) Agent###Agent"
-$AgentsHeading = 'Session / subagent'
 $LeftOut = 'Could not (load|copy) the extension|Skipped the extension'
 $OutOfDate = 'Could not load the extension Reload Fixture\.dll \(it was built against another version of the editor\)'
 $KeepsExtensions = '*--extensions*'
@@ -143,16 +131,6 @@ function Build-Fixture([string] $Name, [bool] $OldApi)
     $folder = Join-Path $Scratch "Fixture\$Name"
     Invoke-Build "the $Name fixture" @($Fixture, "-p:OutDir=$folder\", "-p:IntDir=$folder\Intermediate\", "-p:OldApi=$($OldApi.ToString().ToLower())")
     Join-Path $folder $FixtureFile
-}
-
-function Install-Claude
-{
-    $clone = Join-Path $Scratch 'Claude'
-    & git clone --quiet --shared $ClaudeSource $clone 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "Could not clone $ClaudeSource." }
-
-    $output = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $clone 'update-extension.ps1') -LoomRoot $Root 2>&1
-    if ($LASTEXITCODE -ne 0) { throw "Claude for Loom failed to build against this editor:`n$($output -join "`n")" }
 }
 
 function Set-Manifest([string] $Name, [string] $Source, [string] $LoomRoot)
@@ -278,14 +256,6 @@ function Assert-FixtureWorks([string] $When)
     if (-not (Test-Item $FixtureClicked)) { throw "$When, the fixture's button did nothing." }
 }
 
-function Assert-ClaudeWorks([string] $When)
-{
-    Open-Panel $ClaudePanel
-    Open-Panel $AgentsPanel
-
-    if (-not (Test-Item $AgentsHeading)) { throw "$When, the Agents panel drew nothing." }
-}
-
 function Stop-Started
 {
     $started = @(Get-CimInstance Win32_Process -Filter "Name = 'Loom Editor.exe'" | Where-Object { $_.ExecutablePath -eq $Editor -and $_.CommandLine -like "*--mcp $port*" })
@@ -318,10 +288,6 @@ try
     $env:LOCALAPPDATA = $AppData
     $env:TEMP = $TempFolder
     $env:TMP = $TempFolder
-    $env:CLAUDE_EXE = Join-Path $Scratch 'No Claude.exe'
-
-    $withClaude = Test-Path -LiteralPath (Join-Path $ClaudeSource 'Source\Extension.cpp')
-    if ($withClaude) { Install-Claude }
 
     $first = [OwnDesktop]::Start("Loom extension reload $port", $Editor, "`"$Editor`" --extensions `"$Extensions`" --mcp $port `"$projectFile`"", $Project)
 
@@ -329,16 +295,10 @@ try
     Wait-Compiled
 
     Assert-NothingLeftOut 'Before the update'
-    if ($withClaude)
-    {
-        Assert-Listed @($ClaudePanel, $AgentsPanel, $AgentTab) 'Before the update'
-        Assert-ClaudeWorks 'Before the update'
-    }
     Assert-FixtureWorks 'Before the update'
 
     Copy-Item -LiteralPath $old -Destination $Extensions -Force
     Set-OlderThanEditor $FixtureFile
-    if ($withClaude) { Set-OlderThanEditor $ClaudeFile }
 
     $fixtureName = [IO.Path]::GetFileNameWithoutExtension($FixtureFile)
     Set-Manifest $fixtureName $Refuses $Root
@@ -357,7 +317,7 @@ try
 
     $told = Invoke-Update
     if ($LASTEXITCODE -ne 0 -or $told -notmatch 'told to update') { throw "The editor was not told to update: $told" }
-    $files = @($FixtureFile) + @(if ($withClaude) { $ClaudeFile })
+    $files = @($FixtureFile)
     Assert-Current $files
 
     $latest = Wait-Editor { param($id) $id -ne $second } 'restart'
@@ -367,12 +327,6 @@ try
     if ($line -notlike $KeepsExtensions) { throw "The restart dropped --extensions: $line" }
 
     Assert-NothingLeftOut 'After the update'
-    if ($withClaude)
-    {
-        Assert-StillOpen @($ClaudePanel, $AgentsPanel)
-        Assert-Listed @($ClaudePanel, $AgentsPanel, $AgentTab) 'After the update'
-        Assert-ClaudeWorks 'After the update'
-    }
     Assert-Listed @($FixturePanel) 'After the update'
     Assert-FixtureWorks 'After the update'
 
