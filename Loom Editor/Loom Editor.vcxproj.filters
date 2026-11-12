@@ -41,9 +41,6 @@
     <ClCompile Include="ExtensionLibrary.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
-    <ClCompile Include="ExtensionRegistry.cpp">
-      <Filter>Scripts</Filter>
-    </ClCompile>
     <ClCompile Include="VisualStudio.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
@@ -161,9 +158,6 @@
     <ClCompile Include="EditorSettingsWindow.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
-    <ClCompile Include="EditorTheme.cpp">
-      <Filter>Editor</Filter>
-    </ClCompile>
     <ClCompile Include="EditorIcons.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
@@ -186,9 +180,6 @@
       <Filter>Editor</Filter>
     </ClCompile>
     <ClCompile Include="LoadProgress.cpp">
-      <Filter>Editor</Filter>
-    </ClCompile>
-    <ClCompile Include="WindowFrame.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
     <ClCompile Include="TornWindows.cpp">
@@ -232,7 +223,7 @@
     <ClInclude Include="ExtensionLibrary.h">
       <Filter>Scripts</Filter>
     </ClInclude>
-    <ClInclude Include="ExtensionRegistry.h">
+    <ClInclude Include="..\Loom UI\ExtensionRegistry.h">
       <Filter>Scripts</Filter>
     </ClInclude>
     <ClInclude Include="FileTab.h">
@@ -376,7 +367,7 @@
     <ClInclude Include="EditorUpdate.h">
       <Filter>Editor</Filter>
     </ClInclude>
-    <ClInclude Include="EditorTheme.h">
+    <ClInclude Include="..\Loom UI\EditorTheme.h">
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="EditorIcons.h">
@@ -403,7 +394,7 @@
     <ClInclude Include="LoadProgress.h">
       <Filter>Editor</Filter>
     </ClInclude>
-    <ClInclude Include="WindowFrame.h">
+    <ClInclude Include="..\Loom UI\WindowFrame.h">
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="TornWindows.h">

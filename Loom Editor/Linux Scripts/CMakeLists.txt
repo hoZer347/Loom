@@ -32,6 +32,8 @@ add_library(Scripts SHARED ${SOURCES})
 target_include_directories(Scripts PRIVATE
 	"${LOOM_ROOT}/Loom WASM"
 	"${LOOM_ROOT}/Loom ImGui"
+	"${LOOM_ROOT}/Loom UI"
+	"${LOOM_ROOT}/Loom UI/ImGui"
 	"${LIBS}/glm"
 	"${LIBS}/glew/include"
 	"${LIBS}/glfw/include"

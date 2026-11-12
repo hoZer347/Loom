@@ -120,15 +120,17 @@ if (-not $NoBuild)
     # and there is no equivalent prebuilt artefact for wasm. The GLFW and
     # OpenGL3 backends come along because the engine's OpenGL renderer calls into them.
     $imgui = Join-Path $root 'Loom ImGui'
+    $ui = Join-Path $root 'Loom UI'
+    $uiImgui = Join-Path $ui 'ImGui'
     $sources += @(
-        (Join-Path $imgui 'imgui.cpp')
-        (Join-Path $imgui 'imgui_draw.cpp')
-        (Join-Path $imgui 'imgui_tables.cpp')
-        (Join-Path $imgui 'imgui_widgets.cpp')
-        (Join-Path $imgui 'imgui_impl_glfw.cpp')
-        (Join-Path $imgui 'imgui_impl_opengl3.cpp')
-        (Join-Path $imgui 'ImGuiItemHooks.cpp')
-        (Join-Path $imgui 'ImGuiAutoscroll.cpp')
+        (Join-Path $uiImgui 'imgui.cpp')
+        (Join-Path $uiImgui 'imgui_draw.cpp')
+        (Join-Path $uiImgui 'imgui_tables.cpp')
+        (Join-Path $uiImgui 'imgui_widgets.cpp')
+        (Join-Path $uiImgui 'imgui_impl_glfw.cpp')
+        (Join-Path $uiImgui 'imgui_impl_opengl3.cpp')
+        (Join-Path $uiImgui 'ImGuiItemHooks.cpp')
+        (Join-Path $uiImgui 'ImGuiAutoscroll.cpp')
     )
 
     $includes = @(
@@ -141,6 +143,8 @@ if (-not $NoBuild)
         (Join-Path $root 'External Libraries\json\single_include')
         (Join-Path $root 'External Libraries\miniaudio')
         $imgui
+        $ui
+        $uiImgui
     ) | ForEach-Object { "-I$_" }
 
     $optimisation = if ($Configuration -eq 'Release') { '-O2' } else { '-O0' }

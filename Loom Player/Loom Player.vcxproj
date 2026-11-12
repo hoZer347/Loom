@@ -117,6 +117,10 @@
   <!-- What the game is built from is the engine itself, not a copy for each
        game, so none of the Game properties is handed on to it. -->
   <ItemGroup>
+    <ProjectReference Include="..\Loom UI\Loom UI.vcxproj">
+      <Project>{0E341C2D-C77D-4C31-9E39-EFCF58B583CD}</Project>
+      <GlobalPropertiesToRemove>GameScripts;GameBuild;GameName</GlobalPropertiesToRemove>
+    </ProjectReference>
     <ProjectReference Include="..\Loom ImGui\Loom ImGui.vcxproj">
       <Project>{d58e30f6-a1a0-4a69-a043-d8d4cd47e0b8}</Project>
       <GlobalPropertiesToRemove>GameScripts;GameBuild;GameName</GlobalPropertiesToRemove>

@@ -35,18 +35,18 @@ find_package(X11 REQUIRED)
 set(LIBS "${CMAKE_SOURCE_DIR}/External Libraries")
 
 add_library(LoomImGui STATIC
-	"Loom ImGui/imgui.cpp"
-	"Loom ImGui/imgui_demo.cpp"
-	"Loom ImGui/imgui_draw.cpp"
-	"Loom ImGui/imgui_impl_glfw.cpp"
-	"Loom ImGui/imgui_impl_opengl3.cpp"
+	"Loom UI/ImGui/imgui.cpp"
+	"Loom UI/ImGui/imgui_demo.cpp"
+	"Loom UI/ImGui/imgui_draw.cpp"
+	"Loom UI/ImGui/imgui_impl_glfw.cpp"
+	"Loom UI/ImGui/imgui_impl_opengl3.cpp"
 	"Loom ImGui/imgui_impl_vulkan.cpp"
-	"Loom ImGui/imgui_tables.cpp"
-	"Loom ImGui/imgui_widgets.cpp"
+	"Loom UI/ImGui/imgui_tables.cpp"
+	"Loom UI/ImGui/imgui_widgets.cpp"
 	"Loom ImGui/TextEditor.cpp"
-	"Loom ImGui/ImGuiAutoscroll.cpp"
-	"Loom ImGui/ImGuiItemHooks.cpp")
-target_include_directories(LoomImGui PUBLIC "Loom ImGui" "${LIBS}/glm")
+	"Loom UI/ImGui/ImGuiAutoscroll.cpp"
+	"Loom UI/ImGui/ImGuiItemHooks.cpp")
+target_include_directories(LoomImGui PUBLIC "Loom ImGui" "Loom UI" "Loom UI/ImGui" "${LIBS}/glm")
 target_link_libraries(LoomImGui PUBLIC glfw GLEW::GLEW OpenGL::GL Vulkan::Vulkan)
 
 file(GLOB ENGINE_SOURCES CONFIGURE_DEPENDS "Loom WASM/*.cpp" "Loom WASM/Utilities/*.cpp")

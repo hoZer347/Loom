@@ -312,6 +312,9 @@
     <None Include="Utilities\Flipbook.shader" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Loom UI\Loom UI.vcxproj">
+      <Project>{0E341C2D-C77D-4C31-9E39-EFCF58B583CD}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\Loom ImGui\Loom ImGui.vcxproj">
       <Project>{d58e30f6-a1a0-4a69-a043-d8d4cd47e0b8}</Project>
     </ProjectReference>

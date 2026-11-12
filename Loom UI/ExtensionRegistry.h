@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Loom API.h"
-
 #include "imgui.h"
 
 #include <deque>
@@ -9,6 +7,19 @@
 #include <string>
 #include <vector>
 
+
+// The registry is exported from the editor executable, so an extension built
+// with LOOM_SCRIPT_MODULE imports it rather than carrying a second one. A
+// static consumer of Loom UI defines LOOM_UI_STATIC and has neither.
+#if defined(_WIN32) && !defined(__EMSCRIPTEN__) && !defined(LOOM_UI_STATIC)
+	#ifdef LOOM_SCRIPT_MODULE
+		#define LOOM_UI_API __declspec(dllimport)
+	#else
+		#define LOOM_UI_API __declspec(dllexport)
+	#endif
+#else
+	#define LOOM_UI_API
+#endif
 
 // What the editor looks up in an extension's library. Stop runs before the
 // library unloads, so its threads and child processes end there rather than
@@ -46,7 +57,7 @@ namespace Loom
 	*   LoomRoot. update-editor.ps1 then runs Source's update-extension.ps1
 	*   -LoomRoot <that Loom> whenever the editor is newer than the library
 	*/
-	struct LOOM_API ExtensionRegistry final
+	struct LOOM_UI_API ExtensionRegistry final
 	{
 		struct Panel
 		{

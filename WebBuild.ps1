@@ -8,6 +8,8 @@ $webRoot = $PSScriptRoot
 
 $webWasm = Join-Path $webRoot 'Loom WASM'
 $webImGui = Join-Path $webRoot 'Loom ImGui'
+$webUi = Join-Path $webRoot 'Loom UI'
+$webUiImGui = Join-Path $webUi 'ImGui'
 
 $webIncludes = @(
     $webWasm
@@ -15,6 +17,8 @@ $webIncludes = @(
     (Join-Path $webRoot 'External Libraries\stb')
     (Join-Path $webRoot 'External Libraries\miniaudio')
     $webImGui
+    $webUi
+    $webUiImGui
 ) | ForEach-Object { "-I$_" }
 
 $webCompileFlags = @(
@@ -208,11 +212,11 @@ function Build-WebEngine([string] $Emcc)
         Get-ChildItem -Path (Join-Path $webWasm 'Utilities\*.cpp') -Exclude '_*.cpp'
         'imgui.cpp', 'imgui_draw.cpp', 'imgui_tables.cpp', 'imgui_widgets.cpp',
             'imgui_impl_glfw.cpp', 'imgui_impl_opengl3.cpp', 'ImGuiAutoscroll.cpp', 'ImGuiItemHooks.cpp' |
-            ForEach-Object { Get-Item -LiteralPath (Join-Path $webImGui $_) }
+            ForEach-Object { Get-Item -LiteralPath (Join-Path $webUiImGui $_) }
     ) | ForEach-Object { $_.FullName }
 
     $inputs = @(
-        Get-ChildItem -Path $webWasm, $webImGui -Recurse -File -Include '*.cpp', '*.h', '*.hpp'
+        Get-ChildItem -Path $webWasm, $webImGui, $webUi -Recurse -File -Include '*.cpp', '*.h', '*.hpp'
         Get-Item -LiteralPath (Join-Path $webRoot 'WebBuild.ps1')
     )
 

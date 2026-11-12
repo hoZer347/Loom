@@ -67,7 +67,7 @@
       <ForcedIncludeFiles>Loom.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <ExceptionHandling>Async</ExceptionHandling>
       <PreprocessorDefinitions>LOOM_SCRIPT_MODULE;_WIN32_WINNT=0x0601;WIN32;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)..\..\..\Loom WASM;$(MSBuildThisFileDirectory)..\..\..\Loom ImGui;$(MSBuildThisFileDirectory)..\..\..\External Libraries\glm;$(MSBuildThisFileDirectory)..\..\..\External Libraries\glew\include;$(MSBuildThisFileDirectory)..\..\..\External Libraries\glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)..\..\..\Loom WASM;$(MSBuildThisFileDirectory)..\..\..\Loom ImGui;$(MSBuildThisFileDirectory)..\..\..\Loom UI;$(MSBuildThisFileDirectory)..\..\..\External Libraries\glm;$(MSBuildThisFileDirectory)..\..\..\External Libraries\glew\include;$(MSBuildThisFileDirectory)..\..\..\External Libraries\glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

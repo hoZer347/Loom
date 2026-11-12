@@ -121,7 +121,7 @@ library=Build/{NAME}Scripts.dll
       <ExceptionHandling>Async</ExceptionHandling>
       <DisableSpecificWarnings>4251;4275</DisableSpecificWarnings>
 {PCH_SETTINGS}      <PreprocessorDefinitions>LOOM_SCRIPT_MODULE;_WIN32_WINNT=0x0601;WIN32;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>{ENGINE}\Loom WASM;{ENGINE}\Loom ImGui;{ENGINE}\External Libraries\glm;{ENGINE}\External Libraries\glew\include;{ENGINE}\External Libraries\glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>{ENGINE}\Loom WASM;{ENGINE}\Loom ImGui;{ENGINE}\Loom UI;{ENGINE}\External Libraries\glm;{ENGINE}\External Libraries\glew\include;{ENGINE}\External Libraries\glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

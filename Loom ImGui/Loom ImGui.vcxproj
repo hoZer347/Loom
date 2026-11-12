@@ -127,17 +127,13 @@
     <ClInclude Include="ImGuiItemHooks.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="imgui.cpp" />
-    <ClCompile Include="imgui_demo.cpp" />
-    <ClCompile Include="imgui_draw.cpp" />
-    <ClCompile Include="imgui_impl_glfw.cpp" />
-    <ClCompile Include="imgui_impl_opengl3.cpp" />
     <ClCompile Include="imgui_impl_vulkan.cpp" />
-    <ClCompile Include="imgui_tables.cpp" />
-    <ClCompile Include="imgui_widgets.cpp" />
     <ClCompile Include="TextEditor.cpp" />
-    <ClCompile Include="ImGuiAutoscroll.cpp" />
-    <ClCompile Include="ImGuiItemHooks.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Loom UI\Loom UI.vcxproj">
+      <Project>{0E341C2D-C77D-4C31-9E39-EFCF58B583CD}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="..\Property Files\Final.props" Condition="'$(Configuration)'=='Final'" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

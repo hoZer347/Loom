@@ -50,34 +50,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="imgui.cpp">
-      <Filter>ImGui Files</Filter>
-    </ClCompile>
-    <ClCompile Include="imgui_demo.cpp">
-      <Filter>ImGui Files</Filter>
-    </ClCompile>
-    <ClCompile Include="imgui_draw.cpp">
-      <Filter>ImGui Files</Filter>
-    </ClCompile>
-    <ClCompile Include="imgui_impl_glfw.cpp">
-      <Filter>ImGui Files</Filter>
-    </ClCompile>
-    <ClCompile Include="imgui_tables.cpp">
-      <Filter>ImGui Files</Filter>
-    </ClCompile>
-    <ClCompile Include="imgui_widgets.cpp">
-      <Filter>ImGui Files</Filter>
-    </ClCompile>
     <ClCompile Include="TextEditor.cpp">
-      <Filter>ImGui Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ImGuiAutoscroll.cpp">
-      <Filter>ImGui Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ImGuiItemHooks.cpp">
-      <Filter>ImGui Files</Filter>
-    </ClCompile>
-    <ClCompile Include="imgui_impl_opengl3.cpp">
       <Filter>ImGui Files</Filter>
     </ClCompile>
     <ClCompile Include="imgui_impl_vulkan.cpp">

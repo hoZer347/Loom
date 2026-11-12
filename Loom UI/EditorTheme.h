@@ -19,7 +19,12 @@ namespace Loom
 		constexpr float MinFontSize = 8.0f;
 		constexpr float MaxFontSize = 32.0f;
 
-		// The fonts vendored with ImGui, by file name.
+		// Where the fonts are loaded from. Until a consumer names one, the
+		// Fonts folder beside the executable.
+		void SetFontFolder(const std::filesystem::path& folder);
+		std::filesystem::path FontFolder();
+
+		// The fonts in FontFolder, by file name.
 		std::vector<std::string> Fonts();
 
 		// What draws EditorIcons, merged into the UI font in this order: Windows'

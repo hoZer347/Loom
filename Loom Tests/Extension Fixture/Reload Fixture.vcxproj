@@ -35,7 +35,7 @@
       <Optimization>MaxSpeed</Optimization>
       <DisableSpecificWarnings>4251;4275</DisableSpecificWarnings>
       <PreprocessorDefinitions>$(OldApiDefine)LOOM_SCRIPT_MODULE;NDEBUG;_CRT_SECURE_NO_WARNINGS;_WIN32_WINNT=0x0A00;WIN32;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(LoomRoot)\Loom WASM;$(LoomRoot)\Loom Editor;$(LoomRoot)\Loom ImGui;$(LoomRoot)\External Libraries\glm;$(LoomRoot)\External Libraries\glew\include;$(LoomRoot)\External Libraries\glfw\include;$(LoomRoot)\External Libraries\json\single_include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(LoomRoot)\Loom WASM;$(LoomRoot)\Loom Editor;$(LoomRoot)\Loom ImGui;$(LoomRoot)\Loom UI;$(LoomRoot)\External Libraries\glm;$(LoomRoot)\External Libraries\glew\include;$(LoomRoot)\External Libraries\glfw\include;$(LoomRoot)\External Libraries\json\single_include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(LoomRoot)\x64\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>

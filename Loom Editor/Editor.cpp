@@ -84,6 +84,9 @@ namespace Loom
 {
 	namespace
 	{
+		// Where the engine keeps the fonts the editor offers, under its root.
+		const char* const engine_font_folder = "External Libraries/imgui/misc/fonts";
+
 		#pragma region Inspector
 
 		constexpr float rotation_drag_speed = 0.5f;
@@ -852,6 +855,7 @@ namespace Loom
 		if (destroy_platform_window != nullptr)
 			ImGui::GetPlatformIO().Platform_DestroyWindow = DestroyPlatformWindow;
 
+		EditorTheme::SetFontFolder(std::filesystem::path(ProjectTemplate::EngineRoot()) / engine_font_folder);
 		LoadSettings();
 		m_settings.Apply();
 	};

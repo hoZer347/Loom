@@ -3,7 +3,7 @@
 // The title bar comes off on Windows and X11. Wayland keeps its compositor's, and the web test build compiles this too.
 #ifdef _WIN32
 
-#include "OpenGL.h"
+#include <GLFW/glfw3.h>
 
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
@@ -17,7 +17,7 @@
 
 #elif !defined(__EMSCRIPTEN__)
 
-#include "OpenGL.h"
+#include <GLFW/glfw3.h>
 
 #define GLFW_EXPOSE_NATIVE_X11
 #include <GLFW/glfw3native.h>

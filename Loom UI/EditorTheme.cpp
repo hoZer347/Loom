@@ -1,7 +1,5 @@
 #include "EditorTheme.h"
 
-#include "ProjectTemplate.h"
-
 #include <filesystem>
 #include <iostream>
 
@@ -86,10 +84,32 @@ namespace Loom
 
 		#pragma region Fonts
 
-		// Vendored with ImGui, so they are wherever the engine is.
-		std::filesystem::path FontFolder()
+		// What the consumer last gave SetFontFolder; empty until then.
+		std::filesystem::path fontFolder;
+
+		// Where Loom UI's fonts ship, next to the executable.
+		constexpr const char* FontFolderName = "Fonts";
+
+		std::filesystem::path ExecutableFolder()
 		{
-			return std::filesystem::path(ProjectTemplate::EngineRoot()) / "External Libraries/imgui/misc/fonts";
+			std::error_code code;
+#ifdef _WIN32
+			// The longest path Windows allows, in characters.
+			constexpr DWORD path_capacity = 32768;
+
+			std::wstring buffer(path_capacity, L'\0');
+			buffer.resize(GetModuleFileNameW(nullptr, buffer.data(), path_capacity));
+
+			if (!buffer.empty())
+				return std::filesystem::path(buffer).parent_path();
+#else
+			const std::filesystem::path executable = std::filesystem::read_symlink("/proc/self/exe", code);
+
+			if (!executable.empty())
+				return executable.parent_path();
+#endif
+
+			return std::filesystem::current_path(code);
 		};
 
 		// Monospaced, for the shader editor.
@@ -101,7 +121,7 @@ namespace Loom
 		ImFont* AddFont(const std::string& file, float size)
 		{
 			ImFontAtlas& atlas = *ImGui::GetIO().Fonts;
-			const std::filesystem::path path = FontFolder() / file;
+			const std::filesystem::path path = EditorTheme::FontFolder() / file;
 			std::error_code code;
 
 			if (std::filesystem::exists(path, code))
@@ -136,6 +156,19 @@ namespace Loom
 	};
 
 	#pragma region Fonts
+
+	void EditorTheme::SetFontFolder(const std::filesystem::path& folder)
+	{
+		fontFolder = folder;
+	};
+
+	std::filesystem::path EditorTheme::FontFolder()
+	{
+		if (!fontFolder.empty())
+			return fontFolder;
+
+		return ExecutableFolder() / FontFolderName;
+	};
 
 	std::vector<std::string> EditorTheme::Fonts()
 	{
