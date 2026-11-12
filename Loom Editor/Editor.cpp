@@ -1,6 +1,5 @@
 #include "Editor.h"
 
-#include "CorrinCode.h"
 #include "EditorLog.h"
 #include "EditorTheme.h"
 #include "ExtensionRegistry.h"
@@ -2761,14 +2760,6 @@ namespace Loom
 			};
 
 			ImGui::Separator();
-
-			const std::filesystem::path corrin_exe = CorrinCode::Locate();
-
-			if (ImGui::MenuItem("Open in Corrin Code", nullptr, false, !corrin_exe.empty() && !m_projectPath.empty()))
-				CorrinCode::Open(corrin_exe, m_projectPath);
-
-			if (corrin_exe.empty())
-				ImGui::SetItemTooltip("Corrin Code was not found. Install it, or set CORRIN_CODE_EXE.");
 
 			ImGui::Separator();
 

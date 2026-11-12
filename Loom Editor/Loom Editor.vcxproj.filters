@@ -32,7 +32,6 @@
     <ClCompile Include="EditorProject.cpp">
       <Filter>Panels</Filter>
     </ClCompile>
-    <ClCompile Include="CorrinCode.cpp" />
     <ClCompile Include="HiddenProcess.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
@@ -215,7 +214,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CorrinCode.h" />
     <ClInclude Include="HiddenProcess.h">
       <Filter>Scripts</Filter>
     </ClInclude>
