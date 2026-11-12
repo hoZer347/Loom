@@ -19,7 +19,8 @@
     An extension links against the editor's exports, so one installed with a
     manifest naming this copy is rebuilt once the editor is newer than it, by
     the update-extension.ps1 in its source folder, before any editor restarts
-    onto the new build.
+    onto the new build. A manifest may carry Library, the file that script
+    builds, which is then judged instead of <name>.dll in the extensions folder.
 
     Exits non-zero if a build fails or an open editor cannot be reached. An
     extension that fails to build leaves open editors on the build they have.
@@ -125,7 +126,8 @@ function Update-Extensions
         if ([IO.Path]::GetFullPath($extension.LoomRoot) -ne [IO.Path]::GetFullPath($PSScriptRoot)) { continue }
 
         $name = $manifest.Name.Substring(0, $manifest.Name.Length - $ManifestExtension.Length)
-        $library = Get-Item -LiteralPath (Join-Path $Extensions "$name.dll") -ErrorAction SilentlyContinue
+        $libraryPath = if ($extension.Library) { $extension.Library } else { Join-Path $Extensions "$name.dll" }
+        $library = Get-Item -LiteralPath $libraryPath -ErrorAction SilentlyContinue
         if ($library -and $library.LastWriteTimeUtc -ge $built) { continue }
 
         Write-Output "Rebuilding the extension $name"

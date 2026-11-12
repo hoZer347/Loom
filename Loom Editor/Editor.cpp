@@ -871,6 +871,7 @@ namespace Loom
 		io.IniFilename = nullptr;
 		ImGui::RemoveSettingsHandler(panel_settings);
 		m_tornWindows.RemoveSettings();
+		m_projectExtensions.Unload();
 		m_extensions.Unload();
 
 		SetDropCallback(nullptr);
@@ -2761,7 +2762,8 @@ namespace Loom
 
 			ImGui::Separator();
 
-			ImGui::Separator();
+			if (DrawExtensionMenuItems("File", false))
+				ImGui::Separator();
 
 			if (ImGui::MenuItem("Full Refresh", "Ctrl+Shift+R", false, !IsRefreshing()))
 				FullRefresh();
@@ -2814,6 +2816,8 @@ namespace Loom
 			if (ImGui::MenuItem("Delete", nullptr, false, EditCommands::CanTake(m_selected)))
 				DeleteSelected();
 
+			DrawExtensionMenuItems("Edit", true);
+
 			ImGui::EndMenu();
 		};
 
@@ -2827,6 +2831,8 @@ namespace Loom
 
 			ImGui::Separator();
 			ImGui::MenuItem(EditorPanels::Settings, nullptr, &m_showSettings);
+
+			DrawExtensionMenuItems("Window", true);
 
 			ImGui::EndMenu();
 		};
@@ -2874,6 +2880,8 @@ namespace Loom
 			ImGui::EndMenu();
 		};
 
+		DrawExtensionMenus();
+
 		// Play control, mirrored in the Game and Debug windows' toolbars.
 		ImGui::Separator();
 
@@ -2888,6 +2896,57 @@ namespace Loom
 
 		if (!ScriptRun::Available)
 			ImGui::SetItemTooltip("Windows only");
+	};
+
+	bool Editor::DrawExtensionMenuItems(const std::string& menu, bool separate)
+	{
+		bool any = false;
+
+		for (const ExtensionRegistry::MenuItem& item : ExtensionRegistry::MenuItems())
+		{
+			if (item.menu != menu)
+				continue;
+
+			if (!any && separate)
+				ImGui::Separator();
+
+			any = true;
+
+			const bool enabled = !item.enabled || item.enabled(m_projectPath);
+
+			if (ImGui::MenuItem(item.name.c_str(), nullptr, false, enabled) && item.select)
+				item.select(m_projectPath);
+
+			if (item.tooltip)
+				if (const std::string tip = item.tooltip(m_projectPath); !tip.empty())
+					ImGui::SetItemTooltip("%s", tip.c_str());
+		};
+
+		return any;
+	};
+
+	void Editor::DrawExtensionMenus()
+	{
+		static const std::array<const char*, 4> editor_menus = { "File", "Edit", "GameObject", "Window" };
+
+		std::vector<std::string> drawn;
+
+		for (const ExtensionRegistry::MenuItem& item : ExtensionRegistry::MenuItems())
+		{
+			const bool known = std::find(editor_menus.begin(), editor_menus.end(), item.menu) != editor_menus.end()
+				|| std::find(drawn.begin(), drawn.end(), item.menu) != drawn.end();
+
+			if (known)
+				continue;
+
+			drawn.push_back(item.menu);
+
+			if (ImGui::BeginMenu(item.menu.c_str()))
+			{
+				DrawExtensionMenuItems(item.menu, false);
+				ImGui::EndMenu();
+			};
+		};
 	};
 
 	bool Editor::DrawWindowButtons(GLFWwindow* window, WindowFrame& frame)
@@ -3128,21 +3187,26 @@ namespace Loom
 
 			const std::string name(line, equals);
 
+			const bool shown = equals[1] == '1';
+
+			((Editor*)editor)->m_panelStates[name] = shown;
+
 			for (const Panel& panel : ((Editor*)editor)->Panels())
 				if (name == EditorPanels::IdOf(panel.title))
-					*panel.shown = equals[1] == '1';
+					*panel.shown = shown;
 		};
 
 		handler.WriteAllFn = [](ImGuiContext*, ImGuiSettingsHandler* handler, ImGuiTextBuffer* buffer)
 		{
 			buffer->appendf("[%s][%s]\n", handler->TypeName, entry);
 
-			for (const Panel& panel : ((Editor*)handler->UserData)->Panels())
-			{
-				const std::string_view id = EditorPanels::IdOf(panel.title);
+			Editor& editor = *(Editor*)handler->UserData;
 
-				buffer->appendf("%.*s=%d\n", (int)id.size(), id.data(), *panel.shown ? 1 : 0);
-			};
+			for (const Panel& panel : editor.Panels())
+				editor.m_panelStates[std::string(EditorPanels::IdOf(panel.title))] = *panel.shown;
+
+			for (const auto& [id, shown] : editor.m_panelStates)
+				buffer->appendf("%s=%d\n", id.c_str(), shown ? 1 : 0);
 
 			buffer->append("\n");
 		};

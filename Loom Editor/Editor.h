@@ -717,6 +717,13 @@ namespace Loom
 		// What every window's menu bar holds, the editor's and each torn off.
 		void DrawMenus();
 
+		// Draws the items extensions added under menu, behind a separator when
+		// separate. True if there were any.
+		bool DrawExtensionMenuItems(const std::string& menu, bool separate);
+
+		// The menus extensions name that the editor has not.
+		void DrawExtensionMenus();
+
 		// Minimize, maximize and close, at the right of the menu bar, in place
 		// of the title bar frame takes away; true when close is clicked.
 		bool DrawWindowButtons(GLFWwindow* window, WindowFrame& frame);
@@ -1009,6 +1016,10 @@ namespace Loom
 		// Reads <folder>/*.loomproject, if there is one, and hooks up the script
 		// library it names.
 		void LoadProjectFile();
+
+		// Swaps the project's extensions for files, unless they are the ones
+		// loaded, and gives the panels they add the shown state the layout held.
+		void SetProjectExtensions(const std::vector<std::string>& files);
 
 		// Watches for a finished build and puts the scenes back once the new
 		// library is in.
@@ -1703,6 +1714,13 @@ namespace Loom
 		TestsPanel m_tests;
 
 		ExtensionLibrary m_extensions;
+
+		// The libraries the open project's .loomproject names, in its order.
+		ExtensionLibrary m_projectExtensions;
+		std::vector<std::string> m_projectExtensionFiles;
+
+		// Every shown state the layout held for an extension's panel, by panel ID, so a project extension that loads later finds its own.
+		std::map<std::string, bool> m_panelStates;
 
 		#pragma endregion
 

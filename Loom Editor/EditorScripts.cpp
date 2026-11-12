@@ -2,6 +2,7 @@
 
 #include "EditorFileDialogs.h"
 #include "EditorIcons.h"
+#include "ExtensionRegistry.h"
 #include "ProjectTemplate.h"
 
 #include "Audio.h"
@@ -15,6 +16,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <deque>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -45,6 +47,29 @@ namespace Loom
 	};
 
 	#pragma region Project
+
+	void Editor::SetProjectExtensions(const std::vector<std::string>& files)
+	{
+		if (files == m_projectExtensionFiles)
+			return;
+
+		for (const Panel& panel : Panels())
+			m_panelStates[std::string(EditorPanels::IdOf(panel.title))] = *panel.shown;
+
+		m_projectExtensions.Unload();
+		m_projectExtensionFiles = files;
+
+		const size_t before = ExtensionRegistry::Panels().size();
+
+		for (const std::string& file : files)
+			m_projectExtensions.Open(file);
+
+		std::deque<ExtensionRegistry::Panel>& panels = ExtensionRegistry::Panels();
+
+		for (size_t index = before; index < panels.size(); index++)
+			if (const auto state = m_panelStates.find(std::string(EditorPanels::IdOf(panels[index].title))); state != m_panelStates.end())
+				panels[index].shown = state->second;
+	};
 
 	void Editor::LoadProjectFile()
 	{
@@ -87,7 +112,10 @@ namespace Loom
 		};
 
 		if (m_projectFile.empty())
+		{
+			SetProjectExtensions({ });
 			return;
+		};
 
 		m_scriptFolders.Load(ScriptFoldersFile());
 
@@ -104,6 +132,7 @@ namespace Loom
 
 		std::ifstream in(m_projectFile);
 		std::string line, project, library;
+		std::vector<std::string> extensions;
 
 		while (std::getline(in, line))
 		{
@@ -119,8 +148,13 @@ namespace Loom
 			if (const std::string value = ProjectTemplate::ValueOf(line, ProjectTemplate::library_key); !value.empty())
 				library = Resolve(m_projectPath, value);
 
+			if (const std::string value = ProjectTemplate::ValueOf(line, ProjectTemplate::extension_key); !value.empty())
+				extensions.push_back(Resolve(m_projectPath, value));
+
 			m_componentMenu.Read(line);
 		};
+
+		SetProjectExtensions(extensions);
 
 		if (project.empty())
 			return;

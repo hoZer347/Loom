@@ -33,6 +33,9 @@ namespace Loom
 		static constexpr const char* scripts_key = "scripts";
 		static constexpr const char* library_key = "library";
 
+		// Any number of lines, each an editor extension library to load with the project.
+		static constexpr const char* extension_key = "extension";
+
 		// The value of a project file line holding key, or an empty string for
 		// a line holding another.
 		static std::string ValueOf(const std::string& line, const char* key);
