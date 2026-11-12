@@ -182,13 +182,15 @@ TEST_SUITE("ExtensionLibrary")
 		CHECK(library.Count() == 0);
 	};
 
-	TEST_CASE("unloading drops the extensions' panels")
+	TEST_CASE("unloading keeps panels no extension of the library added")
 	{
 		Loom::ExtensionRegistry::AddPanel("A", "Left Behind", [](const std::string&) { });
 
 		Loom::ExtensionLibrary library;
 		library.Unload();
 
-		CHECK(Loom::ExtensionRegistry::Panels().empty());
+		CHECK(Loom::ExtensionRegistry::Panels().size() == 1);
+
+		Loom::ExtensionRegistry::Panels().clear();
 	};
 };

@@ -26,7 +26,10 @@ namespace Loom
 
 		void Load(const std::filesystem::path& folder);
 
-		// Stops every extension, removes their panels and frees the libraries.
+		// Loads one library file, or reports why it could not.
+		void Open(const std::filesystem::path& library);
+
+		// Stops every extension, removes their panels and menu items, and frees the libraries.
 		void Unload();
 
 		size_t Count() const { return m_loaded.size(); };
@@ -40,12 +43,10 @@ namespace Loom
 		};
 
 		// Starts an extension and keeps it until Unload. If refused, gives why,
-		// and any panel it added is gone.
+		// and any panel or menu item it added is gone.
 		std::optional<std::string> Admit(const Entry& entry, void* module, const std::filesystem::path& copy);
 
 	private:
-		void Open(const std::filesystem::path& library);
-
 		struct Loaded
 		{
 			void* module = nullptr;

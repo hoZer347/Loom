@@ -122,6 +122,12 @@ namespace Loom
 		const std::string name = library.filename().string();
 		std::error_code code;
 
+		if (!std::filesystem::exists(library, code))
+		{
+			std::cerr << "Could not find the extension " << library.string() << "." << std::endl;
+			return;
+		};
+
 		const std::filesystem::path copies = std::filesystem::temp_directory_path(code) / copies_folder;
 		std::filesystem::create_directories(copies, code);
 
@@ -166,7 +172,18 @@ namespace Loom
 			return std::string(other_editor) + ".";
 
 		std::deque<ExtensionRegistry::Panel>& panels = ExtensionRegistry::Panels();
+		std::deque<ExtensionRegistry::MenuItem>& items = ExtensionRegistry::MenuItems();
 		const size_t panelsBefore = panels.size();
+		const size_t itemsBefore = items.size();
+
+		const auto claim = [&]()
+		{
+			for (size_t index = panelsBefore; index < panels.size(); index++)
+				panels[index].owner = module;
+
+			for (size_t index = itemsBefore; index < items.size(); index++)
+				items[index].owner = module;
+		};
 
 		try
 		{
@@ -175,8 +192,11 @@ namespace Loom
 		catch (const std::exception& error)
 		{
 			panels.erase(panels.begin() + panelsBefore, panels.end());
+			items.erase(items.begin() + itemsBefore, items.end());
 			return error.what();
 		};
+
+		claim();
 
 		m_loaded.push_back({ module, entry.stop, copy });
 
@@ -197,12 +217,18 @@ namespace Loom
 			};
 		};
 
-		ExtensionRegistry::Panels().clear();
-
 		std::error_code code;
 
 		for (const Loaded& loaded : m_loaded)
 		{
+			if (loaded.module != nullptr)
+			{
+				const void* const owner = loaded.module;
+
+				std::erase_if(ExtensionRegistry::Panels(), [owner](const ExtensionRegistry::Panel& panel) { return panel.owner == owner; });
+				std::erase_if(ExtensionRegistry::MenuItems(), [owner](const ExtensionRegistry::MenuItem& item) { return item.owner == owner; });
+			};
+
 			if (loaded.module != nullptr)
 				CloseModule(loaded.module);
 
