@@ -324,7 +324,6 @@
     <ClCompile Include="..\Loom Editor\UiScript.cpp" />
     <ClCompile Include="..\Loom Editor\McpProtocol.cpp" />
     <ClCompile Include="..\Loom Editor\HiddenProcess.cpp" />
-    <ClCompile Include="..\Loom Editor\CorrinCode.cpp" />
     <ClCompile Include="..\Loom Editor\CrashReports.cpp" />
     <ClCompile Include="..\Loom Editor\EditorLog.cpp" />
     <ClCompile Include="..\Loom UI\EditorTheme.cpp" />
