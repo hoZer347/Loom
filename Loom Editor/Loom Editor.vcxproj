@@ -149,6 +149,7 @@
     <ClCompile Include="CrashReports.cpp" />
     <ClCompile Include="Editor.cpp" />
     <ClCompile Include="HiddenProcess.cpp" />
+    <ClCompile Include="CorrinCode.cpp" />
     <ClCompile Include="ScriptLibrary.cpp" />
     <ClCompile Include="ExtensionLibrary.cpp" />
     <ClCompile Include="VirtualFolders.cpp" />
@@ -218,6 +219,7 @@
     <ClInclude Include="CrashReports.h" />
     <ClInclude Include="Editor.h" />
     <ClInclude Include="HiddenProcess.h" />
+    <ClInclude Include="CorrinCode.h" />
     <ClInclude Include="ScriptLibrary.h" />
     <ClInclude Include="ExtensionLibrary.h" />
     <ClInclude Include="..\Loom UI\ExtensionRegistry.h" />

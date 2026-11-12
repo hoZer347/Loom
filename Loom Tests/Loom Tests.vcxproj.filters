@@ -53,6 +53,9 @@
     <ClCompile Include="EditorSettings Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="CorrinCode Tests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="EditorIcons Tests.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
