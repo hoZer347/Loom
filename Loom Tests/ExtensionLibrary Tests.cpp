@@ -93,6 +93,7 @@ namespace
 		AddOwnedItem("Other Item");
 	};
 
+#ifndef __EMSCRIPTEN__
 	void* OpenSystemLibrary(const bool first)
 	{
 #ifdef _WIN32
@@ -101,6 +102,7 @@ namespace
 		return dlopen(first ? "libm.so.6" : "libdl.so.2", RTLD_NOW);
 #endif
 	};
+#endif
 
 	struct ClearRegistry final
 	{
@@ -318,6 +320,7 @@ TEST_SUITE("ExtensionLibrary")
 		CHECK(Loom::ExtensionRegistry::MenuItems().back().name == "Second");
 	};
 
+#ifndef __EMSCRIPTEN__
 	TEST_CASE("an entry belongs to the module its adding call came from")
 	{
 		const ClearRegistry clear;
@@ -329,6 +332,7 @@ TEST_SUITE("ExtensionLibrary")
 		CHECK(Loom::ExtensionRegistry::Panels().back().owner == EditorModule());
 		CHECK(Loom::ExtensionRegistry::MenuItems().back().owner == EditorModule());
 	};
+#endif
 
 	TEST_CASE("a started extension's entries keep the module their calls named")
 	{
@@ -354,6 +358,7 @@ TEST_SUITE("ExtensionLibrary")
 		library.Unload();
 	};
 
+#ifndef __EMSCRIPTEN__
 	TEST_CASE("a panel added after start leaves with its library, and another library's panel keeps its place")
 	{
 		const ClearRegistry clear;
@@ -397,6 +402,7 @@ TEST_SUITE("ExtensionLibrary")
 
 		CHECK(Loom::ExtensionRegistry::Panels().empty());
 	};
+#endif
 
 	TEST_CASE("a failed start removes only its own panels and menu items")
 	{
@@ -418,6 +424,7 @@ TEST_SUITE("ExtensionLibrary")
 		CHECK(Loom::ExtensionRegistry::MenuItems().back().name == "Earlier Item");
 	};
 
+#ifndef __EMSCRIPTEN__
 	TEST_CASE("unloading one library leaves another library's panels and menu items")
 	{
 		const ClearRegistry clear;
@@ -454,6 +461,7 @@ TEST_SUITE("ExtensionLibrary")
 		CHECK(Loom::ExtensionRegistry::Panels().size() == 1);
 		CHECK(Loom::ExtensionRegistry::MenuItems().empty());
 	};
+#endif
 
 	TEST_CASE("opening a file that is not there reports it and loads nothing")
 	{
