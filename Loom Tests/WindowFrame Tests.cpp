@@ -131,6 +131,11 @@ TEST_SUITE("WindowFrame")
 			s_depth = 0;
 			s_deepest = 0;
 			s_nestedTimers = 0;
+
+			// A thread message an earlier window left would keep a held window from posting itself frames.
+			MSG leftover;
+			while (PeekMessageW(&leftover, nullptr, 0, 0, PM_REMOVE))
+				;
 		};
 
 		~HiddenWindow()
