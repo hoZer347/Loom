@@ -88,8 +88,14 @@ $slot = [IO.Path]::GetFullPath((Split-Path $common -Parent)) -ne [IO.Path]::GetF
 
 if ($slot -and $result -eq 0 -and -not $TestArgs)
 {
-    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'Loom Tests\extension-reload.ps1')
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'Loom Tests\update-editor-library.ps1')
     $result = $LASTEXITCODE
+
+    if ($result -eq 0)
+    {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'Loom Tests\extension-reload.ps1')
+        $result = $LASTEXITCODE
+    }
 }
 
 Write-StageTime 'test' $started

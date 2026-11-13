@@ -237,6 +237,29 @@ TEST_SUITE("ProjectTemplate")
 			"library=Build/GameScripts.dll\n");
 	};
 
+	TEST_CASE("an extension line is read by its key, relative or absolute, and other lines are not")
+	{
+		CHECK(Loom::ProjectTemplate::ValueOf("extension=../Build/Ext.dll", Loom::ProjectTemplate::extension_key) == "../Build/Ext.dll");
+		CHECK(Loom::ProjectTemplate::ValueOf("extension=C:/Ext/Ext.dll", Loom::ProjectTemplate::extension_key) == "C:/Ext/Ext.dll");
+		CHECK(Loom::ProjectTemplate::ValueOf("extension=", Loom::ProjectTemplate::extension_key).empty());
+		CHECK(Loom::ProjectTemplate::ValueOf("library=Build/A.dll", Loom::ProjectTemplate::extension_key).empty());
+		CHECK(Loom::ProjectTemplate::ValueOf("extensions=A.dll", Loom::ProjectTemplate::extension_key).empty());
+	};
+
+	TEST_CASE("a project file keeps its extension lines when it is pointed at the scripts")
+	{
+		const Folder project("loom template extensions");
+
+		std::ofstream(project.path / "Game.loomproject") << "name=Game\nextension=../One.dll\nextension=Two.dll\n";
+
+		REQUIRE_FALSE(Loom::ProjectTemplate::AddScripts(project.path.string(), "Game").empty());
+
+		const std::string text = ReadAll(project.path / "Game.loomproject");
+
+		CHECK(text.find("extension=../One.dll\n") != std::string::npos);
+		CHECK(text.find("extension=Two.dll\n") != std::string::npos);
+	};
+
 	TEST_CASE("a name MSBuild cannot take is made into one it can")
 	{
 		CHECK(Loom::ProjectTemplate::UsableName("My Game!") == "MyGame");
