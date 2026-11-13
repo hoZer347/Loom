@@ -27,14 +27,32 @@
 #endif
 
 
+// Built with LOOM_FIXTURE_PROJECT it is a second extension with names of its own,
+// for a project to load beside the one in the extensions folder.
+#ifdef LOOM_FIXTURE_PROJECT
+	#define LOOM_FIXTURE_NAME "Project Fixture"
+	#define LOOM_FIXTURE_PREFIX "Project"
+#else
+	#define LOOM_FIXTURE_NAME "Reload Fixture"
+	#define LOOM_FIXTURE_PREFIX "Fixture"
+#endif
+
 namespace
 {
 	constexpr const char* panel_icon = "F";
-	constexpr const char* panel_name = "Reload Fixture";
-	constexpr const char* waiting_label = "Fixture Waiting##Fixture";
-	constexpr const char* clicked_label = "Fixture Clicked##Fixture";
+	constexpr const char* panel_name = LOOM_FIXTURE_NAME;
+	constexpr const char* waiting_label = LOOM_FIXTURE_PREFIX " Waiting##Fixture";
+	constexpr const char* clicked_label = LOOM_FIXTURE_PREFIX " Clicked##Fixture";
+	constexpr const char* file_used_label = LOOM_FIXTURE_PREFIX " File Item Used##Fixture";
+	constexpr const char* custom_used_label = LOOM_FIXTURE_PREFIX " Custom Item Used##Fixture";
+	constexpr const char* file_menu = "File";
+	constexpr const char* file_item = LOOM_FIXTURE_PREFIX " File Item";
+	constexpr const char* custom_menu = LOOM_FIXTURE_PREFIX " Menu";
+	constexpr const char* custom_item = LOOM_FIXTURE_PREFIX " Custom Item";
 
 	bool clicked = false;
+	bool file_used = false;
+	bool custom_used = false;
 };
 
 LOOM_EXTENSION_EXPORT int LoomExtensionAbi()
@@ -51,7 +69,18 @@ LOOM_EXTENSION_EXPORT void LoomExtensionStart()
 	{
 		if (ImGui::Button(clicked ? clicked_label : waiting_label))
 			clicked = true;
+
+		if (file_used)
+			ImGui::Button(file_used_label);
+
+		if (custom_used)
+			ImGui::Button(custom_used_label);
 	});
+
+#ifndef LOOM_FIXTURE_OLD_API
+	Loom::ExtensionRegistry::AddMenuItem(file_menu, file_item, [](const std::string&) { file_used = true; });
+	Loom::ExtensionRegistry::AddMenuItem(custom_menu, custom_item, [](const std::string&) { custom_used = true; });
+#endif
 };
 
 LOOM_EXTENSION_EXPORT void LoomExtensionStop()
