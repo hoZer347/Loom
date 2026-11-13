@@ -49,12 +49,24 @@ namespace
 	constexpr const char* file_item = LOOM_FIXTURE_PREFIX " File Item";
 	constexpr const char* custom_menu = LOOM_FIXTURE_PREFIX " Menu";
 	constexpr const char* custom_item = LOOM_FIXTURE_PREFIX " Custom Item";
+	constexpr const char* late_panel_name = LOOM_FIXTURE_PREFIX " Late Panel";
 	constexpr const char* editor_menus[] = { "Edit", "GameObject", "Window" };
 	constexpr const char* editor_menu_item = LOOM_FIXTURE_PREFIX " Editor Menu Item";
 
 	bool clicked = false;
 	bool file_used = false;
 	bool custom_used = false;
+	bool late_added = false;
+
+	void AddLatePanel()
+	{
+		if (late_added)
+			return;
+
+		late_added = true;
+
+		Loom::ExtensionRegistry::AddPanel(panel_icon, late_panel_name, [](const std::string&) { });
+	};
 };
 
 LOOM_EXTENSION_EXPORT int LoomExtensionAbi()
@@ -80,7 +92,11 @@ LOOM_EXTENSION_EXPORT void LoomExtensionStart()
 	});
 
 #ifndef LOOM_FIXTURE_OLD_API
-	Loom::ExtensionRegistry::AddMenuItem(file_menu, file_item, [](const std::string&) { file_used = true; });
+	Loom::ExtensionRegistry::AddMenuItem(file_menu, file_item, [](const std::string&)
+	{
+		file_used = true;
+		AddLatePanel();
+	});
 	Loom::ExtensionRegistry::AddMenuItem(custom_menu, custom_item, [](const std::string&) { custom_used = true; });
 
 	for (const char* menu : editor_menus)

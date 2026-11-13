@@ -16,7 +16,6 @@
 
 #include <algorithm>
 #include <cstdio>
-#include <deque>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -64,11 +63,11 @@ namespace Loom
 		for (const std::string& file : files)
 			m_projectExtensions.Open(file);
 
-		std::deque<ExtensionRegistry::Panel>& panels = ExtensionRegistry::Panels();
+		std::list<ExtensionRegistry::Panel>& panels = ExtensionRegistry::Panels();
 
-		for (size_t index = before; index < panels.size(); index++)
-			if (const auto state = m_panelStates.find(std::string(EditorPanels::IdOf(panels[index].title))); state != m_panelStates.end())
-				panels[index].shown = state->second;
+		for (auto panel = std::next(panels.begin(), before); panel != panels.end(); ++panel)
+			if (const auto state = m_panelStates.find(std::string(EditorPanels::IdOf(panel->title))); state != m_panelStates.end())
+				panel->shown = state->second;
 	};
 
 	void Editor::LoadProjectFile()

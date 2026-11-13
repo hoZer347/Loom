@@ -3,7 +3,6 @@
 #include "ExtensionRegistry.h"
 
 #include <cstdlib>
-#include <deque>
 #include <exception>
 #include <iostream>
 #include <ranges>
@@ -69,6 +68,15 @@ namespace Loom
 #else
 			dlclose(module);
 #endif
+		};
+
+		void RemoveOwnedBy(const void* const owner)
+		{
+			if (owner == nullptr)
+				return;
+
+			std::erase_if(ExtensionRegistry::Panels(), [owner](const ExtensionRegistry::Panel& panel) { return panel.owner == owner; });
+			std::erase_if(ExtensionRegistry::MenuItems(), [owner](const ExtensionRegistry::MenuItem& item) { return item.owner == owner; });
 		};
 
 		unsigned long ProcessId()
@@ -171,32 +179,15 @@ namespace Loom
 		if (entry.abi() != ExtensionAbi)
 			return std::string(other_editor) + ".";
 
-		std::deque<ExtensionRegistry::Panel>& panels = ExtensionRegistry::Panels();
-		std::deque<ExtensionRegistry::MenuItem>& items = ExtensionRegistry::MenuItems();
-		const size_t panelsBefore = panels.size();
-		const size_t itemsBefore = items.size();
-
-		const auto claim = [&]()
-		{
-			for (size_t index = panelsBefore; index < panels.size(); index++)
-				panels[index].owner = module;
-
-			for (size_t index = itemsBefore; index < items.size(); index++)
-				items[index].owner = module;
-		};
-
 		try
 		{
 			entry.start();
 		}
 		catch (const std::exception& error)
 		{
-			panels.erase(panels.begin() + panelsBefore, panels.end());
-			items.erase(items.begin() + itemsBefore, items.end());
+			RemoveOwnedBy(module);
 			return error.what();
 		};
-
-		claim();
 
 		m_loaded.push_back({ module, entry.stop, copy });
 
@@ -221,13 +212,7 @@ namespace Loom
 
 		for (const Loaded& loaded : m_loaded)
 		{
-			if (loaded.module != nullptr)
-			{
-				const void* const owner = loaded.module;
-
-				std::erase_if(ExtensionRegistry::Panels(), [owner](const ExtensionRegistry::Panel& panel) { return panel.owner == owner; });
-				std::erase_if(ExtensionRegistry::MenuItems(), [owner](const ExtensionRegistry::MenuItem& item) { return item.owner == owner; });
-			};
+			RemoveOwnedBy(loaded.module);
 
 			if (loaded.module != nullptr)
 				CloseModule(loaded.module);

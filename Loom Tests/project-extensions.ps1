@@ -47,6 +47,8 @@ $OpenWindowMenu = "click `"$MainMenuBar`" `"Window`""
 $CloseMenu = 'key escape'
 $GlobalPanel = 'F Reload Fixture###Reload Fixture'
 $ProjectPanel = 'F Project Fixture###Project Fixture'
+$GlobalLatePanel = 'F Fixture Late Panel###Fixture Late Panel'
+$ProjectLatePanel = 'F Project Late Panel###Project Late Panel'
 $ProjectDll = 'Project Fixture.dll'
 $RelativeLine = "Extension/$ProjectDll"
 $MissingLine = 'Extension/Nope.dll'
@@ -279,6 +281,8 @@ function Assert-Loaded([string] $When, [bool] $Project)
     Assert-That ((Test-BarHas $ProjectMenu) -eq $Project) "$When, the project extension's menu was not as expected."
     foreach ($menu in $EditorMenus) { Assert-That ((Test-MenuHas $menu $ProjectEditorMenuItem) -eq $Project) "$When, the $menu menu's project item was not as expected." }
 
+    if (-not $Project) { Assert-That (-not (Test-MenuHas 'Window' $ProjectLatePanel)) "$When, a panel the project extension added after it started is still in the Window menu." }
+
     Assert-That (Test-MenuHas 'Window' $GlobalPanel) "$When, the extensions folder's panel is gone."
     Assert-That (Test-MenuHas 'File' $GlobalFileItem) "$When, the extensions folder's File item is gone."
     Assert-That (Test-BarHas 'Fixture Menu') "$When, the extensions folder's menu is gone."
@@ -349,8 +353,14 @@ try
     Assert-Loaded 'Absolute project' $true
     Assert-That (Test-PanelOpen $ProjectPanel) 'A project extension''s panel did not keep its shown state across projects.'
 
+    Invoke-Ui "click `"$MainMenuBar`" `"File`"`nclick `"File`" `"$GlobalFileItem`""
+    Invoke-Ui "click `"$MainMenuBar`" `"File`"`nclick `"File`" `"$ProjectFileItem`""
+    Assert-That (Test-MenuHas 'Window' $GlobalLatePanel) 'Choosing the extensions folder''s File item did not add its late panel.'
+    Assert-That (Test-MenuHas 'Window' $ProjectLatePanel) 'Choosing the project extension''s File item did not add its late panel.'
+
     Switch-Project 'Plain'
     Assert-Loaded 'Plain project' $false
+    Assert-That (Test-MenuHas 'Window' $GlobalLatePanel) 'Unloading the project extension took the extensions folder''s late panel with it.'
 
     Invoke-EditorCommand 'update'
     Wait-Editor { param($id) $id -ne $second } 'restart on the plain project' | Out-Null

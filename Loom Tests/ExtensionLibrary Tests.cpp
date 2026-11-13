@@ -9,10 +9,11 @@
 #include <dlfcn.h>
 #endif
 
-#include <deque>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
+#include <list>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -40,6 +41,31 @@ namespace
 	};
 
 	int stopped = 0;
+	const void* starting_module = nullptr;
+
+	const void* EditorModule()
+	{
+#ifdef _WIN32
+		return GetModuleHandleW(nullptr);
+#else
+		void* const module = dlopen(nullptr, RTLD_NOW);
+		dlclose(module);
+
+		return module;
+#endif
+	};
+
+	void AddOwnedPanel(const char* name)
+	{
+		Loom::ExtensionRegistry::AddPanel("A", name, [](const std::string&) { });
+		Loom::ExtensionRegistry::Panels().back().owner = starting_module;
+	};
+
+	void AddOwnedItem(const char* name)
+	{
+		Loom::ExtensionRegistry::AddMenuItem("File", name, [](const std::string&) { });
+		Loom::ExtensionRegistry::MenuItems().back().owner = starting_module;
+	};
 
 	int RightAbi() { return Loom::ExtensionAbi; };
 	int WrongAbi() { return Loom::ExtensionAbi + 1; };
@@ -49,22 +75,22 @@ namespace
 
 	void AddPanelAndItem()
 	{
-		Loom::ExtensionRegistry::AddPanel("A", "Owned Panel", [](const std::string&) { });
-		Loom::ExtensionRegistry::AddMenuItem("File", "Owned Item", [](const std::string&) { });
+		AddOwnedPanel("Owned Panel");
+		AddOwnedItem("Owned Item");
 	};
 
 	void AddItemAndThrow()
 	{
-		Loom::ExtensionRegistry::AddPanel("A", "Half Panel", [](const std::string&) { });
-		Loom::ExtensionRegistry::AddMenuItem("File", "Half Item", [](const std::string&) { });
+		AddOwnedPanel("Half Panel");
+		AddOwnedItem("Half Item");
 
 		throw std::runtime_error("no");
 	};
 
 	void AddOtherPanelAndItem()
 	{
-		Loom::ExtensionRegistry::AddPanel("A", "Other Panel", [](const std::string&) { });
-		Loom::ExtensionRegistry::AddMenuItem("File", "Other Item", [](const std::string&) { });
+		AddOwnedPanel("Other Panel");
+		AddOwnedItem("Other Item");
 	};
 
 	void* OpenSystemLibrary(const bool first)
@@ -87,7 +113,7 @@ namespace
 
 	void AddPanelAndThrow()
 	{
-		Loom::ExtensionRegistry::AddPanel("A", "Half Started", [](const std::string&) { });
+		AddOwnedPanel("Half Started");
 
 		throw std::runtime_error("no");
 	};
@@ -133,9 +159,9 @@ TEST_SUITE("ExtensionLibrary")
 			[](const std::string&) { },
 			[&updates](const std::string&) { updates++; });
 
-		const std::deque<Loom::ExtensionRegistry::Panel>& panels = Loom::ExtensionRegistry::Panels();
+		const std::list<Loom::ExtensionRegistry::Panel>& panels = Loom::ExtensionRegistry::Panels();
 
-		CHECK_FALSE(panels[panels.size() - 2].update);
+		CHECK_FALSE(std::prev(panels.end(), 2)->update);
 
 		panels.back().update("Project");
 
@@ -182,9 +208,12 @@ TEST_SUITE("ExtensionLibrary")
 	{
 		Loom::ExtensionRegistry::AddPanel("A", "Earlier", [](const std::string&) { });
 
+		int module = 0;
+		starting_module = &module;
+
 		Loom::ExtensionLibrary library;
 
-		CHECK(library.Admit({ RightAbi, AddPanelAndThrow, CountStop }, nullptr, { }) == "no");
+		CHECK(library.Admit({ RightAbi, AddPanelAndThrow, CountStop }, &module, { }) == "no");
 		CHECK(library.Count() == 0);
 
 		REQUIRE(Loom::ExtensionRegistry::Panels().size() == 1);
@@ -253,26 +282,28 @@ TEST_SUITE("ExtensionLibrary")
 			[](const std::string& project) { return !project.empty(); },
 			[](const std::string& project) { return "Tip " + project; });
 
-		const std::deque<Loom::ExtensionRegistry::MenuItem>& items = Loom::ExtensionRegistry::MenuItems();
+		const std::list<Loom::ExtensionRegistry::MenuItem>& items = Loom::ExtensionRegistry::MenuItems();
+		const Loom::ExtensionRegistry::MenuItem& plain = items.front();
+		const Loom::ExtensionRegistry::MenuItem& full = items.back();
 
 		REQUIRE(items.size() == 2);
 
-		CHECK(items[0].menu == "File");
-		CHECK(items[0].name == "Plain");
-		CHECK_FALSE(items[0].enabled);
-		CHECK_FALSE(items[0].tooltip);
-		CHECK(items[0].owner == nullptr);
+		CHECK(plain.menu == "File");
+		CHECK(plain.name == "Plain");
+		CHECK_FALSE(plain.enabled);
+		CHECK_FALSE(plain.tooltip);
+		CHECK(plain.owner == EditorModule());
 
-		items[0].select("Project");
+		plain.select("Project");
 
 		CHECK(selected == "Project");
 
-		CHECK(items[1].menu == "Tools");
-		CHECK(items[1].name == "Full");
-		CHECK(items[1].owner == nullptr);
-		CHECK_FALSE(items[1].enabled(""));
-		CHECK(items[1].enabled("P"));
-		CHECK(items[1].tooltip("P") == "Tip P");
+		CHECK(full.menu == "Tools");
+		CHECK(full.name == "Full");
+		CHECK(full.owner == EditorModule());
+		CHECK_FALSE(full.enabled(""));
+		CHECK(full.enabled("P"));
+		CHECK(full.tooltip("P") == "Tip P");
 	};
 
 	TEST_CASE("menu items keep the order they were added in, apart from panels")
@@ -287,10 +318,23 @@ TEST_SUITE("ExtensionLibrary")
 		CHECK(Loom::ExtensionRegistry::MenuItems().back().name == "Second");
 	};
 
-	TEST_CASE("a started extension's panels and menu items belong to its module")
+	TEST_CASE("an entry belongs to the module its adding call came from")
+	{
+		const ClearRegistry clear;
+
+		Loom::ExtensionRegistry::AddPanel("A", "Before", [](const std::string&) { });
+		Loom::ExtensionRegistry::AddMenuItem("File", "Before Item", [](const std::string&) { });
+
+		REQUIRE(EditorModule() != nullptr);
+		CHECK(Loom::ExtensionRegistry::Panels().back().owner == EditorModule());
+		CHECK(Loom::ExtensionRegistry::MenuItems().back().owner == EditorModule());
+	};
+
+	TEST_CASE("a started extension's entries keep the module their calls named")
 	{
 		const ClearRegistry clear;
 		int module = 0;
+		starting_module = &module;
 
 		Loom::ExtensionRegistry::AddPanel("A", "Before", [](const std::string&) { });
 
@@ -298,28 +342,75 @@ TEST_SUITE("ExtensionLibrary")
 
 		CHECK_FALSE(library.Admit({ RightAbi, AddPanelAndItem, CountStop }, &module, { }).has_value());
 
-		const std::deque<Loom::ExtensionRegistry::Panel>& panels = Loom::ExtensionRegistry::Panels();
+		const std::list<Loom::ExtensionRegistry::Panel>& panels = Loom::ExtensionRegistry::Panels();
 
 		REQUIRE(panels.size() == 2);
 		REQUIRE(Loom::ExtensionRegistry::MenuItems().size() == 1);
 
-		CHECK(panels[0].owner == nullptr);
-		CHECK(panels[1].owner == &module);
-		CHECK(Loom::ExtensionRegistry::MenuItems()[0].owner == &module);
+		CHECK(panels.front().owner == EditorModule());
+		CHECK(panels.back().owner == &module);
+		CHECK(Loom::ExtensionRegistry::MenuItems().front().owner == &module);
 
 		library.Unload();
+	};
+
+	TEST_CASE("a panel added after start leaves with its library, and another library's panel keeps its place")
+	{
+		const ClearRegistry clear;
+
+		void* const first = OpenSystemLibrary(true);
+		void* const second = OpenSystemLibrary(false);
+
+		REQUIRE(first != nullptr);
+		REQUIRE(second != nullptr);
+
+		Loom::ExtensionLibrary one;
+		Loom::ExtensionLibrary two;
+
+		starting_module = first;
+		CHECK_FALSE(one.Admit({ RightAbi, AddPanelAndItem, CountStop }, first, { }).has_value());
+
+		starting_module = second;
+		CHECK_FALSE(two.Admit({ RightAbi, AddOtherPanelAndItem, CountStop }, second, { }).has_value());
+
+		AddOwnedPanel("Late Of Second");
+		const Loom::ExtensionRegistry::Panel* const lateOfSecond = &Loom::ExtensionRegistry::Panels().back();
+		const Loom::ExtensionRegistry::Panel* const otherPanel = &*std::next(Loom::ExtensionRegistry::Panels().begin());
+
+		starting_module = first;
+		AddOwnedPanel("Late Of First");
+		AddOwnedItem("Late Item Of First");
+
+		REQUIRE(Loom::ExtensionRegistry::Panels().size() == 4);
+
+		one.Unload();
+
+		REQUIRE(Loom::ExtensionRegistry::Panels().size() == 2);
+		REQUIRE(Loom::ExtensionRegistry::MenuItems().size() == 1);
+		CHECK(Loom::ExtensionRegistry::MenuItems().front().name == "Other Item");
+		CHECK(&Loom::ExtensionRegistry::Panels().front() == otherPanel);
+		CHECK(&Loom::ExtensionRegistry::Panels().back() == lateOfSecond);
+		CHECK(otherPanel->title == "A Other Panel###Other Panel");
+		CHECK(lateOfSecond->title == "A Late Of Second###Late Of Second");
+
+		two.Unload();
+
+		CHECK(Loom::ExtensionRegistry::Panels().empty());
 	};
 
 	TEST_CASE("a failed start removes only its own panels and menu items")
 	{
 		const ClearRegistry clear;
 
+		int module = 0;
+		starting_module = &module;
+
 		Loom::ExtensionRegistry::AddPanel("A", "Earlier", [](const std::string&) { });
 		Loom::ExtensionRegistry::AddMenuItem("File", "Earlier Item", [](const std::string&) { });
 
 		Loom::ExtensionLibrary library;
 
-		CHECK(library.Admit({ RightAbi, AddItemAndThrow, CountStop }, nullptr, { }) == "no");
+		CHECK(library.Admit({ RightAbi, AddItemAndThrow, CountStop }, &module, { }) == "no");
 
 		REQUIRE(Loom::ExtensionRegistry::Panels().size() == 1);
 		REQUIRE(Loom::ExtensionRegistry::MenuItems().size() == 1);
@@ -342,7 +433,9 @@ TEST_SUITE("ExtensionLibrary")
 		Loom::ExtensionLibrary one;
 		Loom::ExtensionLibrary two;
 
+		starting_module = first;
 		CHECK_FALSE(one.Admit({ RightAbi, AddPanelAndItem, CountStop }, first, { }).has_value());
+		starting_module = second;
 		CHECK_FALSE(two.Admit({ RightAbi, AddOtherPanelAndItem, CountStop }, second, { }).has_value());
 
 		REQUIRE(Loom::ExtensionRegistry::Panels().size() == 3);
@@ -352,9 +445,9 @@ TEST_SUITE("ExtensionLibrary")
 
 		REQUIRE(Loom::ExtensionRegistry::Panels().size() == 2);
 		REQUIRE(Loom::ExtensionRegistry::MenuItems().size() == 1);
-		CHECK(Loom::ExtensionRegistry::Panels()[0].title == "A Unowned###Unowned");
-		CHECK(Loom::ExtensionRegistry::Panels()[1].title == "A Other Panel###Other Panel");
-		CHECK(Loom::ExtensionRegistry::MenuItems()[0].name == "Other Item");
+		CHECK(Loom::ExtensionRegistry::Panels().front().title == "A Unowned###Unowned");
+		CHECK(Loom::ExtensionRegistry::Panels().back().title == "A Other Panel###Other Panel");
+		CHECK(Loom::ExtensionRegistry::MenuItems().front().name == "Other Item");
 
 		two.Unload();
 
