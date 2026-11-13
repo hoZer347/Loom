@@ -2796,6 +2796,8 @@ namespace Loom
 			if (ImGui::MenuItem("Delete", "Delete", false, EditCommands::CanTake(m_selected)))
 				DeleteSelected();
 
+			DrawExtensionMenuItems("Edit", true);
+
 			ImGui::EndMenu();
 		};
 
@@ -2816,7 +2818,7 @@ namespace Loom
 			if (ImGui::MenuItem("Delete", nullptr, false, EditCommands::CanTake(m_selected)))
 				DeleteSelected();
 
-			DrawExtensionMenuItems("Edit", true);
+			DrawExtensionMenuItems("GameObject", true);
 
 			ImGui::EndMenu();
 		};

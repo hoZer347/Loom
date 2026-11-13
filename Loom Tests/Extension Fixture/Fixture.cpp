@@ -49,6 +49,8 @@ namespace
 	constexpr const char* file_item = LOOM_FIXTURE_PREFIX " File Item";
 	constexpr const char* custom_menu = LOOM_FIXTURE_PREFIX " Menu";
 	constexpr const char* custom_item = LOOM_FIXTURE_PREFIX " Custom Item";
+	constexpr const char* editor_menus[] = { "Edit", "GameObject", "Window" };
+	constexpr const char* editor_menu_item = LOOM_FIXTURE_PREFIX " Editor Menu Item";
 
 	bool clicked = false;
 	bool file_used = false;
@@ -80,6 +82,9 @@ LOOM_EXTENSION_EXPORT void LoomExtensionStart()
 #ifndef LOOM_FIXTURE_OLD_API
 	Loom::ExtensionRegistry::AddMenuItem(file_menu, file_item, [](const std::string&) { file_used = true; });
 	Loom::ExtensionRegistry::AddMenuItem(custom_menu, custom_item, [](const std::string&) { custom_used = true; });
+
+	for (const char* menu : editor_menus)
+		Loom::ExtensionRegistry::AddMenuItem(menu, editor_menu_item, [](const std::string&) { });
 #endif
 };
 

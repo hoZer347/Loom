@@ -54,6 +54,8 @@ $GlobalFileItem = 'Fixture File Item'
 $ProjectFileItem = 'Project File Item'
 $ProjectMenu = 'Project Menu'
 $ProjectCustomItem = 'Project Custom Item'
+$ProjectEditorMenuItem = 'Project Editor Menu Item'
+$EditorMenus = 'Edit', 'GameObject', 'Window'
 $ProjectFileUsed = 'Project File Item Used'
 $ProjectCustomUsed = 'Project Custom Item Used'
 $OpenDialog = 'Open Project##filebrowser'
@@ -275,6 +277,7 @@ function Assert-Loaded([string] $When, [bool] $Project)
     Assert-That ($listed -eq $Project) "$When, the Window menu $(if ($listed) { 'has' } else { 'lacks' }) the project extension's panel."
     Assert-That ((Test-MenuHas 'File' $ProjectFileItem) -eq $Project) "$When, the File menu's project item was not as expected."
     Assert-That ((Test-BarHas $ProjectMenu) -eq $Project) "$When, the project extension's menu was not as expected."
+    foreach ($menu in $EditorMenus) { Assert-That ((Test-MenuHas $menu $ProjectEditorMenuItem) -eq $Project) "$When, the $menu menu's project item was not as expected." }
 
     Assert-That (Test-MenuHas 'Window' $GlobalPanel) "$When, the extensions folder's panel is gone."
     Assert-That (Test-MenuHas 'File' $GlobalFileItem) "$When, the extensions folder's File item is gone."
