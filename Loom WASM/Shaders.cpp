@@ -1320,8 +1320,10 @@ vec3 LoomSceneNormal(ivec2 pixel)
 		const std::string vertex = common + (has_vertex ? sections[ShaderType::VERTEX].str() : EngineCode(DEFAULT_VERTEX));
 		const std::string fragment = common + sections[ShaderType::FRAGMENT].str();
 
-		stages.vertex = settings.shading ? ShadedVertex(vertex, settings.shadows) : vertex;
-		stages.fragment = settings.shading ? ShadedFragment(fragment, settings.shadows) : fragment;
+		const bool shaded = settings.shading && !Light::CallsLight(fragment);
+
+		stages.vertex = shaded ? ShadedVertex(vertex, settings.shadows) : vertex;
+		stages.fragment = shaded ? ShadedFragment(fragment, settings.shadows) : fragment;
 
 		if (settings.shadows)
 		{

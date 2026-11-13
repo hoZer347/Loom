@@ -340,4 +340,18 @@ TEST_SUITE("Light")
 		CHECK(Loom::Light::FragmentLibrary("c = MyLoomLight(n, l);").empty());
 		CHECK(Loom::Light::FragmentLibrary("// LoomLight is not called here").empty());
 	};
+
+	TEST_CASE("a fragment stage calls the light only by a whole LoomLight followed by a call")
+	{
+		CHECK(Loom::Light::CallsLight("c = LoomLight(n, l);"));
+		CHECK(Loom::Light::CallsLight("c = LoomLight (n, l);"));
+		CHECK(Loom::Light::CallsLight("c = LoomLight\n\t(n, l);"));
+
+		CHECK_FALSE(Loom::Light::CallsLight("c = MyLoomLight(n, l);"));
+		CHECK_FALSE(Loom::Light::CallsLight("c = LoomLightX(n, l);"));
+		CHECK_FALSE(Loom::Light::CallsLight("// LoomLight is not called here"));
+		CHECK_FALSE(Loom::Light::CallsLight("s = LoomShadow(l);"));
+		CHECK_FALSE(Loom::Light::CallsLight("v = LoomLightSpace(world);"));
+		CHECK_FALSE(Loom::Light::CallsLight("void main() { gl_Position = vec4(0.0); }"));
+	};
 };

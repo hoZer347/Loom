@@ -287,6 +287,60 @@ namespace
 		return furthest;
 	};
 
+	// The same plane under a light shining up through it, turned from the light,
+	// so all it gets is the ambient.
+	std::string TurnedPlane(const std::string& settings, const std::string& fragment)
+	{
+		return
+			"// ===SETTINGS===\n" + settings +
+			"// ===VERTEX===\n"
+			"layout(location = 0) in vec3 aPos;\n"
+			"uniform mat4 u_model;\n"
+			"uniform mat4 u_viewProjection;\n"
+			"void main() { gl_Position = u_viewProjection * u_model * vec4(aPos, 1.0); }\n"
+			"// ===FRAGMENT===\n"
+			"out vec4 FragColor;\n" + fragment;
+	};
+
+	const std::string SELF_LIT = "void main() { FragColor = vec4(vec3(1.0) * LoomLight(vec3(0.0, 1.0, 0.0)), 1.0); }\n";
+	const std::string NOT_LIT = "void main() { FragColor = vec4(1.0); }\n";
+
+	glm::u8vec3 TurnedPlaneColour(RenderFixture& fixture, const std::string& name, const std::string& source)
+	{
+		const ClearedTo cleared(CLEAR);
+
+		constexpr glm::vec3 POSITION(0.0f, 2.0f, 2.0f);
+		constexpr glm::vec3 ROTATION(-45.0f, 0.0f, 0.0f);
+		constexpr glm::vec3 DIRECTION(0.0f, 1.0f, -0.2f);
+
+		std::istringstream stream(source);
+		Loom::Shader shader(name, stream);
+
+		Loom::Scene scene(name);
+		Pump();
+
+		Loom::GameObject* sun = scene.AddChild("Sun");
+		Loom::GameObject* eye = scene.AddChild("Camera");
+		Loom::GameObject* plane = scene.AddChild("Plane");
+		Pump();
+
+		sun->Attach<Loom::Light>();
+		sun->transform.rotation = Loom::Light::RotationAlong(DIRECTION);
+		Loom::Camera* camera = eye->Attach<Loom::Camera>();
+		eye->transform.position = POSITION;
+		eye->transform.rotation = ROTATION;
+		plane->Attach<Loom::Material>()->shader = &shader;
+		Loom::EditableMesh::Plane(CONTACT_PLANE_SIZE).WriteTo(*plane->Attach<Loom::Mesh>());
+		Pump();
+
+		const Image image = fixture.Frame();
+		const glm::ivec2 pixel = PixelOf(*camera, image, glm::vec3(0.0f));
+
+		image.Save(name);
+
+		return image.At(pixel.x, pixel.y);
+	};
+
 	void CheckOneSidedCaster(RenderFixture& fixture, const std::string& backend)
 	{
 		const ClearedTo cleared(CLEAR);
@@ -561,6 +615,32 @@ TEST_SUITE("Render")
 		CHECK(std::string(bytes.begin(), bytes.begin() + SIGNATURE.size()) == SIGNATURE);
 		CHECK(BigEndian(bytes, WIDTH_AT) == (uint32_t)image.width);
 		CHECK(BigEndian(bytes, HEIGHT_AT) == (uint32_t)image.height);
+	};
+
+	#pragma endregion
+
+	#pragma region Self-Lit Shading
+
+	TEST_CASE_FIXTURE(RenderFixture, "a shader that lights itself renders the same with shading on as off, lit once")
+	{
+		const glm::u8vec3 off = TurnedPlaneColour(*this, "Render - self-lit, shading off", TurnedPlane("shading = off\n", SELF_LIT));
+		const glm::u8vec3 on = TurnedPlaneColour(*this, "Render - self-lit, shading on", TurnedPlane("shading = on\n", SELF_LIT));
+
+		CHECK(on == off);
+		CHECK(on != CLEARED);
+		CHECK(on.r > 0);
+		CHECK(on.r < 255);
+	};
+
+	TEST_CASE_FIXTURE(RenderFixture, "a shader that does not light itself is lit by the engine with shading on, and not with it off")
+	{
+		const glm::u8vec3 off = TurnedPlaneColour(*this, "Render - not lit, shading off", TurnedPlane("shading = off\n", NOT_LIT));
+		const glm::u8vec3 on = TurnedPlaneColour(*this, "Render - not lit, shading on", TurnedPlane("shading = on\n", NOT_LIT));
+		const glm::u8vec3 selfLit = TurnedPlaneColour(*this, "Render - self-lit, for comparison", TurnedPlane("shading = on\n", SELF_LIT));
+
+		CHECK(off == WHITE);
+		CHECK(on.r < off.r);
+		CHECK(on == selfLit);
 	};
 
 	#pragma endregion

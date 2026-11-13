@@ -316,6 +316,34 @@ TEST_SUITE("Shader")
 		CHECK(stages.shadowFragment.find("void main()") != std::string::npos);
 	};
 
+	TEST_CASE("a fragment stage that calls LoomLight is not shaded a second time")
+	{
+		const std::string selfLit = "// ===FRAGMENT===\nout vec4 FragColor;\nvoid main() { FragColor = vec4(vec3(1.0) * LoomLight(vec3(0.0, 1.0, 0.0)), 1.0); }\n";
+
+		for (const std::string extra : { "", "shadows = on\n" })
+		{
+			INFO("settings: ", extra);
+
+			const Loom::Shader::Stages on = Loom::Shader::Assemble("// ===SETTINGS===\nshading = on\n" + extra + VERTEX + selfLit);
+			const Loom::Shader::Stages off = Loom::Shader::Assemble("// ===SETTINGS===\nshading = off\n" + extra + VERTEX + selfLit);
+
+			CHECK(on.vertex == off.vertex);
+			CHECK(on.fragment == off.fragment);
+			CHECK(on.vertex.find("loom_main") == std::string::npos);
+			CHECK(on.fragment.find("loom_main") == std::string::npos);
+			CHECK(on.vertex.find("loom_World") == std::string::npos);
+			CHECK(on.fragment.find("loom_World") == std::string::npos);
+		};
+	};
+
+	TEST_CASE("a fragment stage that does not call LoomLight is still lit by the engine")
+	{
+		const Loom::Shader::Stages stages = Loom::Shader::Assemble("// ===SETTINGS===\nshading = on\n" + VERTEX + FRAGMENT);
+
+		CHECK(stages.fragment.find("FragColor.rgb *= LoomLight(") != std::string::npos);
+		CHECK(stages.vertex.find("loom_main") != std::string::npos);
+	};
+
 	TEST_CASE("a transparent shader's shadow pass runs its fragment stage and dithers out by its alpha")
 	{
 		const std::string source = "// ===SETTINGS===\nshading = on\nshadows = on\ntransparency = on\n" + FRAGMENT;

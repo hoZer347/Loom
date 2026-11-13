@@ -402,6 +402,11 @@ vec3 LoomLight(vec3 normal)
 		return Calls(source, { "LoomLightSpace" }) ? LIGHT_SPACE_LIBRARY : "";
 	};
 
+	bool Light::CallsLight(const std::string& source)
+	{
+		return Calls(source, { "LoomLight" });
+	};
+
 	std::string Light::FragmentLibrary(const std::string& source)
 	{
 		return VertexLibrary(source) + (Calls(source, { "LoomShadow", "LoomLight" }) ? FRAGMENT_LIBRARY : "");

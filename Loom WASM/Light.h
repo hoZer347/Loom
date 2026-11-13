@@ -27,7 +27,9 @@ namespace Loom
 	*   without one, Light::ApplyNone stands in, and a lit shader shows its
 	*   colour flat
 	* - A shader with shading on has the engine light it (see ShaderSettings);
-	*   one with it off can still light itself with the functions below
+	*   one with it off can still light itself with the functions below.
+	*   A fragment stage that calls LoomLight already lights itself, so shading
+	*   leaves it be and it is lit once, as with shading off
 	* - The shadow map covers a box of shadowExtent either side of shadowCenter,
 	*   seen along Direction; geometry outside it is lit
 	* - It shines along its GameObject's -Z, the way a Camera looks, so the
@@ -83,6 +85,9 @@ namespace Loom
 		// LoomLightSpace too.
 		static std::string VertexLibrary(const std::string& source);
 		static std::string FragmentLibrary(const std::string& source);
+
+		// Whether the stage calls LoomLight, so it lights itself.
+		static bool CallsLight(const std::string& source);
 
 		// The light the scene being rendered is lit by, for as long as
 		// Scene::Render is drawing it.

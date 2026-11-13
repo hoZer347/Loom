@@ -46,7 +46,8 @@ namespace Loom
 	struct ShaderSettings
 	{
 		// Lit by the scene's light: ambient plus diffuse, multiplied into the
-		// colour the fragment stage writes.
+		// colour the fragment stage writes. A fragment stage that calls
+		// LoomLight lights itself, so it is left as written, as with shading off.
 		bool shading = false;
 
 		// Drawn into the light's shadow map by a second program built from the
